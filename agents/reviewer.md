@@ -121,6 +121,39 @@ All PR data (metadata, diff, file list) is provided inline by the orchestrator. 
 
 Review the diff against these categories:
 
+### Reviewability Assessment
+
+Compute a Reviewability score as the very first thing you do — it tells the human reviewer *whether to invest now* before they read a single line. The block goes at the top of `review_body` (in Spanish), before "Evaluación del Objetivo".
+
+**Inputs:**
+- `additions` and `deletions` from PR metadata (sum = `lines_changed`)
+- `changedFiles` count
+- For each changed source file: count functions / methods that exceed 40 lines, 4 parameters, or 3 levels of nesting (use Grep + judgement on the Read output; do NOT count tests or generated code)
+- Detect refactor + feature mixing: scan commit messages and the diff for renamed symbols / moved files combined with new behaviour in the same commit
+
+**Score:**
+
+| Reviewability | Conditions |
+|---|---|
+| **alta** | ≤ 200 lines AND ≤ 4 files AND 0 functions over caps AND no refactor+feature mixing |
+| **media** | 200-400 lines OR 4-8 files OR 1-2 functions over caps OR minor refactor+feature mixing |
+| **baja** | > 400 lines OR > 8 files OR 3+ functions over caps OR significant refactor+feature mixing |
+
+**Estimated review time** (for the human, not the agent): low → 5-10 min, media → 15-30 min, baja → 30-90 min.
+
+**Top of `review_body` format (Spanish):**
+
+```markdown
+**Reviewability:** {alta|media|baja}
+- Tamaño: {N} líneas en {M} archivos
+- Funciones que exceden umbrales (40 líneas / 4 params / 3 niveles de anidación): {lista corta o "ninguna"}
+- Mezcla refactor + feature: {sí/no}
+- Tiempo estimado de revisión: {N} min
+{if baja: "_Recomendación: dividir en varios PRs antes de revisar línea por línea — riesgo alto de revisar mal._"}
+```
+
+This is informational, not a verdict. It does NOT change `event` (`APPROVE` / `REQUEST_CHANGES`) — that decision still depends on critical findings. A clean diff with low reviewability still merges; a tiny diff with one critical still gets `REQUEST_CHANGES`.
+
 ### Goal Assessment
 - **Does this PR accomplish what it says?** Compare the PR title/body against the actual diff — is the stated goal reflected in the changes?
 - **Does it satisfy linked issue requirements?** If a linked issue exists, verify the diff addresses what the issue describes.
@@ -224,6 +257,13 @@ Format the review body as:
 **Resultado:** APROBADO / CAMBIOS SOLICITADOS
 **Archivos revisados:** {N}
 **Adiciones:** +{N} | **Eliminaciones:** -{N}
+
+**Reviewability:** {alta|media|baja}
+- Tamaño: {N} líneas en {M} archivos
+- Funciones que exceden umbrales (40 líneas / 4 params / 3 niveles): {lista o "ninguna"}
+- Mezcla refactor + feature: {sí/no}
+- Tiempo estimado de revisión: {N} min
+{if baja: "_Recomendación: dividir en varios PRs antes de revisar línea por línea — riesgo alto de revisar mal._"}
 
 ### Problemas Criticos
 - `file.ts:42` — {descripcion completa y solucion sugerida}
