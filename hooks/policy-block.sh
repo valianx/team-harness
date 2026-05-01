@@ -23,13 +23,13 @@ tool = payload.get("tool_name", "")
 tool_input = payload.get("tool_input", {})
 
 DENIED_BASH = [
-    (r"\brm\s+\S*[rR]\S*[fF]\S*\s+(/|~|\$\{?HOME\}?)(\s|$)",
+    (r"\brm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?(/|~|\$\{?HOME\}?)(\s|$)",
      "rm -rf targeting / ~ or HOME"),
-    (r"\brm\s+\S*[fF]\S*[rR]\S*\s+(/|~|\$\{?HOME\}?)(\s|$)",
+    (r"\brm\s+\S*[fF]\S*[rR]\S*\s+(?:--\s+)?(/|~|\$\{?HOME\}?)(\s|$)",
      "rm -fr targeting / ~ or HOME"),
-    (r"\brm\s+-r\b.*\s+-f\b.*\s+(/|~|\$\{?HOME\}?)(\s|$)",
+    (r"\brm\s+-r\b.*\s+-f\b.*\s+(?:--\s+)?(/|~|\$\{?HOME\}?)(\s|$)",
      "rm -r -f targeting / ~ or HOME"),
-    (r"\brm\s+\S*[rR]\S*[fF]\S*\s+\*(\s|$)",
+    (r"\brm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?\*(\s|$)",
      "rm -rf with bare wildcard"),
     (r"git\s+push\s+(?:[^|]*\s)?(-f\b|--force\b|--force-with-lease)",
      "git push --force"),

@@ -112,8 +112,11 @@ All commands run from the repo root.
 | Import a shared KG JSON | `uv run --directory chromadb-mcp/ python import.py shared-knowledge/<file>.json` |
 | Migrate from legacy Memory MCP | `uv run chromadb-mcp/migrate_knowledge.py --source ~/.claude/knowledge.json` |
 | Validate agents/skills health | `/lint` inside Claude Code |
+| Run the verification suite (policy-block + structure) | `bash tests/run-all.sh` |
+| Run only the policy-block functional tests | `bash tests/test_policy_block.sh` |
+| Run only the agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |
 
-**Not applicable to this repo:** lint, typecheck, unit test, integration test, e2e, build, dev server, migrations, deploy. The repo ships declarative assets, an installer, and one MCP server — no code pipeline.
+**Not applicable to this repo:** typecheck, unit test of agent prompt behaviour, integration test of the live pipeline, e2e, build, dev server, migrations, deploy. The repo ships declarative assets, an installer, and one MCP server — no code pipeline. The `tests/` suite covers the **two surfaces that ARE testable without a live LLM**: `hooks/policy-block.sh` (functional, ~48 cases) and the structural integrity of the agent / skill / hook `.md` and `.json` files (cross-references, mandatory sections, frontmatter fields, ~98 assertions). It does NOT validate prompt behaviour — that still requires running pipelines through Claude Code.
 
 ---
 
@@ -142,7 +145,16 @@ All commands run from the repo root.
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 
 ## 9. Testing Conventions
-<!-- Populated by the delivery agent after each feature. Empty at init. -->
+
+The repo has a verification suite at `tests/` that covers what is testable without a live LLM:
+
+- **`tests/test_policy_block.sh`** — functional tests for `hooks/policy-block.sh`. Each case feeds a tool-call JSON payload and asserts the output (deny → JSON with `permissionDecision: "deny"`; allow → empty stdout). ~48 cases: `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), git destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL DROP/TRUNCATE, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
+- **`tests/test_agent_structure.py`** — structural tests across `agents/`, `skills/`, `hooks/`. ~98 assertions in 11 suites covering tool allowlists per agent, the 5-column Roster matrix, the new pipeline phases (1.5 / 2.5 / 3.5 / 3.6 / 4.5), the `tester` / `qa` / `reviewer` / `implementer` / `delivery` contracts, the `PreToolUse` wiring across windows/macos/linux, and the README cross-references.
+- **`tests/run-all.sh`** — wrapper that runs both suites and exits 0 if all pass.
+
+**When to add a test.** Any new pattern in `policy-block.sh` (new denylist or allowlist case) MUST be backed by an `assert_deny` / `assert_allow` line. Any new pipeline phase, new agent contract field, or new mandatory section MUST be backed by a `check(...)` line in the appropriate suite of `test_agent_structure.py`. Both files are append-only by design — refactor an assertion only when the assertion itself is wrong.
+
+**What the tests do NOT cover.** Agent prompt behaviour (whether Claude actually applies the implementer's `Reviewability self-check` is a behavioural question), hook integration with Claude Code (whether the harness invokes `policy-block.sh` on every Bash/Write/Edit/NotebookEdit depends on `~/.claude/settings.json`), and live pipeline runs (Phase 2.5 / 4.5 only fire inside a real pipeline). For those, restart Claude Code and smoke-test by hand.
 
 ---
 

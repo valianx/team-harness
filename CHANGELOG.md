@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (verification suite for harness changes)
+
+- **`tests/` folder.** First test suite for the repo. Covers the two surfaces that are testable without a live LLM: `hooks/policy-block.sh` (functional) and the structural integrity of the agent / skill / hook `.md` / `.json` files (cross-references, mandatory sections, frontmatter fields).
+  - `tests/test_policy_block.sh` — ~48 cases over `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), `git` destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL `DROP`/`TRUNCATE`, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
+  - `tests/test_agent_structure.py` — ~98 assertions across 11 suites: tool allowlists per agent, the 5-column Roster matrix, new pipeline phases (1.5 / 2.5 / 3.5 / 3.6 / 4.5), the `tester` / `qa` / `reviewer` / `implementer` / `delivery` contracts, the `PreToolUse` wiring across windows/macos/linux, README cross-references.
+  - `tests/run-all.sh` — wrapper, exit 0 iff all suites pass.
+  - CLAUDE.md § 4 Golden Commands and § 9 Testing Conventions updated with how to run and what's covered.
+
+### Fixed
+
+- **`hooks/policy-block.sh` regex now matches `rm -rf -- /` and `rm -rf -- ~`.** The previous patterns required the destructive target to follow `rm -rf` directly; users who write `rm -rf -- /` (POSIX option terminator) bypassed the gate. Patterns updated to allow an optional `-- ` between the flags and the target. Caught by the new functional tests.
+
 ### Added (harness hardening — capability scoping, tracing, gates)
 
 - **Tool allowlist per agent (capability scoping).** Every agent's frontmatter now declares a `tools:` allowlist, the runtime restricts the agent to that set. Read-only auditors (`architect`, `security`, `qa`, `acceptance-checker`) lose `Bash` entirely so they cannot mutate the host even by accident. Builders keep `Bash` but the harness gates destructive commands at `PreToolUse` (next entry). `agents/README.md` Roster table is now a 5-column matrix (Model + Effort + Tools + Role); a new "Earn the tools" principle joins "Earn the model and effort". Implements Anthropic's *"permission surface = agency boundary"*.
