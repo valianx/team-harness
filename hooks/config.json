@@ -1,11 +1,23 @@
 {
-  "_comment": "Copy the 'hooks' section for your OS into ~/.claude/settings.json. Default is quiet: notifications fire only when Claude needs your input or a tool fails. To also be notified when Claude finishes a turn, see the opt-in 'Stop' snippet in hooks/README.md.",
+  "_comment": "Copy the 'hooks' section for your OS into ~/.claude/settings.json. Default is quiet: notifications fire only when Claude needs your input or a tool fails. Plus a PreToolUse policy gate that blocks destructive commands and writes to sensitive files. To also be notified when Claude finishes a turn, see the opt-in 'Stop' snippet in hooks/README.md.",
 
   "windows": {
-    "_requires": "powershell.exe (included in Windows)",
-    "_script": "notify-windows.sh",
-    "_events": "Notification + PostToolUseFailure",
+    "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
+    "_scripts": "notify-windows.sh, policy-block.sh",
+    "_events": "PreToolUse + Notification + PostToolUseFailure",
     "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|Write|Edit|NotebookEdit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/policy-block.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
       "Notification": [
         {
           "matcher": "idle_prompt|permission_prompt",
@@ -34,10 +46,22 @@
   },
 
   "macos": {
-    "_requires": "osascript (included in macOS)",
-    "_script": "notify-mac.sh",
-    "_events": "Notification + PostToolUseFailure",
+    "_requires": "osascript (included in macOS) + python3",
+    "_scripts": "notify-mac.sh, policy-block.sh",
+    "_events": "PreToolUse + Notification + PostToolUseFailure",
     "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|Write|Edit|NotebookEdit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/policy-block.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
       "Notification": [
         {
           "matcher": "idle_prompt|permission_prompt",
@@ -66,10 +90,22 @@
   },
 
   "linux": {
-    "_requires": "libnotify (notify-send)",
-    "_script": "notify-linux.sh",
-    "_events": "Notification + PostToolUseFailure",
+    "_requires": "libnotify (notify-send) + python3",
+    "_scripts": "notify-linux.sh, policy-block.sh",
+    "_events": "PreToolUse + Notification + PostToolUseFailure",
     "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|Write|Edit|NotebookEdit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/policy-block.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
       "Notification": [
         {
           "matcher": "idle_prompt|permission_prompt",

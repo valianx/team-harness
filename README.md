@@ -87,7 +87,7 @@ The full canonical roster (with model + effort matrix) lives in [`agents/README.
 
 Slash-commands that route into the orchestrator (except the standalone utilities `/lint`, `/status`, `/memory`, `/tmux`, `/kg-viewer`):
 
-`/issue`, `/plan`, `/design`, `/research`, `/spike`, `/test`, `/test-pipeline`, `/validate`, `/define-ac`, `/security`, `/audit`, `/review-pr`, `/deliver`, `/diagram`, `/likec4-diagram`, `/d2-diagram`, `/translate`, `/init`, `/recover`, `/eval`, `/gcp-costs`, `/cross-repo`, plus the standalone utilities above.
+`/issue`, `/plan`, `/design`, `/research`, `/spike`, `/test`, `/test-pipeline`, `/validate`, `/define-ac`, `/security`, `/audit`, `/review-pr`, `/deliver`, `/diagram`, `/likec4-diagram`, `/d2-diagram`, `/translate`, `/init`, `/recover`, `/eval`, `/gcp-costs`, `/cross-repo`, plus the standalone utilities above and `/background` (fire-and-forget dispatch for trivially scoped tasks; eligibility-gated, does not invoke the orchestrator).
 
 ### Hooks (`hooks/`)
 

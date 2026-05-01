@@ -24,7 +24,7 @@ The top level also contains a one-file `<name>.md` sibling for each complex skil
 ## Routing
 
 - **Routes to orchestrator** (default for pipeline work): `/issue`, `/plan`, `/design`, `/research`, `/spike`, `/test`, `/test-pipeline`, `/validate`, `/define-ac`, `/security`, `/audit`, `/review-pr`, `/deliver`, `/diagram`, `/likec4-diagram`, `/d2-diagram`, `/translate`, `/init`, `/recover`, `/eval`, `/gcp-costs`, `/cross-repo`.
-- **Standalone** (no orchestrator involvement): `/lint`, `/status`, `/memory`, `/tmux`, `/kg-viewer`.
+- **Standalone** (no orchestrator involvement): `/lint`, `/status`, `/memory`, `/tmux`, `/kg-viewer`, `/background`.
 
 ## Adding a simple skill
 

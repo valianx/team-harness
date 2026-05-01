@@ -9,6 +9,7 @@ OS-native notification scripts plus the `config.json` template that wires them i
 | `notify-windows.sh` | Windows toast notification via PowerShell. |
 | `notify-mac.sh` | macOS notification via `osascript`. |
 | `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). |
+| `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). |
 | `config.json` | Per-OS hook template — copy the section for your OS into `~/.claude/settings.json`. |
 
 All scripts are Bash and cross-platform:
@@ -40,10 +41,38 @@ The default set is deliberately **quiet** — only high-signal events:
 
 | Event | When it fires | Why it's in the default set |
 |---|---|---|
+| `PreToolUse` | Before any `Bash`, `Write`, `Edit`, or `NotebookEdit` invocation. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. |
 | `Notification` | Matcher `idle_prompt\|permission_prompt` — Claude is waiting for input. | High signal: you need to act for Claude to continue. |
 | `PostToolUseFailure` | A tool invocation failed. | Rare and important: something broke, worth looking. |
 
 `Stop` (Claude finished its turn) is **not** in the default on purpose — it fires on every response, which becomes dozens of notifications a day in active back-and-forth work.
+
+## Policy gate (`policy-block.sh`)
+
+The `PreToolUse` hook routes through `policy-block.sh`. It reads the tool call JSON from stdin, evaluates it against a denylist, and returns a hook decision that either lets the call proceed (default) or blocks it with a clear reason.
+
+**What it blocks (Bash):**
+- `rm -rf` (in any flag order, case-insensitive) targeting `/`, `~`, `$HOME`, or a bare wildcard `*`.
+- `git push --force`, `git push -f`, `git push --force-with-lease`.
+- `git reset --hard`.
+- `git clean -f` (any variant).
+- `git commit / rebase / push --no-verify` (bypasses pre-commit hooks).
+- Destructive SQL through shell: `DROP TABLE/DATABASE/SCHEMA`, `TRUNCATE TABLE`.
+
+**What it blocks (Write / Edit / NotebookEdit):**
+- Writes to `.env`, `.env.<anything>` (except `.example`, `.sample`, `.template`).
+- `*.pem`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`.
+- Anything under `.ssh/`.
+- `.aws/credentials`, `.aws/config`.
+- `credentials.json`, `secrets.{yaml,yml,json,toml}`.
+
+**What it does NOT do:**
+- It is not a sandbox. A determined LLM can obfuscate its way around (e.g., split `rm -rf /` across variables). The point is to catch accidents and force visibility on intent — the reviewer remains the last line of defense.
+- It does not read files or call external services. The check is purely pattern-matching on the tool call.
+
+**Bypassing for a specific case.** If you genuinely need a denied command (e.g., a one-off cleanup script), run it manually outside Claude. Editing `policy-block.sh` to scope an exception is also fine, but commit the exception so the rest of the team sees it.
+
+**Performance.** The script runs in single-digit milliseconds (one Python process, regex match). Timeout is 5s.
 
 ## Opt-in: notify when Claude finishes a turn
 

@@ -4,6 +4,7 @@ description: Designs and implements test suites for any project type (backend, f
 model: sonnet
 effort: medium
 color: red
+tools: Read, Edit, Write, Bash, Glob, Grep
 ---
 
 You are an expert testing engineer. You design and implement comprehensive test suites for any project type — backend, frontend, or fullstack — adapting to the project's existing test framework and conventions.
@@ -532,8 +533,16 @@ agent: tester
 status: success | failed | blocked
 output: session-docs/{feature-name}/03-testing.md
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}
+tests_count: {N}
+tests_deleted: {N}
+tests_deleted_reason: {one-line justification if tests_deleted > 0; otherwise omit this field}
 issues: {list of failing tests, or "none"}
 ```
+
+**Field semantics:**
+- `tests_count` — total individual test cases after this iteration (sum of `it()` / `test()` blocks across the suite, or your framework's equivalent). Count cases, not files.
+- `tests_deleted` — number of test cases removed this iteration. **Default: 0.**
+- `tests_deleted_reason` — required only when `tests_deleted > 0`. Examples that pass the orchestrator's test-ratchet gate: "obsolete tests for removed feature X", "duplicate tests consolidated into shared factory", "tests covered scenarios reverted by user request". Examples that FAIL the gate: "tests were broken", "tests were flaky", "couldn't make them pass" — these are NOT valid reasons to delete tests, fix the underlying issue instead.
 
 Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
