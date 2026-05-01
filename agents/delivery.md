@@ -377,6 +377,29 @@ Build the AC traceability matrix from `00-task-intake.md`, `03-testing.md`, `04-
 
 This file becomes part of the PR body in Step 11.2. Stage it together with the other delivery artifacts in Step 10.0 (`git add session-docs/{feature-name}/acceptance-matrix.md`).
 
+### Step 9d — Reviewability size gate
+
+Before staging files, check the diff size against the human-reviewer caps. Cognition reported merge rate drops sharply on large PRs and the team's experience confirms it: PRs above ~400 lines or ~8 files get either rubber-stamped or stuck in review.
+
+```bash
+diff_lines=$(git diff origin/main...HEAD --stat | tail -1 | awk '{print $4 + $6}')
+diff_files=$(git diff origin/main...HEAD --name-only | wc -l)
+```
+
+| Condition | Action |
+|---|---|
+| `diff_lines ≤ 400` AND `diff_files ≤ 8` | Pass. Proceed to Step 10. |
+| `diff_lines > 400` OR `diff_files > 8` | Read the implementer's `02-implementation.md` for any `## Reviewability Exceptions` block. If the implementer documented why the size is justified (cross-cutting refactor, generated code, large config table that cannot be split), proceed but flag it in the PR body under "Size justification" (Step 11.2). Otherwise abort with `status: failed` and message: "Diff is {N} lines across {M} files but no reviewability justification was provided in 02-implementation.md. Either split the change into multiple PRs (preferred) or add a Reviewability Exceptions section explaining why the size is necessary." |
+| `diff_lines > 1000` OR `diff_files > 20` | Always abort regardless of justification — no diff this large is genuinely review-friendly. Report to the user with a suggested split strategy: refactor commits first, then feature commits, each as its own PR. |
+
+When the gate flags but is overridden by a justification, capture it for the PR body:
+
+```bash
+size_justification=$(awk '/^## Reviewability Exceptions/,/^## /' session-docs/{feature-name}/02-implementation.md | sed '$d')
+```
+
+This becomes the "Size justification" section embedded in the PR body in Step 11.2.
+
 ### Step 10 — Commit and push
 
 **Step 10.0 — Stage delivery files:**
@@ -447,6 +470,8 @@ gh pr list --head {branch-name} --base main --state all --json number,url,title,
 
 **Step 11.2 — Create the PR:**
 
+The PR body MUST include every section listed below, in this order. Sections marked **mandatory** appear on every PR; sections marked **conditional** appear only when applicable. The goal is that the human reviewer arrives, reads top-to-bottom, and knows what to focus on without needing to context-switch.
+
 ```
 gh pr create --base main \
   --title "{type}({feature_name}): {short summary}" \
@@ -456,55 +481,63 @@ gh pr create --base main \
   --body "$(cat <<'EOF'
 Closes #{number}
 
-## Summary
-- {bullet points of what was done}
+## Main change (mandatory)
+{1-2 sentences in the user's voice — what does this PR DO from the user's perspective? Not "implements JWT", but "users now stay logged in for 30 days with rotating refresh tokens".}
 
-## Changes
-- {files changed}
+## File map (mandatory)
+Group changed files by intent so the reviewer can navigate by purpose:
+- **Entry points / new public surface:** `{file}` ({1-line role})
+- **Core logic:** `{file}` ({role})
+- **Tests:** `{file}` ({role})
+- **Config / docs:** `{file}` ({role})
 
-## Tests
-- {test results: total / passed / coverage if available}
+## How to review (mandatory)
+Suggested reading order, optimised for the reviewer's mental model:
+1. Start with `{entry-point file}` to see the public surface.
+2. Then `{core-logic file}` for the implementation.
+3. Then `{test file}` to confirm the contract is exercised.
+4. Skim the rest.
 
-## Acceptance Matrix
+## Risk and blast radius (mandatory)
+- **Risk level:** low | medium | high — {one-line justification}
+- **Blast radius:** {what could break if this is wrong, e.g. "auth on /api/* — every authenticated endpoint would 401"}
+- **Rollback plan:** {one line — usually "revert the merge commit"}
+
+## Before / after (conditional — include when behaviour visibly changes)
+- **Before:** {observable behaviour before this PR}
+- **After:** {observable behaviour after this PR}
+
+## Acceptance Matrix (mandatory)
 {paste the table from session-docs/{feature-name}/acceptance-matrix.md}
 
-## Definition of Done
+## Definition of Done (mandatory)
 - [x] Lint: {command} → PASS
 - [x] Type check: {command} → PASS
 - [x] Tests: {command} → PASS ({N} passed)
 - [x] Build: {command} → PASS  (or "n/a" if no build step)
 
-## Version
+## Pre-PR Review (conditional — present only if Phase 4.5 ran)
+{paste the summary block from session-docs/{feature-name}/04-internal-review.md, or omit this section entirely if 04-internal-review.md does not exist}
+
+## Size justification (conditional — present only if Step 9d flagged the diff)
+{paste the size_justification captured in Step 9d, or omit this section entirely if the diff was within the 400 lines / 8 files caps}
+
+## Version (mandatory)
 - {old} → {new}
 EOF
 )"
 ```
 
+**Section omission rules:** sections marked **conditional** are omitted entirely (heading and content) when not applicable. Do NOT leave empty section headings. The reviewer reads what is present and skips nothing.
+
 **Step 11.3 — Update existing PR (when Step 11.0 found an open PR):**
 
-Update the existing PR's body with the latest delivery info:
+Update the existing PR's body with the same complete template as Step 11.2 (Main change / File map / How to review / Risk and blast radius / Before-After / Acceptance Matrix / Definition of Done / Pre-PR Review / Size justification / Version). The reviewer's expectations don't change between fresh and updated PRs — the body must always be navigable.
+
 ```
 gh pr edit {pr-number} \
   --body "$(cat <<'EOF'
-Closes #{number}
-
-## Summary
-- {bullet points of what was done}
-
-## Changes
-- {files changed}
-
-## Tests
-- {test results}
-
-## Acceptance Matrix
-{paste the table from session-docs/{feature-name}/acceptance-matrix.md}
-
-## Definition of Done
-- [x] Lint / Type check / Tests / Build → see body
-
-## Version
-- {old} → {new}
+{full PR body — same template as Step 11.2, with the latest delivery info}
 EOF
 )"
 ```
