@@ -1011,6 +1011,92 @@ This data enables trend analysis: which types of issues need more iterations, wh
 
 ---
 
+## Done.yml (formal completion criteria)
+
+Anthropic's harness-design article puts it bluntly: *"define completion criteria in external, testable files"*. The orchestrator currently decides "the pipeline is done" implicitly by walking through Phases 3.5 and 3.6 — there is no single artifact you can `cat` and conclude "yes, this shipped clean". `done.yml` fixes that.
+
+`done.yml` is an evaluable, single-file mirror of every gate the pipeline already runs. It exists for three reasons:
+
+1. **Tooling.** A script, a CI job, or a separate auditor can evaluate `done.yml` without parsing markdown session-docs.
+2. **Audit.** Six months later, "what did this pipeline actually verify?" is a single-file question.
+3. **Self-consistency check.** If `done.yml` says all green but Phase 3.5 disagrees, the pipeline has a bug — both must agree before delivery.
+
+### When to write each field
+
+The orchestrator writes `done.yml` at three points and `delivery` reads it at the top of Phase 4:
+
+| Phase | Action |
+|---|---|
+| 0b — Specify | Create `session-docs/{feature-name}/done.yml` with `ac_count`, `complexity`, `security_sensitive`, all gate fields set to `null`. |
+| 3 — Verify (success) | Update `tests_passing`, `tests_count`, `qa_verdict`, `security_findings_critical`, `security_findings_high`. |
+| 3.5 — Acceptance Gate (pass) | Update `ac_passed`, `all_ac_have_tests`, `test_ratchet_passed`. |
+| 3.6 — Acceptance Check | Update `acceptance_check_verdict` (pass / concerns / fail / skipped). |
+| 4 — Delivery (top of phase) | Read `done.yml`. If `done == true` (computed by the rules below), proceed. Otherwise abort with `status: blocked` and a one-line reason. |
+
+### Schema
+
+```yaml
+# session-docs/{feature-name}/done.yml
+feature: {kebab-case-name}
+type: feature | fix | refactor | hotfix | enhancement | spike | research
+complexity: standard | complex
+security_sensitive: true | false
+
+# Filled in Phase 0b
+ac_count: 5
+
+# Filled in Phase 3 (verify)
+tests_passing: true            # all tests in the suite pass
+tests_count: 47
+qa_verdict: pass               # qa's overall PASS/FAIL
+security_findings_critical: 0
+security_findings_high: 0
+
+# Filled in Phase 3.5 (acceptance gate)
+ac_passed: 5
+all_ac_have_tests: true
+test_ratchet_passed: true
+
+# Filled in Phase 3.6 (acceptance check) — null if skipped
+acceptance_check_verdict: pass | concerns | fail | skipped
+
+# Computed at Phase 4 entry (the orchestrator computes this just before delivery)
+done: true | false
+done_reasons:
+  - "all 5 AC pass qa validation"
+  - "all 5 AC have at least one passing test"
+  - "no critical/high security findings"
+  - "test-ratchet passed"
+  - "acceptance_check verdict: pass"
+```
+
+### `done == true` rules
+
+`done` is `true` if and only if **all** of these hold:
+
+- `ac_count > 0`
+- `ac_passed == ac_count`
+- `tests_passing == true`
+- `qa_verdict == pass`
+- `all_ac_have_tests == true`
+- `test_ratchet_passed == true`
+- `security_findings_critical == 0`
+- `security_findings_high == 0`
+- `acceptance_check_verdict ∈ {pass, concerns, skipped}` — `concerns` is allowed because Phase 3.6 is non-binding by design (the user is informed); `fail` blocks.
+
+If any rule fails, `done` is `false` and `done_reasons` lists every failing rule (not just the first).
+
+### Why this is not redundant with Phase 3.5
+
+Phase 3.5 does the same checks **internally** before delivery is invoked. The `done.yml` artifact is the **persisted, machine-readable evidence** that those checks happened and passed. They are two different concerns:
+
+- Phase 3.5 — runtime gate (does the pipeline progress?).
+- `done.yml` — durable record (did the gates pass, what did they assert, can a later tool re-verify?).
+
+Both must agree. If Phase 3.5 says proceed but `done.yml` evaluates to `false` at Phase 4, abort with `status: blocked` — there's a bug in the gate logic and shipping would mean shipping that bug.
+
+---
+
 ## Execution Events JSONL (machine-readable trace)
 
 `pipeline-metrics.json` is the **aggregate** snapshot at the end of the pipeline. It does not let you reconstruct what happened minute-by-minute. For that, you also append events to `session-docs/{feature-name}/00-execution-events.jsonl` as the pipeline progresses — one JSON object per line, append-only, never rewritten.

@@ -17,6 +17,7 @@ You NEVER modify feature code. You only update memory (CLAUDE.md, docs/), update
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
 - **NEVER** bump the version when the orchestrator passes `skip-version: true` in the task context. If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: orchestrator requested skip"
+- **ALWAYS** read `session-docs/{feature-name}/done.yml` at the top of Step 0 (before any branch / commit / push). If `done == false`, abort the entire phase with `status: blocked` and the contents of `done_reasons` in your status block. The orchestrator already gates on Phase 3.5 / 3.6 — `done.yml` is your secondary self-check that those gates produced consistent results.
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 
