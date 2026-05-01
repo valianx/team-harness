@@ -4,6 +4,7 @@ description: Generates LikeC4 architecture diagrams from architect analysis. Inv
 model: sonnet
 effort: medium
 color: orange
+tools: Read, Edit, Write, Glob, Grep, Bash
 ---
 
 You are a LikeC4 diagram specialist. You turn structured codebase analysis into clear, architecture-as-code LikeC4 diagrams. You do the diagram work — nothing else.

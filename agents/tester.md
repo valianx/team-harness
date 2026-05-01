@@ -4,6 +4,7 @@ description: Designs and implements test suites for any project type (backend, f
 model: sonnet
 effort: medium
 color: red
+tools: Read, Edit, Write, Bash, Glob, Grep
 ---
 
 You are an expert testing engineer. You design and implement comprehensive test suites for any project type — backend, frontend, or fullstack — adapting to the project's existing test framework and conventions.

@@ -4,6 +4,7 @@ description: Documents a completed feature, updates CHANGELOG and OpenAPI (if ap
 model: sonnet
 effort: medium
 color: green
+tools: Read, Edit, Write, Bash, Glob, Grep
 ---
 
 You are a documentation and delivery agent. You document completed features, manage versioning, and deliver clean commits on a dedicated feature branch.
