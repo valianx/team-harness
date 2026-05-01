@@ -928,6 +928,82 @@ This data enables trend analysis: which types of issues need more iterations, wh
 
 ---
 
+## Execution Events JSONL (machine-readable trace)
+
+`pipeline-metrics.json` is the **aggregate** snapshot at the end of the pipeline. It does not let you reconstruct what happened minute-by-minute. For that, you also append events to `session-docs/{feature-name}/00-execution-events.jsonl` as the pipeline progresses — one JSON object per line, append-only, never rewritten.
+
+This is the audit log Anthropic recommends in the harness-design article: *"Wire tracing in on day one. Retrofitting observability is painful and the place where real agent bugs hide."* The JSONL format is queryable with `jq`, supports streaming, and survives compaction (it lives on disk, not in your context).
+
+**The orchestrator (you) writes every event.** Agents do not write to this file directly — they return status blocks and the orchestrator records the event. This keeps the protocol simple and the file consistent.
+
+### Schema
+
+Every line is a JSON object with these fields:
+
+| Field | Required | Description |
+|---|---|---|
+| `ts` | yes | ISO-8601 timestamp with timezone (e.g. `2026-05-01T14:00:00-03:00`). |
+| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`. |
+| `feature` | yes | Feature name (kebab-case, matches the session-docs folder). |
+| `phase` | conditional | Phase identifier (e.g. `0a-intake`, `1-design`, `2-implement`, `3-verify`, `1.5-ratify-plan`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
+| `agent` | conditional | Agent name. Required for `phase.*` events. |
+| `status` | conditional | `success` / `failed` / `blocked` / `skipped`. Required for `phase.end`. |
+| `duration_ms` | conditional | Wall-clock duration in milliseconds. Required for `phase.end`. |
+| `tokens_in` | optional | Approx input tokens consumed by this agent invocation. Use the same heuristic as `tokens_estimated` in pipeline-metrics if precise count is not available. |
+| `tokens_out` | optional | Approx output tokens. |
+| `iteration` | optional | Iteration number (0 for first pass, 1+ for retries). |
+| `verdict` | conditional | `pass` / `concerns` / `fail`. Required for `gate.*` events from Phase 1.5 / 3.6. |
+| `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
+| `extra` | optional | Object for event-specific extras (e.g., `{"tests_before": 42, "tests_after": 47}` for the test-ratchet gate). |
+
+### Examples
+
+```jsonl
+{"ts":"2026-05-01T14:00:00-03:00","event":"pipeline.start","feature":"auth-jwt","extra":{"type":"feature","complexity":"standard","ac_count":5}}
+{"ts":"2026-05-01T14:00:42-03:00","event":"phase.start","feature":"auth-jwt","phase":"1-design","agent":"architect","iteration":0}
+{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry"}
+{"ts":"2026-05-01T14:03:25-03:00","event":"gate.pass","feature":"auth-jwt","phase":"1.5-ratify-plan","verdict":"pass","summary":"5/5 AC covered by Work Plan"}
+{"ts":"2026-05-01T14:18:52-03:00","event":"iteration.start","feature":"auth-jwt","phase":"3-verify","iteration":1,"summary":"AC-3 missing null check"}
+{"ts":"2026-05-01T14:25:11-03:00","event":"gate.fail","feature":"auth-jwt","phase":"3.5-acceptance-gate","verdict":"fail","summary":"AC-2 has no passing test"}
+{"ts":"2026-05-01T14:30:00-03:00","event":"pipeline.end","feature":"auth-jwt","status":"success","duration_ms":1800000,"extra":{"iterations":1,"ac_passed":5}}
+```
+
+### When to write each event
+
+| Event | When |
+|---|---|
+| `pipeline.start` | Phase 0a, after intent classification, before invoking any agent. |
+| `phase.start` | Just before each Task tool invocation of an agent (Phase 1, 2, 3, 4, etc.). |
+| `phase.end` | When the agent's status block returns. Use the agent's reported duration if available, otherwise wall-clock. |
+| `gate.pass` / `gate.fail` | After Phase 1.5 (ratify-plan), Phase 3.5 (acceptance-gate), Phase 3.6 (acceptance-check). |
+| `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
+| `policy.deny` | When `hooks/policy-block.sh` denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
+| `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
+
+### Implementation note
+
+Append one line at a time using a here-doc to a `>>` redirect, e.g.:
+
+```bash
+cat >> session-docs/{feature-name}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"phase.end","feature":"{feature-name}","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"summary":"..."}
+JSONL
+```
+
+Do NOT pretty-print — one JSON object per line, no array wrapper, no trailing comma. This keeps the file streamable and easily filterable with `jq`:
+
+```bash
+# How long did design take across all features?
+jq -s 'map(select(.event=="phase.end" and .phase=="1-design")) | map(.duration_ms) | add' session-docs/*/00-execution-events.jsonl
+
+# Which features had iterations?
+jq -s 'map(select(.event=="iteration.start")) | group_by(.feature) | map({feature: .[0].feature, iterations: length})' session-docs/*/00-execution-events.jsonl
+```
+
+The `00-execution-log.md` markdown table remains for human reading; the JSONL is for machines. Both files coexist — they describe the same events in different formats.
+
+---
+
 ## Multi-Task Orchestration
 
 **DEFAULT behavior for 2+ tasks.** Whenever you have multiple tasks — from `/issue` batch, `/plan plan-and-execute`, user request for batch work, or your own breakdown of a broad scope — dispatch them using dependency analysis, parallel worktrees, and event-driven monitoring via hooks. You NEVER run multiple tasks sequentially in a single session.
