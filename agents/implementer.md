@@ -32,6 +32,12 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
   - If a service requires a key to function, fail loudly at startup with a clear error message — never silently fall back to a hardcoded value.
 - **Performance:** no N+1 queries, no unbounded result sets, close connections/subscriptions, pagination for lists
 - **DRY:** extract at 3+ repetitions, prefer composition over inheritance, no speculative abstractions
+- **Reviewability — write code the human reviewer can read top-to-bottom without paging context:**
+  - Functions ≤ 40 lines, ≤ 4 parameters, nesting depth ≤ 3. If a function exceeds any of these, split it or extract helpers.
+  - **Golden-path structure**: validation + early returns at the top, happy path running linearly through the middle, error / cleanup at the bottom. No deeply-nested `if/else` for the main flow.
+  - **One concern per commit, one concern per PR.** Do NOT mix refactor + feature in the same commit. Do NOT mix reformatting + functional change in the same commit. If you find yourself doing both, split into ordered commits: refactor first (no behaviour change), feature second (no formatting churn).
+  - **Comments only when WHY is non-obvious.** Do NOT comment WHAT the code does — well-named identifiers already do that. Reasons to write a comment: a hidden constraint, a subtle invariant, a workaround for a specific bug, behaviour that would surprise a reader. If removing the comment wouldn't confuse a future reader, don't write it.
+  - **Tests as documentation.** Test names describe behaviour (`returns_400_when_token_is_expired`, not `test_auth_1`). The reader of the test should understand what the system promises without reading the implementation.
 - **Destructive commands — NEVER run:** `rm -rf` on broad paths, `git push --force`, `git reset --hard`, `drop table`, or any command that deletes data or rewrites shared history. If cleanup is needed, use targeted, reversible operations.
 
 ---
@@ -173,6 +179,18 @@ Before finishing, review your own code:
 
 If any check fails, fix it before finishing.
 
+### Reviewability self-check
+
+After the SOLID / Clean Code / DRY pass above, do one more pass focused on the human reviewer:
+
+- [ ] No function exceeds 40 lines, 4 parameters, or 3 levels of nesting. Where exceeded, splitting or helpers were applied.
+- [ ] Each function follows the golden path: validation/early returns first, happy path linear, errors at the bottom.
+- [ ] No commit mixes refactor with feature, or reformatting with functional change. If a refactor was needed, it lives in its own commit ahead of the feature commit.
+- [ ] Every comment present in the diff explains WHY (a hidden constraint, a subtle invariant, a non-obvious workaround). Comments that restate WHAT the code does have been removed.
+- [ ] Test names describe behaviour, not implementation steps (`returns_X_when_Y`, not `test_method_1`).
+
+If a function genuinely needs to exceed the caps (e.g., a long state machine, a config builder where extraction would only obscure intent), document the reason in `02-implementation.md` under a new `## Reviewability Exceptions` section so the reviewer doesn't have to guess. Do NOT silently ship over-cap functions; the gate is "explained or under cap", not "under cap or hidden".
+
 ---
 
 ## Spec Feedback Protocol
@@ -229,6 +247,10 @@ Write your implementation summary to `session-docs/{feature-name}/02-implementat
 ## Known Limitations
 - {Any limitation or TODO left for follow-up}
 (or "None")
+
+## Reviewability Exceptions
+- {function/file:line — reason it exceeds the 40 lines / 4 params / 3 levels caps and why splitting would obscure intent}
+(or "None — every function fits within the reviewability caps")
 
 ## Ready For
 - [ ] Testing (tester)
