@@ -543,13 +543,20 @@ After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceab
 2. **Read `session-docs/{feature-name}/04-validation.md`** (qa) and count `PASS` vs `FAIL` per AC.
 3. **Read `session-docs/{feature-name}/03-testing.md`** AC Coverage table and verify every AC has at least one test marked PASS.
 4. **If `04-security.md` exists**, confirm there are no Critical/High findings unresolved.
+5. **Test-ratchet check.** Compare the tester's `tests_count` from this iteration's status block against `last_tests_count` recorded in `00-state.md` Hot Context (from the previous iteration; absent on the first iteration of this pipeline). On the first iteration, capture `tests_count` as the baseline and skip the comparison. On subsequent iterations:
+   - **`tests_count >= last_tests_count`** → ratchet passes. Update `last_tests_count` in Hot Context.
+   - **`tests_count < last_tests_count` AND `tests_deleted == 0`** → impossible, the tester miscounted. Log a warning and proceed; treat as ratchet pass.
+   - **`tests_deleted > 0` AND `tests_deleted_reason` is present and meaningful** → ratchet passes (legitimate deletion). Update `last_tests_count`. Note the reason in Hot Context: `tests_deleted: {N} — {reason}`.
+   - **`tests_deleted > 0` AND `tests_deleted_reason` is empty, missing, or matches a forbidden pattern** (`broken`, `flaky`, `couldn't make them pass`, `removing failing tests`) → **ratchet FAILS.** Route back to `tester` with: "Test-ratchet violation: {N} tests deleted without valid justification. Restore the deleted tests and fix the underlying issue instead." This counts toward the max-3 iteration budget.
 
 **Decision matrix:**
-- All AC `PASS` in qa AND every AC has a passing test AND no Critical/High security → **proceed to Phase 4**.
-- Any AC failed in qa, missing a test, or any unresolved Critical/High security → **route back to implementer** with the failing AC as a fix brief. Increment iteration counter (still subject to the max-3 limit from Phase 3).
+- All AC `PASS` in qa AND every AC has a passing test AND no Critical/High security AND test-ratchet passes → **proceed to Phase 4**.
+- Any AC failed in qa, missing a test, any unresolved Critical/High security, or test-ratchet fails → **route back to implementer or tester** (depending on which check failed) with a focused fix brief. Increment iteration counter (still subject to the max-3 limit from Phase 3).
 - AC count in qa report ≠ AC count in `00-task-intake.md` → **abort with `status: blocked`** and report the discrepancy to the user; this means the spec drifted silently and needs reconciliation.
 
-Update `00-state.md` with the Phase 3.5 result. If gate passes, write a single line in Hot Context: `Acceptance gate: {N}/{N} AC verified, {test count} tests, security {clean|N findings}`.
+Update `00-state.md` with the Phase 3.5 result. If gate passes, write a single line in Hot Context: `Acceptance gate: {N}/{N} AC verified, {test count} tests, security {clean|N findings}`. Also persist `last_tests_count: {N}` in Hot Context for the test-ratchet baseline used by the next iteration (if any).
+
+When the test-ratchet step matters (subsequent iterations), append a `gate.fail` or `gate.pass` event to `00-execution-events.jsonl` with `extra: {"tests_before": last_tests_count, "tests_after": tests_count, "tests_deleted": N}` so the trace records ratchet outcomes for offline analysis.
 
 **Report to user:**
 ```
