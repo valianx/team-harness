@@ -626,6 +626,43 @@ check("CHANGELOG.md [Unreleased] mentions KG vocabulary expansion",
       "CHANGELOG [Unreleased] missing stack-profile reference")
 
 # ---------------------------------------------------------------------------
+# Suite 15 — Mandatory Working Agreements section in CLAUDE.md template
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 15: Mandatory Working Agreements ===")
+
+# 1. init.md Phase 3 enumerates the Mandatory Working Agreements section
+check("init.md Phase 3 declares the Mandatory Working Agreements template section",
+      "Mandatory Working Agreements" in init_md and "Phase 3" in init_md,
+      "init.md does not declare the Mandatory Working Agreements section in Phase 3")
+
+# 2. init.md template contains the verbatim heading
+check("init.md template body has '## 6. Mandatory Working Agreements' (verbatim)",
+      "## 6. Mandatory Working Agreements" in init_md,
+      "verbatim §6 heading not found in init.md template body")
+
+# 3. init.md template enumerates the 5 sub-blocks
+for sub in ("Pre-work", "During-work", "Post-work", "Governance", "Anti-patterns"):
+    check(f"init.md template has '{sub}' sub-block",
+          sub in init_md,
+          f"sub-block '{sub}' not found in init.md template body")
+
+# 4. delivery.md Step 5 references the Mandatory Working Agreements section
+check("delivery.md Step 5 cross-references Mandatory Working Agreements (Post-work)",
+      "Mandatory Working Agreements" in delivery and "Post-work" in delivery,
+      "delivery.md does not cross-reference §6 Mandatory Working Agreements")
+
+# 5. orchestrator.md Phase 0a references the Mandatory Working Agreements section
+check("orchestrator.md Phase 0a cross-references Mandatory Working Agreements",
+      "Mandatory Working Agreements" in orch and "Phase 0a" in orch,
+      "orchestrator.md Phase 0a does not cross-reference §6 Mandatory Working Agreements")
+
+# 6. CHANGELOG entry mentions Working Agreements
+check("CHANGELOG.md [Unreleased] mentions Mandatory Working Agreements",
+      "[Unreleased]" in changelog and "Mandatory Working Agreements" in changelog,
+      "CHANGELOG entry for Mandatory Working Agreements section missing")
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
