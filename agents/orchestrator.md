@@ -550,18 +550,23 @@ If `verdict: fail` and routing to architect:
 
 **What the orchestrator does:** emit the STAGE-GATE-1 STOP block (template below) and pause execution. Wait for an explicit user reply. Do NOT proceed without it.
 
-**STOP block emitted to the user:**
+**STOP block emitted to the user.** The orchestrator copies the `## TL;DR` and `## Decisions for human review` sections from `01-architecture.md` verbatim into the block, plus the `## Summary` table from `02-task-list.md`. This is the only place where the orchestrator does a small Read from session-docs on the happy path — the rest of the gating uses status blocks. The intent: the human reviews from the gate, not by opening the file. The plan-reviewer (Phase 1.6, Rule 6) enforces that all three sections exist before this gate fires.
 
 ```
-====================================
+========================================
  STAGE-GATE-1 — Plan ready for human review
-====================================
+========================================
  Feature: {feature-name}
  Stage: 1 (analysis) — complete
 
- Architect proposed {N} PR(s) across {M} service(s):
-   - PR-1: {title} ({service}) — {ac-count} AC
-   - PR-2: {title} ({service}) — {ac-count} AC
+ ── TL;DR ──────────────────────────────
+ {verbatim contents of ## TL;DR from 01-architecture.md, line-wrapped}
+
+ ── Decisions for human review ─────────
+ {verbatim bullets from ## Decisions for human review in 01-architecture.md}
+
+ ── PR Summary ─────────────────────────
+ {verbatim contents of ## Summary table from 02-task-list.md, rendered compactly}
 
  Plan-reviewer verdict: {pass | concerns}
  {if concerns:}
@@ -569,17 +574,22 @@ If `verdict: fail` and routing to architect:
    - {one-line per concern, citing file:line}
 
  Artifacts written:
-   - session-docs/{feature-name}/01-architecture.md
-   - session-docs/{feature-name}/02-task-list.md
-   - session-docs/{feature-name}/01-plan-review.md
+   - session-docs/{feature-name}/01-architecture.md     (full design proposal)
+   - session-docs/{feature-name}/02-task-list.md        (per-PR contracts)
+   - session-docs/{feature-name}/01-plan-review.md      (audit report)
 
  Reply with:
-   - "approve"            → proceed to Stage 2 (per-PR stops at STAGE-GATE-2)
-   - "approve autonomous" → proceed to Stage 2 and skip STAGE-GATE-2 between PRs
+   - "approve"            → proceed to Stage 2 (per-round stops at STAGE-GATE-2)
+   - "approve autonomous" → proceed to Stage 2 and skip STAGE-GATE-2 between rounds
    - "reject {reason}"    → route back to architect with reason
    - "edit"               → I will pause; you edit the artifacts; reply "approve" when ready
-====================================
+========================================
 ```
+
+**Rendering rules:**
+- Preserve markdown bullets and table syntax as-is — terminal users see them rendered by Claude Code, file-output users get faithful markdown.
+- If `## TL;DR` or `## Decisions for human review` is missing in `01-architecture.md`, do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
+- If the `## Summary` table in `02-task-list.md` exceeds 12 rows, render only the first 10 plus a `… +{N-10} more, see 02-task-list.md` line — protect the gate from giant batch features.
 
 **Handling the user reply:**
 
