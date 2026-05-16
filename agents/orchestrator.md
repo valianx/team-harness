@@ -111,6 +111,12 @@ After EVERY phase transition, update `session-docs/{feature-name}/00-state.md`. 
 # Pipeline State: {feature-name}
 **Last updated:** {timestamp}
 
+## TL;DR
+- **Now:** {one-sentence current activity, ≤200 chars}
+- **Last:** {one-sentence most recent milestone, ≤200 chars}
+- **Next:** {one-sentence next phase/gate/decision, ≤200 chars}
+- **Open issues:** {none | comma-separated blockers, ≤200 chars}
+
 ## Current State
 - pipeline_version: 2
 - phase: {0a|0b|1|1.5|1.6|2|2.5|3|3.5|3.6|4|4.5|5|6}
@@ -144,6 +150,14 @@ If reading this after context compaction:
 2. Read 00-execution-log.md for timing
 3. {exactly what to do next}
 ```
+
+**`## TL;DR` rules (dogfooding the consolidated-document rule):**
+- The orchestrator **rewrites** the `## TL;DR` section **in place** at every phase transition — never appends to it.
+- Always exactly **4 bullets** in this order: `Now`, `Last`, `Next`, `Open issues`. No additions, no omissions.
+- No version markers (`v2`, "v2 — 2026-05-16"), no "previously decided", no strikethrough, no inline changelog inside the section.
+- Each bullet ≤ 200 characters. Forces the prose to be tight and readable.
+- `Open issues` is `none` when there are no blockers; otherwise a comma-separated list of concrete blockers.
+- The TL;DR rewrite is part of the same state-file write that happens at each phase transition — it is NOT a separate I/O step.
 
 **Rules:**
 - Update BEFORE starting each new phase
@@ -332,6 +346,8 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
     - When in doubt (ambiguous scope) → ask the user: "Do you want to test a specific feature or the entire service?"
 12. **Announce** to the user: task classified, proceeding to SPECIFY.
 
+13. **Write initial `00-state.md`** (row 1 of §5.2). The initial write MUST include the `## TL;DR` section populated for first-run. Rewrite TL;DR: `Now`: "Phase 0b spec investigation starting." `Last`: "Pipeline started — task classified as {type}/{complexity}." `Next`: "Phase 0b SPECIFY, then Phase 1 design." `Open issues`: "none".
+
 ---
 
 ## Phase 0b — Specify
@@ -427,6 +443,8 @@ If any check fails (except ambiguities), fix it in-place. This is automatic — 
 
 7. **Announce** to the user: spec complete, starting Phase 1 (Design).
 
+8. **Rewrite TL;DR** (row 2 of §5.2): `Now`: "Phase 1 design starting." `Last`: "Phase 0b SPECIFY produced {N} AC across {M} files." `Next`: "Phase 1 architect, then Phase 1.5 ratify-plan." `Open issues`: any unresolved ambiguities (should be none — auto-lint blocks).
+
 ---
 
 ## Phase 1 — Design
@@ -457,6 +475,8 @@ If any check fails (except ambiguities), fix it in-place. This is automatic — 
   {summary from status block}
 → Next: Phase 1.5 — Plan Ratification
 ```
+
+**Rewrite TL;DR** (row 3 of §5.2): `Now`: "Phase 1.5 plan-ratification running (qa checking AC coverage)." `Last`: "Phase 1 architect proposed {N} PRs across {M} services with {K} AC." `Next`: "Phase 1.6 plan-reviewer, then STAGE-GATE-1." `Open issues`: any `[CONSTRAINT-DISCOVERED]` annotations.
 
 ---
 
@@ -497,6 +517,8 @@ Or:
   Uncovered AC: AC-3, AC-7
 ⟳ Routing to architect to revise Work Plan
 ```
+
+**Rewrite TL;DR** (row 4 of §5.2): On `pass`: advance `Now` and `Next` to Phase 1.6. `Now`: "Phase 1.6 plan-reviewer running." `Next`: "STAGE-GATE-1 for human approval." On `fail`: `Now`: "Architect revising Work Plan to cover AC {list}." `Open issues`: uncovered AC identifiers.
 
 ---
 
@@ -539,6 +561,8 @@ If `verdict: fail` and routing to architect:
   Blocking rules: {rule-1 | rule-2} — {short reason per affected PR}
 ⟳ Routing to architect to revise plan (iteration {N}/3)
 ```
+
+**Rewrite TL;DR** (row 5 of §5.2): On `pass` or `concerns`: `Now`: "STAGE-GATE-1 about to emit." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: any concerns (rules 3/4/5/6 hits, if any). On `fail`: `Now`: "Architect revising plan (iter N/3) — rules {1, 2} failing." `Open issues`: failing rule numbers and affected PRs.
 
 ---
 
@@ -604,6 +628,10 @@ If `verdict: fail` and routing to architect:
 
 **Schema update in `00-state.md`:** under `## Current State`, add fields `autonomous: true|false` and `autonomous_granted_at: STAGE-GATE-1 | STAGE-GATE-2-after-PR-{N} | null`. `compaction` recovery and `/recover` must preserve these.
 
+**Rewrite TL;DR when STAGE-GATE-1 emits** (row 6 of §5.2): `Now`: "STAGE-GATE-1 emitted at {HH:MM}, waiting for human." `Last`: "Phase 1.6 plan-reviewer verdict: {pass|concerns}." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: concerns listed (or "none" on pass).
+
+**Rewrite TL;DR when STAGE-GATE-1 is released** (row 7 of §5.2): On `approve`: `Now`: "Phase 2 starting for PR-1 in Round 1." `Last`: "STAGE-GATE-1 released with approve (interactive)." `Next`: "Phase 2 implementer, then Phase 3 verify." On `approve autonomous`: `Last`: "STAGE-GATE-1 released with approve autonomous — STAGE-GATE-2 will be skipped." On `reject`/`edit`: update `Now` and `Next` to reflect the routing back to architect.
+
 ---
 
 ## Phase 2 — Implementation
@@ -653,6 +681,10 @@ If build/lint fails, the implementer fixes it before finishing (internal loop).
 
 **CRITICAL: Immediately proceed to Phase 3. Do NOT stop here, do NOT ask the user, do NOT report "done". Implementation without verification is incomplete.**
 
+**Rewrite TL;DR when Phase 2 per-PR starts** (row 8 of §5.2): `Now`: "Phase 2 implementer working on PR-{i} in Round R{R}." `Last`: prior PR or round result. `Next`: "Phase 2.5 reconcile, then Phase 3 verify." For parallel rounds with N>1, rewrite once when the round opens and once at each PR completion.
+
+**Rewrite TL;DR when Phase 2 per-PR ends** (row 9 of §5.2): `Now`: "Phase 3 verify launching for PR-{i}." `Last`: "PR-{i} Phase 2 done — {N} files touched, build clean." `Next`: "Phase 3 tester + qa in parallel." `Open issues`: any CONSTRAINT-DISCOVERED annotations.
+
 ### Phase 2.5 — Constraint Reconciliation (between Phase 2 and Phase 3)
 
 Before launching Phase 3, read `00-task-intake.md` and check for `[CONSTRAINT-DISCOVERED]` annotations added by architect or implementer. The previous behaviour ("orchestrator reconciles inline") works for cosmetic constraints, but it silently mutates AC for non-trivial ones — exactly the failure Cognition reported as the dominant mid-task issue ("agents handle clear upfront scoping well, but not mid-task requirement changes"). This phase formalises the reconciliation.
@@ -688,6 +720,8 @@ Append a `phase.end` event to `00-execution-events.jsonl` with `phase: "2.5-reco
 
 If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .non_trivial: 0` and proceed to Phase 3.
 
+**Rewrite TL;DR** (row 10 of §5.2): If no constraints: skip TL;DR rewrite (no semantic change). If qa reconcile ran: `Now`: "Phase 3 verify launching." `Last`: "Reconciliation: {N} trivial / {M} non-trivial / {K} dropped." `Open issues`: any dropped AC identifiers.
+
 **Cost:** typically zero (no annotations) or one qa invocation (~2-4K tokens). **Saves:** an entire iteration cycle when a non-trivial constraint would otherwise be silently absorbed and surfaced as an acceptance-checker concern at Phase 3.6.
 
 ---
@@ -714,6 +748,8 @@ Launch agents simultaneously using Task tool calls in the same message:
   {summary from each status block}
 → Next: Phase 4 — Delivery (or: Iterating — implementer fixing N issues)
 ```
+
+**Rewrite TL;DR** (row 11 of §5.2): On all success: `Now`: "Phase 3.5 acceptance-gate running for PR-{i}." `Last`: "PR-{i} Phase 3 verify done — tester pass, qa pass, security {clean|N findings}." `Next`: "Phase 3.5 acceptance-gate." On any iteration: `Now`: "Phase 3 iterating for PR-{i} (iter N/3) — {root cause}." `Open issues`: failing AC identifiers and file:line hints.
 
 ### If any agent fails → ITERATE
 
@@ -793,6 +829,8 @@ Or, if the gate fails:
 
 This phase costs almost no tokens — it parses 2-3 small tables. The cost-vs-confidence tradeoff is heavily on the side of correctness.
 
+**Rewrite TL;DR** (row 12 of §5.2): On pass: `Now`: "Phase 3.6 acceptance-check running (or skipped)." `Last`: "PR-{i} Phase 3.5 PASS — {N}/{N} AC verified, test-ratchet OK." `Next`: "Phase 3.6 then STAGE-GATE-2 (or autonomous continue)." On fail: `Now`: "Iterating (iter N/3) for PR-{i}." `Last`: "Phase 3.5 FAIL — {failing AC list}." `Open issues`: failing AC identifiers.
+
 ---
 
 ## Phase 3.6 — Acceptance Check (external audit, conditional)
@@ -853,6 +891,8 @@ When the previous gate (Phase 3 verify) shows that any iteration happened, **alw
 
 If verdict is `concerns`, list each concern as one line in the report so the user sees them before delivery proceeds.
 
+**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "PR-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "PR-{i} Phase 3.6 verdict={pass|concerns}." On skipped: `Last`: "PR-{i} Phase 3.6 skipped (not warranted)." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
+
 ---
 
 ## STAGE-GATE-2 — Between rounds in Stage 2 (autonomous-skippable)
@@ -910,6 +950,12 @@ If verdict is `concerns`, list each concern as one line in the report so the use
 
 **JSONL trace:** `stage.gate` (`stage: 2, after_round: R{R}, verdict: pass|partial-fail`) when the gate fires interactive; `stage.gate.skipped` when bypassed by autonomous; `stage.gate.release` on user reply with `decision` and `after_round`.
 
+**Rewrite TL;DR when STAGE-GATE-2 emits** (row 14 of §5.2): `Now`: "STAGE-GATE-2 emitted after Round R{R}, waiting for human next/stop/redo." `Last`: "Round R{R} closed — {N} PRs shipped." `Next`: "Round R{R+1} — {M} PRs scheduled." `Open issues`: any partial-fail PRs.
+
+**Rewrite TL;DR when STAGE-GATE-2 is released** (row 15 of §5.2): On `next`: `Now`: "Round R{R+1} dispatching." `Last`: "STAGE-GATE-2 released with next." On `next autonomous`: `Now`: "Round R{R+1} dispatching (autonomous from this point)." On `stop`/`redo`: update `Now` and `Next` accordingly.
+
+**Rewrite TL;DR when STAGE-GATE-2 is skipped** (row 16 of §5.2): `Now`: "Round R{R+1} dispatching (autonomous — gate skipped)." `Last`: "Round R{R} closed — all PRs shipped clean." `Next`: "Phase 2 implementer for next round PRs." `Open issues`: "none".
+
 ---
 
 ## Phase 4 — Delivery
@@ -939,6 +985,8 @@ This phase does NOT iterate — if it fails (e.g., push rejected), report to the
   {summary from status block}
 → Next: Phase 4.5 — Internal Review (or Phase 5 if skipped)
 ```
+
+**Rewrite TL;DR** (row 17 of §5.2): `Now`: "Phase 4.5 internal-review running (or skipped)." `Last`: "Phase 4 delivery done — branch {branch}, version {old → new}." `Next`: "STAGE-GATE-3 (mandatory human approve before push)." `Open issues`: "none" (or delivery errors if any).
 
 ---
 
@@ -988,6 +1036,8 @@ When skipped, log `phase.end` to `00-execution-events.jsonl` with `phase: "4.5-i
 ```
 
 The orchestrator passes `04-internal-review.md` content to `delivery` for optional inclusion in the PR description (under a "Pre-PR Review" section in the body) — `delivery` already has the PR open at this point and can update the body via `gh pr edit`.
+
+**Rewrite TL;DR** (row 18 of §5.2): `Now`: "STAGE-GATE-3 about to emit." `Last`: "Phase 4.5 internal-review — {C}C / {S}S / {N}N." `Next`: "Waiting for human ship/amend/abort." `Open issues`: criticals if any.
 
 **Cost:** one reviewer invocation (~5-15K tokens depending on diff size). **Saves:** human review time and merge churn when the PR has obvious issues. The bound is the diff-size gate above — never run on trivial changes.
 
@@ -1040,6 +1090,10 @@ The orchestrator passes `04-internal-review.md` content to `delivery` for option
 
 **JSONL trace:** append `stage.gate` event with `stage: 3` when the gate fires; append `stage.gate.release` with `stage: 3, decision: {ship|amend|abort}` on user reply.
 
+**Rewrite TL;DR when STAGE-GATE-3 emits** (row 19 of §5.2): `Now`: "STAGE-GATE-3 emitted at {HH:MM}, waiting for human ship/amend/abort." `Last`: "Phase 4.5 complete — {C}C / {S}S / {N}N." `Next`: "On ship: Phase 5 GitHub update + Phase 6 KG save." `Open issues`: any criticals from Phase 4.5.
+
+**Rewrite TL;DR when STAGE-GATE-3 is released** (row 20 of §5.2): On `ship`: `Now`: "Phase 5 GitHub update running." `Last`: "STAGE-GATE-3 released with ship." `Next`: "Phase 6 KG save." On `amend`: `Now`: "Paused for amend — waiting for user fixes." `Open issues`: "amend in progress". On `abort`: `Now`: "Pipeline aborted by user." `Open issues`: "aborted at STAGE-GATE-3".
+
 ---
 
 ## Phase 5 — GitHub Update
@@ -1055,6 +1109,8 @@ The orchestrator passes `04-internal-review.md` content to `delivery` for option
 This phase does NOT iterate — if GitHub update fails, report to the user but continue to Phase 6.
 
 **CRITICAL: Do NOT stop here. Proceed to Phase 6 — Knowledge Save.**
+
+**Rewrite TL;DR** (row 21 of §5.2): `Now`: "Phase 6 KG-save running." `Last`: "Phase 5 GitHub update done — issue moved to In Review, PR comment posted." `Next`: "Pipeline complete after KG save." `Open issues`: any GitHub update errors.
 
 ---
 
@@ -1177,6 +1233,8 @@ normally.
   Process: {iterations} iterations — {1-line friction summary or "clean pass"}
 → Pipeline complete. (See handoff prompt above before next feature.)
 ```
+
+**Rewrite TL;DR** (row 22 of §5.2 — final): `Now`: "Pipeline complete." `Last`: "Phase 6 KG-save done ({N} entities) + process reflection appended." `Next`: "none — ready for handoff." `Open issues`: "none" (or any KG-save warnings).
 
 ---
 
