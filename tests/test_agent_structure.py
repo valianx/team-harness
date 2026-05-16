@@ -147,6 +147,10 @@ checks_orch = [
     ("STAGE-GATE-2 round granularity", "Between rounds"),
     ("STAGE-GATE-2 partial-fail handling", "partial-fail"),
     ("after_round JSONL field", "after_round"),
+    ("STAGE-GATE-1 surfaces TL;DR inline", "TL;DR"),
+    ("STAGE-GATE-1 surfaces Decisions for human review inline", "Decisions for human review"),
+    ("STAGE-GATE-1 surfaces PR Summary inline", "PR Summary"),
+    ("STAGE-GATE-1 protects against giant Summary table", "+{N-10} more"),
     ("test-ratchet", "Test-ratchet check"),
     ("done.yml schema", "done.yml"),
     ("JSONL trace", "00-execution-events.jsonl"),
@@ -346,6 +350,12 @@ if pr_path.exists():
         ("Rule 3 (consolidated docs)", "Rule 3"),
         ("Rule 4 (cross-reference)", "Rule 4"),
         ("Rule 5 (service identity)", "Rule 5"),
+        ("Rule 6 (human-readability sections)", "Rule 6"),
+        ("TL;DR section requirement", "## TL;DR"),
+        ("Decisions for human review section", "## Decisions for human review"),
+        ("Summary table requirement on 02-task-list.md", "## Summary"),
+        ("TL;DR hard cap of 10 lines", "10 lines"),
+        ("Decisions hard cap of 7 bullets", "7 bullets"),
         ("temporal-prod reason: coexistence window", "coexistence window"),
         ("temporal-prod reason: production signal", "production signal"),
         ("temporal-prod reason: cross-repo deploy gate", "cross-repo deploy gate"),
@@ -386,6 +396,29 @@ check("architect.md per-PR template uses Given/When/Then",
       "Given/When/Then" in architect or
       ("Given" in architect and "When" in architect and "Then" in architect),
       "Given/When/Then format not documented in architect")
+
+# architect.md must require the human-readability sections
+check("architect.md requires ## TL;DR section in 01-architecture.md",
+      "## TL;DR" in architect and "MANDATORY" in architect,
+      "TL;DR section not declared mandatory in architect.md")
+check("architect.md requires ## Decisions for human review section",
+      "## Decisions for human review" in architect,
+      "Decisions for human review section not documented")
+check("architect.md requires ## Summary table in 02-task-list.md",
+      "## Summary" in architect and "Summary table" in architect,
+      "Summary table not required in 02-task-list.md schema")
+check("architect.md spells out TL;DR is 3-6 lines (hard cap 10)",
+      "3-6 lines" in architect and ("hard cap 10" in architect or "cap 10" in architect),
+      "TL;DR size guidance missing")
+check("architect.md spells out Decisions is 3-5 bullets (hard cap 7)",
+      "3-5 bullets" in architect and ("hard cap 7" in architect or "cap 7" in architect),
+      "Decisions for human review size guidance missing")
+check("architect.md explains what does NOT belong in Decisions",
+      "NOT belong" in architect and "Mechanical pattern" in architect,
+      "guidance on what does NOT belong in Decisions missing")
+check("architect.md allows 'No human-judgement decisions' as valid value",
+      "No human-judgement decisions" in architect,
+      "fallback bullet for zero decisions not documented")
 
 # qa.md must declare per-PR scoping when 02-task-list.md is present
 qa_md = read(AGENTS_DIR / "qa.md")
