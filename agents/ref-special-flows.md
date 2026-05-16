@@ -54,12 +54,21 @@ When the user wants to quickly test a technical hypothesis without full pipeline
 
 Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeline per task).
 
+**Distinction from normal pipeline mode.** Plan flow's architect output is `01-planning.md` — a task breakdown for **multi-task batch orchestration** across worktrees, with dispatch labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and size estimates. This is structurally different from `02-task-list.md`, which the architect produces in **normal pipeline mode** (single-feature, sequential PRs, per-PR ACs in Given/When/Then). The two files coexist for different consumers:
+
+| File | Mode | Consumer | Purpose |
+|---|---|---|---|
+| `01-planning.md` | planning mode (`/plan`, `/plan plan-and-execute`) | orchestrator (multi-task dispatch) | break a broad scope into N parallel tasks |
+| `02-task-list.md` | design mode (normal pipeline) | implementer + qa + plan-reviewer | list of sequential PRs with per-PR ACs |
+
+Inside each task dispatched by `plan-and-execute`, the child orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `02-task-list.md` for that task's PRs. The parent batch orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
+
 ### Planning phase (both modes)
 
 1. **Intake** — classify as `plan` or `plan-and-execute`. Do NOT move GitHub issues to "In Progress" yet.
 2. **MANDATORY — Query KG** — call `search_nodes` with 2-3 semantic queries. Write `00-knowledge-context.md` if results found.
 3. **Specify** — full SPECIFY as normal (codebase investigation, AC, scope). Update GitHub issue if `needs-specify: true`.
-4. **Design (planning mode)** — invoke `architect` in planning mode. Architect produces task breakdown in `01-planning.md`.
+4. **Design (planning mode)** — invoke `architect` in planning mode. Architect produces task breakdown in `01-planning.md`. **Does NOT produce `02-task-list.md`** — that file belongs to design mode.
 5. **Validate sizing** — read `01-planning.md`. If any task has >20 AC or looks like a full feature, re-invoke architect to split. Max 1 retry.
 6. **Create tasks** — check `gh auth status`:
    - **gh available:** create one GitHub issue per task via `gh issue create` using **SDD issue template**. Labels from repo (`gh label list`), assignee `@me`, project board if exists. Comment on parent issue.
@@ -128,12 +137,12 @@ Same full pipeline as any other development task (Specify → Design → Impleme
 When `type: refactor`:
 
 1. **Specify** — ACs focus on `VERIFY:` format (same API, same behavior, improved structure)
-2. **Design** — architect focuses on target structure, not new features
-3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization."
+2. **Design** — architect focuses on target structure, not new features. The dual-output contract still applies: `01-architecture.md` AND `02-task-list.md` (pipeline_version 2). Per-PR ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then — both formats are accepted by the `plan-reviewer` Rule 2 regex.
+3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-PR scope from `02-task-list.md` `Files:` field still applies."
 4. **Verify** — tester runs **existing tests first** before writing new ones. If existing tests fail → the refactor broke something. New tests only for structural improvements (e.g., new module boundaries).
-5. **Delivery** — as normal
+5. **Delivery** — as normal, gated by STAGE-GATE-3.
 
-The key difference: existing passing tests are the safety net. If they break, the refactor is wrong.
+The key difference: existing passing tests are the safety net. If they break, the refactor is wrong. **The 3-stage gates still apply**: STAGE-GATE-1 (human approves the refactor plan), STAGE-GATE-2 between PRs in autonomous-skippable interactive mode, STAGE-GATE-3 before push.
 
 ---
 
