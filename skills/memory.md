@@ -20,7 +20,7 @@ Analyze the input: $ARGUMENTS
 ### `list [type]` — List all entities
 
 1. Use ChromaDB MCP `read_graph` to get all entities
-2. If `type` provided (pattern/error/constraint/decision/tool-gotcha), filter by entityType
+2. If `type` provided (pattern/error/constraint/decision/tool-gotcha/project/service/stack-profile), filter by entityType
 3. Display as table sorted by type:
    ```
    | Entity | Type | Observations | Relations |
@@ -54,11 +54,15 @@ Analyze the input: $ARGUMENTS
    =====================
    Total entities: {N}
    By type:
-     pattern:      {N}
-     error:        {N}
-     constraint:   {N}
-     decision:     {N}
-     tool-gotcha:  {N}
+     pattern:        {N}
+     error:          {N}
+     constraint:     {N}
+     decision:       {N}
+     tool-gotcha:    {N}
+     process-insight:{N}
+     project:        {N}
+     service:        {N}
+     stack-profile:  {N}
 
    Total relations: {N}
    Total observations: {N}
@@ -120,7 +124,7 @@ Usage: /memory <action> [args]
 
 Actions:
   search <query>        Search entities by text
-  list [type]           List all entities (filter: pattern/error/constraint/decision/tool-gotcha)
+  list [type]           List all entities (filter: pattern/error/constraint/decision/tool-gotcha/project/service/stack-profile)
   show <entity-name>    Show full entity details
   stats                 Knowledge Graph statistics
   prune                 Find and remove stale/duplicate entities
@@ -129,6 +133,7 @@ Actions:
 Examples:
   /memory search "Next.js auth"
   /memory list pattern
+  /memory list service
   /memory show prisma-sqlite-workaround
   /memory stats
   /memory prune

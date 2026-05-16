@@ -33,17 +33,17 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 
 | Agent | Model | Effort | Tools (allowlist) | Role |
 |---|---|---|---|---|
-| `orchestrator` | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit | Central hub. Coordinates the pipeline and routes to all other agents. |
-| `architect` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch | Architecture design, research, planning, audits. **No Bash** (read-only on system). |
+| `orchestrator` | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, all 9 `mcp__memory__*` (KG read + write) | Central hub. Coordinates the pipeline and routes to all other agents. |
+| `architect` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Architecture design, research, planning, audits. **No Bash** (read-only on system). KG read-only (Phase 6 writes stay in orchestrator). |
 | `agent-builder` | opus | `max` | Read, Edit, Write, Glob, Grep, Bash | Create / improve agents and skills. |
-| `security` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). |
+| `security` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). KG read-only for prior-vuln lookup. |
 | `reviewer` | opus | `max` | Read, Glob, Grep, Edit, Write, Bash | GitHub PR review. Bash limited to `git`/`gh` for diff retrieval. |
-| `qa` | opus | `high` | Read, Glob, Grep, Edit, Write | Acceptance criteria definition and validation. **No Bash** (read-only on system). |
-| `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifacts (`01-architecture.md` + `02-task-list.md`) against the five plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own session-doc). |
+| `qa` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Acceptance criteria definition and validation. **No Bash** (read-only on system). KG read-only for AC-pattern lookup. |
+| `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifacts (`01-architecture.md` + `02-task-list.md`) against the six plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own session-doc). |
 | `gcp-cost-analyzer` | opus | `high` | Read, Bash, Glob, Grep, Write | GCP cost / resource inventory reports. Bash limited to `gcloud`/`bq` reads. |
 | `init` | opus | `medium` | Read, Edit, Write, Glob, Grep, Bash | Bootstrap `CLAUDE.md` in any repo. |
 | `implementer` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, NotebookEdit | Production code following the architect's Work Plan. |
-| `tester` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep | Test suites with factory mocks. |
+| `tester` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Test suites with factory mocks. KG read-only for test-pattern lookup. |
 | `acceptance-checker` | sonnet | `medium` | Read, Glob, Grep, Write | External audit comparing original spec vs delivered artifacts (Phase 3.6, non-binding verdict). **No Bash, no Edit** (write-only on its own session-doc). |
 | `diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash, WebFetch | Excalidraw diagrams (render-validate loop). |
 | `likec4-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | LikeC4 diagrams (architecture-as-code). |

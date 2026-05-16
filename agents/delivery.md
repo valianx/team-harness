@@ -229,6 +229,21 @@ Append knowledge to `docs/knowledge.md`. Un solo archivo, bullets planos, sin es
 - Max ~30 entries — when approaching the limit, consolidate or remove entries that are now obvious from the code
 - If no knowledge was extracted in Step 4, skip this step
 
+**Cross-link to KG.** If the orchestrator's Phase 6 saved KG entities for this feature (the orchestrator passes the list of saved entity names in its handoff), append a `[kg]` bullet for each entity so a reader of `docs/knowledge.md` knows where the deeper context lives:
+
+```markdown
+- **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/memory show {entity-name}`
+```
+
+Example:
+- **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/memory show nextjs-prisma-trpc-b2b-saas`
+
+**Rules for the `[kg]` bullets:**
+- Only add bullets for entities the orchestrator confirms were saved this run (from its Phase 6 entity list) — do NOT guess.
+- Skip if `docs/knowledge.md` does not exist.
+- Deduplicate — skip if the entity name already appears in the file.
+- One bullet per entity; omit entities that only triggered `add_observations` (already cross-linked in a prior run).
+
 ### Step 5c — Archive Spec (if valuable)
 
 If the feature was non-trivial (had >2 AC or documented significant decisions), archive the final spec for future reference:

@@ -538,6 +538,94 @@ check("CHANGELOG.md [Unreleased] mentions TL;DR + Stage column + narrative timel
       "CHANGELOG entry for human-readable state surface missing or incomplete")
 
 # ---------------------------------------------------------------------------
+# Suite 14 — KG vocabulary expansion + subagent KG access
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 14: KG vocabulary + subagent KG access ===")
+
+# 1. orchestrator declares the new entity types
+check("orchestrator.md Phase 6 entity-type list includes 'project'",
+      "project" in orch and "Entity type:" in orch and "project`" in orch,
+      "'project' entity type not in Phase 6 entity-type allowlist")
+check("orchestrator.md Phase 6 entity-type list includes 'service'",
+      "service`" in orch,
+      "'service' entity type not in Phase 6 entity-type allowlist")
+check("orchestrator.md Phase 6 entity-type list includes 'stack-profile'",
+      "stack-profile" in orch,
+      "'stack-profile' entity type not in Phase 6 entity-type allowlist")
+
+# 2. orchestrator declares the new relation types with their pairs
+for rel in ("belongs-to", "calls", "uses-stack", "depends-on"):
+    check(f"orchestrator.md Phase 6 declares relation '{rel}'",
+          rel in orch,
+          f"relation type '{rel}' not declared in Phase 6")
+
+# 3. orchestrator declares explicit Save triggers subsection
+check("orchestrator.md Phase 6 has Save triggers subsection",
+      "Save triggers" in orch,
+      "Save triggers subsection missing in Phase 6")
+
+# 4. orchestrator budget is now soft cap 5
+check("orchestrator.md Phase 6 budget is soft cap 5 (not hard 3)",
+      "Soft cap 5" in orch and "Max 3 entities per pipeline run" not in orch,
+      "Phase 6 budget still says hard cap 3 or missing soft cap 5")
+
+# 5. Subagents have KG read-only tools in frontmatter
+for agent_name in ("architect", "qa", "tester", "security"):
+    agent_text = read(AGENTS_DIR / f"{agent_name}.md")
+    fm = parse_frontmatter(agent_text)
+    tools_str = fm.get("tools", "")
+    tools_list = [t.strip() for t in tools_str.split(",")]
+    check(f"agents/{agent_name}.md has mcp__memory__search_nodes",
+          "mcp__memory__search_nodes" in tools_list,
+          f"{agent_name} missing mcp__memory__search_nodes in tools")
+    check(f"agents/{agent_name}.md has mcp__memory__open_nodes",
+          "mcp__memory__open_nodes" in tools_list,
+          f"{agent_name} missing mcp__memory__open_nodes in tools")
+    check(f"agents/{agent_name}.md has Knowledge Graph Access section",
+          "Knowledge Graph Access" in agent_text,
+          f"{agent_name} missing the KG Access prompt section")
+    check(f"agents/{agent_name}.md KG Access section forbids writes",
+          "Knowledge Graph Access" in agent_text and "create_entities" in agent_text and ("Do NOT" in agent_text or "NEVER" in agent_text),
+          f"{agent_name} KG Access section does not explicitly forbid writes")
+
+# 6. Excluded agents do NOT have KG tools (regression guard)
+for agent_name in ("implementer", "delivery", "plan-reviewer", "reviewer"):
+    fm = parse_frontmatter(read(AGENTS_DIR / f"{agent_name}.md"))
+    tools_list = [t.strip() for t in fm.get("tools", "").split(",")]
+    check(f"agents/{agent_name}.md excludes mcp__memory__* (per design)",
+          "mcp__memory__search_nodes" not in tools_list and "mcp__memory__open_nodes" not in tools_list,
+          f"{agent_name} unexpectedly has KG tools — design says these agents are read-excluded")
+
+# 7. delivery.md Step 5b includes [kg] cross-link template
+check("delivery.md Step 5b includes [kg] cross-link bullet",
+      "[kg]" in delivery and "Step 5b" in delivery,
+      "[kg] cross-link template not added to Step 5b")
+
+# 8. orchestrator Phase 6 documents the docs/knowledge.md append
+check("orchestrator.md Phase 6 appends [kg] bullets to docs/knowledge.md",
+      "[kg]" in orch and "docs/knowledge.md" in orch,
+      "Phase 6 docs/knowledge.md cross-link append not documented")
+
+# 9. init.md still creates docs/knowledge.md placeholder (option (a) confirmed)
+init_md = read(AGENTS_DIR / "init.md")
+check("init.md still creates docs/knowledge.md placeholder (option a)",
+      "docs/knowledge.md" in init_md and "Create docs/knowledge.md" in init_md,
+      "init.md no longer documents creating docs/knowledge.md — option (a) violated")
+
+# 10. memory skill documents new types
+mem_skill = read(SKILLS_DIR / "memory.md")
+for new_type in ("project", "service", "stack-profile"):
+    check(f"skills/memory.md documents '{new_type}' as a type filter",
+          new_type in mem_skill,
+          f"new type '{new_type}' not documented in /memory list filter")
+
+# 11. CHANGELOG entry
+check("CHANGELOG.md [Unreleased] mentions KG vocabulary expansion",
+      "[Unreleased]" in changelog and "stack-profile" in changelog,
+      "CHANGELOG [Unreleased] missing stack-profile reference")
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

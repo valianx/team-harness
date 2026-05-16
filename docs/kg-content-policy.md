@@ -6,6 +6,38 @@
 
 ---
 
+## Entity & Relation Types
+
+The KG stores entities and relations. The system uses a fixed vocabulary so semantic searches stay predictable (ChromaDB itself stores `entityType` and `relationType` as free-text metadata).
+
+**Entity types (9).**
+
+| Type | Meaning | Naming convention |
+|---|---|---|
+| `pattern` | Reusable code or architecture pattern | kebab-case, descriptive |
+| `error` | Bug or failure mode + fix | kebab-case, technology-prefixed (`prisma-sqlite-...`) |
+| `constraint` | Technical limitation discovered | kebab-case |
+| `decision` | Key technical decision + rationale | kebab-case |
+| `tool-gotcha` | Library or tool pitfall | kebab-case, technology-prefixed |
+| `process-insight` | Pipeline or process learning | kebab-case |
+| `project` | Repository-level inventory | bare repo name (e.g. `zippy-backoffice`) |
+| `service` | Deployable inside a project | bare service name (e.g. `payment-gateway`) |
+| `stack-profile` | Reusable tech-stack combination for an archetype | kebab-case, archetype-suffixed (e.g. `b2b-saas-stack`) |
+
+**Relation types (5).**
+
+| Type | From → To | Meaning |
+|---|---|---|
+| `relates_to` | any → any | Generic edge (legacy; prefer specific types when possible) |
+| `belongs-to` | service → project | Service ownership |
+| `calls` | service → service | Runtime cross-service IO (HTTP, RPC, queue message) |
+| `uses-stack` | project → stack-profile | Project adopts a stack profile |
+| `depends-on` | service → service | Build or deploy ordering (distinct from runtime `calls`) |
+
+Anything outside this vocabulary should not be created until the policy is updated in this file.
+
+---
+
 ## ✅ Allowed
 
 - **Reusable code patterns** (framework conventions, recurring solutions).
