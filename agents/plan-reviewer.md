@@ -24,6 +24,7 @@ Concretely, the team's rules are:
 3. **Consolidated final documents.** Analysis artifacts in `session-docs/` are deliverables, not iteration logs. Version markers, strikethrough, "previously decided", inline changelogs, dated section headers contaminate the deliverable.
 4. **Cross-reference integrity.** `02-task-list.md` references `01-architecture.md`; every file in the Work Plan appears in some PR's `Files:` field.
 5. **Service identity.** The set of services declared in `01-architecture.md` (`Services Touched`) matches the union of `Service:` fields across all PRs in `02-task-list.md`.
+6. **Human-readability sections.** `01-architecture.md` opens with `## TL;DR` (3-6 lines, hard cap 10) and `## Decisions for human review` (3-5 bullets, hard cap 7). `02-task-list.md` opens with `## Summary` table covering every PR. These are the human's entry points at STAGE-GATE-1 — without them the reviewer is forced to read 800+ lines to decide.
 
 None of these can be audited by `qa` or `acceptance-checker` without folding plan-shape into agents that already have distinct concerns. A separate, narrow, read-only agent keeps responsibilities clean and the audit deterministic.
 
@@ -189,17 +190,70 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 
 **Severity:** `concerns`.
 
+### Rule 6 — Human-readability sections
+
+**What to check:**
+
+1. `01-architecture.md` contains a top-of-document `## TL;DR` section. The section body has between 1 and 10 non-empty lines (excluding the heading itself and blank lines). 0 lines = section missing or empty; >10 lines = bloated.
+2. `01-architecture.md` contains a top-of-document `## Decisions for human review` section. The section body has between 1 and 7 bulleted items (`- ` at start of line). 0 items = section missing or empty; >7 items = bloated; an explicit single bullet of "No human-judgement decisions required — all trade-offs follow established project patterns. → decided" is valid (1 item, passes).
+3. `02-task-list.md` contains a top-of-document `## Summary` section that is a markdown table with at least 2 data rows (one per PR; if the plan has only 1 PR, 1 data row is allowed). Empty `## Summary` heading without a table = finding.
+4. `## TL;DR` appears BEFORE `## Documentation Consulted` in `01-architecture.md` (positional check — these sections must be the entry point).
+5. `## Decisions for human review` appears AFTER `## TL;DR` and BEFORE `## Documentation Consulted`.
+
+**Detection algorithm:**
+
+```
+arch = read 01-architecture.md
+tldr_section = extract section "## TL;DR" body up to next "## "
+decisions_section = extract section "## Decisions for human review" body up to next "## "
+
+if tldr_section is None:
+    findings.append(("Rule 6: 01-architecture.md missing ## TL;DR section", FAIL))
+elif tldr_section.line_count == 0:
+    findings.append(("Rule 6: ## TL;DR is empty", FAIL))
+elif tldr_section.line_count > 10:
+    findings.append(("Rule 6: ## TL;DR exceeds 10 lines (got {N}) — bloated; trim to 3-6", CONCERNS))
+
+if decisions_section is None:
+    findings.append(("Rule 6: 01-architecture.md missing ## Decisions for human review", FAIL))
+elif decisions_section.bullet_count == 0:
+    findings.append(("Rule 6: ## Decisions for human review has no bullets — use the explicit 'No human-judgement decisions required' bullet if there are none", FAIL))
+elif decisions_section.bullet_count > 7:
+    findings.append(("Rule 6: ## Decisions for human review has >7 bullets — many of those are likely mechanical decisions that do NOT belong here", CONCERNS))
+
+task_list = read 02-task-list.md
+summary_section = extract section "## Summary" body up to next "## "
+
+if summary_section is None or no markdown table inside:
+    findings.append(("Rule 6: 02-task-list.md missing ## Summary table", FAIL))
+elif data_row_count(summary_section) < (1 if 1 PR else 2):
+    findings.append(("Rule 6: ## Summary table has fewer data rows than PRs declared", FAIL))
+
+# Positional checks
+if 01-architecture.md's first ## heading is not ## TL;DR:
+    findings.append(("Rule 6: ## TL;DR must be the first section of 01-architecture.md", CONCERNS))
+if 01-architecture.md's index_of(## Decisions for human review) > index_of(## Documentation Consulted):
+    findings.append(("Rule 6: ## Decisions for human review must appear before ## Documentation Consulted", CONCERNS))
+```
+
+**Severity:**
+- Missing section, empty section, or table missing → `fail`. The human has no entry point; the gate cannot fire usefully.
+- Overflow (>10 TL;DR lines, >7 decision bullets) → `concerns`. The sections exist but are too dense; the human can still read but the architect should trim.
+- Out-of-order sections → `concerns`. The sections exist with content but not at the top.
+
+**Override:** the architect may add a `Plan-reviewer override: Rule 6 — {one-line justification}` block inside the affected section to degrade `fail` to `concerns`. Overuse is itself a smell — the human sees it at the gate.
+
 ---
 
 ## Verdict Calibration
 
 | Verdict | When |
 |---|---|
-| `pass` | Zero findings. All five rules satisfied. |
-| `concerns` | Findings exist but all are in rules 3, 4, or 5 (document shape, cross-ref hygiene, identity declaration), OR findings in rules 1/2 carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
-| `fail` | Any finding in rule 1 (PR-count) or rule 2 (per-PR ACs) without an override. These are core contract violations; the architect must fix before the plan reaches the human. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips per CLAUDE.md/orchestrator.md). |
+| `pass` | Zero findings. All six rules satisfied. |
+| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration) or rule 6 overflow/order (sections exist but bloated or out of order), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
+| `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), or rule 6 missing-section without an override. These are core contract violations: rules 1-2 because the plan is structurally wrong for downstream agents; rule 6 because the human has no entry point at the gate. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
 
-**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1 and 2 are; rules 3-5 are not.
+**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, and 6-missing are; rules 3, 4, 5, and 6-overflow/order are not.
 
 ---
 
@@ -221,6 +275,7 @@ Write the audit report to `session-docs/{feature-name}/01-plan-review.md`. **Ove
 | 3 — Consolidated documents | {N} | concerns |
 | 4 — Cross-reference integrity | {N} | concerns |
 | 5 — Service identity | {N} | concerns |
+| 6 — Human-readability sections | {N} | mixed (missing=fail, overflow/order=concerns) |
 | **Total** | **{N}** | — |
 
 ## Findings
@@ -249,6 +304,13 @@ Write the audit report to `session-docs/{feature-name}/01-plan-review.md`. **Ove
 - 01-architecture.md: `## Services Touched` section missing.
 - 02-task-list.md: PR-3 declares Service `transactions-service` which is not in `## Services Touched` of 01-architecture.md.
 (or "None — services declared in both documents match exactly.")
+
+### Rule 6 — Human-readability sections
+- 01-architecture.md:{line} — `## TL;DR` missing or empty (FAIL).
+- 01-architecture.md:{line} — `## Decisions for human review` has {N} bullets > 7 (CONCERNS — likely contains mechanical decisions).
+- 02-task-list.md:{line} — `## Summary` table absent or empty (FAIL).
+- 01-architecture.md: `## TL;DR` is not the first section (CONCERNS).
+(or "None — TL;DR / Decisions / Summary all present, sized appropriately, and ordered correctly.")
 
 ### Overrides honoured
 - PR-{id}: `Plan-reviewer override: <one-line justification>` on Rule {N}. Finding kept; severity degraded from fail to concerns.
@@ -294,6 +356,11 @@ findings:
   - rule-3: {count}
   - rule-4: {count}
   - rule-5: {count}
+  - rule-6: {count}
+human_entry_points:
+  tldr: {true|false}
+  decisions_for_human_review: {true|false}
+  task_list_summary: {true|false}
 issues: {list of failing rule labels with the failing PR or file, or "none"}
 ```
 
