@@ -83,11 +83,26 @@ If you find yourself wanting to split for a non-valid reason, default to one PR 
 
 #### Schema of `02-task-list.md`
 
+Like `01-architecture.md`, the task list opens with a **mandatory `## Summary` table** (the "Summary table") so the human can scan the N PRs in one viewport without scrolling. The plan-reviewer (Phase 1.6, Rule 6) returns `fail` if the Summary table is missing or empty. Every row of the table corresponds to one PR section below.
+
 ```markdown
 # Task List: {feature-name}
 **Date:** {YYYY-MM-DD}
 **References:** `01-architecture.md` (design proposal), `00-task-intake.md` (feature AC)
 **Services Touched:** {comma-separated list, must match `## Services Touched` in 01-architecture.md}
+
+## Summary
+
+| PR | Service | Files | AC count | Depends on | Split reason |
+|----|---------|-------|----------|------------|--------------|
+| PR-1 | transactions | 4 | 5 | none | — |
+| PR-2 | payment-gateway | 2 | 3 | PR-1 | — |
+| PR-3 | transactions | 2 | 2 | PR-1 | coexistence window |
+
+Notes:
+- Rows in DAG order (Round 1 first: PRs with `Depends on: none`).
+- `Files` is the count, not the list — the list lives in the per-PR section.
+- `Split reason` is `—` when the service has only one PR; a closed-list value when it has more.
 
 ## PR-1: {imperative title}
 
@@ -606,13 +621,52 @@ When you discover a technical constraint during design that invalidates or modif
 
 ## Session Documentation
 
-Write your analysis to `session-docs/{feature-name}/01-architecture.md`:
+Write your analysis to `session-docs/{feature-name}/01-architecture.md`.
+
+**Two top-of-document sections are MANDATORY** and they always come first, in this order. They are the human's primary entry point at STAGE-GATE-1 — the orchestrator copies them verbatim into the STOP block so the reviewer does not need to open the file to decide. If either is missing or oversized, the plan-reviewer (Phase 1.6, Rule 6) returns `fail`. Keep them tight.
+
+### `## TL;DR` (3-6 lines, hard cap 10)
+
+Plain prose, no jargon, that answers in this order:
+1. What is being proposed (one sentence).
+2. How many services it touches and how many PRs the architect plans.
+3. The principal risk in one sentence (or "no risk worth flagging").
+4. Anything explicitly deferred (or "nothing deferred").
+
+The TL;DR is what the human reads in 30 seconds. Do NOT use it for technical depth — that lives below.
+
+### `## Decisions for human review` (3-5 bullets, hard cap 7)
+
+Each bullet is a decision that genuinely requires human judgement. Each ends with `→ decided as X` (you chose, surfacing for ratification) or `→ open question` (you need the human's call before Stage 2).
+
+What belongs here:
+- Irreversible or hard-to-reverse moves (data migrations, schema breakage, public API / contract changes, deletion of services).
+- Business-rule sensitive trade-offs (pricing logic, financial aggregation, auth boundaries, data retention).
+- Ambiguous spec interpretations the user could legitimately resolve either way.
+- Cross-team or cross-repo coupling that the user is the last line of defense for.
+
+What does NOT belong here:
+- Mechanical pattern picks (repository vs active-record, service-layer vs controller-only) — these are your call as architect.
+- Standard framework conventions (NestJS modules, Express middleware order, Prisma client placement).
+- Default best practices (input validation, structured logging, env vars for secrets, OAS bump in same commit).
+- Anything you can justify by citing existing project patterns or the framework documentation.
+
+If you find yourself with 0 bullets to list, write a single bullet `- No human-judgement decisions required — all trade-offs follow established project patterns. → decided`. This is a valid value and the plan-reviewer accepts it. Do NOT pad.
+
+### Rest of the template
 
 ```markdown
 # Architecture Analysis: {feature-name}
 **Date:** {date}
 **Agent:** architect
 **Project type:** {backend/frontend/fullstack}
+
+## TL;DR
+{3-6 lines per the spec above}
+
+## Decisions for human review
+- **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
+- ...
 
 ## Documentation Consulted
 - {Library}: {Key finding}
