@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Export the local ChromaDB knowledge graph to a portable JSON file.
+"""Export the local knowledge graph to a portable JSON file.
 
 Usage:
-    uv run --directory chromadb-mcp/ python export.py [--out PATH]
+    uv run --directory knowledge-graph/ python export.py [--out PATH]
 
 Defaults:
     --out      ./<hostname>-<YYYY-MM-DD>.json

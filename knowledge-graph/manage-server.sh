@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
-# ChromaDB MCP SSE Server Manager
+# Knowledge Graph MCP SSE Server Manager
 # Usage: manage-server.sh {start|stop|status|restart}
 #
-# Starts the ChromaDB MCP server in SSE mode so both Windows and WSL
+# Starts the knowledge-graph MCP server in SSE mode so both Windows and WSL
 # Claude Code instances can connect to http://localhost:8421/sse
 #
-# Environment variables:
-#   CHROMADB_MCP_DIR  — server directory (default: ~/.claude/chromadb-mcp)
-#   CHROMADB_PATH     — database directory (default: ~/.claude/chromadb)
-#   CHROMADB_PORT     — SSE port (default: 8421)
-#   CHROMADB_HOST     — SSE host (default: 127.0.0.1)
+# Environment variables (with backward-compatible fallbacks for 1.0.x users):
+#   KNOWLEDGE_GRAPH_DIR  — server directory (default: ~/.claude/knowledge-graph)
+#   CHROMADB_PATH        — database directory (default: ~/.claude/chromadb) — the
+#                          persistent store is still ChromaDB internally; the path
+#                          is an implementation detail and may change if the
+#                          backend is swapped.
+#   CHROMADB_PORT        — SSE port (default: 8421)
+#   CHROMADB_HOST        — SSE host (default: 127.0.0.1)
+#
+# Legacy env var CHROMADB_MCP_DIR (pre-1.1) is honoured if KNOWLEDGE_GRAPH_DIR
+# is unset; this is removed in 2.0.
 
 set -euo pipefail
 
-SERVER_DIR="${CHROMADB_MCP_DIR:-$HOME/.claude/chromadb-mcp}"
+SERVER_DIR="${KNOWLEDGE_GRAPH_DIR:-${CHROMADB_MCP_DIR:-$HOME/.claude/knowledge-graph}}"
 PID_FILE="$SERVER_DIR/.server.pid"
 LOG_FILE="$SERVER_DIR/server.log"
 PORT="${CHROMADB_PORT:-8421}"

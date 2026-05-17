@@ -10,9 +10,9 @@ Thumbs.db
 .idea/
 *.swp
 
-# Python (chromadb-mcp)
+# Python (knowledge-graph)
 **/__pycache__/
 *.pyc
-chromadb-mcp/.venv/
-chromadb-mcp/.server.pid
-chromadb-mcp/server.log
+knowledge-graph/.venv/
+knowledge-graph/.server.pid
+knowledge-graph/server.log

@@ -1,8 +1,10 @@
-# chromadb-mcp/
+# knowledge-graph/
 
-ChromaDB-backed knowledge-graph MCP server. Gives Claude Code semantic memory across projects.
+Knowledge-graph MCP server. Gives Claude Code semantic memory across projects.
 
-This folder gets installed to `~/.claude/chromadb-mcp/`. The data itself (entities, relations, embeddings) lives in `~/.claude/chromadb/`, which **this repo never touches**. Each developer builds their own local KG as they work.
+The current backend is **ChromaDB** (embedded, local, free). The folder name, agent prompts, and external docs are intentionally backend-agnostic so that future implementations (cloud-managed KG, alternative vector DB) can be added without renaming anything user-facing — see `project_pinecone_backend_spike_pending` in memory.
+
+This folder gets installed to `~/.claude/knowledge-graph/`. The data itself (entities, relations, embeddings) lives in `~/.claude/chromadb/` — that path is owned by the ChromaDB backend; if the backend is swapped in the future, the data path may change accordingly. **This repo never touches the data.** Each developer builds their own local KG as they work.
 
 This README is the **canonical reference** for everything you can do with the KG: viewing, editing, sharing, running the server, and migrating.
 
@@ -28,7 +30,7 @@ Quick reference for every KG operation, grouped by intent. All paths are relativ
 | What | How |
 |---|---|
 | Web viewer (recommended) | Inside Claude Code: `/kg-viewer start` — spawns the viewer on `http://localhost:8420`. Also: `stop`, `status`, `restart`. |
-| Web viewer (manual) | `uv run --directory chromadb-mcp/ python viewer/app.py` — same UI, started manually. |
+| Web viewer (manual) | `uv run --directory knowledge-graph/ python viewer/app.py` — same UI, started manually. |
 | From inside Claude | `/memory search <query>` or `/memory show <name>` — semantic search and entity inspection without leaving the conversation. |
 | From inside Claude | `/memory list` — paginated listing of entities. |
 | From inside Claude | `/memory stats` — totals by entity type. |
@@ -49,12 +51,12 @@ Dev A exports their KG (or a subset) to a JSON file; Dev B imports it into their
 
 ```bash
 # Dev A — export
-uv run --directory chromadb-mcp/ python export.py --out shared-knowledge/<name>-<date>.json
+uv run --directory knowledge-graph/ python export.py --out shared-knowledge/<name>-<date>.json
 
 # Open a PR adding the file under shared-knowledge/. Review focuses on content.
 
 # Dev B — after pulling the merged file
-uv run --directory chromadb-mcp/ python import.py shared-knowledge/<name>-<date>.json
+uv run --directory knowledge-graph/ python import.py shared-knowledge/<name>-<date>.json
 ```
 
 Full workflow and conventions: [`shared-knowledge/README.md`](../shared-knowledge/README.md).
@@ -64,16 +66,16 @@ Full workflow and conventions: [`shared-knowledge/README.md`](../shared-knowledg
 | Mode | When to use | Command |
 |---|---|---|
 | **stdio** (default) | Every developer, every day. | No action needed — Claude Code spawns it on demand using the entry registered by the installer in `~/.claude.json`. |
-| **SSE** (optional) | Sharing a single KG across Windows + WSL Claude Code instances. | `./chromadb-mcp/manage-server.sh start` — plus `stop`, `status`, `restart`. Listens on `http://localhost:8421/sse`. Requires updating `~/.claude.json` to point `memory` MCP at that URL. |
+| **SSE** (optional) | Sharing a single KG across Windows + WSL Claude Code instances. | `./knowledge-graph/manage-server.sh start` — plus `stop`, `status`, `restart`. Listens on `http://localhost:8421/sse`. Requires updating `~/.claude.json` to point `memory` MCP at that URL. |
 
 Most developers never need SSE. Start there only if you have a concrete reason.
 
 ### Migrate from legacy Memory MCP
 
-If you previously used the original Memory MCP with a `~/.claude/knowledge.json` file, one-shot migrate it into ChromaDB:
+If you previously used the original Memory MCP with a `~/.claude/knowledge.json` file, one-shot migrate it into the knowledge graph:
 
 ```bash
-uv run --directory chromadb-mcp/ python migrate_knowledge.py
+uv run --directory knowledge-graph/ python migrate_knowledge.py
 # --source <path> to override; default ~/.claude/knowledge.json
 # --db-path <path> to override; default ~/.claude/chromadb
 # Backs up the original to knowledge.json.bak after import.
@@ -96,7 +98,7 @@ The MCP server is registered in `~/.claude.json` by the installer as:
   "memory": {
     "type": "stdio",
     "command": "uv",
-    "args": ["run", "--directory", "~/.claude/chromadb-mcp", "python", "-m", "server"],
+    "args": ["run", "--directory", "~/.claude/knowledge-graph", "python", "-m", "server"],
     "env": {}
   }
 }
@@ -104,14 +106,13 @@ The MCP server is registered in `~/.claude.json` by the installer as:
 
 Claude Code spawns the server on demand; no long-running process is required.
 
-## Storage
+## Storage (backend-specific)
 
-- **Database path**: `$CHROMADB_PATH` (default `~/.claude/chromadb`).
-- Persistent SQLite + HNSW embeddings.
-- Embedding model: `all-MiniLM-L6-v2` (~80 MB, downloaded on first run).
+- **Current backend**: ChromaDB (PersistentClient + HNSW). Database path is `$CHROMADB_PATH` (default `~/.claude/chromadb`). Embedding model: `all-MiniLM-L6-v2` (~80 MB, downloaded on first run).
+- The storage location and embedding model are properties of the current backend. They are not part of the user-facing knowledge-graph contract; a future backend swap may change both.
 
 ## Notes
 
-- `README.md` in this folder is contributor documentation; the installer does **not** copy it to `~/.claude/chromadb-mcp/`.
+- `README.md` in this folder is contributor documentation; the installer does **not** copy it to `~/.claude/knowledge-graph/`.
 - Runtime state (`.venv/`, `__pycache__/`, `.server.pid`, `server.log`) is gitignored and skipped by the installer.
-- The web viewer and the MCP server both open the same ChromaDB — changes in one are immediately visible in the other.
+- The web viewer and the MCP server both open the same ChromaDB database — changes in one are immediately visible in the other.

@@ -232,7 +232,7 @@ def register_mcp_servers(context7_key: str) -> Path | None:
 
     backup = backup_claude_json()
 
-    mcp_dir_posix = (CLAUDE_DIR / "chromadb-mcp").as_posix()
+    mcp_dir_posix = (CLAUDE_DIR / "knowledge-graph").as_posix()
 
     mcp_servers = data.setdefault("mcpServers", {})
     mcp_servers["memory"] = {
@@ -286,8 +286,8 @@ def install_hooks() -> None:
 
 def install_chromadb_mcp() -> None:
     copy_dir_recursive(
-        REPO_ROOT / "chromadb-mcp",
-        CLAUDE_DIR / "chromadb-mcp",
+        REPO_ROOT / "knowledge-graph",
+        CLAUDE_DIR / "knowledge-graph",
         executable_ext=".sh",
     )
 

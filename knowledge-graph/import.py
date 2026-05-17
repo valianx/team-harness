@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import a KG JSON export into the local ChromaDB knowledge graph.
+"""Import a KG JSON export into the local knowledge graph.
 
 Merge is non-destructive:
     - Existing entity (same name): observations appended with dedup.
@@ -10,7 +10,7 @@ Merge is non-destructive:
 Local data is never deleted.
 
 Usage:
-    uv run --directory chromadb-mcp/ python import.py PATH
+    uv run --directory knowledge-graph/ python import.py PATH
 
 Defaults:
     --db-path  $CHROMADB_PATH or ~/.claude/chromadb

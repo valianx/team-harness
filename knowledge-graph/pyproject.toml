@@ -1,7 +1,7 @@
 [project]
-name = "chromadb-mcp"
+name = "knowledge-graph"
 version = "1.0.0"
-description = "Knowledge Graph MCP server backed by ChromaDB for cross-project memory"
+description = "Knowledge Graph MCP server for cross-project memory (current backend: ChromaDB)"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "chromadb>=1.0.0",
