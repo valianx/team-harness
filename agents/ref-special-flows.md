@@ -16,7 +16,7 @@ This file is read on-demand by the orchestrator when executing a special flow. I
 When the user asks to investigate, compare technologies, evaluate a migration, or study an approach:
 
 1. **Intake** — classify as `research`
-2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If ChromaDB MCP fails, log "KG: unavailable" and continue.
+2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If the Knowledge Graph MCP fails, log "KG: unavailable" and continue.
 3. **Invoke `architect` in research mode** — explicitly instruct: "This is a research task, produce `00-research.md`"
 4. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
 5. **Present** the research report to the user

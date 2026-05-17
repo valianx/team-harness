@@ -242,10 +242,10 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 **Owner:** You (orchestrator)
 
 1. **Check for existing pipeline** — use Glob to check if `session-docs/{feature-name}/00-state.md` already exists with `status: in_progress` or `status: iterating`. If found, warn the user: "A pipeline for '{feature-name}' is already active at Phase {N}. Use `/recover {feature-name}` to continue it, or confirm you want to start fresh." Wait for confirmation before proceeding. This prevents duplicate pipelines for the same feature.
-2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST action you take before any analysis. Search for related knowledge from past pipelines using ChromaDB MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If ChromaDB MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `session-docs/{feature-name}/00-knowledge-context.md`:
+2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST action you take before any analysis. Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `session-docs/{feature-name}/00-knowledge-context.md`:
    ```markdown
    # Knowledge Context
-   <!-- Auto-generated from ChromaDB knowledge graph. Agents: read this for relevant past insights. -->
+   <!-- Auto-generated from the knowledge graph. Agents: read this for relevant past insights. -->
 
    ## Relevant entities
    - **{entity-name}** ({entityType}): {observation summary}
@@ -1177,7 +1177,7 @@ This phase does NOT iterate — if GitHub update fails, report to the user but c
 
 **MANDATORY for every pipeline that reaches this point.** This is a numbered phase, not optional. If you delivered code, you save knowledge. No exceptions.
 
-Using the ChromaDB MCP tools (if available), save the most reusable insights as entities in the knowledge graph. ChromaDB provides semantic search, so entity names and observations should be descriptive for good retrieval. If ChromaDB MCP is not available, skip silently.
+Using the Knowledge Graph MCP tools (if available), save the most reusable insights as entities in the knowledge graph. The KG provides semantic search, so entity names and observations should be descriptive for good retrieval. If the Knowledge Graph MCP is not available, skip silently.
 
 **What to save:**
 - **Patterns:** architecture patterns chosen and why (e.g., "repository + service layer for NestJS APIs")
@@ -1195,7 +1195,7 @@ Using the ChromaDB MCP tools (if available), save the most reusable insights as 
    - Use `search_nodes` with the entity name and 1-2 key terms from its observations (vector search returns top-N matches; cheap regardless of graph size).
    - If a similar entity exists (same topic, same technology), use `add_observations` to append new observations to the existing entity instead of creating a duplicate.
    - Only use `create_entities` if no similar entity was found.
-3. Create entities with the ChromaDB MCP `create_entities` tool (only if step 2 found no match):
+3. Create entities with the Knowledge Graph MCP `create_entities` tool (only if step 2 found no match):
    - Entity name: short, descriptive (e.g., "prisma-sqlite-enum-workaround")
    - Entity type: `pattern` | `error` | `constraint` | `decision` | `tool-gotcha` | `project` | `service` | `stack-profile`
    - Observations: the insight text, including project name and date
@@ -2072,7 +2072,7 @@ At the end of a successful orchestration, report to the user:
 
 When invoked with a `Direct Mode Task` (from a skill), execute only the specified flow — not the full pipeline. Set up session-docs as needed, invoke the agent, report results, and STOP. If a required prerequisite is missing, inform the user.
 
-**MANDATORY — KG consultation in direct modes:** Before invoking any agent in a direct mode, you MUST call ChromaDB MCP `search_nodes` with 1-2 semantic queries relevant to the task. If results are found, write `00-knowledge-context.md` (same format as Phase 0a Step 2) so the downstream agent has past insights. If ChromaDB MCP fails or is unavailable, log "KG: unavailable" and continue. The only exceptions are `init` and `recover` (which have no session-docs context to enrich).
+**MANDATORY — KG consultation in direct modes:** Before invoking any agent in a direct mode, you MUST call the Knowledge Graph MCP `search_nodes` with 1-2 semantic queries relevant to the task. If results are found, write `00-knowledge-context.md` (same format as Phase 0a Step 2) so the downstream agent has past insights. If the Knowledge Graph MCP fails or is unavailable, log "KG: unavailable" and continue. The only exceptions are `init` and `recover` (which have no session-docs context to enrich).
 
 | Mode | Agent | Prerequisites | Flow |
 |------|-------|--------------|------|

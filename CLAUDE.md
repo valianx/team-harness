@@ -6,7 +6,7 @@
 
 ## 1. Purpose & Boundaries
 
-**What this repo is.** `claude-dev-team` is a **distribution of a Claude Code agent system**. It packages a curated set of agents (system prompts), skills (slash commands), hooks (OS-native notifications), a ChromaDB-backed knowledge-graph MCP server, and a cross-platform installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
+**What this repo is.** `claude-dev-team` is a **distribution of a Claude Code agent system**. It packages a curated set of agents (system prompts), skills (slash commands), hooks (OS-native notifications), a knowledge-graph MCP server (current backend: ChromaDB), and a cross-platform installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
 
 **What this repo is NOT.**
 - Not an application, library, API, or service.
@@ -15,7 +15,7 @@
 - Not a general-purpose framework — it encodes a specific opinionated workflow (orchestrator + specialized subagents + SDD pipeline).
 
 **External dependencies (required).**
-- `uv` — Python toolchain manager. Runs the installer and the ChromaDB MCP server. Install: https://docs.astral.sh/uv/getting-started/installation/
+- `uv` — Python toolchain manager. Runs the installer and the knowledge-graph MCP server. Install: https://docs.astral.sh/uv/getting-started/installation/
 - `gh` — GitHub CLI. Used by `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/
 - **context7 API key** — for library docs retrieval. Get one at https://context7.com/ (the installer prompts for it or reads `CONTEXT7_API_KEY` from the environment).
 
@@ -43,7 +43,7 @@ claude-dev-team/
 │   ├── notify-mac.sh
 │   ├── notify-linux.sh
 │   └── config.json      Per-OS hook templates for ~/.claude/settings.json
-├── chromadb-mcp/        Knowledge-graph MCP server (Python + ChromaDB)
+├── knowledge-graph/        Knowledge-graph MCP server (Python + ChromaDB)
 │   ├── server.py
 │   ├── pyproject.toml
 │   ├── uv.lock
@@ -67,10 +67,10 @@ claude-dev-team/
 - `agents/` — system prompts only. One `.md` = one agent.
 - `skills/` — slash-command entry points. Most are thin: parse args → route to orchestrator. A few are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/kg-viewer`).
 - `hooks/` — keep these **generic and portable** (no personal tokens, no private endpoints). User-specific hooks belong in `~/.claude/hooks/`, not here.
-- `chromadb-mcp/` — the KG MCP server source. Runtime state (`.venv/`, `.server.pid`, `server.log`, `__pycache__/`) is git-ignored.
+- `knowledge-graph/` — the KG MCP server source. Runtime state (`.venv/`, `.server.pid`, `server.log`, `__pycache__/`) is git-ignored.
 - `bin/install.py` — **stdlib-only** by design. If a dep becomes necessary, declare it in the PEP 723 header and keep the script runnable via `uv run`.
 
-**Ephemeral content** (not committed): `session-docs/`, all runtime artifacts inside `chromadb-mcp/`.
+**Ephemeral content** (not committed): `session-docs/`, all runtime artifacts inside `knowledge-graph/`.
 
 ---
 
@@ -89,7 +89,7 @@ claude-dev-team/
 
 **Current version:** `1.0.0` (see `bin/install.py` `__version__` and `CHANGELOG.md`).
 
-**No package manager, no lockfile, no build for the installer.** `bin/install.py` has zero third-party deps by design. `chromadb-mcp/` is the one exception and uses `pyproject.toml` + `uv.lock` (managed by `uv`).
+**No package manager, no lockfile, no build for the installer.** `bin/install.py` has zero third-party deps by design. `knowledge-graph/` is the one exception and uses `pyproject.toml` + `uv.lock` (managed by `uv`).
 
 ---
 
@@ -106,11 +106,11 @@ All commands run from the repo root.
 | View which files the installer would touch | Run the installer — it reports installed / unchanged / conflicts; never overwrites |
 | Resolve a conflict | Delete the conflicting file in `~/.claude/...` and re-run the installer |
 | Enable notification hooks | Open `hooks/config.json`, copy the section for your OS, merge it into `~/.claude/settings.json` under `"hooks"` |
-| Start the KG MCP in SSE mode | `./chromadb-mcp/manage-server.sh start` (optional; stdio mode is the default and needs no server) |
-| Open the KG viewer | `uv run chromadb-mcp/viewer/app.py` |
-| Export local KG to JSON | `uv run --directory chromadb-mcp/ python export.py --out shared-knowledge/<name>-<date>.json` |
-| Import a shared KG JSON | `uv run --directory chromadb-mcp/ python import.py shared-knowledge/<file>.json` |
-| Migrate from legacy Memory MCP | `uv run chromadb-mcp/migrate_knowledge.py --source ~/.claude/knowledge.json` |
+| Start the KG MCP in SSE mode | `./knowledge-graph/manage-server.sh start` (optional; stdio mode is the default and needs no server) |
+| Open the KG viewer | `uv run knowledge-graph/viewer/app.py` |
+| Export local KG to JSON | `uv run --directory knowledge-graph/ python export.py --out shared-knowledge/<name>-<date>.json` |
+| Import a shared KG JSON | `uv run --directory knowledge-graph/ python import.py shared-knowledge/<file>.json` |
+| Migrate from legacy Memory MCP | `uv run knowledge-graph/migrate_knowledge.py --source ~/.claude/knowledge.json` |
 | Validate agents/skills health | `/lint` inside Claude Code |
 | Run the verification suite (policy-block + structure + YAML frontmatter) | `bash tests/run-all.sh` |
 | Run only the policy-block functional tests | `bash tests/test_policy_block.sh` |
@@ -202,10 +202,10 @@ The repo has a verification suite at `tests/` that covers what is testable witho
 
 This repo ships assets to other developers, so the contribution flow matters more than code-level conventions.
 
-- **Develop in `agents/`, `skills/`, `hooks/`, `chromadb-mcp/` directly.** Do not edit `~/.claude/` by hand for changes you intend to share — they'll get overwritten or drift.
+- **Develop in `agents/`, `skills/`, `hooks/`, `knowledge-graph/` directly.** Do not edit `~/.claude/` by hand for changes you intend to share — they'll get overwritten or drift.
 - **Propagate via installer.** After editing, run `./bin/install.sh` (or `uv run bin/install.py`) locally to sync into your own `~/.claude/`. The installer refuses to overwrite conflicts, so delete the target file if it already exists with a different hash.
 - **Complex skills** live in `skills/{name}/` with a `SKILL.md` plus any `references/`. The installer recursively copies the whole subfolder to `~/.claude/skills/{name}/`.
-- **Never commit personal data.** Hooks must be generic (no tokens, no private endpoints). The chromadb-mcp source has the same rule — never commit runtime state, API keys, or machine paths.
+- **Never commit personal data.** Hooks must be generic (no tokens, no private endpoints). The knowledge-graph source has the same rule — never commit runtime state, API keys, or machine paths.
 
 ---
 
@@ -223,7 +223,7 @@ Routing table for this repo:
 |---|---|---|
 | Add/modify an agent, add/modify a skill, refactor the pipeline | `architect` + `agent-builder` | Design doc + updated `.md` files |
 | Installer changes, hooks refactor, cross-platform fixes | `architect` → `implementer` | Architecture note + code changes |
-| ChromaDB MCP changes (schema, API surface, storage layout) | `architect` → `implementer` | Architecture note + code changes; migration if storage touched |
+| Knowledge-graph MCP changes (schema, API surface, storage layout) | `architect` → `implementer` | Architecture note + code changes; migration if storage touched |
 | Tests (if/when introduced) | `tester` | Test plan + tests with factory mocks |
 | Acceptance criteria + validation against AC | `qa` | AC list / validation report |
 | Docs, CHANGELOG, version bump, branch, commit, PR | `delivery` | Docs + CHANGELOG + commit + PR |

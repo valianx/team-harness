@@ -4,7 +4,7 @@ Drop-off location for knowledge-graph (KG) exports that developers want to share
 
 ## What goes here
 
-JSON files exported from a local ChromaDB KG using `chromadb-mcp/export.py`. Each file is a snapshot of technical knowledge a developer wants to contribute: patterns, gotchas, architectural decisions, library quirks, service inventories.
+JSON files exported from a local knowledge graph using `knowledge-graph/export.py`. Each file is a snapshot of technical knowledge a developer wants to contribute: patterns, gotchas, architectural decisions, library quirks, service inventories.
 
 ## What does NOT go here
 
@@ -19,12 +19,12 @@ The assumption is that the source KG already follows the **technical-only** cont
 
 ```bash
 # On the origin machine — export your local KG
-uv run --directory chromadb-mcp/ python export.py --out shared-knowledge/<name>-<date>.json
+uv run --directory knowledge-graph/ python export.py --out shared-knowledge/<name>-<date>.json
 
 # Open a PR adding the file. Review focuses on content, not format.
 
 # On the destination machine — after pulling the merged file
-uv run --directory chromadb-mcp/ python import.py shared-knowledge/<name>-<date>.json
+uv run --directory knowledge-graph/ python import.py shared-knowledge/<name>-<date>.json
 ```
 
 The import is **non-destructive**: existing entities get new observations appended (deduped), new entities are created, local data is never deleted.
@@ -35,4 +35,4 @@ The import is **non-destructive**: existing entities get new observations append
 
 ## Status
 
-`export.py` and `import.py` live under `chromadb-mcp/`. The import is **non-destructive**: it merges observations with dedup and never deletes local data. The folder stays empty (except this README) until a dev drops a shared export here.
+`export.py` and `import.py` live under `knowledge-graph/`. The import is **non-destructive**: it merges observations with dedup and never deletes local data. The folder stays empty (except this README) until a dev drops a shared export here.

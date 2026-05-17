@@ -56,7 +56,7 @@ A walkthrough of what happens when you ask for a feature.
 
 ## What's inside
 
-The system ships **17 agents**, **28 skills** (slash commands), three OS-native notification scripts plus a `PreToolUse` policy gate, and one MCP server (the ChromaDB knowledge graph). Full per-component contracts in [`CLAUDE.md`](./CLAUDE.md).
+The system ships **17 agents**, **28 skills** (slash commands), three OS-native notification scripts plus a `PreToolUse` policy gate, and one MCP server (the knowledge graph). Full per-component contracts in [`CLAUDE.md`](./CLAUDE.md).
 
 ### Agents
 
@@ -85,9 +85,9 @@ Slash-commands. Most route into the orchestrator; five are standalone utilities 
 
 `hooks/policy-block.sh` is the `PreToolUse` gate: 48 tested cases deny destructive Bash, force-push, no-verify, SQL DROP/TRUNCATE, writes to secret-bearing paths. Allow-list variants (`.env.example`, `.sample`, `.template`) explicitly permitted. Notification scripts (`notify-windows.sh` / `notify-mac.sh` / `notify-linux.sh`) are optional — merge their config block into `~/.claude/settings.json` to enable.
 
-### Knowledge graph (`chromadb-mcp/`)
+### Knowledge graph (`knowledge-graph/`)
 
-ChromaDB-backed semantic memory across projects. 9 entity types, 5 relation types, web viewer, export/import for non-destructive sharing. Reference: [`chromadb-mcp/README.md`](./chromadb-mcp/README.md), [`docs/kg-content-policy.md`](./docs/kg-content-policy.md).
+Semantic memory across projects. 9 entity types, 5 relation types, web viewer, export/import for non-destructive sharing. Current backend is ChromaDB (embedded, local, free); the folder name and external references are backend-agnostic so an alternative backend (e.g., a cloud-hosted KG) can be added without touching the agent prompts. Reference: [`knowledge-graph/README.md`](./knowledge-graph/README.md), [`docs/kg-content-policy.md`](./docs/kg-content-policy.md).
 
 ---
 
@@ -138,7 +138,7 @@ The installer is idempotent. Unchanged files are skipped; conflicting files (you
 
 ## Contributing
 
-Develop against the source files in `agents/`, `skills/`, `hooks/`, `chromadb-mcp/` — not `~/.claude/` directly. After editing, re-run the installer to propagate. Working agreements (enforced — see [`CLAUDE.md` §6](./CLAUDE.md)):
+Develop against the source files in `agents/`, `skills/`, `hooks/`, `knowledge-graph/` — not `~/.claude/` directly. After editing, re-run the installer to propagate. Working agreements (enforced — see [`CLAUDE.md` §6](./CLAUDE.md)):
 
 - Feature branch (`feat/<kebab>`, `fix/<kebab>`, `chore/<kebab>`, `docs/<kebab>`, `refactor/<kebab>`) — never commit on `main`.
 - Conventional-commit messages.

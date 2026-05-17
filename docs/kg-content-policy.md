@@ -8,7 +8,7 @@
 
 ## Entity & Relation Types
 
-The KG stores entities and relations. The system uses a fixed vocabulary so semantic searches stay predictable (ChromaDB itself stores `entityType` and `relationType` as free-text metadata).
+The KG stores entities and relations. The system uses a fixed vocabulary so semantic searches stay predictable (the backend stores `entityType` and `relationType` as free-text metadata, regardless of which backend is active).
 
 **Entity types (9).**
 
@@ -85,7 +85,7 @@ The filter lives **in one place only**: at write time.
 
 ## What to do when a violation is detected
 
-- **In your local KG**: delete the entity / observation via the `/memory` skill or the viewer (`uv run chromadb-mcp/viewer/app.py`).
+- **In your local KG**: delete the entity / observation via the `/memory` skill or the viewer (`uv run knowledge-graph/viewer/app.py`).
 - **In a shared file**: reject the PR in `shared-knowledge/`, ask the origin to curate and re-export.
 - **In an agent's prompt**: open a PR adjusting the agent's prompt to comply.
 
@@ -101,6 +101,6 @@ All KG content is written in **English**, regardless of the conversation languag
 
 **Implementation status**:
 - ✅ Filter wired into `orchestrator.md` Phase 6 (Knowledge Save).
-- ✅ `chromadb-mcp/export.py` and `chromadb-mcp/import.py` available.
+- ✅ `knowledge-graph/export.py` and `knowledge-graph/import.py` available.
 
 This policy is **normative for humans and agents**. The orchestrator's filter is the first line of defense at write time; humans curate by reviewing PRs into `shared-knowledge/`.

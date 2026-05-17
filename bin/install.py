@@ -5,7 +5,7 @@
 # ///
 """claude-dev-team installer.
 
-Installs agents, skills, hooks, and the ChromaDB MCP server into ~/.claude/,
+Installs agents, skills, hooks, and the knowledge-graph MCP server into ~/.claude/,
 and registers the `memory` + `context7` MCP servers in ~/.claude.json.
 
 Safe updates:
@@ -284,7 +284,7 @@ def install_hooks() -> None:
     )
 
 
-def install_chromadb_mcp() -> None:
+def install_knowledge_graph() -> None:
     copy_dir_recursive(
         REPO_ROOT / "knowledge-graph",
         CLAUDE_DIR / "knowledge-graph",
@@ -318,7 +318,7 @@ def print_summary(claude_json_backup: Path | None) -> None:
 
     print()
     print("MCP servers registered in ~/.claude.json:")
-    print("  - memory   (ChromaDB-backed knowledge graph)")
+    print("  - memory   (knowledge graph)")
     print("  - context7 (library docs)")
     if claude_json_backup:
         print(f"  backup: {claude_json_backup}")
@@ -373,7 +373,7 @@ def main() -> None:
     install_agents()
     install_skills()
     install_hooks()
-    install_chromadb_mcp()
+    install_knowledge_graph()
 
     print("Registering MCP servers in ~/.claude.json...")
     claude_json_backup = register_mcp_servers(context7_key)

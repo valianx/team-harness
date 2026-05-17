@@ -526,7 +526,7 @@ If the file doesn't exist, create it with the header:
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the ChromaDB MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In write mode: a test target uses a framework with known testing gotchas — query before writing tests (e.g., `"Vitest Prisma"`, `"Jest Next.js"`) to surface workarounds like pool settings or mock strategies.
