@@ -25,8 +25,10 @@ import os
 import shutil
 import stat
 import sys
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NamedTuple
 
 __version__ = "1.1.0"
 
@@ -213,6 +215,168 @@ def get_context7_api_key() -> str:
 
 
 # ---------------------------------------------------------------------------
+# KG backend selection
+# ---------------------------------------------------------------------------
+class KGBackendChoice(NamedTuple):
+    backend: str       # "memory" or "context-harness"
+    url: str | None    # only set when backend == "context-harness" AND not skipped
+    skipped: bool      # True if backend == "context-harness" but user chose to skip
+
+
+def _check_url_reachability(url: str, *, interactive: bool) -> bool:
+    """Try GET {base}/healthz where base is url with trailing /mcp stripped.
+
+    Returns True if the URL should be saved, False if the user declined.
+    On non-interactive runs always returns True (warn, don't fail install).
+    """
+    base = url.rstrip("/")
+    if base.endswith("/mcp"):
+        base = base[:-4]
+    health_url = f"{base}/healthz"
+
+    try:
+        req = urllib.request.urlopen(  # noqa: S310 — user-supplied URL, not attacker-controlled
+            urllib.request.Request(health_url, method="GET"),
+            timeout=3,
+        )
+        if req.status == 200:
+            print("  [ok] reachable")
+            return True
+        print(f"  [warn] not reachable: HTTP {req.status}")
+    except Exception as exc:
+        print(f"  [warn] not reachable: {exc}")
+
+    if not interactive:
+        return True  # non-interactive: warn but continue
+
+    raw = input("  URL not responding. Save the entry anyway? [Y/n]: ").strip().lower()
+    return raw not in {"n", "no"}
+
+
+def _prompt_url_cloud() -> str | None:
+    """Prompt for a cloud Render URL. Returns URL string or None if skipped."""
+    print()
+    print("  Render endpoint URL (e.g. https://context-harness-mcp-xyz.onrender.com/mcp).")
+    print("  If you haven't deployed yet, type 'skip' and complete this later by re-running")
+    print("  the installer or editing ~/.claude.json under mcpServers.memory manually.")
+    raw = input("  URL [skip]: ").strip()
+    if not raw or raw.lower() == "skip":
+        return None
+    return raw
+
+
+def _prompt_url_local() -> str:
+    """Prompt for a local Docker URL with a sensible default."""
+    default = "http://localhost:8080/mcp"
+    print()
+    print(f"  Local endpoint URL [{default}]:")
+    print("  (Enter accepts default - assumes you ran 'docker compose up' in context-harness-mcp/)")
+    raw = input("  URL: ").strip()
+    return raw if raw else default
+
+
+def _prompt_context_harness_url() -> KGBackendChoice:
+    """Prompt for hosting type then URL. Returns the final backend choice."""
+    print()
+    print("  Hosting:")
+    print("    1) Cloud (Render+Supabase Free)  (recommended; see context-harness-mcp docs/deployment.md)")
+    print("    2) Local (Docker)                (dev/testing offline; docker compose up in context-harness-mcp/)")
+
+    hosting = _prompt_menu("  Choice [1]: ", choices={"1", "2"}, default="1")
+
+    if hosting == "1":
+        url = _prompt_url_cloud()
+    else:
+        url = _prompt_url_local()
+
+    if url is None:
+        return KGBackendChoice(backend="context-harness", url=None, skipped=True)
+
+    save = _check_url_reachability(url, interactive=True)
+    if not save:
+        return KGBackendChoice(backend="context-harness", url=None, skipped=True)
+
+    return KGBackendChoice(backend="context-harness", url=url, skipped=False)
+
+
+def _prompt_menu(prompt: str, choices: set[str], default: str) -> str:
+    """Re-prompt until the user enters a valid choice or presses Enter for the default."""
+    while True:
+        raw = input(prompt).strip()
+        if not raw:
+            return default
+        if raw in choices:
+            return raw
+        print(f"  Invalid choice '{raw}'. Please enter one of: {', '.join(sorted(choices))}.")
+
+
+def _handle_context_harness_env_url() -> KGBackendChoice:
+    """Resolve context-harness choice from env vars (non-interactive path)."""
+    url = os.environ.get("CONTEXT_HARNESS_URL", "").strip()
+    if not url:
+        print(
+            "Error: KG_BACKEND=context-harness requires CONTEXT_HARNESS_URL to be set.",
+            file=sys.stderr,
+        )
+        print("  Export CONTEXT_HARNESS_URL=https://<your-url>/mcp and re-run.", file=sys.stderr)
+        sys.exit(1)
+
+    print("  KG backend: context-harness (loaded from env vars)")
+    _check_url_reachability(url, interactive=False)
+    return KGBackendChoice(backend="context-harness", url=url, skipped=False)
+
+
+def prompt_kg_backend() -> KGBackendChoice:
+    """Determine KG backend from env vars or interactive prompts.
+
+    Decision priority:
+      1. KG_BACKEND env var (non-interactive / CI / scripted installs).
+      2. Non-interactive without env vars — default to "memory".
+      3. Interactive TTY — prompt the user.
+    """
+    env_backend = os.environ.get("KG_BACKEND", "").strip().lower()
+    is_tty = sys.stdin.isatty()
+
+    # --- Env var path ---
+    if env_backend == "memory":
+        print("  KG backend: memory (loaded from KG_BACKEND env var)")
+        return KGBackendChoice(backend="memory", url=None, skipped=False)
+
+    if env_backend == "context-harness":
+        return _handle_context_harness_env_url()
+
+    if env_backend and env_backend not in {"memory", "context-harness"}:
+        print(
+            f"Error: KG_BACKEND='{env_backend}' is not a recognised value.",
+            file=sys.stderr,
+        )
+        print("  Valid values: memory, context-harness", file=sys.stderr)
+        sys.exit(1)
+
+    # --- Non-interactive without env var ---
+    if not is_tty:
+        print(
+            "  KG backend: memory (default for non-interactive installs)."
+            " Set KG_BACKEND=context-harness + CONTEXT_HARNESS_URL=https://..."
+            " to use the remote backend."
+        )
+        return KGBackendChoice(backend="memory", url=None, skipped=False)
+
+    # --- Interactive TTY ---
+    print()
+    print("  Knowledge Graph backend:")
+    print("    1) context-harness  (Go server + Postgres+pgvector. Cloud or local.)")
+    print("    2) memory           (Python ChromaDB. Local single-machine.)")
+
+    backend_choice = _prompt_menu("  Choice [1]: ", choices={"1", "2"}, default="1")
+
+    if backend_choice == "2":
+        return KGBackendChoice(backend="memory", url=None, skipped=False)
+
+    return _prompt_context_harness_url()
+
+
+# ---------------------------------------------------------------------------
 # ~/.claude.json merge (mcpServers only)
 # ---------------------------------------------------------------------------
 def backup_claude_json() -> Path | None:
@@ -224,7 +388,7 @@ def backup_claude_json() -> Path | None:
     return backup
 
 
-def register_mcp_servers(context7_key: str) -> Path | None:
+def register_mcp_servers(context7_key: str, kg_choice: KGBackendChoice) -> Path | None:
     data: dict = {}
     if CLAUDE_JSON.exists():
         with CLAUDE_JSON.open("r", encoding="utf-8") as f:
@@ -232,15 +396,10 @@ def register_mcp_servers(context7_key: str) -> Path | None:
 
     backup = backup_claude_json()
 
-    mcp_dir_posix = (CLAUDE_DIR / "knowledge-graph").as_posix()
-
     mcp_servers = data.setdefault("mcpServers", {})
-    mcp_servers["memory"] = {
-        "type": "stdio",
-        "command": "uv",
-        "args": ["run", "--directory", mcp_dir_posix, "python", "-m", "server"],
-        "env": {},
-    }
+
+    _write_memory_entry(mcp_servers, kg_choice)
+
     mcp_servers["context7"] = {
         "type": "http",
         "url": "https://mcp.context7.com/mcp",
@@ -252,6 +411,36 @@ def register_mcp_servers(context7_key: str) -> Path | None:
         encoding="utf-8",
     )
     return backup
+
+
+def _write_memory_entry(mcp_servers: dict, kg_choice: KGBackendChoice) -> None:
+    """Write (or omit) the 'memory' mcpServers entry based on the backend choice."""
+    if kg_choice.skipped:
+        # Remove any previously registered entry so we don't leave a stale one.
+        mcp_servers.pop("memory", None)
+        print()
+        print("  [warn] No 'memory' MCP entry written. To complete setup later:")
+        print("    - Deploy context-harness-mcp (see https://github.com/valianx/context-harness-mcp)")
+        print("    - Re-run this installer, OR")
+        print('    - Manually add to ~/.claude.json under mcpServers:')
+        print('      "memory": { "type": "http", "url": "https://<your-render-url>/mcp" }')
+        return
+
+    if kg_choice.backend == "context-harness" and kg_choice.url:
+        mcp_servers["memory"] = {
+            "type": "http",
+            "url": kg_choice.url,
+        }
+        return
+
+    # Default: memory (stdio ChromaDB)
+    mcp_dir_posix = (CLAUDE_DIR / "knowledge-graph").as_posix()
+    mcp_servers["memory"] = {
+        "type": "stdio",
+        "command": "uv",
+        "args": ["run", "--directory", mcp_dir_posix, "python", "-m", "server"],
+        "env": {},
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +522,7 @@ def detect_legacy_chromadb_mcp() -> None:
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-def print_summary(claude_json_backup: Path | None) -> None:
+def print_summary(claude_json_backup: Path | None, kg_choice: KGBackendChoice) -> None:
     os_label = {
         "win32": "windows",
         "darwin": "macos",
@@ -356,7 +545,7 @@ def print_summary(claude_json_backup: Path | None) -> None:
 
     print()
     print("MCP servers registered in ~/.claude.json:")
-    print("  - memory   (knowledge graph)")
+    print(f"  {_format_kg_backend_summary(kg_choice)}")
     print("  - context7 (library docs)")
     if claude_json_backup:
         print(f"  backup: {claude_json_backup}")
@@ -370,6 +559,16 @@ def print_summary(claude_json_backup: Path | None) -> None:
     print(f'  2. To enable notification hooks, open hooks/config.json in this repo,')
     print(f'     copy the "{os_label}" section, and merge it into')
     print(f'     ~/.claude/settings.json under the "hooks" key.')
+
+
+def _format_kg_backend_summary(kg_choice: KGBackendChoice) -> str:
+    if kg_choice.skipped:
+        return "  KG backend: (skipped - no MCP entry written)"
+    if kg_choice.backend == "context-harness" and kg_choice.url:
+        return f"  KG backend: context-harness (http) -> {kg_choice.url}"
+    # memory
+    kg_path = CLAUDE_DIR / "knowledge-graph"
+    return f"  KG backend: memory (stdio) -> {kg_path}"
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +597,10 @@ def main() -> None:
     context7_key = get_context7_api_key()
     print()
 
+    print("Knowledge Graph backend setup:")
+    kg_choice = prompt_kg_backend()
+    print()
+
     ensure_dir(CLAUDE_DIR)
     load_manifest()
     prev_version = _manifest.get("installed_version")
@@ -411,15 +614,20 @@ def main() -> None:
     install_agents()
     install_skills()
     install_hooks()
-    install_knowledge_graph()
+
+    if kg_choice.backend == "memory":
+        install_knowledge_graph()
+    else:
+        print("  knowledge-graph (ChromaDB): skipped (using context-harness backend)")
+
     detect_legacy_chromadb_mcp()
 
     print("Registering MCP servers in ~/.claude.json...")
-    claude_json_backup = register_mcp_servers(context7_key)
+    claude_json_backup = register_mcp_servers(context7_key, kg_choice)
 
     save_manifest()
 
-    print_summary(claude_json_backup)
+    print_summary(claude_json_backup, kg_choice)
 
 
 if __name__ == "__main__":

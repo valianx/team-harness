@@ -102,7 +102,8 @@ All commands run from the repo root.
 | Install (Unix / macOS) | `./bin/install.sh` |
 | Install (Windows PowerShell) | `.\bin\install.ps1` |
 | Install (any OS, with `uv` already present) | `uv run bin/install.py` |
-| Non-interactive install | `CONTEXT7_API_KEY=<key> uv run bin/install.py` |
+| Non-interactive install (memory backend) | `CONTEXT7_API_KEY=<key> uv run bin/install.py` |
+| Non-interactive install (context-harness backend) | `CONTEXT7_API_KEY=<key> KG_BACKEND=context-harness CONTEXT_HARNESS_URL=https://<url>/mcp uv run bin/install.py` |
 | View which files the installer would touch | Run the installer — it reports installed / unchanged / conflicts; never overwrites |
 | Resolve a conflict | Delete the conflicting file in `~/.claude/...` and re-run the installer |
 | Enable notification hooks | Open `hooks/config.json`, copy the section for your OS, merge it into `~/.claude/settings.json` under `"hooks"` |

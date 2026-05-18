@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `bin/install.py`: interactive prompt for KG backend choice (context-harness default, memory fallback) with hosting sub-prompt and soft reachability check; `KG_BACKEND` + `CONTEXT_HARNESS_URL` env vars for non-interactive installs.
+- `install_knowledge_graph()` now skipped when `context-harness` backend is chosen — saves the local ChromaDB Python install when the user has a remote backend.
+
 ### Fixed
 
 - **Orchestrator boot probe + dispatch-blocked exit (`agents/orchestrator.md`).** Replaced the "Mandatory acknowledge step" with a "Mandatory boot sequence" that runs a real `Task(general-purpose, "reply OK")` probe before any other action. If the probe succeeds, the existing flow continues (boot acknowledgment now reflects the probe result). If the probe fails with a "tool unavailable" variant — the recurring failure mode when the orchestrator runs nested as a subagent (e.g., invoked via `@orchestrator` mention or via a skill that routes through `Task(subagent_type=orchestrator)`), where the harness strips `Task` regardless of frontmatter — the orchestrator now takes a structured "Dispatch-blocked exit": writes `status: blocked-no-dispatch` to `00-state.md` (new enum value), appends a `## Handoff` section with the literal probe error and the exact next agent / phase / autonomy state, and emits a fixed response telling top-level Claude how to take over dispatch directly. Removes the wasted "discover the limitation in Phase 2 after spending tokens on a plan you cannot execute" cycle. Dispatch invariant #1 was reworded to be conditional on probe success.

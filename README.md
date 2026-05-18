@@ -32,7 +32,9 @@ Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`uv`]
 
 Restart Claude Code after install so it picks up the new agents and MCP servers. The installer is idempotent and never overwrites existing files (conflicts are reported, not silenced).
 
-> Re-running on a machine with `uv` already present: `uv run bin/install.py`. To skip the context7 prompt: `CONTEXT7_API_KEY=ctx7sk-... uv run bin/install.py`.
+The installer prompts for the **Knowledge Graph backend**: `context-harness` (Go + Postgres+pgvector, cloud or local — default) or `memory` (Python ChromaDB, local single-machine). For unattended installs use `KG_BACKEND=memory` or `KG_BACKEND=context-harness CONTEXT_HARNESS_URL=https://<url>/mcp`.
+
+> Re-running on a machine with `uv` already present: `uv run bin/install.py`. To skip all prompts: `CONTEXT7_API_KEY=ctx7sk-... KG_BACKEND=memory uv run bin/install.py`.
 
 ---
 
