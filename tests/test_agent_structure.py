@@ -570,12 +570,23 @@ check("orchestrator.md Phase 6 budget is soft cap 5 (not hard 3)",
       "Soft cap 5" in orch and "Max 3 entities per pipeline run" not in orch,
       "Phase 6 budget still says hard cap 3 or missing soft cap 5")
 
-# 5. Subagents have KG read-only tools in frontmatter
+# 5. Subagents have KG read-only tools in frontmatter — BOTH backend families
+#    must be present (dual-backend support: prefer context-harness, fall back
+#    to memory; Claude Code filters the allowlist to actually-registered MCPs
+#    at runtime, so listing both is the right way to support either or both).
 for agent_name in ("architect", "qa", "tester", "security"):
     agent_text = read(AGENTS_DIR / f"{agent_name}.md")
     fm = parse_frontmatter(agent_text)
     tools_str = fm.get("tools", "")
     tools_list = [t.strip() for t in tools_str.split(",")]
+    # context-harness (preferred backend)
+    check(f"agents/{agent_name}.md has mcp__context-harness__search_nodes",
+          "mcp__context-harness__search_nodes" in tools_list,
+          f"{agent_name} missing mcp__context-harness__search_nodes in tools")
+    check(f"agents/{agent_name}.md has mcp__context-harness__open_nodes",
+          "mcp__context-harness__open_nodes" in tools_list,
+          f"{agent_name} missing mcp__context-harness__open_nodes in tools")
+    # memory (legacy backend, kept for coexistence)
     check(f"agents/{agent_name}.md has mcp__memory__search_nodes",
           "mcp__memory__search_nodes" in tools_list,
           f"{agent_name} missing mcp__memory__search_nodes in tools")
@@ -589,13 +600,45 @@ for agent_name in ("architect", "qa", "tester", "security"):
           "Knowledge Graph Access" in agent_text and "create_entities" in agent_text and ("Do NOT" in agent_text or "NEVER" in agent_text),
           f"{agent_name} KG Access section does not explicitly forbid writes")
 
-# 6. Excluded agents do NOT have KG tools (regression guard)
+# 6. Excluded agents do NOT have KG tools for EITHER backend (regression guard)
 for agent_name in ("implementer", "delivery", "plan-reviewer", "reviewer"):
     fm = parse_frontmatter(read(AGENTS_DIR / f"{agent_name}.md"))
     tools_list = [t.strip() for t in fm.get("tools", "").split(",")]
     check(f"agents/{agent_name}.md excludes mcp__memory__* (per design)",
           "mcp__memory__search_nodes" not in tools_list and "mcp__memory__open_nodes" not in tools_list,
-          f"{agent_name} unexpectedly has KG tools — design says these agents are read-excluded")
+          f"{agent_name} unexpectedly has memory KG tools — design says these agents are read-excluded")
+    check(f"agents/{agent_name}.md excludes mcp__context-harness__* (per design)",
+          "mcp__context-harness__search_nodes" not in tools_list and "mcp__context-harness__open_nodes" not in tools_list,
+          f"{agent_name} unexpectedly has context-harness KG tools — design says these agents are read-excluded")
+
+# 6b. Orchestrator has the FULL dual-backend 9-tool set (read + write) on both
+#     families. The orchestrator is the only agent that does KG writes, and the
+#     dual-backend allowlist must cover every write tool on both backends so
+#     Claude Code can filter to whichever MCP is actually registered at runtime.
+ORCH_KG_TOOLS = (
+    "search_nodes", "open_nodes",
+    "create_entities", "add_observations", "create_relations",
+    "delete_entities", "delete_observations", "delete_relations",
+    "read_graph",
+)
+orch_fm = parse_frontmatter(read(AGENTS_DIR / "orchestrator.md"))
+orch_tools_list = [t.strip() for t in orch_fm.get("tools", "").split(",")]
+for tool in ORCH_KG_TOOLS:
+    check(f"orchestrator.md has mcp__context-harness__{tool}",
+          f"mcp__context-harness__{tool}" in orch_tools_list,
+          f"orchestrator missing mcp__context-harness__{tool} in tools — dual-backend KG support broken")
+    check(f"orchestrator.md has mcp__memory__{tool}",
+          f"mcp__memory__{tool}" in orch_tools_list,
+          f"orchestrator missing mcp__memory__{tool} in tools — legacy backend support broken")
+
+# 6c. Orchestrator Phase 6 declares the backend-priority directive for writes.
+#     When both context-harness and memory are registered, writes must target
+#     context-harness — encoded explicitly in the orchestrator prompt body.
+check("orchestrator.md Phase 6 declares dual-backend priority for KG writes",
+      "Backend priority for KG writes" in orch
+      and "context-harness" in orch
+      and "MUST target `mcp__context-harness__*`" in orch,
+      "Phase 6 missing the dual-backend priority directive")
 
 # 7. delivery.md Step 5b includes [kg] cross-link template
 check("delivery.md Step 5b includes [kg] cross-link bullet",
@@ -1229,7 +1272,7 @@ KNOWN_TOOLS = {
     "Read", "Edit", "Write", "Bash", "Glob", "Grep", "Task", "WebFetch",
     "WebSearch", "NotebookEdit", "PowerShell",
 }
-KNOWN_MCP_PREFIXES = ("mcp__memory__", "mcp__context7__", "mcp__")
+KNOWN_MCP_PREFIXES = ("mcp__memory__", "mcp__context-harness__", "mcp__context7__", "mcp__")
 for agent_file in ALL_AGENT_FILES:
     if agent_file in REFERENCE_ONLY_AGENTS:
         continue
