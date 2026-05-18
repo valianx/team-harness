@@ -244,7 +244,7 @@ def search_nodes(query: str, limit: int = 10) -> str:
                 })
 
     return json.dumps({
-        "entities": entities,
+        "nodes": entities,
         "relations": relation_results,
     }, indent=2)
 
@@ -276,7 +276,7 @@ def open_nodes(names: list[str]) -> str:
                     "relationType": meta["relation_type"],
                 })
 
-    return json.dumps({"entities": entities, "relations": relations}, indent=2)
+    return json.dumps({"nodes": entities, "relations": relations}, indent=2)
 
 
 @mcp.tool()
