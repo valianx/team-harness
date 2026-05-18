@@ -544,15 +544,15 @@ print()
 print("=== Suite 14: KG vocabulary + subagent KG access ===")
 
 # 1. orchestrator declares the new entity types
-check("orchestrator.md Phase 6 entity-type list includes 'project'",
-      "project" in orch and "Entity type:" in orch and "project`" in orch,
-      "'project' entity type not in Phase 6 entity-type allowlist")
-check("orchestrator.md Phase 6 entity-type list includes 'service'",
+check("orchestrator.md Phase 6 node-type list includes 'project'",
+      "project" in orch and "Node type:" in orch and "project`" in orch,
+      "'project' node type not in Phase 6 node-type allowlist")
+check("orchestrator.md Phase 6 node-type list includes 'service'",
       "service`" in orch,
-      "'service' entity type not in Phase 6 entity-type allowlist")
-check("orchestrator.md Phase 6 entity-type list includes 'stack-profile'",
+      "'service' node type not in Phase 6 node-type allowlist")
+check("orchestrator.md Phase 6 node-type list includes 'stack-profile'",
       "stack-profile" in orch,
-      "'stack-profile' entity type not in Phase 6 entity-type allowlist")
+      "'stack-profile' node type not in Phase 6 node-type allowlist")
 
 # 2. orchestrator declares the new relation types with their pairs
 for rel in ("belongs-to", "calls", "uses-stack", "depends-on"):
@@ -586,7 +586,7 @@ for agent_name in ("architect", "qa", "tester", "security"):
           "Knowledge Graph Access" in agent_text,
           f"{agent_name} missing the KG Access prompt section")
     check(f"agents/{agent_name}.md KG Access section forbids writes",
-          "Knowledge Graph Access" in agent_text and "create_entities" in agent_text and ("Do NOT" in agent_text or "NEVER" in agent_text),
+          "Knowledge Graph Access" in agent_text and "create_nodes" in agent_text and ("Do NOT" in agent_text or "NEVER" in agent_text),
           f"{agent_name} KG Access section does not explicitly forbid writes")
 
 # 6. Excluded agents do NOT have KG tools (regression guard)

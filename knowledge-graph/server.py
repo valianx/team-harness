@@ -33,6 +33,8 @@ os.makedirs(DB_PATH, exist_ok=True)
 client = chromadb.PersistentClient(path=DB_PATH)
 
 entities_col = client.get_or_create_collection(
+    # Collection name is legacy ("entities"); the public API uses "node" terminology.
+    # Do NOT rename — existing local KG data uses this name and no migration is needed.
     name="entities",
     metadata={"hnsw:space": "cosine"},
 )
@@ -70,15 +72,15 @@ def retry_on_lock(max_retries: int = 3, delay_ms: int = 200):
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
-def _get_entity(name: str) -> dict | None:
-    """Fetch a single entity by ID, return dict or None."""
+def _get_node(name: str) -> dict | None:
+    """Fetch a single node by ID, return dict or None."""
     result = entities_col.get(ids=[name])
     if not result["ids"]:
         return None
     meta = result["metadatas"][0]
     return {
         "name": name,
-        "entityType": meta.get("entity_type", "unknown"),
+        "nodeType": meta.get("entity_type", "unknown"),
         "observations": json.loads(meta.get("observations_json", "[]")),
         "created_at": meta.get("created_at"),
         "updated_at": meta.get("updated_at"),
@@ -86,15 +88,15 @@ def _get_entity(name: str) -> dict | None:
 
 
 @retry_on_lock()
-def _upsert_entity(name: str, entity_type: str, observations: list[str], preserve_created_at: str | None = None):
-    """Insert or update an entity."""
+def _upsert_node(name: str, node_type: str, observations: list[str], preserve_created_at: str | None = None):
+    """Insert or update a node."""
     now = datetime.now(timezone.utc).isoformat()
     doc_text = "\n".join(observations)
     entities_col.upsert(
         ids=[name],
         documents=[doc_text],
         metadatas=[{
-            "entity_type": entity_type,
+            "entity_type": node_type,
             "observation_count": len(observations),
             "observations_json": json.dumps(observations),
             "created_at": preserve_created_at or now,
@@ -109,115 +111,59 @@ def _upsert_entity(name: str, entity_type: str, observations: list[str], preserv
 
 @mcp.tool()
 @retry_on_lock()
-def create_entities(entities: list[dict]) -> str:
-    """Create new entities in the knowledge graph.
+def create_nodes(nodes: list[dict]) -> str:
+    """Create new nodes in the knowledge graph.
 
-    Each entity should have: name (str), entityType (str), observations (list[str]).
-    If an entity with the same name exists, its observations are merged.
+    Each node should have: name (str), nodeType (str), observations (list[str]).
+    If a node with the same name exists, its observations are merged.
 
     Args:
-        entities: List of entity dicts with name, entityType, observations.
+        nodes: List of node dicts with name, nodeType, observations.
     """
     created = 0
-    for e in entities:
-        name = e["name"]
-        entity_type = e.get("entityType", "unknown")
-        new_obs = e.get("observations", [])
+    for node in nodes:
+        name = node["name"]
+        node_type = node.get("nodeType", "unknown")
+        new_obs = node.get("observations", [])
 
-        existing = _get_entity(name)
+        existing = _get_node(name)
         if existing:
             # Merge observations (dedup)
             merged = list(dict.fromkeys(existing["observations"] + new_obs))
-            _upsert_entity(name, entity_type, merged, preserve_created_at=existing["created_at"])
+            _upsert_node(name, node_type, merged, preserve_created_at=existing["created_at"])
         else:
-            _upsert_entity(name, entity_type, new_obs)
+            _upsert_node(name, node_type, new_obs)
             created += 1
 
-    return json.dumps({"created": created, "total_processed": len(entities)})
+    return json.dumps({"created_nodes": created, "total_processed": len(nodes)})
 
 
 @mcp.tool()
 @retry_on_lock()
 def add_observations(observations: list[dict]) -> str:
-    """Add observations to existing entities.
+    """Add observations to existing nodes.
 
-    Each item should have: entityName (str), contents (list[str]).
+    Each item should have: nodeName (str), contents (list[str]).
 
     Args:
-        observations: List of dicts with entityName and contents.
+        observations: List of dicts with nodeName and contents.
     """
     updated = 0
     for obs in observations:
-        name = obs["entityName"]
+        name = obs["nodeName"]
         new_contents = obs.get("contents", [])
 
-        existing = _get_entity(name)
+        existing = _get_node(name)
         if existing:
             merged = list(dict.fromkeys(existing["observations"] + new_contents))
-            _upsert_entity(name, existing["entityType"], merged, preserve_created_at=existing["created_at"])
+            _upsert_node(name, existing["nodeType"], merged, preserve_created_at=existing["created_at"])
             updated += 1
         else:
-            # Create entity if it doesn't exist
-            _upsert_entity(name, "unknown", new_contents)
+            # Create node if it doesn't exist
+            _upsert_node(name, "unknown", new_contents)
             updated += 1
 
     return json.dumps({"updated": updated})
-
-
-@mcp.tool()
-@retry_on_lock()
-def delete_observations(deletions: list[dict]) -> str:
-    """Remove specific observations from entities.
-
-    Each item should have: entityName (str), observations (list[str]).
-
-    Args:
-        deletions: List of dicts with entityName and observations to remove.
-    """
-    deleted = 0
-    for d in deletions:
-        name = d["entityName"]
-        to_remove = set(d.get("observations", []))
-
-        existing = _get_entity(name)
-        if existing:
-            remaining = [o for o in existing["observations"] if o not in to_remove]
-            _upsert_entity(name, existing["entityType"], remaining, preserve_created_at=existing["created_at"])
-            deleted += len(to_remove & set(existing["observations"]))
-
-    return json.dumps({"deleted": deleted})
-
-
-@mcp.tool()
-@retry_on_lock()
-def delete_entities(entityNames: list[str]) -> str:
-    """Delete entities from the knowledge graph by name.
-
-    Args:
-        entityNames: List of entity names to delete.
-    """
-    # Also delete related relations
-    for name in entityNames:
-        # Delete entity
-        try:
-            entities_col.delete(ids=[name])
-        except Exception:
-            pass
-
-        # Delete relations involving this entity
-        try:
-            results = relations_col.get(where={
-                "$or": [
-                    {"from_entity": name},
-                    {"to_entity": name},
-                ]
-            })
-            if results["ids"]:
-                relations_col.delete(ids=results["ids"])
-        except Exception:
-            pass
-
-    return json.dumps({"deleted": len(entityNames)})
 
 
 @mcp.tool()
@@ -254,28 +200,6 @@ def create_relations(relations: list[dict]) -> str:
 
 
 @mcp.tool()
-@retry_on_lock()
-def delete_relations(relations: list[dict]) -> str:
-    """Delete relations from the knowledge graph.
-
-    Each relation should have: from (str), to (str), relationType (str).
-
-    Args:
-        relations: List of relation dicts with from, to, relationType.
-    """
-    deleted = 0
-    for rel in relations:
-        rel_id = f"{rel['from']}--{rel.get('relationType', 'relates_to')}--{rel['to']}"
-        try:
-            relations_col.delete(ids=[rel_id])
-            deleted += 1
-        except Exception:
-            pass
-
-    return json.dumps({"deleted": deleted})
-
-
-@mcp.tool()
 def search_nodes(query: str, limit: int = 10) -> str:
     """Semantic search across entities using natural language.
 
@@ -298,7 +222,7 @@ def search_nodes(query: str, limit: int = 10) -> str:
             distance = results["distances"][0][i] if results.get("distances") else None
             entities.append({
                 "name": entity_id,
-                "entityType": meta.get("entity_type", "unknown"),
+                "nodeType": meta.get("entity_type", "unknown"),
                 "observations": json.loads(meta.get("observations_json", "[]")),
                 "similarity": round(1 - distance, 4) if distance is not None else None,
             })
@@ -327,14 +251,14 @@ def search_nodes(query: str, limit: int = 10) -> str:
 
 @mcp.tool()
 def open_nodes(names: list[str]) -> str:
-    """Retrieve specific entities by name.
+    """Retrieve specific nodes by name.
 
     Args:
-        names: List of entity names to retrieve.
+        names: List of node names to retrieve.
     """
     entities = []
     for name in names:
-        entity = _get_entity(name)
+        entity = _get_node(name)
         if entity:
             entities.append(entity)
 
@@ -357,18 +281,18 @@ def open_nodes(names: list[str]) -> str:
 
 @mcp.tool()
 def read_graph() -> str:
-    """Read the entire knowledge graph. Returns all entities and relations.
+    """Read the entire knowledge graph. Returns all nodes and relations.
 
     Use sparingly — prefer search_nodes for targeted queries.
     """
-    # Get all entities
+    # Get all nodes (stored in the legacy "entities" collection)
     all_entities = entities_col.get()
-    entities = []
+    nodes = []
     for i, entity_id in enumerate(all_entities["ids"]):
         meta = all_entities["metadatas"][i]
-        entities.append({
+        nodes.append({
             "name": entity_id,
-            "entityType": meta.get("entity_type", "unknown"),
+            "nodeType": meta.get("entity_type", "unknown"),
             "observations": json.loads(meta.get("observations_json", "[]")),
         })
 
@@ -384,9 +308,9 @@ def read_graph() -> str:
         })
 
     return json.dumps({
-        "entities": entities,
+        "nodes": nodes,
         "relations": relations,
-        "entity_count": len(entities),
+        "node_count": len(nodes),
         "relation_count": len(relations),
     }, indent=2)
 

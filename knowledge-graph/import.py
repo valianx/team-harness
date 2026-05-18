@@ -51,7 +51,17 @@ def main() -> None:
     with args.file.open("r", encoding="utf-8") as f:
         payload = json.load(f)
 
-    incoming_entities = payload.get("entities", [])
+    if "nodes" in payload:
+        incoming_entities = payload["nodes"]
+    elif "entities" in payload:
+        print(
+            "warning: input file uses legacy 'entities' top-level key; "
+            "rename to 'nodes' before 2026-06-01",
+            file=sys.stderr,
+        )
+        incoming_entities = payload["entities"]
+    else:
+        incoming_entities = []
     incoming_relations = payload.get("relations", [])
 
     client = chromadb.PersistentClient(path=args.db_path)
@@ -65,10 +75,11 @@ def main() -> None:
     stats = {"added": 0, "merged": 0, "rels_added": 0, "rels_skipped": 0}
     now = datetime.now(timezone.utc).isoformat()
 
-    # --- Entities ---------------------------------------------------------
+    # --- Nodes ------------------------------------------------------------
     for e in incoming_entities:
         name = e["name"]
-        entity_type = e.get("entityType", "unknown")
+        # Accept nodeType (new) with entityType (legacy) as fallback
+        entity_type = e.get("nodeType", e.get("entityType", "unknown"))
         incoming_obs = e.get("observations", [])
 
         existing = entities_col.get(ids=[name])
@@ -130,7 +141,7 @@ def main() -> None:
 
     # --- Report -----------------------------------------------------------
     print("Import complete:")
-    print(f"  entities:  {stats['added']} added, {stats['merged']} merged")
+    print(f"  nodes:     {stats['added']} added, {stats['merged']} merged")
     print(
         f"  relations: {stats['rels_added']} added, "
         f"{stats['rels_skipped']} skipped (already present)"

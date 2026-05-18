@@ -58,15 +58,15 @@ def main() -> None:
         name="relations", metadata={"hnsw:space": "cosine"}
     )
 
-    # Entities
+    # Nodes (stored in the legacy "entities" ChromaDB collection)
     all_entities = entities_col.get()
-    entities = []
+    nodes = []
     for i, entity_id in enumerate(all_entities["ids"]):
         meta = all_entities["metadatas"][i] or {}
-        entities.append(
+        nodes.append(
             {
                 "name": entity_id,
-                "entityType": meta.get("entity_type", "unknown"),
+                "nodeType": meta.get("entity_type", "unknown"),
                 "observations": json.loads(meta.get("observations_json", "[]")),
             }
         )
@@ -88,9 +88,9 @@ def main() -> None:
         "format_version": __version__,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "source_host": socket.gethostname(),
-        "entity_count": len(entities),
+        "node_count": len(nodes),
         "relation_count": len(relations),
-        "entities": entities,
+        "nodes": nodes,
         "relations": relations,
     }
 
@@ -101,7 +101,7 @@ def main() -> None:
     )
 
     print(
-        f"Exported {len(entities)} entities, {len(relations)} relations → {out_path}"
+        f"Exported {len(nodes)} nodes, {len(relations)} relations → {out_path}"
     )
 
 

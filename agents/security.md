@@ -658,14 +658,14 @@ If the file doesn't exist, create it with the header:
 You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
-- In audit or pipeline mode: the audit scope includes a service with known security `constraint` entities — query for those to check whether known limitations are addressed by the current implementation.
+- In audit or pipeline mode: the audit scope includes a service with known security `constraint` nodes — query for those to check whether known limitations are addressed by the current implementation.
 - The stack in use has a known `tool-gotcha` related to auth, session management, or input validation — query for it before reviewing the relevant code paths.
-- The feature involves authentication or authorization changes; query for prior `decision` entities on auth patterns for the same project or stack.
+- The feature involves authentication or authorization changes; query for prior `decision` nodes on auth patterns for the same project or stack.
 
-**How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
+**How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit node names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
+- Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
 - Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 

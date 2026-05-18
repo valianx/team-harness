@@ -92,19 +92,19 @@ HTML_PAGE = """<!DOCTYPE html>
 <div id="results"></div>
 
 <script>
-let allEntities = [];
+let allNodes = [];
 let activeFilter = null;
 
 async function loadAll() {
   document.getElementById('search').value = '';
   activeFilter = null;
-  const res = await fetch('/api/entities');
+  const res = await fetch('/api/nodes');
   const data = await res.json();
-  allEntities = data.entities;
+  allNodes = data.nodes;
   document.getElementById('stats').textContent =
-    `${data.entity_count} entities | ${data.relation_count} relations | Types: ${Object.entries(data.type_counts).map(([k,v])=>k+':'+v).join(', ')}`;
+    `${data.node_count} nodes | ${data.relation_count} relations | Types: ${Object.entries(data.type_counts).map(([k,v])=>k+':'+v).join(', ')}`;
   buildFilters(data.type_counts);
-  render(allEntities);
+  render(allNodes);
 }
 
 function buildFilters(counts) {
@@ -123,7 +123,7 @@ function filterType(type, btn) {
     document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
   }
-  const filtered = activeFilter ? allEntities.filter(e => e.entityType === activeFilter) : allEntities;
+  const filtered = activeFilter ? allNodes.filter(e => e.nodeType === activeFilter) : allNodes;
   render(filtered);
 }
 
@@ -134,23 +134,23 @@ async function doSearch() {
   document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
   const res = await fetch('/api/search?q=' + encodeURIComponent(q));
   const data = await res.json();
-  render(data.entities, true);
+  render(data.nodes, true);
 }
 
-async function deleteEntity(name) {
+async function deleteNode(name) {
   if (!confirm(`Eliminar "${name}"?`)) return;
-  await fetch('/api/entities/' + encodeURIComponent(name), { method: 'DELETE' });
+  await fetch('/api/nodes/' + encodeURIComponent(name), { method: 'DELETE' });
   loadAll();
 }
 
-function render(entities, showSimilarity = false) {
+function render(nodes, showSimilarity = false) {
   const el = document.getElementById('results');
-  if (!entities.length) {
-    el.innerHTML = '<div class="empty">No entities found</div>';
+  if (!nodes.length) {
+    el.innerHTML = '<div class="empty">No nodes found</div>';
     return;
   }
-  el.innerHTML = entities.map(e => {
-    const typeClass = 'type-' + (e.entityType || 'unknown').replace(/[^a-z]/g, '-');
+  el.innerHTML = nodes.map(e => {
+    const typeClass = 'type-' + (e.nodeType || 'unknown').replace(/[^a-z]/g, '-');
     const simBadge = showSimilarity && e.similarity != null
       ? `<span class="similarity">${(e.similarity * 100).toFixed(1)}% match</span>` : '';
     const dateBadge = e.created_at ? `<span class="entity-date">${formatDate(e.created_at)}</span>` : '';
@@ -162,8 +162,8 @@ function render(entities, showSimilarity = false) {
       <div class="entity-header">
         <div><span class="entity-name">${escHtml(e.name)}</span>${simBadge}${dateBadge}</div>
         <div class="actions">
-          <span class="entity-type ${typeClass}">${escHtml(e.entityType || 'unknown')}</span>
-          <button class="btn-delete" onclick="deleteEntity('${escAttr(e.name)}')">eliminar</button>
+          <span class="entity-type ${typeClass}">${escHtml(e.nodeType || 'unknown')}</span>
+          <button class="btn-delete" onclick="deleteNode('${escAttr(e.name)}')">eliminar</button>
         </div>
       </div>
       <ul class="observations">${obs}</ul>
@@ -197,23 +197,23 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/" or parsed.path == "":
             self._respond(200, "text/html", HTML_PAGE)
 
-        elif parsed.path == "/api/entities":
+        elif parsed.path == "/api/nodes":
             all_data = entities_col.get()
-            entities = []
+            nodes = []
             type_counts = {}
             for i, eid in enumerate(all_data["ids"]):
                 meta = all_data["metadatas"][i]
-                et = meta.get("entity_type", "unknown")
-                type_counts[et] = type_counts.get(et, 0) + 1
-                entities.append({
+                nt = meta.get("entity_type", "unknown")
+                type_counts[nt] = type_counts.get(nt, 0) + 1
+                nodes.append({
                     "name": eid,
-                    "entityType": et,
+                    "nodeType": nt,
                     "observations": json.loads(meta.get("observations_json", "[]")),
                     "created_at": meta.get("created_at", ""),
                     "updated_at": meta.get("updated_at", ""),
                 })
 
-            # Get relations for each entity
+            # Get relations for each node
             all_rels = relations_col.get() if relations_col.count() > 0 else {"ids": [], "metadatas": []}
             rel_map = {}
             for i, rid in enumerate(all_rels["ids"]):
@@ -226,13 +226,13 @@ class Handler(BaseHTTPRequestHandler):
                             "relationType": rm["relation_type"],
                         })
 
-            for e in entities:
-                e["relations"] = rel_map.get(e["name"], [])
+            for node in nodes:
+                node["relations"] = rel_map.get(node["name"], [])
 
-            entities.sort(key=lambda x: x.get("updated_at") or x.get("created_at") or "", reverse=True)
+            nodes.sort(key=lambda x: x.get("updated_at") or x.get("created_at") or "", reverse=True)
             self._respond_json({
-                "entities": entities,
-                "entity_count": len(entities),
+                "nodes": nodes,
+                "node_count": len(nodes),
                 "relation_count": len(all_rels["ids"]),
                 "type_counts": type_counts,
             })
@@ -241,36 +241,36 @@ class Handler(BaseHTTPRequestHandler):
             params = parse_qs(parsed.query)
             query = params.get("q", [""])[0]
             if not query or entities_col.count() == 0:
-                self._respond_json({"entities": []})
+                self._respond_json({"nodes": []})
                 return
 
             results = entities_col.query(
                 query_texts=[query],
                 n_results=min(20, entities_col.count()),
             )
-            entities = []
+            nodes = []
             if results["ids"] and results["ids"][0]:
                 for i, eid in enumerate(results["ids"][0]):
                     meta = results["metadatas"][0][i]
                     dist = results["distances"][0][i] if results.get("distances") else None
-                    entities.append({
+                    nodes.append({
                         "name": eid,
-                        "entityType": meta.get("entity_type", "unknown"),
+                        "nodeType": meta.get("entity_type", "unknown"),
                         "observations": json.loads(meta.get("observations_json", "[]")),
                         "similarity": round(1 - dist, 4) if dist is not None else None,
                         "created_at": meta.get("created_at", ""),
                         "updated_at": meta.get("updated_at", ""),
                         "relations": [],
                     })
-            self._respond_json({"entities": entities})
+            self._respond_json({"nodes": nodes})
 
         else:
             self._respond(404, "text/plain", "Not found")
 
     def do_DELETE(self):
         parsed = urlparse(self.path)
-        if parsed.path.startswith("/api/entities/"):
-            name = parsed.path[len("/api/entities/"):]
+        if parsed.path.startswith("/api/nodes/"):
+            name = parsed.path[len("/api/nodes/"):]
             from urllib.parse import unquote
             name = unquote(name)
             try:
@@ -314,7 +314,7 @@ def main():
     init_db(args.db_path)
     count = entities_col.count()
     print(f"ChromaDB Viewer — http://localhost:{args.port}")
-    print(f"DB: {args.db_path} ({count} entities)")
+    print(f"DB: {args.db_path} ({count} nodes)")
     print("Ctrl+C to stop")
 
     server = HTTPServer(("127.0.0.1", args.port), Handler)

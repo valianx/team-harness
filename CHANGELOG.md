@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- BREAKING: parity rename with `context-harness-mcp`. The local ChromaDB MCP tools renamed: `create_entities` → `create_nodes`. Wire shapes: `entityType` → `nodeType`, `entityName` → `nodeName`, `entity_count` → `node_count`, `created_entities` → `created_nodes`, `rejected_entity_index` → `rejected_node_index`. Top-level JSON export shape: `{"entities":[...]}` → `{"nodes":[...]}`. `import.py` accepts both shapes defensively during the transition with a deprecation notice on stderr. Agents updated to reference the new tool names; orchestrator's `tools:` allowlist updated accordingly.
+
+### Removed
+
+- BREAKING: `delete_entities`, `delete_observations`, `delete_relations` removed from the local ChromaDB MCP for parity with `context-harness-mcp`. ChromaDB collection and direct-access scripts remain for operator use; the MCP tool surface no longer exposes destructive operations.
+
 ### Added
 
 - `bin/install.py`: interactive prompt for KG backend choice (context-harness default, memory fallback) with hosting sub-prompt and soft reachability check; `KG_BACKEND` + `CONTEXT_HARNESS_URL` env vars for non-interactive installs.
