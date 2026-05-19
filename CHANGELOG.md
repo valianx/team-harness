@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `cmd/install/claude_json.go`: installer no longer drops operator-set fields on `mcpServers` entries when running re-install. The previous behavior used byte-equality in `rawEntryMatches` and built memory entries with only `{type, url}` — so any operator-added `headers.Authorization` (Bearer for a remote auth-protected MCP like `context-harness-mcp` on Railway) was silently overwritten on every re-run, breaking the auth path. New behavior: `rawEntryMatches` checks subset semantics (existing entry satisfies all desired keys; extras tolerated), and when a real update is needed `mergeMCPEntry` overlays only the installer-owned fields on the existing entry. Headers and any other operator config survive. Regression covered by `TestRegisterMCPServers_PreservesMemoryHeaders` and `TestRegisterMCPServers_MergesHeadersOnURLChange` in `cmd/install/preservation_test.go`.
+
 ### Changed
 
 - BREAKING (contract, not behavior): `agents/orchestrator.md` "Dispatch-blocked exit" — the response top-level Claude reads now contains a machine-parseable `dispatch_handoff` JSON block (schema_version 1) with the variable fields (`probe_error`, `phase`, `autonomy`, `round`, `next_dispatch`, `state_ref`) instead of a ~150-line prose playbook. The canonical takeover protocol moves to `CLAUDE.md §13 Universal rule — auto-takeover on blocked-no-dispatch`, single source of truth. Reduces handoff payload from ~3k tokens to ~300 tokens, eliminates prose-drift between the two locations. Same JSON block is embedded in the `## Handoff` section appended to `00-state.md` (for recovery flows). Fixes issue #14 (Option 4). `tests/test_agent_structure.py` updated to match new contract: now checks for `dispatch_handoff` JSON presence + `CLAUDE.md §13` cross-reference instead of the old `Takeover playbook` literal.

@@ -17,9 +17,10 @@ knowledge-graph/.venv/
 knowledge-graph/.server.pid
 knowledge-graph/server.log
 
-# Build artifacts
-install
-install.exe
+# Build artifacts — installer binary compiled at the repo root via `go build ./cmd/install`.
+# Match only the root-level binary (leading slash); do NOT match the `cmd/install/` source dir.
+/install
+/install.exe
 
 # User-local tool manager config (mise/asdf) — not project state
 mise.toml
