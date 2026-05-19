@@ -30,9 +30,26 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 
 	if !forceFlag {
 		if looksLikeValidMemoryEntry(existingMemory) {
-			url := urlFromEntry(existingMemory)
-			fmt.Printf("  Memory MCP URL: preserving existing http entry (url=%s)\n", url)
-			return MemoryMCPChoice{URL: url, Preserved: true}
+			existingURL := urlFromEntry(existingMemory)
+
+			// Non-interactive (CI / scripted re-installs): preserve silently
+			// so an automated re-run doesn't break on a Keep/Change prompt.
+			if !isTerminal() {
+				fmt.Printf("  Memory MCP URL: preserving existing %s (non-interactive)\n", existingURL)
+				return MemoryMCPChoice{URL: existingURL, Preserved: true}
+			}
+
+			// Interactive: surface the existing value and let the user decide.
+			// Common case where the previous install accepted a wrong default
+			// and the user wants to override on the next run.
+			fmt.Println()
+			fmt.Printf("  Existing Memory MCP URL: %s\n", existingURL)
+			choice := promptMenu("  Keep [Y] / Change [c]? [Y]: ",
+				map[string]bool{"y": true, "c": true}, "y")
+			if choice == "y" {
+				return MemoryMCPChoice{URL: existingURL, Preserved: true}
+			}
+			fmt.Println("  Changing Memory MCP URL — falling through to env var / prompt.")
 		}
 		if isLegacyStdioMemoryEntry(existingMemory) {
 			fmt.Println("  Legacy stdio mcpServers.memory entry detected (v1 shape pointing at")

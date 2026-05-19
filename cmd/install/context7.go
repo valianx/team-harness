@@ -24,32 +24,59 @@ func getContext7APIKey() string {
 	envKey := strings.TrimSpace(os.Getenv("CONTEXT7_API_KEY"))
 
 	if !forceFlag && isValidContext7Key(existingKey) {
-		if envKey == "" || envKey == existingKey {
-			fmt.Println("  context7 API key: preserving existing key in ~/.claude.json")
+		// Non-interactive (CI / scripted re-installs): preserve silently
+		// unless env explicitly overrides with a different value.
+		if !isTerminal() {
+			if envKey != "" && envKey != existingKey {
+				fmt.Println("  context7 API key: existing key differs from env; using env (non-interactive).")
+				return envKey
+			}
+			fmt.Println("  context7 API key: preserving existing key in ~/.claude.json (non-interactive)")
 			return existingKey
 		}
 
-		// Env var present and different from the stored key.
-		if isTerminal() {
-			fmt.Printf("  context7 API key: existing (%s...) differs from env (%s...).\n",
-				safePrefix(existingKey, 12), safePrefix(envKey, 12))
-			choice := promptMenu("  Use [E]xisting / [N]ew env key / [A]bort? [E]: ",
-				map[string]bool{"e": true, "n": true, "a": true}, "e")
+		// Interactive: always surface the existing key + offer to change.
+		// Covers the case where the user typed a wrong key on the first run
+		// and wants to update it on the next re-run.
+		fmt.Println()
+		fmt.Printf("  Existing context7 API key in ~/.claude.json: %s...\n", safePrefix(existingKey, 12))
+
+		if envKey != "" && envKey != existingKey {
+			// Env var present and different — three-way prompt.
+			fmt.Printf("  CONTEXT7_API_KEY env var differs: %s...\n", safePrefix(envKey, 12))
+			choice := promptMenu("  Use [E]xisting / [N]ew env key / [C]ustom (paste) / [A]bort? [E]: ",
+				map[string]bool{"e": true, "n": true, "c": true, "a": true}, "e")
 			switch choice {
 			case "e":
 				return existingKey
 			case "n":
-				fmt.Println("  context7 API key: using env var (user chose N)")
+				fmt.Println("  context7 API key: using env var")
 				return envKey
+			case "c":
+				// Fall through to the manual paste prompt below.
 			default: // "a"
 				fmt.Fprintln(os.Stderr, "Aborted.")
 				os.Exit(1)
 			}
+		} else {
+			// No conflicting env — simple Keep/Change.
+			choice := promptMenu("  Keep [Y] / Change [c]? [Y]: ",
+				map[string]bool{"y": true, "c": true}, "y")
+			if choice == "y" {
+				return existingKey
+			}
+			// Fall through to the manual paste prompt below.
 		}
 
-		// Non-interactive: env var wins when explicitly set.
-		fmt.Println("  context7 API key: existing key differs from env; using env (non-interactive).")
-		return envKey
+		// Reached only via [C]ustom in either of the two prompts above.
+		fmt.Println("  Paste the replacement context7 API key (get one at https://context7.com/).")
+		fmt.Print("  CONTEXT7_API_KEY: ")
+		key := strings.TrimSpace(readLine())
+		if key == "" {
+			fmt.Fprintln(os.Stderr, "Error: empty API key.")
+			os.Exit(1)
+		}
+		return key
 	}
 
 	// No usable existing key — fall through to env var or interactive prompt.
