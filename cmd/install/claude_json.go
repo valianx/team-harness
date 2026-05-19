@@ -62,11 +62,18 @@ func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 	backup := backupClaudeJSON()
 
 	if memoryChanged {
-		encoded, _ := json.Marshal(newMemory)
+		// Merge: preserve operator-set fields (e.g. `headers.Authorization` Bearer
+		// for context-harness-mcp deployments behind auth), overlay only the
+		// installer-owned fields (`type` + `url`). Replacing the entire entry
+		// would silently drop operator config — see issue valianx/claude-dev-team#15
+		// regression notes.
+		merged := mergeMCPEntry(mcpRaw["memory"], newMemory)
+		encoded, _ := json.Marshal(merged)
 		mcpRaw["memory"] = json.RawMessage(encoded)
 	}
 	if context7Changed {
-		encoded, _ := json.Marshal(newContext7)
+		merged := mergeMCPEntry(mcpRaw["context7"], newContext7)
+		encoded, _ := json.Marshal(merged)
 		mcpRaw["context7"] = json.RawMessage(encoded)
 	}
 
@@ -83,8 +90,12 @@ func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 	return backup
 }
 
-// rawEntryMatches checks whether a json.RawMessage encodes the same value as
-// the provided Go map (after a marshal/unmarshal round-trip for normalisation).
+// rawEntryMatches reports whether the existing mcpServers entry already
+// satisfies every key in `desired`. Extra keys in `existing` (e.g. operator-set
+// `headers.Authorization` Bearer tokens) are tolerated — they survive the install.
+// This semantic ("desired ⊆ existing") replaces the previous byte-equality
+// comparison, which falsely flagged operator-augmented entries as "changed"
+// and triggered a destructive replace.
 func rawEntryMatches(existing json.RawMessage, desired map[string]interface{}) bool {
 	if existing == nil {
 		return false
@@ -93,9 +104,32 @@ func rawEntryMatches(existing json.RawMessage, desired map[string]interface{}) b
 	if err := json.Unmarshal(existing, &existingMap); err != nil {
 		return false
 	}
-	desiredBytes, _ := json.Marshal(desired)
-	existingBytes, _ := json.Marshal(existingMap)
-	return string(desiredBytes) == string(existingBytes)
+	for k, v := range desired {
+		ev, ok := existingMap[k]
+		if !ok {
+			return false
+		}
+		a, _ := json.Marshal(v)
+		b, _ := json.Marshal(ev)
+		if string(a) != string(b) {
+			return false
+		}
+	}
+	return true
+}
+
+// mergeMCPEntry returns a map that is the existing entry with `desired` keys
+// overlaid. Operator-set fields not in `desired` (notably `headers`) are
+// preserved. If `existing` is nil/invalid, the result is just `desired`.
+func mergeMCPEntry(existing json.RawMessage, desired map[string]interface{}) map[string]interface{} {
+	merged := map[string]interface{}{}
+	if existing != nil {
+		_ = json.Unmarshal(existing, &merged)
+	}
+	for k, v := range desired {
+		merged[k] = v
+	}
+	return merged
 }
 
 // buildMemoryEntry returns the mcpServers.memory dict: always http type.

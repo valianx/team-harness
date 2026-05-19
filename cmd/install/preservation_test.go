@@ -576,6 +576,98 @@ func TestRegisterMCPServers_WritesWhenContext7KeyChanges(t *testing.T) {
 	}
 }
 
+// TestRegisterMCPServers_PreservesMemoryHeaders is a regression test for the
+// installer dropping `headers.Authorization` on existing `memory` entries.
+//
+// Bug: `buildMemoryEntry` returns only {type, url}; `rawEntryMatches` used
+// byte-equality, so any entry with extra fields (e.g. Bearer headers configured
+// for a remote auth-protected MCP like context-harness-mcp on Railway) was
+// flagged "changed" and silently overwritten — destroying the bearer.
+//
+// Fix: rawEntryMatches uses subset semantics ("desired ⊆ existing"); when a
+// real change is needed, mergeMCPEntry overlays desired fields on the existing
+// entry, preserving operator-set fields like headers.
+func TestRegisterMCPServers_PreservesMemoryHeaders(t *testing.T) {
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	url := "https://context-harness-mcp.up.railway.app/mcp/"
+	bearer := "Bearer eyJhbGciOiJIUzI1NiJ9.test.signature"
+	writeClaudeJSON(t, map[string]interface{}{
+		"mcpServers": map[string]interface{}{
+			"memory": map[string]interface{}{
+				"type": "http",
+				"url":  url,
+				"headers": map[string]interface{}{
+					"Authorization": bearer,
+				},
+			},
+		},
+	})
+
+	// Run installer with the SAME url the operator chose AND empty context7 key
+	// (skips context7 work) — no change expected, idempotent install.
+	backup := registerMCPServers("", memChoice(url, true))
+
+	// No-op path: nothing to backup since nothing changed.
+	if backup != "" {
+		t.Errorf("expected no backup (no-op install with matching url+headers), got %s", backup)
+	}
+
+	// Verify headers survived.
+	result := readClaudeJSON(t)
+	mem := result["mcpServers"].(map[string]interface{})["memory"].(map[string]interface{})
+	headers, ok := mem["headers"].(map[string]interface{})
+	if !ok {
+		t.Fatal("memory.headers missing after install — operator config destroyed")
+	}
+	if headers["Authorization"] != bearer {
+		t.Errorf("Bearer changed: want %q, got %q", bearer, headers["Authorization"])
+	}
+}
+
+// TestRegisterMCPServers_MergesHeadersOnURLChange covers the "operator
+// changed the url, but had set headers" case: the new url replaces the old,
+// but the existing headers survive.
+func TestRegisterMCPServers_MergesHeadersOnURLChange(t *testing.T) {
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	bearer := "Bearer test-bearer"
+	writeClaudeJSON(t, map[string]interface{}{
+		"mcpServers": map[string]interface{}{
+			"memory": map[string]interface{}{
+				"type": "http",
+				"url":  "https://old.example.com/mcp/",
+				"headers": map[string]interface{}{
+					"Authorization": bearer,
+				},
+			},
+		},
+	})
+
+	newURL := "https://new.example.com/mcp/"
+	backup := registerMCPServers("", memChoice(newURL, false))
+
+	if backup == "" {
+		t.Error("expected a backup since url changed")
+	}
+
+	result := readClaudeJSON(t)
+	mem := result["mcpServers"].(map[string]interface{})["memory"].(map[string]interface{})
+
+	if mem["url"] != newURL {
+		t.Errorf("url not updated: want %q, got %q", newURL, mem["url"])
+	}
+	headers, ok := mem["headers"].(map[string]interface{})
+	if !ok {
+		t.Fatal("headers dropped during url-change merge")
+	}
+	if headers["Authorization"] != bearer {
+		t.Errorf("Bearer mutated during url-change: want %q, got %q", bearer, headers["Authorization"])
+	}
+}
+
 func TestRegisterMCPServers_CreatesFileOnFirstInstall(t *testing.T) {
 	_, cleanup := testEnv(t)
 	defer cleanup()
