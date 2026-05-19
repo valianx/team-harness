@@ -927,9 +927,14 @@ check(
     "must forbid recreating the nested condition",
 )
 check(
-    "orchestrator.md response includes 'Takeover playbook' header",
-    "Takeover playbook" in orchestrator_md,
-    "playbook must be present and named consistently",
+    "orchestrator.md response includes machine-parseable dispatch_handoff JSON block",
+    "dispatch_handoff" in orchestrator_md and "next_dispatch" in orchestrator_md,
+    "JSON handoff block must be present — top-level Claude parses it to extract next_dispatch.agent + phase + autonomy. The static playbook lives in CLAUDE.md §13 (not duplicated inline).",
+)
+check(
+    "orchestrator.md response delegates takeover protocol to CLAUDE.md §13",
+    "CLAUDE.md §13" in orchestrator_md or "CLAUDE.md §13 Universal rule" in orchestrator_md,
+    "orchestrator must point at the canonical playbook in CLAUDE.md instead of duplicating it (issue #14 fix).",
 )
 check(
     "orchestrator.md Handoff template includes 'Next agent to dispatch:'",
@@ -979,10 +984,11 @@ check(
     "legacy ack line was the hallucination vector — must stay removed",
 )
 check(
-    "orchestrator.md response respects 'never write code' contract in takeover",
-    "applies to top-level Claude too" in orchestrator_md
-    or "you NEVER write code/tests/docs" in orchestrator_md,
-    "takeover must inherit the no-inline-work contract",
+    "orchestrator.md 'never write code/tests/docs' contract still present (in invariants section)",
+    "you NEVER write code/tests/docs" in orchestrator_md
+    or "you are forbidden from writing" in orchestrator_md.lower()
+    or "Never substitute yourself for a subagent" in orchestrator_md,
+    "the no-inline-work contract for the orchestrator must remain (now in Dispatch invariants, not duplicated in the handoff response).",
 )
 
 # --- CLAUDE.md § 13 ---
@@ -1009,8 +1015,8 @@ check(
 )
 check(
     "CLAUDE.md rule covers STAGE-GATE-2 autonomy semantics",
-    "STAGE-GATE-2" in claude_md and "autonomous" in claude_md,
-    "takeover must respect autonomy gating between PRs",
+    "STAGE-GATE-2" in claude_md and ("autonomous" in claude_md or "autonomy" in claude_md),
+    "takeover must respect autonomy gating between PRs (either word is acceptable; the new JSON-handoff design uses `autonomy.granted`).",
 )
 check(
     "CLAUDE.md rule covers STAGE-GATE-3 always-mandatory",

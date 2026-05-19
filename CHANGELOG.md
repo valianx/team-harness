@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- BREAKING (contract, not behavior): `agents/orchestrator.md` "Dispatch-blocked exit" — the response top-level Claude reads now contains a machine-parseable `dispatch_handoff` JSON block (schema_version 1) with the variable fields (`probe_error`, `phase`, `autonomy`, `round`, `next_dispatch`, `state_ref`) instead of a ~150-line prose playbook. The canonical takeover protocol moves to `CLAUDE.md §13 Universal rule — auto-takeover on blocked-no-dispatch`, single source of truth. Reduces handoff payload from ~3k tokens to ~300 tokens, eliminates prose-drift between the two locations. Same JSON block is embedded in the `## Handoff` section appended to `00-state.md` (for recovery flows). Fixes issue #14 (Option 4). `tests/test_agent_structure.py` updated to match new contract: now checks for `dispatch_handoff` JSON presence + `CLAUDE.md §13` cross-reference instead of the old `Takeover playbook` literal.
+
 ### Added
 
 - `cmd/install/`: Go rewrite of the installer. 1:1 port of `bin/install.py`'s logic including the PR #7 preservation-of-existing-mcpServers behaviour. Cross-compiled binaries shipped as GitHub Release assets (`install-linux-amd64`, `install-darwin-arm64`, `install-darwin-amd64`, `install-linux-arm64`, `install-windows-amd64.exe`).

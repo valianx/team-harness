@@ -52,35 +52,41 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
 
 2. **If no session-docs exist yet** (fresh task, probe failed before any intake): do NOT create session-docs. Just respond inline with the message below.
 
-3. **End your turn with this response** (fill in `{feature-name}`, `{next-phase}`, `{next-agent}`, `{autonomous}` from available context; omit the state-file reference if no session-docs). The response is a **directive to top-level Claude**, not a status report to the user — it must be unambiguous enough that top-level Claude takes over immediately without prompting the user. Use this exact structure and tone:
+3. **End your turn with this response** (fill placeholders from `## Current State`). The response is a **directive to top-level Claude** with two parts: (a) the marker phrase that triggers the auto-takeover protocol in `CLAUDE.md §13`, and (b) a machine-parseable JSON `dispatch_handoff` block with the variable fields top-level Claude needs to dispatch the next agent. The takeover playbook itself is canonical in `CLAUDE.md §13` — do NOT duplicate it inline here. Use this exact structure (no prose between the marker and the JSON, no commentary after):
 
    > **Dispatch handoff — top-level Claude takes over now.**
    >
-   > Boot probe verified `Task` is not available in this nested context (probe returned: *{literal probe error}*). I cannot dispatch agents from here. State, plan, and granted autonomy are intact — only the dispatch caller changed.
+   > ```json
+   > {
+   >   "dispatch_handoff": {
+   >     "schema_version": 1,
+   >     "reason": "task_tool_unavailable_nested",
+   >     "probe_error": "{literal probe error}",
+   >     "state_ref": "session-docs/{feature-name}/00-state.md",
+   >     "phase": { "number": {N}, "name": "{phase-name}", "stage": "{stage-name}" },
+   >     "autonomy": { "granted": {true|false}, "granted_at": "{gate-name|null}" },
+   >     "round": { "current": "{R1|R2|...|null}", "prs_in_round": [{...|null}] },
+   >     "next_dispatch": {
+   >       "agent": "{next-agent}",
+   >       "via": "Task(subagent_type={next-agent}, ...)",
+   >       "contract_files": ["agents/{next-agent}.md", "agents/orchestrator.md#phase-{N}"]
+   >     }
+   >   }
+   > }
+   > ```
    >
-   > **Top-level Claude — execute the takeover playbook below now. Do NOT ask the user for confirmation. Do NOT report the block and wait. Do NOT re-invoke `@orchestrator` or any skill that routes through `Task(subagent_type=orchestrator, ...)` — that recreates the nested context and the probe will fail again. The user already authorised the pipeline; this is a runtime detour, not a new decision.**
-   >
-   > **Takeover playbook (mechanical, follow in order):**
-   >
-   > 1. Read `session-docs/{feature-name}/00-state.md` — focus on `## Current State` (phase, status, autonomous, current_round, prs_in_current_round) and the `## Handoff` section I just appended. *(Skip if no session-docs — the handoff fields below give you everything.)*
-   > 2. Read `agents/orchestrator.md` Phase `{next-phase}` section for the per-phase dispatch contract, and `agents/{next-agent}.md` for the agent's own contract (tools, inputs, status block).
-   > 3. Dispatch `{next-agent}` directly via `Task(subagent_type={next-agent}, ...)` using the contract from Step 2. You have `Task` — the strip only happens to nested subagents, not to the top-level session.
-   > 4. On each subagent return, parse its status block. Update `session-docs/{feature-name}/00-state.md` (TL;DR + Current State + Agent Results table) following the protocol in `agents/orchestrator.md` § "Phase Checkpointing". On `status: success`, advance to the next phase. On `status: failed` or `blocked`, iterate per the orchestrator contract (max 3 iterations).
-   > 5. Continue through the remaining phases of the pipeline. Specifically: Phase 3 verifies in parallel (`tester` + `qa` + `security` if the task is security-sensitive); Phase 3.5 acceptance-gate; Phase 3.6 dispatches `acceptance-checker`; Phase 4 dispatches `delivery`. Respect gate semantics:
-   >    - **STAGE-GATE-2** (between PRs in Stage 2): if `autonomous: true`, skip silently per the orchestrator contract; if `autonomous: false`, stop and ask the user. *(For this run, autonomous is `{autonomous}`.)*
-   >    - **STAGE-GATE-3** (before push in Stage 3): always stop and ask the user — autonomy never covers this gate.
-   > 6. Mirror PR-level progress into `02-task-list.md` (Status field + AC checkbox) at each PR transition, same as the orchestrator would.
-   > 7. When the full pipeline completes (or you hit STAGE-GATE-3), report final status to the user — that's the first and only point you involve the user in this run, unless an iteration loop produces a non-recoverable failure that needs human input.
-   >
-   > **Anti-patterns — do NOT do any of these:**
-   > - Ask the user "should I take over?" — yes, this directive is the authorisation.
-   > - Re-dispatch `Task(subagent_type=orchestrator, ...)` to retry — the next nested probe will also fail.
-   > - Write `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md`, `05-delivery.md`, or `06-acceptance-check.md` yourself in lieu of dispatching the agent — the "you NEVER write code/tests/docs" contract applies to top-level Claude too in this takeover.
-   > - Skip phases or gates because "the orchestrator already started" — you ARE the orchestrator now; run the full remaining contract.
+   > Top-level Claude: follow `CLAUDE.md §13 Universal rule — auto-takeover on blocked-no-dispatch`. Variable fields above; canonical playbook in CLAUDE.md.
 
-   (Then stop your subagent turn. Do not retry the probe. Do not improvise inline work. Do not write any other session-doc beyond the `00-state.md` update.)
+   **Fill rules for placeholders:**
+   - `state_ref`: omit the field entirely (or set `null`) if no session-docs exist for this run.
+   - `phase.number`: integer 0–6 matching the orchestrator's phase numbering.
+   - `autonomy.granted`: `true` only after the user explicitly authorised autonomous execution via `approve autonomous` or equivalent.
+   - `round.current` and `round.prs_in_round`: `null` when not yet in Stage 2.
+   - `next_dispatch.contract_files`: at minimum the agent's own contract file; include orchestrator phase anchor when applicable.
 
-**`## Handoff` template** (append verbatim to `00-state.md` in step 1, fill placeholders from `## Current State`):
+   (Then stop your subagent turn. Do not retry the probe. Do not improvise inline work. Do not write any other session-doc beyond the `00-state.md` update from step 1. Do not append the prose playbook — `CLAUDE.md §13` is the single source of truth for the takeover protocol; duplicating it here drifts.)
+
+**`## Handoff` template** (append verbatim to `00-state.md` in step 1, fill placeholders from `## Current State`). The human-readable fields preserve context for resume-after-compaction; the embedded JSON block is the canonical machine-parseable handoff (identical schema to the response above) so recovery flows (e.g., `/recover`) can pick up state without re-parsing prose:
 
 ```markdown
 ## Handoff
@@ -93,7 +99,26 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
 **Next agent to dispatch:** `{next-agent}`
 **Next agent contract:** `agents/{next-agent}.md` and the Phase {N} section of `agents/orchestrator.md`.
 
-Top-level Claude: dispatch `{next-agent}` directly via `Task`. Do NOT re-invoke `@orchestrator` — that re-creates the nested condition that produced this block.
+```json
+{
+  "dispatch_handoff": {
+    "schema_version": 1,
+    "reason": "task_tool_unavailable_nested",
+    "probe_error": "{literal error string}",
+    "state_ref": "session-docs/{feature-name}/00-state.md",
+    "phase": { "number": {N}, "name": "{phase-name}", "stage": "{stage-name}" },
+    "autonomy": { "granted": {true|false}, "granted_at": "{gate-name|null}" },
+    "round": { "current": "{R1|R2|...|null}", "prs_in_round": [{...|null}] },
+    "next_dispatch": {
+      "agent": "{next-agent}",
+      "via": "Task(subagent_type={next-agent}, ...)",
+      "contract_files": ["agents/{next-agent}.md", "agents/orchestrator.md#phase-{N}"]
+    }
+  }
+}
+```
+
+Top-level Claude: follow `CLAUDE.md §13 Universal rule — auto-takeover on blocked-no-dispatch`. Do NOT re-invoke `@orchestrator` — that re-creates the nested condition.
 ```
 
 ## Dispatch invariants (read first, never weaken)
