@@ -28,13 +28,13 @@ cd claude-dev-team
 # .\bin\install.ps1      # Windows (PowerShell)
 ```
 
-Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`uv`](https://docs.astral.sh/uv/getting-started/installation/) (auto-installed if missing), [`gh`](https://cli.github.com/), and a [context7](https://context7.com/) API key.
+Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`gh`](https://cli.github.com/), and a [context7](https://context7.com/) API key. No Python or `uv` required — the bootstrap script downloads a prebuilt Go binary from the latest GitHub Release.
 
 Restart Claude Code after install so it picks up the new agents and MCP servers. The installer is idempotent and never overwrites existing files (conflicts are reported, not silenced).
 
 The installer prompts for the **Knowledge Graph backend**: `context-harness` (Go + Postgres+pgvector, cloud or local — default) or `memory` (Python ChromaDB, local single-machine). For unattended installs use `KG_BACKEND=memory` or `KG_BACKEND=context-harness CONTEXT_HARNESS_URL=https://<url>/mcp`.
 
-> Re-running on a machine with `uv` already present: `uv run bin/install.py`. To skip all prompts: `CONTEXT7_API_KEY=ctx7sk-... KG_BACKEND=memory uv run bin/install.py`.
+> To skip all prompts: `CONTEXT7_API_KEY=ctx7sk-... KG_BACKEND=memory ./bin/install.sh`. Pass `--force` to reset existing mcpServer entries: `./bin/install.sh --force`.
 
 ---
 

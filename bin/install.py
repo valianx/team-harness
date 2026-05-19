@@ -3,7 +3,18 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""claude-dev-team installer.
+"""DEPRECATED — pending removal in the next major version after v1.1.0.
+
+This Python installer is replaced by a Go binary published as a GitHub
+Release asset. Run `./bin/install.sh` (Linux/macOS) or `.\\bin\\install.ps1`
+(Windows) which now downloads the right Go binary and executes it.
+
+This script remains executable for one release as a fallback. Future
+versions will remove it entirely.
+
+---
+
+claude-dev-team installer.
 
 Installs agents, skills, hooks, and the knowledge-graph MCP server into ~/.claude/,
 and registers the `memory` + `context7` MCP servers in ~/.claude.json.
@@ -700,6 +711,10 @@ def _format_kg_backend_summary(kg_choice: KGBackendChoice) -> str:
 # ---------------------------------------------------------------------------
 def main() -> None:
     global force_flag
+
+    print("WARNING: bin/install.py is deprecated. Run bin/install.sh or bin/install.ps1 instead.", file=sys.stderr)
+    print("This Python installer continues to work for one more release, then will be removed.", file=sys.stderr)
+    print("", file=sys.stderr)
 
     # Parse --force before anything else so helpers can read the flag.
     force_flag = "--force" in sys.argv

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `cmd/install/`: Go rewrite of the installer. 1:1 port of `bin/install.py`'s logic including the PR #7 preservation-of-existing-mcpServers behaviour. Cross-compiled binaries shipped as GitHub Release assets (`install-linux-amd64`, `install-darwin-arm64`, `install-darwin-amd64`, `install-linux-arm64`, `install-windows-amd64.exe`).
+- `.github/workflows/release.yml`: cross-compile workflow triggered by `git tag v*`. Produces 5 platform binaries + SHA256SUMS and uploads as Release assets.
+- `bin/install.sh` and `bin/install.ps1` rewritten as thin bootstrap wrappers — detect OS+arch, download the right binary from the latest GH Release, exec it. End-user no longer needs `uv` or Python.
+- `go.mod`: claude-dev-team is now a Go module (`github.com/valianx/claude-dev-team`, Go 1.23).
+
+### Deprecated
+
+- `bin/install.py`: deprecation header added. Continues to work for one more release as a fallback. Will be removed in the next major.
+
 - `bin/install.py`: interactive prompt for KG backend choice (context-harness default, memory fallback) with hosting sub-prompt and soft reachability check; `KG_BACKEND` + `CONTEXT_HARNESS_URL` env vars for non-interactive installs.
 - `install_knowledge_graph()` now skipped when `context-harness` backend is chosen — saves the local ChromaDB Python install when the user has a remote backend.
 

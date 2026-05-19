@@ -1,36 +1,40 @@
-#!/usr/bin/env bash
-# claude-dev-team bootstrap (Unix / macOS)
-# Ensures uv is installed, then runs the Python installer via `uv run`.
-set -euo pipefail
+#!/bin/sh
+# claude-dev-team installer bootstrap (Unix / macOS)
+# Downloads the right prebuilt Go binary from the latest GitHub Release and execs it.
+set -e
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="valianx/claude-dev-team"
 
-echo "claude-dev-team bootstrap"
-
-if ! command -v uv >/dev/null 2>&1; then
-    echo "uv not found. Installing via astral.sh..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-
-    # Make uv available in the current shell session
-    if [ -f "$HOME/.local/bin/env" ]; then
-        # shellcheck disable=SC1091
-        . "$HOME/.local/bin/env"
-    elif [ -f "$HOME/.cargo/env" ]; then
-        # shellcheck disable=SC1091
-        . "$HOME/.cargo/env"
-    else
-        export PATH="$HOME/.local/bin:$PATH"
-    fi
-fi
-
-if ! command -v uv >/dev/null 2>&1; then
-    echo "Error: uv install did not succeed." >&2
-    echo "Install it manually (https://docs.astral.sh/uv/) and re-run this script." >&2
+# Find latest release tag.
+LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+if [ -z "$LATEST" ]; then
+    echo "Error: could not resolve latest release. Has a release been tagged yet?"
+    echo "See: https://github.com/$REPO/releases"
     exit 1
 fi
 
-echo "uv: $(uv --version)"
-echo "Running installer..."
-echo
+# Detect OS + arch.
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64|amd64) ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *) echo "Error: unsupported arch '$ARCH'"; exit 1 ;;
+esac
+case "$OS" in
+    linux|darwin) ;;
+    *) echo "Error: unsupported OS '$OS'. For Windows, use install.ps1."; exit 1 ;;
+esac
 
-exec uv run "$REPO_ROOT/bin/install.py" "$@"
+ASSET="install-${OS}-${ARCH}"
+URL="https://github.com/$REPO/releases/download/$LATEST/$ASSET"
+
+TMP=$(mktemp -d)
+trap "rm -rf $TMP" EXIT
+
+echo "Downloading $ASSET from $LATEST..."
+curl -fsSL -o "$TMP/install" "$URL"
+chmod +x "$TMP/install"
+
+echo "Running install (you may be prompted for backend choice + API key)..."
+exec "$TMP/install" "$@"

@@ -15,9 +15,11 @@
 - Not a general-purpose framework — it encodes a specific opinionated workflow (orchestrator + specialized subagents + SDD pipeline).
 
 **External dependencies (required).**
-- `uv` — Python toolchain manager. Runs the installer and the knowledge-graph MCP server. Install: https://docs.astral.sh/uv/getting-started/installation/
 - `gh` — GitHub CLI. Used by `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/
 - **context7 API key** — for library docs retrieval. Get one at https://context7.com/ (the installer prompts for it or reads `CONTEXT7_API_KEY` from the environment).
+
+**External dependencies (required for the deprecated Python fallback only).**
+- `uv` — Python toolchain manager. Only needed if you run `bin/install.py` directly (deprecated fallback). The new Go binary installer requires only `curl` + `bash` (Unix/macOS) or PowerShell (Windows). Install: https://docs.astral.sh/uv/getting-started/installation/
 
 **External dependencies (optional).**
 - `d2` CLI — for `/d2-diagram`.
@@ -50,10 +52,29 @@ claude-dev-team/
 │   ├── manage-server.sh     Optional: run in SSE mode
 │   ├── migrate_knowledge.py Optional: legacy JSONL → ChromaDB
 │   └── viewer/app.py        Optional: web UI to inspect the KG
+├── cmd/
+│   └── install/         Go installer source (cross-compiled to GH Release assets)
+│       ├── main.go
+│       ├── prompts.go
+│       ├── preservation.go
+│       ├── claude_json.go
+│       ├── files.go
+│       ├── manifest.go
+│       ├── context7.go
+│       ├── install_kg.go
+│       ├── legacy.go
+│       ├── summary.go
+│       ├── util.go
+│       ├── platform.go
+│       └── preservation_test.go
 ├── bin/
-│   ├── install.py       Installer (Python, PEP 723 inline metadata)
-│   ├── install.sh       Bootstrap for Unix/macOS (installs uv, invokes install.py)
+│   ├── install.py       DEPRECATED — Python installer (fallback; removed next major)
+│   ├── install.sh       Bootstrap for Unix/macOS (downloads Go binary from GH Release)
 │   └── install.ps1      Bootstrap for Windows (same via PowerShell)
+├── .github/
+│   └── workflows/
+│       └── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
+├── go.mod               Go module (github.com/valianx/claude-dev-team, Go 1.23)
 ├── docs/
 │   └── knowledge.md     Project knowledge base — decisions, patterns, stack
 ├── shared-knowledge/    Drop-off for shared KG exports (see folder README)
@@ -68,7 +89,8 @@ claude-dev-team/
 - `skills/` — slash-command entry points. Most are thin: parse args → route to orchestrator. A few are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/kg-viewer`).
 - `hooks/` — keep these **generic and portable** (no personal tokens, no private endpoints). User-specific hooks belong in `~/.claude/hooks/`, not here.
 - `knowledge-graph/` — the KG MCP server source. Runtime state (`.venv/`, `.server.pid`, `server.log`, `__pycache__/`) is git-ignored.
-- `bin/install.py` — **stdlib-only** by design. If a dep becomes necessary, declare it in the PEP 723 header and keep the script runnable via `uv run`.
+- `cmd/install/` — Go installer source. No third-party deps (stdlib-only). Compiled with `CGO_ENABLED=0` for static single-file binaries.
+- `bin/install.py` — **deprecated** fallback (one release). Do not add logic here; new logic goes in `cmd/install/`.
 
 **Ephemeral content** (not committed): `session-docs/`, all runtime artifacts inside `knowledge-graph/`.
 
@@ -78,8 +100,8 @@ claude-dev-team/
 
 | Layer | Choice |
 |---|---|
-| Installer | Python ≥ 3.11 (stdlib only; PEP 723 inline metadata, executed by `uv run`) |
-| Bootstrap scripts | Bash (`install.sh`) + PowerShell (`install.ps1`) — ensure `uv` is present, invoke `install.py` |
+| Installer | Go 1.23+ (cross-compiled static binaries shipped as GH Release assets; source at `cmd/install/main.go`). `bin/install.py` kept as deprecated fallback for one release. |
+| Bootstrap scripts | Bash (`install.sh`) + PowerShell (`install.ps1`) — detect OS+arch, download the right Go binary from the latest GH Release, exec it. No `uv` or Python required. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
 | Hooks | Bash scripts (`.sh`) — run via Git Bash on Windows, native on macOS/Linux |
@@ -101,10 +123,11 @@ All commands run from the repo root.
 |---|---|
 | Install (Unix / macOS) | `./bin/install.sh` |
 | Install (Windows PowerShell) | `.\bin\install.ps1` |
-| Install (any OS, with `uv` already present) | `uv run bin/install.py` |
-| Non-interactive install (memory backend) | `CONTEXT7_API_KEY=<key> uv run bin/install.py` |
-| Non-interactive install (context-harness backend) | `CONTEXT7_API_KEY=<key> KG_BACKEND=context-harness CONTEXT_HARNESS_URL=https://<url>/mcp uv run bin/install.py` |
-| Force-reset MCP config in ~/.claude.json | `uv run bin/install.py --force` (use only when intentionally resetting; default is preserve-existing) |
+| Non-interactive install (memory backend) | `CONTEXT7_API_KEY=<key> ./bin/install.sh` |
+| Non-interactive install (context-harness backend) | `CONTEXT7_API_KEY=<key> KG_BACKEND=context-harness CONTEXT_HARNESS_URL=https://<url>/mcp ./bin/install.sh` |
+| Force-reset MCP config in ~/.claude.json | `./bin/install.sh` then pass `--force` (downloads binary + runs it with `--force`; use only when intentionally resetting) |
+| Build installer from source (requires Go 1.23+) | `go build ./cmd/install` |
+| Deprecated fallback (requires `uv`) | `uv run bin/install.py` |
 | View which files the installer would touch | Run the installer — it reports installed / unchanged / conflicts; never overwrites |
 | Resolve a conflict | Delete the conflicting file in `~/.claude/...` and re-run the installer |
 | Enable notification hooks | Open `hooks/config.json`, copy the section for your OS, merge it into `~/.claude/settings.json` under `"hooks"` |

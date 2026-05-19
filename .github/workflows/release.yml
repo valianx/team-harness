@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v1.2.0). Must already exist."
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # to create the release + upload assets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Cross-compile install binaries
+        run: |
+          mkdir -p dist
+          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64; do
+              GOOS=$(echo $target | cut -d- -f1)
+              GOARCH=$(echo $target | cut -d- -f2)
+              EXT=""
+              [ "$GOOS" = "windows" ] && EXT=".exe"
+              echo "Building install-${target}${EXT}..."
+              CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build \
+                  -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" \
+                  -o dist/install-${target}${EXT} \
+                  ./cmd/install
+          done
+          ls -lah dist/
+
+      - name: Compute SHA256 sums
+        run: |
+          cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Create / update GH Release with assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${{ github.event.inputs.tag || github.ref_name }}
+          # Create release if not exists; --generate-notes produces an auto-generated
+          # changelog from PRs since the previous tag.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release $TAG exists; uploading assets..."
+              gh release upload "$TAG" dist/* --clobber
+          else
+              gh release create "$TAG" dist/* --generate-notes
+          fi
