@@ -16,3 +16,11 @@ Thumbs.db
 knowledge-graph/.venv/
 knowledge-graph/.server.pid
 knowledge-graph/server.log
+
+# Build artifacts
+install
+install.exe
+
+# User-local tool manager config (mise/asdf) — not project state
+mise.toml
+.mise.toml
