@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-05-21
+
 ### Added
 
 - `cmd/install/prompts.go`: installer URL prompt now supports **smart-paste of the full mcpServers.memory JSON snippet** from the context-harness-mcp `/dashboard`. When the input starts with `{`, the installer assembles the rest of the snippet across stdin lines until braces balance (with a `snippetMaxLines = 100` safety cap), parses it with `encoding/json`, and extracts both URL and Bearer in a single operation — the subsequent bearer prompt is then skipped. Bare URL input still works as before. New helper `extractFromSnippet` handles the JSON walk with targeted error messages (missing `mcpServers` / `memory` / `url`, malformed JSON, non-Bearer auth scheme). `readLine` migrated to a shared package-level `bufio.Scanner` so multi-line stdin buffering is preserved between calls (a new scanner per call was discarding buffered lines). Coverage: 7 new unit tests in `preservation_test.go` for `extractFromSnippet` (full dashboard shape · no headers · malformed JSON · missing `mcpServers` / `memory` / `url` · non-Bearer auth scheme). Pairs with the matching dashboard render in context-harness-mcp PR #48 — copy once → paste once → wired up.
