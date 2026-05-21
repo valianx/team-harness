@@ -125,11 +125,18 @@ func promptMenu(prompt string, valid map[string]bool, defaultVal string) string 
 	return lower
 }
 
-// readLine reads a line from stdin, trimming the trailing newline.
+// stdinScanner is the shared package-level scanner used by readLine. A single
+// scanner is required because pasted multi-line input (e.g., a JSON snippet)
+// arrives in stdin's buffer all at once; allocating a new scanner per call
+// would internally buffer trailing bytes and then discard them along with the
+// scanner, losing lines after the first.
+var stdinScanner = bufio.NewScanner(os.Stdin)
+
+// readLine reads a line from stdin (trimming the trailing newline) using the
+// shared package-level scanner.
 func readLine() string {
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		return scanner.Text()
+	if stdinScanner.Scan() {
+		return stdinScanner.Text()
 	}
 	return ""
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -89,16 +90,23 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 	return promptURLInteractive()
 }
 
-// promptURLInteractive shows the URL prompt on a TTY, then chains into the
-// optional bearer-token prompt so one installer run captures both.
+// promptURLInteractive shows the URL prompt on a TTY. It accepts two formats:
+//
+//   - A bare URL (`https://your-mcp.example.com/mcp`) — proceeds to the bearer
+//     prompt afterwards.
+//   - A full mcpServers.memory JSON snippet starting with `{` (as copied from
+//     the context-harness-mcp dashboard) — parsed directly to extract URL +
+//     Bearer in one paste; the bearer prompt is then skipped.
 func promptURLInteractive() MemoryMCPChoice {
 	fmt.Println()
-	fmt.Println("Memory MCP URL")
-	fmt.Println("==============")
+	fmt.Println("Memory MCP URL or paste-ready snippet")
+	fmt.Println("=====================================")
 	fmt.Println()
-	fmt.Println("Paste the URL of your Knowledge Graph MCP — typically a cloud deployment")
-	fmt.Println("(Railway, Render, your own server, etc.) running context-harness-mcp or any")
-	fmt.Println("MCP-compatible server. Press Enter to use the local Docker default.")
+	fmt.Println("Paste either:")
+	fmt.Println("  • the bare URL of your Knowledge Graph MCP, OR")
+	fmt.Println("  • the full JSON snippet from your context-harness-mcp /dashboard")
+	fmt.Println("    (we parse it and skip the separate bearer prompt).")
+	fmt.Println("Press Enter to use the local Docker default.")
 	fmt.Println()
 	fmt.Printf("Memory MCP URL [%s]: ", defaultMemoryMCPURL)
 
@@ -107,12 +115,98 @@ func promptURLInteractive() MemoryMCPChoice {
 		return MemoryMCPChoice{URL: defaultMemoryMCPURL, BearerToken: promptMemoryMCPBearer()}
 	}
 
+	// Smart-paste: if the input opens a JSON object, slurp the rest of the
+	// snippet (across multiple stdin lines) and extract URL + Bearer.
+	if strings.HasPrefix(raw, "{") {
+		return parseSnippetPaste(raw)
+	}
+
 	if err := validateMCPURL(raw); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %q is not a valid URL: %s\n", raw, err)
 		fmt.Fprintln(os.Stderr, "  URL must start with http:// or https://")
 		os.Exit(1)
 	}
 	return MemoryMCPChoice{URL: raw, BearerToken: promptMemoryMCPBearer()}
+}
+
+// snippetMaxLines caps how many lines parseSnippetPaste will read while
+// assembling a JSON snippet. The standard mcpServers.memory shape is 8-10
+// lines; the cap is generous to accommodate operator-added headers while
+// preventing a runaway loop if the paste arrives malformed (unmatched braces).
+const snippetMaxLines = 100
+
+// parseSnippetPaste assembles a JSON snippet from stdin, starting with
+// firstLine, reading additional lines until braces balance (or the safety
+// cap is reached), then extracts URL + Bearer from
+// mcpServers.memory.{url, headers.Authorization}.
+//
+// On any parse / validation failure the process exits 1 with a helpful
+// error message — the user can re-run the installer and paste the URL alone.
+func parseSnippetPaste(firstLine string) MemoryMCPChoice {
+	var b strings.Builder
+	b.WriteString(firstLine)
+	depth := strings.Count(firstLine, "{") - strings.Count(firstLine, "}")
+
+	for i := 0; depth > 0 && i < snippetMaxLines; i++ {
+		next := readLine()
+		b.WriteByte('\n')
+		b.WriteString(next)
+		depth += strings.Count(next, "{") - strings.Count(next, "}")
+	}
+	if depth != 0 {
+		fmt.Fprintln(os.Stderr, "Error: pasted JSON snippet has unmatched braces.")
+		fmt.Fprintln(os.Stderr, "  Re-run the installer and paste the URL alone, or copy the")
+		fmt.Fprintln(os.Stderr, "  snippet again from your context-harness-mcp /dashboard.")
+		os.Exit(1)
+	}
+
+	url, bearer, err := extractFromSnippet(b.String())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: couldn't parse pasted snippet: %s\n", err)
+		fmt.Fprintln(os.Stderr, `  Expected format: { "mcpServers": { "memory": { "url": "...", "headers": { "Authorization": "Bearer ..." } } } }`)
+		os.Exit(1)
+	}
+	if err := validateMCPURL(url); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: snippet URL %q is invalid: %s\n", url, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("  Memory MCP URL: %s (parsed from pasted snippet)\n", url)
+	if bearer != "" {
+		fmt.Println("  Memory MCP bearer: (parsed from pasted snippet)")
+	}
+	return MemoryMCPChoice{URL: url, BearerToken: bearer}
+}
+
+// extractFromSnippet parses a JSON blob and returns the URL + Bearer (without
+// the "Bearer " prefix) from mcpServers.memory. The Authorization header is
+// optional — empty bearer means the MCP is unauthenticated.
+func extractFromSnippet(raw string) (url, bearer string, err error) {
+	var parsed map[string]interface{}
+	if jsonErr := json.Unmarshal([]byte(raw), &parsed); jsonErr != nil {
+		return "", "", jsonErr
+	}
+	mcps, ok := parsed["mcpServers"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("missing mcpServers")
+	}
+	mem, ok := mcps["memory"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("missing mcpServers.memory")
+	}
+	url, _ = mem["url"].(string)
+	if url == "" {
+		return "", "", fmt.Errorf("missing mcpServers.memory.url")
+	}
+	if headers, ok := mem["headers"].(map[string]interface{}); ok {
+		if auth, ok := headers["Authorization"].(string); ok {
+			const prefix = "Bearer "
+			if strings.HasPrefix(auth, prefix) {
+				bearer = strings.TrimSpace(auth[len(prefix):])
+			}
+		}
+	}
+	return url, bearer, nil
 }
 
 // promptMemoryMCPBearer captures the optional Bearer token for the Memory MCP.

@@ -993,6 +993,102 @@ func TestRegisterMCPServers_BearerPreservesOtherHeaders(t *testing.T) {
 	}
 }
 
+// ── extractFromSnippet (smart-paste JSON parsing) ────────────────────────────
+
+// TestExtractFromSnippet_FullDashboardShape verifies the happy path: the
+// snippet shape rendered by context-harness-mcp's /dashboard parses cleanly
+// into url + bearer with the "Bearer " prefix stripped.
+func TestExtractFromSnippet_FullDashboardShape(t *testing.T) {
+	raw := `{
+  "mcpServers": {
+    "memory": {
+      "type": "http",
+      "url": "https://team-harness.up.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer eyJhbGci.payload.signature"
+      }
+    }
+  }
+}`
+	url, bearer, err := extractFromSnippet(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if url != "https://team-harness.up.railway.app/mcp" {
+		t.Errorf("url: got %q", url)
+	}
+	if bearer != "eyJhbGci.payload.signature" {
+		t.Errorf("bearer (Bearer prefix should be stripped): got %q", bearer)
+	}
+}
+
+// TestExtractFromSnippet_NoHeaders verifies that a snippet without an
+// Authorization header (localhost / unauthenticated deployments) yields an
+// empty bearer rather than erroring.
+func TestExtractFromSnippet_NoHeaders(t *testing.T) {
+	raw := `{"mcpServers":{"memory":{"type":"http","url":"http://localhost:7654/mcp"}}}`
+	url, bearer, err := extractFromSnippet(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if url != "http://localhost:7654/mcp" {
+		t.Errorf("url: got %q", url)
+	}
+	if bearer != "" {
+		t.Errorf("expected empty bearer, got %q", bearer)
+	}
+}
+
+// TestExtractFromSnippet_MalformedJSON verifies that invalid JSON returns
+// an error so the caller can surface a helpful message to the user.
+func TestExtractFromSnippet_MalformedJSON(t *testing.T) {
+	if _, _, err := extractFromSnippet(`{not: valid json`); err == nil {
+		t.Error("expected error for malformed JSON")
+	}
+}
+
+// TestExtractFromSnippet_MissingMCPServers verifies that a JSON object
+// without an mcpServers key reports a clear error (vs silently returning
+// empty strings).
+func TestExtractFromSnippet_MissingMCPServers(t *testing.T) {
+	_, _, err := extractFromSnippet(`{"other": "stuff"}`)
+	if err == nil {
+		t.Error("expected error for missing mcpServers")
+	}
+}
+
+// TestExtractFromSnippet_MissingMemory verifies the targeted error when
+// mcpServers exists but the memory entry is absent.
+func TestExtractFromSnippet_MissingMemory(t *testing.T) {
+	_, _, err := extractFromSnippet(`{"mcpServers":{"context7":{}}}`)
+	if err == nil {
+		t.Error("expected error for missing mcpServers.memory")
+	}
+}
+
+// TestExtractFromSnippet_MissingURL verifies the targeted error when memory
+// exists but has no url field — a recognizable shape error operators can fix.
+func TestExtractFromSnippet_MissingURL(t *testing.T) {
+	_, _, err := extractFromSnippet(`{"mcpServers":{"memory":{"type":"http"}}}`)
+	if err == nil {
+		t.Error("expected error for missing mcpServers.memory.url")
+	}
+}
+
+// TestExtractFromSnippet_NonBearerAuthorization verifies that an
+// Authorization header using a non-Bearer scheme (Basic, custom) results in
+// an empty bearer — we never silently mangle a non-matching scheme.
+func TestExtractFromSnippet_NonBearerAuthorization(t *testing.T) {
+	raw := `{"mcpServers":{"memory":{"type":"http","url":"https://x.example.com/mcp","headers":{"Authorization":"Basic dXNlcjpwYXNz"}}}}`
+	_, bearer, err := extractFromSnippet(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bearer != "" {
+		t.Errorf("non-Bearer scheme must produce empty bearer, got %q", bearer)
+	}
+}
+
 // TestRegisterMCPServers_NoWriteWhenBearerUnchanged verifies that re-running
 // the installer with the same URL + same bearer produces no backup.
 func TestRegisterMCPServers_NoWriteWhenBearerUnchanged(t *testing.T) {
