@@ -142,18 +142,29 @@ The detailed mode renders a structured narrative for one feature. **It is read-o
 
 1. **If `session-docs/{feature-name}/00-state.md` does not exist:** output `No state file at session-docs/{feature-name}/00-state.md.` and exit cleanly. No crash.
 
-2. **Read `00-state.md`.** Render in this sequence:
+2. **Pipeline Summary panel** — read `session-docs/{feature-name}/00-pipeline-summary.md` if it exists. Render its `## TL;DR` block and its `## Phase Timeline` table verbatim under a top-level `## Pipeline Summary` header. This is the 30-second answer for "did this work?" that the user sees before the deeper narrative below.
+
+   If `00-pipeline-summary.md` is absent: skip this panel silently and continue to step 3 (pipeline ran before observability was wired up, or trace not yet initialized). Do NOT emit a noise placeholder — the deeper narrative below is still useful.
+
+   For the canonical observability views, point the reader to `/trace`:
+   ```
+   For tool effectiveness:  /trace {feature-name} --tools
+   For failures only:       /trace {feature-name} --fails
+   For raw events:          /trace {feature-name} --jsonl
+   ```
+
+3. **Read `00-state.md`.** Render in this sequence:
    - **TL;DR** — extract and render the `## TL;DR` section verbatim. If the section is absent (pipeline predates this feature), render: `TL;DR\n-----\n(not available — pipeline state predates the TL;DR section)`.
    - **Current State** — render the `## Current State` key-value block.
    - **Agent Results** — render the `## Agent Results` table. If the table body is empty (very early pipeline), render the header row and `(no agent results yet)`.
    - **Hot Context** — render the `## Hot Context` bullets.
    - **Recovery Instructions** — render ONLY if `status` is `paused`, `paused_for_amend`, `blocked`, or the `Process` column was `DEAD` in the no-args view. Otherwise hide — recovery hints are noise when the pipeline is healthy.
 
-3. **Read `00-execution-events.jsonl`** (if it exists at `session-docs/{feature-name}/00-execution-events.jsonl`). Parse line by line into a list of events. Apply the Timeline rules below to produce the `## Timeline` section.
+4. **Read `00-execution-events.jsonl`** (if it exists at `session-docs/{feature-name}/00-execution-events.jsonl`). Parse line by line into a list of events. Apply the Timeline rules below to produce the `## Timeline` section.
 
    If `00-execution-events.jsonl` does not exist: render `Timeline\n--------\n(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash, exit code 0.
 
-4. **Render Timeline** using the rules below.
+5. **Render Timeline** using the rules below.
 
 ### Timeline event types rendered
 

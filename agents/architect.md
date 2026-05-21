@@ -801,9 +801,16 @@ status: success | failed | blocked
 output: session-docs/{feature-name}/{01-architecture|00-research|01-planning}.md
 summary: {1-2 sentence summary of what was designed/researched/planned}
 context7_consult: hit:N miss:N skipped:M
+memory_consult: search_nodes:N open_nodes:N
+kg_save_candidates: [entity-name-1, entity-name-2]
 issues: {list of blockers, or "none"}
 ```
 
-The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 (even when all counts are zero — its presence signals the agent considered documentation freshness).
+**Mandatory tool-usage fields:**
+- `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear; the line's presence signals the agent considered documentation freshness.
+- `memory_consult` — count of Knowledge Graph queries made this run (separate from `00-knowledge-context.md` pre-fetched by orchestrator Phase 0a, which is "free"). Zero is a valid value.
+- `kg_save_candidates` — names of KG entities you propose the orchestrator persist in Phase 6 (per "Knowledge Graph Access" above). Empty list `[]` is valid; omit the line only if you ran in a mode that doesn't generate candidates.
+
+The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md` (see orchestrator's "Pipeline Summary Protocol" section).
 
 Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.

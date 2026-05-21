@@ -1256,6 +1256,129 @@ for agent_file in ALL_AGENT_FILES:
     )
 
 # ---------------------------------------------------------------------------
+# Suite 20 — Pipeline observability (canonical artifacts + status block fields)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 20: Pipeline observability ===")
+
+# --- orchestrator.md: Pipeline Summary Protocol + deprecated artifact banners ---
+
+orch_obs_checks = [
+    ("Pipeline Summary Protocol section header", "## Pipeline Summary Protocol"),
+    ("Pipeline Summary mentions 00-pipeline-summary.md", "00-pipeline-summary.md"),
+    ("Pipeline Summary rewrite-in-full discipline", "rewrite it **in full**"),
+    ("Pipeline Summary cites JSONL as source of truth", "render of the trace"),
+    ("JSONL writing is mandatory not best-effort",
+     "**Writing the trace is mandatory, not best-effort.**"),
+    ("dispatch.blocked event documented", "dispatch.blocked"),
+    ("tools field documented in JSONL schema",
+     "Object propagated from the returning agent's status block"),
+    ("tools mapping table: context7_consult → context7 sub-object",
+     '"context7": {"hit": N, "miss": N, "skipped": M}'),
+    ("tools mapping table: memory_consult → memory sub-object",
+     '"memory": {"search_nodes": N, "open_nodes": N}'),
+    ("tools mapping table: kg_save_candidates → array",
+     '"kg_save_candidates": ["a", "b"]'),
+    ("tools mapping table: kg_passive_capture → string",
+     '"kg_passive_capture":'),
+    ("Pipeline Metrics deprecated banner",
+     "## Pipeline Metrics (DEPRECATED"),
+    ("Done.yml deprecated banner",
+     "## Done.yml (DEPRECATED"),
+]
+for label, marker in orch_obs_checks:
+    check(
+        f"orchestrator.md observability: {label}",
+        marker in orch,
+        f"marker '{marker}' not found",
+    )
+
+# --- skills/trace.md exists with the four modes ---
+
+trace_path = SKILLS_DIR / "trace.md"
+check("skills/trace.md exists", trace_path.exists())
+if trace_path.exists():
+    trace_md = read(trace_path)
+    trace_checks = [
+        ("default mode reads 00-pipeline-summary.md", "00-pipeline-summary.md"),
+        ("--jsonl mode tails 00-execution-events.jsonl",
+         "tail -n 30 session-docs/{feature-name}/00-execution-events.jsonl"),
+        ("--tools mode aggregates with jq",
+         '.event == "phase.end" and .tools'),
+        ("--fails mode filters dispatch.blocked + iterations + gate.fail",
+         "dispatch.blocked"),
+        ("read-only contract explicit",
+         "read-only"),
+        ("falls back gracefully when jq absent",
+         "`jq` is not available"),
+    ]
+    for label, marker in trace_checks:
+        check(
+            f"skills/trace.md: {label}",
+            marker in trace_md,
+            f"marker '{marker}' not found",
+        )
+
+# --- skills/status.md reads 00-pipeline-summary.md ---
+
+status_md = read(SKILLS_DIR / "status.md")
+check(
+    "skills/status.md <feature-name> mode reads 00-pipeline-summary.md",
+    "00-pipeline-summary.md" in status_md,
+    "narrative renderer does not read the pipeline summary",
+)
+check(
+    "skills/status.md points to /trace for deeper observability",
+    "/trace" in status_md,
+    "narrative renderer does not advertise /trace",
+)
+
+# --- Agent status blocks: memory_consult + kg_save_candidates on read-only KG agents ---
+
+# These four agents have read-only KG access (architect, qa, tester, security).
+# Their Return Protocol must declare memory_consult and kg_save_candidates so the
+# orchestrator can propagate them into the JSONL trace.
+KG_READ_ONLY_AGENTS = ["architect", "qa", "tester", "security"]
+for agent_name in KG_READ_ONLY_AGENTS:
+    agent_md = read(AGENTS_DIR / f"{agent_name}.md")
+    return_section = agent_md.split("## Return Protocol", 1)
+    if len(return_section) < 2:
+        check(
+            f"agents/{agent_name}.md has Return Protocol section",
+            False,
+            "section missing",
+        )
+        continue
+    rp = return_section[1]
+    check(
+        f"agents/{agent_name}.md status block declares memory_consult",
+        "memory_consult:" in rp,
+        "memory_consult line missing from Return Protocol",
+    )
+    check(
+        f"agents/{agent_name}.md status block declares kg_save_candidates",
+        "kg_save_candidates:" in rp,
+        "kg_save_candidates line missing from Return Protocol",
+    )
+
+# delivery.md keeps kg_passive_capture (already covered by Step 11.5);
+# implementer.md + translator.md have no KG access, so they don't declare these.
+
+# --- CLAUDE.md §5: observability working agreement bullet ---
+
+claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "CLAUDE.md §5 declares pipeline observability as a working agreement",
+    "Pipeline observability is mandatory" in claude_md,
+    "missing working-agreement bullet",
+)
+check(
+    "CLAUDE.md §5 references the two canonical artifacts",
+    "00-execution-events.jsonl" in claude_md and "00-pipeline-summary.md" in claude_md,
+    "canonical artifacts not both cited",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

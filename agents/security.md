@@ -683,10 +683,17 @@ status: success | failed | blocked
 output: session-docs/{feature-name}/04-security.md
 summary: {1-2 sentences: N findings (X crítico, Y alto, Z medio), risk score, most critical issue}
 context7_consult: hit:N miss:N skipped:M
+memory_consult: search_nodes:N open_nodes:N
+kg_save_candidates: [entity-name-1, entity-name-2]
 issues: {critical and high findings titles, or "none"}
 ```
 
-The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness for the OWASP/CWE baselines.
+**Mandatory tool-usage fields:**
+- `context7_consult` — per `docs/context7-usage.md` §5. Required for the Phase 0 OWASP/CWE version check.
+- `memory_consult` — count of Knowledge Graph queries made this run. Zero is valid.
+- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+
+The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl`.
 
 Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
