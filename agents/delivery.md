@@ -85,7 +85,6 @@ If everything passes, continue to Step 1.
 - Determine current branch and status (`git rev-parse --abbrev-ref HEAD`, `git status`)
 - Detect project type (backend, frontend, fullstack) from project files
 - Scan recent diffs and relevant files to understand the feature scope
-- Use context7 MCP if available to research documentation best practices. If not available, proceed without.
 
 ### Step 2 — Detect GitHub issue
 

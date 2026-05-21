@@ -142,9 +142,11 @@ Use Bash, Read, Grep, and Glob to systematically identify the stack.
 - **State management:** React Query, Zustand, Redux, Jotai, Pinia, etc.
 - **Data fetching:** Server Components, SWR, React Query, fetch patterns
 
-### 2.4 — Documentation Research (optional)
+### 2.4 — Documentation Research (light reference)
 
-If context7 MCP is available, use it to research framework-specific conventions for the detected stack. If not available, proceed without — do not fail or halt.
+context7 may be consulted to learn framework-specific conventions for the detected stack. **Init is exploratory** — failure to consult context7 is acceptable and the agent never halts on context7 absence. The mandatory triggers in `docs/context7-usage.md` §2 apply to downstream agents (architect / implementer / tester / security / translator), not to init itself.
+
+If consulted, follow the playbook (resolve-library-id → get-library-docs) — but do not block the bootstrap on it.
 
 ---
 
