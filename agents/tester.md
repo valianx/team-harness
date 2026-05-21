@@ -558,10 +558,17 @@ tests_count: {N}
 tests_deleted: {N}
 tests_deleted_reason: {one-line justification if tests_deleted > 0; otherwise omit this field}
 context7_consult: hit:N miss:N skipped:M
+memory_consult: search_nodes:N open_nodes:N
+kg_save_candidates: [entity-name-1, entity-name-2]
 issues: {list of failing tests, or "none"}
 ```
 
-The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness.
+**Mandatory tool-usage fields:**
+- `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear.
+- `memory_consult` — count of Knowledge Graph queries made this run. Zero is valid.
+- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+
+The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md`.
 
 **Field semantics:**
 - `tests_count` — total individual test cases after this iteration (sum of `it()` / `test()` blocks across the suite, or your framework's equivalent). Count cases, not files.

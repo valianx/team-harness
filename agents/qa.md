@@ -513,8 +513,16 @@ agent: qa
 status: success | failed | blocked
 output: session-docs/{feature-name}/{04-validation|00-acceptance-criteria}.md
 summary: {1-2 sentences: N/N AC passed, any critical findings}
+memory_consult: search_nodes:N open_nodes:N
+kg_save_candidates: [entity-name-1, entity-name-2]
 issues: {list of failed criteria, or "none"}
 ```
+
+**Mandatory tool-usage fields:**
+- `memory_consult` — count of Knowledge Graph queries made this run. Zero is a valid value.
+- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+
+The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl`.
 
 Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 

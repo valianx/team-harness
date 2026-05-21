@@ -1564,7 +1564,9 @@ This trigger never fires more than once per phase boundary. If the user opts to 
 
 ---
 
-## Pipeline Metrics
+## Pipeline Metrics (DEPRECATED — replaced by 00-pipeline-summary.md + 00-execution-events.jsonl)
+
+> **Deprecation notice (2026-05-21).** The `pipeline-metrics.json` artifact described in this section was specified but never written in practice. Empirical check across all real pipelines showed **0 files of this name** while the spec demanded one per run. The canonical observability stack is now `00-pipeline-summary.md` (human-readable, "Pipeline Summary Protocol" below) + `00-execution-events.jsonl` (machine-readable, "Execution Events JSONL" below). The schema is retained as historical reference until a follow-up cleanup PR removes it. **Do NOT write `pipeline-metrics.json` in new pipelines.**
 
 At the end of every pipeline run (single or batch), write metrics to `session-docs/{feature-name}/pipeline-metrics.json`. The schema below is the **canonical** format — agents and skills that consume metrics expect every field.
 
@@ -1631,7 +1633,9 @@ This data enables trend analysis: which types of issues need more iterations, wh
 
 ---
 
-## Done.yml (formal completion criteria)
+## Done.yml (DEPRECATED — replaced by pipeline.end status in 00-execution-events.jsonl)
+
+> **Deprecation notice (2026-05-21).** The `done.yml` artifact described in this section was specified but never written in practice (0 files across all real pipelines). Its "did this ship clean?" question is now answered by the trailing `pipeline.end` event's `status` field plus the `gate.pass`/`gate.fail` history in `00-execution-events.jsonl`. The schema is retained as historical reference until a follow-up cleanup PR removes it. **Do NOT write `done.yml` in new pipelines.**
 
 Anthropic's harness-design article puts it bluntly: *"define completion criteria in external, testable files"*. The orchestrator currently decides "the pipeline is done" implicitly by walking through Phases 3.5 and 3.6 — there is no single artifact you can `cat` and conclude "yes, this shipped clean". `done.yml` fixes that.
 
@@ -1717,13 +1721,15 @@ Both must agree. If Phase 3.5 says proceed but `done.yml` evaluates to `false` a
 
 ---
 
-## Execution Events JSONL (machine-readable trace)
+## Execution Events JSONL (canonical observability — mandatory)
 
-`pipeline-metrics.json` is the **aggregate** snapshot at the end of the pipeline. It does not let you reconstruct what happened minute-by-minute. For that, you also append events to `session-docs/{feature-name}/00-execution-events.jsonl` as the pipeline progresses — one JSON object per line, append-only, never rewritten.
+`session-docs/{feature-name}/00-execution-events.jsonl` is the **canonical machine-readable trace of the pipeline.** Append one JSON object per line, append-only, never rewritten. Coupled with `00-pipeline-summary.md` (see "Pipeline Summary Protocol" below), this is the observability stack — the legacy `pipeline-metrics.json` and `done.yml` artifacts are deprecated (see their banners below).
 
 This is the audit log Anthropic recommends in the harness-design article: *"Wire tracing in on day one. Retrofitting observability is painful and the place where real agent bugs hide."* The JSONL format is queryable with `jq`, supports streaming, and survives compaction (it lives on disk, not in your context).
 
-**The orchestrator (you) writes every event.** Agents do not write to this file directly — they return status blocks and the orchestrator records the event. This keeps the protocol simple and the file consistent.
+**The orchestrator (you) writes every event.** Agents do not write to this file directly — they return status blocks and you record the event. This keeps the protocol simple and the file consistent.
+
+**Writing the trace is mandatory, not best-effort.** Skipping events under context pressure is the failure mode that killed the previous spec. The append is a single-line `>>` redirect — the cost is negligible compared to the cost of running a pipeline blind. If you find yourself "saving tokens" by batching or skipping appends, you are deleting the only signal we have on whether the pipeline is healthy.
 
 ### Schema
 
@@ -1732,7 +1738,7 @@ Every line is a JSON object with these fields:
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 timestamp with timezone (e.g. `2026-05-01T14:00:00-03:00`). |
-| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`. |
+| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`. |
 | `feature` | yes | Feature name (kebab-case, matches the session-docs folder). |
 | `phase` | conditional | Phase identifier (e.g. `0a-intake`, `1-design`, `2-implement`, `3-verify`, `1.5-ratify-plan`, `1.6-plan-review`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
 | `stage` | conditional | Stage number (`1` / `2` / `3`). Required for `stage.gate*` events. |
@@ -1748,18 +1754,23 @@ Every line is a JSON object with these fields:
 | `round_prs` | conditional | List of PR identifiers in the round (e.g., `["PR-1", "PR-2"]`). Recommended for `stage.gate stage: 2` to record which PRs ran in parallel. |
 | `reason` | conditional | Reason a gate was skipped (e.g., `autonomous`, `legacy`). Required for `stage.gate.skipped`. |
 | `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
+| `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
+| `reason` | conditional | For `dispatch.blocked`: short reason (`task tool stripped`, `agent not registered`, `tool permission denied`). For `stage.gate.skipped`: `autonomous` / `legacy`. |
+| `action` | conditional | For `dispatch.blocked`: what you did about it (`top-level takeover per CLAUDE.md §13`, `aborted`). |
 | `extra` | optional | Object for event-specific extras (e.g., `{"tests_before": 42, "tests_after": 47}` for the test-ratchet gate). |
 
 ### Examples
 
 ```jsonl
 {"ts":"2026-05-01T14:00:00-03:00","event":"pipeline.start","feature":"auth-jwt","extra":{"type":"feature","complexity":"standard","ac_count":5}}
+{"ts":"2026-05-01T14:00:12-03:00","event":"dispatch.blocked","feature":"auth-jwt","phase":"0a-intake","reason":"task tool stripped","action":"top-level takeover per CLAUDE.md §13"}
 {"ts":"2026-05-01T14:00:42-03:00","event":"phase.start","feature":"auth-jwt","phase":"1-design","agent":"architect","iteration":0}
-{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry"}
+{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
 {"ts":"2026-05-01T14:03:25-03:00","event":"gate.pass","feature":"auth-jwt","phase":"1.5-ratify-plan","verdict":"pass","summary":"5/5 AC covered by Work Plan"}
 {"ts":"2026-05-01T14:18:52-03:00","event":"iteration.start","feature":"auth-jwt","phase":"3-verify","iteration":1,"summary":"AC-3 missing null check"}
 {"ts":"2026-05-01T14:25:11-03:00","event":"gate.fail","feature":"auth-jwt","phase":"3.5-acceptance-gate","verdict":"fail","summary":"AC-2 has no passing test"}
-{"ts":"2026-05-01T14:30:00-03:00","event":"pipeline.end","feature":"auth-jwt","status":"success","duration_ms":1800000,"extra":{"iterations":1,"ac_passed":5}}
+{"ts":"2026-05-01T14:30:00-03:00","event":"phase.end","feature":"auth-jwt","phase":"4-delivery","agent":"delivery","status":"success","duration_ms":120000,"summary":"PR #40 opened, version 0.7.0 → 0.8.0","tools":{"kg_passive_capture":"written"}}
+{"ts":"2026-05-01T14:30:00-03:00","event":"pipeline.end","feature":"auth-jwt","status":"success","duration_ms":1800000,"extra":{"iterations":1,"ac_passed":5,"ac_total":5}}
 ```
 
 ### When to write each event
@@ -1775,6 +1786,7 @@ Every line is a JSON object with these fields:
 | `stage.gate.skipped` | When STAGE-GATE-2 is skipped silently (autonomous mode) or STAGE-GATE-1 is skipped (legacy pipeline). Include `stage`, `reason`, `after_pr`. |
 | `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
 | `policy.deny` | When `hooks/policy-block.sh` denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
+| `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §13). Record the reason + the action you took (handoff to top-level Claude, or abort). |
 | `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
 
 ### Implementation note
@@ -1798,6 +1810,92 @@ jq -s 'map(select(.event=="iteration.start")) | group_by(.feature) | map({featur
 ```
 
 The `00-execution-log.md` markdown table remains for human reading; the JSONL is for machines. Both files coexist — they describe the same events in different formats.
+
+### Populating the `tools` field on `phase.end`
+
+When an agent returns, you parse its status block and propagate any of the following lines into the `tools` object of the `phase.end` event:
+
+| Status-block line (from agent) | Maps to `tools` sub-object |
+|---|---|
+| `context7_consult: hit:N miss:N skipped:M` | `"context7": {"hit": N, "miss": N, "skipped": M}` |
+| `memory_consult: search_nodes:N open_nodes:N` | `"memory": {"search_nodes": N, "open_nodes": N}` |
+| `kg_save_candidates: [a, b]` (architect/qa/tester/security) | `"kg_save_candidates": ["a", "b"]` |
+| `kg_passive_capture: written` / `kg_passive_capture: skipped: <reason>` (delivery) | `"kg_passive_capture": "written"` / `"skipped"` / `"failed"` |
+
+Omit any sub-object the agent did not report. If the agent reported none of them, omit the `tools` field entirely (do not write `"tools": {}`).
+
+This is the data that feeds the **Tool Effectiveness** section of `00-pipeline-summary.md` and the `/trace <feature> --tools` view.
+
+---
+
+## Pipeline Summary Protocol (human-readable rollup — mandatory)
+
+`session-docs/{feature-name}/00-pipeline-summary.md` is the human-readable counterpart of the JSONL trace. You (the orchestrator) rewrite it **in full** at the end of every phase transition. The reader of this file should answer "did this pipeline work?" in 30 seconds without opening anything else.
+
+**You are the sole writer.** Agents do not touch this file. The `/trace` skill reads it for the default view; `/status <feature>` reads it for the "Pipeline Summary" panel at the top of the narrative renderer.
+
+### When to rewrite (full rewrite, never append)
+
+- End of each phase (after the `phase.end` event for the phase's primary agent).
+- Whenever an iteration starts (so the iteration count + last failure are visible).
+- After every gate event (`gate.pass`, `gate.fail`, `stage.gate*`).
+- At `pipeline.end`.
+
+A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsistency risks of partial updates.
+
+### Schema (rigid — match exactly)
+
+```markdown
+# Pipeline Summary: {feature-name}
+**Started:** {YYYY-MM-DD HH:MM} **Completed:** {YYYY-MM-DD HH:MM or "—"} **Duration:** {N}min
+
+## TL;DR
+{1-2 lines: outcome (✓ shipped / ↻ iterating / ✗ failed / ⏸ paused at gate) + key numbers (AC pass/total, iterations, PR #) + the single most impactful issue or "no issues"}
+
+## Phase Timeline
+| # | Phase | Agent | Duration | Status | Iter | Notes |
+|---|-------|-------|----------|--------|------|-------|
+| 0a | Intake | orchestrator | {N}min | success | — | KG: {N} hits |
+| 1 | Design | architect | {N}min | success | — | context7: {hit}/{miss} |
+| ... | ... | ... | ... | ... | ... | ... |
+
+## Dispatch Issues
+{(none) — or list every `dispatch.blocked` event with reason + action taken}
+
+## Tool Effectiveness
+| Tool | Consults | Hits | Misses | Notes |
+|------|----------|------|--------|-------|
+| Memory MCP (search) | {N} | {N} | {N} | {short note or —} |
+| context7 | {N} | {N} | {N} | {short note or —} |
+| kg_save_candidates | — | {N surfaced} | — | {entity names or —} |
+| kg_passive_capture | — | {written/skipped} | — | {entity name or skip reason} |
+
+## Iterations
+{(none) — or "Iter N (phase, Case X): one-line summary" per iteration}
+
+## Files Changed
+{N} files, {N} lines.
+```
+
+The **TL;DR** is the contract: a human running `cat session-docs/*/00-pipeline-summary.md | head -3` per feature should know which pipelines are healthy.
+
+### Counts derivation
+
+All numbers come from `00-execution-events.jsonl` — never re-invent them by walking session-docs. The summary is a render of the trace, not an independent source of truth.
+
+- Phase duration → sum of `duration_ms` on `phase.end` events for that phase.
+- Iterations → count of `iteration.start` events.
+- AC pass/total → from the latest `gate.pass`/`gate.fail` at `3.5-acceptance-gate` (read its `summary` and the `pipeline.end.extra`).
+- Tool counts → aggregate of `tools` sub-objects on `phase.end` events.
+- Files / lines changed → from `git diff main...HEAD --stat` at delivery time; "—" before Phase 4.
+
+### Failure modes — never block the pipeline on summary errors
+
+- Write fails → log to `00-execution-log.md` and continue. Re-attempt at next phase transition.
+- Counts mismatch the JSONL → re-read the JSONL and re-derive. The JSONL wins.
+- Trace JSONL is missing → render the summary with `(no trace recorded)` placeholders. Do not crash.
+
+The summary is best-effort rendering; the JSONL is the durable record.
 
 ---
 
