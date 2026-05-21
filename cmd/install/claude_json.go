@@ -65,7 +65,7 @@ func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 		// Merge: preserve operator-set fields (e.g. `headers.Authorization` Bearer
 		// for context-harness-mcp deployments behind auth), overlay only the
 		// installer-owned fields (`type` + `url`). Replacing the entire entry
-		// would silently drop operator config — see issue valianx/claude-dev-team#15
+		// would silently drop operator config — see issue valianx/team-harness#15
 		// regression notes.
 		merged := mergeMCPEntry(mcpRaw["memory"], newMemory)
 		encoded, _ := json.Marshal(merged)

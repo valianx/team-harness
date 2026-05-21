@@ -1,8 +1,8 @@
-# claude-dev-team installer bootstrap (Windows PowerShell)
+# team-harness installer bootstrap (Windows PowerShell)
 # Downloads the right prebuilt Go binary from the latest GitHub Release and runs it.
 $ErrorActionPreference = "Stop"
 
-$Repo = "valianx/claude-dev-team"
+$Repo = "valianx/team-harness"
 
 # Find latest release tag.
 try {

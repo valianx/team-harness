@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Repo renamed from `claude-dev-team` to `team-harness`.** Documentation, installer copy, GitHub URLs (`bin/install.sh`, `bin/install.ps1`), `go.mod` module path, and code-level identifiers updated to the new slug. New `## Roadmap` section in `README.md` declares the long-term direction: today the harness is Claude-Code-specific by construction; a future v2 introduces a runtime abstraction so the same agents + skills + hooks can target other agentic systems (OpenAI Assistants, LangGraph, local-model harnesses) without rewriting prompts. Brand alignment with the sibling product `context-harness-mcp` (both `*-harness` now). Backwards compatibility: GitHub redirects the old `claude-dev-team` URL automatically; the manifest file `~/.claude/.claude-dev-team-manifest.json` keeps its name to avoid breaking existing installs (rename deferred to v2 when a migration path lands). Historical CHANGELOG entries are NOT rewritten.
+
 ### Added
 
 - `cmd/install/prompts.go`, `cmd/install/claude_json.go`: installer now captures the optional Memory MCP **Bearer token** in the same run as the URL — one installer invocation configures everything needed for an auth-protected MCP (e.g. `context-harness-mcp` on Railway). Sources in priority order: existing `headers.Authorization` (Keep flow preserves it), `MEMORY_MCP_BEARER` env var (CI/scripted installs), interactive prompt after the URL prompt (Enter to skip = unauthenticated). `MemoryMCPChoice` gains a `BearerToken string` field; `buildMemoryEntry` writes `headers.Authorization: "Bearer <token>"` when set. `mergeMCPEntry` now does a nested overlay of `headers` so existing custom headers (e.g. `X-Custom-Proxy`) survive when only `Authorization` is updated. Coverage: 9 new tests in `cmd/install/preservation_test.go`.

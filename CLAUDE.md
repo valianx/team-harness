@@ -1,4 +1,4 @@
-# CLAUDE.md — claude-dev-team
+# CLAUDE.md — team-harness
 
 > Bootstrap config for Claude Code in this repository. Keep it actionable.
 
@@ -6,7 +6,7 @@
 
 ## 1. Purpose & Boundaries
 
-**What this repo is.** `claude-dev-team` is a **pure distribution of a Claude Code agent system**. It packages a curated set of agents (system prompts), skills (slash commands), hooks (OS-native notifications), and a cross-platform Go installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. The Memory MCP server (Knowledge Graph) is an **external service** — it lives outside this repo and is configured by a single URL during install. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
+**What this repo is.** `team-harness` is a **pure distribution of a Claude Code agent system** (today; a future v2 will abstract over the runtime — see README Roadmap). It packages a curated set of agents (system prompts), skills (slash commands), hooks (OS-native notifications), and a cross-platform Go installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. The Memory MCP server (Knowledge Graph) is an **external service** — it lives outside this repo and is configured by a single URL during install. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
 
 **What this repo is NOT.**
 - Not an application, library, API, or service.
@@ -31,7 +31,7 @@
 ## 2. Repo Map
 
 ```
-claude-dev-team/
+team-harness/
 ├── agents/              System prompts — one .md per agent
 ├── skills/              Slash-command definitions
 │   ├── *.md             Simple skills (one-file slash commands)
@@ -62,7 +62,7 @@ claude-dev-team/
 ├── .github/
 │   └── workflows/
 │       └── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
-├── go.mod               Go module (github.com/valianx/claude-dev-team, Go 1.23)
+├── go.mod               Go module (github.com/valianx/team-harness, Go 1.23)
 ├── docs/
 │   └── knowledge.md     Project knowledge base — decisions, patterns, stack
 ├── README.md            Human-facing overview

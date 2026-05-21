@@ -1,6 +1,6 @@
 # agents/
 
-System prompts for the subagents of the `claude-dev-team` system. Each `.md` file is a single agent.
+System prompts for the subagents of the `team-harness` system. Each `.md` file is a single agent.
 
 ## File convention
 

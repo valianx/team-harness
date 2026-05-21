@@ -1,3 +1,3 @@
-module github.com/valianx/claude-dev-team
+module github.com/valianx/team-harness
 
 go 1.23

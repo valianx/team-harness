@@ -1,4 +1,4 @@
-# Claude Dev Team
+# Team Harness
 
 > An **agent harness for Claude Code**. Turns the chat into a Spec-Driven Development pipeline with mandatory human gates, agent-then-human review at every transition, and full state captured as files so any session — yours, a teammate's, tomorrow's — can resume from where the last one left off.
 
@@ -22,8 +22,8 @@ A **harness**, not a prompt pack. You install it once and Claude Code becomes a 
 ## Install
 
 ```bash
-git clone https://github.com/valianx/claude-dev-team.git
-cd claude-dev-team
+git clone https://github.com/valianx/team-harness.git
+cd team-harness
 ./bin/install.sh         # Unix / macOS
 # .\bin\install.ps1      # Windows (PowerShell)
 ```
@@ -143,6 +143,16 @@ git pull
 ```
 
 The installer is idempotent. Unchanged files are skipped; conflicting files (yours differ from the repo) are reported so you can choose.
+
+---
+
+## Roadmap
+
+**Today.** Team Harness is built on **Claude Code** specifically — the agents, skills, hooks, and installer assume the Claude Code CLI, the `Task(subagent_type=…)` dispatch model, the `~/.claude/` layout, and the slash-command surface. There is no abstraction layer over the runtime.
+
+**v2 — provider abstraction.** A future major version will introduce a runtime layer that lets the same agent + skill + hook artifacts target other agentic systems (OpenAI Assistants, LangGraph, local-model harnesses, etc.) without rewriting prompts. The orchestration model (Stage 1 / 2 / 3 + parallel verify + mandatory human gates) is provider-agnostic; the bindings are not. Naming the repo `team-harness` instead of `claude-dev-team` is the first step in that direction — the brand stops claiming a vendor before the code is ready to back it up.
+
+No timeline yet. PRs welcome that explore the abstraction shape without breaking the current Claude Code path.
 
 ---
 
