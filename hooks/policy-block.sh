@@ -61,7 +61,7 @@ def deny(reason: str) -> None:
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
             "permissionDecisionReason": (
-                f"Blocked by claude-dev-team policy: {reason}. "
+                f"Blocked by team-harness policy: {reason}. "
                 "If you genuinely need this, run it manually outside Claude "
                 "or scope an exception in hooks/config.json."
             ),

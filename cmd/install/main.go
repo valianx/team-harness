@@ -1,4 +1,4 @@
-// Package main is the claude-dev-team installer.
+// Package main is the team-harness installer.
 //
 // It installs agents, skills, hooks, and registers the memory + context7 MCP
 // servers in ~/.claude/ and ~/.claude.json. The Memory MCP server is an
@@ -45,7 +45,7 @@ func main() {
 	// Force UTF-8 on Windows by ensuring output isn't transcoded.
 	// (Go's stdout is already binary; this note is for awareness only.)
 
-	fmt.Printf("claude-dev-team installer v%s\n", version)
+	fmt.Printf("team-harness installer v%s\n", version)
 	fmt.Printf("  source:   %s\n", repoRoot)
 	fmt.Printf("  target:   %s\n", claudeDir)
 	fmt.Printf("  platform: %s\n", runtime.GOOS)

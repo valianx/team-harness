@@ -1,9 +1,9 @@
 #!/bin/sh
-# claude-dev-team installer bootstrap (Unix / macOS)
+# team-harness installer bootstrap (Unix / macOS)
 # Downloads the right prebuilt Go binary from the latest GitHub Release and execs it.
 set -e
 
-REPO="valianx/claude-dev-team"
+REPO="valianx/team-harness"
 
 # Find latest release tag.
 LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)

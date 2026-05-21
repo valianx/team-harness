@@ -94,7 +94,7 @@ Ask the user: "What would you like to dispatch in the background? Provide a one-
 
 ## Important
 
-- **`/background` does NOT invoke the orchestrator.** This is a deliberately different surface — the orchestrator and its gates exist precisely because most tasks are not eligible for fast-path. If you find yourself wanting to bypass the gates often, the cost is the gates being too heavy, not the gates being wrong; raise it as a `claude-dev-team` issue instead of widening `/background`'s eligibility criteria.
+- **`/background` does NOT invoke the orchestrator.** This is a deliberately different surface — the orchestrator and its gates exist precisely because most tasks are not eligible for fast-path. If you find yourself wanting to bypass the gates often, the cost is the gates being too heavy, not the gates being wrong; raise it as a `team-harness` issue instead of widening `/background`'s eligibility criteria.
 - **`/background` does NOT run the dispatched command.** The user owns the actual fire. The skill only validates eligibility, builds the command, and explains how to monitor it.
 - **The dispatched session inherits the user's `~/.claude/` config**, including the `policy-block.sh` PreToolUse hook. Destructive commands stay blocked even in the background session.
 - For multiple parallel tasks, `/tmux` is the right tool — it manages tmux panes, dependency analysis, and aggregates results. `/background` is for a single fire-and-forget.

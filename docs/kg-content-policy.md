@@ -1,6 +1,6 @@
 # Knowledge Graph Content Policy
 
-**Scope.** This policy governs what may be stored in the Knowledge Graph (KG) of the `claude-dev-team` system — in each developer's local KG (`~/.claude/chromadb/`) and in any export shared with the team.
+**Scope.** This policy governs what may be stored in the Knowledge Graph (KG) of the `team-harness` system — in each developer's local KG (`~/.claude/chromadb/`) and in any export shared with the team.
 
 **Guiding principle.** The KG is **technical memory intended to be shareable**. Everything that goes in must be useful to another developer on the team and safe to circulate between machines.
 
