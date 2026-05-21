@@ -276,7 +276,6 @@ Used by `/cross-repo` to evaluate existing code against business rules from a sy
 
 1. **Read project context** — CLAUDE.md, existing validation patterns, DTOs/schemas, component structure
 2. **Detect project type** — backend, frontend, or fullstack (from CLAUDE.md, package.json, or directory structure)
-3. **Use context7 MCP if available** to research framework-specific validation and testing patterns. If not available, proceed without — do not halt.
 
 ---
 

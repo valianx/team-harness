@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs/context7-usage.md`: new playbook (~150 lines) documenting how agents must use the context7 MCP — what it is for and against, mandatory triggers per agent, two-step query strategy (`resolve-library-id` → `get-library-docs` with granular topic), hit/miss/n-a verdict scoring with fallback contract, status-block telemetry field (`context7_consult: hit:N miss:N skipped:M`), failure handling, and the `## Documentation Consulted` session-doc section. Reframes context7 from "optional research" to "correctness check" against training-snapshot drift.
+- `agents/architect.md`, `agents/implementer.md`, `agents/tester.md`, `agents/security.md`, `agents/translator.md`: context7 tools declared in frontmatter (`mcp__context7__resolve-library-id`, `mcp__context7__get-library-docs`) and mandatory invocation triggers documented in the relevant phase (architect Phase 0 for every cited Decision, implementer Step 2 for every imported third-party library, tester Phase 0 step 4 for the runner + coverage tool, security Phase 0 for OWASP/CWE versions, translator Critical Rules + Phase 2.2 for the i18n library). Each status block now mandates a `context7_consult: hit:N miss:N skipped:M` line — mandatory even when all counts are zero, its presence is the telemetry signal that the agent considered documentation freshness.
+- `CLAUDE.md §5`: new Architectural Conventions bullet codifying documentation freshness via context7 as a working agreement (mirrors the KG passive-capture bullet from v2.1.0).
+
+### Changed
+
+- `agents/architect.md`, `agents/tester.md`: rewrote the `## Documentation Consulted` template in session-doc outputs to require `{Library}@{version}: {confirmation summary}` plus an explicit fallback bullet (`context7 unavailable — used training knowledge as of model cutoff`) — replaces the previous "context7 not available — used codebase analysis only" single line. Makes anchoring of decisions to current docs visible to the reviewer.
+- `agents/init.md` §2.4: clarified that init's context7 use is a **light reference**, not a mandatory trigger — bootstrap is exploratory and never halts on context7 absence. Mandatory triggers apply only to downstream agents (architect / implementer / tester / security / translator).
+
+### Removed
+
+- `agents/qa.md` Phase 0 step 3 ("Use context7 MCP if available to research framework-specific validation and testing patterns") — overlap with `tester` and not load-bearing for qa's contract (validate code vs AC, define AC, ratify-plan, reconcile). qa keeps `mcp__memory__*` for KG-anchored AC research.
+- `agents/delivery.md` Step 1 ("Use context7 MCP if available to research documentation best practices") — CHANGELOG / semver / commit conventions don't change at a cadence that warrants per-task verification.
+
 ## [2.1.0] - 2026-05-21
 
 ### Added
