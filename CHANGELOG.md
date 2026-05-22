@@ -15,6 +15,10 @@ shipped. A follow-up CHANGELOG hygiene PR will split them into the correct
 curl-installer feature work, matching Keep-a-Changelog's "one subheading per
 section per version" expectation. -->
 
+### Changed
+
+- Aligned operator-facing surfaces (agents, skills, installer, docs) to the voice and language guide (formal-neutral voice, dev-natural vocabulary, English-only with documented security/reviewer exception). Codified the guide as `## 7. Voice and Language Guide` in CLAUDE.md. Added test Suite 25 to enforce the rules at CI time.
+
 ### Added
 
 - **Orchestrator stage-end notifications: 4 native OS toasts per pipeline** (after Stage 1 Analysis, Stage 2 Implementation batch, Stage 3 Verify, Stage 4 Delivery). Fires always regardless of autonomy mode and pipeline outcome. New script `hooks/notify-stage.sh` detects OS and routes to the existing per-OS `notify-{os}.sh`. Idempotent across context compaction and `/recover` via `stage.notify` event dedup in `00-execution-events.jsonl` (structured JSON parse, not regex — eliminates false-positive risk). Independent of the ultra-quiet hook preset (PR #26) — the preset controls Claude Code hook events; these toasts are fired directly by the orchestrator's `Bash` tool. New `## Stage-end notification protocol` section in `agents/orchestrator.md` documents the toast mapping table, JSON payload schema, JSONL event schema, idempotency mechanism, input sanitisation contract, and failure-safety guarantee.
