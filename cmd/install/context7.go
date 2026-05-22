@@ -85,15 +85,25 @@ func getContext7APIKey() string {
 		return envKey
 	}
 
-	if !isTerminal() {
-		fmt.Fprintln(os.Stderr, "Error: CONTEXT7_API_KEY not set and stdin is not interactive.")
-		fmt.Fprintln(os.Stderr, "  Export CONTEXT7_API_KEY and re-run.")
+	// CONTEXT7_API_KEY not set — try to prompt interactively.
+	input := openInteractiveInput()
+	if input == nil {
+		fmt.Fprintln(os.Stderr, `CONTEXT7_API_KEY is required.
+  Detected: this install is non-interactive (no controlling terminal available).
+  Options:
+    1. Run with the key inline:
+         CONTEXT7_API_KEY=your-key-here \
+           curl -fsSL https://valianx.github.io/team-harness/install.sh | bash -s -- --force
+    2. Run interactively in a real terminal (TTY available).
+  Get a key at https://context7.com/`)
 		os.Exit(1)
 	}
+	defer input.Close()
 
+	scan := bufio.NewScanner(input)
 	fmt.Println("  context7 API key required (get one at https://context7.com/).")
 	fmt.Print("  Paste your CONTEXT7_API_KEY: ")
-	key := strings.TrimSpace(readLine())
+	key := strings.TrimSpace(readLineFrom(scan))
 	if key == "" {
 		fmt.Fprintln(os.Stderr, "Error: empty API key.")
 		os.Exit(1)
