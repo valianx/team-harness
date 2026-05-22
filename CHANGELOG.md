@@ -7,17 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.3.0] - 2026-05-22
-
-### Added
-
-- **Curl one-liner install (bash / PowerShell / cmd.exe)** matching the Claude Code quickstart pattern. Bootstrap scripts published to `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via a new `.github/workflows/pages.yml` workflow triggered on release. New `bin/install.cmd` for legacy Windows cmd.exe hosts.
-
-### Changed
-
-- **Installer binary is now self-contained via `go:embed`** — agents, skills, and hooks are embedded in the binary at compile time (`//go:embed agents skills hooks` in `assets.go` at the repo root). The binary reads from the embedded FS at runtime and does not require a clone of the repo. Assets are pinned to the release tag for deterministic versioning.
-- **Bootstrap scripts simplified to deterministic-URL pattern** — `bin/install.sh` and `bin/install.ps1` now use `https://github.com/valianx/team-harness/releases/latest/download/install-{os}-{arch}` directly instead of calling the GitHub Releases API (`api.github.com`) and parsing JSON. Removes the unauthenticated rate-limit exposure (60/hour) and the brittle `grep '"tag_name"' | cut -d'"' -f4` parse.
-- **Clone-and-run path updated** — `bin/install.sh` and `bin/install.ps1` now download the released binary (same as the curl one-liner); contributors testing local edits use `go run ./cmd/install` (the `//go:embed` picks up working-tree bytes at compile time). `README.md §Install` foregrounds the three one-liners as the primary path; the clone path moves to the "From source / contributors" subsection.
+<!-- The following entries accumulated in [Unreleased] across PR #26 / PR #27 / PR #28
+and earlier work, and were not promoted to their version sections when their PRs
+shipped. A follow-up CHANGELOG hygiene PR will split them into the correct
+[2.2.0] / [2.1.0] / earlier sections. They are intentionally NOT included under
+[2.3.0] (the curl-installer release) below — that section contains only the
+curl-installer feature work, matching Keep-a-Changelog's "one subheading per
+section per version" expectation. -->
 
 ### Added
 
@@ -91,6 +87,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `agents/qa.md` Phase 0 step 3 ("Use context7 MCP if available to research framework-specific validation and testing patterns") — overlap with `tester` and not load-bearing for qa's contract (validate code vs AC, define AC, ratify-plan, reconcile). qa keeps `mcp__memory__*` for KG-anchored AC research.
 - `agents/delivery.md` Step 1 ("Use context7 MCP if available to research documentation best practices") — CHANGELOG / semver / commit conventions don't change at a cadence that warrants per-task verification.
+
+## [2.3.0] - 2026-05-22
+
+### Added
+
+- **Curl one-liner install (bash / PowerShell / cmd.exe)** matching the Claude Code quickstart pattern. Bootstrap scripts published to `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via a new `.github/workflows/pages.yml` workflow triggered on release. New `bin/install.cmd` for legacy Windows cmd.exe hosts.
+
+### Changed
+
+- **Installer binary is now self-contained via `go:embed`** — agents, skills, and hooks are embedded in the binary at compile time (`//go:embed agents skills hooks` in `assets.go` at the repo root). The binary reads from the embedded FS at runtime and does not require a clone of the repo. Assets are pinned to the release tag for deterministic versioning.
+- **Bootstrap scripts simplified to deterministic-URL pattern** — `bin/install.sh` and `bin/install.ps1` now use `https://github.com/valianx/team-harness/releases/latest/download/install-{os}-{arch}` directly instead of calling the GitHub Releases API (`api.github.com`) and parsing JSON. Removes the unauthenticated rate-limit exposure (60/hour) and the brittle `grep '"tag_name"' | cut -d'"' -f4` parse.
+- **Clone-and-run path updated** — `bin/install.sh` and `bin/install.ps1` now download the released binary (same as the curl one-liner); contributors testing local edits use `go run ./cmd/install` (the `//go:embed` picks up working-tree bytes at compile time). `README.md §Install` foregrounds the three one-liners as the primary path; the clone path moves to the "From source / contributors" subsection.
 
 ## [2.2.0] - 2026-05-22
 
