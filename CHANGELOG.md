@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Hooks default preset → `ultra-quiet`.** `hooks/config.json` for all three OS (windows/macos/linux) now wires only `PreToolUse` (policy gate) + `Notification` matcher `idle_prompt`. The previous `Notification` matcher `permission_prompt` and the blanket `PostToolUseFailure *` triggers were removed because they fire while work continues and accumulate in the Windows Action Center / equivalent surfaces without requiring user action. The intent of notifications is now "fire only when the user must take an action". `hooks/README.md` expanded with three named presets (`ultra-quiet`, `default-quiet`, `noisy`) with copy-pasteable JSON snippets, an Action Center explanation for Windows users, and a section on interaction with `agentPushNotifEnabled`. Existing users keep their current `~/.claude/settings.json` until they re-merge from `hooks/config.json` — no breaking change.
 - `tests/test_agent_structure.py` Suite 5 regression guard: `delivery` removed from the "excludes mcp__memory__* tools" list. Delivery's Step 11.5 now legitimately requires `search_nodes` (Gate 2 dedup pre-flight) and `suggest_node_type` (Gate 1 specificity) in addition to its previous write tools. The exclusion guard still applies to `implementer`, `plan-reviewer`, and `reviewer`.
 
 ### Added

@@ -38,15 +38,123 @@ The installer copies these scripts into `~/.claude/hooks/` but does **not** modi
 
 ## Events covered
 
-The default set is deliberately **quiet** — only high-signal events:
+The default preset is **`ultra-quiet`** — fires **only** when the user needs to take an action:
 
-| Event | When it fires | Why it's in the default set |
-|---|---|---|
-| `PreToolUse` | Before any `Bash`, `Write`, `Edit`, or `NotebookEdit` invocation. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. |
-| `Notification` | Matcher `idle_prompt\|permission_prompt` — Claude is waiting for input. | High signal: you need to act for Claude to continue. |
-| `PostToolUseFailure` | A tool invocation failed. | Rare and important: something broke, worth looking. |
+| Event | Matcher | When it fires | Why it's in the default set |
+|---|---|---|---|
+| `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block.sh` silently. |
+| `Notification` | `idle_prompt` only | Claude finished a turn and is waiting for the user. | High signal: you need to act for Claude to continue. One notification per user-blocking pause. |
 
-`Stop` (Claude finished its turn) is **not** in the default on purpose — it fires on every response, which becomes dozens of notifications a day in active back-and-forth work.
+**What was removed from the previous default (and why).** Earlier versions of this repo also wired:
+
+- `Notification` matcher `permission_prompt` — fired every time any (sub)agent asked permission for a tool. With MCPs and pipeline subagents, this fires many times per pipeline. If you have `skipDangerousModePermissionPrompt: true` in `settings.json`, the prompt is auto-resolved but the notification event still emits — so it produces toasts while work continues, with no action required from you.
+- `PostToolUseFailure` matcher `*` — fired on every tool failure including transient MCP flutter that gets retried successfully. Toast accumulates but no action is needed.
+
+Both were noisy without being actionable. They were removed because the goal is "notify when the user must act" — not "notify on every event of interest". See the `noisy` preset under **Tuning presets** below if you want them back.
+
+`Stop` (Claude finished its turn) is **not** in any default — it fires on every response, which becomes dozens of notifications a day in active back-and-forth work. See the opt-in `Stop` snippet at the bottom of this file.
+
+## Why Windows users see notifications as "push in the system bar"
+
+On Windows, `notify-windows.sh` uses `Windows.UI.Notifications.ToastNotificationManager`. That API does **two** things:
+
+1. Pops a transient toast in the bottom-right corner for a few seconds.
+2. **Persists the toast in the Action Center / notification bar** until the user explicitly clears it.
+
+A toast titled `Claude Code — <project>` looks identical across all events. After a noisy pipeline (the pre-`ultra-quiet` default would fire `permission_prompt` and `PostToolUseFailure` events), the Action Center fills up with dozens of look-alike entries — and because Windows surfaces them in the system tray badge, the user perceives them as "push notifications". They are toasts, not push, but Windows treats them the same as push for UI purposes.
+
+This is the symptom that motivated the move to `ultra-quiet` as the default.
+
+## Tuning presets
+
+Three presets, ordered from least to most noisy. Each one is a drop-in replacement for the `hooks` object in `~/.claude/settings.json`. The `PreToolUse` policy gate is the same across all three — it never produces a notification, only blocks dangerous calls.
+
+### Preset 1 — `ultra-quiet` (default, recommended)
+
+Notifies **only** when Claude is waiting for the user. No toasts for permission prompts, no toasts for tool failures.
+
+```json
+"hooks": {
+  "PreToolUse": [
+    { "matcher": "Bash|Write|Edit|NotebookEdit", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/policy-block.sh", "timeout": 5 }
+    ]}
+  ],
+  "Notification": [
+    { "matcher": "idle_prompt", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+    ]}
+  ]
+}
+```
+
+**Use this when:** you have `skipDangerousModePermissionPrompt: true` or a similar autonomy setting and don't want a Windows Action Center full of look-alike toasts. This is the new default in `hooks/config.json`.
+
+**Trade-off:** you will not be notified when a tool fails. You'll see the failure in Claude's output if you're watching — and `gate.fail` events still land in `session-docs/{feature}/00-execution-events.jsonl` for pipeline runs (queryable via `/trace <feature> --fails`).
+
+### Preset 2 — `default-quiet` (legacy default before `ultra-quiet`)
+
+Notifies on idle, permission prompts, and tool failures. This was the default in earlier releases of this repo. Kept here for reference and for users who prefer "notify on every event of interest, even if action isn't required."
+
+```json
+"hooks": {
+  "PreToolUse": [
+    { "matcher": "Bash|Write|Edit|NotebookEdit", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/policy-block.sh", "timeout": 5 }
+    ]}
+  ],
+  "Notification": [
+    { "matcher": "idle_prompt|permission_prompt", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+    ]}
+  ],
+  "PostToolUseFailure": [
+    { "matcher": "*", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+    ]}
+  ]
+}
+```
+
+**Use this when:** you don't run with auto-skip-permissions and you'd rather have an extra toast than miss a permission gate. Expect significant Action Center accumulation if you also run MCPs and pipeline subagents.
+
+### Preset 3 — `noisy` (active-monitoring / background-tasks)
+
+Adds `Stop` on top of `default-quiet` — fires every time Claude finishes a turn. Useful when you walk away from long-running tasks and want to be pinged each time the agent is ready for more input.
+
+```json
+"hooks": {
+  "PreToolUse": [ /* same as above */ ],
+  "Notification": [
+    { "matcher": "idle_prompt|permission_prompt", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+    ]}
+  ],
+  "PostToolUseFailure": [
+    { "matcher": "*", "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+    ]}
+  ],
+  "Stop": [
+    { "hooks": [
+      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+    ]}
+  ]
+}
+```
+
+**Use this when:** you're babysitting a long task from another room or another machine and want a ping per response. Expect **dozens of notifications per active hour**. Remove it when you go back to interactive work.
+
+### Swapping presets
+
+1. Open `~/.claude/settings.json`.
+2. Back it up: `cp ~/.claude/settings.json ~/.claude/settings.json.bak-$(date +%Y%m%d-%H%M)`.
+3. Replace the `"hooks": { ... }` object with one of the snippets above (swap `notify-windows.sh` for `notify-mac.sh` or `notify-linux.sh` on other platforms).
+4. Restart Claude Code (the settings file is read at startup).
+
+### Interaction with `agentPushNotifEnabled`
+
+`~/.claude/settings.json` also accepts `"agentPushNotifEnabled": true`. This is a **separate notification channel** that uses Anthropic's push infrastructure — it does not go through `hooks/`. If you have it on AND a verbose hook preset, you may get duplicate notifications per event (one toast via hook, one push via Anthropic). Pick one channel or accept the duplication consciously.
 
 ## Policy gate (`policy-block.sh`)
 
@@ -77,21 +185,7 @@ The `PreToolUse` hook routes through `policy-block.sh`. It reads the tool call J
 
 ## Opt-in: notify when Claude finishes a turn
 
-If you walk away from long-running tasks and want to be pinged when Claude is done, add a `Stop` entry into the `"hooks"` object of your `~/.claude/settings.json`. Example for macOS:
-
-```json
-"Stop": [
-  {
-    "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-mac.sh", "timeout": 5 }
-    ]
-  }
-]
-```
-
-Swap the script path for `notify-windows.sh` or `notify-linux.sh` as needed.
-
-Expect this to be **noisy** during active development. Remove it when you go back to interactive work.
+Covered by the `noisy` preset under **Tuning presets** above. In short: add a `Stop` hook entry pointing to your platform's `notify-*.sh`. Remove it when you go back to interactive work — it fires dozens of times per hour during active development.
 
 ## Stage-end notifications (orchestrator pipeline)
 
