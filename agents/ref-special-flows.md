@@ -44,7 +44,7 @@ When the user wants to quickly test a technical hypothesis without full pipeline
    3. Investigate further → I'll run another spike or a /research
    ```
 8. **Act on user's choice:**
-   - Formalize: create GitHub issue via `gh issue create` using **SDD template** — include spike findings in Technical Context. Ask: "Issue created. Run full pipeline now?"
+   - Formalize: create GitHub issue using **SDD template** — include spike findings in Technical Context. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`: `gh issue create`. When `has_gh=false` and token + GitHub origin available: curl POST. When neither: write SDD body to `session-docs/{feature}/inputs/issue-create.md` and prompt operator to paste it into GitHub, then reply with the new issue number. Ask: "Issue created (or paste required). Run full pipeline now?"
    - Discard: `git checkout -- .` to revert (confirm with user first). Clean up session-docs.
    - Investigate: continue as directed.
 
@@ -70,9 +70,10 @@ Inside each task dispatched by `plan-and-execute`, the child th-orchestrator run
 3. **Specify** — full SPECIFY as normal (codebase investigation, AC, scope). Update GitHub issue if `needs-specify: true`.
 4. **Design (planning mode)** — invoke `architect` in planning mode. Architect produces task breakdown in `01-planning.md`. **Does NOT produce `02-task-list.md`** — that file belongs to design mode.
 5. **Validate sizing** — read `01-planning.md`. If any task has >20 AC or looks like a full feature, re-invoke architect to split. Max 1 retry.
-6. **Create tasks** — check `gh auth status`:
+6. **Create tasks** — **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier B — create an issue" and § "Tier A — list repo labels". Use the standard detection probe to set `has_gh`.
    - **gh available:** create one GitHub issue per task via `gh issue create` using **SDD issue template**. Labels from repo (`gh label list`), assignee `@me`, project board if exists. Comment on parent issue.
-   - **gh unavailable:** write each task as markdown in `session-docs/{feature-name}/tasks/`.
+   - **gh unavailable, token + GitHub origin available:** use curl Tier B fallback to create issues and Tier A curl to read labels.
+   - **neither available:** write each task as markdown in `session-docs/{feature-name}/tasks/` (existing fallback path, unchanged).
 7. **Report** created tasks to user.
 
 **Mode: `plan`** → STOP after reporting.
