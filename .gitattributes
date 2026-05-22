@@ -1,0 +1,25 @@
+# Normalise line endings on checkout to LF for all text files.
+# This prevents agents/*.md from being checked out with CRLF on Windows
+# (core.autocrlf=true), which would have caused the installer's frontmatter
+# transformer to silently skip files it could not match. The transformer now
+# handles both LF and CRLF correctly, but pinning eol=lf here prevents the
+# divergence at the source and keeps the working tree consistent across OSes.
+* text=auto eol=lf
+
+# Go source and test files — always LF.
+*.go text eol=lf
+
+# Shell scripts — LF required; CRLF breaks shebang-based execution on Unix.
+*.sh text eol=lf
+
+# Windows scripts — CRLF is fine and expected.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets — no line-ending normalisation.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.excalidraw binary

@@ -23,7 +23,7 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.1.0"
+var version = "2.2.0"
 
 // forceFlag is set by parseFlags and read throughout the package.
 var forceFlag bool
@@ -41,6 +41,8 @@ var claudeJSON string
 func main() {
 	parseFlags()
 	resolveRepoPaths()
+
+	printWelcomeBanner()
 
 	// Force UTF-8 on Windows by ensuring output isn't transcoded.
 	// (Go's stdout is already binary; this note is for awareness only.)
@@ -64,6 +66,10 @@ func main() {
 	memChoice := promptMemoryMCPURL()
 	fmt.Println()
 
+	fmt.Println("Install mode setup:")
+	installMode := promptInstallMode()
+	fmt.Println()
+
 	ensureDir(claudeDir)
 	loadManifest()
 	if prev := manifest.InstalledVersion; prev != "" {
@@ -74,7 +80,7 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("Installing files...")
-	installAgents()
+	installAgents(installMode)
 	installSkills()
 	installHooks()
 
@@ -89,7 +95,8 @@ func main() {
 
 	saveManifest()
 
-	printSummary(backupPath, memChoice, context7Preserved)
+	printSummary(backupPath, memChoice, context7Preserved, installMode)
+	pressEnterToExit()
 }
 
 func parseFlags() {
@@ -159,9 +166,26 @@ func backupClaudeJSON() string {
 	return backup
 }
 
-// installAgents copies agents/*.md to ~/.claude/agents/.
-func installAgents() {
-	copyDirFlat(filepath.Join(repoRoot, "agents"), filepath.Join(claudeDir, "agents"), ".md", false)
+// installAgents copies agents/*.md to ~/.claude/agents/, applying the mode
+// transformer to each file so the on-disk frontmatter reflects the chosen tier.
+func installAgents(mode InstallMode) {
+	srcDir := filepath.Join(repoRoot, "agents")
+	destDir := filepath.Join(claudeDir, "agents")
+	entries, err := sortedEntries(srcDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() || shouldSkip(e.Name()) {
+			continue
+		}
+		if !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		src := filepath.Join(srcDir, e.Name())
+		dest := filepath.Join(destDir, e.Name())
+		copyAgentFile(src, dest, mode)
+	}
 }
 
 // installSkills copies flat .md skills to ~/.claude/commands/ and subdirectory

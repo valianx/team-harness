@@ -47,6 +47,8 @@ team-harness/
 ├── cmd/
 │   └── install/         Go installer source (cross-compiled to GH Release assets)
 │       ├── main.go
+│       ├── modes.go          InstallMode type, low-cost matrix, in-flight transformer
+│       ├── modes_test.go     Unit + integration tests for the transformer
 │       ├── prompts.go
 │       ├── preservation.go
 │       ├── claude_json.go
@@ -95,7 +97,12 @@ team-harness/
 | Config | JSON (`hooks/config.json`) + `~/.claude.json` merge for `mcpServers` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 
-**Current version:** `1.1.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
+**Current version:** `2.2.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
+
+**Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
+
+- `standard` (default) — copies agent files byte-identical to the source-repo `agents/*.md`. Canonical quality contract; recommended for operators on Anthropic Max or Team plans.
+- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight during install, using the canonical matrix declared in `cmd/install/modes.go`. All 17 agents run on `sonnet`; effort is `medium` or `high` per agent. Suitable for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). Trade-offs, per-agent assignments, and the full matrix are documented in [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
 **No package manager, no lockfile, no build for the installer.** The Go installer is stdlib-only with zero third-party deps.
 

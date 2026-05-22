@@ -79,6 +79,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `agents/qa.md` Phase 0 step 3 ("Use context7 MCP if available to research framework-specific validation and testing patterns") — overlap with `tester` and not load-bearing for qa's contract (validate code vs AC, define AC, ratify-plan, reconcile). qa keeps `mcp__memory__*` for KG-anchored AC research.
 - `agents/delivery.md` Step 1 ("Use context7 MCP if available to research documentation best practices") — CHANGELOG / semver / commit conventions don't change at a cadence that warrants per-task verification.
 
+## [2.2.0] - 2026-05-22
+
+### Added
+
+- **Low-cost install mode** (`INSTALL_MODE=low-cost`): opt-in installer mode that rewrites `model:` and `effort:` frontmatter in-flight during agent copy. All 17 agents run on `sonnet`; effort is `medium` (11 agents) or `high` (6 gate-makers). Designed for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). Standard mode (default) is byte-identical to v2.1.0 behaviour. Canonical matrix and trade-off analysis documented in `agents/README.md §"Low-cost mode"`. Transformer is a pure function (`transformAgentFile` in `cmd/install/modes.go`); manifest stores transformed hashes so same-mode re-installs report `unchanged` and cross-mode re-installs report `conflict` (operator must delete + re-run with `--force`). New `cmd/install/modes.go` + `cmd/install/modes_test.go` (16 new tests covering matrix invariants, all-agents transform, body-preservation, edge cases, and AC-5 re-install scenarios).
+
+### Changed
+
+- **Installer now prompts for install mode** (`standard` / `low-cost`) after the Memory MCP setup step. Default is `standard` — behaviour is byte-identical to v2.1.0 for operators who accept the default or leave `INSTALL_MODE` unset. Non-interactive installs with `INSTALL_MODE` unset continue to behave as standard.
+
 ## [2.1.0] - 2026-05-21
 
 ### Added

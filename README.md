@@ -2,7 +2,7 @@
 
 > An **agent harness for Claude Code**. Turns the chat into a Spec-Driven Development pipeline with mandatory human gates, agent-then-human review at every transition, and full state captured as files so any session — yours, a teammate's, tomorrow's — can resume from where the last one left off.
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-3%20suites-success.svg)](./tests)
 
@@ -30,9 +30,13 @@ cd team-harness
 
 Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`gh`](https://cli.github.com/) (for orchestrator delivery flow), and a [context7](https://context7.com/) API key. Zero Python, zero `uv` — the bootstrap downloads a prebuilt Go binary from the latest GitHub Release and the agents talk to your external Memory MCP via HTTP.
 
-The installer prompts for one thing: the **Memory MCP URL**. This is the public URL of your Knowledge Graph MCP server — typically [`context-harness-mcp`](https://github.com/valianx/context-harness-mcp) deployed to Railway, Render, Fly, your own server, or any Docker host of your choice. There is **no default URL** — paste your Knowledge Graph MCP URL or the full JSON snippet from your `context-harness-mcp /dashboard`. For non-interactive installs, set `MEMORY_MCP_URL` (and optionally `MEMORY_MCP_BEARER`) before running the installer.
+On an interactive terminal the installer walks you through three prompts in order:
 
-For unattended installs:
+1. **Memory MCP URL** — paste the public URL of your Knowledge Graph MCP server (typically [`context-harness-mcp`](https://github.com/valianx/context-harness-mcp) deployed to Railway, Render, Fly, your own server, or any Docker host). There is **no default URL** — paste your URL or the full JSON snippet from your `context-harness-mcp /dashboard`.
+2. **context7 API key** — for library docs retrieval. Get one at [context7.com](https://context7.com/). Preserved from a prior install if already configured.
+3. **Install mode** — `[s] standard` (default) or `[l] low-cost`. The prompt looks like: `Install mode [s/l]? [s]:` — press Enter to accept standard.
+
+For non-interactive (CI / scripted) installs, set env vars instead of prompting:
 
 ```bash
 MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
@@ -41,6 +45,15 @@ CONTEXT7_API_KEY=ctx7sk-... \
 ```
 
 Pass `--force` to reset existing `mcpServers` entries: `./bin/install.sh --force`.
+
+**Install modes.** The installer prompts for an install mode (or reads `INSTALL_MODE` env var):
+
+- `standard` (default) — agent files copied byte-identical. Canonical quality contract.
+- `low-cost` — rewrites agent `model:` and `effort:` frontmatter in-flight. All agents run on `sonnet`; lower API cost with documented quality trade-offs. Designed for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). See [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the full matrix and trade-off analysis.
+
+```bash
+INSTALL_MODE=low-cost MEMORY_MCP_URL=https://your-mcp.example.com/mcp ./bin/install.sh
+```
 
 Restart Claude Code after install so it picks up the new agents and MCP servers. The installer is idempotent and never overwrites existing files (conflicts are reported, not silenced).
 

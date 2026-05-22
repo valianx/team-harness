@@ -249,6 +249,55 @@ func promptMemoryMCPBearer() string {
 	return strings.TrimSpace(readLine())
 }
 
+// promptInstallMode determines the install mode via:
+//
+//  1. INSTALL_MODE env var (non-interactive / CI / scripted installs).
+//  2. Non-interactive without env var → default ModeStandard (preserves v1.1.0 behaviour).
+//  3. Interactive TTY → prompt with [s] standard (default) / [l] low-cost menu.
+//
+// The env var is validated: unknown values exit 1 with a clear error. The default
+// is always ModeStandard so an unset env var behaves identically to v1.1.0.
+func promptInstallMode() InstallMode {
+	if env := strings.TrimSpace(os.Getenv("INSTALL_MODE")); env != "" {
+		switch env {
+		case string(ModeStandard):
+			fmt.Printf("  Install mode: standard (loaded from INSTALL_MODE env var)\n")
+			return ModeStandard
+		case string(ModeLowCost):
+			fmt.Printf("  Install mode: low-cost (loaded from INSTALL_MODE env var)\n")
+			return ModeLowCost
+		default:
+			fmt.Fprintf(os.Stderr, "Error: INSTALL_MODE=%q is invalid. Accepted values: standard, low-cost\n", env)
+			os.Exit(1)
+		}
+	}
+
+	if !isTerminal() {
+		// Non-interactive with no env var: default to standard (v1.1.0 behaviour).
+		return ModeStandard
+	}
+
+	fmt.Println()
+	fmt.Println("Install mode")
+	fmt.Println("============")
+	fmt.Println()
+	fmt.Println("  [s] standard  — default. Canonical matrix as documented in agents/README.md.")
+	fmt.Println("                  Best quality, highest API cost.")
+	fmt.Println("  [l] low-cost  — for developers on lower-tier Anthropic plans (Free, Pro,")
+	fmt.Println("                  or tight personal budget). Uniform sonnet matrix (effort:")
+	fmt.Println("                  medium or high). Lower API cost. Accepts documented quality")
+	fmt.Println("                  trade-offs (rougher analysis across the board, more Phase 3")
+	fmt.Println("                  iteration loops, weaker security audit caught by the human")
+	fmt.Println("                  reviewer at STAGE-GATE).")
+	fmt.Println("                  See agents/README.md §\"Low-cost mode\".")
+	fmt.Println()
+	choice := promptMenu("Install mode [s/l]? [s]: ", map[string]bool{"s": true, "l": true}, "s")
+	if choice == "l" {
+		return ModeLowCost
+	}
+	return ModeStandard
+}
+
 // validateMCPURL returns an error if the URL does not start with http:// or https://.
 func validateMCPURL(url string) error {
 	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {

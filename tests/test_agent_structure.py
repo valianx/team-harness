@@ -1712,6 +1712,184 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 23 — Low-cost mode coverage and floor compliance (AC-10)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 23: Low-cost mode ===")
+
+agents_readme = read(AGENTS_DIR / "README.md")
+modes_go = read(REPO_ROOT / "cmd" / "install" / "modes.go")
+prompts_go_lc = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+
+# (a) agents/README.md contains a ## Low-cost mode section.
+check(
+    "agents/README.md has '## Low-cost mode' section",
+    "## Low-cost mode" in agents_readme,
+    "section missing — low-cost matrix has no human-readable documentation",
+)
+
+# (a) continued: the section contains a 17-row table (count pipe-separated rows
+#     with | in the body; each data row has at least one agent name backtick).
+# We detect "17-row table" by counting occurrences of "| `" inside the section.
+low_cost_section = ""
+if "## Low-cost mode" in agents_readme:
+    low_cost_section = agents_readme.split("## Low-cost mode", 1)[1]
+    # Trim at the next ## heading if present.
+    next_section = low_cost_section.find("\n## ")
+    if next_section >= 0:
+        low_cost_section = low_cost_section[:next_section]
+
+table_rows = low_cost_section.count("| `")
+check(
+    "agents/README.md Low-cost mode section has a 17-row agent table",
+    table_rows >= 17,
+    f"found {table_rows} table rows with backtick agent names, expected 17",
+)
+
+# (b) Every agent in the canonical Roster also appears in the low-cost table.
+for agent_name in EXPECTED_AGENTS:
+    check(
+        f"agents/README.md Low-cost mode table contains '{agent_name}'",
+        f"`{agent_name}`" in low_cost_section,
+        f"agent '{agent_name}' not found in the low-cost matrix table",
+    )
+
+# (c) No agent in the low-cost matrix uses effort: low.
+check(
+    "agents/README.md Low-cost mode table has no 'effort: low' cell",
+    "| low |" not in low_cost_section and "| `low`" not in low_cost_section,
+    "'effort: low' found in low-cost matrix table — policy violation (floor is medium)",
+)
+
+# (d) No agent in the low-cost matrix uses model: opus.
+check(
+    "agents/README.md Low-cost mode table has no 'opus' in low-cost model column",
+    # The table has columns: standard model | standard effort | low-cost model | ...
+    # We check that 'opus' does not appear as a value in the low-cost model column.
+    # Approximate: count "| opus |" occurrences in the section — these would be in
+    # the standard-model column (expected) vs low-cost model column. We check that
+    # the section does NOT contain "| sonnet |" followed immediately in the same row
+    # by "opus" (i.e., low-cost column = opus). A simpler signal: count total opus
+    # occurrences vs count where they appear in positions 3+ (low-cost model column).
+    # Simplest reliable check: no agent row has low-cost model = opus.
+    # We grep for rows where the 4th pipe-delimited cell would be 'opus'.
+    not any(
+        row.strip().startswith("|")
+        and [c.strip() for c in row.split("|") if c.strip()][3:4] == ["opus"]
+        for row in low_cost_section.splitlines()
+        if row.strip().startswith("|") and len(row.split("|")) >= 5
+    ),
+    "a row in the low-cost table has low-cost model = opus",
+)
+
+# (e) No agent in the low-cost matrix uses effort: max.
+check(
+    "agents/README.md Low-cost mode table has no 'max' in low-cost effort column",
+    not any(
+        row.strip().startswith("|")
+        and [c.strip() for c in row.split("|") if c.strip()][4:5] == ["max"]
+        for row in low_cost_section.splitlines()
+        if row.strip().startswith("|") and len(row.split("|")) >= 5
+    ),
+    "a row in the low-cost table has low-cost effort = max",
+)
+
+# (f) Every agent in the low-cost matrix uses model: sonnet (low-cost model column).
+check(
+    "agents/README.md Low-cost mode table: all low-cost model cells are 'sonnet'",
+    all(
+        [c.strip() for c in row.split("|") if c.strip()][3:4] == ["sonnet"]
+        for row in low_cost_section.splitlines()
+        if row.strip().startswith("|")
+        and len([c.strip() for c in row.split("|") if c.strip()]) >= 5
+        and not row.strip().startswith("| Agent")   # skip header row
+        and not all(c.strip().startswith("-") or c.strip() == "" for c in row.split("|") if c.strip())
+    ),
+    "one or more rows in the low-cost table have low-cost model != sonnet",
+)
+
+# (g) cmd/install/modes.go declares both standard and low-cost mode values.
+check(
+    "cmd/install/modes.go declares ModeStandard = 'standard'",
+    'ModeStandard InstallMode = "standard"' in modes_go,
+    "ModeStandard constant missing or has wrong value",
+)
+check(
+    "cmd/install/modes.go declares ModeLowCost = 'low-cost'",
+    'ModeLowCost InstallMode = "low-cost"' in modes_go,
+    "ModeLowCost constant missing or has wrong value",
+)
+
+# (h) cmd/install/prompts.go references INSTALL_MODE.
+check(
+    "cmd/install/prompts.go references INSTALL_MODE env var",
+    "INSTALL_MODE" in prompts_go_lc,
+    "prompts.go does not reference INSTALL_MODE — env-var fallback not implemented",
+)
+
+# (i) cmd/install/modes.go declares lowCostMatrix with all 17 agents.
+for agent_name in EXPECTED_AGENTS:
+    check(
+        f"cmd/install/modes.go lowCostMatrix contains entry for '{agent_name}'",
+        f'"{agent_name}"' in modes_go,
+        f"'{agent_name}' entry missing from lowCostMatrix in modes.go",
+    )
+
+# (j) cmd/install/modes.go uses only sonnet in the matrix (no opus, no haiku).
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'opus' model value",
+    'Model: "opus"' not in modes_go,
+    "modes.go matrix contains Model: opus — policy violation (low-cost floor is sonnet)",
+)
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'haiku' model value",
+    'Model: "haiku"' not in modes_go,
+    "modes.go matrix contains Model: haiku — policy violation (low-cost floor is sonnet)",
+)
+
+# (k) cmd/install/modes.go uses only medium or high effort (no max, no low).
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'max' effort value",
+    'Effort: "max"' not in modes_go,
+    "modes.go matrix contains Effort: max — policy violation (low-cost ceiling is high)",
+)
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'low' effort value",
+    'Effort: "low"' not in modes_go,
+    "modes.go matrix contains Effort: low — project policy forbids effort: low",
+)
+
+# (l) AC-9: CLAUDE.md describes the two modes and references INSTALL_MODE.
+claude_md_root = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "CLAUDE.md references INSTALL_MODE env var (AC-9: two modes documented)",
+    "INSTALL_MODE" in claude_md_root,
+    "CLAUDE.md does not mention INSTALL_MODE — low-cost mode toggle undocumented",
+)
+
+# (m) AC-9: CLAUDE.md links to agents/README.md#low-cost-mode (no duplicate matrix).
+check(
+    "CLAUDE.md links to agents/README.md#low-cost-mode (AC-9: matrix in one place)",
+    "agents/README.md#low-cost-mode" in claude_md_root,
+    "CLAUDE.md must link to agents/README.md#low-cost-mode, not duplicate the matrix",
+)
+
+# (n) AC-9: README.md describes the two modes and references INSTALL_MODE.
+top_readme_lc = read(REPO_ROOT / "README.md")
+check(
+    "README.md references INSTALL_MODE env var (AC-9: two modes documented)",
+    "INSTALL_MODE" in top_readme_lc,
+    "README.md does not mention INSTALL_MODE — low-cost mode toggle undocumented",
+)
+
+# (o) AC-9: README.md links to agents/README.md#low-cost-mode (no duplicate matrix).
+check(
+    "README.md links to agents/README.md#low-cost-mode (AC-9: matrix in one place)",
+    "agents/README.md#low-cost-mode" in top_readme_lc,
+    "README.md must link to agents/README.md#low-cost-mode, not duplicate the matrix",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
