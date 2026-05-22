@@ -2996,8 +2996,21 @@ check(
     "delivery.md does not declare the blocked-manual-push status value",
 )
 
-# Checks 13-15 (issue.md, review-pr.md, th-orchestrator.md) are added in their
-# respective PRs (PR-4 through PR-6) where the actual changes land.
+# (13) agents/th-orchestrator.md references blocked-manual-push (added in PR-4).
+_orch_fallback = read(AGENTS_DIR / "th-orchestrator.md")
+check(
+    "agents/th-orchestrator.md references 'blocked-manual-push' status",
+    "blocked-manual-push" in _orch_fallback,
+    "th-orchestrator.md must handle the blocked-manual-push status from delivery",
+)
+check(
+    "agents/th-orchestrator.md references agents/_shared/gh-fallback.md",
+    "agents/_shared/gh-fallback.md" in _orch_fallback,
+    "th-orchestrator.md does not cross-reference the shared gh-fallback snippet",
+)
+
+# Checks 14-15 (issue.md, review-pr.md) are added in their respective
+# PRs (PR-5, PR-6) where the actual changes land.
 
 # ---------------------------------------------------------------------------
 # Summary

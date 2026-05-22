@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Installer `requireCLI("gh", …)` downgraded to `warnCLI("gh", …)`: missing `gh` now prints a one-line recommendation and continues rather than hard-exiting. Skills `/issue`, `/deliver`, and `/review-pr` fall back to manual paths when `gh` is unavailable. New `warnCLI` function added to `cmd/install/util.go`.
 - `agents/delivery.md` Steps 2, 3.2, 11.0–11.3 updated with Tier A/B/D fallback cross-references to `agents/_shared/gh-fallback.md`. Step 11 no longer skips PR creation when `has_gh=false`; uses curl fallback or `blocked-manual-push` escape hatch instead. Return Protocol adds `blocked-manual-push` as a valid status value with structured operator-facing fields.
+- `agents/th-orchestrator.md` Phase 0a Step 5, Phase 0b Step 4, Phase 5 Steps 1-2 updated with Tier B/D fallback cross-references. Delivery gate gains `blocked-manual-push` handling with operator pause/resume protocol.
 
 ## [2.9.4] - 2026-05-22
 
