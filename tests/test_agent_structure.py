@@ -3025,6 +3025,48 @@ check(
     "skills/review-pr.md does not cross-reference the shared gh-fallback snippet",
 )
 
+# (16) assets/scaffolds/team-harness-rereview.yml exists (added in PR-9).
+_SCAFFOLD_DIR = REPO_ROOT / "assets" / "scaffolds"
+_REREVIEW_SCAFFOLD = _SCAFFOLD_DIR / "team-harness-rereview.yml"
+check(
+    "assets/scaffolds/team-harness-rereview.yml exists",
+    _REREVIEW_SCAFFOLD.exists(),
+    "re-review workflow scaffold missing — needed for /init --scaffold-rereview-workflow",
+)
+if _REREVIEW_SCAFFOLD.exists():
+    _rs = read(_REREVIEW_SCAFFOLD)
+    check(
+        "assets/scaffolds/team-harness-rereview.yml triggers on pull_request.synchronize",
+        "synchronize" in _rs,
+        "re-review workflow must trigger on pull_request.synchronize",
+    )
+    check(
+        "assets/scaffolds/team-harness-rereview.yml uses actions/github-script",
+        "actions/github-script" in _rs,
+        "re-review workflow must use actions/github-script for GitHub API calls",
+    )
+    check(
+        "assets/scaffolds/team-harness-rereview.yml checks commit_id for staleness",
+        "commit_id" in _rs,
+        "re-review workflow must compare review.commit_id with head.sha to detect stale reviews",
+    )
+
+# (17) agents/init.md has --scaffold-rereview-workflow behaviour.
+_init_md = read(AGENTS_DIR / "init.md")
+check(
+    "agents/init.md has '--scaffold-rereview-workflow' section",
+    "--scaffold-rereview-workflow" in _init_md,
+    "init.md does not document the --scaffold-rereview-workflow flag",
+)
+
+# (18) skills/init.md passes --scaffold-rereview-workflow flag through.
+_init_skill = read(SKILLS_DIR / "init.md")
+check(
+    "skills/init.md passes --scaffold-rereview-workflow flag to init agent",
+    "--scaffold-rereview-workflow" in _init_skill,
+    "skills/init.md does not propagate the --scaffold-rereview-workflow flag",
+)
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

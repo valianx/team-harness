@@ -77,6 +77,13 @@ go run ./cmd/install
 
 ---
 
+## Optional scaffolds (post-install)
+
+After installing, two optional scaffolds are available via `/init`:
+
+- `/init --scaffold-rereview-workflow` — adds `.github/workflows/team-harness-rereview.yml` to the consumer repo. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review, nudging the operator to re-run `/review-pr`. On private repos, each run consumes ~1 GitHub Actions minute.
+- `/init --scaffold-review-policy` — adds `.team-harness/review-policy.md` with a starter review policy template. The `reviewer` agent reads this file when present and enforces the declared rules.
+
 ## Updating
 
 Re-run the one-liner. The installer detects existing files; unchanged files are skipped, conflicts are reported.

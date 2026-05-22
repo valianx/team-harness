@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `site/index.html` Requirements: `gh` labelled recommended with fallback note.
 - `agents/README.md` roster: `agents/_shared/` cross-cutting snippet documented.
 - `docs/contributing.md`: smoke-test paragraph for gh-fallback paths added.
+- `assets/scaffolds/team-harness-rereview.yml`: GitHub Actions re-review reminder workflow template. Triggers on `pull_request.synchronize`, posts a comment when reviews go stale. Scaffolded by `/init --scaffold-rereview-workflow`.
+- `agents/init.md` Phase 4.5 `--scaffold-rereview-workflow` scaffold behaviour. `skills/init.md` updated to parse and propagate the flag.
+- `docs/knowledge.md` pattern entries for gh-fallback and re-review scaffold. `docs/install.md` Optional scaffolds section.
 
 ## [2.9.4] - 2026-05-22
 

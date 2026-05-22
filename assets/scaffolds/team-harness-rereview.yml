@@ -1,0 +1,83 @@
+name: team-harness — re-review reminder
+# Scaffolded by /init --scaffold-rereview-workflow
+# Posts a PR comment when new commits arrive on a PR that already has a
+# team-harness review. The comment nudges the operator to re-run /review-pr.
+#
+# State is entirely in GitHub (review.commit_id vs pull_request.head.sha).
+# No team-harness server required.
+#
+# Cost note: on private repos each workflow run consumes ~1 GitHub Actions
+# minute. For repos with high PR-push frequency this may be measurable.
+# On public repos Actions minutes are free.
+on:
+  pull_request:
+    types: [synchronize, ready_for_review]
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Check for prior team-harness review
+        id: check
+        uses: actions/github-script@v7
+        env:
+          # Set TH_OPERATOR_LOGIN in repo Settings > Variables > Actions
+          # to the GitHub login of the operator who posts reviews.
+          # Defaults to github-actions[bot] which is wrong for operator reviews.
+          TH_OPERATOR_LOGIN: ${{ vars.TH_OPERATOR_LOGIN || 'github-actions[bot]' }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request.number;
+            const headSha = context.payload.pull_request.head.sha;
+            const author = context.payload.pull_request.user.login;
+            const operator = process.env.TH_OPERATOR_LOGIN;
+
+            const reviews = await github.rest.pulls.listReviews({
+              owner, repo, pull_number: pr
+            });
+
+            // Find the most recent submitted review by the operator.
+            const priorReview = reviews.data
+              .filter(r => r.user.login === operator && r.state !== 'PENDING')
+              .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))[0];
+
+            // Skip when no prior review exists.
+            if (!priorReview) {
+              core.setOutput('should_remind', 'false');
+              return;
+            }
+
+            // Skip when the review is already on the current head SHA
+            // (rebase + force-push with no diff change).
+            if (priorReview.commit_id === headSha) {
+              core.setOutput('should_remind', 'false');
+              return;
+            }
+
+            // Skip self-review (author == operator, absurd case).
+            if (author === operator) {
+              core.setOutput('should_remind', 'false');
+              return;
+            }
+
+            core.setOutput('should_remind', 'true');
+            core.setOutput('head_sha', headSha);
+            core.setOutput('pr_number', String(pr));
+
+      - name: Post re-review comment
+        if: steps.check.outputs.should_remind == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = Number('${{ steps.check.outputs.pr_number }}');
+            const sha = '${{ steps.check.outputs.head_sha }}';
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr,
+              body: `[team-harness] New commits detected (head: \`${sha.slice(0, 7)}\`).\nRun \`@th-orchestrator review-pr #${pr}\` to refresh the review.`
+            });

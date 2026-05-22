@@ -393,6 +393,25 @@ Check if `docs/knowledge.md` exists. If not, create it:
 
 ---
 
+## Phase 4.5 — Optional scaffolds (interactive or flag-driven)
+
+Run these steps only when explicitly invoked via flag or when the operator confirms during an interactive `init` run.
+
+### `--scaffold-rereview-workflow`
+
+Scaffold the GitHub Actions re-review reminder workflow into the consumer repo.
+
+1. **Check if the workflow already exists** (`Glob` for `.github/workflows/team-harness-rereview.yml`). If found, skip with log "re-review workflow already exists".
+2. **Detect the operator's GitHub login.** When `has_gh=true` (probe from `agents/_shared/gh-fallback.md`): run `gh api user --jq '.login'`. When `has_gh=false`: ask the operator for their GitHub login.
+3. **Copy the workflow template** from `~/.claude/agents/_shared/../../../assets/scaffolds/team-harness-rereview.yml` to `.github/workflows/team-harness-rereview.yml` (create the directory if needed).
+4. **Tell the operator:** "Workflow scaffolded at `.github/workflows/team-harness-rereview.yml`. Set the `TH_OPERATOR_LOGIN` Actions variable in repo Settings > Secrets and variables > Actions > Variables to `{operator_login}`. The workflow posts a re-review comment when new commits arrive on a PR that already has a team-harness review."
+
+**Interactive mode (no flag):** when the project has a `.github/` directory and no existing `team-harness-rereview.yml`, offer to scaffold: "Scaffold the team-harness re-review workflow? [y/N]". Proceed only on explicit yes.
+
+**Cost note (private repos):** mention at scaffold time: "On private repos, each workflow run consumes ~1 GitHub Actions minute."
+
+---
+
 ## Phase 5 — Validate CLAUDE.md Accuracy
 
 - Cross-check that all Golden Commands exist in project scripts or tooling files
