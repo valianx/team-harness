@@ -33,13 +33,19 @@ The installer walks you through three prompts (Memory MCP URL, context7 API key,
 
 ## Quick start
 
-After install, open Claude Code and **talk to the orchestrator** — it's the front door to the whole system:
+After install, open Claude Code and **talk to the orchestrator** — it's the front door to the whole system. Ask it for the work plan first:
 
 ```
-@orchestrator tenemos una nueva tarea, diseñá <lo que quieras construir>
+@orchestrator dame el plan de trabajo para esta tarea: <descripción>
 ```
 
-The orchestrator opens a pipeline: plan → human approval → implementation → verify → push approval → PR. State lives in `session-docs/{feature}/`. Continue the same way through the lifecycle: `@orchestrator implementala`, `@orchestrator lanza el PR`, `@orchestrator recuperá <feature>`.
+The orchestrator opens a pipeline: plan → human approval → implementation → verify → push approval → PR. State lives in `session-docs/{feature}/`. Continue the same way through the lifecycle:
+
+```
+@orchestrator implementala
+@orchestrator lanza el PR
+@orchestrator recuperá <feature>
+```
 
 > **The orchestrator is the canonical entry point.** Skills like `/design`, `/deliver`, `/recover` are optional shortcuts that route to the same agent under the hood. Use whichever feels more natural to you — both work.
 
