@@ -292,7 +292,7 @@ Each task must be **small enough to complete in one agent pipeline run** (specif
 
 #### Planning Process
 
-1. **Analyze the problemática** — read `session-docs/{feature-name}/00-task-intake.md` to understand the full spec, acceptance criteria, scope, and codebase context
+1. **Analyze the task spec** — read `session-docs/{feature-name}/00-task-intake.md` to understand the full spec, acceptance criteria, scope, and codebase context
 2. **Investigate the codebase in depth** — use Glob, Grep, and Read to understand the current architecture, find all impact points, existing patterns, and constraints
 3. **Research documentation** — use context7 MCP if available to understand framework conventions and best practices relevant to the problem
 4. **Decompose into discrete tasks** — each task must be implementable independently (or with explicit dependencies). Tasks should be ordered so that foundational work comes first. **Apply the Task Sizing Rules above — never create oversized tasks.**
