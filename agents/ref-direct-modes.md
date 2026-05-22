@@ -183,7 +183,7 @@ Zero Bash in this step.
 
 ### Step 2 — Invoke reviewer (Fresh Review)
 
-Invoke `reviewer` in **fresh mode** via Task tool, passing ALL data inline:
+Invoke `reviewer` in **fresh mode** via Task tool, passing ALL data inline. Include the policy fields when present:
 
 ```
 mode: data-provided
@@ -200,6 +200,8 @@ Linked Issue: #{issue_number} or "none"
 Issue Title: {title} or "N/A"
 Issue Body: {body} or "N/A"
 Issue Labels: {labels} or "N/A"
+Has Policy: {true|false}
+Review Policy: {verbatim content of .team-harness/review-policy.md, or omit when Has Policy: false}
 Changed Files:
 {file list}
 Full Diff:

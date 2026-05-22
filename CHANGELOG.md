@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `assets/scaffolds/team-harness-rereview.yml`: GitHub Actions re-review reminder workflow template. Triggers on `pull_request.synchronize`, posts a comment when reviews go stale. Scaffolded by `/init --scaffold-rereview-workflow`.
 - `agents/init.md` Phase 4.5 `--scaffold-rereview-workflow` scaffold behaviour. `skills/init.md` updated to parse and propagate the flag.
 - `docs/knowledge.md` pattern entries for gh-fallback and re-review scaffold. `docs/install.md` Optional scaffolds section.
+- `assets/scaffolds/review-policy.md`: starter policy template for `/init --scaffold-review-policy`. Hybrid YAML frontmatter + markdown body. `schema_version: 1`, `focus_overrides` map, example rules.
+- `agents/reviewer.md`: Focus modes section (`general`/`security`/`architecture`/`style`); Policy-aware review section (`Has Policy` field, `## Violaciones de política` body section, de-dup rule, policy criticals non-overridable).
+- `skills/review-pr.md` Step 1.5 loads `.team-harness/review-policy.md`. Phase 2 payload gains `Has Policy:` and `Review Policy:` fields. `agents/ref-direct-modes.md` Review Mode Step 2 passes the policy fields to the reviewer.
+- `agents/init.md` Phase 4.5 `--scaffold-review-policy` behaviour. `skills/init.md` parses and propagates both scaffold flags.
 
 ## [2.9.4] - 2026-05-22
 

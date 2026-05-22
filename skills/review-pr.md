@@ -30,6 +30,23 @@ Analyze the input: $ARGUMENTS
    git diff --name-only origin/{baseRefName}...origin/{headRefName}
    ```
 
+### Step 1.5 — Load review policy (1 Read call, optional)
+
+```bash
+if [ -f .team-harness/review-policy.md ]; then
+  review_policy=$(cat .team-harness/review-policy.md)
+  has_policy=true
+else
+  has_policy=false
+fi
+```
+
+When `has_policy=false`, emit one line to the operator:
+```
+Review policy: not found (using general review judgement).
+Scaffold with: /init --scaffold-review-policy
+```
+
 ### Phase 2 — Review (zero Bash, delegated to th-orchestrator)
 
 7. Pass ALL gathered data to the `th-orchestrator` agent:
@@ -54,6 +71,8 @@ Analyze the input: $ARGUMENTS
      {file list from step 6}
    - Full Diff:
      {diff output from step 5}
+   - Has Policy: {true if .team-harness/review-policy.md was found in Step 1.5, else false}
+   - Review Policy: {verbatim content of .team-harness/review-policy.md, or omit field when has_policy=false}
    ```
 
 8. The th-orchestrator invokes the reviewer with all data inline (zero Bash in sub-agent), builds the draft, and writes it to `.claude/pr-review-draft.md`. If the reviewer found critical findings, the th-orchestrator also writes `.claude/pr-review-inline.json` with the inline comments array. The th-orchestrator returns with the decision (APPROVE or CHANGES_REQUESTED) and the event type.

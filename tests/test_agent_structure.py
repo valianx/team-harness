@@ -3067,6 +3067,64 @@ check(
     "skills/init.md does not propagate the --scaffold-rereview-workflow flag",
 )
 
+# (19) assets/scaffolds/review-policy.md exists (added in PR-10).
+_REVIEW_POLICY_SCAFFOLD = _SCAFFOLD_DIR / "review-policy.md"
+check(
+    "assets/scaffolds/review-policy.md exists",
+    _REVIEW_POLICY_SCAFFOLD.exists(),
+    "review policy scaffold missing — needed for /init --scaffold-review-policy",
+)
+if _REVIEW_POLICY_SCAFFOLD.exists():
+    _rp = read(_REVIEW_POLICY_SCAFFOLD)
+    check(
+        "assets/scaffolds/review-policy.md has schema_version in frontmatter",
+        "schema_version" in _rp,
+        "review-policy scaffold must have schema_version in YAML frontmatter",
+    )
+    check(
+        "assets/scaffolds/review-policy.md has focus_overrides in frontmatter",
+        "focus_overrides" in _rp,
+        "review-policy scaffold must declare focus_overrides (used by multi-reviewer)",
+    )
+
+# (20) agents/reviewer.md has Focus modes section (added in PR-10/PR-11).
+_reviewer_md = read(AGENTS_DIR / "reviewer.md")
+check(
+    "agents/reviewer.md has '## Focus modes' section",
+    "## Focus modes" in _reviewer_md,
+    "reviewer.md must document the Focus modes (general/security/architecture/style)",
+)
+check(
+    "agents/reviewer.md has '## Policy-aware review' section",
+    "## Policy-aware review" in _reviewer_md,
+    "reviewer.md must document the policy-aware review behaviour (Has Policy field)",
+)
+check(
+    "agents/reviewer.md policy-aware section mentions 'Violaciones de política'",
+    "Violaciones de política" in _reviewer_md,
+    "reviewer.md must include '## Violaciones de política' as a conditional body section",
+)
+
+# (21) skills/review-pr.md has Step 1.5 policy load (added in PR-10).
+_rvpr = read(SKILLS_DIR / "review-pr.md")
+check(
+    "skills/review-pr.md has Step 1.5 policy load section",
+    "Step 1.5" in _rvpr and "review-policy.md" in _rvpr,
+    "skills/review-pr.md must have Step 1.5 loading .team-harness/review-policy.md",
+)
+check(
+    "skills/review-pr.md passes Has Policy and Review Policy fields to th-orchestrator",
+    "Has Policy:" in _rvpr and "Review Policy:" in _rvpr,
+    "skills/review-pr.md must pass Has Policy and Review Policy fields in Phase 2 payload",
+)
+
+# (22) skills/init.md passes --scaffold-review-policy flag (added in PR-10).
+check(
+    "skills/init.md passes --scaffold-review-policy flag to init agent",
+    "--scaffold-review-policy" in _init_skill,
+    "skills/init.md does not propagate the --scaffold-review-policy flag",
+)
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

@@ -94,6 +94,29 @@ A GitHub review is an **immutable container** for inline comments once submitted
 
 ---
 
+## Focus modes
+
+When the dispatch includes a `Focus:` field, scope the review to the named focus area:
+
+- `general` (default — same behaviour as today)
+- `security` — emphasise OWASP categories, auth boundaries, input validation, secrets handling, injection risks, PII exposure. Skim architecture and style — only flag issues that ALSO have a security dimension.
+- `architecture` — emphasise coupling, abstractions, dependency direction, layer violations, naming consistency at the structural level. Skim security and style — only flag issues with structural impact.
+- `style` — emphasise naming, dead code, comment clarity, dead branches, repetition, complexity. Skim security and architecture — only flag issues at the cosmetic / readability level.
+
+When a focus is set, the policy file's `focus_overrides.<focus>` (see `agents/_shared/gh-fallback.md` § Policy) declares which rule IDs are in scope for that focus. The reviewer enforces those rule IDs plus the focus area's general categories; rule IDs not listed are out of scope. When `focus_overrides.<focus>` is empty (`[]`), fall back to the focus area's general categories (OWASP for security, etc.) as if no policy existed.
+
+## Policy-aware review
+
+When the dispatch includes `Has Policy: true` and a `Review Policy:` field (verbatim content of `.team-harness/review-policy.md` from the consumer repo), treat the policy as authoritative:
+
+- Cite rule IDs in findings (e.g., `Violation SEC-001 — src/api/users.ts:42`).
+- Policy `critical` rules are non-overridable inline findings — do NOT downgrade a critical policy violation to a suggestion.
+- When the diff includes `.team-harness/review-policy.md`, treat any rule removal or severity downgrade as a critical finding requiring rationale in the PR body.
+- De-dup: when a policy rule matches a finding the reviewer would also flag under general judgement, suppress the equivalent general finding (policy wins). This avoids double-counting at the same file:line.
+- Add a `## Violaciones de política` section to `review_body` listing each violated rule by ID, severity, and file:line. Omit this section when no policy violations were found.
+
+When `Has Policy: false` or the field is absent, proceed with general judgement only (today's behaviour).
+
 ## Operating Modes
 
 The reviewer supports four modes. The mode is specified by the th-orchestrator in the invocation.
