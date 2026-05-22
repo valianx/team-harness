@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.4] - 2026-05-22
+
 ### Fixed
 
 - **Installer UAC elevation triggered by filename heuristic** (`bin/install.ps1`): v2.9.3 still hit `The requested operation requires elevation` because Windows applies an "installer detection" heuristic to executables whose filename contains `install`, `setup`, `update`, or `patch` — and silently forces UAC even when launched via `CreateProcess` with `UseShellExecute=$false`. The downloaded `.exe` is now saved as `th-bootstrap.exe` (neutral name) to bypass the heuristic, plus `Unblock-File` strips the Mark-of-the-Web Zone Identifier as a belt-and-suspenders measure. Proper long-term fix is to embed an `asInvoker` execution-level manifest in the Go binary (via `goversioninfo` / `.syso`) — deferred to a future PR.
@@ -512,6 +514,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.9.4]: https://github.com/valianx/team-harness/compare/v2.9.3...v2.9.4
 [2.9.3]: https://github.com/valianx/team-harness/compare/v2.9.2...v2.9.3
 [2.9.2]: https://github.com/valianx/team-harness/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/valianx/team-harness/compare/v2.9.0...v2.9.1
