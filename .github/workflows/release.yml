@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # to create the release + upload assets
+      actions: write   # to dispatch pages.yml via workflow_dispatch (GITHUB_TOKEN needs this scope)
     steps:
       - uses: actions/checkout@v4
         with:

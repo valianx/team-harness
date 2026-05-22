@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`release.yml` missing `actions: write` permission** (`.github/workflows/release.yml`): the v2.10.1 "Trigger pages publish" step failed with `HTTP 403: Resource not accessible by integration` because the job's `permissions` block only declared `contents: write`. The `workflow_dispatch` API endpoint requires `actions: write` on `GITHUB_TOKEN` — added to the `permissions` block. Without this scope, the `gh workflow run pages.yml` call is rejected at the API layer regardless of the `workflow_dispatch` event exception to anti-loop chaining.
+
 ## [2.10.1] - 2026-05-22
 
 ### Fixed
