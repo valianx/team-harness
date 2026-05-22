@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-05-22
+
+### Changed
+
+- **Windows installer manifest embedded** (`cmd/install/manifest.xml` + `goversioninfo`): the installer binary now ships with an `asInvoker` execution-level manifest declaring that it does not require elevation. Windows' installer-detection heuristic (which forces UAC on executables whose filename contains `install`, `setup`, `update`, or `patch`) no longer triggers, regardless of filename. The v2.9.4 filename-rename workaround in `install.ps1` is preserved as defense-in-depth — both protections layered are stronger than either alone.
+
 ## [2.10.2] - 2026-05-22
 
 ### Fixed
