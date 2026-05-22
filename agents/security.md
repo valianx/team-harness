@@ -681,7 +681,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: security
 status: success | failed | blocked
 output: session-docs/{feature-name}/04-security.md
-summary: {1-2 sentences: N findings (X crítico, Y alto, Z medio), risk score, most critical issue}
+summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
