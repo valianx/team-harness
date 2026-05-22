@@ -13,12 +13,13 @@ import (
 //
 // Path rules (Go embed semantics):
 //   - Always use forward slashes when reading, even on Windows.
-//   - Files starting with "." or "_" are excluded by default. None of
-//     agents/ / skills/ / hooks/ currently rely on hidden files.
+//   - The "all:" prefix on agents/ overrides the default exclusion of files and
+//     directories starting with "." or "_". This is required to embed the
+//     agents/_shared/ subdirectory (shared cross-cutting snippets).
 //   - The embedded layout mirrors the repo layout: `agents/architect.md`
 //     in the repo becomes `agents/architect.md` inside embeddedAssets.
 
-//go:embed agents skills hooks
+//go:embed all:agents skills hooks
 var embeddedAssets embed.FS
 
 // FS returns the read-only embedded filesystem containing agents/, skills/,

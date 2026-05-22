@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `agents/_shared/gh-fallback.md`: single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Covers Tier A (read via curl), Tier B (write via curl or operator paste), Tier D (project board skip), detection probe, origin parser, `blocked-manual-push` status, and operator-facing copy templates. Part of the gh-fallback graceful degradation track (v2.10.0).
+- `assets.go` now uses `//go:embed all:agents skills hooks` so the new `agents/_shared/` subdirectory is included in the installer binary (Go embed excludes `_`-prefixed directories by default).
+- `cmd/install/main.go` `installAgents` now recurses into agent subdirectories, installing `agents/_shared/` to `~/.claude/agents/_shared/` alongside the flat agent files.
+- `tests/test_agent_structure.py` Suite 27: structural checks for the shared gh-fallback snippet (file existence, required sections, detection probe, tier documentation, `blocked-manual-push`, assets.go embed directive).
+
 ## [2.9.4] - 2026-05-22
 
 ### Fixed

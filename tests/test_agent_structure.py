@@ -1906,9 +1906,11 @@ PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pages.yml"
 pages_yml_text = read(PAGES_WORKFLOW) if PAGES_WORKFLOW.exists() else ""
 
 # (a) assets.go contains the //go:embed directive for agents, skills, hooks.
+# The "all:" prefix on agents/ is required to include agents/_shared/ (starts with "_").
 check(
     "assets.go contains '//go:embed agents skills hooks'",
-    "//go:embed agents skills hooks" in assets_go,
+    "//go:embed agents skills hooks" in assets_go
+    or "//go:embed all:agents skills hooks" in assets_go,
     "//go:embed directive missing or does not cover agents, skills, hooks",
 )
 
@@ -2875,6 +2877,98 @@ check(
     "Worked examples" in _ref_flows_bf or ("Example A" in _ref_flows_bf and "Example B" in _ref_flows_bf and "Example C" in _ref_flows_bf),
     "Tier System worked examples missing from ref-special-flows.md",
 )
+
+# ---------------------------------------------------------------------------
+# Suite 27 — gh-fallback graceful degradation (v2.10.0)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 27: gh-fallback graceful degradation ===")
+
+_SHARED_DIR = AGENTS_DIR / "_shared"
+_GH_FALLBACK = _SHARED_DIR / "gh-fallback.md"
+
+# (1) Shared snippet file exists.
+check(
+    "agents/_shared/gh-fallback.md exists",
+    _GH_FALLBACK.exists(),
+    "shared fallback snippet missing — agents/_shared/gh-fallback.md not found",
+)
+
+if _GH_FALLBACK.exists():
+    _gf = read(_GH_FALLBACK)
+
+    # (2) Detection probe section is present.
+    check(
+        "agents/_shared/gh-fallback.md has '## Detection probe' section",
+        "## Detection probe" in _gf,
+        "detection probe section missing from gh-fallback.md",
+    )
+    check(
+        "agents/_shared/gh-fallback.md detection probe uses 'command -v gh'",
+        "command -v gh" in _gf,
+        "detection probe must use 'command -v gh' for cross-platform PATH check",
+    )
+    check(
+        "agents/_shared/gh-fallback.md detection probe uses 'gh auth status'",
+        "gh auth status" in _gf,
+        "detection probe must also check 'gh auth status' (installed-but-unauthenticated = absent)",
+    )
+
+    # (3) All four tiers are documented.
+    for tier in ("Tier A", "Tier B", "Tier D"):
+        check(
+            f"agents/_shared/gh-fallback.md documents {tier}",
+            f"## {tier}" in _gf or f"### {tier}" in _gf,
+            f"{tier} section missing from gh-fallback.md",
+        )
+
+    # (4) blocked-manual-push status is defined.
+    check(
+        "agents/_shared/gh-fallback.md defines 'blocked-manual-push' status",
+        "blocked-manual-push" in _gf,
+        "blocked-manual-push status value not defined in gh-fallback.md",
+    )
+
+    # (5) Origin parser section present.
+    check(
+        "agents/_shared/gh-fallback.md has origin URL parser (is_github detection)",
+        "is_github" in _gf,
+        "origin URL parser (is_github flag) missing from gh-fallback.md",
+    )
+
+    # (6) Operator-facing copy templates section present.
+    check(
+        "agents/_shared/gh-fallback.md has '## Operator-facing copy templates' section",
+        "## Operator-facing copy templates" in _gf,
+        "operator-facing copy templates section missing",
+    )
+
+    # (7) How-to-reference section present.
+    check(
+        "agents/_shared/gh-fallback.md has '## How to reference this file' section",
+        "## How to reference this file" in _gf,
+        "how-to-reference section missing from gh-fallback.md",
+    )
+
+# (8) assets.go uses all:agents to include _shared/.
+_assets_go = read(REPO_ROOT / "assets.go")
+check(
+    "assets.go uses 'all:agents' prefix to include agents/_shared/",
+    "all:agents" in _assets_go,
+    "assets.go must use '//go:embed all:agents skills hooks' to include agents/_shared/ "
+    "(Go embed excludes directories starting with '_' without 'all:' prefix)",
+)
+
+# (9) installer copies agents/_shared/ (installAgents recurses into subdirs).
+_main_go = read(REPO_ROOT / "cmd" / "install" / "main.go")
+check(
+    "cmd/install/main.go installAgents function handles subdirectories (recurse for _shared)",
+    "copyEmbeddedDirRecursive" in _main_go,
+    "installAgents must call copyEmbeddedDirRecursive to install agents/_shared/ tree",
+)
+
+# Checks 10-15 (consumer cross-references and warnCLI) are added in their
+# respective PRs (PR-2 through PR-6) where the actual changes land.
 
 # ---------------------------------------------------------------------------
 # Summary

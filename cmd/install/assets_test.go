@@ -7,11 +7,14 @@ import (
 	"testing"
 )
 
-// TestEmbeddedAssets_AgentCount asserts exactly 17 .md files under agents/.
-// This is the AC-6 assertion: every agent in the canonical roster must be
-// present in the embedded FS. The count is a canary — if an agent is added
-// without updating this test, the test fails immediately, preventing a
-// silent deploy where the binary ships fewer agents than the operator expects.
+// TestEmbeddedAssets_AgentCount asserts exactly 17 invocable agent .md files
+// under agents/. This is the AC-6 assertion: every agent in the canonical
+// roster must be present in the embedded FS. The count is a canary — if an
+// agent is added without updating this test, the test fails immediately,
+// preventing a silent deploy where the binary ships fewer agents than expected.
+//
+// Note: agents/_shared/ contains cross-cutting snippets (not invocable agents)
+// and is intentionally excluded from the count.
 func TestEmbeddedAssets_AgentCount(t *testing.T) {
 	const wantAgents = 17
 	embedded := EmbeddedAssets()
@@ -21,8 +24,11 @@ func TestEmbeddedAssets_AgentCount(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// Count only invocable agent files — exclude README.md and ref-*.md
-		// (reference docs that are not registered as subagent_type entries).
+		// Skip the _shared/ subdirectory — it holds cross-cutting snippets,
+		// not invocable subagents. Skip README.md and ref-*.md for the same reason.
+		if d.IsDir() && d.Name() == "_shared" {
+			return fs.SkipDir
+		}
 		isRef := d.Name() == "README.md" || strings.HasPrefix(d.Name(), "ref-")
 		if !d.IsDir() && strings.HasSuffix(d.Name(), ".md") && !isRef {
 			mdFiles = append(mdFiles, path)
@@ -56,6 +62,26 @@ func TestEmbeddedAssets_ArchitectMD(t *testing.T) {
 	hasCRLF := strings.HasPrefix(string(data), "---\r\n")
 	if !hasLF && !hasCRLF {
 		t.Errorf("agents/architect.md does not start with '---\\n' or '---\\r\\n'; first 20 bytes: %q", data[:min20(len(data))])
+	}
+}
+
+// TestEmbeddedAssets_SharedSnippets asserts that the agents/_shared/ subdirectory
+// is present in the embedded FS and contains the gh-fallback.md snippet. This
+// validates that the "all:" prefix on the //go:embed directive correctly includes
+// the underscore-prefixed directory.
+func TestEmbeddedAssets_SharedSnippets(t *testing.T) {
+	embedded := EmbeddedAssets()
+
+	data, err := fs.ReadFile(embedded, "agents/_shared/gh-fallback.md")
+	if err != nil {
+		t.Fatalf("agents/_shared/gh-fallback.md not found in embedded FS: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("agents/_shared/gh-fallback.md is empty in embedded FS")
+	}
+	// Spot-check that it contains the detection probe (canonical content marker).
+	if !strings.Contains(string(data), "command -v gh") {
+		t.Error("agents/_shared/gh-fallback.md is missing the detection probe ('command -v gh')")
 	}
 }
 
