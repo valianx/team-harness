@@ -30,7 +30,7 @@ cd team-harness
 
 Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`gh`](https://cli.github.com/) (for orchestrator delivery flow), and a [context7](https://context7.com/) API key. Zero Python, zero `uv` — the bootstrap downloads a prebuilt Go binary from the latest GitHub Release and the agents talk to your external Memory MCP via HTTP.
 
-The installer prompts for one thing: the **Memory MCP URL**. This is the public URL of your Knowledge Graph MCP server — typically [`context-harness-mcp`](https://github.com/valianx/context-harness-mcp) deployed to Railway, Render, Fly, your own server, or any Docker host of your choice. Press Enter to use the local Docker default (`http://localhost:7654/mcp`).
+The installer prompts for one thing: the **Memory MCP URL**. This is the public URL of your Knowledge Graph MCP server — typically [`context-harness-mcp`](https://github.com/valianx/context-harness-mcp) deployed to Railway, Render, Fly, your own server, or any Docker host of your choice. There is **no default URL** — paste your Knowledge Graph MCP URL or the full JSON snippet from your `context-harness-mcp /dashboard`. For non-interactive installs, set `MEMORY_MCP_URL` (and optionally `MEMORY_MCP_BEARER`) before running the installer.
 
 For unattended installs:
 

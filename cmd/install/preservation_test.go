@@ -320,29 +320,15 @@ func TestPromptMemoryMCPURL_MigratesLegacyStdioEntry(t *testing.T) {
 	}
 }
 
-func TestPromptMemoryMCPURL_StdioFallsThroughToDefaultNonInteractive(t *testing.T) {
-	// Same stdio-migration story but with no env var set and non-interactive
-	// (no TTY): falls through to default URL with notice, NOT preserve.
-	_, cleanup := testEnv(t)
-	defer cleanup()
-
-	writeClaudeJSON(t, map[string]interface{}{
-		"mcpServers": map[string]interface{}{
-			"memory": memoryStdio(""),
-		},
-	})
-	os.Unsetenv("MEMORY_MCP_URL")
-	forceFlag = false
-
-	choice := promptMemoryMCPURL()
-
-	if choice.Preserved {
-		t.Error("expected Preserved=false for legacy stdio entry")
-	}
-	if choice.URL != defaultMemoryMCPURL {
-		t.Errorf("expected default URL fallback, got %s", choice.URL)
-	}
-}
+// NOTE: TestPromptMemoryMCPURL_StdioFallsThroughToDefaultNonInteractive was
+// removed when the installer's defaultMemoryMCPURL fallback was deleted. The
+// new contract: stdio-migration on a non-interactive run with no MEMORY_MCP_URL
+// env var ERRORS OUT (os.Exit(1)) instead of silently using a default. The
+// behaviour is exercised end-to-end by running `./install --some-flag` without
+// the env var; verifying it inside a Go test would require subprocess capture
+// of os.Exit, which is not worth the test-infrastructure complexity. The
+// runtime error message is asserted by documentation in prompts.go (the
+// promptMemoryMCPURL doc comment) and by the operator-facing error string.
 
 // TestEndToEnd_V1StdioToV2HTTP is the integration test the issue called out
 // as missing: plant a v1 stdio entry on disk, run the v2 prompt + register
@@ -435,23 +421,12 @@ func TestPromptMemoryMCPURL_EnvVarHighestPriority(t *testing.T) {
 	}
 }
 
-func TestPromptMemoryMCPURL_NonInteractiveDefault(t *testing.T) {
-	// Stdin is not a TTY in test execution, so non-interactive path runs.
-	_, cleanup := testEnv(t)
-	defer cleanup()
-
-	forceFlag = false
-	t.Setenv("MEMORY_MCP_URL", "")
-
-	choice := promptMemoryMCPURL()
-
-	if choice.Preserved {
-		t.Error("expected Preserved=false for fresh install non-interactive")
-	}
-	if choice.URL != defaultMemoryMCPURL {
-		t.Errorf("expected default URL=%s, got %s", defaultMemoryMCPURL, choice.URL)
-	}
-}
+// NOTE: TestPromptMemoryMCPURL_NonInteractiveDefault was removed when the
+// installer's defaultMemoryMCPURL fallback was deleted. The new contract:
+// fresh non-interactive install with no MEMORY_MCP_URL env var ERRORS OUT
+// (os.Exit(1)) with a message instructing the operator to set the env var.
+// See the previous NOTE block on the stdio-migration test for the rationale
+// on why this is not covered by a Go test (subprocess capture of os.Exit).
 
 func TestPromptMemoryMCPURL_InvalidURLRejected(t *testing.T) {
 	// validateMCPURL is the guard. Test the validator directly.

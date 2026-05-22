@@ -17,7 +17,7 @@
 **External dependencies (required).**
 - `gh` — GitHub CLI. Used by `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/
 - **context7 API key** — for library docs retrieval. Get one at https://context7.com/ (the installer prompts for it or reads `CONTEXT7_API_KEY` from the environment).
-- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker). The installer prompts for it or reads `MEMORY_MCP_URL` from the environment. Default: `http://localhost:7654/mcp`.
+- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker, or a local container). The installer prompts for it (interactive TTY) or reads `MEMORY_MCP_URL` from the environment (non-interactive / CI). **No default URL** — empty input is rejected and missing env var exits the installer with an explicit error. The previous silent fallback was removed because it produced misleading "connection refused" diagnostics for operators whose actual MCP lived on a different host. Every install requires the operator to provide their URL explicitly. Example format only: `https://your-mcp.example.com/mcp` — substitute the actual host of your own deployment.
 
 **External dependencies (optional).**
 - `d2` CLI — for `/d2-diagram`.
@@ -42,6 +42,7 @@ team-harness/
 │   ├── notify-windows.sh
 │   ├── notify-mac.sh
 │   ├── notify-linux.sh
+│   ├── notify-stage.sh  Cross-platform stage-end wrapper (orchestrator calls this at each Stage boundary)
 │   └── config.json      Per-OS hook templates for ~/.claude/settings.json
 ├── cmd/
 │   └── install/         Go installer source (cross-compiled to GH Release assets)
@@ -195,7 +196,7 @@ All commands run from the repo root.
 The repo has a verification suite at `tests/` that covers what is testable without a live LLM:
 
 - **`tests/test_policy_block.sh`** — functional tests for `hooks/policy-block.sh`. Each case feeds a tool-call JSON payload and asserts the output (deny → JSON with `permissionDecision: "deny"`; allow → empty stdout). ~48 cases: `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), git destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL DROP/TRUNCATE, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
-- **`tests/test_agent_structure.py`** — structural tests across `agents/`, `skills/`, `hooks/`. ~282 assertions in 16 suites covering tool allowlists per agent, the 5-column Roster matrix, the pipeline phases (1.5 / 1.6 / 2.5 / 3.5 / 3.6 / 4.5), per-agent contract sections (`tester` / `qa` / `reviewer` / `implementer` / `delivery` / `architect` / `orchestrator`), session-docs hygiene guardrails (Files I write / MUST NOT write, no parallel review files, no iteration history in analysis docs), the inviolable Phase 1.6 gate with its inline fallback, the self-describing task-list contract (Status field + AC checkbox mirror), the `PreToolUse` wiring across windows/macos/linux, and the README cross-references.
+- **`tests/test_agent_structure.py`** — structural tests across `agents/`, `skills/`, `hooks/`. 517 assertions in 22 suites covering tool allowlists per agent, the 5-column Roster matrix, the pipeline phases (1.5 / 1.6 / 2.5 / 3.5 / 3.6 / 4.5), per-agent contract sections (`tester` / `qa` / `reviewer` / `implementer` / `delivery` / `architect` / `orchestrator`), session-docs hygiene guardrails (Files I write / MUST NOT write, no parallel review files, no iteration history in analysis docs), the inviolable Phase 1.6 gate with its inline fallback, the self-describing task-list contract (Status field + AC checkbox mirror), the `PreToolUse` wiring across windows/macos/linux, the README cross-references, pipeline observability stack (Suite 20), KG hygiene gates (Suite 21), and stage-end notification protocol + SEC regression guards (Suite 22).
 - **`tests/test_agent_frontmatter.py`** — YAML frontmatter validity for every `agents/*.md`. Uses PyYAML via `uv run --with PyYAML python` to catch the silent-agent-drop class of bug (an unquoted `": "` inside a description breaks YAML parsing; Claude Code then silently drops the agent from the registered `subagent_type` list with no error surfaced). 19 agents currently parse cleanly.
 - **`tests/run-all.sh`** — wrapper that runs all three suites and exits 0 if all pass.
 

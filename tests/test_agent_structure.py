@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -1402,6 +1403,8 @@ delivery_kg_checks = [
      "mcp__memory__add_observations" in delivery_md.split("---", 2)[1]),
     ("delivery.md frontmatter declares mcp__memory__search_nodes",
      "mcp__memory__search_nodes" in delivery_md.split("---", 2)[1]),
+    ("delivery.md frontmatter declares mcp__memory__doctor (pre-flight health probe)",
+     "mcp__memory__doctor" in delivery_md.split("---", 2)[1]),
     ("Step 11.5 has Pre-flight quality gates section",
      "Pre-flight quality gates" in delivery_md),
     ("Step 11.5 Gate 1 — Specificity gate via suggest_node_type",
@@ -1414,7 +1417,60 @@ delivery_kg_checks = [
      "merged-into" in delivery_md),
     ("Step 11.5 status-block extended with new outcomes",
      "merged-into:" in delivery_md and "written-with-relation-note" in delivery_md),
+    ("Step 11.5 has Pre-flight MCP health check section (doctor pre-flight)",
+     "Pre-flight MCP health check" in delivery_md),
+    ("Step 11.5 forbids URL embellishment in skip log",
+     "Never invent a URL in the skip log" in delivery_md),
+    ("Step 11.5 has Pending payload fallback section",
+     "Pending payload fallback" in delivery_md),
+    ("Step 11.5 pending payload path is session-docs/{feature-name}/kg-passive-capture.pending.json",
+     "kg-passive-capture.pending.json" in delivery_md),
 ]
+
+# --- No default Memory MCP URL anywhere in docs: regression guard ---
+# This is an open-source distribution — the MCP can live on any host
+# (Railway/Render/Fly/Docker/local), so no specific URL is canonical to this
+# repo. Doc surfaces (CLAUDE.md, README.md, agent prompts) must reference only
+# generic placeholders (e.g., your-mcp.example.com), never a "real-looking"
+# host:port. Specific URLs are allowed only in: (a) preservation_test.go test
+# fixtures as sample data exercising URL validation / extraction helpers
+# (functional, not documentary); (b) CHANGELOG historical entries from prior
+# releases (immutable record of what was true at the time).
+
+claude_md = read(REPO_ROOT / "CLAUDE.md")
+readme_md = read(REPO_ROOT / "README.md")
+prompts_go = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+
+# Only the CHANGELOG [Unreleased] block is checked for the doc-surface rule;
+# historical entries below it document past behaviour with the URLs that were
+# real at that time, and are intentionally preserved.
+changelog_md = read(REPO_ROOT / "CHANGELOG.md")
+changelog_unreleased = changelog_md.split("## [Unreleased]", 1)[1].split("## [", 1)[0] if "## [Unreleased]" in changelog_md else ""
+
+no_default_url_checks = [
+    ("CLAUDE.md §1 does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in claude_md),
+    ("CLAUDE.md §1 explains there is no default URL (positive statement)",
+     "No default URL" in claude_md or "no default URL" in claude_md),
+    ("README.md does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in readme_md),
+    ("README.md does NOT promise a default with 'Press Enter to use the local Docker default'",
+     "Press Enter to use the local Docker default" not in readme_md),
+    ("README.md states no default URL exists (positive statement)",
+     "no default URL" in readme_md or "No default URL" in readme_md),
+    ("cmd/install/prompts.go doc comments do NOT name a specific host:port",
+     "localhost:7654" not in prompts_go),
+    ("cmd/install/prompts.go does NOT declare a defaultMemoryMCPURL const",
+     "const defaultMemoryMCPURL" not in prompts_go),
+    ("cmd/install/prompts.go errors out in non-interactive without MEMORY_MCP_URL env var",
+     "Memory MCP URL is required for non-interactive installs" in prompts_go),
+    ("cmd/install/prompts.go errors out on empty interactive input",
+     "empty Memory MCP URL" in prompts_go),
+    ("CHANGELOG [Unreleased] block does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in changelog_unreleased),
+]
+for label, condition in no_default_url_checks:
+    check(f"no-default-mcp-url: {label}", condition)
 for label, condition in delivery_kg_checks:
     check(f"delivery.md KG hygiene: {label}", condition)
 
@@ -1489,6 +1545,171 @@ orch_session_checks = [
 ]
 for label, condition in orch_session_checks:
     check(f"orchestrator.md session lifecycle: {label}", condition)
+
+# ---------------------------------------------------------------------------
+# Suite 22 — Stage-end notification protocol
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 22: Stage-end notification protocol ===")
+
+NOTIFY_STAGE = REPO_ROOT / "hooks" / "notify-stage.sh"
+
+check(
+    "orchestrator.md has ## Stage-end notification protocol section",
+    "## Stage-end notification protocol" in orch,
+    "## Stage-end notification protocol section missing from orchestrator.md",
+)
+
+check(
+    "Stage-end protocol mapping table mentions all 4 stage labels",
+    all(label in orch for label in ["analysis", "implementation batch", "verify", "delivery"]),
+    "one or more stage labels (analysis/implementation batch/verify/delivery) missing from orchestrator.md",
+)
+
+check(
+    "Stage-end protocol section names hooks/notify-stage.sh",
+    "hooks/notify-stage.sh" in orch,
+    "hooks/notify-stage.sh not referenced in orchestrator.md Stage-end notification protocol",
+)
+
+check(
+    "Stage-end protocol section documents the stage.notify JSONL event",
+    '"event":"stage.notify"' in orch or "stage.notify" in orch,
+    "stage.notify event type not documented in orchestrator.md",
+)
+
+check(
+    "hooks/notify-stage.sh file exists",
+    NOTIFY_STAGE.exists(),
+    "hooks/notify-stage.sh does not exist",
+)
+
+# Executable check — skip on Windows where permission bits are not meaningful.
+if os.name != "nt":
+    check(
+        "hooks/notify-stage.sh is executable",
+        os.access(NOTIFY_STAGE, os.X_OK),
+        "hooks/notify-stage.sh is not executable",
+    )
+
+notify_stage_content = read(NOTIFY_STAGE)
+
+check(
+    "notify-stage.sh branches on darwin (macOS)",
+    "darwin" in notify_stage_content,
+    "notify-stage.sh missing darwin branch",
+)
+check(
+    "notify-stage.sh branches on linux",
+    "linux" in notify_stage_content,
+    "notify-stage.sh missing linux branch",
+)
+check(
+    "notify-stage.sh branches on Windows (msys or cygwin or win32)",
+    any(k in notify_stage_content for k in ("msys", "cygwin", "win32")),
+    "notify-stage.sh missing Windows (msys/cygwin/win32) branch",
+)
+
+check(
+    "Stage-end protocol documents idempotency dedup via JSONL",
+    "already-fired" in orch and "00-execution-events.jsonl" in orch,
+    "idempotency dedup mechanism (already-fired / JSONL) not documented in orchestrator.md",
+)
+
+# (h) AC-2 coverage: section explicitly states toasts fire independent of autonomy mode.
+check(
+    "Stage-end protocol section states independence from autonomy mode",
+    "independent of autonomy" in orch,
+    "AC-2 contract ('independent of autonomy mode') not stated in orchestrator.md section",
+)
+
+# (i) AC-6 sub-item (b): Toast Mapping Table sub-heading present (not just label text).
+check(
+    "Stage-end protocol section has ### Toast Mapping Table sub-heading",
+    "### Toast Mapping Table" in orch,
+    "### Toast Mapping Table sub-heading missing from Stage-end notification protocol section",
+)
+
+# (j) AC-6 sub-item (e): Failure-safety sub-heading present (regression guard for 'best-effort, never blocks' contract).
+check(
+    "Stage-end protocol section has ### Failure-safety sub-heading",
+    "### Failure-safety" in orch,
+    "### Failure-safety sub-heading missing — best-effort/never-blocks contract may have been removed",
+)
+
+# (k) hooks/README.md documents notify-stage.sh (installer/documentation propagation check).
+hooks_readme_content = read(REPO_ROOT / "hooks" / "README.md")
+check(
+    "hooks/README.md documents notify-stage.sh",
+    "notify-stage.sh" in hooks_readme_content,
+    "hooks/README.md does not mention notify-stage.sh — documentation incomplete",
+)
+
+# (l) notify-stage.sh exits 0 on every path (failure-safety contract on the script itself).
+check(
+    "notify-stage.sh unconditionally exits 0 (failure-safety contract)",
+    notify_stage_content.rstrip().endswith("exit 0"),
+    "notify-stage.sh does not end with 'exit 0' — wrapper may propagate errors to orchestrator",
+)
+
+# (m) AC-8: CHANGELOG [Unreleased] section mentions stage-end notifications + idempotency.
+changelog = read(REPO_ROOT / "CHANGELOG.md")
+check(
+    "CHANGELOG.md [Unreleased] mentions stage-end notifications and idempotency",
+    "[Unreleased]" in changelog and "notify-stage.sh" in changelog and "idempotent" in changelog,
+    "CHANGELOG entry for stage-end notifications (notify-stage.sh + idempotent) missing or incomplete",
+)
+
+# SEC regression guards (iter 1 — post-security-fix audit)
+# These checks prevent re-introduction of the unsafe patterns fixed in the security iteration.
+
+# (n) SEC-001 regression guard: all 4 stage call-sites in orchestrator.md use python3 json.dumps
+# with positional argv — NOT echo '...' with inline placeholder substitution (CWE-78).
+check(
+    "SEC-001 guard: orchestrator call-sites use python3 json.dumps (not echo single-quoted string)",
+    orch.count("python3 -c \"import json,sys; print(json.dumps(") >= 4,
+    "SEC-001 regression: fewer than 4 'python3 -c json.dumps' call-sites found in orchestrator.md — "
+    "echo with placeholder substitution may have been reintroduced (CWE-78)",
+)
+
+# (o) SEC-001 regression guard (negative): no echo '{"stage" call-sites remain in orchestrator.md.
+check(
+    "SEC-001 guard (negative): no residual echo single-quoted stage payload in orchestrator.md",
+    'echo \'{"stage"' not in orch,
+    "SEC-001 regression: echo single-quoted stage payload found in orchestrator.md — "
+    "this pattern is vulnerable to shell command injection (CWE-78)",
+)
+
+# (p) SEC-002 regression guard: idempotency checks use python3 structural parse, not grep -c.
+# The safe pattern emits print(sum(...json.loads(l)...)); grep -c on JSONL is unanchored and
+# can false-positive on summary text containing the substring.
+check(
+    "SEC-002 guard: idempotency uses python3 structural JSON parse (not grep -c regex match)",
+    orch.count("print(sum(1 for l in open(") >= 4,
+    "SEC-002 regression: fewer than 4 'print(sum(1 for l in open(' patterns in orchestrator.md — "
+    "idempotency may have reverted to unanchored grep -c (CWE-20 false-positive risk)",
+)
+
+# (q) SEC-004 regression guard: notify-windows.sh uses '' (PowerShell double-quote escape)
+# NOT \' (backslash escape, which is invalid in PowerShell single-quoted strings).
+notify_windows_content = read(REPO_ROOT / "hooks" / "notify-windows.sh")
+check(
+    "SEC-004 guard: notify-windows.sh uses PowerShell-correct '' escape (not broken \\' escape)",
+    "s/'/''/g" in notify_windows_content and "s/'/\\\\'/g" not in notify_windows_content,
+    "SEC-004 regression: notify-windows.sh uses s/'/\\\\'/g (broken PowerShell escape) — "
+    "correct escape is s/'/''/g (doubling the quote per PowerShell single-quoted string rules)",
+)
+
+# (r) SEC-005 regression guard: notify-mac.sh body construction uses printf pipe to osascript
+# NOT osascript -e with bash double-quoting (which allows $(...) interpolation before osascript sees it).
+notify_mac_content = read(REPO_ROOT / "hooks" / "notify-mac.sh")
+check(
+    "SEC-005 guard: notify-mac.sh uses printf pipe to osascript (not bash double-quoted -e string)",
+    'printf \'display notification' in notify_mac_content
+    and 'osascript -e "display notification' not in notify_mac_content,
+    "SEC-005 regression: notify-mac.sh reverted to osascript -e with bash double-quoting — "
+    "this allows $(...) subshell expansion in the body before osascript evaluates the string",
+)
 
 # ---------------------------------------------------------------------------
 # Summary

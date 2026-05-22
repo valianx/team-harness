@@ -11,8 +11,8 @@ PROJECT=$(basename "$CWD")
 TITLE="Claude Code — ${PROJECT}"
 BODY="${LAST_MSG:-Waiting for input}"
 
-PS_TITLE=$(echo "$TITLE" | sed "s/'/\\\\'/g")
-PS_BODY=$(echo "$BODY" | sed "s/'/\\\\'/g" | head -c 200)
+PS_TITLE=$(echo "$TITLE" | sed "s/'/''/g")
+PS_BODY=$(echo "$BODY" | sed "s/'/''/g" | head -c 200)
 AUMID='{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
 
 powershell.exe -NoProfile -Command "

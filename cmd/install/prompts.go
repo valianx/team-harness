@@ -7,23 +7,28 @@ import (
 	"strings"
 )
 
-const defaultMemoryMCPURL = "http://localhost:7654/mcp"
-
 // MemoryMCPChoice captures the result of the Memory MCP URL prompt.
 type MemoryMCPChoice struct {
-	URL         string // always set — either from input, env, or default
+	URL         string // always set — either from existing config, env, or interactive input
 	BearerToken string // empty when the MCP requires no auth
 	Preserved   bool   // true when the existing entry was kept without change
 }
 
 // promptMemoryMCPURL determines the Memory MCP URL and Bearer token from
-// existing config, env vars, or an interactive prompt.
+// existing config, env vars, or an interactive prompt. There is intentionally
+// NO default URL fallback — falling back silently produced misleading runtime
+// errors (a "connection refused" trace pointing at the removed default host
+// when the operator had pointed the MCP somewhere else entirely). Every
+// install requires the operator to make an explicit URL choice; the installer
+// never fabricates one. This is an open-source distribution — the MCP can
+// live on any host (Railway/Render/Fly/Docker/local), so no specific URL is
+// canonical to this repo.
 //
 // Decision priority for URL (when --force is NOT set):
 //  1. Existing valid mcpServers.memory in ~/.claude.json → preserve URL+bearer.
 //  2. MEMORY_MCP_URL env var (non-interactive / CI / scripted installs).
-//  3. Non-interactive without env var → default to defaultMemoryMCPURL, print notice.
-//  4. Interactive TTY → prompt the user; Enter → defaultMemoryMCPURL.
+//  3. Non-interactive without env var → ERROR + exit 1 (operator must set the env var).
+//  4. Interactive TTY → prompt the user; empty input → re-prompt (no default).
 //
 // Bearer token (only prompted when URL was NOT preserved):
 //  1. MEMORY_MCP_BEARER env var (non-interactive / CI / scripted installs).
@@ -82,9 +87,11 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 	}
 
 	if !isTerminal() {
-		fmt.Printf("  Memory MCP URL: %s (default for non-interactive installs)."+
-			" Set MEMORY_MCP_URL=https://... to override.\n", defaultMemoryMCPURL)
-		return MemoryMCPChoice{URL: defaultMemoryMCPURL, BearerToken: promptMemoryMCPBearer()}
+		fmt.Fprintln(os.Stderr, "Error: Memory MCP URL is required for non-interactive installs.")
+		fmt.Fprintln(os.Stderr, "  Set MEMORY_MCP_URL=https://your-mcp.example.com/mcp before re-running.")
+		fmt.Fprintln(os.Stderr, "  There is no default URL — falling back silently produced misleading")
+		fmt.Fprintln(os.Stderr, "  runtime errors when the operator's actual MCP was elsewhere.")
+		os.Exit(1)
 	}
 
 	return promptURLInteractive()
@@ -106,13 +113,16 @@ func promptURLInteractive() MemoryMCPChoice {
 	fmt.Println("  • the bare URL of your Knowledge Graph MCP, OR")
 	fmt.Println("  • the full JSON snippet from your context-harness-mcp /dashboard")
 	fmt.Println("    (we parse it and skip the separate bearer prompt).")
-	fmt.Println("Press Enter to use the local Docker default.")
+	fmt.Println("There is no default — empty input is rejected (no silent localhost fallback).")
 	fmt.Println()
-	fmt.Printf("Memory MCP URL [%s]: ", defaultMemoryMCPURL)
+	fmt.Print("Memory MCP URL: ")
 
 	raw := strings.TrimSpace(readLine())
 	if raw == "" {
-		return MemoryMCPChoice{URL: defaultMemoryMCPURL, BearerToken: promptMemoryMCPBearer()}
+		fmt.Fprintln(os.Stderr, "Error: empty Memory MCP URL.")
+		fmt.Fprintln(os.Stderr, "  Paste the URL of your Knowledge Graph MCP server (https://... or http://...)")
+		fmt.Fprintln(os.Stderr, "  or the full JSON snippet from your context-harness-mcp /dashboard.")
+		os.Exit(1)
 	}
 
 	// Smart-paste: if the input opens a JSON object, slurp the rest of the
