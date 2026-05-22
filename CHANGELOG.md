@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- th-orchestrator intent table extended with Spanish bug-fix triggers (`solucionar`, `arreglar`, `corregir`, `fixear`, `debuguear`, `regresión`, `error`) and common Spanish imperative phrasings (`corrija un bug`, `haga un fix`, `haga un hotfix`, `corregir error`). Closes a routing gap where Spanish bug-fix requests fell through to `unclear` instead of the full pipeline. PR-1 of the bug-fix pipeline design (`session-docs/bug-fix-flow/01-architecture.md`).
+
 ## [2.7.0] - 2026-05-22
 
 ### Changed

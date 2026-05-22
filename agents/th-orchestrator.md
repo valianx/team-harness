@@ -417,7 +417,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | spike, exploración rápida, prototype, PoC | `spike` | write |
    | entregar, deliver, "crear branch y commitear" | `deliver` | write |
    | inicializar, init, bootstrap | `init` | write |
-   | feature, fix, refactor, enhancement, bug, implementar | **full pipeline** | write |
+   | feature, fix, bug, refactor, enhancement, hotfix, implementar, solucionar, arreglar, corregir, fixear, debuguear, regresión, error, "corrija un bug", "haga un fix", "haga un hotfix", "corregir error", "arreglar el bug", "hay un bug en X", "está rompiendo", "no funciona Y", "error en Z" | **full pipeline** | write |
    | ambiguous / mixed concerns | **unclear** | — |
 
    **Disambiguation — `validate` vs `plan-review` vs substance refinement.**
