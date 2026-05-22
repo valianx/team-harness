@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-05-22
+
 ### Changed
 
 - Voice contract baked into every agent and standalone skill prompt so the formal-neutral voice rule (CLAUDE.md §7.1) is enforced regardless of which project the operator invokes the agent from. Closes a gap where agents installed via `/th-update` would drift to casual voice when used outside the team-harness repo because the project-local CLAUDE.md was not in scope. CLAUDE.md §7.1 also gains an explicit universal-scope clause covering chat replies, memory writes, and self-corrections.
@@ -471,6 +473,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.7.0]: https://github.com/valianx/team-harness/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/valianx/team-harness/compare/v2.5.1...v2.6.0
 [2.5.1]: https://github.com/valianx/team-harness/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/valianx/team-harness/compare/v2.4.1...v2.5.0
