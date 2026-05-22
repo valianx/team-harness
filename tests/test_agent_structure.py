@@ -1427,33 +1427,47 @@ delivery_kg_checks = [
      "kg-passive-capture.pending.json" in delivery_md),
 ]
 
-# --- No default Memory MCP URL anywhere: regression guard ---
-# The installer's defaultMemoryMCPURL const was removed; doc surfaces (CLAUDE.md,
-# README.md) must not promise a default that no longer exists. The string
-# "localhost:7654" is allowed in (a) prompts.go doc comments explaining the
-# removed default, (b) test fixtures using it as sample data, (c) CHANGELOG
-# historical entries.
+# --- No default Memory MCP URL anywhere in docs: regression guard ---
+# This is an open-source distribution — the MCP can live on any host
+# (Railway/Render/Fly/Docker/local), so no specific URL is canonical to this
+# repo. Doc surfaces (CLAUDE.md, README.md, agent prompts) must reference only
+# generic placeholders (e.g., your-mcp.example.com), never a "real-looking"
+# host:port. Specific URLs are allowed only in: (a) preservation_test.go test
+# fixtures as sample data exercising URL validation / extraction helpers
+# (functional, not documentary); (b) CHANGELOG historical entries from prior
+# releases (immutable record of what was true at the time).
 
 claude_md = read(REPO_ROOT / "CLAUDE.md")
 readme_md = read(REPO_ROOT / "README.md")
 prompts_go = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
 
+# Only the CHANGELOG [Unreleased] block is checked for the doc-surface rule;
+# historical entries below it document past behaviour with the URLs that were
+# real at that time, and are intentionally preserved.
+changelog_md = read(REPO_ROOT / "CHANGELOG.md")
+changelog_unreleased = changelog_md.split("## [Unreleased]", 1)[1].split("## [", 1)[0] if "## [Unreleased]" in changelog_md else ""
+
 no_default_url_checks = [
-    ("CLAUDE.md §1 does NOT promise a default Memory MCP URL",
-     "Default: `http://localhost:7654/mcp`" not in claude_md
-     and "Default: http://localhost:7654/mcp" not in claude_md),
+    ("CLAUDE.md §1 does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in claude_md),
     ("CLAUDE.md §1 explains there is no default URL (positive statement)",
      "No default URL" in claude_md or "no default URL" in claude_md),
+    ("README.md does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in readme_md),
     ("README.md does NOT promise a default with 'Press Enter to use the local Docker default'",
      "Press Enter to use the local Docker default" not in readme_md),
     ("README.md states no default URL exists (positive statement)",
      "no default URL" in readme_md or "No default URL" in readme_md),
+    ("cmd/install/prompts.go doc comments do NOT name a specific host:port",
+     "localhost:7654" not in prompts_go),
     ("cmd/install/prompts.go does NOT declare a defaultMemoryMCPURL const",
      "const defaultMemoryMCPURL" not in prompts_go),
     ("cmd/install/prompts.go errors out in non-interactive without MEMORY_MCP_URL env var",
      "Memory MCP URL is required for non-interactive installs" in prompts_go),
     ("cmd/install/prompts.go errors out on empty interactive input",
      "empty Memory MCP URL" in prompts_go),
+    ("CHANGELOG [Unreleased] block does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in changelog_unreleased),
 ]
 for label, condition in no_default_url_checks:
     check(f"no-default-mcp-url: {label}", condition)

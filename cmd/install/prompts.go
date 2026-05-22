@@ -17,9 +17,12 @@ type MemoryMCPChoice struct {
 // promptMemoryMCPURL determines the Memory MCP URL and Bearer token from
 // existing config, env vars, or an interactive prompt. There is intentionally
 // NO default URL fallback — falling back silently produced misleading runtime
-// errors ("connection refused at http://localhost:7654/mcp" when the operator
-// had pointed the MCP elsewhere). Every install requires the operator to make
-// an explicit URL choice; the installer never fabricates one.
+// errors (a "connection refused" trace pointing at the removed default host
+// when the operator had pointed the MCP somewhere else entirely). Every
+// install requires the operator to make an explicit URL choice; the installer
+// never fabricates one. This is an open-source distribution — the MCP can
+// live on any host (Railway/Render/Fly/Docker/local), so no specific URL is
+// canonical to this repo.
 //
 // Decision priority for URL (when --force is NOT set):
 //  1. Existing valid mcpServers.memory in ~/.claude.json → preserve URL+bearer.

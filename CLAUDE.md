@@ -17,7 +17,7 @@
 **External dependencies (required).**
 - `gh` — GitHub CLI. Used by `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/
 - **context7 API key** — for library docs retrieval. Get one at https://context7.com/ (the installer prompts for it or reads `CONTEXT7_API_KEY` from the environment).
-- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker). The installer prompts for it (interactive TTY) or reads `MEMORY_MCP_URL` from the environment (non-interactive / CI). **No default URL** — empty input is rejected and missing env var exits the installer with an explicit error. The previous fallback to `http://localhost:7654/mcp` was removed because it silently produced misleading "connection refused" errors when the operator's actual MCP was elsewhere (Railway/Render/etc.).
+- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker, or a local container). The installer prompts for it (interactive TTY) or reads `MEMORY_MCP_URL` from the environment (non-interactive / CI). **No default URL** — empty input is rejected and missing env var exits the installer with an explicit error. The previous silent fallback was removed because it produced misleading "connection refused" diagnostics for operators whose actual MCP lived on a different host. Every install requires the operator to provide their URL explicitly. Example format only: `https://your-mcp.example.com/mcp` — substitute the actual host of your own deployment.
 
 **External dependencies (optional).**
 - `d2` CLI — for `/d2-diagram`.
