@@ -3009,8 +3009,21 @@ check(
     "th-orchestrator.md does not cross-reference the shared gh-fallback snippet",
 )
 
-# Checks 14-15 (issue.md, review-pr.md) are added in their respective
-# PRs (PR-5, PR-6) where the actual changes land.
+# (14) skills/issue.md references the shared snippet (added in PR-5).
+_issue_skill = read(SKILLS_DIR / "issue.md")
+check(
+    "skills/issue.md references agents/_shared/gh-fallback.md",
+    "agents/_shared/gh-fallback.md" in _issue_skill,
+    "skills/issue.md does not cross-reference the shared gh-fallback snippet",
+)
+
+# (15) skills/review-pr.md references the shared snippet (added in PR-6).
+_review_pr_skill = read(SKILLS_DIR / "review-pr.md")
+check(
+    "skills/review-pr.md references agents/_shared/gh-fallback.md",
+    "agents/_shared/gh-fallback.md" in _review_pr_skill,
+    "skills/review-pr.md does not cross-reference the shared gh-fallback snippet",
+)
 
 # ---------------------------------------------------------------------------
 # Summary

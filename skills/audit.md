@@ -16,11 +16,8 @@ Analyze the input: $ARGUMENTS
 ## Mode 2 — Issue number or URL
 
 1. Extract the issue number
-2. Read the issue:
-   ```
-   gh issue view {number} --json number,title,body,labels
-   ```
-3. If the command fails, tell the user: "Issue #{number} not found or `gh` is not configured. Provide the target as text instead."
+2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Use `gh issue view {number} --json number,title,body,labels` when `has_gh=true`; curl fallback otherwise.
+3. If the issue cannot be fetched automatically, tell the user: "Issue #{number} could not be fetched automatically. Pasting the issue body as text also works — paste it below or paste the URL again."
 4. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:

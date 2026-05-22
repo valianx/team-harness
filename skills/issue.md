@@ -13,11 +13,8 @@ Before processing modes, check if the input contains flags:
 ## Mode 1 — Single issue number or URL (`#123`, `123`, URL)
 
 1. Extract the issue number
-2. Read the issue:
-   ```
-   gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems
-   ```
-3. If the command fails, tell the user: "Issue #{number} not found or `gh` is not configured. Check `gh auth status`."
+2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier A — read a single issue". Run the probe to set `has_gh`. When `has_gh=true`, use `gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems`. When `has_gh=false`, attempt the curl Tier A fallback. If both fail, prompt the operator to paste the issue body using the escape-hatch template.
+3. If issue data cannot be obtained automatically, tell the user: "Issue #{number} could not be fetched automatically. Paste the issue body as text below, or paste the URL and re-run."
 4. **Assess issue quality** before passing to th-orchestrator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
@@ -41,11 +38,8 @@ Before processing modes, check if the input contains flags:
 ## Mode 2 — Multiple issues (`#12 #13 #14`, `12, 13, 14`)
 
 1. Extract all issue numbers from the input
-2. Read each issue:
-   ```
-   gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems
-   ```
-3. If any issue fails to load, report which ones failed and continue with the rest
+2. **Detection + fallback:** same as Mode 1 — see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Use `gh` when available; curl fallback otherwise. Apply per-issue.
+3. If any issue fails to load (both `gh` and curl unavailable), report which ones failed and continue with the rest.
 4. **Assess each issue's quality** before passing to th-orchestrator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
@@ -77,7 +71,9 @@ Before processing modes, check if the input contains flags:
    - **Label**: classify as one of: `bug`, `enhancement`, `feature`, `refactor`, `docs`, `security`
    - **Body**: structured with the template below
 
-2. Create the issue with auto-label, auto-assign, and **SDD-compliant body**:
+2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`, create with `gh issue create`. When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, write the SDD body to `session-docs/{feature}/inputs/issue-create.md` and prompt the operator to paste it into GitHub, then reply with the new issue number.
+
+   Create the issue with auto-label, auto-assign, and **SDD-compliant body**:
    ```
    gh issue create --title "{title}" --label "{label}" --assignee "@me" --body "$(cat <<'EOF'
    ## User Story
@@ -103,7 +99,7 @@ Before processing modes, check if the input contains flags:
 
    **SDD rules:** min 2 AC, max 20. AC always in Given/When/Then with checkbox. Scope always explicit.
 
-3. Read the created issue to get the full data:
+3. Read the created issue to get the full data. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue".
    ```
    gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems
    ```
@@ -120,9 +116,9 @@ Ask the user: "Provide a GitHub issue number (#123), multiple issues (#12 #13 #1
 
 ## Error Handling
 
-- If `gh` is not available or not authenticated, tell the user: "GitHub CLI is not configured. Run `gh auth login` to set it up."
-- If an issue number doesn't exist, report which one failed and ask if you should continue with the others (batch) or stop (single)
-- If issue creation fails (no permission, no remote), report the error clearly — do not swallow it
+- If `gh` is not available or not authenticated, use the graceful degradation paths in `agents/_shared/gh-fallback.md`: Tier A curl fallback for reads, Tier B for creates, escape hatch (local file + operator paste) when neither is available.
+- If an issue number doesn't exist, report which one failed and ask if you should continue with the others (batch) or stop (single).
+- If issue creation fails (no permission, no remote), report the error clearly — do not swallow it.
 
 ## Important
 
