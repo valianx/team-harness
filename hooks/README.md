@@ -9,6 +9,7 @@ OS-native notification scripts plus the `config.json` template that wires them i
 | `notify-windows.sh` | Windows toast notification via PowerShell. |
 | `notify-mac.sh` | macOS notification via `osascript`. |
 | `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). |
+| `notify-stage.sh` | Wrapper invoked by the orchestrator at stage boundaries (4 toasts/pipeline). Detects OS and routes to the matching `notify-{os}.sh`. |
 | `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). |
 | `config.json` | Per-OS hook template — copy the section for your OS into `~/.claude/settings.json`. |
 
@@ -91,6 +92,16 @@ If you walk away from long-running tasks and want to be pinged when Claude is do
 Swap the script path for `notify-windows.sh` or `notify-linux.sh` as needed.
 
 Expect this to be **noisy** during active development. Remove it when you go back to interactive work.
+
+## Stage-end notifications (orchestrator pipeline)
+
+`notify-stage.sh` is invoked by the orchestrator — not by a Claude Code hook event — at the close of each of the four user-facing pipeline stages. It fires regardless of the `autonomous` mode and regardless of the ultra-quiet hook preset: the preset controls which Claude Code events trigger a toast; this script is called directly by the orchestrator's own `Bash` tool.
+
+The orchestrator pipes a JSON payload of the form `{"stage":N,"label":"...","status":"...","feature":"...","summary":"...","cwd":"..."}` to stdin. The wrapper derives a one-line message (`Pipeline {feature} · Stage N ({label}) {STATUS} — {summary}`), rebuilds a `{last_assistant_message, cwd}` payload, and routes to the matching `notify-{os}.sh` script in the same directory.
+
+**To silence stage notifications:** remove `~/.claude/hooks/notify-stage.sh` after install. The orchestrator checks `test -x ~/.claude/hooks/notify-stage.sh` before calling it; if the file is absent, it logs `stage.notify.skipped` with `reason: wrapper-missing` and continues the pipeline without emitting a toast.
+
+**If a `permission_prompt` fires for the orchestrator's bash call:** add `Bash(bash ~/.claude/hooks/notify-stage.sh:*)` to `permissions.allow` in your `~/.claude/settings.json`. Under the default ultra-quiet preset this is not required, but users who enable a louder preset may encounter one prompt per stage call.
 
 ## Adding support for another OS
 
