@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.2] - 2026-05-22
+
 ### Fixed
 
 - **Installer UX on Windows PowerShell** (`bin/install.ps1`): bootstrap now uses `Start-Process -NoNewWindow -Wait -PassThru` instead of `& $InstallerPath @args`, forcing the installer `.exe` to inherit the parent PowerShell console. Previously, running `irm install.ps1 | iex` spawned a separate cmd window because PowerShell's pipeline context with `iex` triggered Windows console reallocation; that window closed on exit, hiding errors and prompts. The new invocation keeps all output in the operator's session.
@@ -500,6 +502,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.9.2]: https://github.com/valianx/team-harness/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/valianx/team-harness/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/valianx/team-harness/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/valianx/team-harness/compare/v2.7.0...v2.8.0
