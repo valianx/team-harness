@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-05-22
+
 ### Changed
 
 - `/th-update` rewritten to run inline in the agent (no Go installer launch). Resolves output-capture failure on Windows where the spawned installer console was unreadable; removes installer overhead (TTY prompts, MCP re-registration, "Press Enter to exit") that's irrelevant on update. The skill now downloads the release source tarball via `gh release download --archive=tar.gz`, extracts it, and copies files into `~/.claude/` using the documented mapping. Bootstrap install path (`install.sh` / `install.ps1` / `install.cmd` one-liners) is unchanged.
@@ -453,6 +455,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.5.0]: https://github.com/valianx/team-harness/compare/v2.4.1...v2.5.0
 [2.4.1]: https://github.com/valianx/team-harness/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/valianx/team-harness/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/valianx/team-harness/compare/v2.2.0...v2.3.0
