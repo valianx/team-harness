@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `/th-update` now always overwrites every team-harness file under `~/.claude/` — the `--force` flag is removed from the operator surface and always passed to the installer internally. The skill's purpose is "sync to released bytes," so conflict gating was friction rather than safety. Operators who customize agents should fork the repo or contribute upstream — local hand-edits to `~/.claude/agents/*.md` are out of scope.
+
 ## [2.4.0] - 2026-05-22
 
 <!-- The following entries accumulated in [Unreleased] across PR #26 / PR #27 / PR #28
