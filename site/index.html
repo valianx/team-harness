@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Harness — Spec-Driven Development for Claude Code</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0f0f12;
+      --surface:      #1a1a22;
+      --border:       #2a2a38;
+      --text:         #e2e2ef;
+      --muted:        #8888aa;
+      --accent:       #6c6cf0;
+      --accent-dim:   #3a3a80;
+      --pill-bg:      #252535;
+      --tag-out:      #1a3a2a;
+      --tag-out-text: #4dd898;
+      --tag-in:       #2a1a3a;
+      --tag-in-text:  #c084fc;
+      --radius:       8px;
+
+      /* role colors for agent pills */
+      --role-cyan:    #164040;
+      --role-cyan-t:  #4dd8d8;
+      --role-yellow:  #3a3010;
+      --role-yellow-t:#e2c860;
+      --role-orange:  #3a2010;
+      --role-orange-t:#f0944c;
+      --role-red:     #3a1010;
+      --role-red-t:   #f07070;
+      --role-blue:    #10203a;
+      --role-blue-t:  #70a0f0;
+      --role-green:   #0e2a18;
+      --role-green-t: #4dd898;
+      --role-purple:  #251035;
+      --role-purple-t:#c084fc;
+      --role-pink:    #35102a;
+      --role-pink-t:  #f090c0;
+      --role-magenta: #351030;
+      --role-magenta-t:#e070c0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── layout ─────────────────────────────────────────── */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    section {
+      padding: 48px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    section:last-of-type {
+      border-bottom: none;
+    }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    /* ── hero ───────────────────────────────────────────── */
+    #hero {
+      padding: 64px 0 48px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero-name {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .hero-tagline {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 10px;
+      max-width: 620px;
+      line-height: 1.7;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      padding: 3px 9px;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .badge-version {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .badge-license {
+      background: var(--tag-out);
+      color: var(--tag-out-text);
+      border: 1px solid #2a5a3a;
+    }
+
+    /* ── install ────────────────────────────────────────── */
+    .install-block {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .install-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .install-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 8px 14px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .install-row {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .install-code {
+      flex: 1;
+      padding: 12px 14px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: none;
+      border-left: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      padding: 0 14px;
+      transition: color 0.15s, background 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover {
+      color: var(--text);
+      background: var(--pill-bg);
+    }
+
+    .copy-btn.copied {
+      color: var(--tag-out-text);
+    }
+
+    /* ── what you get ───────────────────────────────────── */
+    .prose {
+      color: #c8c8e0;
+      font-size: 13px;
+      line-height: 1.8;
+      max-width: 680px;
+    }
+
+    .prose + .prose {
+      margin-top: 12px;
+    }
+
+    .inline-code {
+      color: var(--accent);
+      background: var(--pill-bg);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+
+    /* ── pipeline stages ────────────────────────────────── */
+    .stage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+
+    .stage-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 16px;
+    }
+
+    .stage-verb {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .stage-subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .stage-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── agent cards ────────────────────────────────────── */
+    .agent-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+    }
+
+    .agent-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .agent-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .agent-pill {
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      padding: 2px 7px;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .agent-desc {
+      font-size: 12px;
+      color: #c8c8e0;
+      line-height: 1.6;
+    }
+
+    /* ── skills chips ───────────────────────────────────── */
+    .skill-category {
+      margin-bottom: 28px;
+    }
+
+    .skill-category:last-child {
+      margin-bottom: 0;
+    }
+
+    .skill-category-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .chip {
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 4px;
+      padding: 3px 10px;
+      letter-spacing: 0.1px;
+      white-space: nowrap;
+    }
+
+    /* chip category colors */
+    .chip-planning    { background: #1a2a3a; color: #70a0f0; }
+    .chip-impl        { background: #2a1a10; color: #f0944c; }
+    .chip-validation  { background: #10203a; color: #70c0f0; }
+    .chip-delivery    { background: #0e2a18; color: #4dd898; }
+    .chip-utilities   { background: #251035; color: #c084fc; }
+    .chip-diagrams    { background: #3a2510; color: #e0b060; }
+
+    /* ── requirements ───────────────────────────────────── */
+    .req-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .req-list li {
+      position: relative;
+      padding-left: 16px;
+      font-size: 13px;
+      color: #c8c8e0;
+      line-height: 1.7;
+    }
+
+    .req-list li::before {
+      content: "·";
+      position: absolute;
+      left: 4px;
+      color: var(--muted);
+    }
+
+    .req-list a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .req-list a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── docs table ─────────────────────────────────────── */
+    .docs-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .docs-table tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .docs-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .docs-table td {
+      padding: 10px 8px;
+      vertical-align: top;
+    }
+
+    .docs-table td:first-child {
+      white-space: nowrap;
+      padding-right: 20px;
+    }
+
+    .docs-table a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .docs-table a:hover {
+      text-decoration: underline;
+    }
+
+    .docs-table .doc-desc {
+      color: var(--muted);
+    }
+
+    /* ── footer ─────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 0;
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .footer-inner a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .footer-inner a:hover {
+      color: var(--text);
+    }
+
+    .footer-commit {
+      font-family: inherit;
+      color: var(--accent-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── HERO ─────────────────────────────────────────── -->
+  <section id="hero">
+    <div class="container">
+      <div class="hero-name">team-harness</div>
+      <p class="hero-tagline">
+        An agent harness for Claude Code. Turns the chat into a Spec-Driven
+        Development pipeline with mandatory human gates and full state captured
+        as files so any session can resume from where the last one left off.
+      </p>
+      <div class="hero-badges">
+        <span class="badge badge-version">v2.3.0</span>
+        <span class="badge badge-license">MIT</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── INSTALL ──────────────────────────────────────── -->
+  <section id="install">
+    <div class="container">
+      <h2>Install</h2>
+      <div class="install-block">
+
+        <div class="install-item">
+          <div class="install-label">macOS / Linux / WSL</div>
+          <div class="install-row">
+            <code class="install-code" id="cmd-unix">curl -fsSL https://valianx.github.io/team-harness/install.sh | bash</code>
+            <button class="copy-btn" onclick="copyCmd('cmd-unix', this)">copy</button>
+          </div>
+        </div>
+
+        <div class="install-item">
+          <div class="install-label">Windows — PowerShell</div>
+          <div class="install-row">
+            <code class="install-code" id="cmd-ps1">irm https://valianx.github.io/team-harness/install.ps1 | iex</code>
+            <button class="copy-btn" onclick="copyCmd('cmd-ps1', this)">copy</button>
+          </div>
+        </div>
+
+        <div class="install-item">
+          <div class="install-label">Windows — cmd.exe</div>
+          <div class="install-row">
+            <code class="install-code" id="cmd-cmd">curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd</code>
+            <button class="copy-btn" onclick="copyCmd('cmd-cmd', this)">copy</button>
+          </div>
+        </div>
+
+      </div>
+      <p class="prose" style="margin-top:16px;">
+        The installer walks you through three prompts (Memory MCP URL, context7 API key,
+        install mode) and writes agents + skills + hooks into <span class="inline-code">~/.claude/</span>.
+        Restart Claude Code after install.
+        Full options and env-var setup in <a href="https://github.com/valianx/team-harness/blob/main/docs/install.md" style="color:var(--accent);">docs/install.md</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── WHAT YOU GET ─────────────────────────────────── -->
+  <section id="what-you-get">
+    <div class="container">
+      <h2>What you get</h2>
+      <p class="prose">
+        After install, 17 specialized agents and 31 slash commands are registered
+        in your <span class="inline-code">~/.claude/</span>. The system runs a full
+        Spec-Driven Development pipeline: intake, architecture design, implementation,
+        parallel test + validation, security review, acceptance check, and delivery —
+        all coordinated through session-docs files that persist across sessions.
+      </p>
+      <p class="prose" style="margin-top:12px;">
+        The front door is the orchestrator agent. Open Claude Code and type:
+      </p>
+      <div class="install-item" style="margin-top:14px; max-width:600px;">
+        <div class="install-row">
+          <code class="install-code" id="cmd-start">@orchestrator give me the work plan for this task: &lt;description&gt;</code>
+          <button class="copy-btn" onclick="copyCmd('cmd-start', this)">copy</button>
+        </div>
+      </div>
+      <p class="prose" style="margin-top:14px;">
+        The orchestrator opens a pipeline, stops for mandatory human approvals at each
+        stage gate, and picks up exactly where it left off after a restart via
+        <span class="inline-code">@orchestrator recover &lt;feature&gt;</span>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── PIPELINE ─────────────────────────────────────── -->
+  <section id="pipeline">
+    <div class="container">
+      <h2>Pipeline at a glance</h2>
+      <div class="stage-grid">
+
+        <div class="stage-card">
+          <div class="stage-verb">plan it</div>
+          <div class="stage-subtitle">Stage 1 — Analysis</div>
+          <p class="stage-desc">
+            Architect designs the solution, QA defines acceptance criteria, plan-reviewer
+            audits shape. A STAGE-GATE stops the pipeline for human review before any
+            code is written.
+          </p>
+        </div>
+
+        <div class="stage-card">
+          <div class="stage-verb">implement it</div>
+          <div class="stage-subtitle">Stage 2 — Implementation</div>
+          <p class="stage-desc">
+            Implementer writes production code. Tester, QA, and security agents verify
+            in parallel. Acceptance-checker performs a final spec-vs-delivered audit.
+            Iteration loops run automatically until all gates pass.
+          </p>
+        </div>
+
+        <div class="stage-card">
+          <div class="stage-verb">ship it</div>
+          <div class="stage-subtitle">Stage 3 — Delivery</div>
+          <p class="stage-desc">
+            Delivery agent writes the changelog, bumps the version, commits, and opens
+            the PR. A final STAGE-GATE asks for push approval. State is captured in the
+            Knowledge Graph for future tasks.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AGENTS ───────────────────────────────────────── -->
+  <section id="agents">
+    <div class="container">
+      <h2>Agents</h2>
+      <div class="agent-grid">
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">orchestrator</span>
+            <span class="agent-pill" style="background:var(--role-cyan);color:var(--role-cyan-t);">hub</span>
+          </div>
+          <p class="agent-desc">Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes from standalone skills. Manages session-docs as the shared board between agents.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">architect</span>
+            <span class="agent-pill" style="background:var(--role-yellow);color:var(--role-yellow-t);">planning</span>
+          </div>
+          <p class="agent-desc">Designs, evolves, and reviews software architecture for any project type (backend, frontend, or fullstack). Focuses on maintainability, security, performance, and accessibility. Produces architecture proposals, risk assessments, migration strategies, and technology research reports — never code.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">implementer</span>
+            <span class="agent-pill" style="background:var(--role-orange);color:var(--role-orange-t);">implementation</span>
+          </div>
+          <p class="agent-desc">Implements features by writing production code based on architecture proposals and acceptance criteria from session-docs. Follows project conventions, writes clean code, and reports what was built. Does not design architecture, write tests, or create documentation.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">tester</span>
+            <span class="agent-pill" style="background:var(--role-red);color:var(--role-red-t);">validation</span>
+          </div>
+          <p class="agent-desc">Designs and implements test suites for any project type (backend, frontend, or fullstack). Adapts to the project's test framework, ensures proper isolation, mocks external dependencies, and validates business logic, user interactions, and accessibility.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">qa</span>
+            <span class="agent-pill" style="background:var(--role-blue);color:var(--role-blue-t);">validation</span>
+          </div>
+          <p class="agent-desc">Validates implementations against acceptance criteria and defines AC for features when invoked standalone. Produces validation reports — never code.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">security</span>
+            <span class="agent-pill" style="background:var(--role-orange);color:var(--role-orange-t);">validation</span>
+          </div>
+          <p class="agent-desc">Performs comprehensive security audits on backend and frontend projects. Evaluates against OWASP Top 10, CWE Top 25, ASVS, and SANS Top 25. Detects vulnerabilities, hardcoded secrets, insecure configurations, auth flaws, and injection risks. Does not implement fixes or modify source code.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">acceptance-checker</span>
+            <span class="agent-pill" style="background:var(--role-pink);color:var(--role-pink-t);">validation</span>
+          </div>
+          <p class="agent-desc">External auditor that compares the original spec against the actual delivered artifacts. Detects drift between "what was asked" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the orchestrator uses to decide whether to proceed to Delivery. Read-only.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">plan-reviewer</span>
+            <span class="agent-pill" style="background:var(--role-magenta);color:var(--role-magenta-t);">validation</span>
+          </div>
+          <p class="agent-desc">Read-only auditor of Stage 1 analysis artifacts. Enforces plan-shape rules: one PR per service, per-PR acceptance criteria in Given/When/Then format, consolidated documents, cross-references, and service-identity coherence. Emits pass/concerns/fail verdict before STAGE-GATE-1.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">delivery</span>
+            <span class="agent-pill" style="background:var(--role-green);color:var(--role-green-t);">delivery</span>
+          </div>
+          <p class="agent-desc">Documents a completed feature, updates CHANGELOG and OpenAPI (if applicable), bumps the project version, creates a feature branch, commits, and pushes. Updates CLAUDE.md memory, project docs/ knowledge base, and README.md.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">reviewer</span>
+            <span class="agent-pill" style="background:var(--role-yellow);color:var(--role-yellow-t);">delivery</span>
+          </div>
+          <p class="agent-desc">Reviews pull requests on GitHub. Analyzes code quality, security, performance, and best practices. Leaves detailed review comments and approves or requests changes.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">agent-builder</span>
+            <span class="agent-pill" style="background:var(--role-purple);color:var(--role-purple-t);">utilities</span>
+          </div>
+          <p class="agent-desc">Designs and creates new Claude Code agents and slash commands. Applies best practices for system prompts, context management, memory, tool scoping, model selection, and output protocols. Always runs /lint after writing files.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">init</span>
+            <span class="agent-pill" style="background:var(--role-green);color:var(--role-green-t);">utilities</span>
+          </div>
+          <p class="agent-desc">Bootstraps Claude Code in any repository (backend, frontend, or fullstack). Discovers the tech stack, generates a CLAUDE.md with golden commands and subagent orchestration, and creates a CHANGELOG.md if missing.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">translator</span>
+            <span class="agent-pill" style="background:var(--role-green);color:var(--role-green-t);">utilities</span>
+          </div>
+          <p class="agent-desc">Discovers user-facing strings in any frontend codebase, builds a product-aware glossary, sets up i18n infrastructure, extracts strings into locale files, translates to target language, and replaces hardcoded strings with i18n keys. Works with any frontend framework.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">gcp-cost-analyzer</span>
+            <span class="agent-pill" style="background:var(--role-green);color:var(--role-green-t);">utilities</span>
+          </div>
+          <p class="agent-desc">Analyzes GCP infrastructure costs and resource utilization across all accessible projects. Inventories resources via Cloud Asset Inventory and gcloud CLI, pulls billing data, fetches Recommender API suggestions, and produces a structured cost report with prioritized optimization recommendations. Does not modify or delete any GCP resources.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">diagrammer</span>
+            <span class="agent-pill" style="background:var(--role-orange);color:var(--role-orange-t);">diagrams</span>
+          </div>
+          <p class="agent-desc">Generates Excalidraw diagrams from architect analysis. Reads the analysis, follows the excalidraw-diagram skill methodology, generates the .excalidraw JSON section-by-section, runs a render-validate loop until the diagram passes quality checks. Does not analyze codebases, write code, tests, or documentation.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">d2-diagrammer</span>
+            <span class="agent-pill" style="background:var(--role-orange);color:var(--role-orange-t);">diagrams</span>
+          </div>
+          <p class="agent-desc">Generates D2 diagrams from architect analysis. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does not analyze codebases, write code, tests, or documentation.</p>
+        </div>
+
+        <div class="agent-card">
+          <div class="agent-header">
+            <span class="agent-name">likec4-diagrammer</span>
+            <span class="agent-pill" style="background:var(--role-orange);color:var(--role-orange-t);">diagrams</span>
+          </div>
+          <p class="agent-desc">Generates LikeC4 architecture diagrams from architect analysis. Reads the analysis, follows the likec4-diagram skill methodology, generates the .c4 DSL incrementally, validates with CLI, and reports back. Does not analyze codebases, write code, tests, or documentation.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SKILLS ───────────────────────────────────────── -->
+  <section id="skills">
+    <div class="container">
+      <h2>Skills (slash commands)</h2>
+
+      <div class="skill-category">
+        <div class="skill-category-label">planning</div>
+        <div class="chip-list">
+          <span class="chip chip-planning">/plan</span>
+          <span class="chip chip-planning">/design</span>
+          <span class="chip chip-planning">/issue</span>
+          <span class="chip chip-planning">/define-ac</span>
+          <span class="chip chip-planning">/research</span>
+          <span class="chip chip-planning">/spike</span>
+          <span class="chip chip-planning">/init</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <div class="skill-category-label">implementation</div>
+        <div class="chip-list">
+          <span class="chip chip-impl">/recover</span>
+          <span class="chip chip-impl">/cross-repo</span>
+          <span class="chip chip-impl">/translate</span>
+          <span class="chip chip-impl">/gcp-costs</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <div class="skill-category-label">validation</div>
+        <div class="chip-list">
+          <span class="chip chip-validation">/test</span>
+          <span class="chip chip-validation">/test-pipeline</span>
+          <span class="chip chip-validation">/validate</span>
+          <span class="chip chip-validation">/security</span>
+          <span class="chip chip-validation">/audit</span>
+          <span class="chip chip-validation">/eval</span>
+          <span class="chip chip-validation">/lint</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <div class="skill-category-label">delivery</div>
+        <div class="chip-list">
+          <span class="chip chip-delivery">/deliver</span>
+          <span class="chip chip-delivery">/review-pr</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <div class="skill-category-label">utilities</div>
+        <div class="chip-list">
+          <span class="chip chip-utilities">/status</span>
+          <span class="chip chip-utilities">/trace</span>
+          <span class="chip chip-utilities">/memory</span>
+          <span class="chip chip-utilities">/tmux</span>
+          <span class="chip chip-utilities">/background</span>
+        </div>
+      </div>
+
+      <div class="skill-category">
+        <div class="skill-category-label">diagrams</div>
+        <div class="chip-list">
+          <span class="chip chip-diagrams">/diagram</span>
+          <span class="chip chip-diagrams">/d2-diagram</span>
+          <span class="chip chip-diagrams">/likec4-diagram</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── REQUIREMENTS ─────────────────────────────────── -->
+  <section id="requirements">
+    <div class="container">
+      <h2>Requirements</h2>
+      <ul class="req-list">
+        <li>
+          <strong>gh CLI</strong> — GitHub CLI used by <span class="inline-code">/issue</span>,
+          <span class="inline-code">/review-pr</span>, <span class="inline-code">/deliver</span>,
+          and others. Install at <a href="https://cli.github.com/">cli.github.com</a>.
+        </li>
+        <li>
+          <strong>context7 API key</strong> — for library docs retrieval.
+          The installer prompts for it or reads <span class="inline-code">CONTEXT7_API_KEY</span>
+          from the environment. Get one at
+          <a href="https://context7.com/">context7.com</a>.
+        </li>
+        <li>
+          <strong>Memory MCP URL</strong> — public URL of a running MCP-compatible server
+          (e.g., <a href="https://github.com/valianx/context-harness-mcp">context-harness-mcp</a>
+          deployed to Railway, Render, Fly, or Docker). The installer prompts for it
+          or reads <span class="inline-code">MEMORY_MCP_URL</span> from the environment.
+          No default — empty input is rejected. See
+          <a href="https://github.com/valianx/team-harness/blob/main/docs/install.md">docs/install.md</a>
+          for details.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── DOCUMENTATION ────────────────────────────────── -->
+  <section id="documentation">
+    <div class="container">
+      <h2>Documentation</h2>
+      <table class="docs-table">
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/docs/how-it-works.md">How it works</a></td>
+            <td class="doc-desc">Pipeline walkthrough, why a harness, what ships</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/docs/install.md">Installation guide</a></td>
+            <td class="doc-desc">Modes, env vars, --force, from source, updating</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/agents/README.md">Agents &amp; low-cost matrix</a></td>
+            <td class="doc-desc">Full agent roster, model/effort matrix, low-cost mode</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/CLAUDE.md">Configuration reference</a></td>
+            <td class="doc-desc">Architectural conventions, working agreements, subagent routing</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/docs/contributing.md">Contributing</a></td>
+            <td class="doc-desc">Working agreements, testing, release process</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/docs/kg-content-policy.md">Knowledge graph policy</a></td>
+            <td class="doc-desc">What goes in the Memory MCP (and what doesn't)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ───────────────────────────────────────── -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <span>
+          <a href="https://github.com/valianx/team-harness">github.com/valianx/team-harness</a>
+          &nbsp;·&nbsp; MIT © 2026 Mario Gutierrez
+        </span>
+        <span>
+          v2.3.0
+          &nbsp;·&nbsp;
+          <span class="footer-commit">d75ba29</span>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      function copyCmd(id, btn) {
+        var el = document.getElementById(id);
+        var text = el.textContent;
+        navigator.clipboard.writeText(text).then(function () {
+          var orig = btn.textContent;
+          btn.textContent = 'copied';
+          btn.classList.add('copied');
+          setTimeout(function () {
+            btn.textContent = orig;
+            btn.classList.remove('copied');
+          }, 1800);
+        }).catch(function () {
+          /* clipboard API unavailable — silently ignore */
+        });
+      }
+      window.copyCmd = copyCmd;
+    })();
+  </script>
+
+</body>
+</html>
