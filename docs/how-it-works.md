@@ -4,9 +4,28 @@ Team-harness turns Claude Code into a Spec-Driven Development pipeline. Every fe
 
 ---
 
+## Entry point: the orchestrator
+
+**The `orchestrator` agent is the canonical front door for every workflow.** You drive the entire lifecycle by talking to it conversationally — design, implementation, delivery, recovery all enter through the same agent. Examples:
+
+```
+@orchestrator tenemos una tarea, diseñá <descripción>
+@orchestrator implementala
+@orchestrator lanza el PR
+@orchestrator recuperá <feature>
+```
+
+The orchestrator's intent-detection step (Step 6 of its contract in `agents/orchestrator.md`) classifies your natural-language request and dispatches to the right phase or direct mode — design, implementation, verify, delivery, plan-review, validate, deliver, research, etc.
+
+**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/status` exist and work, but they all route into the same orchestrator agent under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@orchestrator` path covers everything.
+
+Pick whichever feels more natural. The rest of this doc uses the orchestrator-conversational form.
+
+---
+
 ## The pipeline
 
-You type `/design add a daily reports endpoint`.
+You tell the orchestrator: `@orchestrator tenemos una tarea, diseñá un endpoint de daily reports`.
 
 ### Stage 1 — Analysis
 

@@ -237,6 +237,8 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 ## 13. Subagent Orchestration
 
+**The `orchestrator` agent is the canonical entry point for every development workflow.** Operators drive the pipeline by talking to it conversationally (`@orchestrator diseñá X`, `@orchestrator implementala`, `@orchestrator lanza el PR`) and the orchestrator's Step 6 intent-detection classifies the request and dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route into the same orchestrator under the hood — they give a deterministic entry without the intent-detection step plus a few extras (e.g., `/design #N` fetches a GitHub issue automatically), but the orchestrator-conversational path covers every workflow. Treat the orchestrator as the single front door; do not surface slash commands as "the better way" to operators who prefer chat.
+
 Routing table for this repo:
 
 | Intent | Subagent | Output |
