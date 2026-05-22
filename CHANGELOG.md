@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-05-22
+
 ### Added
 
 - **Bug-fix Pipeline**: dedicated flow for `type: fix` and `type: hotfix` that produces the full session-docs artifact set (same backbone as feature flow), with new artifacts `01-root-cause.md` (architect's focused root-cause analysis, 1pg max) and `02-regression-test.md` (tester's failing test authored BEFORE implementer runs). plan-reviewer gains Rules 7 + 8 for regression-test gating. Implementer enforces scope discipline (zero tangential refactors). Type-classified by intent triggers from v2.8.0; operator-facing surface is unchanged (no new slash command — `/hotfix` deferred to v2). Pipelines are **tier-classified (1-4)** based on bug content keywords, impacted file paths, and operator override. Tier 1 (docs/trivial) skips the architect and conditionally skips the pre-fix regression test when no behavior change (touched paths limited to `*.md` / `LICENSE` / `CHANGELOG*` / comments / non-functional strings, no `*.test.*` paths, no `[regression-test: required]` declaration); Tier 2 (light) uses inline root-cause + tester + qa; Tier 3 (standard, default) is the full pipeline + security; Tier 4 (critical/security) adds mandatory memory prior-art query (`mcp__memory__search_nodes`) and extended security analysis (adjacent-code surface beyond the diff). Auto-escalation favors high-tier signals: any fix touching a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) lands at Tier 3+ regardless of operator hint. Architect can re-tier mid-flow via `tier_promote` + `tier_promote_rationale` with operator confirmation (same protocol as `type_reclassify`). Operator can override via `[TIER: N]`, `[regression-test: required]`, or `[security: required]` markers. The "security runs always for bugs" rule from the initial PR #50 design is preserved for Tier 3+; Tier 1 / Tier 2 fixes skip security because the auto-escalation rule guarantees sensitive paths always land at Tier 3+ at classification time.
@@ -487,6 +489,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.9.0]: https://github.com/valianx/team-harness/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/valianx/team-harness/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/valianx/team-harness/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/valianx/team-harness/compare/v2.5.1...v2.6.0
