@@ -1,4 +1,4 @@
-Re-run the team-harness installer to pull the latest agents, skills, and hooks from the most recent GitHub Release. This is a standalone utility — does NOT route through the orchestrator.
+Pull the latest team-harness release into `~/.claude/` inline, without launching the Go installer binary. This is a standalone utility — does NOT route through the orchestrator.
 
 Analyze the input: $ARGUMENTS
 
@@ -6,110 +6,167 @@ Analyze the input: $ARGUMENTS
 
 ## What this skill does
 
-1. Detect the host OS.
-2. Run the team-harness installer one-liner for that OS, always forwarding `--force` so every team-harness file under `~/.claude/` is overwritten with the bytes from the latest release.
-3. Capture the installer output (categorised as `installed` / `updated` / `unchanged`).
-4. Render a concise summary back to the operator with the file counts.
-5. End with the literal restart reminder.
+The skill drives the update directly from inside this Claude Code session using `Bash`, `Read`, `Write`, `Edit`, and `Glob`. It downloads the source tarball of the latest GitHub Release, extracts it to a temp directory, and copies the asset files into `~/.claude/` using the canonical mapping below. No separate process is spawned, so the entire summary and any errors stay in the same conversation transcript.
 
-The skill is intentionally destructive: it always overwrites. Local edits to files under `~/.claude/agents/`, `~/.claude/commands/`, `~/.claude/skills/`, and `~/.claude/hooks/` that originate from team-harness will be replaced. Source-level customizations belong in the team-harness repo and reach the operator via a new release, not via hand-edits in `~/.claude/`. The `MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, and `CONTEXT7_API_KEY` values are preserved from the existing `~/.claude.json` regardless. This skill never prompts the operator interactively.
+This is the canonical update path. The Go installer (`install.sh` / `install.ps1` / `install.cmd` one-liners) remains the bootstrap path for first-time installs only — it handles MCP server registration, TTY-driven credential prompts, manifest write, and the "Press Enter to exit" prompt that are irrelevant once the operator is already running team-harness.
+
+The skill is intentionally destructive: it always overwrites every file it touches. Local edits to team-harness files under `~/.claude/agents/`, `~/.claude/commands/`, `~/.claude/skills/`, and `~/.claude/hooks/` will be replaced with the bytes from the release tarball. Source-level customizations belong in the team-harness repo and reach the operator via a new release, not via hand-edits in `~/.claude/`. No `--force` flag is exposed because no other mode is possible.
 
 ---
 
 ## Argument parsing
 
-This skill accepts no flags. `$ARGUMENTS` is ignored. If the operator passed any token, print the supported usage and continue with the standard run.
-
-```
-Usage: /th-update
-  (no flags — the skill always overwrites)
-```
+This skill accepts no arguments. `$ARGUMENTS` is ignored.
 
 ---
 
-## OS detection
+## Pre-flight checks
 
-Run this detection first. The result picks the right one-liner.
+Before any download, verify the required CLI tools are available. If a check fails, print the error verbatim and stop — do not fall back to alternative tools.
+
+1. **`gh` is installed.** Run `gh --version`. If the command is not found, print:
+   ```
+   gh (GitHub CLI) is required but not installed.
+   Install instructions: https://cli.github.com/
+   ```
+   and stop.
+
+2. **`tar` is available.** Run `tar --version`. If the command is not found, print:
+   ```
+   tar is required but not found. tar ships with Windows 10+ and all macOS/Linux installs.
+   Please install or upgrade.
+   ```
+   and stop.
+
+---
+
+## Step 1 — Resolve the latest release tag
+
+Run:
 
 ```bash
-if [ -f /proc/version ] && grep -qi microsoft /proc/version 2>/dev/null; then
-  echo "ENV:WSL"
-elif [ "$(uname -s)" = "Linux" ] || [ "$(uname -s)" = "Darwin" ]; then
-  echo "ENV:NIX"
-elif command -v wsl.exe >/dev/null 2>&1 || [ "$OS" = "Windows_NT" ]; then
-  echo "ENV:WIN"
-else
-  echo "ENV:NIX"
-fi
+gh api repos/valianx/team-harness/releases/latest -q .tag_name
 ```
 
-| Result | Installer one-liner |
-|---|---|
-| `ENV:NIX` or `ENV:WSL` | bash via curl pipe with `--force` |
-| `ENV:WIN` | PowerShell scriptblock form with `--force` |
+Capture the tag string (e.g., `v2.5.0`). If the command exits non-zero, print the stderr verbatim and stop. Do not retry.
+
+Store the tag for use in subsequent steps.
 
 ---
 
-## Running the installer
+## Step 2 — Create a temp directory
 
-### Unix, macOS, WSL (`ENV:NIX` / `ENV:WSL`)
+Run:
 
 ```bash
-curl -fsSL https://valianx.github.io/team-harness/install.sh | bash -s -- --force
+tmpdir=$(mktemp -d -t th-update-XXXXXX 2>/dev/null || mktemp -d)
 ```
 
-### Windows PowerShell (`ENV:WIN`)
-
-`iex` cannot forward arguments, so the installer is read into a scriptblock and invoked with `--force` as a positional argument; the bootstrap forwards it to the embedded Go installer via `& $InstallerPath @args`.
-
-```powershell
-& ([scriptblock]::Create((irm https://valianx.github.io/team-harness/install.ps1))) --force
-```
-
-Capture stdout and stderr from the chosen invocation.
+This works on Linux, macOS, and Windows under Git Bash. Capture the path for use in later steps. If `mktemp` fails, print the error and stop.
 
 ---
 
-## Parsing the installer output
+## Step 3 — Download the source tarball
 
-The installer prints a `Summary:` block with the relevant counted buckets:
+Run:
 
-```
-Summary:
-  installed: N
-  updated:   N
-  unchanged: N
+```bash
+gh release download <tag> --repo valianx/team-harness --archive=tar.gz --output "$tmpdir/repo.tgz"
 ```
 
-The `conflicts: N` line is always `0` for this skill because `--force` is always set. If it appears non-zero (installer regression), surface it verbatim — do not hide it.
-
-Extract the integer counts from the `Summary:` block.
+Substitute `<tag>` with the value captured in Step 1. If the command exits non-zero (network error, missing release asset, auth failure), print stderr verbatim and stop.
 
 ---
 
-## Operator-facing summary
+## Step 4 — Extract the tarball
 
-Render the following block to the operator. Use declarative facts, no emoji, no enthusiasm.
+Run:
+
+```bash
+tar -xzf "$tmpdir/repo.tgz" -C "$tmpdir"
+```
+
+The archive expands to a single folder named `team-harness-<tag-without-v>/` inside `$tmpdir` (GitHub's convention for source tarballs).
+
+Resolve the extracted folder dynamically — do not hardcode the name:
+
+```bash
+extracted=$(find "$tmpdir" -maxdepth 1 -mindepth 1 -type d | head -n 1)
+```
+
+If `extracted` is empty after the tar succeeds, print "extraction produced no directory under $tmpdir" and stop.
+
+---
+
+## Step 5 — Copy files using the canonical mapping
+
+The mapping below mirrors the Go installer's file selection (`cmd/install/files.go` + `cmd/install/main.go`) with one deliberate override: `hooks/config.json` is never written by this skill (operators merge it into `~/.claude/settings.json` manually — see CLAUDE.md §4).
+
+Track per-category counters as you go, incrementing only when a file is actually written. The counters drive the operator-facing summary.
+
+**Mapping (in order):**
+
+1. **Agents** — every `agents/*.md` file in the extracted tree, except `README.md`, is copied to `~/.claude/agents/<filename>`. Includes `ref-direct-modes.md` and `ref-special-flows.md`. Ensure `~/.claude/agents/` exists first (`mkdir -p`). Increment `agents_count` for each file written.
+
+2. **Simple skills** — every top-level `skills/*.md` file in the extracted tree, except `README.md`, is copied to `~/.claude/commands/<filename>`. Ensure `~/.claude/commands/` exists first. Increment `simple_skills_count` for each file written.
+
+3. **Complex skills** — every subdirectory under `skills/` that contains a `SKILL.md` is copied recursively (preserving subfolder structure) to `~/.claude/skills/<dirname>/`. Use `cp -r` (or the equivalent loop with `mkdir -p` + per-file copy on Windows). Increment `complex_skills_count` once per top-level subdirectory copied — not once per inner file. Detection: list directories under `skills/` and check for the presence of `SKILL.md` inside each.
+
+4. **Hooks** — every `hooks/*.sh` file in the extracted tree is copied to `~/.claude/hooks/<filename>`. Ensure `~/.claude/hooks/` exists first. On Linux and macOS, set the executable bit (`chmod +x`); on Windows, no chmod is required. Increment `hooks_count` for each file written. **Do NOT copy `hooks/config.json`** — that file stays under operator control.
+
+**File-copy failure handling.** If any individual copy fails (permission denied, disk full, source not found after extraction), print the failing source path and destination path and stop. Do not roll back files already written; report counters as they stood at the failure.
+
+---
+
+## Step 6 — Files explicitly NOT touched
+
+- `~/.claude.json` — MCP server registration (memory, context7) is owned by the bootstrap installer. The update skill never modifies this file.
+- `~/.claude/.claude-dev-team-manifest.json` — the manifest is owned by the Go installer's conflict-detection logic. The update skill never writes it. Side effect: the bootstrap installer's next run may report many files as `conflict` because the manifest's recorded hashes drift away from what is on disk. That is expected and harmless — `/th-update` is the canonical update path and the conflict-gating is bypassed by construction here, the same destructive semantics already documented in CLAUDE.md §3 ("This skill always overwrites").
+- `~/.claude/settings.json` — the operator's hook wiring choice. Never touched.
+- `hooks/config.json` from the release tarball — never copied (see Step 5).
+
+---
+
+## Step 7 — Clean up the temp directory
+
+Run:
+
+```bash
+rm -rf "$tmpdir"
+```
+
+If the cleanup fails, print a one-line warning (`temp directory cleanup failed at $tmpdir`) and continue — do not stop the skill. The summary still renders.
+
+---
+
+## Step 8 — Render the operator-facing summary
+
+After every successful copy, print this block exactly as shown (no emoji, no enthusiasm markers, no first-person prose):
 
 ```
 team-harness update
 -------------------
-installed: N
-updated:   N
-unchanged: N
+release:  <tag>
+agents:   <agents_count>
+skills:   <simple_skills_count + complex_skills_count> (<simple_skills_count> simple, <complex_skills_count> complex)
+hooks:    <hooks_count>
 ```
 
-If the installer exited non-zero (download failure, network error, missing release), surface the literal error from stderr instead of the summary block:
+Substitute the tag captured in Step 1 and the counters tracked in Step 5.
+
+If the skill stopped on an error before reaching this step, print the failure block instead:
 
 ```
 team-harness update failed
 --------------------------
-{stderr verbatim}
+<error message verbatim from the failing step>
 ```
+
+Include the counters that were already incremented so the operator knows how far the update got before the failure.
 
 ---
 
-## Closing line (mandatory)
+## Step 9 — Closing line (mandatory)
 
 After the summary block, emit this exact sentence as the final line of the response:
 
@@ -117,15 +174,16 @@ After the summary block, emit this exact sentence as the final line of the respo
 Restart Claude Code to load the new agents and skills.
 ```
 
-No emoji, no leading marker, no rephrasing.
+No emoji, no leading marker, no rephrasing. Print this even on a partial-failure summary — the operator may have a partially-updated install and the restart still applies to whatever was written.
 
 ---
 
 ## Important
 
 - This skill does NOT route through the orchestrator.
-- This skill does NOT prompt the operator interactively — the installer's preservation logic carries the existing `MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, and `CONTEXT7_API_KEY` values across updates.
-- This skill does NOT compare versions or print a "you have X, latest is Y" line — the installer itself reports unchanged vs updated counts; that is the source of truth.
+- This skill does NOT launch the Go installer binary, `install.sh`, `install.ps1`, or `install.cmd`. The previous version of this skill did, and the binary's output was unreadable to the agent because the binary ran in a separate process (a new console window on Windows). This skill drives the update entirely inline so the summary and any errors stay in the agent's transcript.
+- This skill does NOT prompt the operator interactively. There are no credentials to capture — `MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, and `CONTEXT7_API_KEY` were already written to `~/.claude.json` during the original bootstrap install and are not touched here.
+- This skill does NOT compare versions or print a "you have X, latest is Y" line. The operator gets the release tag back; if they need to compare against their installed version, they read `~/.claude/.claude-dev-team-manifest.json` themselves.
 - This skill does NOT write to `session-docs/`.
-- The only operator-visible state mutation comes from the installer itself, which writes under `~/.claude/`.
+- This skill does NOT retry on network failure. The agent surfaces the error and the operator re-invokes `/th-update` when their connection is back.
 - The skill always overwrites. Operators who customize agents should fork the repo or contribute upstream — local edits to `~/.claude/agents/*.md` are explicitly out of scope.

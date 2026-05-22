@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `/th-update` rewritten to run inline in the agent (no Go installer launch). Resolves output-capture failure on Windows where the spawned installer console was unreadable; removes installer overhead (TTY prompts, MCP re-registration, "Press Enter to exit") that's irrelevant on update. The skill now downloads the release source tarball via `gh release download --archive=tar.gz`, extracts it, and copies files into `~/.claude/` using the documented mapping. Bootstrap install path (`install.sh` / `install.ps1` / `install.cmd` one-liners) is unchanged.
+
 ## [2.4.1] - 2026-05-22
 
 ### Changed
