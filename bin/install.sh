@@ -54,4 +54,5 @@ fi
 chmod +x "$TMP/install"
 
 echo "Launching installer..."
-exec "$TMP/install" "$@"
+"$TMP/install" "$@"
+exit $?

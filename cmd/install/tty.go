@@ -40,6 +40,23 @@ func isTerminal() bool {
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
+// hasInteractiveInput returns true when an interactive prompt can be shown
+// to the operator — either stdin is a TTY, or /dev/tty is accessible as
+// a fallback input source (Unix curl | bash case). Returns false only
+// when neither is available (CI, container without controlling tty,
+// systemd service contexts).
+func hasInteractiveInput() bool {
+	if isTerminal() {
+		return true
+	}
+	// Try /dev/tty — same path openInteractiveInput uses.
+	if f, err := openTTYDevice(); err == nil {
+		_ = f.Close()
+		return true
+	}
+	return false
+}
+
 // newScanner constructs a bufio.Scanner from r with a buffer large enough
 // for typical interactive input lines (up to 64 KiB — handles very long
 // bearer tokens and URL values without truncation).

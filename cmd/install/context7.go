@@ -26,7 +26,9 @@ func getContext7APIKey() string {
 	if !forceFlag && isValidContext7Key(existingKey) {
 		// Non-interactive (CI / scripted re-installs): preserve silently
 		// unless env explicitly overrides with a different value.
-		if !isTerminal() {
+		// hasInteractiveInput also checks /dev/tty so curl | bash users
+		// (stdin is a pipe but /dev/tty is available) reach the prompt.
+		if !hasInteractiveInput() {
 			if envKey != "" && envKey != existingKey {
 				fmt.Println("  context7 API key: existing key differs from env; using env (non-interactive).")
 				return envKey
@@ -65,10 +67,28 @@ func getContext7APIKey() string {
 			if choice == "y" {
 				return existingKey
 			}
-			// Fall through to the manual paste prompt below.
+			// Operator explicitly chose Change. Skip the env var check so the prompt
+			// always fires interactively — they want to replace the value with what
+			// they paste, not silently inherit CONTEXT7_API_KEY.
+			input := openInteractiveInput()
+			if input == nil {
+				fmt.Fprintln(os.Stderr, "Error: Change selected but no interactive input source is available.")
+				os.Exit(1)
+			}
+			defer input.Close()
+			scan := bufio.NewScanner(input)
+			fmt.Println("  Paste the replacement context7 API key (get one at https://context7.com/).")
+			fmt.Print("  CONTEXT7_API_KEY: ")
+			key := strings.TrimSpace(readLineFrom(scan))
+			if key == "" {
+				fmt.Fprintln(os.Stderr, "Error: empty API key.")
+				os.Exit(1)
+			}
+			return key
 		}
 
-		// Reached only via [C]ustom in either of the two prompts above.
+		// Reached only via [C]ustom in the three-way prompt above
+		// (env var present and different).
 		fmt.Println("  Paste the replacement context7 API key (get one at https://context7.com/).")
 		fmt.Print("  CONTEXT7_API_KEY: ")
 		key := strings.TrimSpace(readLine())

@@ -153,3 +153,28 @@ func TestOpenInteractiveInput_StdinIsNopCloser(t *testing.T) {
 		t.Errorf("Close on NopCloser returned error: %v", err)
 	}
 }
+
+// TestHasInteractiveInput_FalseInTestRunner verifies that hasInteractiveInput
+// returns false in a standard CI / test-runner context where stdin is a pipe
+// and /dev/tty is unavailable. The function returns true only when either
+// condition holds; in a normal test run neither does.
+//
+// When the test runs in an environment where /dev/tty IS accessible (e.g., a
+// developer running go test directly from an interactive terminal with a
+// controlling tty), the function correctly returns true and the test is skipped
+// — that path is the valid curl | bash case, not a failure.
+func TestHasInteractiveInput_FalseInTestRunner(t *testing.T) {
+	if isTerminal() {
+		t.Skip("stdin is a TTY in this environment; hasInteractiveInput returns true (correct)")
+	}
+	// Attempt /dev/tty: if it opens, we have a controlling tty and the result
+	// is true — skip rather than fail, because the behavior is correct.
+	if f, err := openTTYDevice(); err == nil {
+		_ = f.Close()
+		t.Skip("/dev/tty accessible (test run has a controlling terminal); hasInteractiveInput returns true (correct)")
+	}
+	// Neither stdin TTY nor /dev/tty: hasInteractiveInput must return false.
+	if hasInteractiveInput() {
+		t.Error("hasInteractiveInput() = true, want false in non-interactive test runner")
+	}
+}
