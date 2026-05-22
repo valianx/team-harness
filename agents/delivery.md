@@ -113,11 +113,9 @@ If everything passes, continue to Step 1.
 
 ### Step 2 — Detect GitHub issue
 
-Check `session-docs/{feature-name}/00-task-intake.md` for a `## GitHub Issue` section. If found, extract the **issue number** and fetch its metadata:
+Check `session-docs/{feature-name}/00-task-intake.md` for a `## GitHub Issue` section. If found, extract the **issue number** and fetch its metadata.
 
-```
-gh issue view {number} --json number,title,labels,assignees,projectItems
-```
+**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Run the detection probe first (sets `has_gh` flag used in Step 2b). Use `gh issue view {number} --json number,title,labels,assignees,projectItems` when `has_gh=true`; fall back to curl or the local-file escape hatch when `has_gh=false`.
 
 You will use this to:
 - Include it in the branch name (Step 3)
@@ -129,18 +127,23 @@ If no GitHub issue section exists, proceed without — this is not an error.
 
 ### Step 2b — Detect remote availability
 
-Check if the repo has a remote and GitHub CLI is configured:
+Run the standard detection probe from `agents/_shared/gh-fallback.md` § "Detection probe" to set `has_gh`, then check for a remote:
 
 ```bash
-git remote get-url origin 2>/dev/null && echo "HAS_REMOTE" || echo "NO_REMOTE"
-gh auth status 2>/dev/null && echo "HAS_GH" || echo "NO_GH"
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  has_gh=true
+else
+  has_gh=false
+fi
+origin_url="$(git remote get-url origin 2>/dev/null)"
+if [ -n "$origin_url" ]; then has_remote=true; else has_remote=false; fi
 ```
 
 Set internal flags:
 - `has_remote: true/false` — controls push behavior (Step 10)
-- `has_gh: true/false` — controls PR creation (Step 11)
+- `has_gh: true/false` — controls PR creation (Step 11); also used to choose between `gh` and curl/escape-hatch in Steps 2, 3, and 11
 
-These flags affect Steps 3, 10, and 11. All other steps run identically.
+These flags affect Steps 2, 3, 10, and 11. All other steps run identically.
 
 ### Step 3 — Create or validate feature branch
 
@@ -151,15 +154,18 @@ These flags affect Steps 3, 10, and 11. All other steps run identically.
 
 **Step 3.2 — If on a feature/fix/hotfix branch, check its PR state:**
 
+**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — list open PRs for a branch".
+
 If `has_gh: true`:
 ```
 gh pr list --head {current-branch} --base main --state all --json number,state -q '.[0]'
 ```
+If `has_gh: false` and `is_github=true` (parsed from `origin_url` in Step 2b) → use the curl Tier A fallback from the shared snippet.
 - If PR state is `MERGED` or `CLOSED` → this branch was already delivered. **Do NOT reuse it.** Go to Step 3.3 to create a new branch.
 - If PR state is `OPEN` → the branch has an active PR. Use it as-is (new commits will update the existing PR).
 - If **no PR exists** → branch is fresh. Use it as-is.
 
-If `has_gh: false` → skip PR check. Use the current branch as-is if it's a feature branch.
+If `has_gh: false` and `is_github=false` → skip PR check. Use the current branch as-is if it's a feature branch.
 
 **Step 3.3 — Create a new branch** (when on `main`, or when current branch has a merged/closed PR):
 - If `has_remote: true`: ensure you're on latest main: `git checkout main && git pull --ff-only origin main`
@@ -510,16 +516,21 @@ Do NOT stage unrelated files.
 
 ### Step 11 — Create or Update Pull Request (skip if no remote)
 
-**If `has_remote: false` or `has_gh: false`:** skip this entire step. Report the branch name and suggest manual merge instead. Jump to session documentation.
+**If `has_remote: false`:** skip this entire step. Report the branch name and suggest manual merge instead. Jump to session documentation.
+
+**If `has_gh: false`:** do NOT skip. Use the Tier B fallback chain from `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When neither `gh` nor a token is available, emit the compare URL and body file and report `status: blocked-manual-push` (see Return Protocol).
 
 **Always target `main`.**
 
 **Step 11.0 — Check for existing PR:**
 
+**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — list open PRs for a branch".
+
 Check if a PR already exists for the current branch:
 ```
 gh pr list --head {branch-name} --base main --state all --json number,url,title,state -q '.[0]'
 ```
+When `has_gh=false` and `is_github=true`, use the curl fallback from the shared snippet. When neither is available, assume no PR exists and proceed to Step 11.1.
 
 - If an **open PR** exists → go to Step 11.3 (update it)
 - If a **merged/closed PR** exists → this should NOT happen if Step 3 ran correctly. Report `status: failed` with message: "Branch {branch-name} has a merged/closed PR #{number}. A new branch should have been created in Step 3." Do NOT create or update any PR.
@@ -527,11 +538,16 @@ gh pr list --head {branch-name} --base main --state all --json number,url,title,
 
 **Step 11.1 — Gather PR metadata (only for new PRs):**
 
-1. **Labels:** If a GitHub issue was detected in Step 2, read its labels: `gh issue view {number} --json labels -q '.labels[].name'`. Use those same labels on the PR. If no issue, detect the type from the feature context and use matching labels from the repo (`gh label list --json name -q '.[].name'`).
+1. **Labels:** If a GitHub issue was detected in Step 2, read its labels.
+   - **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue" and § "Tier A — list repo labels".
+   - When `has_gh=true`: `gh issue view {number} --json labels -q '.labels[].name'`.
+   - When `has_gh=false`: use the curl Tier A fallback for the issue endpoint, or `gh label list` curl fallback. If neither is available, infer labels from the feature type context.
 
-2. **Project board:** Detect the repo's project board: `gh project list --format json | head -1`. Extract the project number. If no project exists, skip.
+2. **Project board:** Detect the repo's project board — **Tier D**, see `agents/_shared/gh-fallback.md` § "Tier D — project board ops".
+   - When `has_gh=true`: `gh project list --format json | head -1`.
+   - When `has_gh=false`: log "Project board: skipped — gh CLI unavailable" and proceed without the project number.
 
-3. **Assignee:** The PR author is always the current user (`@me`).
+3. **Assignee:** The PR author is always the current user (`@me`). Omit `--assignee` flag when using the curl fallback (the token user is the assignee implicitly).
 
 **Step 11.2 — Create the PR:**
 
@@ -547,6 +563,8 @@ The PR body MUST include every section listed below, in this order. Sections mar
 | **`hotfix`** | **`fix({area}): {imperative summary} (hotfix)`** | `fix(auth): bypass on empty token (hotfix)` |
 
 The `{area}` is the kebab-case module/service name (e.g., `auth`, `date-range`, `payment-webhook`). The title length cap is 72 characters. The `(hotfix)` suffix signals urgency to the reviewer.
+
+**Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create a PR". When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, write the PR body to `session-docs/{feature}/inputs/pr-body.md`, emit the compare URL and instructions, and report `status: blocked-manual-push` (see Return Protocol). The pipeline resumes when the operator replies `pr opened #N`.
 
 ```
 gh pr create --base main \
@@ -628,7 +646,7 @@ EOF
 
 **Step 11.3 — Update existing PR (when Step 11.0 found an open PR):**
 
-Update the existing PR's body with the same complete template as Step 11.2 (Main change / File map / How to review / Risk and blast radius / Before-After / Acceptance Matrix / Definition of Done / Pre-PR Review / Size justification / Version). The reviewer's expectations don't change between fresh and updated PRs — the body must always be navigable.
+Update the existing PR's body with the same complete template as Step 11.2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — edit an existing PR". When `has_gh=false` and a token + GitHub origin are available, use the curl PATCH fallback. When neither is available, emit the URL for the operator to update manually.
 
 ```
 gh pr edit {pr-number} \
@@ -849,10 +867,25 @@ When invoked by the th-orchestrator via Task tool, your **FINAL message** must b
 
 ```
 agent: delivery
-status: success | failed | blocked
+status: success | failed | blocked | blocked-manual-push
 output: session-docs/{feature-name}/05-delivery.md
 summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections updated}
 issues: {list of blockers, or "none"}
 ```
+
+**`status: blocked-manual-push`** — emitted when the Tier B fallback (Step 11.2) cannot create the PR automatically because `gh` is unavailable, no `$GH_TOKEN` / `$GITHUB_TOKEN` is set, or the remote is not a GitHub origin. Add these fields when reporting this status:
+
+```
+agent: delivery
+status: blocked-manual-push
+output: session-docs/{feature-name}/05-delivery.md
+manual_action_required: true
+manual_action_file: session-docs/{feature-name}/inputs/pr-body.md
+manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1
+summary: PR not created automatically (gh unavailable). Operator paste required.
+issues: none
+```
+
+The th-orchestrator pauses and waits for the operator to reply `pr opened #N`. On continue, the pipeline re-probes the PR number with a Tier A read and records it in `00-state.md`.
 
 Do NOT repeat the full session-docs content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.

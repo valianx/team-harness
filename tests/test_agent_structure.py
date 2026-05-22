@@ -2981,8 +2981,23 @@ check(
     "main.go still calls requireCLI for gh — must downgrade to warnCLI",
 )
 
-# Checks 11-15 (consumer cross-references) are added in their
-# respective PRs (PR-3 through PR-6) where the actual changes land.
+# (11) delivery.md references the shared snippet (added in PR-3).
+_delivery_fallback = read(AGENTS_DIR / "delivery.md")
+check(
+    "agents/delivery.md references agents/_shared/gh-fallback.md",
+    "agents/_shared/gh-fallback.md" in _delivery_fallback,
+    "delivery.md does not cross-reference the shared gh-fallback snippet",
+)
+
+# (12) delivery.md declares 'blocked-manual-push' as a valid status value (added in PR-3).
+check(
+    "agents/delivery.md declares 'blocked-manual-push' status value",
+    "blocked-manual-push" in _delivery_fallback,
+    "delivery.md does not declare the blocked-manual-push status value",
+)
+
+# Checks 13-15 (issue.md, review-pr.md, th-orchestrator.md) are added in their
+# respective PRs (PR-4 through PR-6) where the actual changes land.
 
 # ---------------------------------------------------------------------------
 # Summary
