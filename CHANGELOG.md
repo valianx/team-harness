@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-05-22
+
 ### Changed
 
 - `/th-update` now always overwrites every team-harness file under `~/.claude/` — the `--force` flag is removed from the operator surface and always passed to the installer internally. The skill's purpose is "sync to released bytes," so conflict gating was friction rather than safety. Operators who customize agents should fork the repo or contribute upstream — local hand-edits to `~/.claude/agents/*.md` are out of scope.
@@ -447,5 +449,6 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.4.1]: https://github.com/valianx/team-harness/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/valianx/team-harness/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/valianx/team-harness/compare/v2.2.0...v2.3.0
