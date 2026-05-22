@@ -402,7 +402,8 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - Use the issue body as task description
    - Use labels to help classify type (e.g., `bug` → fix, `enhancement` → feature)
    - If the description is empty or unclear, infer the scope from the title and labels
-5. **MANDATORY — Move GitHub issue to "In Progress"** on the project board using `gh project list`, `gh project field-list`, `gh project item-list`, and `gh project item-edit`. If any command fails, report the error to the user and continue.
+5. **MANDATORY — Move GitHub issue to "In Progress"** on the project board.
+   **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier D — project board ops". Run the detection probe (sets `has_gh`). When `has_gh=true`, use `gh project list`, `gh project field-list`, `gh project item-list`, and `gh project item-edit`. When `has_gh=false`, log "Project board update skipped — gh CLI unavailable" and continue. If any command fails, report the error and continue.
 6. **MANDATORY — Intent detection and smart routing** — when the task arrives as plain text (NOT from a skill's `Direct Mode Task` payload), detect whether the user's intent maps to a known direct mode before entering the full pipeline. Skip this step entirely for skill payloads — the skill already declared the intent.
 
    **Step 6a — Classify intent.** Match the request against known direct modes:
@@ -593,7 +594,7 @@ If any `[NEEDS CLARIFICATION]` markers exist:
 
 ### Step 4 — Update GitHub issue (if applicable)
 
-If `needs-specify: true` (or no flag), update the issue body via `gh issue edit` using the **SDD format**:
+If `needs-specify: true` (or no flag), update the issue body using the **SDD format**. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — edit an issue". When `has_gh=true`, use `gh issue edit`. When `has_gh=false`, use the curl PATCH fallback if a token + GitHub origin are available; else write the updated body to `session-docs/{feature}/inputs/issue-edit.md` and instruct the operator to paste it into the issue.
 
 ```markdown
 > **Original description:**
@@ -1409,9 +1410,13 @@ Then return your status block and exit.
 - Summary of what was built, tested, and validated (from status block summaries, NOT re-reading session-docs)
 - **`skip-version: true`** if the th-orchestrator explicitly requests it.
 
-**Gate (status-block):** The delivery agent returns a compact status block. If `status: success` → update `00-state.md` with branch, version, and PR info, proceed to Phase 5. If `status: failed` → report to the user.
+**Gate (status-block):** The delivery agent returns a compact status block. Handle each outcome:
 
-This phase does NOT iterate — if it fails (e.g., push rejected), report to the user.
+| `status:` | Action |
+|---|---|
+| `success` | Update `00-state.md` with branch, version, and PR info. Proceed to Phase 5. |
+| `failed` | Report to the user. This phase does NOT iterate — if delivery fails (e.g., push rejected), surface the error. |
+| `blocked-manual-push` | `gh` is unavailable; PR was not created automatically. Emit a STOP block to the user with `manual_action_url` and `manual_action_file` from the status block. Wait for operator reply `pr opened #N`. On reply: record the PR number in `00-state.md`, then proceed to Phase 5. Reply `abort` → mark pipeline `blocked`. |
 
 **Report to user:**
 ```
@@ -1556,9 +1561,11 @@ fi
 
 **Owner:** You (th-orchestrator) — only runs if the task originated from a GitHub issue. If not from GitHub, skip to Phase 6.
 
-1. **Comment on the issue** via `gh issue comment` with: branch, commit, version, files changed, test results, **every AC individually with pass/fail status** (read `04-validation.md` for this — never summarize as "15/15 passed"), and QA notes/warnings.
+1. **Comment on the issue** with: branch, commit, version, files changed, test results, **every AC individually with pass/fail status** (read `04-validation.md` for this — never summarize as "15/15 passed"), and QA notes/warnings.
+   **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — comment on an issue". When `has_gh=true`, use `gh issue comment`. When `has_gh=false`, use the curl POST fallback if a token + GitHub origin are available; else write the comment body to `session-docs/{feature}/inputs/issue-comment.md` and instruct the operator to paste it.
 
-2. **Move to "In Review"** on the project board using `gh project` commands (same pattern as Phase 0a). Target column is **"In Review"** — never "Done", never "Closed". If the board lacks "In Review", leave in "In Progress". Report errors to user.
+2. **Move to "In Review"** on the project board.
+   **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier D — project board ops". When `has_gh=true`, use `gh project` commands (same pattern as Phase 0a). When `has_gh=false`, log "Project board update skipped — gh CLI unavailable". Target column is **"In Review"** — never "Done", never "Closed". If the board lacks "In Review", leave in "In Progress". Report errors to user.
 
 3. **Do NOT close the issue.** Leave it open in "In Review" for human review.
 
