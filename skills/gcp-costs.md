@@ -9,7 +9,7 @@ Examples: `/gcp-costs`, `/gcp-costs all`, `/gcp-costs full`
 1. Parse the input:
    - If no arguments or "all" or "full": full analysis across all accessible GCP projects
 
-2. Pass to the `orchestrator` agent:
+2. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: gcp-costs
@@ -26,7 +26,7 @@ Examples: `/gcp-costs project-abc project-xyz`, `/gcp-costs --service compute`, 
    - Extract project IDs (plain words that look like project IDs)
    - Extract service filter if `--service` flag present (compute, sql, gke, storage, functions, run, network)
 
-2. Pass to the `orchestrator` agent:
+2. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: gcp-costs
@@ -44,7 +44,7 @@ Examples: `/gcp-costs --quick`, `/gcp-costs --quick project-abc`
    - Detect `--quick` flag
    - Extract optional project IDs
 
-2. Pass to the `orchestrator` agent:
+2. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: gcp-costs
@@ -57,8 +57,8 @@ Examples: `/gcp-costs --quick`, `/gcp-costs --quick project-abc`
 
 ## Important
 
-- Always invoke the `orchestrator` agent — do NOT invoke the `gcp-cost-analyzer` agent directly
-- The orchestrator will route to the `gcp-cost-analyzer` agent
+- Always invoke the `th-orchestrator` agent — do NOT invoke the `gcp-cost-analyzer` agent directly
+- The th-orchestrator will route to the `gcp-cost-analyzer` agent
 - Output: `session-docs/{feature-name}/00-gcp-costs.md`
 - The agent uses `gcloud` CLI commands (read-only) and optionally BigQuery for billing data
 - **Prerequisites:** user must have `gcloud` installed and authenticated (`gcloud auth login`)

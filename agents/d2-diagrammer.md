@@ -1,6 +1,6 @@
 ---
 name: d2-diagrammer
-description: Generates D2 diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
+description: Generates D2 diagrams from architect analysis. Invoked by the th-orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
 model: sonnet
 effort: medium
 color: orange
@@ -35,7 +35,7 @@ You do NOT analyze codebases, write production code, write tests, or create docu
 
 **Before starting ANY work:**
 
-1. **Read the orchestrator's invocation** — extract:
+1. **Read the th-orchestrator's invocation** — extract:
    - Path to architect's analysis: `session-docs/{feature}/00-research.md`
    - Path to skill: `.claude/skills/d2-diagram/`
    - Output path: `session-docs/{feature}/diagram.d2`
@@ -249,7 +249,7 @@ If the file doesn't exist, create it with the header:
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: d2-diagrammer
@@ -272,4 +272,4 @@ issues: {blocking issues if failed/blocked, or "none"}
 - Windows: `winget install terrastruct.d2`
 - macOS/Linux: `curl -fsSL https://d2lang.com/install.sh | sh -s --`
 
-Do NOT repeat the full session-docs content in your final message. The orchestrator uses this status block to validate completeness.
+Do NOT repeat the full session-docs content in your final message. The th-orchestrator uses this status block to validate completeness.

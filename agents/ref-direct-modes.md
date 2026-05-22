@@ -1,19 +1,19 @@
 ---
 name: ref-direct-modes
-description: Reference file for orchestrator direct modes (diagram, likec4, d2, review, translate, plan-review). Read on-demand by the orchestrator — not a standalone agent.
+description: Reference file for th-orchestrator direct modes (diagram, likec4, d2, review, translate, plan-review). Read on-demand by the th-orchestrator — not a standalone agent.
 model: opus
 color: cyan
 ---
 
-# Orchestrator — Direct Mode Reference
+# th-orchestrator — Direct Mode Reference
 
-This file is read on-demand by the orchestrator when executing a direct mode. It is NOT part of the orchestrator's system prompt.
+This file is read on-demand by the th-orchestrator when executing a direct mode. It is NOT part of the th-orchestrator's system prompt.
 
 ---
 
 ## Plan Review Mode (standalone audit of Stage 1 artifacts)
 
-**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous orchestrator run, without re-running the full pipeline. Common trigger: developer hand-edits `01-architecture.md` or `02-task-list.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
+**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous th-orchestrator run, without re-running the full pipeline. Common trigger: developer hand-edits `01-architecture.md` or `02-task-list.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
 
 **Routing:** the user invokes `/plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
 
@@ -162,7 +162,7 @@ Present source file path, SVG output path, and re-render options:
 
 When invoked with `Direct Mode Task: review`:
 
-The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The orchestrator and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
+The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The th-orchestrator and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
 
 ### Submode routing
 

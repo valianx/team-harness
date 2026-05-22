@@ -4,7 +4,7 @@ Analyze the input: $ARGUMENTS
 
 ## Mode 1 — Topic or question provided
 
-1. Pass to the `orchestrator` agent:
+1. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: research
@@ -19,6 +19,6 @@ Ask the user: "What technology, library, or approach do you want to research? Ex
 
 ## Important
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator will route to the `architect` in research mode
+- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
+- The th-orchestrator will route to the `architect` in research mode
 - Output: `session-docs/{topic-slug}/00-research.md`

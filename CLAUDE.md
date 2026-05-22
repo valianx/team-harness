@@ -12,7 +12,7 @@
 - Not an application, library, API, or service.
 - Not a runtime — nothing executes from this repo except the installer and the MCP server (after installation).
 - No test suite, no build step.
-- Not a general-purpose framework — it encodes a specific opinionated workflow (orchestrator + specialized subagents + SDD pipeline).
+- Not a general-purpose framework — it encodes a specific opinionated workflow (th-orchestrator + specialized subagents + SDD pipeline).
 
 **External dependencies (required).**
 - `gh` — GitHub CLI. Used by `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/
@@ -42,7 +42,7 @@ team-harness/
 │   ├── notify-windows.sh
 │   ├── notify-mac.sh
 │   ├── notify-linux.sh
-│   ├── notify-stage.sh  Cross-platform stage-end wrapper (orchestrator calls this at each Stage boundary)
+│   ├── notify-stage.sh  Cross-platform stage-end wrapper (th-orchestrator calls this at each Stage boundary)
 │   └── config.json      Per-OS hook templates for ~/.claude/settings.json
 ├── cmd/
 │   └── install/         Go installer source (cross-compiled to GH Release assets)
@@ -79,7 +79,7 @@ team-harness/
 
 **Ownership boundaries.**
 - `agents/` — system prompts only. One `.md` = one agent.
-- `skills/` — slash-command entry points. Most are thin: parse args → route to orchestrator. A few are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`).
+- `skills/` — slash-command entry points. Most are thin: parse args → route to th-orchestrator. A few are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`).
 - `hooks/` — keep these **generic and portable** (no personal tokens, no private endpoints). User-specific hooks belong in `~/.claude/hooks/`, not here.
 - `cmd/install/` — Go installer source. No third-party deps (stdlib-only). Compiled with `CGO_ENABLED=0` for static single-file binaries.
 
@@ -132,7 +132,7 @@ All commands run from the repo root.
 | Run only the policy-block functional tests | `bash tests/test_policy_block.sh` |
 | Run only the agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |
 | Run only the agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
-| Run the behavioral suite (dispatches orchestrator via `claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
+| Run the behavioral suite (dispatches th-orchestrator via `claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
 
 **Not applicable to this repo:** typecheck, unit test of agent prompt behaviour, integration test of the live pipeline, e2e, build, dev server, migrations, deploy. The repo ships declarative assets, an installer, and one MCP server — no code pipeline. The `tests/` suite covers the **three surfaces that ARE testable without a live LLM**: `hooks/policy-block.sh` (functional, ~48 cases), the structural integrity of the agent / skill / hook `.md` and `.json` files (~282 assertions across 16 suites), and the YAML frontmatter parseability of every `agents/*.md` (~19 files — catches the silent-agent-drop class of bug). It does NOT validate prompt behaviour — that still requires running pipelines through Claude Code.
 
@@ -142,14 +142,14 @@ All commands run from the repo root.
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
 - **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`). `init`, `architect`, `agent-builder` use `opus`; others generally use `sonnet`.
-- **Orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `orchestrator`. Exceptions: standalone utilities (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`).
+- **th-orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `th-orchestrator`. Exceptions: standalone utilities (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`).
 - **Session-docs as the shared board.** Agents communicate through files in `session-docs/{feature-name}/`, never through return values. `session-docs/` is always git-ignored.
-- **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on the block without re-reading full session-docs on happy paths.
+- **Status-block return protocol.** Agents finish with a compact status block; the th-orchestrator gates on the block without re-reading full session-docs on happy paths.
 - **Installer is idempotent and non-destructive.** Conflicts (existing file with different hash) are reported, never overwritten. User must delete manually to force a re-install. `~/.claude.json` is backed up before every merge.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux. Avoid Unix-only tools or shell-specific syntax in agent prompts.
 - **KG content is technical-only.** The knowledge graph must never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
 - **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per successfully-completed task (Step 11.5 of its workflow). The insight is synthesised from session-docs + the CHANGELOG entry and describes what was learned that future tasks can reuse — not what changed (that's the CHANGELOG). The call is best-effort: if the Memory MCP server is unreachable or the task has no reusable learning, the step logs and skips. This builds team knowledge automatically without operator curation.
-- **Pipeline observability is mandatory.** Every pipeline run produces two observability artifacts in `session-docs/{feature}/`: `00-execution-events.jsonl` (append-only event trace, machine-readable, queryable with `jq`) and `00-pipeline-summary.md` (human-readable rollup, rewritten in full at every phase transition). Both are written exclusively by the orchestrator (agents return tool-usage counts in their status blocks; the orchestrator propagates them into the `tools` field of `phase.end` events and aggregates them into the summary). The `/trace <feature>` skill is the canonical 30-second answer to "did this pipeline work and were the tools effective?" The legacy `pipeline-metrics.json` and `done.yml` artifacts are deprecated (banners in `agents/orchestrator.md`) — they were specified but never written in practice. Writing observability events is mandatory, not best-effort: skipping appends to save tokens deletes the only signal we have on pipeline health.
+- **Pipeline observability is mandatory.** Every pipeline run produces two observability artifacts in `session-docs/{feature}/`: `00-execution-events.jsonl` (append-only event trace, machine-readable, queryable with `jq`) and `00-pipeline-summary.md` (human-readable rollup, rewritten in full at every phase transition). Both are written exclusively by the th-orchestrator (agents return tool-usage counts in their status blocks; the th-orchestrator propagates them into the `tools` field of `phase.end` events and aggregates them into the summary). The `/trace <feature>` skill is the canonical 30-second answer to "did this pipeline work and were the tools effective?" The legacy `pipeline-metrics.json` and `done.yml` artifacts are deprecated (banners in `agents/th-orchestrator.md`) — they were specified but never written in practice. Writing observability events is mandatory, not best-effort: skipping appends to save tokens deletes the only signal we have on pipeline health.
 - **Documentation freshness via context7.** Every decision involving a third-party library's API or configuration syntax must be verified against context7 before code is generated. Training-snapshot knowledge is treated as potentially stale. Mandatory triggers per agent are documented in `docs/context7-usage.md` §2 (architect, implementer, tester, security, translator); `init` is a light reference. Every consulting agent emits `context7_consult: hit:N miss:N skipped:M` in its status block — even when all counts are zero, the line's presence signals the agent considered freshness. Absence of context7 ≠ excuse to ignore the check: fall back to training knowledge and document the fallback in the session-doc's `## Documentation Consulted` section.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
@@ -158,7 +158,7 @@ All commands run from the repo root.
 
 ## 6. Mandatory Working Agreements
 
-> These are the minimum agreements that keep the codebase aligned across humans, agents, and outside contributors. They apply to every change in this repo, whether it goes through the orchestrator pipeline or is a manual commit. If a rule conflicts with a more specific instruction in §5 Architectural Conventions, the more specific one wins — but the rules below are the floor, not the ceiling.
+> These are the minimum agreements that keep the codebase aligned across humans, agents, and outside contributors. They apply to every change in this repo, whether it goes through the th-orchestrator pipeline or is a manual commit. If a rule conflicts with a more specific instruction in §5 Architectural Conventions, the more specific one wins — but the rules below are the floor, not the ceiling.
 
 ### 6.1 Pre-work (read before you touch code)
 
@@ -260,7 +260,7 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 **Documented exceptions** (committed artefacts where Spanish is allowed):
 
 - **`agents/security.md` report-body template, `04-security.md` report bodies, `agents/reviewer.md` review-body templates, `04-internal-review.md` / `05-internal-review.md` reviewer outputs.** The two agents are spec'd to produce Spanish-language reports per their existing contracts. The Spanish output is **only the body of those session-doc reports** (and the GitHub PR-review comment posted by `reviewer` in fresh mode). The agent's system prompt itself, the agent's status-block fields, and any framework-level field remain English. Note: under the session-docs rule above, the report body would already follow operator language; the security/reviewer contracts are the legacy expression of that rule applied selectively to committed PR comments as well.
-- **`agents/orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language and the orchestrator routes correctly. This is the explicit bridge between any-language chat and English-only repo content. The patterns themselves are not operator-facing text — they are intent classifiers.
+- **`agents/th-orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language and the th-orchestrator routes correctly. This is the explicit bridge between any-language chat and English-only repo content. The patterns themselves are not operator-facing text — they are intent classifiers.
 
 **`agents/translator.md` example glossary tables** are domain illustrations (Spanish source → English target translation examples), not operator copy. They illustrate what the translator does, not how team-harness speaks to the operator. They are out of scope for this guide.
 
@@ -290,11 +290,11 @@ The agent never composes Spanish (post-audit, with the §7.3 exceptions). The op
 - **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on where it lives.
 - **Where does it live?** Gitignored session-docs → operator's chat language. Committed repo file → English (with the documented §7.3 exceptions).
 
-### 7.5 Orchestrator as the canonical entry point
+### 7.5 th-orchestrator as the canonical entry point
 
-When documenting how to invoke the system, treat `@orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+When documenting how to invoke the system, treat `@th-orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
 
-The operator's mental model is: orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+The operator's mental model is: th-orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
 
 ### 7.6 Application checklist (for contributors)
 
@@ -304,8 +304,8 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
 - [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, session-doc templates). Exception: `/status` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/orchestrator.md` Step 6 routing table.
-- [ ] If the change documents how to invoke the system, the example uses `@orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
+- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/th-orchestrator.md` Step 6 routing table.
+- [ ] If the change documents how to invoke the system, the example uses `@th-orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 
 `tests/test_agent_structure.py` Suite 25 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).
 
@@ -325,7 +325,7 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 The repo has a verification suite at `tests/` that covers what is testable without a live LLM:
 
 - **`tests/test_policy_block.sh`** — functional tests for `hooks/policy-block.sh`. Each case feeds a tool-call JSON payload and asserts the output (deny → JSON with `permissionDecision: "deny"`; allow → empty stdout). ~48 cases: `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), git destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL DROP/TRUNCATE, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
-- **`tests/test_agent_structure.py`** — structural tests across `agents/`, `skills/`, `hooks/`. 517 assertions in 22 suites covering tool allowlists per agent, the 5-column Roster matrix, the pipeline phases (1.5 / 1.6 / 2.5 / 3.5 / 3.6 / 4.5), per-agent contract sections (`tester` / `qa` / `reviewer` / `implementer` / `delivery` / `architect` / `orchestrator`), session-docs hygiene guardrails (Files I write / MUST NOT write, no parallel review files, no iteration history in analysis docs), the inviolable Phase 1.6 gate with its inline fallback, the self-describing task-list contract (Status field + AC checkbox mirror), the `PreToolUse` wiring across windows/macos/linux, the README cross-references, pipeline observability stack (Suite 20), KG hygiene gates (Suite 21), and stage-end notification protocol + SEC regression guards (Suite 22).
+- **`tests/test_agent_structure.py`** — structural tests across `agents/`, `skills/`, `hooks/`. 517 assertions in 22 suites covering tool allowlists per agent, the 5-column Roster matrix, the pipeline phases (1.5 / 1.6 / 2.5 / 3.5 / 3.6 / 4.5), per-agent contract sections (`tester` / `qa` / `reviewer` / `implementer` / `delivery` / `architect` / `th-orchestrator`), session-docs hygiene guardrails (Files I write / MUST NOT write, no parallel review files, no iteration history in analysis docs), the inviolable Phase 1.6 gate with its inline fallback, the self-describing task-list contract (Status field + AC checkbox mirror), the `PreToolUse` wiring across windows/macos/linux, the README cross-references, pipeline observability stack (Suite 20), KG hygiene gates (Suite 21), and stage-end notification protocol + SEC regression guards (Suite 22).
 - **`tests/test_agent_frontmatter.py`** — YAML frontmatter validity for every `agents/*.md`. Uses PyYAML via `uv run --with PyYAML python` to catch the silent-agent-drop class of bug (an unquoted `": "` inside a description breaks YAML parsing; Claude Code then silently drops the agent from the registered `subagent_type` list with no error surfaced). 19 agents currently parse cleanly.
 - **`tests/run-all.sh`** — wrapper that runs all three suites and exits 0 if all pass.
 
@@ -354,7 +354,7 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 ## 14. Subagent Orchestration
 
-**The `orchestrator` agent is the canonical entry point for every development workflow.** Operators drive the pipeline by talking to it conversationally (e.g., `@orchestrator give me the work plan for this task: X`, `@orchestrator implement it`, `@orchestrator open the PR`) and the orchestrator's Step 6 intent-detection classifies the request and dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route into the same orchestrator under the hood — they give a deterministic entry without the intent-detection step plus a few extras (e.g., `/design #N` fetches a GitHub issue automatically), but the orchestrator-conversational path covers every workflow. Treat the orchestrator as the single front door; do not surface slash commands as "the better way" to operators who prefer chat. **All repo artefacts (code, configs, agents, skills, docs, commits, PR bodies, CHANGELOG) are written in English. Operators may chat in any language; the orchestrator's intent-detection patterns accept Spanish and English. The English-only rule applies to what is committed to the repository, not to live chat.**
+**The `th-orchestrator` agent is the canonical entry point for every development workflow.** Operators drive the pipeline by talking to it conversationally (e.g., `@th-orchestrator give me the work plan for this task: X`, `@th-orchestrator implement it`, `@th-orchestrator open the PR`) and the th-orchestrator's Step 6 intent-detection classifies the request and dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route into the same th-orchestrator under the hood — they give a deterministic entry without the intent-detection step plus a few extras (e.g., `/design #N` fetches a GitHub issue automatically), but the th-orchestrator-conversational path covers every workflow. Treat the th-orchestrator as the single front door; do not surface slash commands as "the better way" to operators who prefer chat. **All repo artefacts (code, configs, agents, skills, docs, commits, PR bodies, CHANGELOG) are written in English. Operators may chat in any language; the th-orchestrator's intent-detection patterns accept Spanish and English. The English-only rule applies to what is committed to the repository, not to live chat.**
 
 Routing table for this repo:
 
@@ -373,20 +373,20 @@ Routing table for this repo:
 - Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
 - Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the orchestrator pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Changing the th-orchestrator pipeline → architecture review mandatory; update `agents/th-orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
-**Universal rule — auto-takeover on `blocked-no-dispatch` (applies regardless of how the orchestrator was invoked):**
+**Universal rule — auto-takeover on `blocked-no-dispatch` (applies regardless of how the th-orchestrator was invoked):**
 
-When the `orchestrator` subagent returns a response containing **"Dispatch handoff — top-level Claude takes over now"**, or when an existing `session-docs/{feature}/00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. This is not a user-decision point — the user already authorised the pipeline; the nested-context Task strip is a runtime detour, not a new authorisation.
+When the `th-orchestrator` subagent returns a response containing **"Dispatch handoff — top-level Claude takes over now"**, or when an existing `session-docs/{feature}/00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. This is not a user-decision point — the user already authorised the pipeline; the nested-context Task strip is a runtime detour, not a new authorisation.
 
-**Handoff payload (canonical).** The orchestrator emits a structured JSON `dispatch_handoff` block in its response (and embeds the same block in `00-state.md` § `## Handoff`). Top-level Claude parses that JSON to extract the variable fields — `next_dispatch.agent`, `phase`, `autonomy`, `round`, `state_ref`, `probe_error` — and follows the static protocol below. Treat the JSON as ground truth; if any prose contradicts it, JSON wins.
+**Handoff payload (canonical).** The th-orchestrator emits a structured JSON `dispatch_handoff` block in its response (and embeds the same block in `00-state.md` § `## Handoff`). Top-level Claude parses that JSON to extract the variable fields — `next_dispatch.agent`, `phase`, `autonomy`, `round`, `state_ref`, `probe_error` — and follows the static protocol below. Treat the JSON as ground truth; if any prose contradicts it, JSON wins.
 
 **Takeover protocol (static, identical for every handoff):**
 
-1. Do NOT ask the user "should I take over?" The directive in the orchestrator's response is itself the authorisation.
-2. Do NOT re-invoke `@orchestrator` or any skill that routes via `Task(subagent_type=orchestrator, ...)` — that recreates the nested context and the boot probe will fail again.
-3. Parse `dispatch_handoff.next_dispatch.agent` from the JSON. If `state_ref` is set, read that state file (`## Current State` + `## Agent Results` + `## Handoff`). Read `agents/{next_dispatch.agent}.md` for the agent's contract (tools, inputs, status block). If `dispatch_handoff.phase.number` is set, also read the matching Phase section of `agents/orchestrator.md`.
-4. Dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session. Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the orchestrator's checkpointing protocol. Iterate per the orchestrator contract (max 3 iterations on `failed`/`blocked`).
+1. Do NOT ask the user "should I take over?" The directive in the th-orchestrator's response is itself the authorisation.
+2. Do NOT re-invoke `@th-orchestrator` or any skill that routes via `Task(subagent_type=th-orchestrator, ...)` — that recreates the nested context and the boot probe will fail again.
+3. Parse `dispatch_handoff.next_dispatch.agent` from the JSON. If `state_ref` is set, read that state file (`## Current State` + `## Agent Results` + `## Handoff`). Read `agents/{next_dispatch.agent}.md` for the agent's contract (tools, inputs, status block). If `dispatch_handoff.phase.number` is set, also read the matching Phase section of `agents/th-orchestrator.md`.
+4. Dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session. Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the th-orchestrator's checkpointing protocol. Iterate per the th-orchestrator contract (max 3 iterations on `failed`/`blocked`).
 5. Continue through the remaining phases of the pipeline (Phase 3 verifies in parallel: `tester` + `qa` + `security` when sensitive; Phase 3.5 acceptance-gate; Phase 3.6 `acceptance-checker`; Phase 4 `delivery`). Respect gate semantics:
    - **STAGE-GATE-2** (between PRs in Stage 2): if `dispatch_handoff.autonomy.granted` is `true`, skip silently; otherwise stop and ask the user.
    - **STAGE-GATE-3** (before push in Stage 3): always stop and ask the user — autonomy never covers this gate.
@@ -394,7 +394,7 @@ When the `orchestrator` subagent returns a response containing **"Dispatch hando
 7. Mirror PR-level progress into `02-task-list.md` (Status field + AC checkbox) at each PR transition.
 8. Report to the user only at pipeline completion, at a mandatory STAGE-GATE, or when a non-recoverable failure needs human input.
 
-This rule applies to **every** entry mode: `@orchestrator` mention, skill routing (`/issue`, `/recover`, `/plan`, `/design`, `/deliver`, `/validate`, `/research`, `/spike`, `/test`, etc.), or another agent's referral. The `blocked-no-dispatch` state is the system's documented self-healing path — leaving it open for the user to resolve manually defeats the purpose.
+This rule applies to **every** entry mode: `@th-orchestrator` mention, skill routing (`/issue`, `/recover`, `/plan`, `/design`, `/deliver`, `/validate`, `/research`, `/spike`, `/test`, etc.), or another agent's referral. The `blocked-no-dispatch` state is the system's documented self-healing path — leaving it open for the user to resolve manually defeats the purpose.
 
 ---
 

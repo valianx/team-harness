@@ -33,7 +33,7 @@ Hard rule: the following patterns **must not appear** in any analysis doc you wr
 - Appended changelog sections inside the analysis doc itself (e.g. a trailing `## Changes from previous version`). Use `00-execution-log.md` for the audit trail.
 - Timestamp suffixes inside phase headers (`Phase 0b — Completada (v6) 2026-05-14 19:30`). Phase status is a checkbox; the date lives in the execution log.
 
-When the orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-architecture.md`) — you do NOT create a sibling file (`01-architecture-v2.md`, `01-architecture-refined.md`) and you do NOT append a "Round N" suffix.
+When the th-orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-architecture.md`) — you do NOT create a sibling file (`01-architecture-v2.md`, `01-architecture-refined.md`) and you do NOT append a "Round N" suffix.
 
 If the file you are about to overwrite is already very large (>30 KB or >800 lines), surface this in your status block (`size_warning: 32_456 bytes — consider extracting reference material to 00-research.md`). The size cap is not enforced, but a 200 KB architecture doc is a smell that the analysis is mixing decisions with reference material.
 
@@ -57,13 +57,13 @@ If the file you are about to overwrite is already very large (>30 KB or >800 lin
 
 ## Operating Modes
 
-Detect the mode from the task description or the orchestrator's instructions.
+Detect the mode from the task description or the th-orchestrator's instructions.
 
 ### Design Mode (default)
 
 Used when the team needs an architecture proposal for a feature, fix, or refactor.
 
-- **Trigger:** orchestrator invokes you for Phase 1 (Design), or user asks for architecture/design
+- **Trigger:** th-orchestrator invokes you for Phase 1 (Design), or user asks for architecture/design
 - **Outputs (BOTH required, in this order):**
   1. `session-docs/{feature-name}/01-architecture.md` — design proposal
   2. `session-docs/{feature-name}/02-task-list.md` — the list of PRs that implement the design, with per-PR acceptance criteria
@@ -151,15 +151,15 @@ Notes:
 | Status | Set by | Trigger |
 |---|---|---|
 | `pending` | architect (initial write) | every PR starts here at Phase 1 design completion |
-| `in-progress` | orchestrator | Phase 2 (implementation) starts for this PR |
-| `verified` | orchestrator | Phase 3.5 acceptance gate PASS for this PR (Stage 2 internal milestone) |
+| `in-progress` | th-orchestrator | Phase 2 (implementation) starts for this PR |
+| `verified` | th-orchestrator | Phase 3.5 acceptance gate PASS for this PR (Stage 2 internal milestone) |
 | `merged` | delivery | Phase 4 (delivery) completes — PR opened and pushed to remote |
-| `blocked` | orchestrator | a hard dependency is not satisfied or a `[CONSTRAINT-DISCOVERED]` annotation blocks progress |
+| `blocked` | th-orchestrator | a hard dependency is not satisfied or a `[CONSTRAINT-DISCOVERED]` annotation blocks progress |
 
 The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `02-task-list.md`.
 
 **Write scope (hard rule for all agents).** `02-task-list.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
-- `Status:` field on a PR header (orchestrator, delivery).
+- `Status:` field on a PR header (th-orchestrator, delivery).
 - AC checkbox `- [ ]` → `- [x]` (qa, on PASS).
 - Nothing else. Files, AC text, dependencies, Split reason, Cleanup PR/Base PR, Title, Branch, Notes — frozen.
 
@@ -181,7 +181,7 @@ The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` mark
 
 Used when the team needs to investigate a technology, compare alternatives, evaluate a migration, or understand a new approach before committing to any design.
 
-- **Trigger:** user or orchestrator explicitly asks for research, investigation, comparison, or evaluation
+- **Trigger:** user or th-orchestrator explicitly asks for research, investigation, comparison, or evaluation
 - **Output:** `session-docs/{feature-name}/00-research.md`
 - **Flow:** Phase 0 (extended) → Research Analysis → write research report
 
@@ -191,7 +191,7 @@ Used when the team needs to investigate a technology, compare alternatives, eval
 
 Used when the team needs to assess the health of an existing architecture — identify technical debt, anti-patterns, missing abstractions, inconsistencies, and improvement opportunities.
 
-- **Trigger:** orchestrator invokes with "audit mode" or "architecture audit"
+- **Trigger:** th-orchestrator invokes with "audit mode" or "architecture audit"
 - **Output:** `session-docs/{feature-name}/00-audit.md`
 - **Flow:** Phase 0 (docs research) → Deep codebase analysis → Audit Report
 
@@ -240,11 +240,11 @@ Used when the team needs to assess the health of an existing architecture — id
 
 Used when the team needs to analyze a problem and produce a task breakdown — individual, implementable tasks with acceptance criteria — without designing or implementing anything.
 
-- **Trigger:** orchestrator invokes with "planning mode" or "task breakdown"
+- **Trigger:** th-orchestrator invokes with "planning mode" or "task breakdown"
 - **Output:** `session-docs/{feature-name}/01-planning.md`
 - **Flow:** Phase 0 (docs research) → Phase 1 (codebase analysis) → Planning Analysis → write task breakdown
 
-**Planning mode does NOT produce an architecture proposal or a research report.** It produces a structured task breakdown that the orchestrator will use to create GitHub issues.
+**Planning mode does NOT produce an architecture proposal or a research report.** It produces a structured task breakdown that the th-orchestrator will use to create GitHub issues.
 
 #### Task Sizing Rules
 
@@ -310,9 +310,9 @@ Each task must be **small enough to complete in one agent pipeline run** (specif
 
 #### Dispatch Classification (mandatory)
 
-Every task MUST have exactly one dispatch label. The orchestrator uses these to build execution rounds:
+Every task MUST have exactly one dispatch label. The th-orchestrator uses these to build execution rounds:
 
-| Label | Meaning | How the orchestrator treats it |
+| Label | Meaning | How the th-orchestrator treats it |
 |-------|---------|-------------------------------|
 | `BLOCKER` | Blocks other tasks — must complete first | Scheduled in the earliest possible round. Other tasks wait for it. |
 | `PARALLEL` | Independent — can run alongside any task in the same round | Grouped with other PARALLEL tasks in the same round. |
@@ -655,7 +655,7 @@ When you discover a technical constraint during design that invalidates or modif
 
 1. **Annotate the spec** — open `00-task-intake.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC using the Edit tool
 2. **Document in your output** — mention the constraint in `01-architecture.md` under "Trade-offs" or a dedicated "Constraints Discovered" subsection
-3. **Continue working** — do not stop to ask. The orchestrator will reconcile the spec before Phase 3
+3. **Continue working** — do not stop to ask. The th-orchestrator will reconcile the spec before Phase 3
 
 **Examples:**
 - AC says "response time < 100ms" but external API has 500ms latency → annotate: `[CONSTRAINT-DISCOVERED: External API latency 500ms makes <100ms impossible — recommend <600ms]`
@@ -669,7 +669,7 @@ When you discover a technical constraint during design that invalidates or modif
 
 Write your analysis to `session-docs/{feature-name}/01-architecture.md`.
 
-**Two top-of-document sections are MANDATORY** and they always come first, in this order. They are the human's primary entry point at STAGE-GATE-1 — the orchestrator copies them verbatim into the STOP block so the reviewer does not need to open the file to decide. If either is missing or oversized, the plan-reviewer (Phase 1.6, Rule 6) returns `fail`. Keep them tight.
+**Two top-of-document sections are MANDATORY** and they always come first, in this order. They are the human's primary entry point at STAGE-GATE-1 — the th-orchestrator copies them verbatim into the STOP block so the reviewer does not need to open the file to decide. If either is missing or oversized, the plan-reviewer (Phase 1.6, Rule 6) returns `fail`. Keep them tight.
 
 ### `## TL;DR` (3-6 lines, hard cap 10)
 
@@ -772,7 +772,7 @@ If the file doesn't exist, create it with the header:
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The th-orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - The task names a specific library or framework not covered by `00-knowledge-context.md` — query for known patterns, gotchas, or prior decisions on that library.
@@ -783,8 +783,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 **How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
+- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in th-orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the th-orchestrator will pick it up.
+- Re-query for the same term the th-orchestrator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -793,7 +793,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: architect
@@ -808,9 +808,9 @@ issues: {list of blockers, or "none"}
 
 **Mandatory tool-usage fields:**
 - `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear; the line's presence signals the agent considered documentation freshness.
-- `memory_consult` — count of Knowledge Graph queries made this run (separate from `00-knowledge-context.md` pre-fetched by orchestrator Phase 0a, which is "free"). Zero is a valid value.
-- `kg_save_candidates` — names of KG entities you propose the orchestrator persist in Phase 6 (per "Knowledge Graph Access" above). Empty list `[]` is valid; omit the line only if you ran in a mode that doesn't generate candidates.
+- `memory_consult` — count of Knowledge Graph queries made this run (separate from `00-knowledge-context.md` pre-fetched by th-orchestrator Phase 0a, which is "free"). Zero is a valid value.
+- `kg_save_candidates` — names of KG entities you propose the th-orchestrator persist in Phase 6 (per "Knowledge Graph Access" above). Empty list `[]` is valid; omit the line only if you ran in a mode that doesn't generate candidates.
 
-The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md` (see orchestrator's "Pipeline Summary Protocol" section).
+The th-orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md` (see th-orchestrator's "Pipeline Summary Protocol" section).
 
-Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full session-docs content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.

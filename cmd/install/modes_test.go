@@ -18,7 +18,7 @@ import (
 //   - all 17 expected agents are present
 func TestLowCostMatrixInvariants(t *testing.T) {
 	expectedAgents := []string{
-		"orchestrator", "architect", "agent-builder", "security", "reviewer",
+		"th-orchestrator", "architect", "agent-builder", "security", "reviewer",
 		"qa", "plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "acceptance-checker", "diagrammer", "likec4-diagrammer",
 		"d2-diagrammer", "translator", "delivery",
@@ -46,7 +46,7 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 
 // TestLowCostMatrixTally verifies the 6 high / 11 medium split from the architecture.
 func TestLowCostMatrixTally(t *testing.T) {
-	high := []string{"orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
+	high := []string{"th-orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
 	medium := []string{
 		"plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "acceptance-checker", "diagrammer", "likec4-diagrammer",
@@ -252,7 +252,7 @@ func TestAgentNameFromPath(t *testing.T) {
 		want string
 	}{
 		{"/home/user/.claude/agents/architect.md", "architect"},
-		{`C:\Users\user\.claude\agents\orchestrator.md`, "orchestrator"},
+		{`C:\Users\user\.claude\agents\th-orchestrator.md`, "th-orchestrator"},
 		{"delivery.md", "delivery"},
 		{"plan-reviewer.md", "plan-reviewer"},
 		{"noextension", "noextension"},

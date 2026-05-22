@@ -33,9 +33,9 @@ Analyze the input: $ARGUMENTS
    git diff --name-only origin/{baseRefName}...origin/{headRefName}
    ```
 
-### Phase 2 — Review (zero Bash, delegated to orchestrator)
+### Phase 2 — Review (zero Bash, delegated to th-orchestrator)
 
-7. Pass ALL gathered data to the `orchestrator` agent:
+7. Pass ALL gathered data to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: review
@@ -59,13 +59,13 @@ Analyze the input: $ARGUMENTS
      {diff output from step 5}
    ```
 
-8. The orchestrator invokes the reviewer with all data inline (zero Bash in sub-agent), builds the draft, and writes it to `.claude/pr-review-draft.md`. If the reviewer found critical findings, the orchestrator also writes `.claude/pr-review-inline.json` with the inline comments array. The orchestrator returns with the decision (APPROVE or CHANGES_REQUESTED) and the event type.
+8. The th-orchestrator invokes the reviewer with all data inline (zero Bash in sub-agent), builds the draft, and writes it to `.claude/pr-review-draft.md`. If the reviewer found critical findings, the th-orchestrator also writes `.claude/pr-review-inline.json` with the inline comments array. The th-orchestrator returns with the decision (APPROVE or CHANGES_REQUESTED) and the event type.
 
 ### Phase 3 — Publish (Bash in main context)
 
 9. **Verify the draft exists.** Check that `.claude/pr-review-draft.md` was created and is not empty. If it's missing or empty:
-   - Tell the user: "The orchestrator did not produce the review draft. Retrying once."
-   - Re-invoke the orchestrator with the same data (go back to step 7)
+   - Tell the user: "The th-orchestrator did not produce the review draft. Retrying once."
+   - Re-invoke the th-orchestrator with the same data (go back to step 7)
    - If it fails a second time, report the error and stop
 
 10. Read `.claude/pr-review-draft.md` and display the full review draft to the user.
@@ -96,7 +96,7 @@ Analyze the input: $ARGUMENTS
 
     ### Step 12a — Update summary only
 
-    1. Re-invoke the orchestrator with the same PR data but with mode `update-body`:
+    1. Re-invoke the th-orchestrator with the same PR data but with mode `update-body`:
        ```
        Direct Mode Task:
        - Mode: review
@@ -107,7 +107,7 @@ Analyze the input: $ARGUMENTS
        - Existing review body: {current body text}
        - Instruction: Generate an updated summary incorporating any new observations.
        ```
-    2. The orchestrator invokes the reviewer in `update-body` mode and writes the new body to `.claude/pr-review-draft.md`.
+    2. The th-orchestrator invokes the reviewer in `update-body` mode and writes the new body to `.claude/pr-review-draft.md`.
     3. Read `.claude/pr-review-draft.md` and show to the user for approval.
     4. On approval, publish with PUT:
        ```bash
@@ -124,7 +124,7 @@ Analyze the input: $ARGUMENTS
        ```
        If no inline comments exist, tell the user: "The prior review has no inline comments to reply to. Use option (a) to update the summary instead." Then re-show the menu.
     2. Display the list and ask the user to select a `comment_id`.
-    3. Re-invoke the orchestrator with mode `reply`:
+    3. Re-invoke the th-orchestrator with mode `reply`:
        ```
        Direct Mode Task:
        - Mode: review
@@ -138,7 +138,7 @@ Analyze the input: $ARGUMENTS
          - original_body: {the inline comment text}
        - Instruction: Generate a focused reply to this thread.
        ```
-    4. The orchestrator invokes the reviewer in `reply` mode and writes the reply to `.claude/pr-review-reply-draft.md`.
+    4. The th-orchestrator invokes the reviewer in `reply` mode and writes the reply to `.claude/pr-review-reply-draft.md`.
     5. Read `.claude/pr-review-reply-draft.md` and show to the user for approval.
     6. On approval, publish the reply:
        ```bash
@@ -165,7 +165,7 @@ Analyze the input: $ARGUMENTS
 
       a. Read the review body from `.claude/pr-review-draft.md`.
       b. Read inline findings from `.claude/pr-review-inline.json` (if it exists). Format: `[{"path": "...", "line": N, "body": "..."}]`. If the file doesn't exist or is empty, use an empty array `[]`.
-      c. Determine the event. Use the orchestrator's decision (user can override):
+      c. Determine the event. Use the th-orchestrator's decision (user can override):
          - 0 criticals → `APPROVE`
          - 1+ criticals → `REQUEST_CHANGES`
          - User override → whatever the user says
@@ -189,7 +189,7 @@ Analyze the input: $ARGUMENTS
 
     **15.1 — File cleanup.** Delete `.claude/pr-review-draft.md` and `.claude/pr-review-inline.json` (if it exists) after successful publishing.
 
-    **15.2 — Context prune reminder (MANDATORY).** Each `/review-pr` invocation accumulates 5-30K tokens in the main context (PR metadata, full diff, file lists from `gh` and `git` outputs in Phase 1, plus the orchestrator's status block, plus Phase 3 publish outputs). Subagents die between PRs but the **main context does not** — successive reviews in the same session compound linearly.
+    **15.2 — Context prune reminder (MANDATORY).** Each `/review-pr` invocation accumulates 5-30K tokens in the main context (PR metadata, full diff, file lists from `gh` and `git` outputs in Phase 1, plus the th-orchestrator's status block, plus Phase 3 publish outputs). Subagents die between PRs but the **main context does not** — successive reviews in the same session compound linearly.
 
     Your **final response** to the user MUST include this reminder block (verbatim or equivalent — do NOT shorten it, do NOT phrase it as optional):
 
@@ -225,9 +225,9 @@ Ask the user: "Provide a PR number or URL to review. Example: `#45`, `45`, or `h
 
 ## Important
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator coordinates: reviewer (analysis with pre-fetched data) → draft → return to skill
-- ALL Bash commands run in this skill (main context) — the orchestrator and reviewer do ZERO Bash
+- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
+- The th-orchestrator coordinates: reviewer (analysis with pre-fetched data) → draft → return to skill
+- ALL Bash commands run in this skill (main context) — the th-orchestrator and reviewer do ZERO Bash
 - The user approves the review before publishing (Phase 3)
 - **ONE review per author per PR.** A fresh review is created only when no prior review exists (step 13) or after an explicit dismiss (step 12c). NEVER publish a second review without dismissing first. After-the-fact additions use PUT body (step 12a) or reply to thread (step 12b) — these do NOT create new reviews.
 - **Atomic submission for fresh reviews.** The `gh api POST .../reviews` call (step 13) includes body + event + comments[] in a single call. NEVER split into `gh pr review` + separate `gh api pulls/:n/comments`.

@@ -42,7 +42,7 @@ You write code (i18n setup, string extraction, key replacement) and produce docu
 
 Complete i18n setup: discover → glossary → setup → extract → translate → replace → document.
 
-- **Trigger:** no specific mode specified, or orchestrator invokes without mode
+- **Trigger:** no specific mode specified, or th-orchestrator invokes without mode
 - **Output:** `session-docs/{feature-name}/00-translation.md`
 - **Flow:** Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 
@@ -50,7 +50,7 @@ Complete i18n setup: discover → glossary → setup → extract → translate �
 
 Discover strings and build the glossary without modifying any code.
 
-- **Trigger:** orchestrator specifies `mode: glossary-only`
+- **Trigger:** th-orchestrator specifies `mode: glossary-only`
 - **Output:** `session-docs/{feature-name}/00-translation.md` (glossary section only)
 - **Flow:** Phase 0 → Phase 1 → Phase 5 (report only)
 
@@ -58,17 +58,17 @@ Discover strings and build the glossary without modifying any code.
 
 Apply translations using an existing glossary. Assumes i18n is already set up.
 
-- **Trigger:** orchestrator specifies `mode: translate-only`
+- **Trigger:** th-orchestrator specifies `mode: translate-only`
 - **Prerequisites:** existing glossary in `session-docs/{feature-name}/00-translation.md` or `docs/glossary.md`
 - **Output:** updated locale files + updated report
 - **Flow:** Phase 0 → Phase 3 → Phase 4 → Phase 5
 
 ### Parallel-Batch Mode
 
-Translate a specific subset of files as part of a parallelized run. Receives all context from the orchestrator — does NOT discover, does NOT build glossary, does NOT set up i18n.
+Translate a specific subset of files as part of a parallelized run. Receives all context from the th-orchestrator — does NOT discover, does NOT build glossary, does NOT set up i18n.
 
-- **Trigger:** orchestrator specifies `mode: parallel-batch`
-- **Prerequisites:** ALL of the following passed inline by orchestrator:
+- **Trigger:** th-orchestrator specifies `mode: parallel-batch`
+- **Prerequisites:** ALL of the following passed inline by th-orchestrator:
   - `glossary`: path to `docs/glossary.md` (read-only, do NOT modify)
   - `i18n-config`: framework, library, key naming convention, interpolation syntax
   - `files`: list of files to translate (this agent's batch)
@@ -82,7 +82,7 @@ Translate a specific subset of files as part of a parallelized run. Receives all
 - **Rules:**
   - Use ONLY the provided glossary for translations — never invent terms
   - All keys MUST be prefixed with the assigned namespace: `{namespace}.{section}.{descriptor}`
-  - Write locale fragments as separate files (`{namespace}.en.json`, `{namespace}.es.json`), NOT the main `en.json`/`es.json` — the orchestrator merges them after all batches complete
+  - Write locale fragments as separate files (`{namespace}.en.json`, `{namespace}.es.json`), NOT the main `en.json`/`es.json` — the th-orchestrator merges them after all batches complete
   - Do NOT touch files outside your assigned batch
   - Do NOT modify `docs/glossary.md` — it's shared read-only across all parallel agents
   - Do NOT modify i18n config files — setup is already done
@@ -92,7 +92,7 @@ Translate a specific subset of files as part of a parallelized run. Receives all
 
 Merge locale fragments from parallel batches into final locale files, verify build, produce final report.
 
-- **Trigger:** orchestrator specifies `mode: merge`
+- **Trigger:** th-orchestrator specifies `mode: merge`
 - **Prerequisites:**
   - All parallel-batch agents have completed
   - Locale fragment files exist in locale directory (`{namespace}.en.json`, `{namespace}.es.json`)
@@ -580,7 +580,7 @@ If the file doesn't exist, create it with the header:
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: translator
@@ -594,4 +594,4 @@ glossary: docs/glossary.md
 
 The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness for the i18n library.
 
-Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to decide next steps.
+Do NOT repeat the full session-docs content in your final message — it's already written to the file. The th-orchestrator uses this status block to decide next steps.

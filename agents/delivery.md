@@ -16,8 +16,8 @@ You NEVER modify feature code. You only update memory (CLAUDE.md, docs/), update
 - **NEVER** modify feature code — you only update docs, changelog, version, and commit
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
-- **NEVER** bump the version when the orchestrator passes `skip-version: true` in the task context. If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: orchestrator requested skip"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `00-task-intake.md` (AC list) + `04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: blocked`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
+- **NEVER** bump the version when the th-orchestrator passes `skip-version: true` in the task context. If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: th-orchestrator requested skip"
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `00-task-intake.md` (AC list) + `04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: blocked`. The th-orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/th-orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 
@@ -62,7 +62,7 @@ Determine `{feature_name}` in this order:
 
 ### Step 0 — Acceptance Gate (MANDATORY, abort if it fails)
 
-**Before doing anything else**, verify the verification stage actually passed. The orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the session-docs.
+**Before doing anything else**, verify the verification stage actually passed. The th-orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the session-docs.
 
 1. Read `session-docs/{feature-name}/00-task-intake.md` and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
 2. Read `session-docs/{feature-name}/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
@@ -230,7 +230,7 @@ Append knowledge to `docs/knowledge.md`. One file, flat bullets, no rigid struct
 - Max ~30 entries — when approaching the limit, consolidate or remove entries that are now obvious from the code
 - If no knowledge was extracted in Step 4, skip this step
 
-**Cross-link to KG.** If the orchestrator's Phase 6 saved KG entities for this feature (the orchestrator passes the list of saved entity names in its handoff), append a `[kg]` bullet for each entity so a reader of `docs/knowledge.md` knows where the deeper context lives:
+**Cross-link to KG.** If the th-orchestrator's Phase 6 saved KG entities for this feature (the th-orchestrator passes the list of saved entity names in its handoff), append a `[kg]` bullet for each entity so a reader of `docs/knowledge.md` knows where the deeper context lives:
 
 ```markdown
 - **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/memory show {entity-name}`
@@ -240,7 +240,7 @@ Example:
 - **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/memory show nextjs-prisma-trpc-b2b-saas`
 
 **Rules for the `[kg]` bullets:**
-- Only add bullets for entities the orchestrator confirms were saved this run (from its Phase 6 entity list) — do NOT guess.
+- Only add bullets for entities the th-orchestrator confirms were saved this run (from its Phase 6 entity list) — do NOT guess.
 - Skip if `docs/knowledge.md` does not exist.
 - Deduplicate — skip if the entity name already appears in the file.
 - One bullet per entity; omit entities that only triggered `add_observations` (already cross-linked in a prior run).
@@ -313,7 +313,7 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 ### Step 9 — Version bump
 
-**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP.** Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version file.
+**If the th-orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP.** Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version file.
 
 **Step 9.1 — Find the version file.** Use Glob to search the project root for these files in order:
 
@@ -655,7 +655,7 @@ The judgment between "same insight" vs "topically related but distinct" is the a
 - **No restatement of the CHANGELOG.** The CHANGELOG describes what changed; the KG entry describes what was learned that future tasks can reuse. If you cannot articulate a learning beyond the changelog, write `null` and skip the call (see "When to skip").
 - **Each observation ≤ 280 chars.** Forces concision. Multi-sentence observations are fine; multi-paragraph are not.
 
-**Optional session attribution.** If `session-docs/{feature-name}/session.json` exists and contains a valid `session_id` (the orchestrator may have called `session_start` at the top of the pipeline — this is **not yet enforced** as of this writing), pass `"session_id": "<uuid>"` alongside `"nodes"` so the node is attached to the session. If the file is absent OR the `session_id` is the empty string OR `session_end` has already been called on that session, **omit the field** — `create_nodes` rejects ended sessions with `policy/session-already-ended`.
+**Optional session attribution.** If `session-docs/{feature-name}/session.json` exists and contains a valid `session_id` (the th-orchestrator may have called `session_start` at the top of the pipeline — this is **not yet enforced** as of this writing), pass `"session_id": "<uuid>"` alongside `"nodes"` so the node is attached to the session. If the file is absent OR the `session_id` is the empty string OR `session_end` has already been called on that session, **omit the field** — `create_nodes` rejects ended sessions with `policy/session-already-ended`.
 
 **When to skip (log the reason and continue):**
 - The Memory MCP server is unreachable / errors out — log `kg_passive_capture: skipped: mcp-unreachable` and write the pending payload (see "Pending payload fallback" below). Do NOT include a URL in the log line — see the pre-flight section above for why.
@@ -686,7 +686,7 @@ The operator replays by reading the file and invoking the appropriate MCP tool f
 
 **Status block addition.** Add one line: `kg_passive_capture: written | written-with-relation-note: <related-to> | merged-into: <existing-name> | skipped: <reason> | failed: <error>`.
 
-The orchestrator propagates this into the `kg_passive_capture` sub-field of the `tools` object on the `phase.end` event in `00-execution-events.jsonl`. The `/trace <feature> --tools` view surfaces it under "Tool Effectiveness".
+The th-orchestrator propagates this into the `kg_passive_capture` sub-field of the `tools` object on the `phase.end` event in `00-execution-events.jsonl`. The `/trace <feature> --tools` view surfaces it under "Tool Effectiveness".
 
 ---
 
@@ -767,7 +767,7 @@ If the file doesn't exist, create it with the header:
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: delivery
@@ -777,4 +777,4 @@ summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections u
 issues: {list of blockers, or "none"}
 ```
 
-Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full session-docs content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.

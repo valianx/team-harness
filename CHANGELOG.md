@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking change:** orchestrator agent renamed to `th-orchestrator` to cluster operator-facing surfaces under the `@th` autocomplete prefix. Existing installs will have a stale `~/.claude/agents/orchestrator.md` after `/th-update`; the skill removes it automatically (one-shot legacy cleanup). Operators must use `@th-orchestrator <task>` instead of `@orchestrator <task>` from this release forward.
+
 ## [2.5.1] - 2026-05-22
 
 ### Changed

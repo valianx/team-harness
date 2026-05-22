@@ -499,18 +499,18 @@
         all coordinated through session-docs files that persist across sessions.
       </p>
       <p class="prose" style="margin-top:12px;">
-        The front door is the orchestrator agent. Open Claude Code and type:
+        The front door is the th-orchestrator agent. Open Claude Code and type:
       </p>
       <div class="install-item" style="margin-top:14px; max-width:600px;">
         <div class="install-row">
-          <code class="install-code" id="cmd-start">@orchestrator give me the work plan for this task: &lt;description&gt;</code>
+          <code class="install-code" id="cmd-start">@th-orchestrator give me the work plan for this task: &lt;description&gt;</code>
           <button class="copy-btn" onclick="copyCmd('cmd-start', this)">copy</button>
         </div>
       </div>
       <p class="prose" style="margin-top:14px;">
-        The orchestrator opens a pipeline, stops for mandatory human approvals at each
+        The th-orchestrator opens a pipeline, stops for mandatory human approvals at each
         stage gate, and picks up exactly where it left off after a restart via
-        <span class="inline-code">@orchestrator recover &lt;feature&gt;</span>.
+        <span class="inline-code">@th-orchestrator recover &lt;feature&gt;</span>.
       </p>
     </div>
   </section>
@@ -563,7 +563,7 @@
 
         <div class="agent-card">
           <div class="agent-header">
-            <span class="agent-name">orchestrator</span>
+            <span class="agent-name">th-orchestrator</span>
             <span class="agent-pill" style="background:var(--role-cyan);color:var(--role-cyan-t);">hub</span>
           </div>
           <p class="agent-desc">Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes from standalone skills. Manages session-docs as the shared board between agents.</p>
@@ -614,7 +614,7 @@
             <span class="agent-name">acceptance-checker</span>
             <span class="agent-pill" style="background:var(--role-pink);color:var(--role-pink-t);">validation</span>
           </div>
-          <p class="agent-desc">External auditor that compares the original spec against the actual delivered artifacts. Detects drift between "what was asked" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the orchestrator uses to decide whether to proceed to Delivery. Read-only.</p>
+          <p class="agent-desc">External auditor that compares the original spec against the actual delivered artifacts. Detects drift between "what was asked" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the th-orchestrator uses to decide whether to proceed to Delivery. Read-only.</p>
         </div>
 
         <div class="agent-card">

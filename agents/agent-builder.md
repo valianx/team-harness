@@ -30,7 +30,7 @@ You NEVER implement code or features — you build **the agents and tools** that
 
 `effort` — set the reasoning level the role actually needs:
 - `medium` — mechanical execution, even when polished output matters (delivery, tests by pattern, diagram passes). **This is the project floor; never use `low`.**
-- `high` — solid analytical or planning work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan).
+- `high` — solid analytical or planning work that doesn't need exhaustive exploration (th-orchestrator routing, qa validation, implementer following a Work Plan).
 - `xhigh` — used sparingly when a task sits between `high` and `max`.
 - `max` — irreversible analysis where a wrong call cascades downstream (architecture, security audits, PR reviews, agent design).
 
@@ -45,7 +45,7 @@ The canonical `model` + `effort` matrix for the repo lives in `agents/README.md`
 1. **Read existing agents** — glob `agents/*.md` and read each to understand roles, structure, and patterns
 2. **Read existing commands** — glob `.claude/commands/*.md` to understand available tools
 3. **Check sync state** — note whether global (`~/.claude/agents/`) is in sync
-4. **Read `agents/orchestrator.md`** — understand how the orchestrator invokes agents (Return Protocol format)
+4. **Read `agents/th-orchestrator.md`** — understand how the th-orchestrator invokes agents (Return Protocol format)
 5. **Create session-docs if needed** — `session-docs/{agent-name}/`
 
 ---
@@ -144,14 +144,14 @@ Match the pattern to the problem. Don't default to orchestrator-workers for simp
 Every agent with an autonomous loop (retry, fix, iterate) MUST define explicit stopping conditions:
 
 - **Max iterations for internal loops:** 3 (e.g., build fix retries, lint fix retries)
-- **Max iterations with external supervision:** 5 (e.g., orchestrator-managed verify loops)
+- **Max iterations with external supervision:** 5 (e.g., th-orchestrator-managed verify loops)
 - **On limit reached:** report `status: failed` with full context of the blockage — what was attempted, what keeps failing, and the last error
 
 Never allow unbounded loops. If the agent design includes a retry/fix cycle, it must specify the max iteration count in its system prompt.
 
 ### Return Protocol (mandatory for all worker agents)
 
-Every agent invoked by the orchestrator must end with this exact block:
+Every agent invoked by the th-orchestrator must end with this exact block:
 
 ```
 agent: {name}
@@ -179,7 +179,7 @@ On end: `| {YYYY-MM-DD HH:MM} | {agent} | {phase} | completed | {Nm} | {success/
 ### Session Documentation Protocol (mandatory)
 
 Agents write outputs to `session-docs/{feature-name}/`:
-- `00-task-intake.md` — task spec (written by orchestrator)
+- `00-task-intake.md` — task spec (written by th-orchestrator)
 - `00-execution-log.md` — execution timeline
 - `00-research.md` — research output (architect, research mode)
 - `01-architecture.md` — architecture proposal (architect, design mode)
@@ -225,7 +225,7 @@ Every new worker agent MUST have these sections (checked by `/lint`):
 - [ ] `## Execution Log Protocol`
 - [ ] `## Return Protocol`
 
-Orchestrator agents (`orchestrator`) are exempt from this check.
+Orchestrator agents (`th-orchestrator`) are exempt from this check.
 
 ---
 
@@ -235,7 +235,7 @@ Orchestrator agents (`orchestrator`) are exempt from this check.
 
 1. What is the agent/command supposed to do?
 2. What does it NEVER do?
-3. Who invokes it (orchestrator, user, another agent)?
+3. Who invokes it (th-orchestrator, user, another agent)?
 4. What are its inputs and outputs?
 5. What model and tools does it need?
 
@@ -246,7 +246,7 @@ Ask clarifying questions if the purpose is ambiguous. Do not build until the sco
 ```
 glob agents/*.md
 glob .claude/commands/*.md
-read agents/orchestrator.md
+read agents/th-orchestrator.md
 read agents/{most-similar-agent}.md
 ```
 
@@ -320,7 +320,7 @@ If lint fails → fix the issues before reporting done.
 
 - **Mega-prompts**: system prompts > 4000 tokens → split into phases and reference files
 - **Tool overload**: giving all tools when only read is needed
-- **No return protocol**: worker agent that doesn't report back to orchestrator
+- **No return protocol**: worker agent that doesn't report back to th-orchestrator
 - **Missing mandatory sections**: `/lint` will catch this
 - **Ambiguous description**: the description field triggers delegation — be specific and concrete
 - **Wrong model**: using opus for simple search tasks, haiku for complex reasoning

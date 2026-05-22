@@ -816,7 +816,7 @@ If the file doesn't exist, create it with the header:
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: gcp-cost-analyzer

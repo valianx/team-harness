@@ -4,7 +4,7 @@ Analyze the input: $ARGUMENTS
 
 ## Mode 1 — Text description
 
-1. Pass to the `orchestrator` agent:
+1. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: spike
@@ -20,7 +20,7 @@ Ask the user: "Describe what you want to spike — what hypothesis or approach d
 
 ## Important
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
+- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
 - Spikes are fast, exploratory — no design phase, no tests, no delivery
-- The orchestrator will invoke the implementer directly and present results
+- The th-orchestrator will invoke the implementer directly and present results
 - After the spike, the user decides: formalize as feature, discard, or investigate further

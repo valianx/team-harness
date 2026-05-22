@@ -164,11 +164,11 @@ Before writing any test:
 
 Tests verify the **acceptance criteria** from the spec. They are **ordered by the changed files** for dependency correctness.
 
-1. **Read the spec** — read `session-docs/{feature-name}/00-task-intake.md` (or AC passed by the orchestrator). Extract the full list of acceptance criteria.
+1. **Read the spec** — read `session-docs/{feature-name}/00-task-intake.md` (or AC passed by the th-orchestrator). Extract the full list of acceptance criteria.
 2. **Map the changes** — read session-docs and git diff to determine what was modified. List every file, service, component, or endpoint that was added or changed.
 3. **AC Coverage Mapping** — for each acceptance criterion, identify which changed file(s) implement it and which test(s) will verify it. Every AC must map to at least one test. If an AC cannot be mapped to a test, flag it.
    - **AC formats:** Both `Given/When/Then` and `VERIFY: {condition}` are valid. For VERIFY criteria, write a test that asserts the stated condition holds true.
-   - **Large specs (>10 AC):** Group AC by component/area in the AC Coverage table. This helps the orchestrator and QA quickly understand coverage at a glance.
+   - **Large specs (>10 AC):** Group AC by component/area in the AC Coverage table. This helps the th-orchestrator and QA quickly understand coverage at a glance.
 4. **Order by dependency** — start from the lowest-level changes (utilities, repositories, factories) up to the highest (controllers, pages, orchestrators). **Write tests in this exact order.** Each test file corresponds to a changed file.
 5. **For each changed unit, define:**
    - Which AC it satisfies (reference by AC number)
@@ -527,7 +527,7 @@ If the file doesn't exist, create it with the header:
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The th-orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In write mode: a test target uses a framework with known testing gotchas — query before writing tests (e.g., `"Vitest Prisma"`, `"Jest Next.js"`) to surface workarounds like pool settings or mock strategies.
@@ -537,8 +537,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 **How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
+- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in th-orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the th-orchestrator will pick it up.
+- Re-query for the same term the th-orchestrator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -547,7 +547,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: tester
@@ -566,20 +566,20 @@ issues: {list of failing tests, or "none"}
 **Mandatory tool-usage fields:**
 - `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear.
 - `memory_consult` — count of Knowledge Graph queries made this run. Zero is valid.
-- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+- `kg_save_candidates` — names of KG entities you propose the th-orchestrator persist (empty list `[]` is valid).
 
-The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md`.
+The th-orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md`.
 
 **Field semantics:**
 - `tests_count` — total individual test cases after this iteration (sum of `it()` / `test()` blocks across the suite, or your framework's equivalent). Count cases, not files.
 - `tests_deleted` — number of test cases removed this iteration. **Default: 0.**
-- `tests_deleted_reason` — required only when `tests_deleted > 0`. Examples that pass the orchestrator's test-ratchet gate: "obsolete tests for removed feature X", "duplicate tests consolidated into shared factory", "tests covered scenarios reverted by user request". Examples that FAIL the gate: "tests were broken", "tests were flaky", "couldn't make them pass" — these are NOT valid reasons to delete tests, fix the underlying issue instead.
+- `tests_deleted_reason` — required only when `tests_deleted > 0`. Examples that pass the th-orchestrator's test-ratchet gate: "obsolete tests for removed feature X", "duplicate tests consolidated into shared factory", "tests covered scenarios reverted by user request". Examples that FAIL the gate: "tests were broken", "tests were flaky", "couldn't make them pass" — these are NOT valid reasons to delete tests, fix the underlying issue instead.
 
-Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full session-docs content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.
 
 ### Failure Brief (when `status: failed` only)
 
-When you finish with `status: failed`, **append** an iteration entry to `session-docs/{feature-name}/failure-brief.md` so the orchestrator can route the iteration without re-reading `03-testing.md`. Create the file if it doesn't exist.
+When you finish with `status: failed`, **append** an iteration entry to `session-docs/{feature-name}/failure-brief.md` so the th-orchestrator can route the iteration without re-reading `03-testing.md`. Create the file if it doesn't exist.
 
 ```markdown
 ## Iteration {N} — tester — {YYYY-MM-DD HH:MM}
@@ -594,4 +594,4 @@ When you finish with `status: failed`, **append** an iteration entry to `session
 - ...
 ```
 
-Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing — no re-reads of the full test report.
+Keep the brief tight: 5-10 lines per iteration. The th-orchestrator reads ONLY this file to decide routing — no re-reads of the full test report.

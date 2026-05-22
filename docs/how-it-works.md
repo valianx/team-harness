@@ -4,32 +4,32 @@ Team-harness turns Claude Code into a Spec-Driven Development pipeline. Every fe
 
 ---
 
-## Entry point: the orchestrator
+## Entry point: the th-orchestrator
 
-**The `orchestrator` agent is the canonical front door for every workflow.** You drive the entire lifecycle by talking to it conversationally — design, implementation, delivery, and recovery all enter through the same agent. Phrasings that route correctly:
+**The `th-orchestrator` agent is the canonical front door for every workflow.** You drive the entire lifecycle by talking to it conversationally — design, implementation, delivery, and recovery all enter through the same agent. Phrasings that route correctly:
 
 ```
-@orchestrator give me the work plan for this task: <description>   # → Stage 1 design
-@orchestrator implement it                                          # → Stage 2 implementation
-@orchestrator open the PR                                           # → Stage 3 delivery + push
-@orchestrator recover <feature>                                     # → resume from 00-state.md
+@th-orchestrator give me the work plan for this task: <description>   # → Stage 1 design
+@th-orchestrator implement it                                          # → Stage 2 implementation
+@th-orchestrator open the PR                                           # → Stage 3 delivery + push
+@th-orchestrator recover <feature>                                     # → resume from 00-state.md
 ```
 
-The orchestrator's intent-detection step (Step 6 of its contract in `agents/orchestrator.md`) classifies the natural-language request and dispatches to the right phase or direct mode — design, implementation, verify, delivery, plan-review, validate, deliver, research, and others. Verbs such as `design`, `give me the plan`, `implement`, `open the PR`, `validate`, `review the plan`, `research`, and `recover` map to specific phases. The intent-detection patterns are bilingual; the operator can use either English or Spanish at the chat layer, but repo artefacts (this doc included) are written in English.
+The th-orchestrator's intent-detection step (Step 6 of its contract in `agents/th-orchestrator.md`) classifies the natural-language request and dispatches to the right phase or direct mode — design, implementation, verify, delivery, plan-review, validate, deliver, research, and others. Verbs such as `design`, `give me the plan`, `implement`, `open the PR`, `validate`, `review the plan`, `research`, and `recover` map to specific phases. The intent-detection patterns are bilingual; the operator can use either English or Spanish at the chat layer, but repo artefacts (this doc included) are written in English.
 
-**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/status` exist and work, but they all route into the same orchestrator agent under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@orchestrator` path covers everything.
+**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/status` exist and work, but they all route into the same th-orchestrator agent under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@th-orchestrator` path covers everything.
 
-Pick whichever feels more natural. The rest of this doc uses the orchestrator-conversational form.
+Pick whichever feels more natural. The rest of this doc uses the th-orchestrator-conversational form.
 
 ---
 
 ## The pipeline
 
-You tell the orchestrator: `@orchestrator give me the work plan for this task: add a daily reports endpoint`.
+You tell the th-orchestrator: `@th-orchestrator give me the work plan for this task: add a daily reports endpoint`.
 
 ### Stage 1 — Analysis
 
-The `orchestrator` creates `session-docs/daily-reports/` and routes to the `architect`. The architect reads `docs/knowledge.md`, the codebase, and any prior session-docs; produces `01-architecture.md` (the design proposal) and `02-task-list.md` (one section per PR, with Given/When/Then acceptance criteria). `qa` runs Phase 1.5 to confirm every AC maps to a Work Plan step. `plan-reviewer` runs Phase 1.6 to audit the plan-shape (one PR per service, AC format, consolidated documents, cross-references).
+The `th-orchestrator` creates `session-docs/daily-reports/` and routes to the `architect`. The architect reads `docs/knowledge.md`, the codebase, and any prior session-docs; produces `01-architecture.md` (the design proposal) and `02-task-list.md` (one section per PR, with Given/When/Then acceptance criteria). `qa` runs Phase 1.5 to confirm every AC maps to a Work Plan step. `plan-reviewer` runs Phase 1.6 to audit the plan-shape (one PR per service, AC format, consolidated documents, cross-references).
 
 You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the PR table. Reply `approve` (per-PR stops in Stage 2) or `approve autonomous` (skip the per-PR stops).
 
@@ -80,8 +80,8 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 ## What ships
 
-- **17 agents** (`orchestrator`, `architect`, `implementer`, `tester`, `qa`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `security`, plus `diagrammer` / `likec4-diagrammer` / `d2-diagrammer`, `translator`, `gcp-cost-analyzer`, `init`, `agent-builder`). Full roster + model + effort matrix in [`agents/README.md`](../agents/README.md).
-- **29 skills** (slash commands). Most route into the orchestrator; five are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`). Common entries: `/design`, `/recover`, `/deliver`, `/review-pr`, `/issue`, `/background`.
+- **17 agents** (`th-orchestrator`, `architect`, `implementer`, `tester`, `qa`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `security`, plus `diagrammer` / `likec4-diagrammer` / `d2-diagrammer`, `translator`, `gcp-cost-analyzer`, `init`, `agent-builder`). Full roster + model + effort matrix in [`agents/README.md`](../agents/README.md).
+- **29 skills** (slash commands). Most route into the th-orchestrator; five are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`). Common entries: `/design`, `/recover`, `/deliver`, `/review-pr`, `/issue`, `/background`.
 - **Hooks.** `hooks/policy-block.sh` is the `PreToolUse` gate (48 tested cases: destructive Bash, force-push, secret-file writes, etc.). Notification scripts per OS are optional opt-in.
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
 

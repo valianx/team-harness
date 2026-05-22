@@ -1,13 +1,13 @@
 ---
 name: ref-special-flows
-description: Reference file for orchestrator special flows (research, spike, plan, parallel dispatch, refactor, simple). Read on-demand by the orchestrator — not a standalone agent.
+description: Reference file for th-orchestrator special flows (research, spike, plan, parallel dispatch, refactor, simple). Read on-demand by the th-orchestrator — not a standalone agent.
 model: opus
 color: cyan
 ---
 
-# Orchestrator — Special Flows Reference
+# th-orchestrator — Special Flows Reference
 
-This file is read on-demand by the orchestrator when executing a special flow. It is NOT part of the orchestrator's system prompt.
+This file is read on-demand by the th-orchestrator when executing a special flow. It is NOT part of the th-orchestrator's system prompt.
 
 ---
 
@@ -58,10 +58,10 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeli
 
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
-| `01-planning.md` | planning mode (`/plan`, `/plan plan-and-execute`) | orchestrator (multi-task dispatch) | break a broad scope into N parallel tasks |
+| `01-planning.md` | planning mode (`/plan`, `/plan plan-and-execute`) | th-orchestrator (multi-task dispatch) | break a broad scope into N parallel tasks |
 | `02-task-list.md` | design mode (normal pipeline) | implementer + qa + plan-reviewer | list of sequential PRs with per-PR ACs |
 
-Inside each task dispatched by `plan-and-execute`, the child orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `02-task-list.md` for that task's PRs. The parent batch orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
+Inside each task dispatched by `plan-and-execute`, the child th-orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `02-task-list.md` for that task's PRs. The parent batch th-orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
 
 ### Planning phase (both modes)
 
@@ -83,16 +83,16 @@ Inside each task dispatched by `plan-and-execute`, the child orchestrator runs t
 
 ## Parallel Dispatch Flow (DEFAULT for 2+ tasks)
 
-Parallel dispatch is defined in the orchestrator's **Multi-Task Orchestration** section. It is the **default behavior** whenever the orchestrator has 2+ tasks, regardless of entry point.
+Parallel dispatch is defined in the th-orchestrator's **Multi-Task Orchestration** section. It is the **default behavior** whenever the th-orchestrator has 2+ tasks, regardless of entry point.
 
 **Entry points that lead here:**
 - `/plan plan-and-execute` → architect produces task breakdown → dispatch
 - `/issue #1 #2 #3` → multiple issues → dispatch
-- User requests batch/parallel work → orchestrator runs Specify + Design (planning mode) → dispatch
-- Orchestrator identifies broad scope needing breakdown → auto plan-and-execute → dispatch
+- User requests batch/parallel work → th-orchestrator runs Specify + Design (planning mode) → dispatch
+- th-orchestrator identifies broad scope needing breakdown → auto plan-and-execute → dispatch
 
 When multiple tasks exist:
-1. The orchestrator reads `01-planning.md` for dependency info (if available) or analyzes dependencies itself
+1. The th-orchestrator reads `01-planning.md` for dependency info (if available) or analyzes dependencies itself
 2. Follows the **Multi-Task Orchestration** flow (dependency analysis → rounds → hooks + inotifywait → event-driven monitoring)
 3. Each worktree runs a full pipeline via `/issue #{number}`
 
@@ -154,7 +154,7 @@ A dedicated pipeline for achieving **80% branch coverage service-wide**. Decompo
 
 ### Phase 0 --- Analyze & Decompose
 
-**Owner:** Orchestrator
+**Owner:** th-orchestrator
 
 1. **Resolve target** --- use service path from skill (or cwd). Validate it contains source code.
 2. **Detect stack** --- read `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc. Detect test framework from config files (`jest.config.*`, `vitest.config.*`, `pytest.ini`, etc.).
@@ -184,7 +184,7 @@ A dedicated pipeline for achieving **80% branch coverage service-wide**. Decompo
 
 ### Phase 1 --- Blocker Round
 
-**Owner:** Orchestrator dispatches, tester agent executes
+**Owner:** th-orchestrator dispatches, tester agent executes
 
 **These tasks MUST complete before any parallel test task starts.**
 
@@ -229,7 +229,7 @@ Test-Pipeline Task:
 
 ### Phase 2 --- Parallel Test Round
 
-**Owner:** Orchestrator dispatches via Multi-Task Orchestration
+**Owner:** th-orchestrator dispatches via Multi-Task Orchestration
 
 **Reuses existing parallel dispatch mechanism:** worktrees + tmux, max 5 concurrent, eager slot-filling, Stop hooks + inotifywait.
 
@@ -275,7 +275,7 @@ Reuse Multi-Task Orchestration Steps 1-6 exactly:
 
 #### Internal fix loop
 
-Each tester agent has its own fix loop (max 3 attempts). If a module fails after 3 internal attempts, it reports `status: failed`. The orchestrator records it in `batch-progress.md` but does NOT re-launch automatically.
+Each tester agent has its own fix loop (max 3 attempts). If a module fails after 3 internal attempts, it reports `status: failed`. The th-orchestrator records it in `batch-progress.md` but does NOT re-launch automatically.
 
 #### Gap iteration (re-launched from Phase 3)
 
@@ -286,7 +286,7 @@ When Phase 3 sends tasks back:
 
 ### Phase 3 --- Coverage Gate
 
-**Owner:** Orchestrator
+**Owner:** th-orchestrator
 
 **⚠️ THE 80% BRANCH COVERAGE GATE IS NON-NEGOTIABLE. 79.99% IS A FAILURE. THERE IS NO "CLOSE ENOUGH".**
 
@@ -343,7 +343,7 @@ When Phase 3 sends tasks back:
 
 ### Phase 4 --- Consolidation & Report
 
-**Owner:** Orchestrator
+**Owner:** th-orchestrator
 
 1. **Merge per-module results** --- aggregate: tests created, tests passing, coverage, security findings from all `03-testing.md` files.
 
@@ -419,7 +419,7 @@ When Phase 3 sends tasks back:
 
 ```
 session-docs/
-  test-pipeline/                        # orchestrator coordination
+  test-pipeline/                        # th-orchestrator coordination
     00-state.md                         # pipeline checkpoint
     00-execution-log.md                 # all agents append
     00-task-intake.md                   # service analysis & task list
@@ -449,7 +449,7 @@ session-docs/
 
 ## User-Initiated Simple Mode
 
-**Only the user can request simple mode.** The orchestrator NEVER auto-classifies as simple.
+**Only the user can request simple mode.** The th-orchestrator NEVER auto-classifies as simple.
 
 When the user explicitly says "simple", "just implement", "skip design", "no tests needed", or equivalent:
 

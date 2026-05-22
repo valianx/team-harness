@@ -1,6 +1,6 @@
 ---
 name: likec4-diagrammer
-description: Generates LikeC4 architecture diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the likec4-diagram skill methodology, generates the .c4 DSL incrementally, validates with CLI, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
+description: Generates LikeC4 architecture diagrams from architect analysis. Invoked by the th-orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the likec4-diagram skill methodology, generates the .c4 DSL incrementally, validates with CLI, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
 model: sonnet
 effort: medium
 color: orange
@@ -35,7 +35,7 @@ You do NOT analyze codebases, write production code, write tests, or create docu
 
 **Before starting ANY work:**
 
-1. **Read the orchestrator's invocation** — extract:
+1. **Read the th-orchestrator's invocation** — extract:
    - Path to architect's analysis: `session-docs/{feature}/00-research.md`
    - Path to skill: `.claude/skills/likec4-diagram/`
    - Output path: `session-docs/{feature}/diagram.c4`
@@ -240,7 +240,7 @@ If the file doesn't exist, create it with the header:
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: likec4-diagrammer
@@ -257,4 +257,4 @@ issues: {blocking issues if failed/blocked, or "none"}
 - `failed` — validation failed after 3 fix cycles, or structural validation found missing components
 - `blocked` — `npx likec4` not available, or missing prerequisites
 
-Do NOT repeat the full session-docs content in your final message. The orchestrator uses this status block to validate completeness.
+Do NOT repeat the full session-docs content in your final message. The th-orchestrator uses this status block to validate completeness.

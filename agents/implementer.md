@@ -57,15 +57,15 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 2. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. Read ALL files:
    - `00-task-intake.md` — original task definition and feature-wide scope (context, not your scope).
    - `01-architecture.md` — **CRITICAL: this is your blueprint.** Follow the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies).
-   - `02-task-list.md` (if present) — **CRITICAL when the orchestrator assigned you a PR identifier.** Read your assigned PR's section: `Files:` is the file scope you must not exceed, `Acceptance Criteria:` is the contract you must satisfy, `Notes:` flags constraints (e.g., same-commit OAS bump). The feature-wide AC list in `00-task-intake.md` is for context; your PR's AC block is the contract.
+   - `02-task-list.md` (if present) — **CRITICAL when the th-orchestrator assigned you a PR identifier.** Read your assigned PR's section: `Files:` is the file scope you must not exceed, `Acceptance Criteria:` is the contract you must satisfy, `Notes:` flags constraints (e.g., same-commit OAS bump). The feature-wide AC list in `00-task-intake.md` is for context; your PR's AC block is the contract.
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `04-validation.md` — understand acceptance criteria to satisfy
 
-   **Per-PR scoping (pipeline_version: 2).** If the orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `02-task-list.md`. If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
+   **Per-PR scoping (pipeline_version: 2).** If the th-orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `02-task-list.md`. If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the th-orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
-   **Backward compat (pipeline_version: 1 or `02-task-list.md` absent).** Fall back to the legacy contract: follow the full Work Plan in `01-architecture.md` and validate against the feature-wide AC list in `00-task-intake.md`. The orchestrator does not pass a PR identifier in legacy mode.
+   **Backward compat (pipeline_version: 1 or `02-task-list.md` absent).** Fall back to the legacy contract: follow the full Work Plan in `01-architecture.md` and validate against the feature-wide AC list in `00-task-intake.md`. The th-orchestrator does not pass a PR identifier in legacy mode.
 
-   **You NEVER write to `02-task-list.md`.** It is the Stage 1 contract — frozen for you. The orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
+   **You NEVER write to `02-task-list.md`.** It is the Stage 1 contract — frozen for you. The th-orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
 3. **Create session-docs folder if it doesn't exist** — create `session-docs/{feature-name}/` for your output.
 
@@ -212,7 +212,7 @@ When implementation reveals a technical constraint that affects an acceptance cr
 
 1. **Annotate the spec** — open `00-task-intake.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC using the Edit tool
 2. **Document in your output** — mention the deviation in `02-implementation.md` under "Deviations from Architecture"
-3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The orchestrator will reconcile the spec before verification.
+3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The th-orchestrator will reconcile the spec before verification.
 
 **Examples:**
 - AC says "use WebSocket for real-time updates" but the framework only supports SSE → annotate and implement with SSE
@@ -290,7 +290,7 @@ If the file doesn't exist, create it with the header:
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: implementer
@@ -303,4 +303,4 @@ issues: {list of blockers, or "none"}
 
 The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness.
 
-Do NOT repeat the full session-docs content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full session-docs content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.

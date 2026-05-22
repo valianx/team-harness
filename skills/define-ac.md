@@ -10,7 +10,7 @@ Analyze the input: $ARGUMENTS
    gh issue view {number} --json number,title,body,labels
    ```
 3. If the command fails, tell the user: "Issue #{number} not found or `gh` is not configured. Provide the feature as text instead."
-4. Pass to the `orchestrator` agent:
+4. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: define-ac
@@ -22,7 +22,7 @@ Analyze the input: $ARGUMENTS
 
 ## Mode 2 — Text description
 
-1. Pass to the `orchestrator` agent:
+1. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: define-ac
@@ -39,7 +39,7 @@ Ask the user: "Provide a GitHub issue number or describe the feature to define a
 
 ## Important
 
-- **You read issues. The orchestrator does NOT** — it receives the data from you.
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator will route to the `qa` agent in define-ac mode
+- **You read issues. The th-orchestrator does NOT** — it receives the data from you.
+- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
+- The th-orchestrator will route to the `qa` agent in define-ac mode
 - Output: acceptance criteria in Given/When/Then format

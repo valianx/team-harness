@@ -1,4 +1,4 @@
-Pull the latest team-harness release into `~/.claude/` inline, without launching the Go installer binary. This is a standalone utility — does NOT route through the orchestrator.
+Pull the latest team-harness release into `~/.claude/` inline, without launching the Go installer binary. This is a standalone utility — does NOT route through the th-orchestrator.
 
 Analyze the input: $ARGUMENTS
 
@@ -122,6 +122,8 @@ Track per-category counters as you go, incrementing only when a file is actually
 
 4. **Hooks** — every `hooks/*.sh` file in the extracted tree is copied to `~/.claude/hooks/<filename>`. Ensure `~/.claude/hooks/` exists first. On Linux and macOS, set the executable bit (`chmod +x`); on Windows, no chmod is required. Increment `hooks_count` for each file written. **Do NOT copy `hooks/config.json`** — that file stays under operator control.
 
+5. **Legacy cleanup — `orchestrator.md` removal (one-shot, v2.6.0 rename migration)**. After the agent copy in step 1, check whether `~/.claude/agents/orchestrator.md` still exists on disk. If it does, remove it with `rm -f` (no error if missing — the file disappears silently on systems that already migrated). Track this in a `legacy_removed` flag (boolean) so the operator-facing summary can surface the cleanup. This is a one-time migration: the v2.6.0 release renamed the `orchestrator` agent to `th-orchestrator`, and existing installs would otherwise carry both the stale and the new file side-by-side. The check is conditional and idempotent — safe to re-run.
+
 **File-copy failure handling.** If any individual copy fails (permission denied, disk full, source not found after extraction), print the failing source path and destination path and stop. Do not roll back files already written; report counters as they stood at the failure.
 
 ---
@@ -160,6 +162,14 @@ skills:   <simple_skills_count + complex_skills_count> (<simple_skills_count> si
 hooks:    <hooks_count>
 ```
 
+If `legacy_removed` is true (the v2.6.0 one-shot orchestrator-to-th-orchestrator migration fired this run), append one more line immediately after the `hooks:` line:
+
+```
+legacy:   removed ~/.claude/agents/orchestrator.md
+```
+
+If `legacy_removed` is false, omit the line entirely — operators on a clean install or already-migrated install should not see a no-op row.
+
 Substitute the tag captured in Step 1 and the counters tracked in Step 5.
 
 If the skill stopped on an error before reaching this step, print the failure block instead:
@@ -188,7 +198,7 @@ No emoji, no leading marker, no rephrasing. Print this even on a partial-failure
 
 ## Important
 
-- This skill does NOT route through the orchestrator.
+- This skill does NOT route through the th-orchestrator.
 - This skill does NOT launch the Go installer binary, `install.sh`, `install.ps1`, or `install.cmd`. The previous version of this skill did, and the binary's output was unreadable to the agent because the binary ran in a separate process (a new console window on Windows). This skill drives the update entirely inline so the summary and any errors stay in the agent's transcript.
 - This skill does NOT prompt the operator interactively. There are no credentials to capture — `MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, and `CONTEXT7_API_KEY` were already written to `~/.claude.json` during the original bootstrap install and are not touched here.
 - This skill does NOT compare versions or print a "you have X, latest is Y" line. The operator gets the release tag back; if they need to compare against their installed version, they read `~/.claude/.claude-dev-team-manifest.json` themselves.

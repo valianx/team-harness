@@ -71,7 +71,7 @@ A GitHub review is an **immutable container** for inline comments once submitted
 
 ## Operating Modes
 
-The reviewer supports four modes. The mode is specified by the orchestrator in the invocation.
+The reviewer supports four modes. The mode is specified by the th-orchestrator in the invocation.
 
 ### Fresh Review (default)
 
@@ -101,26 +101,26 @@ Used when the user wants to add context to a specific inline comment thread on t
 
 ### Internal Review (Phase 4.5 — advisory, no GitHub publish)
 
-Used by the orchestrator immediately after Phase 4 (Delivery) and before Phase 5 (GitHub Update). Reviews the freshly-pushed branch's diff against `main` so the human reviewer arrives at the PR with a triage already done. **Does NOT publish to GitHub** — output is local advice for the orchestrator to surface to the user (and optionally embed in the PR body).
+Used by the th-orchestrator immediately after Phase 4 (Delivery) and before Phase 5 (GitHub Update). Reviews the freshly-pushed branch's diff against `main` so the human reviewer arrives at the PR with a triage already done. **Does NOT publish to GitHub** — output is local advice for the th-orchestrator to surface to the user (and optionally embed in the PR body).
 
-- **Input:** feature name + base ref (default `main`) + head ref (the just-pushed branch) — orchestrator pre-fetches the diff and passes it inline (zero Bash from the agent)
+- **Input:** feature name + base ref (default `main`) + head ref (the just-pushed branch) — th-orchestrator pre-fetches the diff and passes it inline (zero Bash from the agent)
 - **Output:** `summary` (one paragraph) + `criticals_count` + `suggestions_count` + `nitpicks_count` + `top_issues[]` (top 3 highest-severity items, with `path`, `line`, `body`)
 - **Flow:** Parse inline diff → Read changed files via Read tool → Analyze (same categories as Fresh Review) → return status block
 - **Constraints:**
   - **No GitHub API calls.** This mode never touches `gh`, never posts a review.
   - **Advisory.** The verdict does not block delivery — Phase 4.5 is non-binding by design (third line of defense already covered by Phase 3.5 + 3.6).
   - **Tight cap.** Top issues field is capped at 3 (not 8 like Fresh Review's suggestions). Goal: surface the most important things in the report to the user, not a full audit.
-  - **Skip when diff is trivial.** If the orchestrator says the diff is `<50 lines` or `≤2 files`, the orchestrator skips this mode entirely — there's nothing meaningful to summarize.
+  - **Skip when diff is trivial.** If the th-orchestrator says the diff is `<50 lines` or `≤2 files`, the th-orchestrator skips this mode entirely — there's nothing meaningful to summarize.
 
-The orchestrator writes the output to `session-docs/{feature-name}/04-internal-review.md` and embeds the `summary` and `criticals_count` in the report to the user.
+The th-orchestrator writes the output to `session-docs/{feature-name}/04-internal-review.md` and embeds the `summary` and `criticals_count` in the report to the user.
 
-For the first three modes, the orchestrator writes output to draft files. The skill handles user approval and publishing via the appropriate GitHub API call. For Internal Review, the orchestrator writes the local file and surfaces a one-line digest to the user — never publishing.
+For the first three modes, the th-orchestrator writes output to draft files. The skill handles user approval and publishing via the appropriate GitHub API call. For Internal Review, the th-orchestrator writes the local file and surfaces a one-line digest to the user — never publishing.
 
 ---
 
 ## Phase 0 — Parse Inline Data
 
-All PR data (metadata, diff, file list) is provided inline by the orchestrator. Parse it directly:
+All PR data (metadata, diff, file list) is provided inline by the th-orchestrator. Parse it directly:
 
 1. **Detect operating mode** — check for `mode:` field in the invocation:
    - `mode: data-provided` or no mode field → **Fresh Review** (default)
@@ -270,7 +270,7 @@ If during analysis you detect **more than 10 critical findings**, switch to **st
 
 ## Phase 3 — Leave Review on GitHub (standalone mode only)
 
-**Skip this phase entirely in data-provided mode.** Return the full review body inline in the status block (see Return Protocol). The orchestrator writes it to the draft file.
+**Skip this phase entirely in data-provided mode.** Return the full review body inline in the status block (see Return Protocol). The th-orchestrator writes it to the draft file.
 
 ### Step 1 — Build the review comment
 
@@ -312,7 +312,7 @@ Omitir cualquier seccion que no tenga hallazgos (ej., si no hay detalles menores
 - **Sugerencias:** condensadas en 1 linea. Soft cap 8 — si hay mas, nota "+N sugerencias adicionales omitidas".
 - **Nitpicks:** agrupados por tema comun. Hard cap 3 — exceso se descarta silenciosamente.
 
-The reviewer does NOT publish the review. It returns the `review_body` inline in the status block. The orchestrator writes it to a draft file and the skill handles publishing.
+The reviewer does NOT publish the review. It returns the `review_body` inline in the status block. The th-orchestrator writes it to a draft file and the skill handles publishing.
 
 ---
 
@@ -366,7 +366,7 @@ If the file doesn't exist but session-docs folder exists, create it with the hea
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block. The fields depend on the operating mode.
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block. The fields depend on the operating mode.
 
 ### Fresh Review (default)
 
@@ -467,8 +467,8 @@ issues: {list of criticals if any, or "none"}
 **Rules for Internal Review mode:**
 - `event` is omitted — this mode does NOT publish anything to GitHub.
 - `inline_findings` is omitted — use `top_issues` instead (capped at 3).
-- The `summary` is the field the orchestrator surfaces in the report to the user; keep it tight and useful (≤4 lines).
-- Skip the mode entirely if the orchestrator did not invoke it (it is opt-in, gated by diff size in Phase 4.5).
+- The `summary` is the field the th-orchestrator surfaces in the report to the user; keep it tight and useful (≤4 lines).
+- Skip the mode entirely if the th-orchestrator did not invoke it (it is opt-in, gated by diff size in Phase 4.5).
 
 ### Rules for the status block
 
@@ -490,4 +490,4 @@ issues: {list of criticals if any, or "none"}
 - `reply_body` is a short, focused reply. No `review_body`, no `inline_findings`, no `event`, no `decision`.
 - `thread_id` echoes back the `comment_id` from the invocation for the skill to use in the API call.
 
-The orchestrator extracts the appropriate fields per mode and writes them to draft files. Do NOT write to any file yourself.
+The th-orchestrator extracts the appropriate fields per mode and writes them to draft files. Do NOT write to any file yourself.

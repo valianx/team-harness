@@ -1,6 +1,6 @@
 Validate the health of agents and skills in this dev-team system. Run all 4 checks below **in sequence**, then show the consolidated report.
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
+**IMPORTANT:** This skill runs directly — do NOT invoke the `th-orchestrator` agent or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
 
 ---
 
@@ -45,7 +45,7 @@ Result:
 
 For each `.md` file in `agents/`:
 
-1. **Skip** `orchestrator.md` (it has a different structure as the hub agent)
+1. **Skip** `th-orchestrator.md` (it has a different structure as the hub agent)
 2. For all other agent files, check that these **mandatory sections** exist (as `## Section Name` headings):
    - `## Core Philosophy`
    - `## Session Context Protocol`
@@ -66,7 +66,7 @@ Result:
 For each `.md` file in `agents/`:
 
 1. **Skip** these files (they have their own guardrail model or Write/Edit IS their job):
-   - `orchestrator.md` — hub agent, different structure
+   - `th-orchestrator.md` — hub agent, different structure
    - `diagrammer.md`, `d2-diagrammer.md`, `likec4-diagrammer.md` — generate diagram files (Write/Edit is their core function)
    - `init.md` — generates CLAUDE.md (Write/Edit is its core function)
 2. For each remaining agent, check its tool grants (from frontmatter or Tool Scoping section) and verify:
@@ -81,18 +81,18 @@ Result:
 
 ---
 
-## Check 5 — Orchestrator coherence
+## Check 5 — th-orchestrator coherence
 
-Cross-reference the orchestrator's team table against actual agent files.
+Cross-reference the th-orchestrator's team table against actual agent files.
 
-1. **Read `agents/orchestrator.md`** and extract the team table (the `| Agent | Role |` table)
-2. **List all `.md` files in `agents/`** (excluding `orchestrator.md` and `ref-*.md` reference files)
+1. **Read `agents/th-orchestrator.md`** and extract the team table (the `| Agent | Role |` table)
+2. **List all `.md` files in `agents/`** (excluding `th-orchestrator.md` and `ref-*.md` reference files)
 3. **Cross-check:**
    - For each agent in the team table → verify a corresponding `.md` file exists in `agents/`
-   - For each agent `.md` file (excluding orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note
+   - For each agent `.md` file (excluding th-orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note
    - Report: agents in table but missing file, agents with file but not in table/standalone note
 4. **Session-doc conflicts:** Extract the `Session doc` column from the team table. Check for duplicate output files (two agents writing to the same session-doc). Report any duplicates.
-5. **Direct modes coherence:** Read the Direct Modes table in `orchestrator.md`. For each agent referenced in the direct modes table, verify it exists as a file in `agents/`.
+5. **Direct modes coherence:** Read the Direct Modes table in `th-orchestrator.md`. For each agent referenced in the direct modes table, verify it exists as a file in `agents/`.
 
 Result:
 - **PASS** if all cross-references are consistent and no session-doc conflicts
@@ -105,7 +105,7 @@ Result:
 
 Analyze agent definitions for contradictions and overlap.
 
-1. **Role boundary check:** For each agent, extract its "NEVER" statements (e.g., "NEVER writes code", "NEVER modify files"). Cross-check against the orchestrator's team table `Writes code` column. Report contradictions (e.g., agent says "NEVER writes code" but orchestrator marks it as "Yes" for writes code).
+1. **Role boundary check:** For each agent, extract its "NEVER" statements (e.g., "NEVER writes code", "NEVER modify files"). Cross-check against the th-orchestrator's team table `Writes code` column. Report contradictions (e.g., agent says "NEVER writes code" but th-orchestrator marks it as "Yes" for writes code).
 2. **Session-doc write conflicts:** For each agent, search for the session-doc filename it writes to (from `## Session Documentation` section or output references). Verify no two agents write to the same file. Report conflicts.
 
 Result:
@@ -122,7 +122,7 @@ Canonical matrix (must match exactly):
 
 | Agent | Model | Effort |
 |---|---|---|
-| `orchestrator` | opus | high |
+| `th-orchestrator` | opus | high |
 | `architect` | opus | max |
 | `agent-builder` | opus | max |
 | `security` | opus | max |
@@ -209,7 +209,7 @@ Status: {PASS|WARN}
 {for each agent with issues: "  {agent}: has {capability} but missing {guardrail}"}
 {if PASS: "All agents have appropriate guardrails for their tool access"}
 
---- Check 5: Orchestrator coherence ---
+--- Check 5: th-orchestrator coherence ---
 Status: {PASS|WARN|FAIL}
 Team table:  {N agents} referenced | {N matched} | {mismatches}
 Session-docs: {N unique} / {N total} | {conflicts or "no conflicts"}

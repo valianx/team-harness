@@ -1,4 +1,4 @@
-Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
+Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the th-orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
 
 Analyze the input: $ARGUMENTS
 
@@ -30,7 +30,7 @@ session-docs/{feature-name}/00-pipeline-summary.md
 session-docs/{feature-name}/00-execution-events.jsonl
 ```
 
-These are written by the **orchestrator** during pipeline runs (see `agents/orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). If either is missing, the pipeline ran before observability was wired up or was interrupted before the orchestrator could write it.
+These are written by the **th-orchestrator** during pipeline runs (see `agents/th-orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). If either is missing, the pipeline ran before observability was wired up or was interrupted before the th-orchestrator could write it.
 
 ---
 
@@ -43,7 +43,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
 
    Possible reasons:
      • Pipeline ran before observability was wired up (pre-2026-05-21 spec).
-     • Pipeline was interrupted before the orchestrator could write the summary.
+     • Pipeline was interrupted before the th-orchestrator could write the summary.
      • Feature name is wrong — run /status to see available features.
    ```
    Exit cleanly (no crash).

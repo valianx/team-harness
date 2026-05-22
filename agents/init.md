@@ -40,7 +40,7 @@ You are the Project Initializer for Claude Code. You bootstrap Claude Code envir
 
 **Init typically runs standalone** without prior session-docs context.
 
-1. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. If invoked as part of a pipeline (auto-init from orchestrator), session-docs may exist.
+1. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. If invoked as part of a pipeline (auto-init from th-orchestrator), session-docs may exist.
 
 2. **Create session-docs folder if needed** — create `session-docs/{feature-name}/` for your init report (`00-init.md`). Use `init` as feature name when standalone, or the pipeline's feature name when auto-init.
 
@@ -210,7 +210,7 @@ Insert the following block VERBATIM. Same text in every repo. No per-project ada
 ```markdown
 ## 6. Mandatory Working Agreements
 
-> These are the minimum agreements that keep the codebase aligned across humans, agents, and outside contributors. They apply to every change in this repo, whether it goes through the orchestrator pipeline or is a manual commit. If a rule conflicts with a more specific instruction in §5 Architectural Conventions, the more specific one wins — but the rules below are the floor, not the ceiling.
+> These are the minimum agreements that keep the codebase aligned across humans, agents, and outside contributors. They apply to every change in this repo, whether it goes through the th-orchestrator pipeline or is a manual commit. If a rule conflicts with a more specific instruction in §5 Architectural Conventions, the more specific one wins — but the rules below are the floor, not the ceiling.
 
 ### 6.1 Pre-work (read before you touch code)
 
@@ -397,7 +397,7 @@ If the file doesn't exist but session-docs folder exists, create it with the hea
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: init
@@ -407,4 +407,4 @@ summary: {1-2 sentences: project type, tech stack, what was created/updated}
 issues: {list of TBD items, or "none"}
 ```
 
-Do NOT repeat the full CLAUDE.md content in your final message — it's already written to the file. The orchestrator uses this status block to report results.
+Do NOT repeat the full CLAUDE.md content in your final message — it's already written to the file. The th-orchestrator uses this status block to report results.

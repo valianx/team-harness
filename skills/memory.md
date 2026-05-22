@@ -1,4 +1,4 @@
-Manage the Knowledge Graph (cross-project memory). Search, inspect, prune, and consolidate entities. This is a standalone utility — does NOT route through the orchestrator.
+Manage the Knowledge Graph (cross-project memory). Search, inspect, prune, and consolidate entities. This is a standalone utility — does NOT route through the th-orchestrator.
 
 Analyze the input: $ARGUMENTS
 
@@ -188,21 +188,21 @@ Examples:
 ## Error Handling
 
 - If Knowledge Graph MCP is not available → "Knowledge Graph MCP server is not running. Check your Claude Code MCP configuration."
-- If `read_graph` returns empty → "Knowledge Graph is empty. Entities are created automatically by the orchestrator after successful pipelines."
+- If `read_graph` returns empty → "Knowledge Graph is empty. Entities are created automatically by the th-orchestrator after successful pipelines."
 - If `delete_entities` fails → report the error, do not retry
 
 ---
 
 ## Important
 
-- This skill does NOT route through the orchestrator
+- This skill does NOT route through the th-orchestrator
 - Uses Knowledge Graph MCP tools directly: `search_nodes`, `read_graph`, `open_nodes`, `create_entities`, `add_observations`, `mark_superseded`, `find_conflicts`, `delete_entities` (hard-delete only), `delete_observations`, `create_relations`, `delete_relations`
 - **Destructive actions require user confirmation.** Soft-delete via `mark_superseded` is reversible and is the default for `prune` and `consolidate`. Hard-delete via `delete_entities` requires double confirmation (the user types the entity name twice).
 - Never auto-prune or auto-consolidate without asking
 
 ## Content policy (mandatory before any write)
 
-When `consolidate` writes new observations or `create_entities` is invoked, apply the same redaction the orchestrator applies in Phase 6:
+When `consolidate` writes new observations or `create_entities` is invoked, apply the same redaction the th-orchestrator applies in Phase 6:
 
 - No absolute paths that include a user identifier (`C:/Users/<name>/...`, `/home/<name>/...`, `/mnt/c/Users/<name>/...`). Strip them or use the bare repo name.
 - No personal names, no client / stakeholder data, no tokens or keys.

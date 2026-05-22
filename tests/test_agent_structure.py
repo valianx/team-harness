@@ -61,7 +61,7 @@ def parse_frontmatter(text: str) -> dict[str, str]:
 print("=== Suite 1: Tool allowlist per agent ===")
 
 EXPECTED_AGENTS = [
-    "orchestrator", "architect", "agent-builder", "security", "reviewer",
+    "th-orchestrator", "architect", "agent-builder", "security", "reviewer",
     "qa", "gcp-cost-analyzer", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery",
@@ -113,12 +113,12 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Suite 3 — orchestrator.md has new phases and artifacts
+# Suite 3 — th-orchestrator.md has new phases and artifacts
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 3: orchestrator.md harness pieces ===")
+print("=== Suite 3: th-orchestrator.md harness pieces ===")
 
-orch = read(AGENTS_DIR / "orchestrator.md")
+orch = read(AGENTS_DIR / "th-orchestrator.md")
 checks_orch = [
     ("Phase 1.5", "Phase 1.5 — Plan Ratification"),
     ("Phase 1.6", "Phase 1.6 — Plan Review"),
@@ -160,19 +160,19 @@ checks_orch = [
 ]
 for label, marker in checks_orch:
     check(
-        f"orchestrator.md mentions {label}",
+        f"th-orchestrator.md mentions {label}",
         marker in orch,
         f"marker '{marker}' not found",
     )
 
-# orchestrator.md must declare that STAGE-GATE-1 and STAGE-GATE-3 cannot be skipped
+# th-orchestrator.md must declare that STAGE-GATE-1 and STAGE-GATE-3 cannot be skipped
 check(
-    "orchestrator.md declares STAGE-GATE-1 is mandatory / non-skippable",
+    "th-orchestrator.md declares STAGE-GATE-1 is mandatory / non-skippable",
     "STAGE-GATE-1" in orch and ("mandatory" in orch.lower() or "never skip" in orch.lower() or "cannot be skipped" in orch.lower()),
     "STAGE-GATE-1 mandatory-ness not documented",
 )
 check(
-    "orchestrator.md declares STAGE-GATE-3 is mandatory / non-skippable",
+    "th-orchestrator.md declares STAGE-GATE-3 is mandatory / non-skippable",
     "STAGE-GATE-3" in orch and ("irreversible" in orch.lower() or "cannot be skipped" in orch.lower()),
     "STAGE-GATE-3 mandatory-ness not documented",
 )
@@ -307,8 +307,8 @@ if bg_path.exists():
     bg = read(bg_path)
     check("skills/background.md has eligibility check",
           "Eligibility check" in bg)
-    check("skills/background.md does NOT route to orchestrator",
-          "DOES NOT" in bg.upper() or "does NOT invoke the orchestrator" in bg)
+    check("skills/background.md does NOT route to th-orchestrator",
+          "DOES NOT" in bg.upper() or "does NOT invoke the th-orchestrator" in bg)
     check("skills/background.md mentions claude -p headless",
           "claude -p" in bg)
 
@@ -481,16 +481,16 @@ check("README.md agent count is 17", "17 agents" in top_readme,
 print()
 print("=== Suite 13: human-readable state surface ===")
 
-# orchestrator.md changes
-check("orchestrator.md 00-state.md schema declares the ## TL;DR section",
+# th-orchestrator.md changes
+check("th-orchestrator.md 00-state.md schema declares the ## TL;DR section",
       "## TL;DR" in orch and "00-state.md" in orch,
       "## TL;DR not declared in 00-state.md schema")
 
-check("orchestrator.md TL;DR schema names the four fixed fields",
+check("th-orchestrator.md TL;DR schema names the four fixed fields",
       all(field in orch for field in ["**Now:**", "**Last:**", "**Next:**", "**Open issues:**"]),
-      "one or more TL;DR fields (Now/Last/Next/Open issues) missing from orchestrator")
+      "one or more TL;DR fields (Now/Last/Next/Open issues) missing from th-orchestrator")
 
-check("orchestrator.md TL;DR section dogfoods consolidated rule (rewritten in place)",
+check("th-orchestrator.md TL;DR section dogfoods consolidated rule (rewritten in place)",
       "rewrites" in orch.lower() and "TL;DR" in orch and ("in place" in orch or "never appends" in orch.lower()),
       "TL;DR rewrite-in-place rule not documented")
 
@@ -498,7 +498,7 @@ check("orchestrator.md TL;DR section dogfoods consolidated rule (rewritten in pl
 # Minimum set required by AC-2 of the intake: rows 1, 5/6, 8, 12, 14, 19, 22 of §5.2.
 # The assertion checks the phase section bodies, not just the index.
 for phase_label in ("Phase 0a", "Phase 1.6", "STAGE-GATE-1", "Phase 2 ", "Phase 3.5", "STAGE-GATE-2", "STAGE-GATE-3", "Phase 6"):
-    check(f"orchestrator.md {phase_label} body mentions TL;DR rewrite",
+    check(f"th-orchestrator.md {phase_label} body mentions TL;DR rewrite",
           phase_label in orch and "TL;DR" in orch,
           f"TL;DR rewrite instruction not found near {phase_label}")
 # (this check expands to 8 phase-label assertions; counted as one logical check group)
@@ -544,30 +544,30 @@ check("CHANGELOG.md [Unreleased] mentions TL;DR + Stage column + narrative timel
 print()
 print("=== Suite 14: KG vocabulary + subagent KG access ===")
 
-# 1. orchestrator declares the new entity types
-check("orchestrator.md Phase 6 entity-type list includes 'project'",
+# 1. th-orchestrator declares the new entity types
+check("th-orchestrator.md Phase 6 entity-type list includes 'project'",
       "project" in orch and "Entity type:" in orch and "project`" in orch,
       "'project' entity type not in Phase 6 entity-type allowlist")
-check("orchestrator.md Phase 6 entity-type list includes 'service'",
+check("th-orchestrator.md Phase 6 entity-type list includes 'service'",
       "service`" in orch,
       "'service' entity type not in Phase 6 entity-type allowlist")
-check("orchestrator.md Phase 6 entity-type list includes 'stack-profile'",
+check("th-orchestrator.md Phase 6 entity-type list includes 'stack-profile'",
       "stack-profile" in orch,
       "'stack-profile' entity type not in Phase 6 entity-type allowlist")
 
-# 2. orchestrator declares the new relation types with their pairs
+# 2. th-orchestrator declares the new relation types with their pairs
 for rel in ("belongs-to", "calls", "uses-stack", "depends-on"):
-    check(f"orchestrator.md Phase 6 declares relation '{rel}'",
+    check(f"th-orchestrator.md Phase 6 declares relation '{rel}'",
           rel in orch,
           f"relation type '{rel}' not declared in Phase 6")
 
-# 3. orchestrator declares explicit Save triggers subsection
-check("orchestrator.md Phase 6 has Save triggers subsection",
+# 3. th-orchestrator declares explicit Save triggers subsection
+check("th-orchestrator.md Phase 6 has Save triggers subsection",
       "Save triggers" in orch,
       "Save triggers subsection missing in Phase 6")
 
-# 4. orchestrator budget is now soft cap 5
-check("orchestrator.md Phase 6 budget is soft cap 5 (not hard 3)",
+# 4. th-orchestrator budget is now soft cap 5
+check("th-orchestrator.md Phase 6 budget is soft cap 5 (not hard 3)",
       "Soft cap 5" in orch and "Max 3 entities per pipeline run" not in orch,
       "Phase 6 budget still says hard cap 3 or missing soft cap 5")
 
@@ -608,8 +608,8 @@ check("delivery.md Step 5b includes [kg] cross-link bullet",
       "[kg]" in delivery and "Step 5b" in delivery,
       "[kg] cross-link template not added to Step 5b")
 
-# 8. orchestrator Phase 6 documents the docs/knowledge.md append
-check("orchestrator.md Phase 6 appends [kg] bullets to docs/knowledge.md",
+# 8. th-orchestrator Phase 6 documents the docs/knowledge.md append
+check("th-orchestrator.md Phase 6 appends [kg] bullets to docs/knowledge.md",
       "[kg]" in orch and "docs/knowledge.md" in orch,
       "Phase 6 docs/knowledge.md cross-link append not documented")
 
@@ -658,10 +658,10 @@ check("delivery.md Step 5 cross-references Mandatory Working Agreements (Post-wo
       "Mandatory Working Agreements" in delivery and "Post-work" in delivery,
       "delivery.md does not cross-reference §6 Mandatory Working Agreements")
 
-# 5. orchestrator.md Phase 0a references the Mandatory Working Agreements section
-check("orchestrator.md Phase 0a cross-references Mandatory Working Agreements",
+# 5. th-orchestrator.md Phase 0a references the Mandatory Working Agreements section
+check("th-orchestrator.md Phase 0a cross-references Mandatory Working Agreements",
       "Mandatory Working Agreements" in orch and "Phase 0a" in orch,
-      "orchestrator.md Phase 0a does not cross-reference §6 Mandatory Working Agreements")
+      "th-orchestrator.md Phase 0a does not cross-reference §6 Mandatory Working Agreements")
 
 # 6. CHANGELOG entry mentions Working Agreements
 check("CHANGELOG.md [Unreleased] mentions Mandatory Working Agreements",
@@ -672,7 +672,7 @@ check("CHANGELOG.md [Unreleased] mentions Mandatory Working Agreements",
 # Suite 16 — Session-docs hygiene guardrails
 #   qa.md: "Files I write (exhaustive)" + "Files I MUST NOT write"
 #   architect.md: "Forbidden output patterns" with no-history rule
-#   orchestrator.md: explicit plan-review routing + qa-substance ban
+#   th-orchestrator.md: explicit plan-review routing + qa-substance ban
 # Triggered by a real failure in a downstream pipeline that accumulated
 # 01-coverage-review.md, 02-flow-coverage.md and a qa-reports/PR-N.md tree
 # alongside 01-architecture.md / 02-task-list.md instead of refining them
@@ -684,7 +684,7 @@ print("=== Suite 16: Session-docs hygiene guardrails ===")
 
 qa_md = read(AGENTS_DIR / "qa.md")
 architect_md = read(AGENTS_DIR / "architect.md")
-orchestrator_md = read(AGENTS_DIR / "orchestrator.md")
+orchestrator_md = read(AGENTS_DIR / "th-orchestrator.md")
 
 # 1. qa.md declares an exhaustive file-output table at the top
 check("qa.md has '## Files I write (exhaustive)' section",
@@ -720,48 +720,48 @@ for doc in ("01-architecture.md", "02-task-list.md", "00-task-intake.md"):
           "Forbidden output patterns" in architect_md and doc in architect_md,
           f"architect.md does not name {doc} as in-place-edit target")
 
-# 6. orchestrator.md routes 'revisa el plan' to plan-review direct mode
-check("orchestrator.md intent table has plan-review row",
+# 6. th-orchestrator.md routes 'revisa el plan' to plan-review direct mode
+check("th-orchestrator.md intent table has plan-review row",
       "plan-review" in orchestrator_md and "revisa el plan" in orchestrator_md,
-      "orchestrator.md intent table missing plan-review routing")
+      "th-orchestrator.md intent table missing plan-review routing")
 
-# 7. orchestrator.md explicitly bans qa-substance plan-review delegation
-check("orchestrator.md bans delegating substance-of-plan review to qa",
+# 7. th-orchestrator.md explicitly bans qa-substance plan-review delegation
+check("th-orchestrator.md bans delegating substance-of-plan review to qa",
       "Never delegate substance refinement of a plan to `qa`" in orchestrator_md
       or "Never delegate substance refinement of a plan to qa" in orchestrator_md,
-      "orchestrator.md does not ban qa-substance plan-review delegation")
+      "th-orchestrator.md does not ban qa-substance plan-review delegation")
 
-# 8. orchestrator.md still names the canonical max-3 plan-review budget
-check("orchestrator.md keeps max-3 budget for plan-review round trips",
+# 8. th-orchestrator.md still names the canonical max-3 plan-review budget
+check("th-orchestrator.md keeps max-3 budget for plan-review round trips",
       "max-3 budget for plan-review" in orchestrator_md,
-      "orchestrator.md does not declare the max-3 budget for plan-review iterations")
+      "th-orchestrator.md does not declare the max-3 budget for plan-review iterations")
 
-# 9. orchestrator.md declares Phase 1.6 inviolable + agent-then-human contract preserved
-check("orchestrator.md Phase 1.6 is declared inviolable",
+# 9. th-orchestrator.md declares Phase 1.6 inviolable + agent-then-human contract preserved
+check("th-orchestrator.md Phase 1.6 is declared inviolable",
       "Phase 1.6 is inviolable" in orchestrator_md,
-      "orchestrator.md does not declare Phase 1.6 as inviolable")
-check("orchestrator.md requires 01-plan-review.md present before STAGE-GATE-1",
+      "th-orchestrator.md does not declare Phase 1.6 as inviolable")
+check("th-orchestrator.md requires 01-plan-review.md present before STAGE-GATE-1",
       "01-plan-review.md` MUST exist" in orchestrator_md
       or "01-plan-review.md MUST exist" in orchestrator_md,
-      "orchestrator.md does not require 01-plan-review.md presence before STAGE-GATE-1")
+      "th-orchestrator.md does not require 01-plan-review.md presence before STAGE-GATE-1")
 
-# 10. orchestrator.md defines inline fallback when Task subagent invocation fails
-check("orchestrator.md defines inline fallback for plan-review subagent failures",
+# 10. th-orchestrator.md defines inline fallback when Task subagent invocation fails
+check("th-orchestrator.md defines inline fallback for plan-review subagent failures",
       "Inline fallback" in orchestrator_md
       and "not available as subagent_type" in orchestrator_md
       and "Task is not available inside subagents" in orchestrator_md,
-      "orchestrator.md does not define inline fallback for nested-subagent constraint")
-check("orchestrator.md inline fallback procedure references plan-reviewer.md as spec",
+      "th-orchestrator.md does not define inline fallback for nested-subagent constraint")
+check("th-orchestrator.md inline fallback procedure references plan-reviewer.md as spec",
       "Read `agents/plan-reviewer.md`" in orchestrator_md,
-      "orchestrator.md inline fallback does not point to plan-reviewer.md as procedure spec")
-check("orchestrator.md emits mode: subagent | inline for telemetry",
+      "th-orchestrator.md inline fallback does not point to plan-reviewer.md as procedure spec")
+check("th-orchestrator.md emits mode: subagent | inline for telemetry",
       "mode: subagent | inline" in orchestrator_md or "mode: subagent" in orchestrator_md,
-      "orchestrator.md status block does not distinguish subagent vs inline execution")
+      "th-orchestrator.md status block does not distinguish subagent vs inline execution")
 
-# 11. orchestrator.md ties both execution modes to the same max-3 budget
-check("orchestrator.md subjects subagent + inline runs to the same max-3 budget",
+# 11. th-orchestrator.md ties both execution modes to the same max-3 budget
+check("th-orchestrator.md subjects subagent + inline runs to the same max-3 budget",
       "same max-3 budget" in orchestrator_md or "does not reset the counter" in orchestrator_md,
-      "orchestrator.md does not bind subagent+inline runs to the same iteration budget")
+      "th-orchestrator.md does not bind subagent+inline runs to the same iteration budget")
 
 # 12. Self-describing task-list contract — architect.md declares the Status field
 implementer_md = read(AGENTS_DIR / "implementer.md")
@@ -789,18 +789,18 @@ check("qa.md restricts edits on 02-task-list.md to checkbox flips",
       or "only edit you are allowed to make on 02-task-list.md" in qa_md,
       "qa.md does not pin its edit scope on 02-task-list.md to checkbox flips")
 
-# 14. orchestrator.md mirrors PR transitions to the Status field
-check("orchestrator.md declares Mirror PR-level progress into 02-task-list.md",
+# 14. th-orchestrator.md mirrors PR transitions to the Status field
+check("th-orchestrator.md declares Mirror PR-level progress into 02-task-list.md",
       "Mirror PR-level progress into `02-task-list.md`" in orchestrator_md,
-      "orchestrator.md does not declare the Status mirror contract")
+      "th-orchestrator.md does not declare the Status mirror contract")
 for transition in ("in-progress", "verified", "merged", "blocked"):
-    check(f"orchestrator.md Status mirror table names '{transition}'",
+    check(f"th-orchestrator.md Status mirror table names '{transition}'",
           transition in orchestrator_md,
-          f"orchestrator.md does not name '{transition}' in the Status mirror table")
-check("orchestrator.md hands the 'merged' transition to delivery",
+          f"th-orchestrator.md does not name '{transition}' in the Status mirror table")
+check("th-orchestrator.md hands the 'merged' transition to delivery",
       "`delivery` agent owns the `merged` transition" in orchestrator_md
       or "delivery agent owns the merged transition" in orchestrator_md,
-      "orchestrator.md does not assign the merged transition to delivery")
+      "th-orchestrator.md does not assign the merged transition to delivery")
 
 # 15. implementer.md acknowledges it never writes 02-task-list.md
 check("implementer.md says it never writes to 02-task-list.md",
@@ -862,10 +862,10 @@ for pattern in FORBIDDEN_PATTERNS:
 # ---------------------------------------------------------------------------
 # Suite 18 — Dispatch-blocked auto-takeover contract
 # ---------------------------------------------------------------------------
-# Guards against the recurring "orchestrator nested → Task stripped → user has
+# Guards against the recurring "th-orchestrator nested → Task stripped → user has
 # to manually take over" failure mode. The contract has three load-bearing
 # touchpoints that must stay coherent:
-#   1. agents/orchestrator.md  — the boot probe + Dispatch-blocked exit
+#   1. agents/th-orchestrator.md  — the boot probe + Dispatch-blocked exit
 #   2. CLAUDE.md § 13          — the universal auto-takeover rule
 #   3. skills/README.md        — the canonical Continuity contract
 #
@@ -874,7 +874,7 @@ for pattern in FORBIDDEN_PATTERNS:
 # working and the user is back to relaying the handoff by hand.
 print("=== Suite 18: Dispatch-blocked auto-takeover contract ===")
 
-orchestrator_md = read(AGENTS_DIR / "orchestrator.md")
+orchestrator_md = read(AGENTS_DIR / "th-orchestrator.md")
 claude_md = read(REPO_ROOT / "CLAUDE.md")
 skills_readme_md = read(SKILLS_DIR / "README.md")
 
@@ -884,76 +884,76 @@ skills_readme_md = read(SKILLS_DIR / "README.md")
 TRIGGER_PHRASE = "Dispatch handoff — top-level Claude takes over now"
 STATUS_ENUM_VALUE = "blocked-no-dispatch"
 
-# --- orchestrator.md ---
+# --- th-orchestrator.md ---
 check(
-    "orchestrator.md has 'Mandatory boot sequence' section",
+    "th-orchestrator.md has 'Mandatory boot sequence' section",
     "Mandatory boot sequence" in orchestrator_md,
     "missing boot sequence section — auto-takeover starts here",
 )
 check(
-    "orchestrator.md boot probe uses general-purpose subagent_type",
+    "th-orchestrator.md boot probe uses general-purpose subagent_type",
     "subagent_type`: `general-purpose`" in orchestrator_md
     or "subagent_type: general-purpose" in orchestrator_md,
     "probe must dispatch general-purpose to test Task availability",
 )
 check(
-    "orchestrator.md boot probe expects single-word OK reply",
+    "th-orchestrator.md boot probe expects single-word OK reply",
     "Reply with the single word OK" in orchestrator_md,
     "probe payload contract must be present so the check is unambiguous",
 )
 check(
-    "orchestrator.md has 'Dispatch-blocked exit' section",
+    "th-orchestrator.md has 'Dispatch-blocked exit' section",
     "### Dispatch-blocked exit" in orchestrator_md,
     "missing dispatch-blocked exit section",
 )
 check(
-    f"orchestrator.md status enum includes '{STATUS_ENUM_VALUE}'",
+    f"th-orchestrator.md status enum includes '{STATUS_ENUM_VALUE}'",
     STATUS_ENUM_VALUE in orchestrator_md,
     "status enum must list blocked-no-dispatch so 00-state.md is detectable",
 )
 check(
-    f"orchestrator.md response starts with universal trigger phrase '{TRIGGER_PHRASE}'",
+    f"th-orchestrator.md response starts with universal trigger phrase '{TRIGGER_PHRASE}'",
     TRIGGER_PHRASE in orchestrator_md,
     "top-level Claude scans for this exact phrase to switch into takeover mode",
 )
 check(
-    "orchestrator.md response declares itself as a directive (not user report)",
+    "th-orchestrator.md response declares itself as a directive (not user report)",
     "directive to top-level Claude" in orchestrator_md,
     "framing must be imperative — drift toward 'status report' breaks auto-takeover",
 )
 check(
-    "orchestrator.md anti-pattern: 'Do NOT ask the user'",
+    "th-orchestrator.md anti-pattern: 'Do NOT ask the user'",
     "Do NOT ask the user" in orchestrator_md or "do NOT ask the user" in orchestrator_md,
     "imperative must forbid asking the user for confirmation",
 )
 check(
-    "orchestrator.md anti-pattern: 'do NOT re-invoke `@orchestrator`'",
-    "Do NOT re-invoke `@orchestrator`" in orchestrator_md
-    or "do NOT re-invoke `@orchestrator`" in orchestrator_md,
+    "th-orchestrator.md anti-pattern: 'do NOT re-invoke `@th-orchestrator`'",
+    "Do NOT re-invoke `@th-orchestrator`" in orchestrator_md
+    or "do NOT re-invoke `@th-orchestrator`" in orchestrator_md,
     "must forbid recreating the nested condition",
 )
 check(
-    "orchestrator.md response includes machine-parseable dispatch_handoff JSON block",
+    "th-orchestrator.md response includes machine-parseable dispatch_handoff JSON block",
     "dispatch_handoff" in orchestrator_md and "next_dispatch" in orchestrator_md,
     "JSON handoff block must be present — top-level Claude parses it to extract next_dispatch.agent + phase + autonomy. The static playbook lives in CLAUDE.md §14 (not duplicated inline).",
 )
 check(
-    "orchestrator.md response delegates takeover protocol to CLAUDE.md §14",
+    "th-orchestrator.md response delegates takeover protocol to CLAUDE.md §14",
     "CLAUDE.md §14" in orchestrator_md or "CLAUDE.md §14 Universal rule" in orchestrator_md,
-    "orchestrator must point at the canonical playbook in CLAUDE.md instead of duplicating it (issue #14 fix).",
+    "th-orchestrator must point at the canonical playbook in CLAUDE.md instead of duplicating it (issue #14 fix).",
 )
 check(
-    "orchestrator.md Handoff template includes 'Next agent to dispatch:'",
+    "th-orchestrator.md Handoff template includes 'Next agent to dispatch:'",
     "Next agent to dispatch:" in orchestrator_md,
     "Handoff template must name the next agent for takeover",
 )
 check(
-    "orchestrator.md Handoff template includes 'Probe error:'",
+    "th-orchestrator.md Handoff template includes 'Probe error:'",
     "Probe error:" in orchestrator_md,
     "Handoff must record the literal probe error for debugging",
 )
 check(
-    "orchestrator.md dispatch invariant #1 is conditional on probe success",
+    "th-orchestrator.md dispatch invariant #1 is conditional on probe success",
     "After a successful boot probe" in orchestrator_md,
     "invariant #1 must NOT unconditionally claim Task is present — that was the original bug",
 )
@@ -963,38 +963,38 @@ check(
 # line as its opening response even when Task had been stripped — a hallucination
 # cascade primed by the contradictory prose.
 check(
-    "orchestrator.md does NOT contain the unconditional 'Task is on the list' claim",
+    "th-orchestrator.md does NOT contain the unconditional 'Task is on the list' claim",
     "Task is on the list. You have `Task`" not in orchestrator_md
     and "Task is on the list. You have Task" not in orchestrator_md,
     "unconditional 'You have Task' claim primes a hallucination — must stay removed",
 )
 check(
-    "orchestrator.md tools section explicitly warns that Task can be stripped at runtime",
+    "th-orchestrator.md tools section explicitly warns that Task can be stripped at runtime",
     "strips `Task`" in orchestrator_md or "strips Task" in orchestrator_md,
     "tools section must acknowledge runtime stripping in nested invocations",
 )
 check(
-    "orchestrator.md tools section forbids opening claims about Task before probe",
+    "th-orchestrator.md tools section forbids opening claims about Task before probe",
     "Do NOT emit any opening claim about `Task` availability before the boot probe" in orchestrator_md
     or "do NOT emit any opening claim about" in orchestrator_md.lower(),
     "explicit anti-hallucination instruction must remain",
 )
 check(
-    "orchestrator.md boot ack line references the probe, not a static tools-confirmed claim",
+    "th-orchestrator.md boot ack line references the probe, not a static tools-confirmed claim",
     "dispatch probe OK — subagent dispatch verified by general-purpose probe" in orchestrator_md,
     "boot ack must derive from the probe result, not from a hardcoded tool list",
 )
 check(
-    "orchestrator.md does NOT contain the legacy 'tools confirmed' acknowledgment",
-    "[orchestrator boot] tools confirmed:" not in orchestrator_md,
+    "th-orchestrator.md does NOT contain the legacy 'tools confirmed' acknowledgment",
+    "[th-orchestrator boot] tools confirmed:" not in orchestrator_md,
     "legacy ack line was the hallucination vector — must stay removed",
 )
 check(
-    "orchestrator.md 'never write code/tests/docs' contract still present (in invariants section)",
+    "th-orchestrator.md 'never write code/tests/docs' contract still present (in invariants section)",
     "you NEVER write code/tests/docs" in orchestrator_md
     or "you are forbidden from writing" in orchestrator_md.lower()
     or "Never substitute yourself for a subagent" in orchestrator_md,
-    "the no-inline-work contract for the orchestrator must remain (now in Dispatch invariants, not duplicated in the handoff response).",
+    "the no-inline-work contract for the th-orchestrator must remain (now in Dispatch invariants, not duplicated in the handoff response).",
 )
 
 # --- CLAUDE.md § 13 ---
@@ -1007,12 +1007,12 @@ check(
 check(
     f"CLAUDE.md auto-takeover rule references status enum '{STATUS_ENUM_VALUE}'",
     STATUS_ENUM_VALUE in claude_md,
-    "rule must name the same enum value used in orchestrator.md and 00-state.md",
+    "rule must name the same enum value used in th-orchestrator.md and 00-state.md",
 )
 check(
     f"CLAUDE.md auto-takeover rule references trigger phrase '{TRIGGER_PHRASE}'",
     TRIGGER_PHRASE in claude_md,
-    "rule must reference the same trigger phrase the orchestrator response uses",
+    "rule must reference the same trigger phrase the th-orchestrator response uses",
 )
 check(
     "CLAUDE.md rule explicitly says do NOT ask the user",
@@ -1031,7 +1031,7 @@ check(
 )
 check(
     "CLAUDE.md rule applies regardless of invocation mode",
-    "regardless of how the orchestrator was invoked" in claude_md
+    "regardless of how the th-orchestrator was invoked" in claude_md
     or "every entry mode" in claude_md,
     "must be explicit that the rule covers @mention, skills, and agent referrals",
 )
@@ -1053,23 +1053,23 @@ check(
     "skills doc must reference the same trigger phrase",
 )
 check(
-    "skills/README.md Continuity contract cross-refs orchestrator.md AND CLAUDE.md",
-    "agents/orchestrator.md" in skills_readme_md and "CLAUDE.md" in skills_readme_md,
+    "skills/README.md Continuity contract cross-refs th-orchestrator.md AND CLAUDE.md",
+    "agents/th-orchestrator.md" in skills_readme_md and "CLAUDE.md" in skills_readme_md,
     "skills doc must point to both authoritative sources",
 )
 
 # --- Cross-file consistency ---
 # The three files must agree on the literal trigger phrase. If one of them
-# drifts (e.g. someone localises the orchestrator response to Spanish but
+# drifts (e.g. someone localises the th-orchestrator response to Spanish but
 # leaves CLAUDE.md in English), top-level Claude's scan no longer matches.
 all_three = (orchestrator_md, claude_md, skills_readme_md)
 check(
-    "trigger phrase identical across orchestrator.md, CLAUDE.md, skills/README.md",
+    "trigger phrase identical across th-orchestrator.md, CLAUDE.md, skills/README.md",
     all(TRIGGER_PHRASE in src for src in all_three),
     "drift detected — the universal touchpoint must be byte-identical in all three files",
 )
 check(
-    "status enum value identical across orchestrator.md, CLAUDE.md, skills/README.md",
+    "status enum value identical across th-orchestrator.md, CLAUDE.md, skills/README.md",
     all(STATUS_ENUM_VALUE in src for src in all_three),
     "drift detected — enum value must match in all three files",
 )
@@ -1082,19 +1082,19 @@ check(
 #   - filename ↔ frontmatter `name:` drift (Claude Code loads the frontmatter
 #     name; if it doesn't match the filename, agents/init has trouble locating
 #     and references to the old name go stale)
-#   - agents that exist in agents/ but aren't listed in orchestrator's Your Team
+#   - agents that exist in agents/ but aren't listed in th-orchestrator's Your Team
 #     table, README roster, or anywhere else (orphan agent — never dispatched)
-#   - agent names referenced in CLAUDE.md / orchestrator.md / skills that don't
+#   - agent names referenced in CLAUDE.md / th-orchestrator.md / skills that don't
 #     resolve to an actual `agents/<name>.md` (dangling reference — dispatch
 #     will fail with "not a valid subagent_type")
 #   - skill names referenced from agents/CLAUDE.md that don't resolve to
 #     `skills/<name>.md` or `skills/<name>/SKILL.md`
-#   - phase numbers mentioned in orchestrator.md outside the canonical set
+#   - phase numbers mentioned in th-orchestrator.md outside the canonical set
 #     (introducing "Phase 1.7" without wiring it in is silent UX breakage)
 print("=== Suite 19: Agent identity & cross-reference consistency ===")
 
 # Agents that legitimately have no .md file because they're reference files
-# (loaded on-demand by the orchestrator, not standalone agents)
+# (loaded on-demand by the th-orchestrator, not standalone agents)
 REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows"}
 
 # Pipeline + standalone + reference agents that legitimately exist
@@ -1130,20 +1130,20 @@ for agent_file in ALL_AGENT_FILES:
         "registered",
     )
 
-# 3. Every agent file (except reference-only) appears in orchestrator's Your Team
+# 3. Every agent file (except reference-only) appears in th-orchestrator's Your Team
 #    table OR is explicitly listed as standalone.
 orchestrator_md_v19 = orchestrator_md  # reuse from Suite 18 (already read)
 expected_in_orchestrator = {
     name for name in ALL_AGENT_FILES if name not in REFERENCE_ONLY_AGENTS
-} - {"orchestrator"}  # orchestrator doesn't list itself
+} - {"th-orchestrator"}  # th-orchestrator doesn't list itself
 for agent_name in sorted(expected_in_orchestrator):
     # Must appear either in the Your Team table OR be named in the "Standalone
     # agents" callout.
     mentioned_in_team = f"`{agent_name}`" in orchestrator_md_v19
     check(
-        f"agents/{agent_name}.md is referenced in orchestrator.md",
+        f"agents/{agent_name}.md is referenced in th-orchestrator.md",
         mentioned_in_team,
-        "agent file exists but orchestrator never mentions it — orphan agent "
+        "agent file exists but th-orchestrator never mentions it — orphan agent "
         "(no one will dispatch it) or stale leftover that should be deleted",
     )
 
@@ -1161,7 +1161,7 @@ referenced_in_claude_md = set(
 plausible_agent_refs = {
     n for n in referenced_in_claude_md
     if n in KNOWN_AGENT_NAMES or n.endswith("-checker") or n.endswith("-reviewer")
-    or n in {"orchestrator", "architect", "implementer", "tester", "qa", "security",
+    or n in {"th-orchestrator", "architect", "implementer", "tester", "qa", "security",
              "delivery", "init", "diagrammer", "reviewer", "translator"}
 }
 for ref in sorted(plausible_agent_refs):
@@ -1173,7 +1173,7 @@ for ref in sorted(plausible_agent_refs):
         f"agents/{ref}.md does not exist — rename in CLAUDE.md or restore the file",
     )
 
-# 5. Phase numbers mentioned in orchestrator.md are in the canonical set.
+# 5. Phase numbers mentioned in th-orchestrator.md are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
     "0a", "0b", "1", "1.5", "1.6", "2", "2.5", "3", "3.5", "3.6", "4", "4.5", "5", "6",
@@ -1182,7 +1182,7 @@ CANONICAL_PHASES = {
 phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", orchestrator_md_v19))
 unknown_phases = phase_mentions - CANONICAL_PHASES - {"N"}  # "{N}" placeholder is OK
 check(
-    "orchestrator.md uses only canonical phase numbers",
+    "th-orchestrator.md uses only canonical phase numbers",
     not unknown_phases,
     f"unknown phase numbers found: {sorted(unknown_phases)} — either add them "
     "to the canonical set or fix the typo",
@@ -1208,12 +1208,12 @@ for skill_file in SKILL_FILES:
         f"frontmatter name='{declared}' but file is '{skill_file}.md'",
     )
 
-# 7. Every skill name listed in skills/README.md "Routes to orchestrator" line
+# 7. Every skill name listed in skills/README.md "Routes to th-orchestrator" line
 #    exists as either skills/<name>.md or skills/<name>/SKILL.md.
 skills_readme_v19 = skills_readme_md  # reuse from Suite 18
 # Extract names from the routing line: e.g. "/issue, /plan, /design, ..."
 routes_line_match = re.search(
-    r"\*\*Routes to orchestrator\*\*[^:]*:\s*([^\n]+)",
+    r"\*\*Routes to th-orchestrator\*\*[^:]*:\s*([^\n]+)",
     skills_readme_v19,
 )
 if routes_line_match:
@@ -1228,7 +1228,7 @@ if routes_line_match:
         )
 else:
     check(
-        "skills/README.md contains 'Routes to orchestrator' line",
+        "skills/README.md contains 'Routes to th-orchestrator' line",
         False,
         "expected line is missing from skills/README.md",
     )
@@ -1267,7 +1267,7 @@ for agent_file in ALL_AGENT_FILES:
 print()
 print("=== Suite 20: Pipeline observability ===")
 
-# --- orchestrator.md: Pipeline Summary Protocol + deprecated artifact banners ---
+# --- th-orchestrator.md: Pipeline Summary Protocol + deprecated artifact banners ---
 
 orch_obs_checks = [
     ("Pipeline Summary Protocol section header", "## Pipeline Summary Protocol"),
@@ -1294,7 +1294,7 @@ orch_obs_checks = [
 ]
 for label, marker in orch_obs_checks:
     check(
-        f"orchestrator.md observability: {label}",
+        f"th-orchestrator.md observability: {label}",
         marker in orch,
         f"marker '{marker}' not found",
     )
@@ -1343,7 +1343,7 @@ check(
 
 # These four agents have read-only KG access (architect, qa, tester, security).
 # Their Return Protocol must declare memory_consult and kg_save_candidates so the
-# orchestrator can propagate them into the JSONL trace.
+# th-orchestrator can propagate them into the JSONL trace.
 KG_READ_ONLY_AGENTS = ["architect", "qa", "tester", "security"]
 for agent_name in KG_READ_ONLY_AGENTS:
     agent_md = read(AGENTS_DIR / f"{agent_name}.md")
@@ -1525,12 +1525,12 @@ policy_checks = [
 for label, condition in policy_checks:
     check(f"docs/kg-content-policy.md: {label}", condition)
 
-# --- orchestrator.md: session_start in Phase 0a, session_end in Phase 6 ---
+# --- th-orchestrator.md: session_start in Phase 0a, session_end in Phase 6 ---
 
 orch_session_checks = [
-    ("orchestrator.md frontmatter declares mcp__memory__session_start",
+    ("th-orchestrator.md frontmatter declares mcp__memory__session_start",
      "mcp__memory__session_start" in orch.split("---", 2)[1]),
-    ("orchestrator.md frontmatter declares mcp__memory__session_end",
+    ("th-orchestrator.md frontmatter declares mcp__memory__session_end",
      "mcp__memory__session_end" in orch.split("---", 2)[1]),
     ("Phase 0a calls session_start before search_nodes",
      "session_start" in orch and "1b" in orch),
@@ -1544,7 +1544,7 @@ orch_session_checks = [
      '"session_id"' in orch and '"started_at"' in orch),
 ]
 for label, condition in orch_session_checks:
-    check(f"orchestrator.md session lifecycle: {label}", condition)
+    check(f"th-orchestrator.md session lifecycle: {label}", condition)
 
 # ---------------------------------------------------------------------------
 # Suite 22 — Stage-end notification protocol
@@ -1555,27 +1555,27 @@ print("=== Suite 22: Stage-end notification protocol ===")
 NOTIFY_STAGE = REPO_ROOT / "hooks" / "notify-stage.sh"
 
 check(
-    "orchestrator.md has ## Stage-end notification protocol section",
+    "th-orchestrator.md has ## Stage-end notification protocol section",
     "## Stage-end notification protocol" in orch,
-    "## Stage-end notification protocol section missing from orchestrator.md",
+    "## Stage-end notification protocol section missing from th-orchestrator.md",
 )
 
 check(
     "Stage-end protocol mapping table mentions all 4 stage labels",
     all(label in orch for label in ["analysis", "implementation batch", "verify", "delivery"]),
-    "one or more stage labels (analysis/implementation batch/verify/delivery) missing from orchestrator.md",
+    "one or more stage labels (analysis/implementation batch/verify/delivery) missing from th-orchestrator.md",
 )
 
 check(
     "Stage-end protocol section names hooks/notify-stage.sh",
     "hooks/notify-stage.sh" in orch,
-    "hooks/notify-stage.sh not referenced in orchestrator.md Stage-end notification protocol",
+    "hooks/notify-stage.sh not referenced in th-orchestrator.md Stage-end notification protocol",
 )
 
 check(
     "Stage-end protocol section documents the stage.notify JSONL event",
     '"event":"stage.notify"' in orch or "stage.notify" in orch,
-    "stage.notify event type not documented in orchestrator.md",
+    "stage.notify event type not documented in th-orchestrator.md",
 )
 
 check(
@@ -1613,14 +1613,14 @@ check(
 check(
     "Stage-end protocol documents idempotency dedup via JSONL",
     "already-fired" in orch and "00-execution-events.jsonl" in orch,
-    "idempotency dedup mechanism (already-fired / JSONL) not documented in orchestrator.md",
+    "idempotency dedup mechanism (already-fired / JSONL) not documented in th-orchestrator.md",
 )
 
 # (h) AC-2 coverage: section explicitly states toasts fire independent of autonomy mode.
 check(
     "Stage-end protocol section states independence from autonomy mode",
     "independent of autonomy" in orch,
-    "AC-2 contract ('independent of autonomy mode') not stated in orchestrator.md section",
+    "AC-2 contract ('independent of autonomy mode') not stated in th-orchestrator.md section",
 )
 
 # (i) AC-6 sub-item (b): Toast Mapping Table sub-heading present (not just label text).
@@ -1649,7 +1649,7 @@ check(
 check(
     "notify-stage.sh unconditionally exits 0 (failure-safety contract)",
     notify_stage_content.rstrip().endswith("exit 0"),
-    "notify-stage.sh does not end with 'exit 0' — wrapper may propagate errors to orchestrator",
+    "notify-stage.sh does not end with 'exit 0' — wrapper may propagate errors to th-orchestrator",
 )
 
 # (m) AC-8: CHANGELOG [Unreleased] section mentions stage-end notifications + idempotency.
@@ -1663,20 +1663,20 @@ check(
 # SEC regression guards (iter 1 — post-security-fix audit)
 # These checks prevent re-introduction of the unsafe patterns fixed in the security iteration.
 
-# (n) SEC-001 regression guard: all 4 stage call-sites in orchestrator.md use python3 json.dumps
+# (n) SEC-001 regression guard: all 4 stage call-sites in th-orchestrator.md use python3 json.dumps
 # with positional argv — NOT echo '...' with inline placeholder substitution (CWE-78).
 check(
-    "SEC-001 guard: orchestrator call-sites use python3 json.dumps (not echo single-quoted string)",
+    "SEC-001 guard: th-orchestrator call-sites use python3 json.dumps (not echo single-quoted string)",
     orch.count("python3 -c \"import json,sys; print(json.dumps(") >= 4,
-    "SEC-001 regression: fewer than 4 'python3 -c json.dumps' call-sites found in orchestrator.md — "
+    "SEC-001 regression: fewer than 4 'python3 -c json.dumps' call-sites found in th-orchestrator.md — "
     "echo with placeholder substitution may have been reintroduced (CWE-78)",
 )
 
-# (o) SEC-001 regression guard (negative): no echo '{"stage" call-sites remain in orchestrator.md.
+# (o) SEC-001 regression guard (negative): no echo '{"stage" call-sites remain in th-orchestrator.md.
 check(
-    "SEC-001 guard (negative): no residual echo single-quoted stage payload in orchestrator.md",
+    "SEC-001 guard (negative): no residual echo single-quoted stage payload in th-orchestrator.md",
     'echo \'{"stage"' not in orch,
-    "SEC-001 regression: echo single-quoted stage payload found in orchestrator.md — "
+    "SEC-001 regression: echo single-quoted stage payload found in th-orchestrator.md — "
     "this pattern is vulnerable to shell command injection (CWE-78)",
 )
 
@@ -1686,7 +1686,7 @@ check(
 check(
     "SEC-002 guard: idempotency uses python3 structural JSON parse (not grep -c regex match)",
     orch.count("print(sum(1 for l in open(") >= 4,
-    "SEC-002 regression: fewer than 4 'print(sum(1 for l in open(' patterns in orchestrator.md — "
+    "SEC-002 regression: fewer than 4 'print(sum(1 for l in open(' patterns in th-orchestrator.md — "
     "idempotency may have reverted to unanchored grep -c (CWE-20 false-positive risk)",
 )
 
@@ -2030,7 +2030,7 @@ print("=== Suite 25: Voice and Language Guide enforcement ===")
 
 # Reload files for the voice suite (may have been updated during prior suites).
 _claude_md = read(REPO_ROOT / "CLAUDE.md")
-_orch_md = read(AGENTS_DIR / "orchestrator.md")
+_orch_md = read(AGENTS_DIR / "th-orchestrator.md")
 
 
 def _extract_section(text: str, start_marker: str, end_marker: str) -> str:
@@ -2085,7 +2085,7 @@ check(
     f"found: {_banned_found}",
 )
 
-# (2) No emoji decoration in operator-facing skill files and orchestrator templates.
+# (2) No emoji decoration in operator-facing skill files and th-orchestrator templates.
 # Check for the four specific Unicode codepoints used as status decorations.
 _EMOJI_CODEPOINTS = ["✅", "⚠️", "🎉", "✨"]
 _emoji_found: list[str] = []
@@ -2094,7 +2094,7 @@ for _skill_file in SKILLS_DIR.glob("*.md"):
     for _emoji in _EMOJI_CODEPOINTS:
         if _emoji in _content:
             _emoji_found.append(f"{_skill_file.name}: {_emoji!r}")
-# Also check orchestrator operator-facing report templates.
+# Also check th-orchestrator operator-facing report templates.
 _orch_report_sections = re.findall(
     r"\*\*Report to user:\*\*\s*```(.*?)```",
     _orch_md,
@@ -2103,14 +2103,14 @@ _orch_report_sections = re.findall(
 for _section in _orch_report_sections:
     for _emoji in _EMOJI_CODEPOINTS:
         if _emoji in _section:
-            _emoji_found.append(f"orchestrator.md report template: {_emoji!r}")
+            _emoji_found.append(f"th-orchestrator.md report template: {_emoji!r}")
 check(
-    "voice: no emoji decoration in operator-facing skill files or orchestrator report templates",
+    "voice: no emoji decoration in operator-facing skill files or th-orchestrator report templates",
     len(_emoji_found) == 0,
     f"found: {_emoji_found}",
 )
 
-# (3) No Phase N.M/7 patterns in orchestrator operator-visible report-template blocks.
+# (3) No Phase N.M/7 patterns in th-orchestrator operator-visible report-template blocks.
 # The pattern `Phase \d+(\.\d+)?/7` should not appear inside fenced code blocks
 # that follow a `**Report to user:**` label.
 _phase_number_in_templates: list[str] = []
@@ -2119,7 +2119,7 @@ for _section in _orch_report_sections:
     if _hits:
         _phase_number_in_templates.extend(_hits)
 check(
-    "voice: no 'Phase N/7' breadcrumbs in orchestrator operator-visible report templates",
+    "voice: no 'Phase N/7' breadcrumbs in th-orchestrator operator-visible report templates",
     len(_phase_number_in_templates) == 0,
     f"found: {_phase_number_in_templates}",
 )
@@ -2128,7 +2128,7 @@ check(
 # Allowlists (identified by section header proximity):
 #   - agents/security.md: lines from "## Phase 4 — Security Report" to next "---"
 #   - agents/reviewer.md: full review_body template region (both Fresh and Update Body)
-#   - agents/orchestrator.md: Step 6 routing table (identified by "| Intent Pattern")
+#   - agents/th-orchestrator.md: Step 6 routing table (identified by "| Intent Pattern")
 #   - agents/translator.md: glossary tables (identified by "## Phase 1 — Glossary")
 _agents_spanish_found: list[str] = []
 for _agent_file in AGENTS_DIR.glob("*.md"):
@@ -2152,7 +2152,7 @@ for _agent_file in AGENTS_DIR.glob("*.md"):
         )
         if _rev_ops:
             _allowed_sections.append(_rev_ops)
-    elif _name == "orchestrator.md":
+    elif _name == "th-orchestrator.md":
         # Allow the Step 6 intent-detection routing table (bilingual bridge).
         _step6 = _extract_section(_content, "| Intent Pattern (es/en) |", "**Disambiguation")
         if _step6:
@@ -2224,16 +2224,16 @@ check(
     "## 7. Voice and Language Guide section missing from CLAUDE.md",
 )
 
-# (9) agents/orchestrator.md and docs/how-it-works.md contain a dev-natural @orchestrator example.
+# (9) agents/th-orchestrator.md and docs/how-it-works.md contain a dev-natural @th-orchestrator example.
 _HOW_IT_WORKS = REPO_ROOT / "docs" / "how-it-works.md"
 _how_it_works_md = read(_HOW_IT_WORKS) if _HOW_IT_WORKS.exists() else ""
 _ORCHESTRATOR_EXAMPLE_PATTERN = re.compile(
-    r"@orchestrator.*(plan|implement|PR|recover)", re.IGNORECASE
+    r"@th-orchestrator.*(plan|implement|PR|recover)", re.IGNORECASE
 )
 check(
-    "voice: orchestrator.md contains @orchestrator dev-natural example (plan/implement/PR/recover)",
+    "voice: th-orchestrator.md contains @th-orchestrator dev-natural example (plan/implement/PR/recover)",
     _ORCHESTRATOR_EXAMPLE_PATTERN.search(_orch_md) is not None,
-    "agents/orchestrator.md does not contain an @orchestrator dev-natural example",
+    "agents/th-orchestrator.md does not contain an @th-orchestrator dev-natural example",
 )
 
 # (10) No first-person personality phrases in agent output templates (status-block / report regions).

@@ -4,7 +4,7 @@ Analyze the input: $ARGUMENTS
 
 ## Mode 1 — Feature name provided
 
-1. Pass to the `orchestrator` agent:
+1. Pass to the `th-orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: validate
@@ -22,7 +22,7 @@ Analyze the input: $ARGUMENTS
 
 ## Important
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator will route to the `qa` agent in validate mode
+- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
+- The th-orchestrator will route to the `qa` agent in validate mode
 - Validates implementation against acceptance criteria from `00-task-intake.md`
 - Output: `session-docs/{feature-name}/04-validation.md`
