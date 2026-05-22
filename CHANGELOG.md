@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `/th-update` no longer requires the `gh` CLI. Tag resolution and tarball download both use `curl` directly, matching the bootstrap install path's "just needs curl" surface. `gh` remains a repo-wide requirement for `/issue`, `/deliver`, `/review-pr`.
+
 ## [2.5.0] - 2026-05-22
 
 ### Changed

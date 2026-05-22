@@ -24,10 +24,10 @@ This skill accepts no arguments. `$ARGUMENTS` is ignored.
 
 Before any download, verify the required CLI tools are available. If a check fails, print the error verbatim and stop — do not fall back to alternative tools.
 
-1. **`gh` is installed.** Run `gh --version`. If the command is not found, print:
+1. **`curl` is installed.** Run `curl --version`. If the command is not found, print:
    ```
-   gh (GitHub CLI) is required but not installed.
-   Install instructions: https://cli.github.com/
+   curl is required but not installed. curl ships with macOS, all Linux distributions, and Windows 10+ (since April 2018).
+   Install instructions: https://curl.se/
    ```
    and stop.
 
@@ -45,10 +45,18 @@ Before any download, verify the required CLI tools are available. If a check fai
 Run:
 
 ```bash
-gh api repos/valianx/team-harness/releases/latest -q .tag_name
+tag=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/valianx/team-harness/releases/latest | sed 's|.*/tag/||' | tr -d '\r\n')
 ```
 
-Capture the tag string (e.g., `v2.5.0`). If the command exits non-zero, print the stderr verbatim and stop. Do not retry.
+The command issues a HEAD request to GitHub's `/releases/latest` URL, follows the redirect to `/releases/tag/<latest-tag>`, and captures the final effective URL. `sed` strips everything up to and including `/tag/`, leaving just the tag (e.g., `v2.5.1`). `tr -d '\r\n'` defends against trailing CR/LF that Windows curl can emit.
+
+If `tag` is empty after the command (network failure, GitHub redirect shape changed, no releases published), print:
+
+```
+failed to resolve latest release tag from https://github.com/valianx/team-harness/releases/latest
+```
+
+and stop. Do not retry.
 
 Store the tag for use in subsequent steps.
 
@@ -71,10 +79,10 @@ This works on Linux, macOS, and Windows under Git Bash. Capture the path for use
 Run:
 
 ```bash
-gh release download <tag> --repo valianx/team-harness --archive=tar.gz --output "$tmpdir/repo.tgz"
+curl -fsSL "https://github.com/valianx/team-harness/archive/refs/tags/${tag}.tar.gz" -o "$tmpdir/repo.tgz"
 ```
 
-Substitute `<tag>` with the value captured in Step 1. If the command exits non-zero (network error, missing release asset, auth failure), print stderr verbatim and stop.
+Substitute `${tag}` with the value captured in Step 1. This is GitHub's deterministic source-archive URL pattern. `-f` fails on HTTP errors (so a 404 from a malformed tag aborts cleanly). If the command exits non-zero (network error, missing tag, 404), print stderr verbatim and stop.
 
 ---
 
