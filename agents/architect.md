@@ -171,7 +171,7 @@ The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` mark
 - The **intersection** is empty when possible (every feature AC owned by exactly one PR, except shared ones explicitly noted).
 - ACs in `02-task-list.md` are the **contract for Stage 2**. The implementer reads its PR's AC list before coding; the qa validates against the AC list of the same PR.
 
-**Reviewability inside a PR:** prefer one commit per concern (e.g., migration, entity, endpoints, tests). Conventional commits as required by CLAUDE.md §11.
+**Reviewability inside a PR:** prefer one commit per concern (e.g., migration, entity, endpoints, tests). Conventional commits as required by CLAUDE.md §12.
 
 #### Cross-reference rule
 

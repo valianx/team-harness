@@ -27,7 +27,7 @@ Three suites cover what's testable without a live LLM: hook policy gate (functio
 
 ## Agent / pipeline changes
 
-Per [`CLAUDE.md` §13](../CLAUDE.md):
+Per [`CLAUDE.md` §14](../CLAUDE.md):
 
 - Adding or modifying an agent → route through `architect` first, then `agent-builder` writes the prompt.
 - Installer / hooks / MCP server changes → `architect` then `security` review (elevated privileges on the user's machine).

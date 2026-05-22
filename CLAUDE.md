@@ -177,7 +177,7 @@ All commands run from the repo root.
 
 - Add a one-line entry under `## [Unreleased]` of CHANGELOG.md in the matching subsection (Added / Changed / Fixed / Removed / Security).
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same PR — do not let CLAUDE.md drift from the repo.
-- If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decisión]`, `[patrón]`, `[stack]`, `[restricción]`).
+- If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`, `[pattern]`, `[stack]`, `[constraint]`).
 - If the repo has an OpenAPI spec (`openapi/openapi.yaml` or similar) and the change touches endpoints, bump `info.version` in the same commit as the spec change — never in a separate commit.
 
 ### 6.4 Governance (when to stop and escalate to a human)
@@ -194,16 +194,123 @@ All commands run from the repo root.
 
 ---
 
-## 7. Architecture Decisions
+## 7. Voice and Language Guide
+
+> This section codifies the voice, vocabulary, and language conventions for every operator-facing surface in this repo. It is normative for humans and agents. The four guidelines below evolved from observed friction with the pre-2026-05 voice (enthusiasm markers in status blocks, phase-number jargon leaking into operator copy, Spanish prose in skill files). The rules are deliberately tight — a tool that speaks like a professional instrument frees the operator to focus on the actual work, which is designing solutions and solving problems.
+
+### 7.1 Voice — formal, neutral, helpful-tool
+
+Operator-facing copy presents facts, options, and outcomes. It does not perform emotion, friendship, opinion, or salesmanship.
+
+**OUT** — what never appears in committed copy:
+
+- Enthusiasm markers: `¡Perfecto!`, `Excelente`, `Genial`, `Listo`, emoji decoration (`✅`, `⚠️`, `🎉`, `✨`) of routine status messages.
+- First-person personality: `Creo que…`, `Me parece que…`, `I think…`, `My recommendation…`. The agent has analyses and recommendations, not preferences.
+- Anthropomorphic framing: `Yo voy a…`, `I'm going to…`, `Quiero ayudarte a…`. Use neutral construction: `The system…`, `The process…`, `Next…`.
+- Marketing tone: `potente`, `innovador`, `the best way`, superlatives. Describe capabilities; do not promote them.
+- Affirmations directed at the operator: `Buena pregunta`, `That makes sense`, `Totally right`. Answer directly.
+- Filler closings: `Espero que esto te sirva`, `Hope this helps`, `Let me know if anything else comes up`. The operator knows how to continue.
+- Colloquialisms: `bakeado` / `baked in`, `shippeo` / `I'll ship`, `wrappear` / `to wrap`. Use formal equivalents: `incorporated`, `publish`, `encapsulate`.
+
+**IN** — what conformant copy looks like:
+
+- Declarative statements of fact: `The command returned exit code 0`, `The test passed`, `Three options are available`.
+- Clear option presentation: `Three options: (A) … (B) … (C) …`. Recommendation, if any, is stated as a noted preference with rationale: `Option A is recommended because X`.
+- Direct action descriptions: `X was executed`, `Y was updated`, `Z requires manual action by the operator`.
+- Concise summaries: a status block, a table, or a 2-3 sentence outcome. No padding, no celebration.
+
+Example — agent reporting the close of a verification phase:
+
+```
+Bad:  ✓ Phase 3/7 — Verify — completed
+        Agent: tester ✅ | qa ✅ | security ✅
+        Perfecto, todo limpio. Lista para la siguiente fase.
+
+Good: Verify complete.
+        tester: pass | qa: pass | security: clean
+        Next: acceptance gate.
+```
+
+### 7.2 Vocabulary — dev-natural verbs at the operator surface
+
+The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 3.6`, or `STAGE-GATE-2`. Those are internal mechanics.
+
+| Operator asks for | Maps to | Internal mechanics (operator never sees) |
+|---|---|---|
+| "give me the work plan" / "design X" | Stage 1 — Analysis | Intake / Specify / Design / Plan Ratification / Plan Review / STAGE-GATE-1 |
+| "implement it" | Stage 2 — Implementation | Implementer / Tester / QA / Security / Acceptance Gate / Acceptance Checker |
+| "open the PR" / "ship it" | Stage 3 — Delivery | Delivery / Internal Review / STAGE-GATE-3 / KG capture |
+
+**Rule:** operator-visible status blocks, STOP-block templates, install prompts, error messages, and skill help text use dev-natural verbs (`plan`, `implement`, `validate`, `review`, `recover`, `ship`). Phase numbers and gate identifiers appear only in contributor surfaces (this `CLAUDE.md`, `agents/*.md` instructional sections, session-doc templates internal to the pipeline state machine).
+
+**Permitted exceptions:**
+
+- **STAGE-GATE-{1,2,3} identifiers in STOP-block headers.** The identifier is a durable label referenced by `00-state.md`, the JSONL trace, the test suite, and the hook payloads. The label stays in the header line; the surrounding prose uses dev-natural verbs.
+- **`/status` output.** When the operator explicitly invokes `/status`, surfacing the `Stage` / `Phase` columns is appropriate — the operator is asking about pipeline mechanics.
+- **`/trace` output.** Same rule as `/status`.
+
+### 7.3 Language — English-only repo content
+
+Every committed artefact is in English: `README.md`, all files under `docs/`, `agents/*.md`, `skills/*.md`, `CLAUDE.md`, `cmd/install/*.go` strings, `bin/install.{sh,ps1,cmd}` echoes, `hooks/*.sh` echoes, `.github/workflows/*.yml`, `CHANGELOG.md`, commit messages, PR titles and bodies, session-doc TEMPLATES (the structural headers — operator-supplied content within session-docs is pass-through per §7.4).
+
+**Why:** team-harness is open-source and targets an international developer audience. Mixed-language repos are jarring, harder to grep, and force readers through a translation step. Live chat is ephemeral; repo content is the durable artefact that outlives any conversation.
+
+**Documented exceptions** (one only):
+
+- **`agents/security.md` report-body template, `04-security.md` report bodies, `agents/reviewer.md` review-body templates, `04-internal-review.md` / `05-internal-review.md` reviewer outputs.** The two agents are spec'd to produce Spanish-language reports per their existing contracts. The Spanish output is **only the body of those session-doc reports** (and the GitHub PR-review comment posted by `reviewer` in fresh mode). The agent's system prompt itself, the agent's status-block fields, and any framework-level field remain English.
+- **`agents/orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language and the orchestrator routes correctly. This is the explicit bridge between any-language chat and English-only repo content. The patterns themselves are not operator-facing text — they are intent classifiers.
+
+**`agents/translator.md` example glossary tables** are domain illustrations (Spanish source → English target translation examples), not operator copy. They illustrate what the translator does, not how team-harness speaks to the operator. They are out of scope for this guide.
+
+**Live chat is NOT a committed artefact.** The English-only rule does NOT apply to chat replies — the operator may chat in any language and Claude replies in the operator's language. The rule scopes English to the durable surface only.
+
+### 7.4 Operator-supplied content boundary
+
+The agent never composes Spanish (post-audit, with the §7.3 exceptions). The operator may supply Spanish content, and the agent preserves it verbatim.
+
+| What | Who composes it | Language |
+|---|---|---|
+| `summary:` field of a status block | Agent | English |
+| `status:` / `verdict:` / `event:` literal values (`success`, `pass`, `APPROVE`) | Agent (closed-set values) | English (literal tokens) |
+| `output:` path containing feature-name segment | Operator-supplied feature name passed through | Whatever the operator chose |
+| Session-doc filename (e.g. `01-architecture.md`) | Agent (structural) | English |
+| Feature name (e.g. `exportación-de-facturas`) | Operator-supplied | Whatever the operator chose |
+| `00-task-intake.md` Original Description block | Operator-quoted | Whatever the operator said |
+| All other prose inside session-doc bodies | Agent | English (with §7.3 exceptions) |
+
+**Rule of thumb:** "Did the agent compose this string, or pass through user input?" The agent's compositions are English. User input is preserved verbatim.
+
+### 7.5 Orchestrator as the canonical entry point
+
+When documenting how to invoke the system, treat `@orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+
+The operator's mental model is: orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+
+### 7.6 Application checklist (for contributors)
+
+Before opening a PR that adds or modifies operator-facing copy, walk through this checklist:
+
+- [ ] No enthusiasm markers, no emoji decoration of routine status messages.
+- [ ] No first-person personality or anthropomorphic framing.
+- [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
+- [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, session-doc templates). Exception: `/status` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
+- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/orchestrator.md` Step 6 routing table.
+- [ ] If the change documents how to invoke the system, the example uses `@orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
+
+`tests/test_agent_structure.py` Suite 23 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).
+
+---
+
+## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 
-## 8. Patterns & Conventions
+## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 
-## 9. Known Constraints
+## 10. Known Constraints
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 
-## 10. Testing Conventions
+## 11. Testing Conventions
 
 The repo has a verification suite at `tests/` that covers what is testable without a live LLM:
 
@@ -218,7 +325,7 @@ The repo has a verification suite at `tests/` that covers what is testable witho
 
 ---
 
-## 11. Contribution Workflow (repo-specific)
+## 12. Contribution Workflow (repo-specific)
 
 This repo ships assets to other developers, so the contribution flow matters more than code-level conventions.
 
@@ -229,13 +336,13 @@ This repo ships assets to other developers, so the contribution flow matters mor
 
 ---
 
-## 12. Git & Delivery Conventions
+## 13. Git & Delivery Conventions
 
 Git & delivery rules are now part of §6 Mandatory Working Agreements (see During-work and Post-work sub-blocks). This section is intentionally a pointer to keep one source of truth.
 
 ---
 
-## 13. Subagent Orchestration
+## 14. Subagent Orchestration
 
 **The `orchestrator` agent is the canonical entry point for every development workflow.** Operators drive the pipeline by talking to it conversationally (e.g., `@orchestrator give me the work plan for this task: X`, `@orchestrator implement it`, `@orchestrator open the PR`) and the orchestrator's Step 6 intent-detection classifies the request and dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route into the same orchestrator under the hood — they give a deterministic entry without the intent-detection step plus a few extras (e.g., `/design #N` fetches a GitHub issue automatically), but the orchestrator-conversational path covers every workflow. Treat the orchestrator as the single front door; do not surface slash commands as "the better way" to operators who prefer chat. **All repo artefacts (code, configs, agents, skills, docs, commits, PR bodies, CHANGELOG) are written in English. Operators may chat in any language; the orchestrator's intent-detection patterns accept Spanish and English. The English-only rule applies to what is committed to the repository, not to live chat.**
 
@@ -281,7 +388,7 @@ This rule applies to **every** entry mode: `@orchestrator` mention, skill routin
 
 ---
 
-## 14. When to Ask Humans
+## 15. When to Ask Humans
 
 - Proposing a new direct mode or a new pipeline phase (changes the mental model).
 - Changing the installer's target layout under `~/.claude/` or touching new keys in `~/.claude.json` beyond `mcpServers.memory` / `mcpServers.context7` (breaks existing users or risks clobbering personal config).
@@ -290,6 +397,6 @@ This rule applies to **every** entry mode: `@orchestrator` mention, skill routin
 
 ---
 
-## 15. Meta-Note
+## 16. Meta-Note
 
 **This is the repo that produces the agents and skills of the orchestrator system.** A CLAUDE.md edit here does *not* propagate automatically — agents in this repo are read from `agents/*.md` as source artifacts, and developers pick them up via the installer. If you change agent behavior and want it to take effect on your own machine, re-run the installer.

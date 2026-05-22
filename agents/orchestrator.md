@@ -52,7 +52,7 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
 
 2. **If no session-docs exist yet** (fresh task, probe failed before any intake): do NOT create session-docs. Just respond inline with the message below.
 
-3. **End your turn with this response** (fill placeholders from `## Current State`). The response is a **directive to top-level Claude** with two parts: (a) the marker phrase that triggers the auto-takeover protocol in `CLAUDE.md §13`, and (b) a machine-parseable JSON `dispatch_handoff` block with the variable fields top-level Claude needs to dispatch the next agent. The takeover playbook itself is canonical in `CLAUDE.md §13` — do NOT duplicate it inline here. Use this exact structure (no prose between the marker and the JSON, no commentary after):
+3. **End your turn with this response** (fill placeholders from `## Current State`). The response is a **directive to top-level Claude** with two parts: (a) the marker phrase that triggers the auto-takeover protocol in `CLAUDE.md §14`, and (b) a machine-parseable JSON `dispatch_handoff` block with the variable fields top-level Claude needs to dispatch the next agent. The takeover playbook itself is canonical in `CLAUDE.md §14` — do NOT duplicate it inline here. Use this exact structure (no prose between the marker and the JSON, no commentary after):
 
    > **Dispatch handoff — top-level Claude takes over now.**
    >
@@ -75,7 +75,7 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
    > }
    > ```
    >
-   > Top-level Claude: follow `CLAUDE.md §13 Universal rule — auto-takeover on blocked-no-dispatch`. Variable fields above; canonical playbook in CLAUDE.md.
+   > Top-level Claude: follow `CLAUDE.md §14 Universal rule — auto-takeover on blocked-no-dispatch`. Variable fields above; canonical playbook in CLAUDE.md.
 
    **Fill rules for placeholders:**
    - `state_ref`: omit the field entirely (or set `null`) if no session-docs exist for this run.
@@ -84,7 +84,7 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
    - `round.current` and `round.prs_in_round`: `null` when not yet in Stage 2.
    - `next_dispatch.contract_files`: at minimum the agent's own contract file; include orchestrator phase anchor when applicable.
 
-   (Then stop your subagent turn. Do not retry the probe. Do not improvise inline work. Do not write any other session-doc beyond the `00-state.md` update from step 1. Do not append the prose playbook — `CLAUDE.md §13` is the single source of truth for the takeover protocol; duplicating it here drifts.)
+   (Then stop your subagent turn. Do not retry the probe. Do not improvise inline work. Do not write any other session-doc beyond the `00-state.md` update from step 1. Do not append the prose playbook — `CLAUDE.md §14` is the single source of truth for the takeover protocol; duplicating it here drifts.)
 
 **`## Handoff` template** (append verbatim to `00-state.md` in step 1, fill placeholders from `## Current State`). The human-readable fields preserve context for resume-after-compaction; the embedded JSON block is the canonical machine-parseable handoff (identical schema to the response above) so recovery flows (e.g., `/recover`) can pick up state without re-parsing prose:
 
@@ -118,7 +118,7 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
 }
 ```
 
-Top-level Claude: follow `CLAUDE.md §13 Universal rule — auto-takeover on blocked-no-dispatch`. Do NOT re-invoke `@orchestrator` — that re-creates the nested condition.
+Top-level Claude: follow `CLAUDE.md §14 Universal rule — auto-takeover on blocked-no-dispatch`. Do NOT re-invoke `@orchestrator` — that re-creates the nested condition.
 ```
 
 ## Dispatch invariants (read first, never weaken)
@@ -1887,14 +1887,14 @@ Every line is a JSON object with these fields:
 | `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
 | `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
 | `reason` | conditional | For `dispatch.blocked`: short reason (`task tool stripped`, `agent not registered`, `tool permission denied`). For `stage.gate.skipped`: `autonomous` / `legacy`. |
-| `action` | conditional | For `dispatch.blocked`: what you did about it (`top-level takeover per CLAUDE.md §13`, `aborted`). |
+| `action` | conditional | For `dispatch.blocked`: what you did about it (`top-level takeover per CLAUDE.md §14`, `aborted`). |
 | `extra` | optional | Object for event-specific extras (e.g., `{"tests_before": 42, "tests_after": 47}` for the test-ratchet gate). |
 
 ### Examples
 
 ```jsonl
 {"ts":"2026-05-01T14:00:00-03:00","event":"pipeline.start","feature":"auth-jwt","extra":{"type":"feature","complexity":"standard","ac_count":5}}
-{"ts":"2026-05-01T14:00:12-03:00","event":"dispatch.blocked","feature":"auth-jwt","phase":"0a-intake","reason":"task tool stripped","action":"top-level takeover per CLAUDE.md §13"}
+{"ts":"2026-05-01T14:00:12-03:00","event":"dispatch.blocked","feature":"auth-jwt","phase":"0a-intake","reason":"task tool stripped","action":"top-level takeover per CLAUDE.md §14"}
 {"ts":"2026-05-01T14:00:42-03:00","event":"phase.start","feature":"auth-jwt","phase":"1-design","agent":"architect","iteration":0}
 {"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
 {"ts":"2026-05-01T14:03:25-03:00","event":"gate.pass","feature":"auth-jwt","phase":"1.5-ratify-plan","verdict":"pass","summary":"5/5 AC covered by Work Plan"}
@@ -1917,7 +1917,7 @@ Every line is a JSON object with these fields:
 | `stage.gate.skipped` | When STAGE-GATE-2 is skipped silently (autonomous mode) or STAGE-GATE-1 is skipped (legacy pipeline). Include `stage`, `reason`, `after_pr`. |
 | `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
 | `policy.deny` | When `hooks/policy-block.sh` denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
-| `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §13). Record the reason + the action you took (handoff to top-level Claude, or abort). |
+| `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
 | `stage.notify` | After invoking `hooks/notify-stage.sh` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
 | `stage.notify.skipped` | When toast emission is skipped — either because `stage.notify` for that stage already exists in the JSONL (`reason: already-fired`), or the wrapper is absent (`reason: wrapper-missing`). |
 | `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
