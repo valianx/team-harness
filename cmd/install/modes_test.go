@@ -271,35 +271,16 @@ func TestAgentNameFromPath(t *testing.T) {
 //           cross-mode re-install with --force → overwrite.
 // ---------------------------------------------------------------------------
 
-// writeAgentFixture creates a minimal agent .md file with the given model+effort.
-func writeAgentFixture(t *testing.T, dir, name, model, effort string) string {
-	t.Helper()
-	content := fmt.Sprintf("---\nname: %s\nmodel: %s\neffort: %s\ncolor: blue\n---\nPrompt body.\n", name, model, effort)
-	path := filepath.Join(dir, name+".md")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("writeAgentFixture: %v", err)
-	}
-	return path
-}
-
 // TestAC5_SameModeReinstall_ReportsUnchanged verifies that a same-mode re-install
 // reports the agent as unchanged (the manifest stores the transformed hash).
+// Uses the embedded architect.md as the source (the real embedded bytes).
 func TestAC5_SameModeReinstall_ReportsUnchanged(t *testing.T) {
-	tmp, cleanup := testEnv(t)
+	_, cleanup := testEnv(t)
 	defer cleanup()
 
-	// Create a source agents directory.
-	srcDir := filepath.Join(tmp, "agents")
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	// Write a standard-model agent source file.
-	agentName := "architect"
-	srcPath := writeAgentFixture(t, srcDir, agentName, "opus", "max")
-
-	destDir := filepath.Join(claudeDir, "agents")
-	destPath := filepath.Join(destDir, agentName+".md")
+	// Use the embedded architect.md as the source path.
+	srcPath := "agents/architect.md"
+	destPath := filepath.Join(claudeDir, "agents", "architect.md")
 
 	// First install in low-cost mode.
 	stats.Installed = nil
@@ -328,18 +309,11 @@ func TestAC5_SameModeReinstall_ReportsUnchanged(t *testing.T) {
 // TestAC5_CrossModeReinstall_NoForce_ReportsConflict verifies that switching from
 // low-cost to standard without --force reports a conflict and leaves the file intact.
 func TestAC5_CrossModeReinstall_NoForce_ReportsConflict(t *testing.T) {
-	tmp, cleanup := testEnv(t)
+	_, cleanup := testEnv(t)
 	defer cleanup()
 
-	srcDir := filepath.Join(tmp, "agents")
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	agentName := "architect"
-	srcPath := writeAgentFixture(t, srcDir, agentName, "opus", "max")
-	destDir := filepath.Join(claudeDir, "agents")
-	destPath := filepath.Join(destDir, agentName+".md")
+	srcPath := "agents/architect.md"
+	destPath := filepath.Join(claudeDir, "agents", "architect.md")
 
 	// Install in low-cost mode.
 	stats.Installed = nil
@@ -371,18 +345,11 @@ func TestAC5_CrossModeReinstall_NoForce_ReportsConflict(t *testing.T) {
 // TestAC5_CrossModeReinstall_WithForce_Overwrites verifies that --force causes
 // the cross-mode re-install to overwrite the file with the new mode's content.
 func TestAC5_CrossModeReinstall_WithForce_Overwrites(t *testing.T) {
-	tmp, cleanup := testEnv(t)
+	_, cleanup := testEnv(t)
 	defer cleanup()
 
-	srcDir := filepath.Join(tmp, "agents")
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	agentName := "architect"
-	srcPath := writeAgentFixture(t, srcDir, agentName, "opus", "max")
-	destDir := filepath.Join(claudeDir, "agents")
-	destPath := filepath.Join(destDir, agentName+".md")
+	srcPath := "agents/architect.md"
+	destPath := filepath.Join(claudeDir, "agents", "architect.md")
 
 	// Install in low-cost mode.
 	stats.Installed = nil
@@ -395,7 +362,7 @@ func TestAC5_CrossModeReinstall_WithForce_Overwrites(t *testing.T) {
 		t.Fatal("expected initial install")
 	}
 
-	// Read what was written to disk (should be low-cost: sonnet/high).
+	// Read what was written to disk (should be low-cost: sonnet/high — architect is high).
 	lowCostContent, _ := os.ReadFile(destPath)
 	if !strings.Contains(string(lowCostContent), "model: sonnet") {
 		t.Fatalf("low-cost install must produce sonnet on disk; got:\n%s", lowCostContent)
@@ -414,10 +381,10 @@ func TestAC5_CrossModeReinstall_WithForce_Overwrites(t *testing.T) {
 			stats.Installed, stats.Updated, stats.Conflicts)
 	}
 
-	// On-disk content must now be standard (opus/max).
+	// On-disk content must now be standard (original frontmatter from the embedded file).
 	standardContent, _ := os.ReadFile(destPath)
-	if !strings.Contains(string(standardContent), "model: opus") {
-		t.Errorf("after --force standard re-install, disk must have model: opus; got:\n%s", standardContent)
+	if strings.Contains(string(standardContent), "model: sonnet") {
+		t.Errorf("after --force standard re-install, disk must not have model: sonnet (low-cost); got:\n%s", standardContent)
 	}
 }
 

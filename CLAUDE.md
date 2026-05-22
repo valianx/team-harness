@@ -61,10 +61,13 @@ team-harness/
 │       └── preservation_test.go
 ├── bin/
 │   ├── install.sh       Bootstrap for Unix/macOS (downloads Go binary from GH Release)
-│   └── install.ps1      Bootstrap for Windows (same via PowerShell)
+│   ├── install.ps1      Bootstrap for Windows (same via PowerShell)
+│   └── install.cmd      Bootstrap for Windows cmd.exe (same via curl)
 ├── .github/
 │   └── workflows/
-│       └── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
+│       ├── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
+│       └── pages.yml    Publish bootstrap scripts to GitHub Pages on release
+├── assets.go            go:embed entry point (package teamharness) — embeds agents/, skills/, hooks/
 ├── go.mod               Go module (github.com/valianx/team-harness, Go 1.23)
 ├── docs/
 │   └── knowledge.md     Project knowledge base — decisions, patterns, stack
@@ -88,8 +91,8 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | Go 1.23 (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). |
-| Bootstrap scripts | Bash (`install.sh`) + PowerShell (`install.ps1`) — detect OS+arch, download the right Go binary from the latest GH Release, exec it. Zero Python, zero `uv` required. |
+| Installer | Go 1.23 (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). Agents, skills, and hooks are embedded at compile time via `//go:embed agents skills hooks` in `assets.go` (repo root) — the binary is self-contained and requires no repo clone at runtime. |
+| Bootstrap scripts | Bash (`install.sh`) + PowerShell (`install.ps1`) + cmd.exe (`install.cmd`) — detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call). Served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via a GitHub Pages workflow. Zero Python, zero `uv` required. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
 | Hooks | Bash scripts (`.sh`) — run via Git Bash on Windows, native on macOS/Linux |
@@ -97,7 +100,7 @@ team-harness/
 | Config | JSON (`hooks/config.json`) + `~/.claude.json` merge for `mcpServers` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 
-**Current version:** `2.2.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
+**Current version:** `2.3.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -114,11 +117,13 @@ All commands run from the repo root.
 
 | Intent | Command |
 |---|---|
-| Install (Unix / macOS) | `./bin/install.sh` |
-| Install (Windows PowerShell) | `.\bin\install.ps1` |
-| Non-interactive install | `CONTEXT7_API_KEY=<key> MEMORY_MCP_URL=https://<url>/mcp [MEMORY_MCP_BEARER=<jwt>] ./bin/install.sh` |
-| Force-reset MCP config in ~/.claude.json | `./bin/install.sh --force` |
-| Build installer from source (requires Go 1.23+) | `go build ./cmd/install` |
+| Install — one-liner (Unix / macOS) | `curl -fsSL https://valianx.github.io/team-harness/install.sh \| bash` |
+| Install — one-liner (Windows PowerShell) | `irm https://valianx.github.io/team-harness/install.ps1 \| iex` |
+| Install — one-liner (Windows cmd.exe) | `curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd` |
+| Non-interactive install | `CONTEXT7_API_KEY=<key> MEMORY_MCP_URL=https://<url>/mcp [MEMORY_MCP_BEARER=<jwt>] curl -fsSL https://valianx.github.io/team-harness/install.sh \| bash` |
+| Force-reset MCP config in ~/.claude.json | Append `--force` after the pipe (bash): `bash /dev/stdin --force` |
+| Build / test installer from source (contributors) | `go run ./cmd/install` (embed picks up local working-tree bytes) |
+| Build installer binary from source (requires Go 1.23+) | `go build ./cmd/install` |
 | View which files the installer would touch | Run the installer — it reports installed / unchanged / conflicts; never overwrites |
 | Resolve a conflict | Delete the conflicting file in `~/.claude/...` and re-run the installer |
 | Enable notification hooks | Open `hooks/config.json`, copy the section for your OS, merge it into `~/.claude/settings.json` under `"hooks"` |

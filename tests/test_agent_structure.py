@@ -1890,6 +1890,139 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 24 — Curl one-liner install: go:embed + bootstrap URLs + pages.yml
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 24: Curl one-liner install (go:embed + Pages + bootstrap) ===")
+
+assets_go = read(REPO_ROOT / "assets.go")
+install_sh = read(REPO_ROOT / "bin" / "install.sh")
+install_ps1 = read(REPO_ROOT / "bin" / "install.ps1")
+install_cmd = read(REPO_ROOT / "bin" / "install.cmd")
+
+PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pages.yml"
+pages_yml_text = read(PAGES_WORKFLOW) if PAGES_WORKFLOW.exists() else ""
+
+# (a) assets.go contains the //go:embed directive for agents, skills, hooks.
+check(
+    "assets.go contains '//go:embed agents skills hooks'",
+    "//go:embed agents skills hooks" in assets_go,
+    "//go:embed directive missing or does not cover agents, skills, hooks",
+)
+
+# (b) bin/install.sh references the deterministic releases/latest/download URL.
+# The URL may be split across a variable assignment (BASE_URL=...download) — check
+# for the path suffix which is always present literally.
+RELEASES_PATH = "releases/latest/download"
+check(
+    "bin/install.sh references releases/latest/download URL",
+    RELEASES_PATH in install_sh,
+    f"install.sh must reference a URL containing '{RELEASES_PATH}'",
+)
+
+# (c) bin/install.ps1 references the deterministic releases/latest/download URL.
+check(
+    "bin/install.ps1 references releases/latest/download URL",
+    RELEASES_PATH in install_ps1,
+    f"install.ps1 must reference a URL containing '{RELEASES_PATH}'",
+)
+
+# (d) bin/install.cmd exists and references the deterministic URL.
+check(
+    "bin/install.cmd exists",
+    (REPO_ROOT / "bin" / "install.cmd").exists(),
+    "bin/install.cmd not found — Windows cmd.exe one-liner not implemented",
+)
+check(
+    "bin/install.cmd references releases/latest/download URL",
+    RELEASES_PATH in install_cmd,
+    f"install.cmd must reference a URL containing '{RELEASES_PATH}'",
+)
+
+# (e) .github/workflows/pages.yml exists.
+check(
+    ".github/workflows/pages.yml exists",
+    PAGES_WORKFLOW.exists(),
+    ".github/workflows/pages.yml missing — Pages publish workflow not implemented",
+)
+
+# (f) pages.yml is triggered by release: published (the only publish trigger).
+check(
+    "pages.yml triggered by 'release: published'",
+    "release:" in pages_yml_text and "published" in pages_yml_text,
+    "pages.yml must trigger on release: types: [published]",
+)
+
+# (g) pages.yml has NO 'push:' trigger (AC-9: must not republish on main pushes).
+check(
+    "pages.yml has no 'push:' trigger (AC-9)",
+    # Allow 'push' in comments but not as a trigger key.
+    not re.search(r"^\s*push\s*:", pages_yml_text, re.MULTILINE),
+    "pages.yml must not have a 'push:' trigger — would republish on every main commit",
+)
+
+# (h) pages.yml has a workflow_dispatch trigger (R7 manual recovery).
+check(
+    "pages.yml has workflow_dispatch trigger (R7 recovery)",
+    "workflow_dispatch" in pages_yml_text,
+    "pages.yml must have workflow_dispatch for manual re-publish recovery (R7)",
+)
+
+# (i) pages.yml uses actions/deploy-pages (first-party, D5).
+check(
+    "pages.yml uses actions/deploy-pages",
+    "actions/deploy-pages" in pages_yml_text,
+    "pages.yml must use the first-party actions/deploy-pages action (D5)",
+)
+
+# (j) bin/install.sh does NOT use the GitHub API endpoint (replaced by deterministic URL).
+check(
+    "bin/install.sh does not call api.github.com (replaced by deterministic URL)",
+    "api.github.com" not in install_sh,
+    "install.sh still calls api.github.com — should use releases/latest/download directly",
+)
+
+# (k) bin/install.ps1 does NOT use Invoke-RestMethod for the API (replaced by direct download).
+check(
+    "bin/install.ps1 does not call api.github.com",
+    "api.github.com" not in install_ps1,
+    "install.ps1 still calls api.github.com — should use releases/latest/download directly",
+)
+
+# (l) README.md ## Install section references the GitHub Pages URL (AC-11: one-liners visible).
+top_readme = read(REPO_ROOT / "README.md")
+PAGES_INSTALL_SH = "valianx.github.io/team-harness/install.sh"
+check(
+    "README.md ## Install references the GitHub Pages install.sh URL (AC-11)",
+    PAGES_INSTALL_SH in top_readme,
+    f"README.md does not reference '{PAGES_INSTALL_SH}' — one-liner install not surfaced",
+)
+
+# (m) README.md positions one-liners before the clone-and-run path (AC-11: primary vs secondary).
+# The Pages URL must appear before the "From source" or "clone" heading.
+pages_url_pos = top_readme.find(PAGES_INSTALL_SH)
+from_source_pos = top_readme.lower().find("from source")
+check(
+    "README.md one-liner (Pages URL) appears before 'From source' section (AC-11: primary path)",
+    pages_url_pos != -1 and from_source_pos != -1 and pages_url_pos < from_source_pos,
+    "README.md must show the Pages one-liner BEFORE the 'From source' clone section",
+)
+
+# (n) Bootstrap scripts do NOT clear the environment before exec-ing the binary.
+# Each script must inherit env (exec / & $Installer / direct call) — no 'env -i' or
+# 'Start-Process -UseNewEnvironment' which would lose INSTALL_MODE.
+check(
+    "bin/install.sh does not clear environment (no 'env -i') — AC-4 INSTALL_MODE propagation",
+    "env -i" not in install_sh,
+    "install.sh uses 'env -i' which clears INSTALL_MODE before spawning the binary",
+)
+check(
+    "bin/install.ps1 does not clear environment (no '-UseNewEnvironment') — AC-4 INSTALL_MODE propagation",
+    "-UseNewEnvironment" not in install_ps1,
+    "install.ps1 uses -UseNewEnvironment which clears INSTALL_MODE before spawning the binary",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

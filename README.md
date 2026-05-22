@@ -2,7 +2,7 @@
 
 > An **agent harness for Claude Code**. Turns the chat into a Spec-Driven Development pipeline with mandatory human gates, agent-then-human review at every transition, and full state captured as files so any session — yours, a teammate's, tomorrow's — can resume from where the last one left off.
 
-[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Tests](https://img.shields.io/badge/tests-3%20suites-success.svg)](./tests)
 
@@ -22,13 +22,17 @@ A **harness**, not a prompt pack. You install it once and Claude Code becomes a 
 ## Install
 
 ```bash
-git clone https://github.com/valianx/team-harness.git
-cd team-harness
-./bin/install.sh         # Unix / macOS
-# .\bin\install.ps1      # Windows (PowerShell)
+# Unix / macOS
+curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
+
+# Windows (PowerShell)
+irm https://valianx.github.io/team-harness/install.ps1 | iex
+
+# Windows (cmd.exe)
+curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd
 ```
 
-Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`gh`](https://cli.github.com/) (for orchestrator delivery flow), and a [context7](https://context7.com/) API key. Zero Python, zero `uv` — the bootstrap downloads a prebuilt Go binary from the latest GitHub Release and the agents talk to your external Memory MCP via HTTP.
+Requirements: [Claude Code](https://docs.claude.com/en/docs/claude-code), [`gh`](https://cli.github.com/) (for orchestrator delivery flow), and a [context7](https://context7.com/) API key. Zero Python, zero `uv` — the bootstrap downloads a self-contained Go binary from the latest GitHub Release; agents, skills, and hooks are embedded in the binary and written directly to `~/.claude/`.
 
 On an interactive terminal the installer walks you through three prompts in order:
 
@@ -41,10 +45,10 @@ For non-interactive (CI / scripted) installs, set env vars instead of prompting:
 ```bash
 MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
 CONTEXT7_API_KEY=ctx7sk-... \
-./bin/install.sh
+curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 ```
 
-Pass `--force` to reset existing `mcpServers` entries: `./bin/install.sh --force`.
+Pass `--force` to reset existing `mcpServers` entries by appending it after the pipe: `bash /dev/stdin --force`.
 
 **Install modes.** The installer prompts for an install mode (or reads `INSTALL_MODE` env var):
 
@@ -52,10 +56,21 @@ Pass `--force` to reset existing `mcpServers` entries: `./bin/install.sh --force
 - `low-cost` — rewrites agent `model:` and `effort:` frontmatter in-flight. All agents run on `sonnet`; lower API cost with documented quality trade-offs. Designed for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). See [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the full matrix and trade-off analysis.
 
 ```bash
-INSTALL_MODE=low-cost MEMORY_MCP_URL=https://your-mcp.example.com/mcp ./bin/install.sh
+INSTALL_MODE=low-cost MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
+  curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 ```
 
 Restart Claude Code after install so it picks up the new agents and MCP servers. The installer is idempotent and never overwrites existing files (conflicts are reported, not silenced).
+
+### From source / contributors
+
+```bash
+git clone https://github.com/valianx/team-harness.git
+cd team-harness
+go run ./cmd/install     # builds from local source (embed picks up your working-tree bytes)
+```
+
+Contributors testing local edits should use `go run ./cmd/install` — the `//go:embed` directive snapshots the local `agents/`, `skills/`, and `hooks/` directories at compile time, so the binary you build reflects your working tree exactly. The bootstrap scripts (`./bin/install.sh` / `.\bin\install.ps1`) always download the released binary rather than using the local clone.
 
 ---
 

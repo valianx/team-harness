@@ -1,40 +1,57 @@
 #!/bin/sh
 # team-harness installer bootstrap (Unix / macOS)
-# Downloads the right prebuilt Go binary from the latest GitHub Release and execs it.
-set -e
+# Curl-pipeable: curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
+# Or run from a clone: ./bin/install.sh
+set -eu
 
 REPO="valianx/team-harness"
+BASE_URL="https://github.com/${REPO}/releases/latest/download"
 
-# Find latest release tag.
-LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
-if [ -z "$LATEST" ]; then
-    echo "Error: could not resolve latest release. Has a release been tagged yet?"
-    echo "See: https://github.com/$REPO/releases"
-    exit 1
-fi
-
-# Detect OS + arch.
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-case "$ARCH" in
-    x86_64|amd64) ARCH="amd64" ;;
-    aarch64|arm64) ARCH="arm64" ;;
-    *) echo "Error: unsupported arch '$ARCH'"; exit 1 ;;
-esac
+# Detect OS.
+OS=$(uname -s 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo unknown)
 case "$OS" in
     linux|darwin) ;;
-    *) echo "Error: unsupported OS '$OS'. For Windows, use install.ps1."; exit 1 ;;
+    *)
+        echo "Error: unsupported OS '$OS'." >&2
+        echo "  team-harness supports linux and darwin via install.sh." >&2
+        echo "  For Windows, see: https://valianx.github.io/team-harness/install.ps1" >&2
+        exit 1
+        ;;
+esac
+
+# Detect arch.
+ARCH=$(uname -m 2>/dev/null || echo unknown)
+case "$ARCH" in
+    x86_64|amd64)  ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *)
+        echo "Error: unsupported arch '$ARCH'." >&2
+        echo "  team-harness supports amd64 and arm64." >&2
+        echo "  See: https://github.com/${REPO}/releases" >&2
+        exit 1
+        ;;
 esac
 
 ASSET="install-${OS}-${ARCH}"
-URL="https://github.com/$REPO/releases/download/$LATEST/$ASSET"
+URL="${BASE_URL}/${ASSET}"
 
-TMP=$(mktemp -d)
-trap "rm -rf $TMP" EXIT
+# Download to a tmp dir we clean up on exit.
+TMP=$(mktemp -d 2>/dev/null) || {
+    echo "Error: could not create temporary directory." >&2
+    exit 1
+}
+trap 'rm -rf "$TMP"' EXIT
 
-echo "Downloading $ASSET from $LATEST..."
-curl -fsSL -o "$TMP/install" "$URL"
+echo "Downloading ${ASSET} from latest release..."
+if ! curl -fsSL --max-time 120 -o "$TMP/install" "$URL"; then
+    echo "Error: download failed from ${URL}" >&2
+    echo "  This usually means: (a) no release has been tagged yet, (b) GitHub is" >&2
+    echo "  unreachable from this network, or (c) your firewall blocks github.com." >&2
+    echo "  Releases: https://github.com/${REPO}/releases" >&2
+    exit 1
+fi
+
 chmod +x "$TMP/install"
 
-echo "Running install (you may be prompted for backend choice + API key)..."
+echo "Launching installer..."
 exec "$TMP/install" "$@"

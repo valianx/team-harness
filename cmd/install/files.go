@@ -56,22 +56,7 @@ func ensureDir(p string) {
 	}
 }
 
-// applyFile copies src to dest; sets executable bits on non-Windows when requested.
-func applyFile(src, dest string, executable bool) error {
-	if err := copyFileRaw(src, dest); err != nil {
-		return err
-	}
-	if executable && !isWindows() {
-		info, err := os.Stat(dest)
-		if err != nil {
-			return err
-		}
-		return os.Chmod(dest, info.Mode()|0o111)
-	}
-	return nil
-}
-
-// copyFileRaw performs a raw byte copy from src to dest.
+// copyFileRaw performs a raw byte copy from src to dest (both filesystem paths).
 func copyFileRaw(src, dest string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -89,22 +74,37 @@ func copyFileRaw(src, dest string) error {
 	return err
 }
 
-// copyFile installs a single file with idempotency / conflict detection.
-func copyFile(src, dest string, executable bool) {
+// writeBytesToDest writes the given bytes to dest and optionally sets executable bits.
+func writeBytesToDest(data []byte, dest string, executable bool) error {
+	if err := os.WriteFile(dest, data, 0o644); err != nil {
+		return err
+	}
+	if executable && !isWindows() {
+		info, err := os.Stat(dest)
+		if err != nil {
+			return err
+		}
+		return os.Chmod(dest, info.Mode()|0o111)
+	}
+	return nil
+}
+
+// copyEmbeddedFile installs a single file from the embedded FS with idempotency
+// and conflict detection.
+func copyEmbeddedFile(srcPath, dest string, executable bool) {
 	ensureDir(filepath.Dir(dest))
 
-	srcHash, err := hashFile(src)
+	srcData, err := fs.ReadFile(EmbeddedAssets(), srcPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "  [warn] cannot hash %s: %v\n", src, err)
+		fmt.Fprintf(os.Stderr, "  [warn] cannot read embedded %s: %v\n", srcPath, err)
 		return
 	}
-
+	srcHash := hashBytes(srcData)
 	recordedHash := manifest.Files[dest].Hash
 
 	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
-		// Brand-new file.
-		if applyErr := applyFile(src, dest, executable); applyErr != nil {
-			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, applyErr)
+		if writeErr := writeBytesToDest(srcData, dest, executable); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
 			return
 		}
 		recordManifest(dest, srcHash)
@@ -119,7 +119,6 @@ func copyFile(src, dest string, executable bool) {
 	}
 
 	if destHash == srcHash {
-		// File already matches — keep manifest in sync.
 		recordManifest(dest, srcHash)
 		stats.Unchanged = append(stats.Unchanged, dest)
 		return
@@ -128,8 +127,8 @@ func copyFile(src, dest string, executable bool) {
 	// Destination differs from source.
 	if recordedHash != "" && recordedHash == destHash {
 		// We installed this before and the user hasn't touched it — safe update.
-		if applyErr := applyFile(src, dest, executable); applyErr != nil {
-			fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, applyErr)
+		if writeErr := writeBytesToDest(srcData, dest, executable); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
 			return
 		}
 		recordManifest(dest, srcHash)
@@ -141,23 +140,23 @@ func copyFile(src, dest string, executable bool) {
 	stats.Conflicts = append(stats.Conflicts, dest)
 }
 
-// copyAgentFile installs a single agent .md file with optional in-flight
-// frontmatter transformation. The transformer rewrites model: and effort: lines
-// per the lowCostMatrix when mode is ModeLowCost; for ModeStandard the bytes
-// are passed through unchanged. The sha256 is computed from the TRANSFORMED
-// bytes — this is load-bearing for conflict detection (AC-5): a same-mode
-// re-install will hash-match and report unchanged; a cross-mode re-install will
-// diverge and report conflict.
-func copyAgentFile(src, dest string, mode InstallMode) {
+// copyAgentFile installs a single agent .md file from the embedded FS with
+// optional in-flight frontmatter transformation. The transformer rewrites
+// model: and effort: lines per the lowCostMatrix when mode is ModeLowCost; for
+// ModeStandard the bytes are passed through unchanged. The sha256 is computed
+// from the TRANSFORMED bytes — this is load-bearing for conflict detection:
+// a same-mode re-install will hash-match and report unchanged; a cross-mode
+// re-install will diverge and report conflict.
+func copyAgentFile(srcPath, dest string, mode InstallMode) {
 	ensureDir(filepath.Dir(dest))
 
-	srcBytes, err := os.ReadFile(src)
+	srcBytes, err := fs.ReadFile(EmbeddedAssets(), srcPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "  [warn] cannot read %s: %v\n", src, err)
+		fmt.Fprintf(os.Stderr, "  [warn] cannot read embedded %s: %v\n", srcPath, err)
 		return
 	}
 
-	agentName := agentNameFromPath(src)
+	agentName := agentNameFromPath(srcPath)
 	transformed := transformAgentFile(srcBytes, agentName, mode)
 
 	// Compute the hash of the TRANSFORMED content (not the raw source).
@@ -167,7 +166,6 @@ func copyAgentFile(src, dest string, mode InstallMode) {
 	transformedHash := hashBytes(transformed)
 
 	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
-		// Brand-new file.
 		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
 			return
@@ -184,7 +182,6 @@ func copyAgentFile(src, dest string, mode InstallMode) {
 	}
 
 	if destHash == transformedHash {
-		// On-disk already matches what this mode would produce — keep manifest in sync.
 		recordManifest(dest, transformedHash)
 		stats.Unchanged = append(stats.Unchanged, dest)
 		return
@@ -193,8 +190,6 @@ func copyAgentFile(src, dest string, mode InstallMode) {
 	// Destination differs from what this mode would produce.
 	if forceFlag {
 		// --force overrides all conflict detection: overwrite unconditionally.
-		// The file already exists (we're past the os.IsNotExist branch), so this
-		// is semantically an update, not a fresh install.
 		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
 			return
@@ -205,22 +200,7 @@ func copyAgentFile(src, dest string, mode InstallMode) {
 	}
 
 	// Without --force: report conflict whenever the on-disk content would need
-	// to change. This covers two situations:
-	//
-	//   (a) Mode switch (cross-mode re-install): manifest recorded a hash for
-	//       the previous mode; the current mode produces a different hash.
-	//       The operator must delete the file and re-run with --force.
-	//
-	//   (b) User-modified file: manifest differs from on-disk (user touched it).
-	//       Leave it alone — same behaviour as the original copyFile.
-	//
-	// In case (a) recordedHash == destHash (user hasn't touched it) but
-	// transformedHash != recordedHash (mode changed). We treat this as a
-	// conflict rather than a "safe update" because the manifest cannot
-	// distinguish "same mode, upstream source changed" from "mode switched"
-	// without persisting the install mode (out of scope per intake §"Excluded").
-	// The safe, operator-visible choice is always conflict. A future feature
-	// could persist the mode in the manifest to enable silent same-mode updates.
+	// to change. See the full rationale in the original copyAgentFile comment.
 	stats.Conflicts = append(stats.Conflicts, dest)
 }
 
@@ -231,10 +211,22 @@ func hashBytes(data []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// copyDirFlat installs all files with the given suffix from srcDir → destDir
-// (one level deep, no recursion).
-func copyDirFlat(srcDir, destDir, suffix string, executable bool) {
-	entries, err := sortedEntries(srcDir)
+// readEmbeddedDir reads directory entries from the embedded FS, sorted by name.
+func readEmbeddedDir(dir string) ([]fs.DirEntry, error) {
+	entries, err := fs.ReadDir(EmbeddedAssets(), dir)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+	return entries, nil
+}
+
+// copyEmbeddedDirFlat installs all files with the given suffix from an embedded
+// directory to destDir (one level deep, no recursion).
+func copyEmbeddedDirFlat(srcDir, destDir, suffix string, executable bool) {
+	entries, err := readEmbeddedDir(srcDir)
 	if err != nil {
 		return
 	}
@@ -245,14 +237,14 @@ func copyDirFlat(srcDir, destDir, suffix string, executable bool) {
 		if suffix != "" && !strings.HasSuffix(e.Name(), suffix) {
 			continue
 		}
-		copyFile(filepath.Join(srcDir, e.Name()), filepath.Join(destDir, e.Name()), executable)
+		copyEmbeddedFile(srcDir+"/"+e.Name(), filepath.Join(destDir, e.Name()), executable)
 	}
 }
 
-// copyDirRecursive installs an entire directory tree, marking files with the
-// given extension as executable.
-func copyDirRecursive(srcDir, destDir, executableExt string) {
-	entries, err := sortedEntries(srcDir)
+// copyEmbeddedDirRecursive installs an entire embedded directory tree, marking
+// files with the given extension as executable.
+func copyEmbeddedDirRecursive(srcDir, destDir, executableExt string) {
+	entries, err := readEmbeddedDir(srcDir)
 	if err != nil {
 		return
 	}
@@ -260,27 +252,15 @@ func copyDirRecursive(srcDir, destDir, executableExt string) {
 		if shouldSkip(e.Name()) {
 			continue
 		}
-		src := filepath.Join(srcDir, e.Name())
+		srcPath := srcDir + "/" + e.Name()
 		dest := filepath.Join(destDir, e.Name())
 		if e.IsDir() {
-			copyDirRecursive(src, dest, executableExt)
+			copyEmbeddedDirRecursive(srcPath, dest, executableExt)
 		} else {
 			isExec := executableExt != "" && strings.HasSuffix(e.Name(), executableExt)
-			copyFile(src, dest, isExec)
+			copyEmbeddedFile(srcPath, dest, isExec)
 		}
 	}
-}
-
-// sortedEntries reads a directory and returns entries sorted by name.
-func sortedEntries(dir string) ([]fs.DirEntry, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name() < entries[j].Name()
-	})
-	return entries, nil
 }
 
 // isWindows returns true when running on Windows.
