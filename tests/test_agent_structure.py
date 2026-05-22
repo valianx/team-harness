@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -1402,6 +1403,8 @@ delivery_kg_checks = [
      "mcp__memory__add_observations" in delivery_md.split("---", 2)[1]),
     ("delivery.md frontmatter declares mcp__memory__search_nodes",
      "mcp__memory__search_nodes" in delivery_md.split("---", 2)[1]),
+    ("delivery.md frontmatter declares mcp__memory__doctor (pre-flight health probe)",
+     "mcp__memory__doctor" in delivery_md.split("---", 2)[1]),
     ("Step 11.5 has Pre-flight quality gates section",
      "Pre-flight quality gates" in delivery_md),
     ("Step 11.5 Gate 1 — Specificity gate via suggest_node_type",
@@ -1414,7 +1417,60 @@ delivery_kg_checks = [
      "merged-into" in delivery_md),
     ("Step 11.5 status-block extended with new outcomes",
      "merged-into:" in delivery_md and "written-with-relation-note" in delivery_md),
+    ("Step 11.5 has Pre-flight MCP health check section (doctor pre-flight)",
+     "Pre-flight MCP health check" in delivery_md),
+    ("Step 11.5 forbids URL embellishment in skip log",
+     "Never invent a URL in the skip log" in delivery_md),
+    ("Step 11.5 has Pending payload fallback section",
+     "Pending payload fallback" in delivery_md),
+    ("Step 11.5 pending payload path is session-docs/{feature-name}/kg-passive-capture.pending.json",
+     "kg-passive-capture.pending.json" in delivery_md),
 ]
+
+# --- No default Memory MCP URL anywhere in docs: regression guard ---
+# This is an open-source distribution — the MCP can live on any host
+# (Railway/Render/Fly/Docker/local), so no specific URL is canonical to this
+# repo. Doc surfaces (CLAUDE.md, README.md, agent prompts) must reference only
+# generic placeholders (e.g., your-mcp.example.com), never a "real-looking"
+# host:port. Specific URLs are allowed only in: (a) preservation_test.go test
+# fixtures as sample data exercising URL validation / extraction helpers
+# (functional, not documentary); (b) CHANGELOG historical entries from prior
+# releases (immutable record of what was true at the time).
+
+claude_md = read(REPO_ROOT / "CLAUDE.md")
+readme_md = read(REPO_ROOT / "README.md")
+prompts_go = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+
+# Only the CHANGELOG [Unreleased] block is checked for the doc-surface rule;
+# historical entries below it document past behaviour with the URLs that were
+# real at that time, and are intentionally preserved.
+changelog_md = read(REPO_ROOT / "CHANGELOG.md")
+changelog_unreleased = changelog_md.split("## [Unreleased]", 1)[1].split("## [", 1)[0] if "## [Unreleased]" in changelog_md else ""
+
+no_default_url_checks = [
+    ("CLAUDE.md §1 does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in claude_md),
+    ("CLAUDE.md §1 explains there is no default URL (positive statement)",
+     "No default URL" in claude_md or "no default URL" in claude_md),
+    ("README.md does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in readme_md),
+    ("README.md does NOT promise a default with 'Press Enter to use the local Docker default'",
+     "Press Enter to use the local Docker default" not in readme_md),
+    ("README.md states no default URL exists (positive statement)",
+     "no default URL" in readme_md or "No default URL" in readme_md),
+    ("cmd/install/prompts.go doc comments do NOT name a specific host:port",
+     "localhost:7654" not in prompts_go),
+    ("cmd/install/prompts.go does NOT declare a defaultMemoryMCPURL const",
+     "const defaultMemoryMCPURL" not in prompts_go),
+    ("cmd/install/prompts.go errors out in non-interactive without MEMORY_MCP_URL env var",
+     "Memory MCP URL is required for non-interactive installs" in prompts_go),
+    ("cmd/install/prompts.go errors out on empty interactive input",
+     "empty Memory MCP URL" in prompts_go),
+    ("CHANGELOG [Unreleased] block does NOT name a specific host:port for the Memory MCP URL",
+     "localhost:7654" not in changelog_unreleased),
+]
+for label, condition in no_default_url_checks:
+    check(f"no-default-mcp-url: {label}", condition)
 for label, condition in delivery_kg_checks:
     check(f"delivery.md KG hygiene: {label}", condition)
 
@@ -1489,6 +1545,349 @@ orch_session_checks = [
 ]
 for label, condition in orch_session_checks:
     check(f"orchestrator.md session lifecycle: {label}", condition)
+
+# ---------------------------------------------------------------------------
+# Suite 22 — Stage-end notification protocol
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 22: Stage-end notification protocol ===")
+
+NOTIFY_STAGE = REPO_ROOT / "hooks" / "notify-stage.sh"
+
+check(
+    "orchestrator.md has ## Stage-end notification protocol section",
+    "## Stage-end notification protocol" in orch,
+    "## Stage-end notification protocol section missing from orchestrator.md",
+)
+
+check(
+    "Stage-end protocol mapping table mentions all 4 stage labels",
+    all(label in orch for label in ["analysis", "implementation batch", "verify", "delivery"]),
+    "one or more stage labels (analysis/implementation batch/verify/delivery) missing from orchestrator.md",
+)
+
+check(
+    "Stage-end protocol section names hooks/notify-stage.sh",
+    "hooks/notify-stage.sh" in orch,
+    "hooks/notify-stage.sh not referenced in orchestrator.md Stage-end notification protocol",
+)
+
+check(
+    "Stage-end protocol section documents the stage.notify JSONL event",
+    '"event":"stage.notify"' in orch or "stage.notify" in orch,
+    "stage.notify event type not documented in orchestrator.md",
+)
+
+check(
+    "hooks/notify-stage.sh file exists",
+    NOTIFY_STAGE.exists(),
+    "hooks/notify-stage.sh does not exist",
+)
+
+# Executable check — skip on Windows where permission bits are not meaningful.
+if os.name != "nt":
+    check(
+        "hooks/notify-stage.sh is executable",
+        os.access(NOTIFY_STAGE, os.X_OK),
+        "hooks/notify-stage.sh is not executable",
+    )
+
+notify_stage_content = read(NOTIFY_STAGE)
+
+check(
+    "notify-stage.sh branches on darwin (macOS)",
+    "darwin" in notify_stage_content,
+    "notify-stage.sh missing darwin branch",
+)
+check(
+    "notify-stage.sh branches on linux",
+    "linux" in notify_stage_content,
+    "notify-stage.sh missing linux branch",
+)
+check(
+    "notify-stage.sh branches on Windows (msys or cygwin or win32)",
+    any(k in notify_stage_content for k in ("msys", "cygwin", "win32")),
+    "notify-stage.sh missing Windows (msys/cygwin/win32) branch",
+)
+
+check(
+    "Stage-end protocol documents idempotency dedup via JSONL",
+    "already-fired" in orch and "00-execution-events.jsonl" in orch,
+    "idempotency dedup mechanism (already-fired / JSONL) not documented in orchestrator.md",
+)
+
+# (h) AC-2 coverage: section explicitly states toasts fire independent of autonomy mode.
+check(
+    "Stage-end protocol section states independence from autonomy mode",
+    "independent of autonomy" in orch,
+    "AC-2 contract ('independent of autonomy mode') not stated in orchestrator.md section",
+)
+
+# (i) AC-6 sub-item (b): Toast Mapping Table sub-heading present (not just label text).
+check(
+    "Stage-end protocol section has ### Toast Mapping Table sub-heading",
+    "### Toast Mapping Table" in orch,
+    "### Toast Mapping Table sub-heading missing from Stage-end notification protocol section",
+)
+
+# (j) AC-6 sub-item (e): Failure-safety sub-heading present (regression guard for 'best-effort, never blocks' contract).
+check(
+    "Stage-end protocol section has ### Failure-safety sub-heading",
+    "### Failure-safety" in orch,
+    "### Failure-safety sub-heading missing — best-effort/never-blocks contract may have been removed",
+)
+
+# (k) hooks/README.md documents notify-stage.sh (installer/documentation propagation check).
+hooks_readme_content = read(REPO_ROOT / "hooks" / "README.md")
+check(
+    "hooks/README.md documents notify-stage.sh",
+    "notify-stage.sh" in hooks_readme_content,
+    "hooks/README.md does not mention notify-stage.sh — documentation incomplete",
+)
+
+# (l) notify-stage.sh exits 0 on every path (failure-safety contract on the script itself).
+check(
+    "notify-stage.sh unconditionally exits 0 (failure-safety contract)",
+    notify_stage_content.rstrip().endswith("exit 0"),
+    "notify-stage.sh does not end with 'exit 0' — wrapper may propagate errors to orchestrator",
+)
+
+# (m) AC-8: CHANGELOG [Unreleased] section mentions stage-end notifications + idempotency.
+changelog = read(REPO_ROOT / "CHANGELOG.md")
+check(
+    "CHANGELOG.md [Unreleased] mentions stage-end notifications and idempotency",
+    "[Unreleased]" in changelog and "notify-stage.sh" in changelog and "idempotent" in changelog,
+    "CHANGELOG entry for stage-end notifications (notify-stage.sh + idempotent) missing or incomplete",
+)
+
+# SEC regression guards (iter 1 — post-security-fix audit)
+# These checks prevent re-introduction of the unsafe patterns fixed in the security iteration.
+
+# (n) SEC-001 regression guard: all 4 stage call-sites in orchestrator.md use python3 json.dumps
+# with positional argv — NOT echo '...' with inline placeholder substitution (CWE-78).
+check(
+    "SEC-001 guard: orchestrator call-sites use python3 json.dumps (not echo single-quoted string)",
+    orch.count("python3 -c \"import json,sys; print(json.dumps(") >= 4,
+    "SEC-001 regression: fewer than 4 'python3 -c json.dumps' call-sites found in orchestrator.md — "
+    "echo with placeholder substitution may have been reintroduced (CWE-78)",
+)
+
+# (o) SEC-001 regression guard (negative): no echo '{"stage" call-sites remain in orchestrator.md.
+check(
+    "SEC-001 guard (negative): no residual echo single-quoted stage payload in orchestrator.md",
+    'echo \'{"stage"' not in orch,
+    "SEC-001 regression: echo single-quoted stage payload found in orchestrator.md — "
+    "this pattern is vulnerable to shell command injection (CWE-78)",
+)
+
+# (p) SEC-002 regression guard: idempotency checks use python3 structural parse, not grep -c.
+# The safe pattern emits print(sum(...json.loads(l)...)); grep -c on JSONL is unanchored and
+# can false-positive on summary text containing the substring.
+check(
+    "SEC-002 guard: idempotency uses python3 structural JSON parse (not grep -c regex match)",
+    orch.count("print(sum(1 for l in open(") >= 4,
+    "SEC-002 regression: fewer than 4 'print(sum(1 for l in open(' patterns in orchestrator.md — "
+    "idempotency may have reverted to unanchored grep -c (CWE-20 false-positive risk)",
+)
+
+# (q) SEC-004 regression guard: notify-windows.sh uses '' (PowerShell double-quote escape)
+# NOT \' (backslash escape, which is invalid in PowerShell single-quoted strings).
+notify_windows_content = read(REPO_ROOT / "hooks" / "notify-windows.sh")
+check(
+    "SEC-004 guard: notify-windows.sh uses PowerShell-correct '' escape (not broken \\' escape)",
+    "s/'/''/g" in notify_windows_content and "s/'/\\\\'/g" not in notify_windows_content,
+    "SEC-004 regression: notify-windows.sh uses s/'/\\\\'/g (broken PowerShell escape) — "
+    "correct escape is s/'/''/g (doubling the quote per PowerShell single-quoted string rules)",
+)
+
+# (r) SEC-005 regression guard: notify-mac.sh body construction uses printf pipe to osascript
+# NOT osascript -e with bash double-quoting (which allows $(...) interpolation before osascript sees it).
+notify_mac_content = read(REPO_ROOT / "hooks" / "notify-mac.sh")
+check(
+    "SEC-005 guard: notify-mac.sh uses printf pipe to osascript (not bash double-quoted -e string)",
+    'printf \'display notification' in notify_mac_content
+    and 'osascript -e "display notification' not in notify_mac_content,
+    "SEC-005 regression: notify-mac.sh reverted to osascript -e with bash double-quoting — "
+    "this allows $(...) subshell expansion in the body before osascript evaluates the string",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 23 — Low-cost mode coverage and floor compliance (AC-10)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 23: Low-cost mode ===")
+
+agents_readme = read(AGENTS_DIR / "README.md")
+modes_go = read(REPO_ROOT / "cmd" / "install" / "modes.go")
+prompts_go_lc = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+
+# (a) agents/README.md contains a ## Low-cost mode section.
+check(
+    "agents/README.md has '## Low-cost mode' section",
+    "## Low-cost mode" in agents_readme,
+    "section missing — low-cost matrix has no human-readable documentation",
+)
+
+# (a) continued: the section contains a 17-row table (count pipe-separated rows
+#     with | in the body; each data row has at least one agent name backtick).
+# We detect "17-row table" by counting occurrences of "| `" inside the section.
+low_cost_section = ""
+if "## Low-cost mode" in agents_readme:
+    low_cost_section = agents_readme.split("## Low-cost mode", 1)[1]
+    # Trim at the next ## heading if present.
+    next_section = low_cost_section.find("\n## ")
+    if next_section >= 0:
+        low_cost_section = low_cost_section[:next_section]
+
+table_rows = low_cost_section.count("| `")
+check(
+    "agents/README.md Low-cost mode section has a 17-row agent table",
+    table_rows >= 17,
+    f"found {table_rows} table rows with backtick agent names, expected 17",
+)
+
+# (b) Every agent in the canonical Roster also appears in the low-cost table.
+for agent_name in EXPECTED_AGENTS:
+    check(
+        f"agents/README.md Low-cost mode table contains '{agent_name}'",
+        f"`{agent_name}`" in low_cost_section,
+        f"agent '{agent_name}' not found in the low-cost matrix table",
+    )
+
+# (c) No agent in the low-cost matrix uses effort: low.
+check(
+    "agents/README.md Low-cost mode table has no 'effort: low' cell",
+    "| low |" not in low_cost_section and "| `low`" not in low_cost_section,
+    "'effort: low' found in low-cost matrix table — policy violation (floor is medium)",
+)
+
+# (d) No agent in the low-cost matrix uses model: opus.
+check(
+    "agents/README.md Low-cost mode table has no 'opus' in low-cost model column",
+    # The table has columns: standard model | standard effort | low-cost model | ...
+    # We check that 'opus' does not appear as a value in the low-cost model column.
+    # Approximate: count "| opus |" occurrences in the section — these would be in
+    # the standard-model column (expected) vs low-cost model column. We check that
+    # the section does NOT contain "| sonnet |" followed immediately in the same row
+    # by "opus" (i.e., low-cost column = opus). A simpler signal: count total opus
+    # occurrences vs count where they appear in positions 3+ (low-cost model column).
+    # Simplest reliable check: no agent row has low-cost model = opus.
+    # We grep for rows where the 4th pipe-delimited cell would be 'opus'.
+    not any(
+        row.strip().startswith("|")
+        and [c.strip() for c in row.split("|") if c.strip()][3:4] == ["opus"]
+        for row in low_cost_section.splitlines()
+        if row.strip().startswith("|") and len(row.split("|")) >= 5
+    ),
+    "a row in the low-cost table has low-cost model = opus",
+)
+
+# (e) No agent in the low-cost matrix uses effort: max.
+check(
+    "agents/README.md Low-cost mode table has no 'max' in low-cost effort column",
+    not any(
+        row.strip().startswith("|")
+        and [c.strip() for c in row.split("|") if c.strip()][4:5] == ["max"]
+        for row in low_cost_section.splitlines()
+        if row.strip().startswith("|") and len(row.split("|")) >= 5
+    ),
+    "a row in the low-cost table has low-cost effort = max",
+)
+
+# (f) Every agent in the low-cost matrix uses model: sonnet (low-cost model column).
+check(
+    "agents/README.md Low-cost mode table: all low-cost model cells are 'sonnet'",
+    all(
+        [c.strip() for c in row.split("|") if c.strip()][3:4] == ["sonnet"]
+        for row in low_cost_section.splitlines()
+        if row.strip().startswith("|")
+        and len([c.strip() for c in row.split("|") if c.strip()]) >= 5
+        and not row.strip().startswith("| Agent")   # skip header row
+        and not all(c.strip().startswith("-") or c.strip() == "" for c in row.split("|") if c.strip())
+    ),
+    "one or more rows in the low-cost table have low-cost model != sonnet",
+)
+
+# (g) cmd/install/modes.go declares both standard and low-cost mode values.
+check(
+    "cmd/install/modes.go declares ModeStandard = 'standard'",
+    'ModeStandard InstallMode = "standard"' in modes_go,
+    "ModeStandard constant missing or has wrong value",
+)
+check(
+    "cmd/install/modes.go declares ModeLowCost = 'low-cost'",
+    'ModeLowCost InstallMode = "low-cost"' in modes_go,
+    "ModeLowCost constant missing or has wrong value",
+)
+
+# (h) cmd/install/prompts.go references INSTALL_MODE.
+check(
+    "cmd/install/prompts.go references INSTALL_MODE env var",
+    "INSTALL_MODE" in prompts_go_lc,
+    "prompts.go does not reference INSTALL_MODE — env-var fallback not implemented",
+)
+
+# (i) cmd/install/modes.go declares lowCostMatrix with all 17 agents.
+for agent_name in EXPECTED_AGENTS:
+    check(
+        f"cmd/install/modes.go lowCostMatrix contains entry for '{agent_name}'",
+        f'"{agent_name}"' in modes_go,
+        f"'{agent_name}' entry missing from lowCostMatrix in modes.go",
+    )
+
+# (j) cmd/install/modes.go uses only sonnet in the matrix (no opus, no haiku).
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'opus' model value",
+    'Model: "opus"' not in modes_go,
+    "modes.go matrix contains Model: opus — policy violation (low-cost floor is sonnet)",
+)
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'haiku' model value",
+    'Model: "haiku"' not in modes_go,
+    "modes.go matrix contains Model: haiku — policy violation (low-cost floor is sonnet)",
+)
+
+# (k) cmd/install/modes.go uses only medium or high effort (no max, no low).
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'max' effort value",
+    'Effort: "max"' not in modes_go,
+    "modes.go matrix contains Effort: max — policy violation (low-cost ceiling is high)",
+)
+check(
+    "cmd/install/modes.go lowCostMatrix has no 'low' effort value",
+    'Effort: "low"' not in modes_go,
+    "modes.go matrix contains Effort: low — project policy forbids effort: low",
+)
+
+# (l) AC-9: CLAUDE.md describes the two modes and references INSTALL_MODE.
+claude_md_root = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "CLAUDE.md references INSTALL_MODE env var (AC-9: two modes documented)",
+    "INSTALL_MODE" in claude_md_root,
+    "CLAUDE.md does not mention INSTALL_MODE — low-cost mode toggle undocumented",
+)
+
+# (m) AC-9: CLAUDE.md links to agents/README.md#low-cost-mode (no duplicate matrix).
+check(
+    "CLAUDE.md links to agents/README.md#low-cost-mode (AC-9: matrix in one place)",
+    "agents/README.md#low-cost-mode" in claude_md_root,
+    "CLAUDE.md must link to agents/README.md#low-cost-mode, not duplicate the matrix",
+)
+
+# (n) AC-9: README.md describes the two modes and references INSTALL_MODE.
+top_readme_lc = read(REPO_ROOT / "README.md")
+check(
+    "README.md references INSTALL_MODE env var (AC-9: two modes documented)",
+    "INSTALL_MODE" in top_readme_lc,
+    "README.md does not mention INSTALL_MODE — low-cost mode toggle undocumented",
+)
+
+# (o) AC-9: README.md links to agents/README.md#low-cost-mode (no duplicate matrix).
+check(
+    "README.md links to agents/README.md#low-cost-mode (AC-9: matrix in one place)",
+    "agents/README.md#low-cost-mode" in top_readme_lc,
+    "README.md must link to agents/README.md#low-cost-mode, not duplicate the matrix",
+)
 
 # ---------------------------------------------------------------------------
 # Summary

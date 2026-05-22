@@ -15,4 +15,4 @@ BODY="${LAST_MSG:-Waiting for input}"
 AS_TITLE=$(printf '%s' "$TITLE" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
 AS_BODY=$(printf '%s' "$BODY" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
 
-osascript -e "display notification \"${AS_BODY}\" with title \"${AS_TITLE}\"" >/dev/null 2>&1
+printf 'display notification "%s" with title "%s"\n' "$AS_BODY" "$AS_TITLE" | osascript >/dev/null 2>&1

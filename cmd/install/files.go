@@ -141,6 +141,96 @@ func copyFile(src, dest string, executable bool) {
 	stats.Conflicts = append(stats.Conflicts, dest)
 }
 
+// copyAgentFile installs a single agent .md file with optional in-flight
+// frontmatter transformation. The transformer rewrites model: and effort: lines
+// per the lowCostMatrix when mode is ModeLowCost; for ModeStandard the bytes
+// are passed through unchanged. The sha256 is computed from the TRANSFORMED
+// bytes — this is load-bearing for conflict detection (AC-5): a same-mode
+// re-install will hash-match and report unchanged; a cross-mode re-install will
+// diverge and report conflict.
+func copyAgentFile(src, dest string, mode InstallMode) {
+	ensureDir(filepath.Dir(dest))
+
+	srcBytes, err := os.ReadFile(src)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  [warn] cannot read %s: %v\n", src, err)
+		return
+	}
+
+	agentName := agentNameFromPath(src)
+	transformed := transformAgentFile(srcBytes, agentName, mode)
+
+	// Compute the hash of the TRANSFORMED content (not the raw source).
+	// The manifest stores this transformed hash so a same-mode re-install
+	// finds destHash == transformedHash (unchanged) and a cross-mode
+	// re-install finds destHash != transformedHash (conflict).
+	transformedHash := hashBytes(transformed)
+
+	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
+		// Brand-new file.
+		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
+			return
+		}
+		recordManifest(dest, transformedHash)
+		stats.Installed = append(stats.Installed, dest)
+		return
+	}
+
+	destHash, hashErr := hashFile(dest)
+	if hashErr != nil {
+		fmt.Fprintf(os.Stderr, "  [warn] cannot hash %s: %v\n", dest, hashErr)
+		return
+	}
+
+	if destHash == transformedHash {
+		// On-disk already matches what this mode would produce — keep manifest in sync.
+		recordManifest(dest, transformedHash)
+		stats.Unchanged = append(stats.Unchanged, dest)
+		return
+	}
+
+	// Destination differs from what this mode would produce.
+	if forceFlag {
+		// --force overrides all conflict detection: overwrite unconditionally.
+		// The file already exists (we're past the os.IsNotExist branch), so this
+		// is semantically an update, not a fresh install.
+		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
+			return
+		}
+		recordManifest(dest, transformedHash)
+		stats.Updated = append(stats.Updated, dest)
+		return
+	}
+
+	// Without --force: report conflict whenever the on-disk content would need
+	// to change. This covers two situations:
+	//
+	//   (a) Mode switch (cross-mode re-install): manifest recorded a hash for
+	//       the previous mode; the current mode produces a different hash.
+	//       The operator must delete the file and re-run with --force.
+	//
+	//   (b) User-modified file: manifest differs from on-disk (user touched it).
+	//       Leave it alone — same behaviour as the original copyFile.
+	//
+	// In case (a) recordedHash == destHash (user hasn't touched it) but
+	// transformedHash != recordedHash (mode changed). We treat this as a
+	// conflict rather than a "safe update" because the manifest cannot
+	// distinguish "same mode, upstream source changed" from "mode switched"
+	// without persisting the install mode (out of scope per intake §"Excluded").
+	// The safe, operator-visible choice is always conflict. A future feature
+	// could persist the mode in the manifest to enable silent same-mode updates.
+	stats.Conflicts = append(stats.Conflicts, dest)
+}
+
+// hashBytes returns the sha256 hex of the given byte slice.
+func hashBytes(data []byte) string {
+	h := sha256.New()
+	h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // copyDirFlat installs all files with the given suffix from srcDir → destDir
 // (one level deep, no recursion).
 func copyDirFlat(srcDir, destDir, suffix string, executable bool) {

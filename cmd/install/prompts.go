@@ -7,23 +7,28 @@ import (
 	"strings"
 )
 
-const defaultMemoryMCPURL = "http://localhost:7654/mcp"
-
 // MemoryMCPChoice captures the result of the Memory MCP URL prompt.
 type MemoryMCPChoice struct {
-	URL         string // always set — either from input, env, or default
+	URL         string // always set — either from existing config, env, or interactive input
 	BearerToken string // empty when the MCP requires no auth
 	Preserved   bool   // true when the existing entry was kept without change
 }
 
 // promptMemoryMCPURL determines the Memory MCP URL and Bearer token from
-// existing config, env vars, or an interactive prompt.
+// existing config, env vars, or an interactive prompt. There is intentionally
+// NO default URL fallback — falling back silently produced misleading runtime
+// errors (a "connection refused" trace pointing at the removed default host
+// when the operator had pointed the MCP somewhere else entirely). Every
+// install requires the operator to make an explicit URL choice; the installer
+// never fabricates one. This is an open-source distribution — the MCP can
+// live on any host (Railway/Render/Fly/Docker/local), so no specific URL is
+// canonical to this repo.
 //
 // Decision priority for URL (when --force is NOT set):
 //  1. Existing valid mcpServers.memory in ~/.claude.json → preserve URL+bearer.
 //  2. MEMORY_MCP_URL env var (non-interactive / CI / scripted installs).
-//  3. Non-interactive without env var → default to defaultMemoryMCPURL, print notice.
-//  4. Interactive TTY → prompt the user; Enter → defaultMemoryMCPURL.
+//  3. Non-interactive without env var → ERROR + exit 1 (operator must set the env var).
+//  4. Interactive TTY → prompt the user; empty input → re-prompt (no default).
 //
 // Bearer token (only prompted when URL was NOT preserved):
 //  1. MEMORY_MCP_BEARER env var (non-interactive / CI / scripted installs).
@@ -82,9 +87,11 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 	}
 
 	if !isTerminal() {
-		fmt.Printf("  Memory MCP URL: %s (default for non-interactive installs)."+
-			" Set MEMORY_MCP_URL=https://... to override.\n", defaultMemoryMCPURL)
-		return MemoryMCPChoice{URL: defaultMemoryMCPURL, BearerToken: promptMemoryMCPBearer()}
+		fmt.Fprintln(os.Stderr, "Error: Memory MCP URL is required for non-interactive installs.")
+		fmt.Fprintln(os.Stderr, "  Set MEMORY_MCP_URL=https://your-mcp.example.com/mcp before re-running.")
+		fmt.Fprintln(os.Stderr, "  There is no default URL — falling back silently produced misleading")
+		fmt.Fprintln(os.Stderr, "  runtime errors when the operator's actual MCP was elsewhere.")
+		os.Exit(1)
 	}
 
 	return promptURLInteractive()
@@ -106,13 +113,16 @@ func promptURLInteractive() MemoryMCPChoice {
 	fmt.Println("  • the bare URL of your Knowledge Graph MCP, OR")
 	fmt.Println("  • the full JSON snippet from your context-harness-mcp /dashboard")
 	fmt.Println("    (we parse it and skip the separate bearer prompt).")
-	fmt.Println("Press Enter to use the local Docker default.")
+	fmt.Println("There is no default — empty input is rejected (no silent localhost fallback).")
 	fmt.Println()
-	fmt.Printf("Memory MCP URL [%s]: ", defaultMemoryMCPURL)
+	fmt.Print("Memory MCP URL: ")
 
 	raw := strings.TrimSpace(readLine())
 	if raw == "" {
-		return MemoryMCPChoice{URL: defaultMemoryMCPURL, BearerToken: promptMemoryMCPBearer()}
+		fmt.Fprintln(os.Stderr, "Error: empty Memory MCP URL.")
+		fmt.Fprintln(os.Stderr, "  Paste the URL of your Knowledge Graph MCP server (https://... or http://...)")
+		fmt.Fprintln(os.Stderr, "  or the full JSON snippet from your context-harness-mcp /dashboard.")
+		os.Exit(1)
 	}
 
 	// Smart-paste: if the input opens a JSON object, slurp the rest of the
@@ -237,6 +247,55 @@ func promptMemoryMCPBearer() string {
 	fmt.Println()
 	fmt.Print("Bearer token: ")
 	return strings.TrimSpace(readLine())
+}
+
+// promptInstallMode determines the install mode via:
+//
+//  1. INSTALL_MODE env var (non-interactive / CI / scripted installs).
+//  2. Non-interactive without env var → default ModeStandard (preserves v1.1.0 behaviour).
+//  3. Interactive TTY → prompt with [s] standard (default) / [l] low-cost menu.
+//
+// The env var is validated: unknown values exit 1 with a clear error. The default
+// is always ModeStandard so an unset env var behaves identically to v1.1.0.
+func promptInstallMode() InstallMode {
+	if env := strings.TrimSpace(os.Getenv("INSTALL_MODE")); env != "" {
+		switch env {
+		case string(ModeStandard):
+			fmt.Printf("  Install mode: standard (loaded from INSTALL_MODE env var)\n")
+			return ModeStandard
+		case string(ModeLowCost):
+			fmt.Printf("  Install mode: low-cost (loaded from INSTALL_MODE env var)\n")
+			return ModeLowCost
+		default:
+			fmt.Fprintf(os.Stderr, "Error: INSTALL_MODE=%q is invalid. Accepted values: standard, low-cost\n", env)
+			os.Exit(1)
+		}
+	}
+
+	if !isTerminal() {
+		// Non-interactive with no env var: default to standard (v1.1.0 behaviour).
+		return ModeStandard
+	}
+
+	fmt.Println()
+	fmt.Println("Install mode")
+	fmt.Println("============")
+	fmt.Println()
+	fmt.Println("  [s] standard  — default. Canonical matrix as documented in agents/README.md.")
+	fmt.Println("                  Best quality, highest API cost.")
+	fmt.Println("  [l] low-cost  — for developers on lower-tier Anthropic plans (Free, Pro,")
+	fmt.Println("                  or tight personal budget). Uniform sonnet matrix (effort:")
+	fmt.Println("                  medium or high). Lower API cost. Accepts documented quality")
+	fmt.Println("                  trade-offs (rougher analysis across the board, more Phase 3")
+	fmt.Println("                  iteration loops, weaker security audit caught by the human")
+	fmt.Println("                  reviewer at STAGE-GATE).")
+	fmt.Println("                  See agents/README.md §\"Low-cost mode\".")
+	fmt.Println()
+	choice := promptMenu("Install mode [s/l]? [s]: ", map[string]bool{"s": true, "l": true}, "s")
+	if choice == "l" {
+		return ModeLowCost
+	}
+	return ModeStandard
 }
 
 // validateMCPURL returns an error if the URL does not start with http:// or https://.

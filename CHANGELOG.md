@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Orchestrator stage-end notifications: 4 native OS toasts per pipeline** (after Stage 1 Analysis, Stage 2 Implementation batch, Stage 3 Verify, Stage 4 Delivery). Fires always regardless of autonomy mode and pipeline outcome. New script `hooks/notify-stage.sh` detects OS and routes to the existing per-OS `notify-{os}.sh`. Idempotent across context compaction and `/recover` via `stage.notify` event dedup in `00-execution-events.jsonl` (structured JSON parse, not regex — eliminates false-positive risk). Independent of the ultra-quiet hook preset (PR #26) — the preset controls Claude Code hook events; these toasts are fired directly by the orchestrator's `Bash` tool. New `## Stage-end notification protocol` section in `agents/orchestrator.md` documents the toast mapping table, JSON payload schema, JSONL event schema, idempotency mechanism, input sanitisation contract, and failure-safety guarantee.
+
+### Changed
+
+- **BREAKING: removed the installer's hardcoded default Memory MCP URL** (`cmd/install/prompts.go`). Non-interactive installs without `MEMORY_MCP_URL` now exit 1 with an explicit error; interactive prompts no longer accept empty input. Motivation: a silent default produced misleading "connection refused" diagnostics for operators whose actual MCP lived on a different host, and propagated the misleading URL into agent skip-logs that referenced `CLAUDE.md §1`'s documented default. This is an open-source distribution — the MCP can live on any host (Railway/Render/Fly/Docker/local), so no specific URL is canonical to this repo and the installer never fabricates one. Existing valid `mcpServers.memory` entries in `~/.claude.json` are still preserved unchanged — only fresh installs and `--force` reinstalls are affected. CLAUDE.md §1 and README.md updated to drop the default and document the new contract; the 2 Go tests that exercised the removed fallback path were dropped with comments referencing the new contract.
+- **Robustness pass on `delivery` Step 11.5 KG passive capture** (`agents/delivery.md`): added a mandatory `mcp__memory__doctor` pre-flight check before any `create_nodes` / `add_observations` / `search_nodes` call, so a stale or unreachable MCP wiring fails fast with the doctor output instead of generating a misleading "MCP unreachable at <guessed URL>" log line. Added a `Pending payload fallback` contract: on `mcp-unreachable` / `mcp-unhealthy` / `mcp-not-wired` skip reasons, write the would-be payload (with `skip_reason`, `intended_action`, `gate1_result`, `gate2_result`) to `session-docs/{feature-name}/kg-passive-capture.pending.json` so the operator can replay it from a fresh Claude Code session where the MCP client is wired correctly. Skip logs are now forbidden from inventing URLs (the agent must log only what `doctor` reports, never CLAUDE.md's documented default). Frontmatter extended with `mcp__memory__doctor`. Suite 21 gains 5 regression guards (frontmatter, pre-flight section, URL-embellishment ban, pending payload section, pending payload path). Suite count: 522 → 529 (also adds 7 no-default-mcp-url regression guards verifying CLAUDE.md, README.md, and prompts.go no longer carry the removed default).
+
+### Security
+
+- **CWE-78 (shell injection) closed in notification call-sites** (`agents/orchestrator.md`): all 4 stage toast call-sites switched from `echo '{"stage":N,...,"feature":"{feature}",...}'` (single-quoted bash string — `'` in a feature name breaks out of the string) to `python3 -c "import json,sys; print(json.dumps(...))"` with values passed as `sys.argv` positional arguments. `json.dumps` handles all metacharacters safely; user-controlled strings never touch the shell string layer.
+- **CWE-20 (improper input validation) closed for idempotency check** (`agents/orchestrator.md`): all 4 idempotency lookups switched from `grep -c '"event":"stage.notify".*"stage":N'` (unanchored regex — could false-positive on substrings in `summary` text) to a `python3 -c "...json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==N..."` structural JSON parse. Keyed on typed field values, not raw text.
+- **Input sanitisation contract added** (`agents/orchestrator.md` `### Input sanitisation contract`): orchestrator MUST pre-sanitise `{feature}` (kebab-case regex), `{summary}` (≤120 chars, strip `\n\r\t'"`), `{cwd}` (absolute path, no shell metacharacters), `{status}` (closed-set enum) before constructing the payload — defence-in-depth on top of the `json.dumps` fix.
+- **PowerShell single-quote escape corrected** (`hooks/notify-windows.sh`): `sed "s/'/\\\\'/g"` (which produced invalid PowerShell `\'`) replaced with `sed "s/'/''/g"` (doubled single quote — the canonical PowerShell escape). Prevents broken `LoadXml` calls and closes the injection vector on feature names containing apostrophes.
+- **macOS osascript injection closed** (`hooks/notify-mac.sh`): `osascript -e "display notification \"${AS_BODY}\" with title \"${AS_TITLE}\""` (bash-interpolated — `$(...)` in body expanded by shell) replaced with `printf 'display notification "%s" with title "%s"\n' "$AS_BODY" "$AS_TITLE" | osascript`. Format string in single-quotes (no bash expansion); values travel as `printf` positional arguments into a stdin pipe, eliminating the shell-substitution surface entirely.
+
+### Added
+
 - **KG passive-capture quality gates (delivery Step 11.5).** Two mandatory pre-flight gates before `create_nodes` to keep noise out of the Knowledge Graph:
   - **Gate 1 — Specificity (`suggest_node_type`):** concat proposed observations, call the classifier; if top-1 confidence < 0.5 OR top-1 type ≠ `process-insight` by ≥ 0.2 margin, skip the write. Generic insights and mis-typed insights never reach the KG.
   - **Gate 2 — Dedup (`search_nodes` pre-flight):** search by the synthesized summary; if a top-3 result clearly covers the same insight, redirect to `add_observations` on it instead of creating a duplicate. Topically-related-but-distinct matches still write but add an explicit relation note in the new node's first observation.
@@ -62,6 +79,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `agents/qa.md` Phase 0 step 3 ("Use context7 MCP if available to research framework-specific validation and testing patterns") — overlap with `tester` and not load-bearing for qa's contract (validate code vs AC, define AC, ratify-plan, reconcile). qa keeps `mcp__memory__*` for KG-anchored AC research.
 - `agents/delivery.md` Step 1 ("Use context7 MCP if available to research documentation best practices") — CHANGELOG / semver / commit conventions don't change at a cadence that warrants per-task verification.
+
+## [2.2.0] - 2026-05-22
+
+### Added
+
+- **Low-cost install mode** (`INSTALL_MODE=low-cost`): opt-in installer mode that rewrites `model:` and `effort:` frontmatter in-flight during agent copy. All 17 agents run on `sonnet`; effort is `medium` (11 agents) or `high` (6 gate-makers). Designed for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). Standard mode (default) is byte-identical to v2.1.0 behaviour. Canonical matrix and trade-off analysis documented in `agents/README.md §"Low-cost mode"`. Transformer is a pure function (`transformAgentFile` in `cmd/install/modes.go`); manifest stores transformed hashes so same-mode re-installs report `unchanged` and cross-mode re-installs report `conflict` (operator must delete + re-run with `--force`). New `cmd/install/modes.go` + `cmd/install/modes_test.go` (16 new tests covering matrix invariants, all-agents transform, body-preservation, edge cases, and AC-5 re-install scenarios).
+
+### Changed
+
+- **Installer now prompts for install mode** (`standard` / `low-cost`) after the Memory MCP setup step. Default is `standard` — behaviour is byte-identical to v2.1.0 for operators who accept the default or leave `INSTALL_MODE` unset. Non-interactive installs with `INSTALL_MODE` unset continue to behave as standard.
 
 ## [2.1.0] - 2026-05-21
 

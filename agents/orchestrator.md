@@ -712,6 +712,30 @@ If `verdict: fail` and routing to architect:
 ⟳ Routing to architect to revise plan (iteration {N}/3)
 ```
 
+**Emit Stage 1 toast (per `## Stage-end notification protocol`).** After writing the `gate.pass`/`gate.fail` event for Phase 1.6, emit the Stage 1 toast before the STAGE-GATE-1 STOP block. Status: `complete` on `pass` or `concerns`; `FAILED` on iteration-budget exhaustion. Use the idempotency check (grep `stage.notify` with `stage:1` in JSONL) before calling the wrapper.
+
+```bash
+# Check idempotency first
+if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==1))" 2>/dev/null || echo 0)" = "0" ]; then
+  if test -x ~/.claude/hooks/notify-stage.sh; then
+    python3 -c "import json,sys; print(json.dumps({'stage':1,'label':'analysis','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{1-line summary ≤120 chars, no quotes}" "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  else
+    # append stage.notify.skipped with reason: wrapper-missing
+    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":1,"reason":"wrapper-missing"}
+JSONL
+  fi
+  # append stage.notify regardless of wrapper outcome
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":1,"label":"analysis","status":"{complete|FAILED}","summary":"{1-line summary}"}
+JSONL
+else
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":1,"reason":"already-fired"}
+JSONL
+fi
+```
+
 **Rewrite TL;DR** (row 5 of §5.2): On `pass` or `concerns`: `Now`: "STAGE-GATE-1 about to emit." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: any concerns (rules 3/4/5/6 hits, if any). On `fail`: `Now`: "Architect revising plan (iter N/3) — rules {1, 2} failing." `Open issues`: failing rule numbers and affected PRs.
 
 ---
@@ -849,6 +873,28 @@ If build/lint fails, the implementer fixes it before finishing (internal loop).
 **Rewrite TL;DR when Phase 2 per-PR starts** (row 8 of §5.2): `Now`: "Phase 2 implementer working on PR-{i} in Round R{R}." `Last`: prior PR or round result. `Next`: "Phase 2.5 reconcile, then Phase 3 verify." For parallel rounds with N>1, rewrite once when the round opens and once at each PR completion.
 
 **Rewrite TL;DR when Phase 2 per-PR ends** (row 9 of §5.2): `Now`: "Phase 3 verify launching for PR-{i}." `Last`: "PR-{i} Phase 2 done — {N} files touched, build clean." `Next`: "Phase 3 tester + qa in parallel." `Open issues`: any CONSTRAINT-DISCOVERED annotations.
+
+**Emit Stage 2 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 2 of the **last PR in the last round** completes — not after every PR's Phase 2. Determine "last PR in last round" from the DAG: the round has no successor rounds, and all PRs in that round have returned `status: success` from Phase 2. Status: `complete` on success, `FAILED` if iteration budget was exhausted in Phase 2.
+
+```bash
+# Fire only when this is the last PR's Phase 2 in the last round
+if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==2))" 2>/dev/null || echo 0)" = "0" ]; then
+  if test -x ~/.claude/hooks/notify-stage.sh; then
+    python3 -c "import json,sys; print(json.dumps({'stage':2,'label':'implementation batch','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N} PRs implemented across {M} rounds. {K} files touched." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  else
+    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":2,"reason":"wrapper-missing"}
+JSONL
+  fi
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":2,"label":"implementation batch","status":"{complete|FAILED}","summary":"{1-line summary}"}
+JSONL
+else
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":2,"reason":"already-fired"}
+JSONL
+fi
+```
 
 ### Phase 2.5 — Constraint Reconciliation (between Phase 2 and Phase 3)
 
@@ -1058,6 +1104,28 @@ If verdict is `concerns`, list each concern as one line in the report so the use
 
 **Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "PR-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "PR-{i} Phase 3.6 verdict={pass|concerns}." On skipped: `Last`: "PR-{i} Phase 3.6 skipped (not warranted)." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
 
+**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 (or Phase 3.5 if 3.6 was skipped/not warranted) of the **last PR** completes — not after every PR's Phase 3. Determine "last PR" as the final PR in the final round of the DAG (all rounds done). Status: `complete` on pass/concerns/skipped, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
+
+```bash
+# Fire only when this is the last PR's Phase 3.6 (or 3.5) in the last round
+if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
+  if test -x ~/.claude/hooks/notify-stage.sh; then
+    python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} PRs. Tests: {sum}. Security: {clean|N findings}." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  else
+    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":3,"reason":"wrapper-missing"}
+JSONL
+  fi
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":3,"label":"verify","status":"{complete|FAILED}","summary":"{1-line summary}"}
+JSONL
+else
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":3,"reason":"already-fired"}
+JSONL
+fi
+```
+
 ---
 
 ## STAGE-GATE-2 — Between rounds in Stage 2 (autonomous-skippable)
@@ -1203,6 +1271,27 @@ When skipped, log `phase.end` to `00-execution-events.jsonl` with `phase: "4.5-i
 The orchestrator passes `04-internal-review.md` content to `delivery` for optional inclusion in the PR description (under a "Pre-PR Review" section in the body) — `delivery` already has the PR open at this point and can update the body via `gh pr edit`.
 
 **Rewrite TL;DR** (row 18 of §5.2): `Now`: "STAGE-GATE-3 about to emit." `Last`: "Phase 4.5 internal-review — {C}C / {S}S / {N}N." `Next`: "Waiting for human ship/amend/abort." `Open issues`: criticals if any.
+
+**Emit Stage 4 toast (per `## Stage-end notification protocol`).** After Phase 4.5 returns (or is skipped), before emitting the STAGE-GATE-3 STOP block. Status: `complete` on success; `FAILED` if delivery push rejected; `BLOCKED` if `status: paused_for_amend`.
+
+```bash
+if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==4))" 2>/dev/null || echo 0)" = "0" ]; then
+  if test -x ~/.claude/hooks/notify-stage.sh; then
+    python3 -c "import json,sys; print(json.dumps({'stage':4,'label':'delivery','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED|BLOCKED}" "{feature}" "Branch {branch}. Version {old} to {new}. Internal review: {C}C/{S}S/{N}N." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  else
+    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":4,"reason":"wrapper-missing"}
+JSONL
+  fi
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":4,"label":"delivery","status":"{complete|FAILED|BLOCKED}","summary":"{1-line summary}"}
+JSONL
+else
+  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+{"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":4,"reason":"already-fired"}
+JSONL
+fi
+```
 
 **Cost:** one reviewer invocation (~5-15K tokens depending on diff size). **Saves:** human review time and merge churn when the PR has obvious issues. The bound is the diff-size gate above — never run on trivial changes.
 
@@ -1780,7 +1869,7 @@ Every line is a JSON object with these fields:
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 timestamp with timezone (e.g. `2026-05-01T14:00:00-03:00`). |
-| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`. |
+| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`. |
 | `feature` | yes | Feature name (kebab-case, matches the session-docs folder). |
 | `phase` | conditional | Phase identifier (e.g. `0a-intake`, `1-design`, `2-implement`, `3-verify`, `1.5-ratify-plan`, `1.6-plan-review`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
 | `stage` | conditional | Stage number (`1` / `2` / `3`). Required for `stage.gate*` events. |
@@ -1829,6 +1918,8 @@ Every line is a JSON object with these fields:
 | `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
 | `policy.deny` | When `hooks/policy-block.sh` denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
 | `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §13). Record the reason + the action you took (handoff to top-level Claude, or abort). |
+| `stage.notify` | After invoking `hooks/notify-stage.sh` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
+| `stage.notify.skipped` | When toast emission is skipped — either because `stage.notify` for that stage already exists in the JSONL (`reason: already-fired`), or the wrapper is absent (`reason: wrapper-missing`). |
 | `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
 
 ### Implementation note
@@ -1938,6 +2029,88 @@ All numbers come from `00-execution-events.jsonl` — never re-invent them by wa
 - Trace JSONL is missing → render the summary with `(no trace recorded)` placeholders. Do not crash.
 
 The summary is best-effort rendering; the JSONL is the durable record.
+
+---
+
+## Stage-end notification protocol
+
+The orchestrator emits one OS-native toast at the close of each of the four user-facing pipeline stages, independent of autonomy mode and pipeline outcome. This gives the developer a predictable "come back and look" signal without requiring them to poll `/status`. The protocol is orthogonal to the Claude Code hook events in `~/.claude/settings.json` — the ultra-quiet preset stays unchanged; these toasts go through the `hooks/notify-stage.sh` wrapper invoked via the orchestrator's own `Bash` tool.
+
+Design rationale lives in `session-docs/orchestrator-stage-notifications/01-architecture.md`.
+
+### When each toast fires
+
+| User-facing stage | Toast fires at the end of | Maps to canonical |
+|---|---|---|
+| Stage 1 (analysis) | Phase 1.6 — after `gate.pass`/`gate.fail` written, immediately before the STAGE-GATE-1 STOP block | Stage 1 |
+| Stage 2 (implementation batch) | Phase 2 of the **last PR in the last round** — after the implementer's success status block, before Phase 3 launches | Stage 2 |
+| Stage 3 (verify) | Phase 3.6 of the **last PR** (or Phase 3.5 if 3.6 was skipped) — after the closing verdict, before Phase 4 | Stage 2 |
+| Stage 4 (delivery) | Phase 4.5 — after reviewer returns (or is skipped), immediately before the STAGE-GATE-3 STOP block | Stage 3 |
+
+### Toast Mapping Table
+
+| Stage | Title on success | Title on failure/blocked | Body |
+|---|---|---|---|
+| Stage 1 (analysis) | `Pipeline {feature} · Stage 1 (analysis) complete` | `Pipeline {feature} · Stage 1 (analysis) FAILED` | success: `{N} PRs proposed across {M} services. Plan-reviewer verdict: {pass\|concerns}.` failure: `Plan-reviewer fail after {N} iterations. Failing rules: {list}.` |
+| Stage 2 (implementation batch) | `Pipeline {feature} · Stage 2 (implementation batch) complete` | `Pipeline {feature} · Stage 2 (implementation batch) FAILED` | success: `{N} PRs implemented across {M} rounds. {K} files touched.` failure: `PR-{i} implementation failed after {N} iterations. Reason: {1-line root cause}.` |
+| Stage 3 (verify) | `Pipeline {feature} · Stage 3 (verify) complete` | `Pipeline {feature} · Stage 3 (verify) FAILED` | success: `{N}/{N} AC verified across {M} PRs. Tests: {sum}. Security: {clean\|N findings}.` failure: `PR-{i} verify failed: {tester\|qa\|security} verdict failed. {1-line summary}.` |
+| Stage 4 (delivery) | `Pipeline {feature} · Stage 4 (delivery) complete` | `Pipeline {feature} · Stage 4 (delivery) FAILED` or `Pipeline {feature} · Stage 4 (delivery) BLOCKED` | success: `Branch {branch}. Version {old} → {new}. Internal review: {C}C/{S}S/{N}N.` failure/blocked: `Delivery {error\|paused for amend}. See 05-delivery.md.` |
+
+**How the toast renders on screen.** The `notify-{os}.sh` scripts derive the title from `basename($cwd)`, so the user sees:
+```
+Title: Claude Code — claude-dev-team
+Body:  Pipeline my-feature · Stage 1 (analysis) complete — 2 PRs proposed across 1 service. Plan-reviewer verdict: pass.
+```
+
+### JSON payload schema
+
+The orchestrator constructs the payload using `python3 -c "json.dumps(...)"` with placeholders as positional arguments — never via string interpolation into a single-quoted `echo`. This prevents shell command injection (CWE-78) when feature names, summaries, or paths contain quotes or shell metacharacters.
+
+```bash
+python3 -c "import json,sys; print(json.dumps({'stage':N,'label':'<label>','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "<status>" "<feature>" "<summary ≤120 chars>" "<project root>" | bash ~/.claude/hooks/notify-stage.sh
+```
+
+The wrapper derives `last_assistant_message` from those fields (format: `Pipeline {feature} · Stage {N} ({label}) {STATUS} — {summary}`) and rebuilds a `{last_assistant_message, cwd}` payload for the OS-specific script.
+
+### Input sanitisation contract
+
+Before constructing the payload, the orchestrator MUST:
+
+1. **`{feature}`** — MUST match `^[a-z0-9-]{1,60}$` (kebab-case; the orchestrator derives feature names from `session-docs/` folder names which follow this convention by construction).
+2. **`{summary}`** — MUST be ≤120 chars. Strip `\n`, `\r`, `\t` (replace with single space). Strip or replace `'` and `"` with their closest typographic alternatives if present (e.g., remove or replace with a plain space). Truncate to 120 chars BEFORE constructing the payload — defense-in-depth: even if the wrapper is bypassed, the orchestrator never passes a longer summary.
+3. **`{cwd}`** — MUST be the absolute path to the project root with no shell metacharacters. Derived from the session state, not from user input.
+4. **`{status}`** — MUST be one of the closed-set values (`complete`, `FAILED`, `BLOCKED`). Derived from the agent status block, not from user input.
+
+### JSONL event schema
+
+Two new event types appended to `00-execution-events.jsonl`:
+
+```jsonl
+{"ts":"<ISO>","event":"stage.notify","feature":"<name>","stage":1,"label":"analysis","status":"complete","summary":"<1-line>"}
+{"ts":"<ISO>","event":"stage.notify.skipped","feature":"<name>","stage":1,"reason":"already-fired|wrapper-missing"}
+```
+
+### Idempotency (dedup across `/recover` and context compaction)
+
+Before firing a toast for stage N, check `00-execution-events.jsonl` for a prior `stage.notify` event with the same `stage` field using a structured JSON parse (not grep — unanchored regex can false-positive on summary text):
+
+```bash
+python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==N))" 2>/dev/null || echo 0
+```
+
+If the count is non-zero, skip the toast and append `stage.notify.skipped` with `reason: already-fired`. This prevents duplicate toasts when the orchestrator is resumed after context compaction or `/recover`.
+
+### Invocation sequence at each boundary
+
+The order at every insertion point is: write `phase.end` event → write `gate.pass`/`gate.fail` if applicable → **check idempotency → emit toast → append `stage.notify` event** → rewrite TL;DR → emit STAGE-GATE STOP (if applicable).
+
+### Failure-safety (best-effort, never blocks pipeline)
+
+1. **Wrapper missing** (`~/.claude/hooks/notify-stage.sh` not found): skip via `test -x` pre-check, append `stage.notify.skipped` with `reason: wrapper-missing`, continue.
+2. **OS unknown or wrapper exits non-zero**: the wrapper swallows errors and exits 0; from the orchestrator's perspective the call succeeded. `stage.notify` is appended regardless.
+3. **Wrapper found, call dispatched**: always append `stage.notify` after the bash call returns, accept that a wrapper-side failure is recorded as successful emission.
+
+The guarantee mirrors the KG passive-capture pattern in `agents/delivery.md` § Step 11.5: the side-effect is best-effort; the pipeline MUST NOT be blocked by notification failure under any OS.
 
 ---
 
