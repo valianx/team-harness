@@ -104,13 +104,35 @@ func TestPromptMenuWith_ValidChoice(t *testing.T) {
 	}
 }
 
-// TestPromptMenuWith_InvalidChoiceFallsBackToDefault verifies that an
-// unrecognized character returns the default value.
-func TestPromptMenuWith_InvalidChoiceFallsBackToDefault(t *testing.T) {
-	scan := newScanner(strings.NewReader("z\n"))
+// TestPromptMenuWith_InvalidThenValidAcceptsRetry verifies that a single
+// invalid character triggers a re-prompt and a subsequent valid character is
+// accepted on the next attempt.
+func TestPromptMenuWith_InvalidThenValidAcceptsRetry(t *testing.T) {
+	// Feed "z" (invalid), then "b" (valid) — the function must re-prompt and
+	// accept the valid character on the second attempt without calling os.Exit.
+	scan := newScanner(strings.NewReader("z\nb\n"))
 	got := promptMenuWith("prompt: ", map[string]bool{"a": true, "b": true}, "a", scan)
-	if got != "a" {
-		t.Errorf("expected default 'a' for invalid choice, got %q", got)
+	if got != "b" {
+		t.Errorf("expected 'b' after one invalid attempt, got %q", got)
+	}
+}
+
+// TestValidKeysSorted verifies deterministic, slash-separated output.
+func TestValidKeysSorted(t *testing.T) {
+	cases := []struct {
+		input map[string]bool
+		want  string
+	}{
+		{map[string]bool{"y": true, "c": true}, "c/y"},
+		{map[string]bool{"s": true, "l": true}, "l/s"},
+		{map[string]bool{"a": true}, "a"},
+		{map[string]bool{"e": true, "n": true, "c": true, "a": true}, "a/c/e/n"},
+	}
+	for _, tc := range cases {
+		got := validKeysSorted(tc.input)
+		if got != tc.want {
+			t.Errorf("validKeysSorted(%v) = %q, want %q", tc.input, got, tc.want)
+		}
 	}
 }
 

@@ -119,21 +119,51 @@ func safePrefix(s string, n int) string {
 	return s[:n]
 }
 
-// promptMenu prints the prompt and reads a single-character menu choice.
-// valid is the set of accepted lower-case characters; defaultVal is returned
-// when the user presses Enter without typing.
+// promptMenu prints the prompt and reads a single-character menu choice from
+// the shared stdin scanner (stdinScanner). valid is the set of accepted
+// lower-case characters; defaultVal is returned when the user presses Enter
+// without typing.
+//
+// Invalid single-character input triggers a re-prompt (up to maxAttempts=3).
+// Multi-character or structured input (starting with '{', '[', '"') exits
+// immediately: the shared scanner buffer is now polluted with remaining lines,
+// and there is no safe way to flush a bufio.Scanner mid-stream. The operator
+// must re-run the installer and answer prompts one at a time.
 func promptMenu(prompt string, valid map[string]bool, defaultVal string) string {
-	fmt.Print(prompt)
-	raw := strings.TrimSpace(readLine())
-	if raw == "" {
-		return defaultVal
+	const maxAttempts = 3
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		fmt.Print(prompt)
+		raw := strings.TrimSpace(readLine())
+
+		if raw == "" {
+			return defaultVal
+		}
+
+		if isPasteInput(raw) {
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "Error: pasted multi-character or structured content at a single-letter prompt.")
+			fmt.Fprintf(os.Stderr, "  This prompt accepts only: %s\n", validKeysSorted(valid))
+			fmt.Fprintln(os.Stderr, "  The URL/snippet prompt comes later in the flow.")
+			fmt.Fprintln(os.Stderr, "  Re-run the installer and answer the prompts one at a time.")
+			os.Exit(1)
+		}
+
+		lower := strings.ToLower(raw[:1])
+		if valid[lower] {
+			return lower
+		}
+
+		fmt.Fprintf(os.Stderr, "  Invalid input %q. Expected one of: %s\n", raw, validKeysSorted(valid))
+		if attempt < maxAttempts {
+			fmt.Fprintln(os.Stderr, "  Try again.")
+		}
 	}
-	lower := strings.ToLower(raw[:1])
-	if !valid[lower] {
-		return defaultVal
-	}
-	return lower
+	fmt.Fprintf(os.Stderr, "Error: too many invalid attempts. Aborting.\n")
+	os.Exit(1)
+	return "" // unreachable
 }
+
+// Note: validKeysSorted and isPasteInput are defined in util.go.
 
 // stdinScanner is the shared package-level scanner used by readLine. A single
 // scanner is required because pasted multi-line input (e.g., a JSON snippet)

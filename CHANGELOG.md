@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Installer UX on Windows PowerShell** (`bin/install.ps1`): bootstrap now uses `Start-Process -NoNewWindow -Wait -PassThru` instead of `& $InstallerPath @args`, forcing the installer `.exe` to inherit the parent PowerShell console. Previously, running `irm install.ps1 | iex` spawned a separate cmd window because PowerShell's pipeline context with `iex` triggered Windows console reallocation; that window closed on exit, hiding errors and prompts. The new invocation keeps all output in the operator's session.
+- **Installer prompt validation** (`cmd/install/context7.go` `promptMenu`, `cmd/install/util.go` `promptMenuWith`): single-letter menu prompts (Keep/Change, install mode `s/l`) no longer silently coerce invalid input to the default value. Single invalid character → re-prompt with an explicit error listing valid options (up to 3 attempts). Multi-character or structured paste (JSON, URL) at a y/n prompt → exit immediately with a clear "you pasted at the wrong prompt" error, preventing scanner-buffer leak into subsequent prompts. Closes the silent-failure path where the operator pasted the MCP URL snippet at the Keep/Change prompt and saw the URL not update.
+
 ## [2.9.1] - 2026-05-22
 
 ### Fixed

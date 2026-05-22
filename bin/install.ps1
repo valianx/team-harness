@@ -38,8 +38,17 @@ try {
     }
 
     Write-Host "Launching installer..."
-    & $InstallerPath @args
-    exit $LASTEXITCODE
+    # -NoNewWindow forces inheritance of the parent PowerShell console.
+    # Without it, running via `irm ... | iex` causes Windows to allocate a new
+    # cmd console for the spawned .exe — that window closes on exit, hiding all
+    # output. -Wait keeps the bootstrap alive until the child exits; -PassThru
+    # returns the process object so we can forward the exit code.
+    if ($args.Count -gt 0) {
+        $proc = Start-Process -FilePath $InstallerPath -ArgumentList $args -NoNewWindow -Wait -PassThru
+    } else {
+        $proc = Start-Process -FilePath $InstallerPath -NoNewWindow -Wait -PassThru
+    }
+    exit $proc.ExitCode
 } finally {
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
 }
