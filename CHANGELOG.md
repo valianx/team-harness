@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.3] - 2026-05-22
+
 ### Fixed
 
 - **Installer UAC error on Windows PowerShell** (`bin/install.ps1`): the v2.9.2 fix used `Start-Process -NoNewWindow -Wait -PassThru` which triggers UAC elevation prompts when the working directory is protected (e.g., `C:\Windows\System32`) or when the downloaded `.exe` carries Mark-of-the-Web. Operators saw `Start-Process: This command cannot be run due to the error: The requested operation requires elevation.` even on standard user accounts. Replaced with direct `[System.Diagnostics.ProcessStartInfo]` invocation with `UseShellExecute = $false`, which bypasses ShellExecuteEx (no UAC mediation) and inherits the parent console naturally (no stream redirection). Cross-compatible with PowerShell 5.1 and 7.x.
@@ -506,6 +508,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.9.3]: https://github.com/valianx/team-harness/compare/v2.9.2...v2.9.3
 [2.9.2]: https://github.com/valianx/team-harness/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/valianx/team-harness/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/valianx/team-harness/compare/v2.8.0...v2.9.0
