@@ -22,32 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stage bootstrap scripts
+      - name: Stage bootstrap scripts and landing page
         run: |
           mkdir -p public
           cp bin/install.sh  public/install.sh
           cp bin/install.ps1 public/install.ps1
           cp bin/install.cmd public/install.cmd
-          # A minimal landing page so visiting the root URL gives the operator something.
-          cat > public/index.html <<'HTML'
-          <!doctype html>
-          <meta charset="utf-8">
-          <title>team-harness installer</title>
-          <pre style="font-family: ui-monospace,monospace; line-height:1.5">
-          team-harness — install in one command
-
-          Unix / macOS:
-              curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
-
-          Windows (PowerShell):
-              irm https://valianx.github.io/team-harness/install.ps1 | iex
-
-          Windows (cmd.exe):
-              curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd
-
-          Source: https://github.com/valianx/team-harness
-          </pre>
-          HTML
+          cp -r site/. public/
           ls -lah public/
 
       - uses: actions/configure-pages@v5
@@ -70,14 +51,29 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # Release-time smoke probe (R2 mitigation). Fails the workflow loudly if
-      # the published URL is unreachable so a bad publish is visible in the
+      # Release-time smoke probes (R2 mitigation). Fails the workflow loudly if
+      # either published URL is unreachable so a bad publish is visible in the
       # Actions tab and surfaces a red badge on the release page.
       - name: Smoke-probe published install.sh
         run: |
           URL="https://valianx.github.io/team-harness/install.sh"
           echo "Probing ${URL}..."
           # Pages cache may need a few seconds to invalidate; retry up to 60s.
+          for i in 1 2 3 4 5 6; do
+              if curl -fsSL --max-time 10 -o /dev/null "$URL"; then
+                  echo "OK: ${URL} reachable."
+                  exit 0
+              fi
+              echo "Attempt $i failed, sleeping 10s..."
+              sleep 10
+          done
+          echo "Error: ${URL} did not become reachable within 60s." >&2
+          exit 1
+
+      - name: Smoke-probe published root index
+        run: |
+          URL="https://valianx.github.io/team-harness/"
+          echo "Probing ${URL}..."
           for i in 1 2 3 4 5 6; do
               if curl -fsSL --max-time 10 -o /dev/null "$URL"; then
                   echo "OK: ${URL} reachable."
