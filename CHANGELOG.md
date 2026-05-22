@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-05-22
+
 <!-- The following entries accumulated in [Unreleased] across PR #26 / PR #27 / PR #28
 and earlier work, and were not promoted to their version sections when their PRs
 shipped. A follow-up CHANGELOG hygiene PR will split them into the correct
@@ -18,6 +20,7 @@ section per version" expectation. -->
 ### Added
 
 - New `/th-update` skill: re-runs the installer to pull the latest agents/skills/hooks; reminds operator to restart Claude Code.
+- **GitHub Pages landing page overhaul**: new `site/index.html` with dark-indigo design replacing the minimal heredoc-built page in `.github/workflows/pages.yml`. Post-deploy smoke probe extended to also verify the `/` root.
 
 ### Changed
 
@@ -439,3 +442,6 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `uv` — Python toolchain manager (runs installer and MCP server).
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
+
+[2.4.0]: https://github.com/valianx/team-harness/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/valianx/team-harness/compare/v2.2.0...v2.3.0
