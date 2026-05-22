@@ -204,22 +204,22 @@ Read CLAUDE.md. Add entries to the memory sections below. **Create the sections 
 
 ### Step 5b — Update docs/knowledge.md
 
-Append knowledge to `docs/knowledge.md`. Un solo archivo, bullets planos, sin estructura rígida. Los agentes lo leen antes de trabajar.
+Append knowledge to `docs/knowledge.md`. One file, flat bullets, no rigid structure. Agents read it before working.
 
 **If the file doesn't exist, create it:**
 
 ```markdown
 # Knowledge Base
-<!-- Conocimiento del proyecto que los agentes deben leer antes de trabajar -->
+<!-- Project knowledge that agents read before working -->
 ```
 
 **Format — just bullets with a tag prefix:**
 
 ```markdown
-- **[decisión]** {qué se decidió} — {por qué} ({fecha})
-- **[patrón]** {patrón adoptado} → `{archivo ejemplo}`
-- **[stack]** {tecnología}: {versión y propósito}
-- **[restricción]** {limitación y detalle}
+- **[decision]** {what was decided} — {why} ({date})
+- **[pattern]** {pattern adopted} → `{example file}`
+- **[stack]** {technology}: {version and purpose}
+- **[constraint]** {limitation and detail}
 ```
 
 **Rules:**

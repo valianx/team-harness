@@ -64,13 +64,13 @@ Analyze the input: $ARGUMENTS
 ### Phase 3 — Publish (Bash in main context)
 
 9. **Verify the draft exists.** Check that `.claude/pr-review-draft.md` was created and is not empty. If it's missing or empty:
-   - Tell the user: "El orchestrator no generó el borrador de revisión. Reintentando..."
+   - Tell the user: "The orchestrator did not produce the review draft. Retrying once."
    - Re-invoke the orchestrator with the same data (go back to step 7)
    - If it fails a second time, report the error and stop
 
 10. Read `.claude/pr-review-draft.md` and display the full review draft to the user.
 
-11. Ask the user: "Borrador de revisión listo. Aprueba para publicar, o dime qué cambiar."
+11. Ask the user: "Review draft ready. Approve to publish, or describe the changes needed."
 
 12. **Prior review check (MANDATORY before publishing).** Before submitting, check for an existing review from the same author on this PR:
     ```
@@ -82,15 +82,15 @@ Analyze the input: $ARGUMENTS
 
     - **If a prior review exists**, present this menu to the user:
       ```
-      Ya existe review del autor sobre este PR (ID: {review_id}, fecha: {submitted_at}, estado: {state}).
-      GitHub no permite anadir inline comments a una review ya submitida. Opciones:
+      A prior review by this author exists on this PR (ID: {review_id}, date: {submitted_at}, state: {state}).
+      GitHub does not allow adding inline comments to an already-submitted review. Three options:
 
-      (a) Actualizar solo el resumen — PUT review body (mantiene inline comments anteriores)
-      (b) Responder a un thread existente — reply a un inline comment existente
-      (c) Ciclo de re-review — dismiss la anterior + crear nueva review atomica (codigo cambio)
-      (d) Cancelar
+      (a) Update the summary only — PUT review body (prior inline comments preserved)
+      (b) Reply to an existing thread — reply to one of the prior inline comments
+      (c) Re-review cycle — dismiss the prior review and create a new atomic one (code changed)
+      (d) Cancel
 
-      Cual eliges?
+      Which option?
       ```
       Route to the corresponding substep below based on user choice.
 
@@ -122,7 +122,7 @@ Analyze the input: $ARGUMENTS
        ```
        gh api repos/{owner}/{repo}/pulls/{number}/comments --jq '.[] | select(.pull_request_review_id == {review_id}) | {id: .id, path: .path, line: .line, body: .body[:120]}'
        ```
-       If no inline comments exist, tell the user: "La review anterior no tiene inline comments para responder. Usa la opcion (a) para actualizar el resumen." Then re-show the menu.
+       If no inline comments exist, tell the user: "The prior review has no inline comments to reply to. Use option (a) to update the summary instead." Then re-show the menu.
     2. Display the list and ask the user to select a `comment_id`.
     3. Re-invoke the orchestrator with mode `reply`:
        ```
@@ -151,7 +151,7 @@ Analyze the input: $ARGUMENTS
 
     1. Dismiss the existing review:
        ```
-       gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id}/dismissals -f message="Reemplazada por nueva revision"
+       gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id}/dismissals -f message="Superseded by new review"
        ```
     2. Verify the dismiss succeeded. If it fails, report the error and STOP.
     3. Proceed to step 13 (normal fresh review flow with atomic submission).
@@ -191,23 +191,24 @@ Analyze the input: $ARGUMENTS
 
     **15.2 — Context prune reminder (MANDATORY).** Each `/review-pr` invocation accumulates 5-30K tokens in the main context (PR metadata, full diff, file lists from `gh` and `git` outputs in Phase 1, plus the orchestrator's status block, plus Phase 3 publish outputs). Subagents die between PRs but the **main context does not** — successive reviews in the same session compound linearly.
 
-    Your **final response** to the user MUST include this prominent reminder block (verbatim or equivalent — do NOT shorten it, do NOT phrase it as optional):
+    Your **final response** to the user MUST include this reminder block (verbatim or equivalent — do NOT shorten it, do NOT phrase it as optional):
 
     ```
-    ✅ Review on PR #{number} published successfully.
+    Review on PR #{number} published.
 
-    ⚠️  IMPORTANT — Context cleanup
-    This review accumulated ~{estimated_kb}K tokens in your session
-    (PR data, diff, file lists). Before reviewing the next PR, run:
+    Context cleanup (recommended)
+    This review accumulated approximately {estimated_kb}K tokens in
+    your session (PR data, diff, file lists). Before reviewing the
+    next PR, run:
 
         /compact
 
     Without this, each successive `/review-pr` adds another 5-30K
-    tokens that never get released. After 5+ reviews in one session,
-    response latency and per-turn cost grow noticeably.
+    tokens that never get released. After 5 or more reviews in one
+    session, response latency and per-turn cost grow noticeably.
 
-    If this is your last review of the session, you can ignore this
-    and close the session normally.
+    If this is the last review of the session, no action is needed —
+    close the session normally.
     ```
 
     Estimate `{estimated_kb}` from the size of the diff you handled in Phase 1: small PR (<100 changed lines) ≈ 5K, medium (100-500) ≈ 10K, large (500-2000) ≈ 20K, truncated (>2000) ≈ 30K.
@@ -218,7 +219,7 @@ Analyze the input: $ARGUMENTS
 
 ## Mode 2 — No input provided
 
-Ask the user: "Proporciona un número de PR o URL para revisar. Ejemplo: `#45`, `45`, o `https://github.com/owner/repo/pull/45`."
+Ask the user: "Provide a PR number or URL to review. Example: `#45`, `45`, or `https://github.com/owner/repo/pull/45`."
 
 ---
 

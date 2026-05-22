@@ -42,10 +42,10 @@ Use the detected mode in the payload below. When in doubt, ask the user: "Do you
 
 ## Mode 2 — Text description (not a number or URL)
 
-1. Do NOT create a GitHub issue — the problemática is the input, the issues will be created at the end as result of the breakdown
+1. Do NOT create a GitHub issue — the input task is the source of the breakdown; issues are created at the end as a result.
 2. Analyze the description to determine:
    - **Title**: short, imperative summary (max 70 chars)
-3. Pass the problemática to the `orchestrator` agent:
+3. Pass the task to the `orchestrator` agent:
    ```
    Planning Task:
    - Mode: {plan | plan-and-execute}

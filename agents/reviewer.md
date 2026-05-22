@@ -377,7 +377,7 @@ mode: fresh
 output: inline
 decision: APPROVE | CHANGES_REQUESTED
 event: APPROVE | REQUEST_CHANGES | COMMENT
-summary: {N criticos, N sugerencias, N detalles menores}
+summary: {N critical, N suggestions, N nitpicks}
 inline_findings:
   - path: "src/service.ts"
     line: 42
@@ -451,7 +451,7 @@ status: success | failed | blocked
 mode: internal
 output: session-docs/{feature-name}/04-internal-review.md
 summary: |
-  {one paragraph in Spanish: overall assessment, riskiest area, anything the human reviewer should look at first}
+  {one paragraph: overall assessment, riskiest area, anything the human reviewer should look at first}
 criticals_count: {N}
 suggestions_count: {N}
 nitpicks_count: {N}
@@ -467,7 +467,7 @@ issues: {list of criticals if any, or "none"}
 **Rules for Internal Review mode:**
 - `event` is omitted — this mode does NOT publish anything to GitHub.
 - `inline_findings` is omitted — use `top_issues` instead (capped at 3).
-- The `summary` is the field the orchestrator surfaces in the report to the user; keep it tight and useful (Spanish, ≤4 lines).
+- The `summary` is the field the orchestrator surfaces in the report to the user; keep it tight and useful (≤4 lines).
 - Skip the mode entirely if the orchestrator did not invoke it (it is opt-in, gated by diff size in Phase 4.5).
 
 ### Rules for the status block

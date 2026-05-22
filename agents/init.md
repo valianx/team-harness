@@ -229,7 +229,7 @@ Insert the following block VERBATIM. Same text in every repo. No per-project ada
 
 - Add a one-line entry under `## [Unreleased]` of CHANGELOG.md in the matching subsection (Added / Changed / Fixed / Removed / Security).
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same PR — do not let CLAUDE.md drift from the repo.
-- If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decisión]`, `[patrón]`, `[stack]`, `[restricción]`).
+- If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`, `[pattern]`, `[stack]`, `[constraint]`).
 - If the repo has an OpenAPI spec (`openapi/openapi.yaml` or similar) and the change touches endpoints, bump `info.version` in the same commit as the spec change — never in a separate commit.
 
 ### 6.4 Governance (when to stop and escalate to a human)
@@ -359,7 +359,7 @@ Check if `docs/knowledge.md` exists. If not, create it:
 
 ```markdown
 # Knowledge Base
-<!-- Conocimiento del proyecto que los agentes deben leer antes de trabajar -->
+<!-- Project knowledge that agents read before working -->
 ```
 
 **Rules:**
