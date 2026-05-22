@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `agents/delivery.md` Steps 2, 3.2, 11.0–11.3 updated with Tier A/B/D fallback cross-references to `agents/_shared/gh-fallback.md`. Step 11 no longer skips PR creation when `has_gh=false`; uses curl fallback or `blocked-manual-push` escape hatch instead. Return Protocol adds `blocked-manual-push` as a valid status value with structured operator-facing fields.
 - `agents/th-orchestrator.md` Phase 0a Step 5, Phase 0b Step 4, Phase 5 Steps 1-2 updated with Tier B/D fallback cross-references. Delivery gate gains `blocked-manual-push` handling with operator pause/resume protocol.
 - `skills/{issue,plan,design,define-ac,audit}.md` Mode 1 `gh issue view` updated with Tier A fallback cross-references. Error handling describes graceful degradation rather than hard failure.
+- `skills/review-pr.md` Phase 1 Steps 2-3, Phase 3 Steps 12/12a-12c/13 updated with Tier A/B fallback cross-references. Atomic PR review submission preserved across `gh` and curl paths.
 
 ## [2.9.4] - 2026-05-22
 

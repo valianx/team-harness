@@ -8,13 +8,10 @@ Analyze the input: $ARGUMENTS
 
 1. Extract the PR number from the input (e.g., `#45`, `45`, or full URL)
 
-2. Fetch PR metadata (1 Bash call):
-   ```
-   gh pr view {number} --json number,title,body,author,baseRefName,headRefName,additions,deletions,changedFiles,url,files
-   ```
+2. Fetch PR metadata (1 Bash call). **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier A — read a single PR". Run the probe to set `has_gh`. When `has_gh=true`: `gh pr view {number} --json number,title,body,author,baseRefName,headRefName,additions,deletions,changedFiles,url,files`. When `has_gh=false`: use the curl Tier A fallback. If both fail: prompt the operator to paste the PR diff manually (the `git diff origin/{base}...origin/{head}` path below still works when branches are locally available).
 
 3. Detect linked issue: search PR body for patterns like `Closes #N`, `Fixes #N`, `Resolves #N`
-   - If found: fetch issue data (1 Bash call): `gh issue view {N} --json number,title,body,labels`
+   - If found: fetch issue data. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". When `has_gh=true`: `gh issue view {N} --json number,title,body,labels`. When `has_gh=false`: use the curl fallback; if unavailable, linked issue = "none" (best-effort).
    - If not found: linked issue = "none"
 
 4. Fetch branches (1 Bash call):
@@ -72,11 +69,11 @@ Analyze the input: $ARGUMENTS
 
 11. Ask the user: "Review draft ready. Approve to publish, or describe the changes needed."
 
-12. **Prior review check (MANDATORY before publishing).** Before submitting, check for an existing review from the same author on this PR:
+12. **Prior review check (MANDATORY before publishing).** Before submitting, check for an existing review from the same author on this PR. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read prior PR reviews". When `has_gh=true`:
     ```
     gh api repos/{owner}/{repo}/pulls/{number}/reviews --jq '.[] | select(.user.login == "{current_user}") | {id: .id, state: .state, submitted_at: .submitted_at, body: .body[:120]}'
     ```
-    Replace `{current_user}` with the output of `gh api user --jq '.login'`.
+    Replace `{current_user}` with the output of `gh api user --jq '.login'`. When `has_gh=false`: use the curl fallback to fetch the reviews list. If unavailable, default to treating as "no prior review" (worst case is a duplicate review, recoverable via dismiss).
 
     - **If NO prior review exists** from the same author → proceed to step 13 (normal fresh review flow).
 
@@ -109,7 +106,7 @@ Analyze the input: $ARGUMENTS
        ```
     2. The th-orchestrator invokes the reviewer in `update-body` mode and writes the new body to `.claude/pr-review-draft.md`.
     3. Read `.claude/pr-review-draft.md` and show to the user for approval.
-    4. On approval, publish with PUT:
+    4. On approval, publish with PUT. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When `has_gh=true`: use `gh api -X PUT`. When `has_gh=false` and a token is available: use `curl -X PUT`. When neither is available: instruct the operator to run the curl command with their token.
        ```bash
        jq -n --arg body "$(cat .claude/pr-review-draft.md)" '{body: $body}' \
        | gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id} --input -
@@ -140,7 +137,7 @@ Analyze the input: $ARGUMENTS
        ```
     4. The th-orchestrator invokes the reviewer in `reply` mode and writes the reply to `.claude/pr-review-reply-draft.md`.
     5. Read `.claude/pr-review-reply-draft.md` and show to the user for approval.
-    6. On approval, publish the reply:
+    6. On approval, publish the reply. **Detection + fallback:** Tier B — same pattern as step 12a. Use `gh api` when available, curl fallback when token present, operator instruction otherwise.
        ```bash
        jq -n --arg body "$(cat .claude/pr-review-reply-draft.md)" '{body: $body}' \
        | gh api -X POST repos/{owner}/{repo}/pulls/{number}/comments/{comment_id}/replies --input -
@@ -149,7 +146,7 @@ Analyze the input: $ARGUMENTS
 
     ### Step 12c — Dismiss and re-review
 
-    1. Dismiss the existing review:
+    1. Dismiss the existing review. **Detection + fallback:** Tier B — use `gh api -X PUT` when available, curl PATCH fallback with token, or operator instruction.
        ```
        gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id}/dismissals -f message="Superseded by new review"
        ```
@@ -169,7 +166,7 @@ Analyze the input: $ARGUMENTS
          - 0 criticals → `APPROVE`
          - 1+ criticals → `REQUEST_CHANGES`
          - User override → whatever the user says
-      d. Construct the JSON payload and submit in a **single atomic call**:
+      d. Construct the JSON payload and submit in a **single atomic call**. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — submit a PR review (atomic POST)". The body+event+comments payload is saved to `.claude/pr-review-payload.json` regardless of whether `gh` or curl is used — this is the atomic submission model:
          ```bash
          jq -n \
            --arg body "$(cat .claude/pr-review-draft.md)" \
@@ -179,11 +176,11 @@ Analyze the input: $ARGUMENTS
          | gh api -X POST repos/{owner}/{repo}/pulls/{number}/reviews --input -
          ```
          Replace `{owner}/{repo}` with the repo from the PR URL, `{number}` with the PR number, and `"APPROVE"` with the actual event.
-      e. **NEVER use `gh pr review`** for publishing. NEVER post separate inline comments via `gh api repos/.../pulls/:n/comments`. The single `POST /repos/:o/:r/pulls/:n/reviews` call with `body` + `event` + `comments[]` is the ONLY allowed submission method.
+      e. **NEVER use `gh pr review`** for publishing. NEVER post separate inline comments via `gh api repos/.../pulls/:n/comments`. The single `POST /repos/:o/:r/pulls/:n/reviews` call with `body` + `event` + `comments[]` is the ONLY allowed submission method — this atomicity constraint applies to both the `gh` and curl paths.
 
     - **User requests edits**: modify the draft per feedback, show again, repeat until approved.
 
-14. **Verify the review was posted.** After the `gh api POST .../reviews` call, check the exit code. If it failed, report the error to the user with the exact error message.
+14. **Verify the review was posted.** After the `gh api POST .../reviews` (or curl equivalent) call, check the exit code. If it failed, report the error to the user with the exact error message.
 
 15. **Cleanup, prune context, and STOP.**
 
