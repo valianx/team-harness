@@ -58,7 +58,16 @@ Used when the th-orchestrator dispatches you for **Phase 2.0** of the Bug-fix Fl
 
 **This mode is mutually exclusive with Phase 3 verify mode.** Phase 2.0 runs BEFORE the implementer; Phase 3 (default tester behavior) runs AFTER the implementer.
 
-**Operator override (no fallback):** the original design proposed a manual-repro-script fallback for race-condition, timing-dependent, or environment-dependent bugs. The fallback is **rejected**. Regression test is mandatory always, no exceptions. If you cannot author a regression test (the bug is genuinely impossible to reproduce deterministically in a test environment), return `status: blocked` with a clear explanation in `issues`. The pipeline will block and surface to the operator. Do NOT improvise a runnable script — that path no longer exists in v2.9.
+**Tier-gated dispatch (Phase 2.0 conditional skip).** The th-orchestrator passes `bug_tier: {1|2|3|4}` AND `pre_fix_test_required: {true|false}` in the task payload. The dispatch contract:
+
+| `pre_fix_test_required` | Source of the decision | Action |
+|---|---|---|
+| `true` | Default for `bug_tier: 2 | 3 | 4`, or `bug_tier: 1` with operator-declared `[regression-test: required]`, or `bug_tier: 1` with any touched path failing the no-behavior-change condition | Run the full Pre-Fix Regression Test flow as documented below. Produce `02-regression-test.md`. Return `status: success` with `regression_test_status: failing`. |
+| `false` | `bug_tier: 1` AND all touched paths match `*.md` / `LICENSE` / `CHANGELOG*` / `docs/**/*` / comments / non-functional strings AND no `*.test.*` / `*.spec.*` / `tests/` touched AND operator did NOT declare `[regression-test: required]` | **Skip authoring.** Do NOT produce `02-regression-test.md`. Return `status: success` with `pre_fix_test_status: skipped`, the rationale in the status block, and the no-behavior-change condition cited verbatim. The th-orchestrator handles the skip-side-effects (state update, JSONL trace, task-list placeholder mutation). |
+
+**Skip rationale (when `pre_fix_test_required: false`).** Cite the no-behavior-change condition: "All touched paths match Tier 1 patterns (docs/comments/non-functional strings); no `*.test.*` paths touched; no `[regression-test: required]` declaration." The operator at STAGE-GATE-1 already approved this path; do NOT second-guess the th-orchestrator's classification. If you genuinely believe the skip is wrong (e.g., the touched paths include UI strings the th-orchestrator missed), return `status: blocked` with `issues: pre_fix_test_required: false rejected — paths X, Y appear to change behavior; recommend re-tier to 2`. The th-orchestrator surfaces this to the operator.
+
+**Operator override (no fallback):** the original design proposed a manual-repro-script fallback for race-condition, timing-dependent, or environment-dependent bugs. The fallback is **rejected**. Regression test is mandatory in Tier 2-4; in Tier 1 the conditional skip above is the only path. If you cannot author a regression test in Tier 2-4 (the bug is genuinely impossible to reproduce deterministically in a test environment), return `status: blocked` with a clear explanation in `issues`. The pipeline will block and surface to the operator. Do NOT improvise a runnable script — that path no longer exists in v2.9.
 
 ### Pre-Fix Regression Test process
 
@@ -686,13 +695,14 @@ When invoked by the th-orchestrator via Task tool, your **FINAL message** must b
 agent: tester
 mode: default | pre-fix-regression | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
-output: session-docs/{feature-name}/{03-testing|02-regression-test}.md
+output: session-docs/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}
 tests_count: {N}
 tests_deleted: {N}
 tests_deleted_reason: {one-line justification if tests_deleted > 0; otherwise omit this field}
-regression_test_path: {test-file-path}    # pre-fix-regression mode AND Phase 3 post-fix verify (type: fix | hotfix); omit in other modes
-regression_test_status: failing | passing  # pre-fix-regression: always 'failing'; Phase 3 verify (post-fix): 'passing'; omit in other modes
+pre_fix_test_status: authored | skipped | null   # pre-fix-regression mode only; 'authored' when Phase 2.0 ran, 'skipped' when bug_tier: 1 no-behavior-change; null/omit in other modes
+regression_test_path: {test-file-path}    # pre-fix-regression mode AND Phase 3 post-fix verify (type: fix | hotfix); omit in other modes; null when pre_fix_test_status: skipped
+regression_test_status: failing | passing | skipped  # pre-fix-regression: 'failing' or 'skipped'; Phase 3 verify (post-fix): 'passing' or 'skipped'; omit in other modes
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
@@ -700,8 +710,9 @@ issues: {list of failing tests, or "none"}
 ```
 
 **Field semantics for bug-fix mode fields:**
-- `regression_test_path` — repo-relative path to the regression test file. In pre-fix-regression mode: the file you just authored. In Phase 3 verify (post-fix) for `type: fix` / `type: hotfix`: re-state the same path so the th-orchestrator can confirm the test is still in the suite (test-ratchet check) and the implementer did not delete it.
-- `regression_test_status` — `failing` when authored in Phase 2.0 (the test captures the bug, suite confirms it fails). `passing` when re-run in Phase 3 (the implementer's fix made it pass). Omit the field for `type: feature` / `type: refactor` and other non-bug-fix runs.
+- `pre_fix_test_status: authored | skipped` — pre-fix-regression mode only. `authored` means you wrote `02-regression-test.md` per the standard contract. `skipped` means the th-orchestrator passed `pre_fix_test_required: false` (Tier 1 no-behavior-change) and you intentionally produced no test file. Omit in other modes.
+- `regression_test_path` — repo-relative path to the regression test file. In pre-fix-regression mode: the file you just authored (omit when `pre_fix_test_status: skipped`). In Phase 3 verify (post-fix) for `type: fix` / `type: hotfix` Tier 2-4: re-state the same path so the th-orchestrator can confirm the test is still in the suite (test-ratchet check) and the implementer did not delete it. For Tier 1 with Phase 2.0 skipped: omit or set to `null`.
+- `regression_test_status` — `failing` when authored in Phase 2.0 (the test captures the bug, suite confirms it fails). `passing` when re-run in Phase 3 (the implementer's fix made it pass). `skipped` when Phase 2.0 was skipped for Tier 1 no-behavior-change AND Phase 3 verify ran only the suite no-regress check. Omit the field for `type: feature` / `type: refactor` and other non-bug-fix runs.
 
 **Mandatory tool-usage fields:**
 - `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear.

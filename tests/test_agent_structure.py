@@ -2635,6 +2635,248 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 26b — Bug-fix Tier System (v2.9.0 extension)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 26b: Bug-fix Tier System (4 tiers) ===")
+
+# (T1) th-orchestrator: tier classification subsection in Step 7
+check(
+    "th-orchestrator.md Step 7 declares bug_tier classification (Tier 1-4)",
+    "Bug tier" in _orch_bf and "bug_tier" in _orch_bf and "1` | `2` | `3` | `4`" in _orch_bf,
+    "bug_tier classification subsection not declared in Step 7",
+)
+check(
+    "th-orchestrator.md documents Signal 1 (keywords) for tier classification",
+    "Signal 1" in _orch_bf and "Keywords" in _orch_bf and "auth" in _orch_bf and "injection" in _orch_bf and "typo" in _orch_bf,
+    "Signal 1 (keywords) not documented for tier classification",
+)
+check(
+    "th-orchestrator.md documents Signal 2 (file-path patterns) for tier classification",
+    "Signal 2" in _orch_bf and "File-path patterns" in _orch_bf and "auth/**" in _orch_bf and "middleware/**" in _orch_bf,
+    "Signal 2 (file-path patterns) not documented for tier classification",
+)
+check(
+    "th-orchestrator.md documents Signal 3 (operator override) for tier classification",
+    "Signal 3" in _orch_bf and "[TIER:" in _orch_bf and "[regression-test: required]" in _orch_bf and "[security: required]" in _orch_bf,
+    "Signal 3 (operator override) not documented for tier classification",
+)
+check(
+    "th-orchestrator.md documents auto-escalation rules (high-tier signal wins)",
+    "Auto-escalation" in _orch_bf and ("Path priority" in _orch_bf or "sobrescribes" in _orch_bf or "high-tier signal" in _orch_bf.lower()),
+    "Auto-escalation rules not documented",
+)
+check(
+    "th-orchestrator.md documents architect tier_promote protocol",
+    "tier_promote" in _orch_bf and "tier_promote_rationale" in _orch_bf,
+    "tier_promote protocol not documented in th-orchestrator.md",
+)
+check(
+    "th-orchestrator.md default-to-Tier-3 rule documented (conservative)",
+    "Default: Tier 3" in _orch_bf or "default to Tier 3" in _orch_bf.lower() or "default tier 3" in _orch_bf.lower(),
+    "Default-Tier-3 conservative rule not documented",
+)
+check(
+    "th-orchestrator.md 00-state.md schema includes bug_tier field",
+    "bug_tier:" in _orch_bf and "{1 | 2 | 3 | 4 | null}" in _orch_bf,
+    "bug_tier field missing from 00-state.md schema",
+)
+check(
+    "th-orchestrator.md 00-state.md schema includes bug_tier_source field",
+    "bug_tier_source" in _orch_bf,
+    "bug_tier_source field missing from 00-state.md schema",
+)
+
+# (T2) th-orchestrator: Phase 1 dispatch table modulated by bug_tier
+check(
+    "th-orchestrator.md Phase 1 dispatch table modulated by bug_tier (Tier 1 skipped, Tier 2 light, Tier 3-4 full)",
+    "light-root-cause" in _orch_bf and "full-root-cause" in _orch_bf and "skipped" in _orch_bf.lower(),
+    "Phase 1 dispatch by bug_tier not documented",
+)
+check(
+    "th-orchestrator.md Phase 1 dispatch declares Tier 4 mandatory ## Prior Art",
+    "Prior Art" in _orch_bf and "mcp__memory__search_nodes" in _orch_bf,
+    "Tier 4 mandatory ## Prior Art (memory query) not declared in Phase 1 dispatch",
+)
+
+# (T3) th-orchestrator: Phase 2.0 conditional skip for Tier 1 no-behavior-change
+check(
+    "th-orchestrator.md Phase 2.0 documents Tier 1 conditional skip (no-behavior-change)",
+    "Phase 2.0" in _orch_bf and "no-behavior-change" in _orch_bf and ("Skip Phase 2.0" in _orch_bf or "Conditional skip" in _orch_bf),
+    "Phase 2.0 Tier 1 conditional skip not documented",
+)
+check(
+    "th-orchestrator.md Phase 2.0 declares pre_fix_test_required parameter for tester dispatch",
+    "pre_fix_test_required" in _orch_bf,
+    "pre_fix_test_required parameter not declared in Phase 2.0 dispatch",
+)
+check(
+    "th-orchestrator.md Phase 2.0 conditional-skip enumerates allowed Tier 1 paths",
+    "*.md" in _orch_bf and "LICENSE" in _orch_bf and "CHANGELOG*" in _orch_bf and "non-functional string" in _orch_bf,
+    "Tier 1 allowed-path patterns not enumerated in Phase 2.0 conditional skip",
+)
+check(
+    "th-orchestrator.md Phase 2.0 declares UI strings are Tier 2 minimum",
+    "UI strings" in _orch_bf and "Tier 2 minimum" in _orch_bf,
+    "UI-strings-are-Tier-2 rule not declared",
+)
+
+# (T4) th-orchestrator: Phase 3 parallel-dispatch tier-gated
+check(
+    "th-orchestrator.md Phase 3 declares tier-gated parallel dispatch table",
+    "Tier-gated dispatch" in _orch_bf or ("Phase 3" in _orch_bf and "bug_tier" in _orch_bf and "skipped" in _orch_bf),
+    "Phase 3 tier-gated dispatch table not declared",
+)
+check(
+    "th-orchestrator.md Phase 3 Tier 1 dispatches tester only (no qa Bug-fix contract, no security)",
+    "Tier 1" in _orch_bf and "suite no-regress" in _orch_bf,
+    "Phase 3 Tier 1 reduced dispatch not documented",
+)
+check(
+    "th-orchestrator.md Phase 3 Tier 2 dispatches tester + qa (no security)",
+    "Tier 2" in _orch_bf and "tester + qa" in _orch_bf,
+    "Phase 3 Tier 2 reduced dispatch not documented",
+)
+check(
+    "th-orchestrator.md Phase 3 Tier 4 dispatches security with extended analysis",
+    "extended analysis" in _orch_bf,
+    "Phase 3 Tier 4 extended security analysis not documented",
+)
+
+# (T5) architect.md: mode: light-root-cause | full-root-cause
+check(
+    "architect.md Root-Cause mode declares light-root-cause sub-mode",
+    "light-root-cause" in _architect_bf,
+    "mode: light-root-cause not declared in architect.md",
+)
+check(
+    "architect.md Root-Cause mode declares full-root-cause sub-mode",
+    "full-root-cause" in _architect_bf,
+    "mode: full-root-cause not declared in architect.md",
+)
+check(
+    "architect.md light-root-cause is gated to bug_tier: 2",
+    "light-root-cause" in _architect_bf and "bug_tier: 2" in _architect_bf,
+    "light-root-cause-to-bug_tier-2 binding not documented",
+)
+check(
+    "architect.md full-root-cause covers bug_tier: 3 and 4",
+    "full-root-cause" in _architect_bf and "bug_tier: 3" in _architect_bf and "bug_tier: 4" in _architect_bf,
+    "full-root-cause-to-bug_tier-3/4 binding not documented",
+)
+check(
+    "architect.md declares ## Prior Art mandatory for bug_tier: 4",
+    "## Prior Art" in _architect_bf and "mandatory" in _architect_bf.lower() and "bug_tier: 4" in _architect_bf,
+    "## Prior Art mandatory-for-Tier-4 not declared",
+)
+check(
+    "architect.md declares mcp__memory__search_nodes for Tier 4 prior-art query",
+    "mcp__memory__search_nodes" in _architect_bf and "Tier 4" in _architect_bf,
+    "Tier 4 memory query not declared",
+)
+check(
+    "architect.md Return Protocol declares tier_promote field",
+    "tier_promote:" in _architect_bf.split("## Return Protocol", 1)[1] if "## Return Protocol" in _architect_bf else False,
+    "tier_promote field not declared in architect Return Protocol",
+)
+check(
+    "architect.md Return Protocol declares tier_promote_rationale field",
+    "tier_promote_rationale" in _architect_bf,
+    "tier_promote_rationale field not declared in architect Return Protocol",
+)
+check(
+    "architect.md Return Protocol declares sub_mode field",
+    "sub_mode:" in _architect_bf,
+    "sub_mode field not declared in architect Return Protocol",
+)
+
+# (T6) tester.md: pre_fix_test_required parameter + pre_fix_test_status field
+check(
+    "tester.md Pre-Fix Regression Test mode accepts pre_fix_test_required parameter",
+    "pre_fix_test_required" in _tester_bf,
+    "pre_fix_test_required parameter not documented in tester.md",
+)
+check(
+    "tester.md declares Tier 1 conditional skip semantics for Phase 2.0",
+    "Tier 1" in _tester_bf and ("no-behavior-change" in _tester_bf or "skipped" in _tester_bf.lower()),
+    "Tier 1 conditional-skip semantics not documented in tester.md",
+)
+check(
+    "tester.md Return Protocol declares pre_fix_test_status field",
+    "pre_fix_test_status" in _tester_bf,
+    "pre_fix_test_status field not declared in tester Return Protocol",
+)
+check(
+    "tester.md regression_test_status accepts 'skipped' value (Tier 1)",
+    "regression_test_status" in _tester_bf and "skipped" in _tester_bf,
+    "regression_test_status: skipped value not documented in tester.md",
+)
+
+# (T7) qa.md: Tier 1 simplified validation
+check(
+    "qa.md Validate mode documents Tier 1 simplified validation contract",
+    "Tier 1" in _qa_bf and ("simplified" in _qa_bf.lower() or "implicit" in _qa_bf.lower() or "diff matches" in _qa_bf.lower()),
+    "qa.md Tier 1 simplified validation not documented",
+)
+check(
+    "qa.md Return Protocol allows regression_test_referenced: null for Tier 1 skipped",
+    "regression_test_referenced" in _qa_bf and "null" in _qa_bf and "bug_tier: 1" in _qa_bf,
+    "regression_test_referenced: null for Tier 1 not documented",
+)
+
+# (T8) ref-special-flows.md: Tier System subsection
+check(
+    "ref-special-flows.md has Tier System subsection inside Bug-fix Flow",
+    "Tier System" in _ref_flows_bf and "## Bug-fix Flow" in _ref_flows_bf,
+    "Tier System subsection missing from ref-special-flows.md Bug-fix Flow",
+)
+check(
+    "ref-special-flows.md Tier System declares 4 tiers with names",
+    "Tier 1" in _ref_flows_bf and "Tier 2" in _ref_flows_bf and "Tier 3" in _ref_flows_bf and "Tier 4" in _ref_flows_bf and "Docs/Trivial" in _ref_flows_bf and "Critical/Security" in _ref_flows_bf,
+    "4-tier table with names not declared in ref-special-flows.md",
+)
+check(
+    "ref-special-flows.md Tier System documents Tier 1 conditional regression-test skip",
+    "Tier 1 regression-test conditional skip" in _ref_flows_bf or ("Tier 1" in _ref_flows_bf and "conditional skip" in _ref_flows_bf.lower() and "no behavior change" in _ref_flows_bf.lower()),
+    "Tier 1 conditional regression-test skip not documented in ref-special-flows.md",
+)
+check(
+    "ref-special-flows.md Tier System documents Signal 1 (keywords)",
+    "Signal 1" in _ref_flows_bf and "Keywords in the bug report" in _ref_flows_bf and "auth" in _ref_flows_bf and "typo" in _ref_flows_bf,
+    "Signal 1 (keywords) not documented in Tier System",
+)
+check(
+    "ref-special-flows.md Tier System documents Signal 2 (file-path patterns)",
+    "Signal 2" in _ref_flows_bf and "File-path patterns" in _ref_flows_bf and "auth/**" in _ref_flows_bf,
+    "Signal 2 (file-path patterns) not documented in Tier System",
+)
+check(
+    "ref-special-flows.md Tier System documents Signal 3 (operator override)",
+    "Signal 3" in _ref_flows_bf and "[TIER:" in _ref_flows_bf,
+    "Signal 3 (operator override) not documented in Tier System",
+)
+check(
+    "ref-special-flows.md Tier System documents auto-escalation rules (high-tier wins)",
+    "Auto-escalation" in _ref_flows_bf or "auto-escalation" in _ref_flows_bf,
+    "Auto-escalation rules not documented in Tier System",
+)
+check(
+    "ref-special-flows.md Tier System declares default Tier 3 when in doubt",
+    "Default: Tier 3" in _ref_flows_bf or "default to Tier 3" in _ref_flows_bf.lower(),
+    "Default-to-Tier-3 conservative rule not documented in Tier System",
+)
+check(
+    "ref-special-flows.md Tier System enumerates security-sensitive paths (auth/**, middleware/**, api/**, db/**, security/**, crypto/**, session/**)",
+    all(p in _ref_flows_bf for p in ["auth/**", "middleware/**", "api/**", "db/**", "security/**", "crypto/**", "session/**"]),
+    "Security-sensitive path enumeration incomplete in Tier System",
+)
+check(
+    "ref-special-flows.md Tier System has worked examples (Tier 1, Tier 2, Tier 3-with-security-escalation)",
+    "Worked examples" in _ref_flows_bf or ("Example A" in _ref_flows_bf and "Example B" in _ref_flows_bf and "Example C" in _ref_flows_bf),
+    "Tier System worked examples missing from ref-special-flows.md",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

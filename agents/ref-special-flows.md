@@ -109,52 +109,127 @@ This mirrors how human teams work with dependent features.
 
 ## Bug-fix Flow
 
-When `type: fix` is classified (Phase 0a Step 7), the th-orchestrator runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. Every artifact of the feature backbone is produced; nothing is stripped. The pipeline replaces `01-architecture.md` with `01-root-cause.md` (1 page max, focused on file:line + mechanism + scope), inserts a new **Phase 2.0 — Regression Test Authoring** between STAGE-GATE-1 and Phase 2, enforces the implementer scope-discipline contract, routes the CHANGELOG entry to `### Fixed`, and **runs the `security` agent at Phase 3 regardless of the `security-sensitive` flag** (defense-in-depth — many bugs have non-obvious security implications).
+When `type: fix` is classified (Phase 0a Step 7), the th-orchestrator runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. The pipeline is **tier-classified (1-4)** based on bug content keywords, impacted file paths, and operator override. The tier determines which artifacts are produced and which agents run: Tier 1 (docs/trivial) skips the architect entirely and conditionally skips the pre-fix regression test; Tier 2 (light) uses an abbreviated root-cause + tester + qa; Tier 3 (standard, the PR #50 default) runs the full pipeline + security; Tier 4 (critical/security) adds mandatory prior-art memory query and extended security analysis. The "security runs always for bugs" rule from PR #50 is preserved for Tier 3+; auto-escalation favors high-tier signals so any fix touching a security-sensitive path lands at Tier 3+ regardless of the operator's hint.
+
+### Tier System (4 tiers)
+
+The Tier System modulates the Bug-fix Pipeline depth so trivial fixes skip ceremony and critical fixes get prior-art research and extended analysis. The th-orchestrator emits `bug_tier: 1 | 2 | 3 | 4` at Phase 0a Step 7 (Classify), in addition to the existing `type: fix | hotfix`.
+
+#### Tier table
+
+| Tier | Name | Phase 1 (root-cause) | Phase 2.0 (pre-fix regression test) | Phase 3 agents | Estimated agent runs |
+|---|---|---|---|---|---|
+| **1** | Docs/Trivial | **Skip** — no `01-root-cause.md`. th-orchestrator emits one-sentence prose plan at STAGE-GATE-1 (same surface as `type: hotfix`). | **Conditional skip** — only when there is no behavior change (see condition below). | tester (suite no-regress) only | ~3 |
+| **2** | Light fix | Inline `01-root-cause.md` — 1 paragraph for `## Mechanism` + 1 paragraph for `## Scope of Fix`, no extended sections. Architect dispatched with `mode: light-root-cause`. | Mandatory | tester + qa | ~5 |
+| **3** | Standard fix | Full `01-root-cause.md` (current PR #50 default). Architect dispatched with `mode: full-root-cause`. `## Prior Art` section optional. | Mandatory | tester + qa + security | ~7 |
+| **4** | Critical/Security | Full `01-root-cause.md` + **mandatory `## Prior Art` section** (architect invokes `mcp__memory__search_nodes`). Architect dispatched with `mode: full-root-cause`. | Mandatory | tester + qa + security (**extended analysis** — adjacent-code surface + prior-art cross-reference) | ~9 |
+
+#### Tier 1 regression-test conditional skip
+
+The Tier 1 candidate skips Phase 2.0 ONLY when ALL of these conditions hold:
+- Tier is `1` (auto-classified or operator-declared via `[TIER: 1]`).
+- All touched paths match `*.md`, `LICENSE`, `CHANGELOG*`, `docs/**/*`, code comments, or non-functional string literals (informational error messages, log messages with no runtime branching on the content).
+- No `*.test.*`, `*.spec.*`, or `tests/` paths touched.
+- Operator did NOT declare `[regression-test: required]`.
+
+Otherwise — UI strings (Tier 2 minimum, pragmatic not permissive), dev-tooling, test-fixture changes, etc. — Tier 1 still requires a regression test, OR the candidate is auto-promoted to Tier 2 at classification time. The conditional skip is recorded in `00-state.md` as `regression_test_status: skipped`, in the JSONL trace as `phase.skipped` with `reason: tier-1-no-behavior-change`, and in `02-task-list.md` by mutating the `<TBD-Phase-2.0>` placeholder to `<skipped — Tier 1 no-behavior-change>`.
+
+#### Auto-classification signals
+
+The th-orchestrator combines three signals at Phase 0a Step 7.
+
+**Signal 1 — Keywords in the bug report** (operator's plain-text request and any linked issue body):
+- **High-tier triggers (escalate to Tier 4, case-insensitive whole-word match):** `auth`, `injection`, `xss`, `csrf`, `secret`, `token`, `permission`, `bypass`, `vulnerability`, `cve`, `leak`, `exposed`, `unauthorized`.
+- **Low-tier hints (Tier 1 candidate):** `typo`, `trivial`, `fix rápido`, `quick fix`, `cosmetic`, `documentation`, `comment fix`, `whitespace`.
+
+**Signal 2 — File-path patterns** (use Phase 0b Step 1 codebase investigation results if the operator mentioned files; otherwise re-evaluate after Phase 1):
+- **Tier 1 paths:** `*.md`, `LICENSE`, `CHANGELOG*`, `docs/**/*`, code-comments-only changes.
+- **Tier 2 paths:** `.github/**`, `scripts/**`, `*.config.*`, `*.toml`, root-level `package.json` (only when changes are non-dep), `tests/**`, `__tests__/**`, `*.test.*`, `*.spec.*`, `mocks/**`, `fixtures/**`.
+- **Tier 3 paths (default for production code):** `src/**`, `lib/**`, `app/**`, `cmd/**` (when no security signals).
+- **Security-sensitive paths** (force `security-sensitive: true` and minimum Tier 3): `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, `**/middleware/**`, any path with `auth` or `permission` in the name.
+- **Tier 4 paths:** same as Tier 3 sensitive paths COMBINED with a Signal 1 high-tier keyword match.
+
+**Signal 3 — Operator override** (literal markers in the operator's request):
+- `[TIER: 1|2|3|4]` — forces the declared tier, overrides auto-classification.
+- `[regression-test: required]` — forces Tier 2 minimum on a Tier 1 candidate.
+- `[security: required]` — forces Tier 3 minimum.
+
+#### Auto-escalation rules
+
+- **High-tier signal sobrescribes lower-tier classification.** Path priority > keyword priority > size hints. Example: path `auth/handlers.ts` + report "typo in error message" → Tier 3, not Tier 1. The sensitive path wins.
+- **Architect can re-tier in Phase 1.** If during root-cause analysis the architect discovers the scope is wider than the initial classification suggests, the architect emits `tier_promote: <new_tier>` with `tier_promote_rationale: <1-line>` in its status block. The th-orchestrator surfaces both to the operator for confirmation before continuing. Operator-in-loop, same protocol as `type_reclassify`.
+- **Default: Tier 3 when in doubt.** Conservative. Ambiguous signals or unclassifiable paths default to Tier 3.
+
+#### Worked examples
+
+**Example A — Tier 1, regression-test skipped:**
+- Operator request: "fix typo in README.md: 'recieve' should be 'receive'"
+- Signal 1: `typo` (low-tier hint).
+- Signal 2: `README.md` matches Tier 1 path pattern.
+- Signal 3: none.
+- Classification: `bug_tier: 1` (auto). All touched paths match `*.md`, no test paths touched, no `[regression-test: required]` declaration → Phase 2.0 skipped.
+- Pipeline: th-orchestrator skips Phase 1 (no architect). Phase 1.6 plan-reviewer runs against the minimal `02-task-list.md`. STAGE-GATE-1 with one-sentence prose plan. Phase 2 (implementer fixes the typo). Phase 3 (tester suite no-regress + qa simplified validation). No security. ~3 agent runs total.
+
+**Example B — Tier 2, light fix:**
+- Operator request: "fix bug in .github/workflows/ci.yml — the matrix doesn't include Python 3.12"
+- Signal 1: none high-tier.
+- Signal 2: `.github/**` matches Tier 2 path pattern.
+- Signal 3: none.
+- Classification: `bug_tier: 2` (auto).
+- Pipeline: th-orchestrator dispatches architect with `mode: light-root-cause`. `01-root-cause.md` contains 1-paragraph `## Mechanism` + 1-paragraph `## Scope of Fix` + `## Regression Test Approach` (the regression test asserts the matrix includes 3.12). Phase 2.0 mandatory — tester authors failing test. Phase 2 (implementer adds 3.12 to matrix). Phase 3 (tester + qa, no security). ~5 agent runs total.
+
+**Example C — Tier 3 with security-path auto-escalation:**
+- Operator request: "typo in error message from `src/auth/middleware.ts`: 'unautorized' should be 'unauthorized'"
+- Signal 1: `unauthorized` is a high-tier trigger keyword. Also `typo` is a low-tier hint.
+- Signal 2: `src/auth/middleware.ts` is a security-sensitive path → forces minimum Tier 3.
+- Signal 3: none.
+- Classification: `bug_tier: 3` (path priority > keyword priority; sensitive path wins over the typo hint). The keyword `unauthorized` would normally trigger Tier 4, but here it appears as part of the error-message text being fixed, not as the bug class; the architect can promote to Tier 4 in Phase 1 if root-cause analysis reveals the underlying logic is actually broken.
+- Pipeline: th-orchestrator dispatches architect with `mode: full-root-cause`. `01-root-cause.md` full template (Prior Art optional). Phase 2.0 mandatory. Phase 2 (implementer fixes the typo). Phase 3 (tester + qa + security — defense-in-depth on sensitive path). ~7 agent runs total. If the architect surfaces a tier-promote, the operator decides between Tier 3 and Tier 4.
 
 ### Full session-docs artifact set (type: fix)
 
-Every bug-fix pipeline produces all of these. **Operator override:** the full backbone is preserved — nothing is stripped vs feature flow.
+Every bug-fix pipeline produces the backbone artifacts; the tier modulates which Phase-1 / Phase-2.0 / Phase-3 artifacts are generated.
 
-| Artifact | Required | Content notes |
-|---|---|---|
-| `00-task-intake.md` | Yes | Bug report content + reproduction steps from operator |
-| `00-state.md` | Yes | Standard schema, `type: fix` |
-| `00-execution-events.jsonl` | Yes | Standard event trace |
-| `00-pipeline-summary.md` | Yes | Standard rollup |
-| `01-root-cause.md` | Yes (replaces `01-architecture.md`) | 1 pg max, file:line + mechanism + scope |
-| `01-plan-review.md` | Yes | plan-reviewer output, includes Rules 7 + 8 |
-| `02-task-list.md` | **Yes (always)** | Tasks of the fix: reproduce, root-cause confirm, regression test, fix, verify. Minimum 4 lines |
-| `02-regression-test.md` | **Yes (NEW artifact)** | tester's failing test (path + content + how to run) BEFORE implementer touches anything |
-| `02-implementation.md` | Yes | implementer's report |
-| `03-testing.md` | Yes | tester's post-fix verification |
-| `04-validation.md` | **Yes (mandatory)** | qa validation — never skipped |
-| `04-security.md` | **Yes (mandatory always)** | security agent runs ALWAYS for bugs, regardless of `security-sensitive` flag — hard requirement override |
-| `05-delivery.md` | Yes | delivery report |
-| `06-acceptance-check.md` | Yes | acceptance-checker output |
+| Artifact | Tier 1 | Tier 2 | Tier 3 | Tier 4 | Content notes |
+|---|---|---|---|---|---|
+| `00-task-intake.md` | Yes | Yes | Yes | Yes | Bug report content + reproduction steps from operator |
+| `00-state.md` | Yes | Yes | Yes | Yes | Standard schema, `type: fix`, `bug_tier: N`, `bug_tier_source` |
+| `00-execution-events.jsonl` | Yes | Yes | Yes | Yes | Standard event trace |
+| `00-pipeline-summary.md` | Yes | Yes | Yes | Yes | Standard rollup |
+| `01-root-cause.md` | **No (Phase 1 skipped)** | Yes — `mode: light-root-cause`, ≤30 lines | Yes — `mode: full-root-cause`, 1 pg max | Yes — `mode: full-root-cause` + mandatory `## Prior Art`, 1 pg max + ≤15 lines | file:line + mechanism + scope |
+| `01-plan-review.md` | Yes | Yes | Yes | Yes | plan-reviewer output, includes Rules 7 + 8 (gated on `type: fix | hotfix`) |
+| `02-task-list.md` | **Yes (always)** | Yes | Yes | Yes | Tasks of the fix. Minimum 4 lines; Tier 1 may be 3 lines when Phase 2.0 is skipped (reproduce-or-cite, fix, verify) |
+| `02-regression-test.md` | **Conditional skip** — only when no behavior change (see Tier 1 condition above); otherwise Yes | Yes | Yes | Yes | tester's failing test (path + content + how to run) BEFORE implementer touches anything |
+| `02-implementation.md` | Yes | Yes | Yes | Yes | implementer's report |
+| `03-testing.md` | Yes — suite no-regress only | Yes | Yes | Yes | tester's post-fix verification |
+| `04-validation.md` | Yes — Tier 1 simplified template (≤15 lines, no per-AC table) | Yes — default bug-fix contract | Yes — default bug-fix contract | Yes — default bug-fix contract | qa validation |
+| `04-security.md` | **No** | **No** | **Yes (mandatory)** | **Yes (mandatory + extended analysis)** | security agent — see "Why security is tier-gated" below |
+| `05-delivery.md` | Yes | Yes | Yes | Yes | delivery report |
+| `06-acceptance-check.md` | Conditional (per existing complexity/iteration gate) | Conditional | Conditional | Conditional | acceptance-checker output |
 
-**Why security is mandatory for bugs.** Many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information). Fixes can also introduce new vulnerabilities. The defense-in-depth answer: every bug gets a security review. For `type: fix` / `type: hotfix`, the th-orchestrator forces `security-sensitive: true` at Phase 0a Step 7 classification.
+**Why security is tier-gated.** PR #50 set `security-sensitive: true` for every bug as a defense-in-depth override. The Tier System refines that override: security runs for every Tier 3+ bug (Tier 4 includes extended analysis cross-referencing prior art), and Tier 1 / Tier 2 fixes skip security because the impacted scope is non-functional (docs, dev-tooling, test infra). The auto-escalation rule guarantees that any fix touching a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, etc.) lands at Tier 3+ at classification time — so a Tier 1 / Tier 2 run cannot accidentally bypass security on sensitive paths. Many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information); the path-pattern auto-escalation captures these without forcing security on every typo-in-docs fix.
 
 ### Phase structure (type: fix)
 
 | Phase | Owner | Output | Notes |
 |---|---|---|---|
-| 0a Intake | th-orchestrator | `00-state.md` initial | KG session start, KG query, CLAUDE.md read, type classified as `fix`, `security-sensitive: true` forced |
-| 0b Specify | th-orchestrator | `00-task-intake.md` (bug-report format) | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists mandatory) |
+| 0a Intake | th-orchestrator | `00-state.md` initial | KG session start, KG query, CLAUDE.md read, type classified as `fix`, `bug_tier` classified (1-4), `security-sensitive: true` forced for Tier 3+ |
+| 0b Specify | th-orchestrator | `00-task-intake.md` (bug-report format) | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
 | 0.5 Bootstrap | th-orchestrator | — | Same as feature flow |
-| 1 Root-cause | architect (mode: root-cause) | `01-root-cause.md` | 1 page max, replaces `01-architecture.md` |
+| 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
 | 1.5 Plan ratification | qa (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
-| 1.6 Plan review | plan-reviewer | `01-plan-review.md` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`) |
-| STAGE-GATE-1 | th-orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + PR Summary from `02-task-list.md` |
-| **2.0 Regression Test (NEW)** | tester (mode: pre-fix-regression) | `02-regression-test.md` | Failing test authored BEFORE implementer runs; never skipped |
+| 1.6 Plan review | plan-reviewer | `01-plan-review.md` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
+| STAGE-GATE-1 | th-orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + PR Summary from `02-task-list.md`. Tier 1: one-sentence prose plan replaces TL;DR copy |
+| **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
 | 2.5 Reconcile | th-orchestrator + qa (reconcile) | — | Same as feature flow |
-| 3 Verify | tester + qa + **security (always)** | `03-testing.md`, `04-validation.md`, `04-security.md` | Parallel; security runs always for bugs |
-| 3.5 Acceptance gate | th-orchestrator | — | Same as feature flow; regression test must still be in suite |
+| 3 Verify | tester + qa + security (tier-gated) | `03-testing.md`, `04-validation.md`, `04-security.md` (Tier 3+) | Tier 1: tester (suite no-regress) + qa (simplified). Tier 2: tester + qa. Tier 3: tester + qa + security. Tier 4: tester + qa + security (extended analysis) |
+| 3.5 Acceptance gate | th-orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1) |
 | 3.6 Acceptance check | acceptance-checker | `06-acceptance-check.md` | Conditional per existing gates |
 | 4 Delivery | delivery | `05-delivery.md` | CHANGELOG `### Fixed`, PR title `fix(area):`, Bug Report section in PR body, `Fixes #N` |
 | 4.5 Internal review | reviewer (mode: internal) | — | Conditional per diff-size gate |
 | STAGE-GATE-3 | th-orchestrator | STOP block | ship / amend / abort |
-| 5 GitHub update | th-orchestrator | — | Comment with regression test path + Before/After |
+| 5 GitHub update | th-orchestrator | — | Comment with regression test path + Before/After (regression test omitted for Tier 1 skipped) |
 | 6 KG save | th-orchestrator | — | `process-insight` describes failure mode learned, not feature shipped |
 
 ### Phase 2.0 — Regression Test Authoring (mandatory, never skipped)

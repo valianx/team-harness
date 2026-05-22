@@ -224,17 +224,33 @@ Used when the team needs to assess the health of an existing architecture — id
 
 ### Root-Cause Analysis Mode (Bug-fix Flow, type: fix)
 
-Used when the th-orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`type: fix`). Replaces Design Mode for bug fixes. Skipped entirely for `type: hotfix` — the th-orchestrator emits a one-sentence prose plan inline at STAGE-GATE-1 instead.
+Used when the th-orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`type: fix` with `bug_tier: 2 | 3 | 4`). Replaces Design Mode for bug fixes. Skipped entirely for `type: hotfix` AND for `type: fix` with `bug_tier: 1` — in both cases the th-orchestrator emits a one-sentence prose plan inline at STAGE-GATE-1 instead.
 
-- **Trigger:** th-orchestrator invokes with `mode: root-cause` (the task payload also declares `type: fix`)
+- **Trigger:** th-orchestrator invokes with `mode: root-cause` (the task payload also declares `type: fix`) plus a sub-mode parameter:
+  - **`mode: light-root-cause`** for `bug_tier: 2` — produces `01-root-cause.md` with only `## Mechanism` + `## Scope of Fix` (no `## Prior Art`, no `## Trade-offs`, no `## Decisions for human review`). One paragraph each, three paragraphs total. The output is a glance-read for the human at STAGE-GATE-1, not a full document.
+  - **`mode: full-root-cause`** for `bug_tier: 3` (default) and `bug_tier: 4` — produces the full `01-root-cause.md` per the template below. For `bug_tier: 4`, the `## Prior Art` section is mandatory (Tier 3 it is optional, fill only when relevant prior-art exists).
 - **Outputs (BOTH required, in this order):**
-  1. `session-docs/{feature-name}/01-root-cause.md` — focused root-cause analysis (1 page max)
+  1. `session-docs/{feature-name}/01-root-cause.md` — focused root-cause analysis (size depends on sub-mode; see below)
   2. `session-docs/{feature-name}/02-task-list.md` — typically one PR for the fix
-- **Flow:** Phase 0 (light docs research; context7 optional) → Phase 1 (codebase deep-read to locate the defect) → Phase 2 (write root-cause + minimal fix scope) → write `01-root-cause.md` → write `02-task-list.md`
+- **Flow:** Phase 0 (light docs research; context7 optional) → Phase 1 (codebase deep-read to locate the defect; **for `bug_tier: 4` also invoke `mcp__memory__search_nodes`** with 1-3 semantic queries derived from the failure mode) → Phase 2 (write root-cause + minimal fix scope) → write `01-root-cause.md` → write `02-task-list.md`
+
+**Sub-mode size contracts.**
+
+| Sub-mode | Triggers | `01-root-cause.md` content | Hard size cap |
+|---|---|---|---|
+| `light-root-cause` | `bug_tier: 2` | TL;DR (1 line) + `## Mechanism` (1 paragraph, ≤5 sentences) + `## Scope of Fix` (1 paragraph, ≤3 sentences) + `## Regression Test Approach` (mandatory section, same as full). Omit `## Prior Art`, `## Trade-offs`, `## Decisions for human review`, `## Services Touched`, `## Work Plan`. | ≤30 lines total. The plan-reviewer Rule 7 size check accepts the abbreviated shape when `bug_tier: 2` is declared. |
+| `full-root-cause` (Tier 3) | `bug_tier: 3` | Full template (see below). `## Prior Art` is **optional** — include it only when a relevant prior `process-insight` is known (operator hint or KG query result). | 1 page maximum: ≤80 lines of markdown body (excluding tables and the TL;DR). plan-reviewer Rule 7 flags `>120 lines` as `concerns`. |
+| `full-root-cause` (Tier 4) | `bug_tier: 4` | Full template + **mandatory `## Prior Art`** section. Invoke `mcp__memory__search_nodes` with 1-3 semantic queries derived from the failure mode (e.g., `"auth bypass middleware"`, `"token leak logger"`). List relevant prior `process-insight` nodes with one-line summaries. If no relevant prior art is found, write `## Prior Art\nNo prior art found in the knowledge graph for this failure mode.` — the empty section is mandatory because its presence signals the agent looked. | 1 page maximum: ≤80 lines of markdown body (excluding tables and the TL;DR), `## Prior Art` excluded from the cap (≤15 additional lines). |
+
+**Tier-promote protocol (architect-recommends-operator-decides).** If during codebase analysis you discover the scope of the fix is wider than the tier classification suggests, do NOT auto-route. Instead emit `tier_promote: <new_tier>` and a 1-line `tier_promote_rationale` in your status block. The th-orchestrator surfaces both to the operator for the decision. You do NOT proceed beyond the current Phase 1. Examples that justify a tier promotion:
+- Tier 2 → Tier 3 — codebase analysis reveals the bug is in `src/auth/middleware.ts`, not the `.github/workflows/` config the operator originally mentioned. Sensitive path forces Tier 3 minimum.
+- Tier 3 → Tier 4 — analysis reveals the bug is a permission-check bypass with a CVE-like signature (e.g., a missing JWT signature verification). Triggers extended security review and mandatory prior-art query.
+
+**Tier-promote is mutually exclusive with type-reclassify.** If you discover the bug is a feature gap AND a tier-promote candidate, return `type_reclassify: true` only (the th-orchestrator re-routes to feature flow, where tier is irrelevant). Do NOT set both fields in the same status block.
 
 **Why this differs from Design Mode.** A bug fix does not need a multi-PR plan, a services-touched matrix, or a Work Plan that catalogues new functionality. It needs three things — where the bug is, why it happens, what the minimal fix is. The output is a focused single-page document. Producing a feature-shaped document for a 5-line bug fix produces noise; this mode matches the work shape.
 
-**Hard rule on `01-root-cause.md` size.** 1 page maximum: ≤80 lines of markdown body (excluding tables and the TL;DR). If the analysis runs longer, the bug is either misclassified (it's a feature gap or an architectural issue) or you are over-analysing. The plan-reviewer Rule 7 size check flags `>120 lines` as a `concerns` finding.
+**Hard rule on `01-root-cause.md` size.** See sub-mode contract table above. The plan-reviewer Rule 7 size check accepts the abbreviated shape when `bug_tier: 2` is declared.
 
 **Consolidated-documents rule (dogfooding).** `01-root-cause.md` is subject to the same no-version-markers / no-strikethrough / no-previously-decided / no-inline-changelog rules as `01-architecture.md`. See `## Forbidden output patterns` above. The mode is one polished version, not a diff log.
 
@@ -261,6 +277,10 @@ Used when the th-orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`t
 - **Files to modify:** {1-3 files typically — bug fixes that touch >3 files are a signal to re-examine}
 - **Behavioural change:** {what changes from the user's perspective}
 - **Non-changes:** {what does NOT change — APIs, schemas, public contracts}
+
+## Prior Art
+{Mandatory for `bug_tier: 4`. Optional for `bug_tier: 3`. Omitted in `light-root-cause` mode (`bug_tier: 2`).}
+{For Tier 4: list relevant prior `process-insight` nodes from `mcp__memory__search_nodes`, one line each: `- {node-name}: {one-line failure-mode summary}` — or `No prior art found in the knowledge graph for this failure mode.` when the queries return nothing relevant. The empty section is still required for Tier 4 because its presence signals the agent looked.}
 
 ## Regression Test Approach
 {Mandatory section. The tester reads this in Phase 2.0 to author the failing test.}
@@ -908,10 +928,13 @@ When invoked by the th-orchestrator via Task tool, your **FINAL message** must b
 ```
 agent: architect
 mode: design | research | audit | planning | root-cause | consolidation
+sub_mode: light-root-cause | full-root-cause | null   # set only when mode: root-cause; null/omit otherwise
 status: success | failed | blocked
 output: session-docs/{feature-name}/{01-architecture|01-root-cause|00-research|00-audit|01-planning}.md
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
 type_reclassify: false | true   # set to true only in root-cause mode when the bug is actually a feature gap; omit the line otherwise
+tier_promote: 2 | 3 | 4 | null   # set only in root-cause mode when the scope is wider than the initial classification; null/omit otherwise
+tier_promote_rationale: {1-line}  # mandatory when tier_promote is non-null; omit otherwise
 regression_test_kind: unit | integration | e2e | null   # set in root-cause mode from the Regression Test Approach section; omit the line in other modes
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
@@ -920,7 +943,9 @@ issues: {list of blockers, or "none"}
 ```
 
 **Field semantics (root-cause mode only):**
+- `sub_mode: light-root-cause | full-root-cause` — declares which abbreviated/full template was produced. `light-root-cause` for `bug_tier: 2`; `full-root-cause` for `bug_tier: 3` (Prior Art optional) and `bug_tier: 4` (Prior Art mandatory). The th-orchestrator and the plan-reviewer use this to gate Rule 7's size/shape check.
 - `type_reclassify: true` — you determined the reported bug is actually a feature gap. Pair with `status: blocked` and a 1-line rationale in `summary`. Do NOT write `01-root-cause.md` or `02-task-list.md` when this fires — the th-orchestrator surfaces the recommendation to the operator for decision.
+- `tier_promote: <new_tier>` — you determined the scope is wider than the initial tier classification. Pair with `tier_promote_rationale: <1-line>` and `status: blocked`. Do NOT proceed beyond the current Phase 1; the th-orchestrator surfaces the recommendation to the operator for decision. Mutually exclusive with `type_reclassify: true` — set at most one of them per run.
 - `regression_test_kind: unit | integration | e2e` — the layer at which the bug can be deterministically reproduced. Copied from the `## Regression Test Approach` section's `Test layer:` field. Used by the th-orchestrator to dispatch the tester at Phase 2.0 with the correct framework context. **Operator override rejected the `manual-repro-script` value** — regression test is mandatory always, no manual fallback.
 
 **Mandatory tool-usage fields:**

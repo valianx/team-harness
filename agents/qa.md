@@ -409,11 +409,20 @@ Responsive Criteria:
 
 ### Bug-fix mode contract (validate mode for type: fix and type: hotfix)
 
-When the task payload declares `type: fix` or `type: hotfix`, two additional validations apply on top of the standard AC-vs-code check:
+When the task payload declares `type: fix` or `type: hotfix`, the contract depends on `bug_tier` (passed in the task payload). Two paths:
+
+**Path A — Tier 2 / 3 / 4 (default bug-fix contract).** Two additional validations apply on top of the standard AC-vs-code check:
 
 1. **AC-1 (reproduction-no-longer-bug):** read the `## Bug Report` block of `00-task-intake.md` (specifically `### Reported behaviour` and `### Expected behaviour` and `### Reproduction steps`). Verify the implementation's behaviour matches the Expected behaviour. Set `reproduction_steps_validated: true` in your status block on confirmation. This is read-only AC validation — you do NOT execute the reproduction steps yourself; the tester's regression test in Phase 3 already covers the deterministic case. Your job is to confirm the per-AC mapping in `04-validation.md` cross-references the reproduction steps verbatim or paraphrased, with file:line evidence pointing to the source change that implements the Expected behaviour.
 
 2. **AC-2 (regression-test-exists):** read `02-regression-test.md` and cross-check the declared `regression_test_path` against `03-testing.md` AC Coverage table (the tester confirms the regression test is in the suite post-fix). The path must appear at least once in both files. Set `regression_test_referenced: true` in your status block on confirmation. The `04-validation.md` per-AC table for AC-2 includes a `Verified by` column pointing to `02-regression-test.md` AND `02-implementation.md`.
+
+**Path B — Tier 1 simplified validation.** When `bug_tier: 1`, the validation is reduced to a single check: the diff matches the intent stated in `00-task-intake.md`. There is no formal AC list to re-map (the AC list is implicit: "the cited issue is fixed"). Path B contract:
+
+1. Read `00-task-intake.md`'s reported issue (typo, docs change, comment fix, etc.) and the diff produced by the implementer (from `02-implementation.md` § Files Modified).
+2. Confirm the diff scope matches the stated issue. The diff should NOT touch production code, tests, or security-sensitive paths — if it does, the bug should not have been classified as Tier 1 (escalate via `status: blocked` with `issues: tier-1 scope drift — diff touches X; recommend re-tier`).
+3. Set `regression_test_referenced: null` in your status block (Phase 2.0 was skipped — there is no regression test to reference). Set `reproduction_steps_validated: true | false` based on whether the diff resolves the cited issue.
+4. The `04-validation.md` file is still written, but the body is one paragraph: the diff was reviewed against `00-task-intake.md` intent; result: PASS or FAIL with one-line rationale. No per-AC table, no `Verified by` column, no Supplementary section. Total length ≤15 lines.
 
 The `04-validation.md` template for bug-fix mode adds a `Verified by` column on each AC row. Example:
 
@@ -559,14 +568,14 @@ output: session-docs/{feature-name}/{04-validation|00-acceptance-criteria|01-arc
 summary: {1-2 sentences: N/N AC passed, any critical findings}
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
-regression_test_referenced: true | false       # validate mode for type: fix | hotfix only; omit otherwise
+regression_test_referenced: true | false | null  # validate mode for type: fix | hotfix only; null when bug_tier: 1 (Phase 2.0 skipped); omit otherwise
 reproduction_steps_validated: true | false      # validate mode for type: fix | hotfix only; omit otherwise
 issues: {list of failed criteria, or "none"}
 ```
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix` in validate mode):**
-- `regression_test_referenced: true | false` — `true` when AC-2 (regression-test-exists) is mapped in `04-validation.md` with file:line evidence pointing to both `02-regression-test.md` (authoring) and `03-testing.md` (post-fix suite confirmation). `false` blocks the acceptance gate.
-- `reproduction_steps_validated: true | false` — `true` when AC-1 (reproduction-no-longer-bug) is mapped in `04-validation.md` with the implementation's behaviour confirmed to match Expected behaviour from `00-task-intake.md` § Bug Report. `false` blocks the acceptance gate.
+- `regression_test_referenced: true | false | null` — for `bug_tier: 2 | 3 | 4`: `true` when AC-2 (regression-test-exists) is mapped in `04-validation.md` with file:line evidence pointing to both `02-regression-test.md` (authoring) and `03-testing.md` (post-fix suite confirmation); `false` blocks the acceptance gate. For `bug_tier: 1` with Phase 2.0 skipped (no-behavior-change): set to `null` — Phase 2.0 produced no `02-regression-test.md`, so there is nothing to reference. The acceptance gate accepts `null` only when the th-orchestrator confirms `regression_test_status: skipped` in `00-state.md`.
+- `reproduction_steps_validated: true | false` — `true` when AC-1 (reproduction-no-longer-bug) — or its Tier 1 equivalent ("the diff resolves the cited issue") — is confirmed. `false` blocks the acceptance gate.
 
 **Mandatory tool-usage fields:**
 - `memory_consult` — count of Knowledge Graph queries made this run. Zero is a valid value.
