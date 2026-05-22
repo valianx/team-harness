@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- GitHub Pages landing version had drifted from `v2.3.0` across releases v2.4.0 through v2.8.0 because the version was hardcoded in `site/index.html` and not bumped at release time. The `pages.yml` workflow now extracts the version from `cmd/install/main.go` and substitutes a `{{VERSION}}` placeholder into the published landing at every publish event. The page is now self-correcting on every release; no manual bump required.
+
 ## [2.8.0] - 2026-05-22
 
 ### Changed

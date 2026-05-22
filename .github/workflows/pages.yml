@@ -31,6 +31,21 @@ jobs:
           cp -r site/. public/
           ls -lah public/
 
+      - name: Substitute current version into landing page
+        run: |
+          VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' cmd/install/main.go)
+          if [ -z "$VERSION" ]; then
+            echo "Error: could not extract version from cmd/install/main.go" >&2
+            exit 1
+          fi
+          echo "Substituting {{VERSION}} -> v${VERSION} in public/index.html"
+          sed -i "s|{{VERSION}}|v${VERSION}|g" public/index.html
+          # Sanity: the placeholder must not survive the substitution.
+          if grep -q '{{VERSION}}' public/index.html; then
+            echo "Error: {{VERSION}} placeholder still present after sed substitution" >&2
+            exit 1
+          fi
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
