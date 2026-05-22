@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `skills/{issue,plan,design,define-ac,audit}.md` Mode 1 `gh issue view` updated with Tier A fallback cross-references. Error handling describes graceful degradation rather than hard failure.
 - `skills/review-pr.md` Phase 1 Steps 2-3, Phase 3 Steps 12/12a-12c/13 updated with Tier A/B fallback cross-references. Atomic PR review submission preserved across `gh` and curl paths.
 - `agents/ref-special-flows.md` Spike Flow Step 8 and Plan Flow Step 6 updated with Tier B fallback cross-references. Existing local-file fallback retained as final escape hatch.
+- `CLAUDE.md` §1: `gh` moved from required to recommended with fallback contract described. §3: embed directive updated to `all:agents`. §14: `blocked-manual-push` protocol documented.
+- `docs/install.md` Requirements: `gh` moved to recommended section with curl/paste fallback noted.
+- `site/index.html` Requirements: `gh` labelled recommended with fallback note.
+- `agents/README.md` roster: `agents/_shared/` cross-cutting snippet documented.
+- `docs/contributing.md`: smoke-test paragraph for gh-fallback paths added.
 
 ## [2.9.4] - 2026-05-22
 

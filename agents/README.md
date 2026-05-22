@@ -53,6 +53,8 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 
 Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`) loaded on-demand by the th-orchestrator. They are not invocable subagents — their `model` field is vestigial and not enforced by `/lint`.
 
+Plus `_shared/gh-fallback.md` — a cross-cutting snippet (not an invocable agent) installed to `~/.claude/agents/_shared/`. Contains the single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `delivery.md`, `th-orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
+
 ## Earn the model AND the effort AND the tools
 
 Three principles drive the matrix above:

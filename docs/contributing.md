@@ -25,6 +25,17 @@ bash tests/run-all.sh
 
 Three suites cover what's testable without a live LLM: hook policy gate (functional), agent + skill + hook structural integrity, and agent YAML frontmatter parseability. Prompt behaviour requires a live pipeline to validate.
 
+## Verifying gh-fallback paths locally
+
+To smoke-test the graceful degradation introduced in v2.10.0 without needing to actually uninstall `gh`:
+
+1. Set `has_gh=false` in your test by temporarily running with a dummy `GH_TOKEN` and no `gh` auth (e.g., `GH_TOKEN="" gh auth logout --hostname github.com` in a scratch env).
+2. In a Claude Code session, run `/issue #N` for a real issue number on a public GitHub repo — the skill should fetch the issue via the `curl` Tier A fallback and report "gh CLI unavailable. Fetched issue #N via the GitHub REST API instead."
+3. For Tier B write paths, run `/deliver` on a feature branch — if `GH_TOKEN` is set, it should attempt a curl PR creation; if not, it should emit the compare URL and a body file, then report `blocked-manual-push`.
+4. For Tier D (project board), verify the orchestrator logs "Project board update skipped — gh CLI unavailable" rather than erroring out.
+
+This is a manual smoke test — the automated test suite (`tests/test_agent_structure.py`) only verifies the static cross-references are present.
+
 ## Agent / pipeline changes
 
 Per [`CLAUDE.md` §14](../CLAUDE.md):

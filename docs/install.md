@@ -89,9 +89,12 @@ curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 
 ## Requirements
 
+**Required:**
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) — the runtime team-harness depends on
-- [`gh`](https://cli.github.com/) CLI — for the `delivery` flow (PRs, issues, releases)
 - [context7](https://context7.com/) API key — for library docs retrieval
 - A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — for the knowledge graph
+
+**Recommended (not required):**
+- [`gh`](https://cli.github.com/) CLI — for `/issue`, `/deliver`, and `/review-pr` GitHub integration. When `gh` is absent or unauthenticated, these skills use `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or fall back to operator-paste paths with `blocked-manual-push` status. The installer prints a note when `gh` is missing.
 
 No Python, no `uv` — the binary is stdlib-only Go.
