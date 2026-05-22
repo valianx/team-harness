@@ -13,7 +13,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -23,14 +22,10 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.2.0"
+var version = "2.3.0"
 
 // forceFlag is set by parseFlags and read throughout the package.
 var forceFlag bool
-
-// repoRoot is the directory that contains go.mod / cmd/ / agents/ / skills/ etc.
-// It is resolved at startup relative to the running binary's location.
-var repoRoot string
 
 // claudeDir is ~/.claude
 var claudeDir string
@@ -40,7 +35,7 @@ var claudeJSON string
 
 func main() {
 	parseFlags()
-	resolveRepoPaths()
+	resolveClaudePaths()
 
 	printWelcomeBanner()
 
@@ -48,7 +43,7 @@ func main() {
 	// (Go's stdout is already binary; this note is for awareness only.)
 
 	fmt.Printf("team-harness installer v%s\n", version)
-	fmt.Printf("  source:   %s\n", repoRoot)
+	fmt.Printf("  source:   embedded\n")
 	fmt.Printf("  target:   %s\n", claudeDir)
 	fmt.Printf("  platform: %s\n", runtime.GOOS)
 	fmt.Println()
@@ -114,34 +109,13 @@ func parseFlags() {
 	}
 }
 
-// resolveRepoPaths locates the repo root by walking up from the binary's location
-// until it finds go.mod, then sets claudeDir and claudeJSON.
-func resolveRepoPaths() {
-	exe, err := os.Executable()
-	if err != nil {
-		// Fallback: walk from cwd.
-		exe, _ = os.Getwd()
-	}
-	dir := filepath.Dir(exe)
-
-	// Walk up to find go.mod (repo root indicator).
-	for {
-		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
-			repoRoot = dir
-			break
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Hit filesystem root — fall back to cwd.
-			repoRoot, _ = os.Getwd()
-			break
-		}
-		dir = parent
-	}
-
+// resolveClaudePaths sets claudeDir and claudeJSON from the user's home
+// directory. The repoRoot walk is intentionally removed — agents/skills/hooks
+// are now embedded at compile time, so no filesystem clone is required.
+func resolveClaudePaths() {
 	home, _ := os.UserHomeDir()
-	claudeDir = filepath.Join(home, ".claude")
-	claudeJSON = filepath.Join(home, ".claude.json")
+	claudeDir = fmt.Sprintf("%s/.claude", home)
+	claudeJSON = fmt.Sprintf("%s/.claude.json", home)
 }
 
 // checkDependencies ensures required CLI tools are in PATH.
@@ -169,9 +143,8 @@ func backupClaudeJSON() string {
 // installAgents copies agents/*.md to ~/.claude/agents/, applying the mode
 // transformer to each file so the on-disk frontmatter reflects the chosen tier.
 func installAgents(mode InstallMode) {
-	srcDir := filepath.Join(repoRoot, "agents")
-	destDir := filepath.Join(claudeDir, "agents")
-	entries, err := sortedEntries(srcDir)
+	destDir := fmt.Sprintf("%s/agents", claudeDir)
+	entries, err := readEmbeddedDir("agents")
 	if err != nil {
 		return
 	}
@@ -182,27 +155,27 @@ func installAgents(mode InstallMode) {
 		if !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		src := filepath.Join(srcDir, e.Name())
-		dest := filepath.Join(destDir, e.Name())
-		copyAgentFile(src, dest, mode)
+		srcPath := "agents/" + e.Name()
+		dest := fmt.Sprintf("%s/%s", destDir, e.Name())
+		copyAgentFile(srcPath, dest, mode)
 	}
 }
 
 // installSkills copies flat .md skills to ~/.claude/commands/ and subdirectory
 // skills to ~/.claude/skills/<name>/.
 func installSkills() {
-	skillsSrc := filepath.Join(repoRoot, "skills")
-	copyDirFlat(skillsSrc, filepath.Join(claudeDir, "commands"), ".md", false)
+	destCommands := fmt.Sprintf("%s/commands", claudeDir)
+	copyEmbeddedDirFlat("skills", destCommands, ".md", false)
 
-	entries, err := os.ReadDir(skillsSrc)
+	entries, err := readEmbeddedDir("skills")
 	if err != nil {
 		return
 	}
 	for _, e := range entries {
 		if e.IsDir() && !shouldSkip(e.Name()) {
-			copyDirRecursive(
-				filepath.Join(skillsSrc, e.Name()),
-				filepath.Join(claudeDir, "skills", e.Name()),
+			copyEmbeddedDirRecursive(
+				"skills/"+e.Name(),
+				fmt.Sprintf("%s/skills/%s", claudeDir, e.Name()),
 				"",
 			)
 		}
@@ -211,5 +184,8 @@ func installSkills() {
 
 // installHooks copies hooks/*.sh to ~/.claude/hooks/ with executable bit.
 func installHooks() {
-	copyDirFlat(filepath.Join(repoRoot, "hooks"), filepath.Join(claudeDir, "hooks"), ".sh", true)
+	destDir := fmt.Sprintf("%s/hooks", claudeDir)
+	copyEmbeddedDirFlat("hooks", destDir, ".sh", true)
+	// config.json is not executable but is needed by the user.
+	copyEmbeddedDirFlat("hooks", destDir, ".json", false)
 }

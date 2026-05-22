@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -61,8 +61,8 @@ func printSummary(claudeJSONBackup string, mem MemoryMCPChoice, context7Preserve
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Println("  1. Restart Claude Code so it picks up the new MCP servers.")
-	fmt.Printf("  2. To enable notification hooks, open hooks/config.json in this repo,\n")
-	fmt.Printf("     copy the \"%s\" section, and merge it into\n", osLabel)
+	fmt.Printf("  2. To enable notification hooks, copy the \"%s\" section from\n", osLabel)
+	fmt.Printf("     ~/.claude/hooks/config.json and merge it into\n")
 	fmt.Printf("     ~/.claude/settings.json under the \"hooks\" key.\n")
 
 	agentCount, skillCount := countInstalledAgentsAndSkills()
@@ -92,13 +92,12 @@ func countInstalledAgentsAndSkills() (agents, skills int) {
 	return agents, skills
 }
 
-// readSourceFrontmatter reads the model: and effort: values from the source
-// frontmatter of an agent .md file. It uses the same line-by-line parse as
-// the transformer, so it is always in sync with what the installer reads.
-// Returns ("", "") if the file cannot be opened or has no parseable values.
+// readSourceFrontmatter reads the model: and effort: values from the embedded
+// source frontmatter of an agent .md file. It uses the same line-by-line parse
+// as the transformer, so it is always in sync with what the installer reads.
+// Returns ("", "") if the file cannot be read or has no parseable values.
 func readSourceFrontmatter(agentName string) (model, effort string) {
-	path := filepath.Join(repoRoot, "agents", agentName+".md")
-	data, err := os.ReadFile(path)
+	data, err := fs.ReadFile(EmbeddedAssets(), "agents/"+agentName+".md")
 	if err != nil {
 		return "", ""
 	}
