@@ -140,8 +140,9 @@ func backupClaudeJSON() string {
 	return backup
 }
 
-// installAgents copies agents/*.md to ~/.claude/agents/, applying the mode
-// transformer to each file so the on-disk frontmatter reflects the chosen tier.
+// installAgents copies agents/*.md to ~/.claude/agents/ and recursively copies
+// the agents/_shared/ subdirectory. The mode transformer is applied to top-level
+// agent files only; shared snippets are copied byte-identical.
 func installAgents(mode InstallMode) {
 	destDir := fmt.Sprintf("%s/agents", claudeDir)
 	entries, err := readEmbeddedDir("agents")
@@ -149,7 +150,16 @@ func installAgents(mode InstallMode) {
 		return
 	}
 	for _, e := range entries {
-		if e.IsDir() || shouldSkip(e.Name()) {
+		if shouldSkip(e.Name()) {
+			continue
+		}
+		if e.IsDir() {
+			// Recurse into subdirectories (e.g. _shared/).
+			copyEmbeddedDirRecursive(
+				"agents/"+e.Name(),
+				fmt.Sprintf("%s/%s", destDir, e.Name()),
+				"",
+			)
 			continue
 		}
 		if !strings.HasSuffix(e.Name(), ".md") {
