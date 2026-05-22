@@ -193,12 +193,14 @@ func copyAgentFile(src, dest string, mode InstallMode) {
 	// Destination differs from what this mode would produce.
 	if forceFlag {
 		// --force overrides all conflict detection: overwrite unconditionally.
+		// The file already exists (we're past the os.IsNotExist branch), so this
+		// is semantically an update, not a fresh install.
 		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
-			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
+			fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
 			return
 		}
 		recordManifest(dest, transformedHash)
-		stats.Installed = append(stats.Installed, dest)
+		stats.Updated = append(stats.Updated, dest)
 		return
 	}
 
