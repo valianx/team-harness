@@ -935,11 +935,11 @@ check(
 check(
     "orchestrator.md response includes machine-parseable dispatch_handoff JSON block",
     "dispatch_handoff" in orchestrator_md and "next_dispatch" in orchestrator_md,
-    "JSON handoff block must be present — top-level Claude parses it to extract next_dispatch.agent + phase + autonomy. The static playbook lives in CLAUDE.md §13 (not duplicated inline).",
+    "JSON handoff block must be present — top-level Claude parses it to extract next_dispatch.agent + phase + autonomy. The static playbook lives in CLAUDE.md §14 (not duplicated inline).",
 )
 check(
-    "orchestrator.md response delegates takeover protocol to CLAUDE.md §13",
-    "CLAUDE.md §13" in orchestrator_md or "CLAUDE.md §13 Universal rule" in orchestrator_md,
+    "orchestrator.md response delegates takeover protocol to CLAUDE.md §14",
+    "CLAUDE.md §14" in orchestrator_md or "CLAUDE.md §14 Universal rule" in orchestrator_md,
     "orchestrator must point at the canonical playbook in CLAUDE.md instead of duplicating it (issue #14 fix).",
 )
 check(
@@ -2020,6 +2020,253 @@ check(
     "bin/install.ps1 does not clear environment (no '-UseNewEnvironment') — AC-4 INSTALL_MODE propagation",
     "-UseNewEnvironment" not in install_ps1,
     "install.ps1 uses -UseNewEnvironment which clears INSTALL_MODE before spawning the binary",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 25 — Voice and Language Guide enforcement
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 25: Voice and Language Guide enforcement ===")
+
+# Reload files for the voice suite (may have been updated during prior suites).
+_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_orch_md = read(AGENTS_DIR / "orchestrator.md")
+
+
+def _extract_section(text: str, start_marker: str, end_marker: str) -> str:
+    """Return the text between start_marker and end_marker (exclusive)."""
+    start = text.find(start_marker)
+    if start < 0:
+        return ""
+    end = text.find(end_marker, start + len(start_marker))
+    return text[start:end] if end > start else text[start:]
+
+
+# Closed list of high-confidence Spanish words for the language-leak checks.
+# The list is intentionally narrow — it targets words that are unambiguously
+# Spanish and appear in actual violation patterns found during the audit.
+_SPANISH_WORDS = [
+    "problemática", "código", "revisión", "actualización", "cualquier",
+    "borrador", "aprueba", "reemplazada", "cancelar",
+]
+
+# (1) No banned tone markers in committed markdown files.
+# The CLAUDE.md Voice and Language Guide §7.1 OUT section lists these markers
+# as illustrative examples of what NOT to use — that section is an allowlisted
+# exception. All other files and all other sections of CLAUDE.md are checked.
+_BANNED_TONE_MARKERS = [
+    "¡Perfecto", "¡Excelente", "Excelente", "Genial", "¡Listo",
+]
+_md_files_to_scan = (
+    list(AGENTS_DIR.glob("*.md"))
+    + list(SKILLS_DIR.glob("*.md"))
+    + list((REPO_ROOT / "docs").glob("*.md"))
+    + [REPO_ROOT / "README.md", REPO_ROOT / "CLAUDE.md", REPO_ROOT / "CHANGELOG.md"]
+)
+_banned_found: list[str] = []
+for _md_file in _md_files_to_scan:
+    if not _md_file.exists():
+        continue
+    _content = read(_md_file)
+    # For CLAUDE.md: strip the Voice and Language Guide OUT section (§7.1)
+    # which legitimately lists banned markers as negative examples.
+    _scan_content = _content
+    if _md_file.name == "CLAUDE.md":
+        _voice_guide_section = _extract_section(
+            _content, "**OUT** — what never appears in committed copy:", "**IN** — what conformant copy looks like:"
+        )
+        _scan_content = _content.replace(_voice_guide_section, "")
+    for _marker in _BANNED_TONE_MARKERS:
+        if _marker in _scan_content:
+            _banned_found.append(f"{_md_file.name}: {_marker!r}")
+check(
+    "voice: no banned tone markers in committed markdown",
+    len(_banned_found) == 0,
+    f"found: {_banned_found}",
+)
+
+# (2) No emoji decoration in operator-facing skill files and orchestrator templates.
+# Check for the four specific Unicode codepoints used as status decorations.
+_EMOJI_CODEPOINTS = ["✅", "⚠️", "🎉", "✨"]
+_emoji_found: list[str] = []
+for _skill_file in SKILLS_DIR.glob("*.md"):
+    _content = read(_skill_file)
+    for _emoji in _EMOJI_CODEPOINTS:
+        if _emoji in _content:
+            _emoji_found.append(f"{_skill_file.name}: {_emoji!r}")
+# Also check orchestrator operator-facing report templates.
+_orch_report_sections = re.findall(
+    r"\*\*Report to user:\*\*\s*```(.*?)```",
+    _orch_md,
+    re.DOTALL,
+)
+for _section in _orch_report_sections:
+    for _emoji in _EMOJI_CODEPOINTS:
+        if _emoji in _section:
+            _emoji_found.append(f"orchestrator.md report template: {_emoji!r}")
+check(
+    "voice: no emoji decoration in operator-facing skill files or orchestrator report templates",
+    len(_emoji_found) == 0,
+    f"found: {_emoji_found}",
+)
+
+# (3) No Phase N.M/7 patterns in orchestrator operator-visible report-template blocks.
+# The pattern `Phase \d+(\.\d+)?/7` should not appear inside fenced code blocks
+# that follow a `**Report to user:**` label.
+_phase_number_in_templates: list[str] = []
+for _section in _orch_report_sections:
+    _hits = re.findall(r"Phase \d+(?:\.\d+)?/7", _section)
+    if _hits:
+        _phase_number_in_templates.extend(_hits)
+check(
+    "voice: no 'Phase N/7' breadcrumbs in orchestrator operator-visible report templates",
+    len(_phase_number_in_templates) == 0,
+    f"found: {_phase_number_in_templates}",
+)
+
+# (4) No high-confidence Spanish words in agents/*.md outside documented allowlists.
+# Allowlists (identified by section header proximity):
+#   - agents/security.md: lines from "## Phase 4 — Security Report" to next "---"
+#   - agents/reviewer.md: full review_body template region (both Fresh and Update Body)
+#   - agents/orchestrator.md: Step 6 routing table (identified by "| Intent Pattern")
+#   - agents/translator.md: glossary tables (identified by "## Phase 1 — Glossary")
+_agents_spanish_found: list[str] = []
+for _agent_file in AGENTS_DIR.glob("*.md"):
+    _content = read(_agent_file)
+    _name = _agent_file.name
+
+    # Build list of allowlisted sections for this agent (each is stripped separately).
+    _allowed_sections: list[str] = []
+    if _name == "security.md":
+        # Allow the entire Phase 4 Security Report template through Return Protocol
+        # (Spanish report-body template region — AC-11 documented exception).
+        _sec_report = _extract_section(_content, "## Phase 4 — Security Report", "## Return Protocol")
+        if _sec_report:
+            _allowed_sections.append(_sec_report)
+    elif _name == "reviewer.md":
+        # Allow the Phase 0–Phase 3 operational sections that contain the Spanish
+        # report-body templates (AC-11 documented exception: reviewer output bodies
+        # posted to GitHub and session-doc outputs stay Spanish per the contract).
+        _rev_ops = _extract_section(
+            _content, "## Phase 0 — Parse Inline Data", "## Session Documentation"
+        )
+        if _rev_ops:
+            _allowed_sections.append(_rev_ops)
+    elif _name == "orchestrator.md":
+        # Allow the Step 6 intent-detection routing table (bilingual bridge).
+        _step6 = _extract_section(_content, "| Intent Pattern (es/en) |", "**Disambiguation")
+        if _step6:
+            _allowed_sections.append(_step6)
+    elif _name == "translator.md":
+        # Allow the glossary example tables (domain illustrations, not operator copy).
+        _glossary = _extract_section(_content, "## Phase 1 — Glossary", "## Phase 2")
+        if _glossary:
+            _allowed_sections.append(_glossary)
+
+    for _word in _SPANISH_WORDS:
+        # Strip each allowed section from a scratch copy before checking.
+        _remaining = _content
+        for _sec in _allowed_sections:
+            _remaining = _remaining.replace(_sec, "")
+        if _word in _remaining:
+            _agents_spanish_found.append(f"{_name}: {_word!r}")
+
+check(
+    "voice: no high-confidence Spanish words in agents/*.md outside documented allowlists",
+    len(_agents_spanish_found) == 0,
+    f"found: {_agents_spanish_found}",
+)
+
+# (5) No high-confidence Spanish words in skills/*.md (no allowlist — skills are operator entry points).
+_skills_spanish_found: list[str] = []
+for _skill_file in SKILLS_DIR.glob("*.md"):
+    _content = read(_skill_file)
+    for _word in _SPANISH_WORDS:
+        if _word in _content:
+            _skills_spanish_found.append(f"{_skill_file.name}: {_word!r}")
+check(
+    "voice: no high-confidence Spanish words in skills/*.md",
+    len(_skills_spanish_found) == 0,
+    f"found: {_skills_spanish_found}",
+)
+
+# (6) No high-confidence Spanish words in cmd/install/*.go string literals.
+_INSTALL_DIR = REPO_ROOT / "cmd" / "install"
+_install_spanish_found: list[str] = []
+for _go_file in _INSTALL_DIR.glob("*.go"):
+    _content = read(_go_file)
+    for _word in _SPANISH_WORDS:
+        if _word in _content:
+            _install_spanish_found.append(f"{_go_file.name}: {_word!r}")
+check(
+    "voice: no high-confidence Spanish words in cmd/install/*.go",
+    len(_install_spanish_found) == 0,
+    f"found: {_install_spanish_found}",
+)
+
+# (7) No high-confidence Spanish words in hooks/*.sh echo/printf strings.
+_hooks_spanish_found: list[str] = []
+for _hook_file in HOOKS_DIR.glob("*.sh"):
+    _content = read(_hook_file)
+    for _word in _SPANISH_WORDS:
+        if _word in _content:
+            _hooks_spanish_found.append(f"{_hook_file.name}: {_word!r}")
+check(
+    "voice: no high-confidence Spanish words in hooks/*.sh",
+    len(_hooks_spanish_found) == 0,
+    f"found: {_hooks_spanish_found}",
+)
+
+# (8) CLAUDE.md contains the Voice and Language Guide section heading.
+check(
+    "voice: CLAUDE.md contains '## 7. Voice and Language Guide' section",
+    re.search(r"^## 7\.?\s+Voice and Language Guide", _claude_md, re.MULTILINE) is not None,
+    "## 7. Voice and Language Guide section missing from CLAUDE.md",
+)
+
+# (9) agents/orchestrator.md and docs/how-it-works.md contain a dev-natural @orchestrator example.
+_HOW_IT_WORKS = REPO_ROOT / "docs" / "how-it-works.md"
+_how_it_works_md = read(_HOW_IT_WORKS) if _HOW_IT_WORKS.exists() else ""
+_ORCHESTRATOR_EXAMPLE_PATTERN = re.compile(
+    r"@orchestrator.*(plan|implement|PR|recover)", re.IGNORECASE
+)
+check(
+    "voice: orchestrator.md contains @orchestrator dev-natural example (plan/implement/PR/recover)",
+    _ORCHESTRATOR_EXAMPLE_PATTERN.search(_orch_md) is not None,
+    "agents/orchestrator.md does not contain an @orchestrator dev-natural example",
+)
+
+# (10) No first-person personality phrases in agent output templates (status-block / report regions).
+_FIRST_PERSON_PATTERNS = [
+    re.compile(r"^I think", re.MULTILINE),
+    re.compile(r"^My recommendation", re.MULTILINE),
+    re.compile(r"^Yo voy", re.MULTILINE),
+    re.compile(r"^Creo que", re.MULTILINE),
+]
+_first_person_found: list[str] = []
+for _agent_file in AGENTS_DIR.glob("*.md"):
+    _content = read(_agent_file)
+    for _pat in _FIRST_PERSON_PATTERNS:
+        if _pat.search(_content):
+            _first_person_found.append(f"{_agent_file.name}: {_pat.pattern!r}")
+check(
+    "voice: no first-person personality phrases in agent files",
+    len(_first_person_found) == 0,
+    f"found: {_first_person_found}",
+)
+
+# (11) Affirmative: security/reviewer Spanish exception is preserved (regression guard).
+_security_md = read(AGENTS_DIR / "security.md")
+_reviewer_md = read(AGENTS_DIR / "reviewer.md")
+check(
+    "voice: agents/security.md Phase 4 report template still contains Spanish severity labels",
+    "Crítico" in _security_md and "Alto" in _security_md and "Medio" in _security_md,
+    "Spanish severity labels (Crítico/Alto/Medio) missing from security.md — exception may have been removed",
+)
+check(
+    "voice: agents/reviewer.md review body template still contains Spanish section headers",
+    "Revision de Codigo" in _reviewer_md or "Problemas Criticos" in _reviewer_md,
+    "Spanish section headers (Revision de Codigo/Problemas Criticos) missing from reviewer.md — exception may have been removed",
 )
 
 # ---------------------------------------------------------------------------
