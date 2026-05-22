@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-05-22
+
 ### Added
 
 - `agents/_shared/gh-fallback.md`: single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Covers Tier A (read via curl), Tier B (write via curl or operator paste), Tier D (project board skip), detection probe, origin parser, `blocked-manual-push` status, and operator-facing copy templates. Part of the gh-fallback graceful degradation track (v2.10.0).
@@ -552,6 +554,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.10.0]: https://github.com/valianx/team-harness/compare/v2.9.4...v2.10.0
 [2.9.4]: https://github.com/valianx/team-harness/compare/v2.9.3...v2.9.4
 [2.9.3]: https://github.com/valianx/team-harness/compare/v2.9.2...v2.9.3
 [2.9.2]: https://github.com/valianx/team-harness/compare/v2.9.1...v2.9.2
