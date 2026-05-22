@@ -59,3 +59,18 @@ jobs:
           else
               gh release create "$TAG" dist/* --generate-notes
           fi
+
+      # Trigger pages.yml explicitly via workflow_dispatch. The `release: published`
+      # event emitted by `gh release create` above does NOT chain to pages.yml
+      # because GitHub blocks workflow-on-workflow events initiated with
+      # GITHUB_TOKEN (anti-loop security feature). The workflow_dispatch event is
+      # one of the documented exceptions that DOES chain even via GITHUB_TOKEN.
+      # See: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+      # Without this step, every release requires manual `gh workflow run pages.yml`
+      # to publish the updated landing — observed across v2.9.0 through v2.10.0.
+      - name: Trigger pages publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run pages.yml --ref main
+          echo "Triggered pages.yml to publish landing for $(echo ${{ github.event.inputs.tag || github.ref_name }})"
