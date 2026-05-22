@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.1] - 2026-05-22
+
 ### Fixed
 
 - **`pages.yml` not auto-triggered on release publish** (`.github/workflows/release.yml`): every release from v2.9.0 through v2.10.0 required a manual `gh workflow run pages.yml` to publish the updated landing page. Root cause: GitHub blocks workflow-on-workflow events initiated with `GITHUB_TOKEN` (anti-loop security feature), so the `release: published` event from `gh release create` did not chain to `pages.yml`. Added an explicit `gh workflow run pages.yml --ref main` step at the end of `release.yml` — `workflow_dispatch` is one of the documented exceptions that chains even via `GITHUB_TOKEN`. No new secrets required.
@@ -558,6 +560,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.10.1]: https://github.com/valianx/team-harness/compare/v2.10.0...v2.10.1
 [2.10.0]: https://github.com/valianx/team-harness/compare/v2.9.4...v2.10.0
 [2.9.4]: https://github.com/valianx/team-harness/compare/v2.9.3...v2.9.4
 [2.9.3]: https://github.com/valianx/team-harness/compare/v2.9.2...v2.9.3
