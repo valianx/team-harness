@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-05-22
+
 ### Fixed
 
 - Installer (`curl | bash` on Unix/macOS) now prompts interactively even when stdin is the curl pipe, by opening `/dev/tty` directly. Previous behavior required setting `MEMORY_MCP_URL` (and other env vars) as a precondition, blocking first-install and legacy-migration UX. The `/dev/tty` fallback follows the established pattern used by rustup, oh-my-zsh, and nvm. CI scripts that intentionally run non-interactive (no controlling terminal) continue to require env vars; behavior unchanged for that case. Windows behavior unchanged (no `/dev/tty` to fall back to).
@@ -493,6 +495,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.9.1]: https://github.com/valianx/team-harness/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/valianx/team-harness/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/valianx/team-harness/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/valianx/team-harness/compare/v2.6.0...v2.7.0
