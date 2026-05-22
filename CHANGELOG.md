@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-05-22
+
 ### Changed
 
 - `/th-update` no longer requires the `gh` CLI. Tag resolution and tarball download both use `curl` directly, matching the bootstrap install path's "just needs curl" surface. `gh` remains a repo-wide requirement for `/issue`, `/deliver`, `/review-pr`.
@@ -459,6 +461,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.5.1]: https://github.com/valianx/team-harness/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/valianx/team-harness/compare/v2.4.1...v2.5.0
 [2.4.1]: https://github.com/valianx/team-harness/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/valianx/team-harness/compare/v2.3.0...v2.4.0
