@@ -1989,6 +1989,39 @@ check(
     "install.ps1 still calls api.github.com — should use releases/latest/download directly",
 )
 
+# (l) README.md ## Install section references the GitHub Pages URL (AC-11: one-liners visible).
+top_readme = read(REPO_ROOT / "README.md")
+PAGES_INSTALL_SH = "valianx.github.io/team-harness/install.sh"
+check(
+    "README.md ## Install references the GitHub Pages install.sh URL (AC-11)",
+    PAGES_INSTALL_SH in top_readme,
+    f"README.md does not reference '{PAGES_INSTALL_SH}' — one-liner install not surfaced",
+)
+
+# (m) README.md positions one-liners before the clone-and-run path (AC-11: primary vs secondary).
+# The Pages URL must appear before the "From source" or "clone" heading.
+pages_url_pos = top_readme.find(PAGES_INSTALL_SH)
+from_source_pos = top_readme.lower().find("from source")
+check(
+    "README.md one-liner (Pages URL) appears before 'From source' section (AC-11: primary path)",
+    pages_url_pos != -1 and from_source_pos != -1 and pages_url_pos < from_source_pos,
+    "README.md must show the Pages one-liner BEFORE the 'From source' clone section",
+)
+
+# (n) Bootstrap scripts do NOT clear the environment before exec-ing the binary.
+# Each script must inherit env (exec / & $Installer / direct call) — no 'env -i' or
+# 'Start-Process -UseNewEnvironment' which would lose INSTALL_MODE.
+check(
+    "bin/install.sh does not clear environment (no 'env -i') — AC-4 INSTALL_MODE propagation",
+    "env -i" not in install_sh,
+    "install.sh uses 'env -i' which clears INSTALL_MODE before spawning the binary",
+)
+check(
+    "bin/install.ps1 does not clear environment (no '-UseNewEnvironment') — AC-4 INSTALL_MODE propagation",
+    "-UseNewEnvironment" not in install_ps1,
+    "install.ps1 uses -UseNewEnvironment which clears INSTALL_MODE before spawning the binary",
+)
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
