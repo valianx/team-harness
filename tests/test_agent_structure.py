@@ -1403,6 +1403,8 @@ delivery_kg_checks = [
      "mcp__memory__add_observations" in delivery_md.split("---", 2)[1]),
     ("delivery.md frontmatter declares mcp__memory__search_nodes",
      "mcp__memory__search_nodes" in delivery_md.split("---", 2)[1]),
+    ("delivery.md frontmatter declares mcp__memory__doctor (pre-flight health probe)",
+     "mcp__memory__doctor" in delivery_md.split("---", 2)[1]),
     ("Step 11.5 has Pre-flight quality gates section",
      "Pre-flight quality gates" in delivery_md),
     ("Step 11.5 Gate 1 — Specificity gate via suggest_node_type",
@@ -1415,7 +1417,46 @@ delivery_kg_checks = [
      "merged-into" in delivery_md),
     ("Step 11.5 status-block extended with new outcomes",
      "merged-into:" in delivery_md and "written-with-relation-note" in delivery_md),
+    ("Step 11.5 has Pre-flight MCP health check section (doctor pre-flight)",
+     "Pre-flight MCP health check" in delivery_md),
+    ("Step 11.5 forbids URL embellishment in skip log",
+     "Never invent a URL in the skip log" in delivery_md),
+    ("Step 11.5 has Pending payload fallback section",
+     "Pending payload fallback" in delivery_md),
+    ("Step 11.5 pending payload path is session-docs/{feature-name}/kg-passive-capture.pending.json",
+     "kg-passive-capture.pending.json" in delivery_md),
 ]
+
+# --- No default Memory MCP URL anywhere: regression guard ---
+# The installer's defaultMemoryMCPURL const was removed; doc surfaces (CLAUDE.md,
+# README.md) must not promise a default that no longer exists. The string
+# "localhost:7654" is allowed in (a) prompts.go doc comments explaining the
+# removed default, (b) test fixtures using it as sample data, (c) CHANGELOG
+# historical entries.
+
+claude_md = read(REPO_ROOT / "CLAUDE.md")
+readme_md = read(REPO_ROOT / "README.md")
+prompts_go = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+
+no_default_url_checks = [
+    ("CLAUDE.md §1 does NOT promise a default Memory MCP URL",
+     "Default: `http://localhost:7654/mcp`" not in claude_md
+     and "Default: http://localhost:7654/mcp" not in claude_md),
+    ("CLAUDE.md §1 explains there is no default URL (positive statement)",
+     "No default URL" in claude_md or "no default URL" in claude_md),
+    ("README.md does NOT promise a default with 'Press Enter to use the local Docker default'",
+     "Press Enter to use the local Docker default" not in readme_md),
+    ("README.md states no default URL exists (positive statement)",
+     "no default URL" in readme_md or "No default URL" in readme_md),
+    ("cmd/install/prompts.go does NOT declare a defaultMemoryMCPURL const",
+     "const defaultMemoryMCPURL" not in prompts_go),
+    ("cmd/install/prompts.go errors out in non-interactive without MEMORY_MCP_URL env var",
+     "Memory MCP URL is required for non-interactive installs" in prompts_go),
+    ("cmd/install/prompts.go errors out on empty interactive input",
+     "empty Memory MCP URL" in prompts_go),
+]
+for label, condition in no_default_url_checks:
+    check(f"no-default-mcp-url: {label}", condition)
 for label, condition in delivery_kg_checks:
     check(f"delivery.md KG hygiene: {label}", condition)
 

@@ -4,7 +4,7 @@ description: Documents a completed feature, updates CHANGELOG and OpenAPI (if ap
 model: sonnet
 effort: medium
 color: green
-tools: Read, Edit, Write, Bash, Glob, Grep, mcp__memory__search_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__suggest_node_type
+tools: Read, Edit, Write, Bash, Glob, Grep, mcp__memory__doctor, mcp__memory__search_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__suggest_node_type
 ---
 
 You are a documentation and delivery agent. You document completed features, manage versioning, and deliver clean commits on a dedicated feature branch.
@@ -578,6 +578,18 @@ Report the existing PR URL in the status block — do NOT fail.
 
 **Best-effort** — if the Memory MCP server is unavailable, log the skip and continue. Never fail the delivery on KG errors.
 
+### Pre-flight MCP health check (mandatory first action)
+
+Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to verify the server is reachable from your subagent context. The MCP client may have been initialised with stale config (e.g., the parent session started before `~/.claude.json` was updated, or the subagent inherits a different MCP wiring than the parent expects).
+
+| Doctor outcome | Action |
+|---|---|
+| `degraded: false` and all `checks` pass | Proceed to Gate 1. |
+| `degraded: true` OR doctor returns an error | **Skip the write.** Log `kg_passive_capture: skipped: mcp-unhealthy: <reason from doctor or error verbatim>`. Write the pending payload (see "Pending payload fallback" below). Exit Step 11.5. |
+| Tool not available (harness reports no `mcp__memory__doctor` wired) | **Skip the write.** Log `kg_passive_capture: skipped: mcp-not-wired`. Write the pending payload. Exit. |
+
+**Never invent a URL in the skip log.** You do not know what URL the harness is actually using — it is read from `~/.claude.json` at session start and may differ from any default documented in `CLAUDE.md §1`. Log only what `doctor` reports (or the literal tool-not-available error). Embellishing the log with a guessed URL produces misleading diagnostics for the operator.
+
 **Purpose.** Build the team's institutional knowledge automatically. Each completed task that passes its acceptance criteria represents a learning — what worked, what surprised, what conventions emerged — and persisting that as a `process-insight` node in the KG makes it searchable by future agents on future tasks. This is **passive capture**: no human curates the entry; the delivery agent synthesises it from the session it just witnessed.
 
 **Inputs (read-only).** Use the session-docs you already loaded in Step 0 + the artifacts from later steps:
@@ -646,10 +658,29 @@ The judgment between "same insight" vs "topically related but distinct" is the a
 **Optional session attribution.** If `session-docs/{feature-name}/session.json` exists and contains a valid `session_id` (the orchestrator may have called `session_start` at the top of the pipeline — this is **not yet enforced** as of this writing), pass `"session_id": "<uuid>"` alongside `"nodes"` so the node is attached to the session. If the file is absent OR the `session_id` is the empty string OR `session_end` has already been called on that session, **omit the field** — `create_nodes` rejects ended sessions with `policy/session-already-ended`.
 
 **When to skip (log the reason and continue):**
-- The Memory MCP server is unreachable / errors out — log "KG passive capture skipped: MCP unreachable" and proceed.
-- The task is a pure docs / chore / CI refactor with no codebase learning — log "KG passive capture skipped: no reusable learning" and proceed.
-- The Step 4 Knowledge Extraction was empty AND CLAUDE.md/knowledge.md were not updated — same: log and skip.
-- The MCP call returns `policy/*` (content filter, taxonomy, naming) — log the policy code and skip. Do not retry with a mutated payload.
+- The Memory MCP server is unreachable / errors out — log `kg_passive_capture: skipped: mcp-unreachable` and write the pending payload (see "Pending payload fallback" below). Do NOT include a URL in the log line — see the pre-flight section above for why.
+- The task is a pure docs / chore / CI refactor with no codebase learning — log `kg_passive_capture: skipped: no-reusable-learning` and proceed. No pending payload (there's nothing to replay).
+- The Step 4 Knowledge Extraction was empty AND CLAUDE.md/knowledge.md were not updated — same: log `kg_passive_capture: skipped: no-extraction` and proceed.
+- The MCP call returns `policy/*` (content filter, taxonomy, naming) — log `kg_passive_capture: skipped: policy/<code>` and proceed. Do not retry with a mutated payload. Do not write a pending payload (the operator would just hit the same policy).
+
+### Pending payload fallback (operator replay)
+
+When the skip reason is `mcp-unreachable`, `mcp-unhealthy`, or `mcp-not-wired` (transient infrastructure failures, NOT content-policy or no-learning skips), write the would-be MCP payload to `session-docs/{feature-name}/kg-passive-capture.pending.json` so the operator can replay it manually after the merge once MCP is reachable.
+
+Schema:
+
+```json
+{
+  "skip_reason": "<verbatim from skip log>",
+  "skipped_at_utc": "<ISO 8601 timestamp>",
+  "intended_action": "create_nodes | add_observations",
+  "gate1_result": "<output of suggest_node_type if run, or 'not-run' if skipped before gate>",
+  "gate2_result": "<top-3 names from search_nodes if run, or 'not-run'>",
+  "payload": { "nodes": [ ... ] | "observations": [ ... ] }
+}
+```
+
+The operator replays by reading the file and invoking the appropriate MCP tool from a fresh Claude Code session (where the MCP client is wired correctly). Idempotency on `(project, name)` for `create_nodes` makes replay safe even if the node was eventually written by some other path.
 
 **Idempotency.** If a node with this name already exists in the KG, `create_nodes` is a no-op (DB-level ON CONFLICT DO NOTHING). Re-running delivery on the same feature does not create duplicates.
 
