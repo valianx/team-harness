@@ -380,6 +380,17 @@ Routing table for this repo:
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
 - Changing the th-orchestrator pipeline → architecture review mandatory; update `agents/th-orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
+> **Limitation — nested-context dispatch.** When `th-orchestrator` is invoked from a context where another agent is already active — for example, via an `@th-orchestrator` mention inside an ongoing agent session, via a skill that itself runs inside a parent agent, or via a chained orchestrator dispatch — the Claude Code harness strips the `Task` tool as an anti-recursion safety measure. The orchestrator cannot dispatch specialist agents and emits a `dispatch_handoff` directive instead.
+>
+> **When this triggers:** any path where the orchestrator is NOT the first agent started from the user's top-level session.
+>
+> **Correct invocation patterns:**
+> - From an interactive Claude Code session: type `@th-orchestrator <task>` directly — this is top-level and the `Task` tool is available.
+> - From a skill: skills route to the orchestrator via `Task(subagent_type=th-orchestrator, ...)` from top-level — this works correctly.
+> - From another agent: the other agent must emit a `dispatch_handoff` block back to top-level Claude, which then takes over per the protocol below.
+>
+> **What to expect when the limitation triggers:** the orchestrator emits a "Dispatch handoff" response with a human-readable summary followed by a JSON block. Top-level Claude reads the summary, dispatches the named agent directly, and continues the pipeline — no user action needed.
+
 **Universal rule — auto-takeover on `blocked-no-dispatch` (applies regardless of how the th-orchestrator was invoked):**
 
 When the `th-orchestrator` subagent returns a response containing **"Dispatch handoff — top-level Claude takes over now"**, or when an existing `session-docs/{feature}/00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. This is not a user-decision point — the user already authorised the pipeline; the nested-context Task strip is a runtime detour, not a new authorisation.

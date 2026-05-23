@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Orchestrator nested-context limitation documented** (`CLAUDE.md` §14, `agents/th-orchestrator.md`, `docs/install.md`): when `th-orchestrator` is dispatched from a nested subagent context (e.g., from another agent, chained orchestrator dispatch), the `Task` tool is stripped by the Claude Code harness as an anti-recursion safety. The orchestrator cannot dispatch specialist agents and emits a `dispatch_handoff` directive to top-level Claude. The handoff format now leads with a human-readable summary; the JSON block follows as supporting detail. Documentation surfaces the constraint visibly, lists correct invocation patterns, and identifies the anti-pattern that triggers the handoff.
+
 ### Fixed
 
 - **README.md missing plan-reviewer mention** (`README.md`): the structural test in `tests/test_agent_structure.py` asserts that the top-level README surfaces every pipeline agent for discoverability. The `plan-reviewer` agent was added in v2.9.0 (bug-fix pipeline Rules 7+8) but never propagated to the README. Added a brief mention in the agents section. Closes the README-drift assertion for plan-reviewer.

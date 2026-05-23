@@ -77,9 +77,18 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
 
 2. **If no session-docs exist yet** (fresh task, probe failed before any intake): do NOT create session-docs. Just respond inline with the message below.
 
-3. **End your turn with this response** (fill placeholders from `## Current State`). The response is a **directive to top-level Claude** with two parts: (a) the marker phrase that triggers the auto-takeover protocol in `CLAUDE.md §14`, and (b) a machine-parseable JSON `dispatch_handoff` block with the variable fields top-level Claude needs to dispatch the next agent. The takeover playbook itself is canonical in `CLAUDE.md §14` — do NOT duplicate it inline here. Use this exact structure (no prose between the marker and the JSON, no commentary after):
+3. **End your turn with this response** (fill placeholders from `## Current State`). The response is a **directive to top-level Claude** with two parts: (a) a human-readable summary that leads with the actionable directive, followed by (b) a machine-parseable JSON `dispatch_handoff` block as supporting detail. The takeover playbook itself is canonical in `CLAUDE.md §14` — do NOT duplicate it inline here. Use this exact structure:
 
    > **Dispatch handoff — top-level Claude takes over now.**
+   >
+   > **Reason:** Task tool unavailable (nested subagent context).
+   > **Next dispatch:** {next-agent}
+   > **Phase:** {N} ({phase-name})
+   > **State ref:** {state_ref or "no session-doc yet"}
+   >
+   > Top-level Claude: dispatch `{next-agent}` via `Task(subagent_type={next-agent}, ...)`. Follow `CLAUDE.md §14` universal rule.
+   >
+   > Full handoff JSON (for programmatic parsing):
    >
    > ```json
    > {
@@ -99,8 +108,6 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
    >   }
    > }
    > ```
-   >
-   > Top-level Claude: follow `CLAUDE.md §14 Universal rule — auto-takeover on blocked-no-dispatch`. Variable fields above; canonical playbook in CLAUDE.md.
 
    **Fill rules for placeholders:**
    - `state_ref`: omit the field entirely (or set `null`) if no session-docs exist for this run.
@@ -111,18 +118,25 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
 
    (Then stop your subagent turn. Do not retry the probe. Do not improvise inline work. Do not write any other session-doc beyond the `00-state.md` update from step 1. Do not append the prose playbook — `CLAUDE.md §14` is the single source of truth for the takeover protocol; duplicating it here drifts.)
 
-**`## Handoff` template** (append verbatim to `00-state.md` in step 1, fill placeholders from `## Current State`). The human-readable fields preserve context for resume-after-compaction; the embedded JSON block is the canonical machine-parseable handoff (identical schema to the response above) so recovery flows (e.g., `/recover`) can pick up state without re-parsing prose:
+**`## Handoff` template** (append verbatim to `00-state.md` in step 1, fill placeholders from `## Current State`). The human-readable summary leads for operator readability; the embedded JSON block is the canonical machine-parseable handoff (identical schema to the response above) so recovery flows (e.g., `/recover`) can pick up state without re-parsing prose. Top-level Claude can parse either the summary or the JSON — both are equivalent:
 
 ```markdown
 ## Handoff
 
 **Reason:** Task tool unavailable in nested subagent context (boot probe failed).
 **Probe error:** {literal error string returned by the Task probe}
-**Resumes from:** Phase {N} ({phase-name}), {stage-name}.
+**Next agent to dispatch:** `{next-agent}`
+**Phase:** {N} ({phase-name}), {stage-name}
+**State ref:** session-docs/{feature-name}/00-state.md
+
+Top-level Claude: dispatch `{next-agent}` via `Task(subagent_type={next-agent}, ...)`. Follow `CLAUDE.md §14` universal rule. Do NOT re-invoke `@th-orchestrator` — that re-creates the nested condition.
+
+Additional context:
 **Granted autonomy:** {autonomous=true|false}
 **Current round / PR:** round {current_round} / {prs_in_current_round}
-**Next agent to dispatch:** `{next-agent}`
 **Next agent contract:** `agents/{next-agent}.md` and the Phase {N} section of `agents/th-orchestrator.md`.
+
+Full handoff JSON (for programmatic parsing):
 
 ```json
 {
@@ -142,8 +156,6 @@ Triggered **only** by Step 2 above (boot probe returned a genuine "tool unavaila
   }
 }
 ```
-
-Top-level Claude: follow `CLAUDE.md §14 Universal rule — auto-takeover on blocked-no-dispatch`. Do NOT re-invoke `@th-orchestrator` — that re-creates the nested condition.
 ```
 
 ## Dispatch invariants (read first, never weaken)
