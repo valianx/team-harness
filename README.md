@@ -2,7 +2,7 @@
 
 > An agent harness for **Claude Code**. Turns the chat into a Spec-Driven Development pipeline with mandatory human gates and full state captured as files so any session can resume from where the last one left off.
 
-[![Version](https://img.shields.io/badge/version-2.12.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 ---
