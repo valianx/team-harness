@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-05-23
+
 ### Changed
 
 - **`docs/pipelines.md` gains Quick reference table** — operators now see the full pipeline list, invocation phrasing, and one-line descriptions in a single section at the top of the doc. Detailed per-pipeline sections remain unchanged below the quick reference.
@@ -640,7 +642,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v2.15.0...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v2.15.1...HEAD
+[2.15.1]: https://github.com/valianx/team-harness/compare/v2.15.0...v2.15.1
 [2.15.0]: https://github.com/valianx/team-harness/compare/v2.14.0...v2.15.0
 [2.14.0]: https://github.com/valianx/team-harness/compare/v2.13.1...v2.14.0
 [2.13.1]: https://github.com/valianx/team-harness/compare/v2.13.0...v2.13.1
