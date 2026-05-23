@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-05-23
+
 ### Added
 
 - **Tier 0 — Trivial/Cosmetic** added to the bug-fix pipeline tier system. Skips session-docs creation entirely; only the implementer + tester suite-no-regress run. Auto-classifies when all of: single file, ≤5 lines, comments/whitespace/docs only, no test paths, no system-level files. Auto-promotes to Tier 1+ if any rule breaks. Closes the ceremony-floor observation from the v2.10.0 dogfood: Tier 1 still required session-docs creation for 1-line typo fixes, which felt over-engineered. Tier 0 is the genuinely-lite path.
@@ -616,7 +618,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v2.12.1...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/valianx/team-harness/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/valianx/team-harness/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/valianx/team-harness/compare/v2.11.1...v2.12.0
 [2.11.1]: https://github.com/valianx/team-harness/compare/v2.11.0...v2.11.1
