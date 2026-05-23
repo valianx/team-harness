@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`docs/pipelines.md` gains Quick reference table** — operators now see the full pipeline list, invocation phrasing, and one-line descriptions in a single section at the top of the doc. Detailed per-pipeline sections remain unchanged below the quick reference.
+
 ## [2.15.0] - 2026-05-22
 
 ### Changed

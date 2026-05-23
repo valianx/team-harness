@@ -4,11 +4,38 @@ This document describes every pipeline the th-orchestrator supports. Each sectio
 
 For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-works.md). For agent contracts and the full routing table, see [`agents/th-orchestrator.md`](../agents/th-orchestrator.md) and [`agents/ref-special-flows.md`](../agents/ref-special-flows.md).
 
+## Quick reference
+
+| Pipeline | How to invoke | What it does |
+|---|---|---|
+| **Feature** | `@th-orchestrator <describe new feature>` | New functionality via SDD flow (architect → implementer → verify → delivery). Default when no other intent is detected. |
+| **Bug-fix** | `@th-orchestrator <bug report>` · `/issue #N` (from GitHub issue) | Bug correction with 4-tier classification (0–4). Tier auto-determines ceremony. |
+| **Hotfix** | `@th-orchestrator hotfix <urgent fix>` | Fast-path bug-fix that skips architect root-cause. Regression test still mandatory. |
+| **Refactor** | `@th-orchestrator refactor <X>` · `@th-orchestrator rename <X>` | Structure-only changes. Existing tests guard against behavior drift. |
+| **Security-sensitive** | Auto-triggered by path patterns (`auth/`, `middleware/`, `db/`, etc.) or keywords | Forces `security` agent in parallel during verify. Cannot be downgraded. |
+| **Database changes** | Auto-triggered when diff touches migration files | Architect declares migration strategy; plan-reviewer validates reversibility. |
+| **Test pipeline** | `/test-pipeline` · `@th-orchestrator run the test pipeline` | Service-wide coverage analysis. No code changes; produces a prioritized test list. |
+| **Research** | `/research <topic>` · `@th-orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `01-research.md`, no code committed. |
+| **Spike** | `/spike <prototype>` · `@th-orchestrator spike <X>` | Throwaway prototype to validate a technical approach. No delivery. |
+| **Plan** | `/plan <task>` · `/design <feature>` · `@th-orchestrator give me the work plan` | Stage 1 only (intake → architect → plan-review → STAGE-GATE-1). Stops without implementing. |
+| **PR review** | `/review-pr #N` · `@th-orchestrator review PR #N` | 5-phase enriched review with worktree, tier-aware multi-agent dispatch (reviewer + qa + security at Tier 3+), explicit decision menu. |
+| **PR review (multi)** | `/review-pr #N --multi` | Multi-reviewer parallel: reviewer-security + reviewer-architecture + reviewer-style consolidated by `reviewer-consolidator`. |
+
+### Reading the table
+
+- **`@th-orchestrator <phrase>`** invocations use intent detection — the orchestrator classifies the phrase and routes to the appropriate pipeline. Slash-command invocations skip the classification step.
+- For full intent-detection patterns and Spanish triggers, see [`agents/th-orchestrator.md`](../agents/th-orchestrator.md) Step 6.
+- For tier-system details (auto-detection rules, paths, keywords), see the **Bug-fix pipeline** section below.
+
+### Pipelines NOT in this list
+
+`docs/pipelines.md` covers multi-phase pipelines that dispatch multiple agents through staged gates. Standalone utility skills (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`, `/trace`, `/background`, `/eval`, `/cross-repo`) and direct modes (`/audit`, `/diagram`, `/translate`, `/security`, `/define-ac`, `/validate`, `/recover`, `/deliver`, `/gcp-costs`, `/init`) are operator-facing surfaces but do not run a multi-phase pipeline. Their contracts live in the respective `skills/*.md` and `agents/*.md` files. The orchestrator routes them directly (see `agents/th-orchestrator.md` Step 6 routing table).
+
 ---
 
 ## Feature pipeline (standard SDD flow)
 
-**When to use.** New features, enhancements, API additions, non-trivial refactors, or any work that requires a design decision before implementation. The default pipeline when no special type is detected.
+**When to use.** New features, enhancements, API additions, non-trivial refactors, or any work that requires a design decision before implementation. Default when no special intent is detected. Invoke via `@th-orchestrator <describe new feature>`.
 
 ### Phases
 
@@ -134,7 +161,7 @@ The `tester` agent runs in coverage mode, reports coverage gaps, and produces a 
 
 ## Research / Spike flow (type: research or spike)
 
-**When to use.** Time-boxed investigation of an unknown (technology evaluation, feasibility analysis, performance profiling, cost modeling). No code changes are committed.
+**When to use.** Time-boxed investigation of an unknown (technology evaluation, feasibility analysis, performance profiling, cost modeling). No code changes are committed. Triggered by `/research <topic>`, `/spike <prototype>`, `@th-orchestrator investigate <X>`, or `@th-orchestrator spike <X>`.
 
 The th-orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `01-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
 
@@ -188,6 +215,8 @@ Re-review automation: optionally scaffold `.github/workflows/team-harness-rerevi
 ---
 
 ## PR review (enriched) — v2.15.0
+
+**When to use.** Review an open pull request with worktree-accurate file context and tier-aware multi-agent dispatch. Invoke via `/review-pr #N` or `@th-orchestrator review PR #N`. Add `--multi` for parallel focused reviewers (see Multi-reviewer flow above).
 
 The `/review-pr` skill runs a 5-phase pipeline that provides accurate file context, parallel multi-agent analysis, and an explicit operator decision menu.
 
