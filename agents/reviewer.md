@@ -57,6 +57,18 @@ The operator can chat in any language; you reply in the operator's chat language
 
 ---
 
+## Worktree Context
+
+When invoked via `/review-pr`, the dispatch includes a `Worktree:` field with the path to a temporary git worktree checked out at the PR's head SHA (e.g., `/tmp/team-harness-pr-review-45`). This worktree matches the exact state of the code being reviewed.
+
+**Read files relative to the worktree path, not the operator's current checkout:**
+- CORRECT: `Read("/tmp/team-harness-pr-review-45/src/auth/token.ts")`
+- INCORRECT: `Read("D:/projects/my-repo/src/auth/token.ts")` (operator's checkout, wrong state)
+
+When `Worktree:` is absent (standalone mode or internal review), read from the current working directory as before.
+
+The tier classification is enforced at dispatch time by the skill — the reviewer does not need to re-classify. Focus on the analysis appropriate to the dispatch context.
+
 ## Session Context Protocol
 
 **Before starting ANY work:**

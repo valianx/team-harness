@@ -40,13 +40,26 @@ The consolidated review body follows the same language contract as `agents/revie
 
 ## Input contract
 
-The th-orchestrator invokes you with:
-- 2-3 draft body files: `.claude/pr-review-draft-security.md`, `.claude/pr-review-draft-architecture.md`, `.claude/pr-review-draft-style.md` (one per focus that ran)
-- 2-3 inline JSON files: `.claude/pr-review-inline-security.json`, `.claude/pr-review-inline-architecture.json`, `.claude/pr-review-inline-style.json`
+The th-orchestrator invokes you with one of two input sets:
+
+**Multi-focused reviewer path (when `--multi` or auto-multi was active):**
+- 2-3 reviewer draft files: `.claude/pr-review-draft-security.md`, `.claude/pr-review-draft-architecture.md`, `.claude/pr-review-draft-style.md` (one per focus that ran)
+- 2-3 reviewer inline JSON files: `.claude/pr-review-inline-security.json`, `.claude/pr-review-inline-architecture.json`, `.claude/pr-review-inline-style.json`
+- Optional qa draft: `.claude/pr-review-qa.md` (present when `Has QA draft: true` in dispatch)
+- Optional security draft: `.claude/pr-review-security.md` (present when `Has Security draft: true` in dispatch)
 - The list of focuses that ran (e.g., `["security", "architecture", "style"]`)
 - PR metadata (number, title, author, URL) for the consolidated header
 
-Read each file using the Read tool. All files are in `.claude/` in the current working directory.
+**Single-reviewer path (when only one reviewer ran but qa/security also ran):**
+- Reviewer draft: `.claude/pr-review-draft.md`
+- Reviewer inline JSON: `.claude/pr-review-inline.json`
+- Optional qa draft: `.claude/pr-review-qa.md`
+- Optional security draft: `.claude/pr-review-security.md`
+- PR metadata (number, title, author, URL)
+
+Read each file using the Read tool. All files are in `.claude/` in the current working directory. Check file existence before reading — a missing file means that agent was not dispatched (skip cleanly).
+
+**When only one draft file exists** (no qa, no security, single reviewer): skip consolidation entirely. Copy or rename that file to `.claude/pr-review-final.md` and return immediately.
 
 ## De-duplication rules
 
@@ -84,27 +97,38 @@ When all focuses found zero issues:
 ## Output contract
 
 Write two files:
-1. `.claude/pr-review-draft.md` — the unified `review_body` in Spanish.
-2. `.claude/pr-review-inline.json` — the merged `inline_findings` array (criticals only, all focuses combined).
+1. `.claude/pr-review-final.md` — the unified `review_body` in Spanish. (This replaces the legacy `.claude/pr-review-draft.md` for multi-agent consolidation paths.)
+2. `.claude/pr-review-inline.json` — the merged `inline_findings` array (criticals only, all sources combined).
 
 The consolidated `review_body` MUST have this structure (in Spanish):
 
 ```markdown
-## Revisión Multi-Foco
+## Revisión Coordinada
 
-Multi-revisión coordinada ({focus list}, e.g., "security / architecture / style").
+{Tier-aware header: e.g., "Multi-revisión (security / architecture / style) + QA + Seguridad" or "Revisión + Seguridad", depending on which agents ran}
 {N} críticos, {M} sugerencias.
 
 ## Hallazgos por enfoque
 
-### Seguridad (security)
-{findings from security focus — each bullet: **Nivel** — `file:line` — description}
+### Seguridad (security focus — reviewer)
+{findings from reviewer's security focus, if --multi was active}
 
-### Arquitectura (architecture)
-{findings from architecture focus}
+### Arquitectura (architecture focus — reviewer)
+{findings from reviewer's architecture focus, if --multi was active}
 
-### Estilo (style)
-{findings from style focus}
+### Estilo (style focus — reviewer)
+{findings from reviewer's style focus, if --multi was active}
+
+### Revisión general (reviewer)
+{findings from single-focus reviewer, when --multi was NOT active}
+
+### QA (aceptación)
+{findings from .claude/pr-review-qa.md, if present}
+{If qa_status: skipped-no-ac: "Sin criterios de aceptación encontrados — QA omitido."}
+
+### Seguridad (security agent)
+{findings from .claude/pr-review-security.md, if present}
+{If no findings: "Sin hallazgos de seguridad."}
 
 ### Contradicciones detectadas (omit section when empty)
 {contradiction entries}
@@ -113,22 +137,24 @@ Multi-revisión coordinada ({focus list}, e.g., "security / architecture / style
 {policy violation findings, cited by rule ID}
 
 ## Veredicto
-{REQUEST_CHANGES | APPROVE} ({justification: N criticals from which focus, or "sin críticos en todos los enfoques"}).
+{REQUEST_CHANGES | APPROVE} ({justification: N criticals from which source, or "sin críticos en todos los agentes"}).
 ```
 
-When a focus ran but found zero issues, write: `### {Focus name} (focus)\n- Sin hallazgos.`
+When a source ran but found zero issues, write: `### {Source name}\n- Sin hallazgos.`
+
+**Per-agent attribution footer:** for each finding in the consolidated body, append a brief attribution suffix in parentheses, e.g., `(reviewer-security)`, `(qa)`, `(security-agent)`. This helps the PR author understand which perspective flagged what.
 
 ## Return Protocol
 
 ```
 agent: reviewer-consolidator
 status: success | failed
-output: .claude/pr-review-draft.md
-consolidated_focuses: [{focus1}, {focus2}, ...]
+output: .claude/pr-review-final.md
+consolidated_sources: [{reviewer/focus1}, {reviewer/focus2}, ..., {qa}, {security}]
 critical_count: {N}
 suggestion_count: {N}
 event: APPROVE | REQUEST_CHANGES
 contradictions_found: {true|false}
-summary: {1-2 sentences: N criticals across M focuses, overall verdict}
+summary: {1-2 sentences: N criticals across M sources, overall verdict}
 issues: {list of blockers, or "none"}
 ```

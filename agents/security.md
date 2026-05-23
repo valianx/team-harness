@@ -86,6 +86,64 @@ Invoked as part of the main pipeline after implementation, to verify no security
 - **Flow:** Phase 0 → Phase 1 (only changed files) → Phase 2 (only changed files) → Phase 4 (report)
 - **Scope rule:** In pipeline mode, ONLY analyze files listed as created/modified by the implementer. Do NOT scan global config, dependencies, or other files unless they were explicitly changed. This keeps the audit fast and focused on regressions introduced by the current feature.
 
+### PR Review Security Mode (`pr-review-security`)
+
+Invoked by `/review-pr` in parallel with the reviewer at Tier 3 and Tier 4 to perform an OWASP-aligned scan of the PR's diff and changed files. At Tier 4 (security-sensitive paths or keywords), the analysis is extended to adjacent code beyond the diff.
+
+- **Trigger:** `/review-pr` skill dispatches with `mode: pr-review-security`
+- **Output:** `.claude/pr-review-security.md` (read by `reviewer-consolidator` during consolidation)
+- **Flow:** Phase 0 → Phase 1 (diff + changed files only; Tier 4: adjacent files too) → Phase 2 → condensed report
+
+**Key constraints:**
+- Read files from the `Worktree:` path in the dispatch. Use `$WORKTREE/path/to/file`, NOT the operator's current checkout.
+- At Tier 3: scope strictly to the diff and changed files listed in `Changed files:`. Do NOT expand scope.
+- At Tier 4: additionally scan files in security-sensitive directories adjacent to the changed files (`auth/`, `middleware/`, `db/`, `security/`, `crypto/`, `session/`).
+- Output to `.claude/pr-review-security.md` (NOT to `session-docs/` — this is a transient draft).
+
+**Output format (condensed — this feeds the consolidator, not the final GitHub review):**
+
+```markdown
+## Security Review — PR #{number}
+**Mode:** pr-review-security
+**Tier:** {3 or 4}
+**Files scanned:** {N}
+
+### Critical findings
+- `file.ts:42` — [CWE-89] SQL injection via string concatenation in query builder
+- `file.ts:18` — [CWE-798] Hardcoded API key in fallback default
+
+### High findings
+- `file.ts:67` — [CWE-287] JWT algorithm not whitelisted — accepts `alg: none`
+
+### Medium / Low / Info
+- `file.ts:91` — [CWE-20] Missing input length check on user-supplied field
+
+### Summary
+{1-2 sentences: N critical, M high, overall security risk for this PR}
+```
+
+When no security findings are found:
+```markdown
+## Security Review — PR #{number}
+**Mode:** pr-review-security
+**qa_status:** clean
+
+No security findings in the scanned diff and changed files.
+```
+
+**Return Protocol (status block):**
+```
+agent: security
+status: success | failed | blocked
+mode: pr-review-security
+output: .claude/pr-review-security.md
+summary: {N critical, M high findings, or "no findings"}
+context7_consult: hit:0 miss:0 skipped:1
+memory_consult: search_nodes:0 open_nodes:0
+kg_save_candidates: []
+issues: {critical and high finding titles, or "none"}
+```
+
 ---
 
 ## Security Standards Reference

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`/review-pr` skill enriched** (`skills/review-pr.md`, `agents/{reviewer,qa,security,reviewer-consolidator}.md`, `docs/pipelines.md`): the PR review pipeline now creates a temporary git worktree at the PR's head SHA so review agents read files matching what they're reviewing (closes the gap where reviewer read files from `main` while reviewing a refactor PR on `feat/x`). Tier-aware multi-agent dispatch: Tier 3+ PRs run reviewer + qa (if AC found) + security in parallel; lower tiers run reviewer only. New explicit decision menu replaces the autonomous approve/request-changes default: operator chooses `approve / request changes / comment only / defer / cancel`. `comment only` posts the review body without approval state (uses GitHub's `COMMENT` event). Worktree cleanup is trap-style — fires even on early exit. Existing prior-review handling, atomic submission, and Spanish output rules preserved.
+
 ## [2.14.0] - 2026-05-23
 
 ### Changed

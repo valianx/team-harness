@@ -184,3 +184,90 @@ The `reviewer` agent runs 2–3 focused review passes (one per focus: `general`,
 Review policy: if `.team-harness/review-policy.md` exists in the consumer repo, the reviewer reads it and enforces its declared rules. Scaffold via `/init --scaffold-review-policy`.
 
 Re-review automation: optionally scaffold `.github/workflows/team-harness-rereview.yml` via `/init --scaffold-rereview-workflow`. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review.
+
+---
+
+## PR review (enriched) — v2.15.0
+
+The `/review-pr` skill runs a 5-phase pipeline that provides accurate file context, parallel multi-agent analysis, and an explicit operator decision menu.
+
+### Phase 1 — Gather (with worktree)
+
+After fetching PR metadata and the diff, the skill creates a temporary git worktree at the PR's head SHA:
+
+```sh
+git worktree add /tmp/team-harness-pr-review-{N} origin/{headRefName}
+```
+
+All review agents read files from this worktree (`$WORKTREE/path/to/file`), not from the operator's current checkout. This ensures agents see the exact file state being reviewed — critical for refactor PRs where `main` and the PR branch differ substantially.
+
+A shell `trap` registers cleanup so the worktree is removed even on early exit. The worktree name includes the PR number — concurrent reviews in the same session do not conflict.
+
+The phase also scans for `session-docs/` in the worktree. If found, the PR came from a team-harness pipeline and carries AC that can be used for QA validation.
+
+### Phase 2 — Tier classification
+
+The PR's changed file list is auto-classified into a tier. The tier determines which agents run.
+
+| Tier | Paths / signals | Agents dispatched |
+|---|---|---|
+| 0 | Docs only (`*.md`, `LICENSE`, `CHANGELOG*`) | reviewer only |
+| 1 | Single-file or test-only changes | reviewer only |
+| 2 | Dev-tooling, configs (`.github/**`, `*.json`, `*.yml`) | reviewer + qa (if AC found, else skipped) |
+| 3 | Production code (`src/**`, `lib/**`, `cmd/**`, `app/**`, `pkg/**`) | reviewer + qa + security (parallel) |
+| 4 | Security-sensitive paths (`auth/**`, `middleware/**`, `db/**`, etc.) OR security keyword in PR body | reviewer + qa + security (extended) |
+
+**Auto-escalation:** any Tier-4 path or keyword escalates to Tier 4 regardless of other signals.
+
+**Operator override:** append `[TIER: N]` to the `/review-pr` call (e.g., `/review-pr #45 [TIER: 4]`).
+
+**Without `--multi`:** Tier 3+ runs single reviewer (general focus) + qa + security in parallel.
+
+**With `--multi`:** Tier 3+ runs reviewer-security + reviewer-architecture + reviewer-style (all from `agents/reviewer.md` parameterised) + qa + security agent. The `reviewer-consolidator` merges all drafts.
+
+### Phase 3 — Multi-agent parallel dispatch
+
+Agents are dispatched in parallel based on tier. Each writes its draft to a dedicated file:
+
+| Agent | Draft file | When dispatched |
+|---|---|---|
+| reviewer (general or per-focus) | `.claude/pr-review-draft.md` (or `.claude/pr-review-draft-{focus}.md`) | Always |
+| qa (`pr-review-qa` mode) | `.claude/pr-review-qa.md` | Tier 2+ with AC, or Tier 3/4 |
+| security (`pr-review-security` mode) | `.claude/pr-review-security.md` | Tier 3/4 |
+
+If 2+ draft files exist, `reviewer-consolidator` merges them into `.claude/pr-review-final.md`. Single-draft case skips consolidation.
+
+**Consolidator output structure:**
+- Header: tier, agents that ran
+- Critical findings (inline, evidence-based, deduped by file:line, with per-agent attribution)
+- High-priority suggestions (body, with `file.ts:42` refs)
+- Lower-priority observations
+- Contradictions section (when reviewer focuses disagree)
+
+### Phase 4 — Decision menu
+
+The operator receives the consolidated draft and an explicit menu:
+
+```
+Review draft ready. Decide action:
+  (a) approve              — APPROVE event, body + inline comments posted
+  (b) request changes      — REQUEST_CHANGES event, body + inline comments posted
+  (c) comment only         — COMMENT event, body posted without approval state
+  (d) defer                — save draft to disk, do not publish
+  (e) cancel               — discard draft, do not publish
+
+Recommendation: {auto-suggested based on findings}
+Choose [a/b/c/d/e]:
+```
+
+Recommendation logic: 0 criticals + 0 high → `(a) approve`; 0 criticals + 1+ high → `(c) comment only`; 1+ critical → `(b) request changes`.
+
+`(c) comment only` posts the review using GitHub's `COMMENT` event — the body is visible on the PR but no approval state is set. This is suitable when findings are informational or when the reviewer wants to flag concerns without blocking the merge.
+
+`(d) defer` saves the draft and exits cleanly. The operator can publish later with `/review-pr {N} --resume-from-draft`.
+
+### Phase 5 — Publish + cleanup
+
+Atomic `gh api POST .../reviews` with `body + event + comments[]`. The `event` field maps directly from the operator's choice. Worktree and all temp draft files are removed after publishing (or by the EXIT trap on early exit).
+
+The context prune reminder (`/compact`) is printed at the end — PR review context is heavy (5–30K tokens).

@@ -3149,8 +3149,8 @@ if _CONSOLIDATOR.exists():
     )
     check(
         "agents/reviewer-consolidator.md output contract documents two files",
-        "pr-review-draft.md" in _rc and "pr-review-inline.json" in _rc,
-        "consolidator must write pr-review-draft.md and pr-review-inline.json",
+        ("pr-review-draft.md" in _rc or "pr-review-final.md" in _rc) and "pr-review-inline.json" in _rc,
+        "consolidator must write pr-review-final.md (or legacy pr-review-draft.md) and pr-review-inline.json",
     )
 
 # (20) assets/scaffolds/review-policy.md exists (added in PR-10).
@@ -3237,6 +3237,252 @@ check(
     "skills/review-pr.md Step 15.1 cleans up focus draft files",
     "pr-review-draft-security" in _rvpr and "pr-review-draft-architecture" in _rvpr,
     "skills/review-pr.md Step 15.1 cleanup must include focus-specific draft files",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 28 — /review-pr enriched (v2.15.0): worktree + multi-agent + tier-aware + decision menu
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 28: /review-pr enriched (v2.15.0) ===")
+
+_rvpr_v28 = read(SKILLS_DIR / "review-pr.md")
+_reviewer_v28 = read(AGENTS_DIR / "reviewer.md")
+_qa_v28 = read(AGENTS_DIR / "qa.md")
+_security_v28 = read(AGENTS_DIR / "security.md")
+_consolidator_v28 = read(AGENTS_DIR / "reviewer-consolidator.md")
+_pipelines_v28 = read(REPO_ROOT / "docs" / "pipelines.md")
+_changelog_v28 = read(REPO_ROOT / "CHANGELOG.md")
+
+# (1) skills/review-pr.md: worktree creation in Phase 1
+check(
+    "skills/review-pr.md Phase 1 creates a git worktree at PR head SHA",
+    "git worktree add" in _rvpr_v28,
+    "skills/review-pr.md must create a temporary git worktree at the PR's head SHA",
+)
+check(
+    "skills/review-pr.md worktree name includes PR number (multi-PR safety)",
+    "pr-review-{N}" in _rvpr_v28 or "pr-review-" in _rvpr_v28,
+    "worktree name must include PR number to avoid concurrent-review conflicts",
+)
+check(
+    "skills/review-pr.md registers EXIT trap for worktree cleanup",
+    "trap" in _rvpr_v28 and "worktree remove" in _rvpr_v28,
+    "skills/review-pr.md must register a trap for worktree cleanup on early exit",
+)
+check(
+    "skills/review-pr.md passes WORKTREE path to agents",
+    "Worktree:" in _rvpr_v28 or "WORKTREE" in _rvpr_v28,
+    "skills/review-pr.md must pass the $WORKTREE path in every agent dispatch",
+)
+check(
+    "skills/review-pr.md scans for session-docs in the worktree",
+    "SESSION_DOCS_PATH" in _rvpr_v28 or "session-docs" in _rvpr_v28,
+    "skills/review-pr.md must scan for session-docs in the worktree to detect AC",
+)
+
+# (2) skills/review-pr.md: tier classification
+check(
+    "skills/review-pr.md has Phase 2 Tier Classification section",
+    "Phase 2 — Tier Classification" in _rvpr_v28 or "Tier Classification" in _rvpr_v28,
+    "skills/review-pr.md must have a Tier Classification phase",
+)
+check(
+    "skills/review-pr.md tier table covers Tier 0 (docs only)",
+    "Tier 0" in _rvpr_v28,
+    "Tier 0 (docs only) missing from skills/review-pr.md tier table",
+)
+check(
+    "skills/review-pr.md tier table covers Tier 4 (security-sensitive)",
+    "Tier 4" in _rvpr_v28,
+    "Tier 4 (security-sensitive) missing from skills/review-pr.md tier table",
+)
+check(
+    "skills/review-pr.md tier table documents security-sensitive paths",
+    "auth/**" in _rvpr_v28 or "middleware/**" in _rvpr_v28,
+    "security-sensitive paths not documented in skills/review-pr.md tier table",
+)
+check(
+    "skills/review-pr.md supports [TIER: N] operator override",
+    "[TIER:" in _rvpr_v28 or "tier_override" in _rvpr_v28,
+    "skills/review-pr.md must support [TIER: N] operator override",
+)
+
+# (3) skills/review-pr.md: multi-agent dispatch
+check(
+    "skills/review-pr.md dispatches qa in pr-review-qa mode",
+    "pr-review-qa" in _rvpr_v28,
+    "skills/review-pr.md must dispatch qa in pr-review-qa mode at Tier 2+",
+)
+check(
+    "skills/review-pr.md dispatches security in pr-review-security mode",
+    "pr-review-security" in _rvpr_v28,
+    "skills/review-pr.md must dispatch security in pr-review-security mode at Tier 3+",
+)
+check(
+    "skills/review-pr.md Tier 3/4 runs qa and security in parallel with reviewer",
+    "Tier 3" in _rvpr_v28 and "Tier 4" in _rvpr_v28,
+    "Tier 3/4 multi-agent parallel dispatch not documented in skills/review-pr.md",
+)
+
+# (4) skills/review-pr.md: decision menu (Phase 4)
+check(
+    "skills/review-pr.md has explicit Phase 4 decision menu",
+    "Phase 4" in _rvpr_v28 and "Decision" in _rvpr_v28,
+    "skills/review-pr.md must have Phase 4 — Decision Menu",
+)
+check(
+    "skills/review-pr.md decision menu offers approve option",
+    "(a) approve" in _rvpr_v28,
+    "skills/review-pr.md decision menu must include (a) approve",
+)
+check(
+    "skills/review-pr.md decision menu offers request changes option",
+    "(b) request changes" in _rvpr_v28,
+    "skills/review-pr.md decision menu must include (b) request changes",
+)
+check(
+    "skills/review-pr.md decision menu offers comment only option",
+    "(c) comment only" in _rvpr_v28,
+    "skills/review-pr.md decision menu must include (c) comment only — COMMENT event",
+)
+check(
+    "skills/review-pr.md decision menu offers defer option",
+    "(d) defer" in _rvpr_v28,
+    "skills/review-pr.md decision menu must include (d) defer — save draft without publishing",
+)
+check(
+    "skills/review-pr.md decision menu offers cancel option",
+    "(e) cancel" in _rvpr_v28,
+    "skills/review-pr.md decision menu must include (e) cancel",
+)
+check(
+    "skills/review-pr.md decision menu includes recommendation hint",
+    "Recommendation:" in _rvpr_v28,
+    "skills/review-pr.md decision menu must include a Recommendation hint",
+)
+check(
+    "skills/review-pr.md maps comment only to GitHub COMMENT event",
+    "COMMENT" in _rvpr_v28,
+    "skills/review-pr.md must use COMMENT event for comment-only option",
+)
+check(
+    "skills/review-pr.md supports --resume-from-draft flag",
+    "--resume-from-draft" in _rvpr_v28,
+    "skills/review-pr.md must support --resume-from-draft for deferred drafts",
+)
+
+# (5) skills/review-pr.md: Phase 5 publish uses event mapping
+check(
+    "skills/review-pr.md Phase 5 maps operator choice to GitHub event",
+    "APPROVE" in _rvpr_v28 and "REQUEST_CHANGES" in _rvpr_v28 and "COMMENT" in _rvpr_v28,
+    "skills/review-pr.md Phase 5 must map all three event types",
+)
+
+# (6) agents/reviewer.md: Worktree Context section
+check(
+    "agents/reviewer.md has Worktree Context section",
+    "## Worktree Context" in _reviewer_v28,
+    "agents/reviewer.md must document that file reads go via the $WORKTREE path",
+)
+check(
+    "agents/reviewer.md Worktree Context distinguishes correct vs incorrect read path",
+    "CORRECT" in _reviewer_v28 or "INCORRECT" in _reviewer_v28,
+    "reviewer.md Worktree Context must show correct vs incorrect file read patterns",
+)
+
+# (7) agents/qa.md: pr-review-qa mode
+check(
+    "agents/qa.md has PR Review QA Mode (pr-review-qa) section",
+    "pr-review-qa" in _qa_v28 and "PR Review QA Mode" in _qa_v28,
+    "agents/qa.md must document the pr-review-qa mode",
+)
+check(
+    "agents/qa.md pr-review-qa mode outputs to .claude/pr-review-qa.md",
+    ".claude/pr-review-qa.md" in _qa_v28,
+    "agents/qa.md pr-review-qa mode must write to .claude/pr-review-qa.md",
+)
+check(
+    "agents/qa.md pr-review-qa mode defines qa_status: skipped-no-ac",
+    "skipped-no-ac" in _qa_v28,
+    "agents/qa.md pr-review-qa mode must declare qa_status: skipped-no-ac when no AC found",
+)
+
+# (8) agents/security.md: pr-review-security mode
+check(
+    "agents/security.md has PR Review Security Mode (pr-review-security) section",
+    "pr-review-security" in _security_v28 and "PR Review Security Mode" in _security_v28,
+    "agents/security.md must document the pr-review-security mode",
+)
+check(
+    "agents/security.md pr-review-security mode outputs to .claude/pr-review-security.md",
+    ".claude/pr-review-security.md" in _security_v28,
+    "agents/security.md pr-review-security mode must write to .claude/pr-review-security.md",
+)
+check(
+    "agents/security.md pr-review-security Tier 4 extends to adjacent security-sensitive files",
+    "Tier 4" in _security_v28 and ("adjacent" in _security_v28 or "extended" in _security_v28),
+    "agents/security.md pr-review-security must document Tier 4 extended analysis",
+)
+
+# (9) agents/reviewer-consolidator.md: handles qa and security drafts
+check(
+    "agents/reviewer-consolidator.md input contract mentions .claude/pr-review-qa.md",
+    "pr-review-qa.md" in _consolidator_v28,
+    "reviewer-consolidator.md input contract must include .claude/pr-review-qa.md",
+)
+check(
+    "agents/reviewer-consolidator.md input contract mentions .claude/pr-review-security.md",
+    "pr-review-security.md" in _consolidator_v28,
+    "reviewer-consolidator.md input contract must include .claude/pr-review-security.md",
+)
+check(
+    "agents/reviewer-consolidator.md output writes to .claude/pr-review-final.md",
+    "pr-review-final.md" in _consolidator_v28,
+    "reviewer-consolidator.md must write to .claude/pr-review-final.md",
+)
+
+# (10) docs/pipelines.md: PR review enriched section
+check(
+    "docs/pipelines.md has 'PR review (enriched)' section",
+    "PR review (enriched)" in _pipelines_v28,
+    "docs/pipelines.md must have a 'PR review (enriched)' section describing the 5-phase flow",
+)
+check(
+    "docs/pipelines.md enriched section documents 5 phases",
+    "Phase 1" in _pipelines_v28 and "Phase 5" in _pipelines_v28,
+    "docs/pipelines.md enriched section must document all 5 phases",
+)
+check(
+    "docs/pipelines.md enriched section documents tier matrix",
+    "Tier 0" in _pipelines_v28 and "Tier 4" in _pipelines_v28,
+    "docs/pipelines.md enriched section must include the tier matrix",
+)
+check(
+    "docs/pipelines.md enriched section documents decision menu options",
+    "comment only" in _pipelines_v28 and "defer" in _pipelines_v28,
+    "docs/pipelines.md enriched section must document the decision menu options",
+)
+
+# (11) CHANGELOG.md [Unreleased] documents the enrichment
+check(
+    "CHANGELOG.md [Unreleased] mentions worktree",
+    "[Unreleased]" in _changelog_v28 and "worktree" in _changelog_v28,
+    "CHANGELOG [Unreleased] must document the worktree addition",
+)
+check(
+    "CHANGELOG.md [Unreleased] mentions tier-aware dispatch",
+    "[Unreleased]" in _changelog_v28 and ("tier" in _changelog_v28.lower() or "Tier" in _changelog_v28),
+    "CHANGELOG [Unreleased] must mention tier-aware dispatch",
+)
+check(
+    "CHANGELOG.md [Unreleased] mentions decision menu",
+    "[Unreleased]" in _changelog_v28 and "decision" in _changelog_v28.lower(),
+    "CHANGELOG [Unreleased] must mention the decision menu",
+)
+check(
+    "CHANGELOG.md [Unreleased] mentions comment only option",
+    "[Unreleased]" in _changelog_v28 and "comment only" in _changelog_v28,
+    "CHANGELOG [Unreleased] must mention the comment-only option",
 )
 
 # ---------------------------------------------------------------------------

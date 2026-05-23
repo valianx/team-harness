@@ -222,6 +222,64 @@ This mode is read-only and short — typical run is 2-3 minutes of agent time, ~
 
 ---
 
+### PR Review QA Mode (`pr-review-qa`)
+
+Used by `/review-pr` to validate a PR's changes against session-docs AC (if the PR came from a team-harness pipeline). Runs in parallel with the reviewer and security agents at Tier 2+ when AC are available.
+
+- **Trigger:** `/review-pr` skill dispatches with `mode: pr-review-qa`
+- **Flow:** Phase 0 → read session-docs AC → validate diff against AC → write output
+- **Output:** `.claude/pr-review-qa.md` (read by `reviewer-consolidator` during consolidation)
+
+**Process:**
+
+1. Read `Worktree:` path from the dispatch. All file reads MUST use `$WORKTREE/path/to/file`, not the operator's current checkout.
+2. Read `Session-docs path:` from the dispatch. If absent or `"none"`, skip cleanly — emit `qa_status: skipped-no-ac` in the output file and return.
+3. From `{SESSION_DOCS_PATH}/02-task-list.md` (or `00-task-intake.md`), extract the AC relevant to this PR.
+4. For each AC, check whether the diff and changed files satisfy it. Use the `Worktree` path to read full file context beyond the diff when needed.
+5. Write findings to `.claude/pr-review-qa.md`.
+
+**Output format:**
+
+```markdown
+## QA Review — PR #{number}
+**Mode:** pr-review-qa
+**Session-docs:** {SESSION_DOCS_PATH or "none"}
+**qa_status:** pass | fail | partial | skipped-no-ac
+
+### AC Coverage
+| AC | Status | Evidence |
+|----|--------|---------|
+| AC-1 | PASS | `file.ts:42` — condition satisfied |
+| AC-2 | FAIL | `file.ts:18` — expected X, found Y |
+
+### Summary
+{1-2 sentences: N/N AC satisfied, any blocking gaps}
+```
+
+When `qa_status: skipped-no-ac`:
+```markdown
+## QA Review — PR #{number}
+**Mode:** pr-review-qa
+**qa_status:** skipped-no-ac
+
+No session-docs with AC found for this PR. QA validation skipped.
+```
+
+**Return Protocol (status block):**
+```
+agent: qa
+status: success | failed | blocked
+mode: pr-review-qa
+output: .claude/pr-review-qa.md
+qa_status: pass | fail | partial | skipped-no-ac
+summary: {N/N AC passed, or "skipped — no AC found"}
+memory_consult: search_nodes:0 open_nodes:0
+kg_save_candidates: []
+issues: {list of failed AC, or "none"}
+```
+
+---
+
 ### Review Mode (read-only)
 
 Used by `/cross-repo` to evaluate existing code against business rules from a system profile or flow definition. Unlike validate mode (which checks AC from a pipeline), review mode checks whether **externally-defined business rules** are enforced in an existing codebase.
