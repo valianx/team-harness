@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-05-23
+
 ### Changed
 
 - **Orchestrator nested-context limitation documented** (`CLAUDE.md` §14, `agents/th-orchestrator.md`, `docs/install.md`): when `th-orchestrator` is dispatched from a nested subagent context (e.g., from another agent, chained orchestrator dispatch), the `Task` tool is stripped by the Claude Code harness as an anti-recursion safety. The orchestrator cannot dispatch specialist agents and emits a `dispatch_handoff` directive to top-level Claude. The handoff format now leads with a human-readable summary; the JSON block follows as supporting detail. Documentation surfaces the constraint visibly, lists correct invocation patterns, and identifies the anti-pattern that triggers the handoff.
@@ -580,6 +582,7 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
+[2.11.1]: https://github.com/valianx/team-harness/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/valianx/team-harness/compare/v2.10.2...v2.11.0
 [2.10.2]: https://github.com/valianx/team-harness/compare/v2.10.1...v2.10.2
 [2.10.1]: https://github.com/valianx/team-harness/compare/v2.10.0...v2.10.1
