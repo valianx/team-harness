@@ -624,7 +624,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v2.13.1...HEAD
+[2.13.1]: https://github.com/valianx/team-harness/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/valianx/team-harness/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/valianx/team-harness/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/valianx/team-harness/compare/v2.11.1...v2.12.0
