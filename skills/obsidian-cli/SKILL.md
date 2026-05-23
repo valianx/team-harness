@@ -9,7 +9,7 @@ Use the `obsidian` CLI to interact with a running Obsidian instance. Requires Ob
 
 ## Vault Configuration
 
-Before any operation, resolve the vault name:
+**MANDATORY — do this before any operation.** Resolve the vault name:
 
 1. Read `~/.claude/config/obsidian-vaults.json`
 2. If the file **does not exist** or has no vaults configured:
