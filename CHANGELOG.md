@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **GitHub Actions JavaScript runtime forced to Node.js 24** (`.github/workflows/release.yml`, `.github/workflows/pages.yml`): added `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` as a job-level env var across both workflows. GitHub flips the default from Node 20 to Node 24 on 2026-06-02; this opt-in eliminates the deprecation warning that has appeared in every release run since v2.9.0 and surfaces any Node 24 incompatibilities before the forced cutover. JavaScript Actions (`actions/checkout`, `actions/setup-go`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`, `actions/upload-artifact`) now run on Node 24 immediately. The exact patch version (24.x.x) is provided by the runner image — for ubuntu-latest, this currently maps to Node 24.16.0 series. team-harness binaries are Go and unaffected.
+
 ## [2.12.0] - 2026-05-22
 
 ### Added

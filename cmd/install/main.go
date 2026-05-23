@@ -22,7 +22,7 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.12.0"
+var version = "2.12.1"
 
 // forceFlag is set by parseFlags and read throughout the package.
 var forceFlag bool

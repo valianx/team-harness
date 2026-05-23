@@ -12,6 +12,14 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Force JavaScript actions (actions/checkout, actions/setup-go, etc.) to run
+    # on Node.js 24. GitHub flips the default from Node 20 to Node 24 on
+    # 2026-06-02; this opt-in eliminates the deprecation warning that appears
+    # in every release run and surfaces any Node 24 incompatibilities before
+    # the forced cutover. Once Node 24 is the default, this env var becomes
+    # redundant (harmless to keep).
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: write  # to create the release + upload assets
       actions: write   # to dispatch pages.yml via workflow_dispatch (GITHUB_TOKEN needs this scope)
