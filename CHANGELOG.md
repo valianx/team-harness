@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **README.md missing plan-reviewer mention** (`README.md`): the structural test in `tests/test_agent_structure.py` asserts that the top-level README surfaces every pipeline agent for discoverability. The `plan-reviewer` agent was added in v2.9.0 (bug-fix pipeline Rules 7+8) but never propagated to the README. Added a brief mention in the agents section. Closes the README-drift assertion for plan-reviewer.
+
 ## [2.11.0] - 2026-05-22
 
 ### Changed

@@ -39,7 +39,7 @@ After install, open Claude Code and **talk to the th-orchestrator** — it is th
 @th-orchestrator give me the work plan for this task: <description>
 ```
 
-The th-orchestrator opens a pipeline: plan → human approval → implementation → verify → push approval → PR. State lives in `session-docs/{feature}/`. Continue the same way through the lifecycle:
+The th-orchestrator opens a pipeline: plan → human approval → implementation → verify → push approval → PR. At Phase 1.6, the `plan-reviewer` agent audits the architecture and task-list artifacts before the plan gate, emitting a pass/concerns/fail verdict. State lives in `session-docs/{feature}/`. Continue the same way through the lifecycle:
 
 ```
 @th-orchestrator implement it
