@@ -39,9 +39,18 @@ func readLineFrom(scan *bufio.Scanner) string {
 	return ""
 }
 
-// promptMenuWith prints prompt and reads a single-character menu choice from
-// scan. valid is the set of accepted lower-case characters; defaultVal is
-// returned when the user presses Enter without typing.
+// promptMenuWith prints prompt and reads a single-character menu choice.
+// valid is the set of accepted lower-case characters; defaultVal is returned
+// when the user presses Enter without typing, or when no interactive source
+// is available (CI/non-interactive).
+//
+// scan is the caller-supplied scanner, used only when stdin is a TTY
+// (normal interactive shell). When stdin is NOT a TTY — the curl | bash case,
+// where bash has the rest of install.sh sitting in the pipe — this function
+// opens /dev/tty directly instead of reading from scan. Reading from the
+// caller-supplied scan in that situation would consume install.sh leftover
+// bytes (e.g., "exit $?\n") as operator input, triggering the paste-detection
+// error incorrectly.
 //
 // Invalid single-character input triggers a re-prompt (up to maxAttempts=3).
 // Multi-character or structured input (starting with '{', '[', '"') exits
@@ -49,6 +58,19 @@ func readLineFrom(scan *bufio.Scanner) string {
 // there is no safe way to flush a bufio.Scanner mid-stream. The operator must
 // re-run the installer and answer prompts one at a time.
 func promptMenuWith(prompt string, valid map[string]bool, defaultVal string, scan *bufio.Scanner) string {
+	// When stdin is a TTY the caller's scanner is safe to use directly.
+	// When stdin is a pipe (curl | bash), open /dev/tty so we read from the
+	// operator's keyboard rather than the pipe carrying install.sh bytes.
+	if !isTerminal() {
+		input := openInteractiveInput()
+		if input == nil {
+			// No interactive source — accept the default silently.
+			return defaultVal
+		}
+		defer input.Close()
+		scan = newScanner(input)
+	}
+
 	const maxAttempts = 3
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		fmt.Print(prompt)

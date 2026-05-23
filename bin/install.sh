@@ -54,5 +54,18 @@ fi
 chmod +x "$TMP/install"
 
 echo "Launching installer..."
-"$TMP/install" "$@"
+# When invoked via `curl | bash`, bash reads install.sh line-by-line from the
+# curl pipe (stdin). When bash spawns the installer binary below, the binary
+# inherits that same stdin pipe, which still contains the subsequent `exit $?`
+# line that bash has not yet consumed. If we allow the binary to inherit that
+# stdin, its first menu prompt reads those leftover bytes and the paste-
+# detection logic fires — even though the operator pasted nothing.
+# Redirect stdin from /dev/tty so the binary reads from the operator's
+# terminal directly. Fall back to inherited stdin in non-TTY environments
+# (CI, containers) where /dev/tty does not exist.
+if [ -e /dev/tty ]; then
+    "$TMP/install" "$@" < /dev/tty
+else
+    "$TMP/install" "$@"
+fi
 exit $?

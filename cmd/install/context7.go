@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -76,7 +75,7 @@ func getContext7APIKey() string {
 				os.Exit(1)
 			}
 			defer input.Close()
-			scan := bufio.NewScanner(input)
+			scan := newScanner(input)
 			fmt.Println("  Paste the replacement context7 API key (get one at https://context7.com/).")
 			fmt.Print("  CONTEXT7_API_KEY: ")
 			key := strings.TrimSpace(readLineFrom(scan))
@@ -88,10 +87,19 @@ func getContext7APIKey() string {
 		}
 
 		// Reached only via [C]ustom in the three-way prompt above
-		// (env var present and different).
+		// (env var present and different). Open /dev/tty directly — promptMenu
+		// above already consumed its own openInteractiveInput() session, and
+		// we need a fresh read for the API key paste.
+		input2 := openInteractiveInput()
+		if input2 == nil {
+			fmt.Fprintln(os.Stderr, "Error: Custom selected but no interactive input source is available.")
+			os.Exit(1)
+		}
+		defer input2.Close()
+		scan2 := newScanner(input2)
 		fmt.Println("  Paste the replacement context7 API key (get one at https://context7.com/).")
 		fmt.Print("  CONTEXT7_API_KEY: ")
-		key := strings.TrimSpace(readLine())
+		key := strings.TrimSpace(readLineFrom(scan2))
 		if key == "" {
 			fmt.Fprintln(os.Stderr, "Error: empty API key.")
 			os.Exit(1)
@@ -120,7 +128,7 @@ func getContext7APIKey() string {
 	}
 	defer input.Close()
 
-	scan := bufio.NewScanner(input)
+	scan := newScanner(input)
 	fmt.Println("  context7 API key required (get one at https://context7.com/).")
 	fmt.Print("  Paste your CONTEXT7_API_KEY: ")
 	key := strings.TrimSpace(readLineFrom(scan))
@@ -140,20 +148,44 @@ func safePrefix(s string, n int) string {
 }
 
 // promptMenu prints the prompt and reads a single-character menu choice from
-// the shared stdin scanner (stdinScanner). valid is the set of accepted
-// lower-case characters; defaultVal is returned when the user presses Enter
-// without typing.
+// an interactive input source. valid is the set of accepted lower-case
+// characters; defaultVal is returned when the user presses Enter without
+// typing, or when no interactive source is available (CI/non-interactive).
+//
+// Input source priority:
+//  1. stdin when it is a TTY (normal interactive shell).
+//  2. /dev/tty when stdin is a pipe (curl | bash — bash still has the rest of
+//     install.sh in stdin; the .exe must NOT inherit that pipe or it reads the
+//     leftover "exit $?\n" as operator input, triggering paste-detection).
+//  3. nil (CI, container without controlling terminal) — returns defaultVal
+//     silently without prompting.
 //
 // Invalid single-character input triggers a re-prompt (up to maxAttempts=3).
 // Multi-character or structured input (starting with '{', '[', '"') exits
-// immediately: the shared scanner buffer is now polluted with remaining lines,
-// and there is no safe way to flush a bufio.Scanner mid-stream. The operator
-// must re-run the installer and answer prompts one at a time.
+// immediately: the scanner buffer is now polluted with remaining lines, and
+// there is no safe way to flush a bufio.Scanner mid-stream. The operator must
+// re-run the installer and answer prompts one at a time.
 func promptMenu(prompt string, valid map[string]bool, defaultVal string) string {
+	// Open the appropriate interactive input source:
+	//   - stdin TTY (normal interactive shell), or
+	//   - /dev/tty fallback when stdin is piped (curl | bash case), or
+	//   - nil if neither is available (CI, container without controlling terminal).
+	input := openInteractiveInput()
+	if input == nil {
+		// No interactive source — accept the default silently. This preserves
+		// CI/non-interactive behaviour where prompts default through.
+		return defaultVal
+	}
+	defer input.Close()
+	scan := newScanner(input)
+
 	const maxAttempts = 3
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		fmt.Print(prompt)
-		raw := strings.TrimSpace(readLine())
+		var raw string
+		if scan.Scan() {
+			raw = strings.TrimSpace(scan.Text())
+		}
 
 		if raw == "" {
 			return defaultVal
@@ -183,20 +215,4 @@ func promptMenu(prompt string, valid map[string]bool, defaultVal string) string 
 	return "" // unreachable
 }
 
-// Note: validKeysSorted and isPasteInput are defined in util.go.
-
-// stdinScanner is the shared package-level scanner used by readLine. A single
-// scanner is required because pasted multi-line input (e.g., a JSON snippet)
-// arrives in stdin's buffer all at once; allocating a new scanner per call
-// would internally buffer trailing bytes and then discard them along with the
-// scanner, losing lines after the first.
-var stdinScanner = bufio.NewScanner(os.Stdin)
-
-// readLine reads a line from stdin (trimming the trailing newline) using the
-// shared package-level scanner.
-func readLine() string {
-	if stdinScanner.Scan() {
-		return stdinScanner.Text()
-	}
-	return ""
-}
+// Note: validKeysSorted, isPasteInput, and promptMenuWith are defined in util.go.

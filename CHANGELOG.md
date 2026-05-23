@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.1] - 2026-05-22
+
+### Fixed
+
+- **Installer paste-detection false positive on Linux/macOS `curl | bash`** (`cmd/install/context7.go` `promptMenu`, `cmd/install/util.go` `promptMenuWith`, `bin/install.sh`): when invoked via `curl ... | bash`, the installer triggered `Error: pasted multi-character or structured content at a single-letter prompt` even though the operator didn't paste anything. Root cause: bash reads `install.sh` line-by-line from the curl pipe; when bash spawns the installer `.exe`, the `.exe` inherits the same stdin pipe, which still contains the subsequent line `exit $?\n` that bash hasn't consumed yet. The `.exe`'s first menu prompt reads that leftover content and treats it as operator paste. Fixed at two layers: (1) `promptMenu` / `promptMenuWith` now use `openInteractiveInput()` (same pattern as other prompts), falling back to `/dev/tty` when stdin isn't a TTY; (2) `install.sh` explicitly redirects the `.exe`'s stdin from `/dev/tty` when available, preventing the leak at the source. Windows `install.ps1` unaffected — PowerShell does not have the line-by-line stdin pipe semantic.
+
 ## [2.13.0] - 2026-05-23
 
 ### Added

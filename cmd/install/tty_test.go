@@ -154,6 +154,46 @@ func TestOpenInteractiveInput_StdinIsNopCloser(t *testing.T) {
 	}
 }
 
+// TestPromptMenu_NoLeakWhenStdinHasContent verifies that promptMenu does NOT
+// treat leftover install.sh bytes (the curl | bash stdin-pipe leak) as
+// operator paste input.
+//
+// Regression test for the bug where `curl ... | bash` caused the installer to
+// exit with "pasted multi-character or structured content at a single-letter
+// prompt" even though the operator pasted nothing. Root cause: bash reads
+// install.sh line-by-line; when it spawns the binary the binary inherited
+// bash's stdin pipe, which still contained the unconsumed `exit $?\n` line.
+// promptMenu read that content as operator input and isPasteInput("exit $?")
+// returned true (len > 1).
+//
+// After the fix, promptMenu calls openInteractiveInput() instead of reading
+// from the shared stdin scanner:
+//   - When /dev/tty is available (curl | bash on a real terminal) it reads
+//     from /dev/tty, bypassing the pipe entirely.
+//   - When no interactive source is available (CI, this test runner) it
+//     returns defaultVal silently — it does NOT read from stdin at all, so
+//     any leftover install.sh bytes in stdin are never consumed as input.
+//
+// This test asserts the CI path: stdin is not a TTY and /dev/tty is
+// unavailable → promptMenu returns defaultVal without calling os.Exit.
+func TestPromptMenu_NoLeakWhenStdinHasContent(t *testing.T) {
+	if isTerminal() {
+		t.Skip("stdin is a TTY in this environment; promptMenu reads stdin directly (correct for TTY case)")
+	}
+	if f, err := openTTYDevice(); err == nil {
+		_ = f.Close()
+		t.Skip("/dev/tty accessible; promptMenu reads from /dev/tty (correct for curl | bash case)")
+	}
+	// Neither stdin TTY nor /dev/tty: this is the CI path. The old buggy
+	// promptMenu would call readLine() → stdinScanner.Scan() → read from stdin
+	// and misinterpret any bytes there. After the fix, openInteractiveInput()
+	// returns nil and promptMenu returns defaultVal immediately.
+	got := promptMenu("test prompt: ", map[string]bool{"y": true, "n": true}, "y")
+	if got != "y" {
+		t.Errorf("promptMenu returned %q, want default %q", got, "y")
+	}
+}
+
 // TestHasInteractiveInput_FalseInTestRunner verifies that hasInteractiveInput
 // returns false in a standard CI / test-runner context where stdin is a pipe
 // and /dev/tty is unavailable. The function returns true only when either
