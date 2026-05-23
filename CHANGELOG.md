@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.14.0] - 2026-05-22
+## [2.14.0] - 2026-05-23
 
 ### Changed
 
@@ -630,7 +630,8 @@ Initial release of the `claude-dev-team` agent system distribution.
 - `gh` — GitHub CLI (used by several skills).
 - **context7 API key** — for library docs retrieval.
 
-[Unreleased]: https://github.com/valianx/team-harness/compare/v2.13.1...HEAD
+[Unreleased]: https://github.com/valianx/team-harness/compare/v2.14.0...HEAD
+[2.14.0]: https://github.com/valianx/team-harness/compare/v2.13.1...v2.14.0
 [2.13.1]: https://github.com/valianx/team-harness/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/valianx/team-harness/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/valianx/team-harness/compare/v2.12.0...v2.12.1
