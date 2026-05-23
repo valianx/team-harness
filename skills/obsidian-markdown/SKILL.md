@@ -11,7 +11,7 @@ Create and edit valid Obsidian Flavored Markdown. Obsidian extends CommonMark an
 
 ## Vault Configuration
 
-Before any file operation, resolve the vault path:
+**MANDATORY — do this before writing any file.** Resolve the vault path:
 
 1. Read `~/.claude/config/obsidian-vaults.json`
 2. If the file **does not exist** or has no vaults configured:
