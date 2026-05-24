@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-05-24
+
 ### Added
 
-- **Dual-mode session-docs** (`agents/th-orchestrator.md`, 11 agent files): pipeline session-docs can now output to a configured Obsidian vault with YAML frontmatter metadata. Configured via `logs-mode` in `.team-harness.json`. Default: local (current behavior). Agents are mode-unaware — the th-orchestrator resolves the path once and passes it. Session-doc folders now include a date prefix (`{YYYY-MM-DD}_{feature-name}/`) in both modes.
+- **Dual-mode session-docs** (`agents/th-orchestrator.md`, 11 agent files, `cmd/install/session_docs.go`): pipeline session-docs can now output to a configured Obsidian vault with YAML frontmatter metadata. Configured via `logs-mode` in `.team-harness.json`. Default: local (current behavior). Agents are mode-unaware — the th-orchestrator resolves the path once and passes it. Session-doc folders now include a date prefix (`{YYYY-MM-DD}_{feature-name}/`) in both modes. Installer gains a new `Work-logs output [l/o]` prompt with env var support (`LOGS_MODE`, `LOGS_PATH`).
 - **Human-first document format** (11 agent files): all session-doc files now use a two-section layout — `## Review Summary` for human reviewers (decisions, risks, trade-offs with Obsidian callouts) followed by `## Technical Detail` for agent consumption.
+- **Obsidian skills** (`skills/obsidian-markdown/`, `skills/obsidian-bases/`, `skills/json-canvas/`, `skills/obsidian-cli/`): four standalone complex skills for working with Obsidian vaults. Based on [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills), adapted for the team-harness skill format. Per-machine vault configuration at `~/.claude/config/obsidian-vaults.json`.
 
 ## [2.18.1] - 2026-05-23
 
