@@ -47,10 +47,7 @@ func printSummary(claudeJSONBackup string, mem MemoryMCPChoice, context7Preserve
 
 	fmt.Println()
 	fmt.Println("Next steps:")
-	fmt.Println("  1. Restart Claude Code so it picks up the new MCP servers.")
-	fmt.Printf("  2. To enable notification hooks, copy the \"%s\" section from\n", osLabel)
-	fmt.Printf("     ~/.claude/hooks/config.json and merge it into\n")
-	fmt.Printf("     ~/.claude/settings.json under the \"hooks\" key.\n")
+	fmt.Println("  1. Restart Claude Code so it picks up the new MCP servers and hooks.")
 
 	agentCount, skillCount := countInstalledAgentsAndSkills()
 	fmt.Println()
