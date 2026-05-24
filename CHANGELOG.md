@@ -7,9 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-05-23
+
 ### Added
 
-- **Obsidian skills** (`skills/obsidian-markdown/`, `skills/obsidian-bases/`, `skills/json-canvas/`, `skills/obsidian-cli/`): four standalone complex skills for working with Obsidian vaults. `obsidian-markdown` covers Obsidian Flavored Markdown (wikilinks, embeds, callouts, frontmatter, tags). `obsidian-bases` covers `.base` files (database views, filters, formulas, summaries). `json-canvas` covers `.canvas` files (visual canvases, nodes, edges, groups). `obsidian-cli` covers CLI interaction with a running Obsidian instance. All skills use a per-machine vault configuration at `~/.claude/config/obsidian-vaults.json` — no hardcoded paths. Based on [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills), adapted for the team-harness skill format.
+- **Documentation pipeline** (`type: docs`): new pipeline flow routed through the th-orchestrator. Architect researches a topic → documenter writes diagram-first Obsidian documentation → diagram agents create Excalidraw/Canvas visuals → QA validates coverage → DOC-GATE human checkpoint. Supports multi-topic parallel dispatch and `--lang` for non-English output.
+- **Documenter agent** (`agents/documenter.md`): Opus/high agent that transforms `00-research.md` into structured Obsidian vault pages with mandatory Mermaid diagrams per page, wikilinks, callouts, and frontmatter. Writes a `02-documentation.md` manifest flagging pages that need Excalidraw or Canvas diagrams.
+- **`/docs` skill** (`skills/docs.md`): entry point for the documentation pipeline with `--lang`, `--folder`, and `--vault` flags.
+- **`--vault` flag on diagram skills** (`skills/diagram.md`, `skills/d2-diagram.md`, `skills/likec4-diagram.md`): writes diagram output to an Obsidian vault instead of session-docs. Reads `~/.claude/config/obsidian-vaults.json` for vault path. Also supports `--folder` for subfolder targeting.
+- **§7 Document Hygiene** in init template: establishes the "lean CLAUDE.md + rich docs/" convention from project creation. Includes 40 KB file size cap (§7.1), max 10 entries per memory section (§7.2), CLAUDE.md vs docs/ content boundary (§7.3), and docs/ structure reference (§7.4). Init upgrade-path detects and inserts §7 on existing projects.
+- **Obsidian skills** (`skills/obsidian-markdown/`, `skills/obsidian-bases/`, `skills/json-canvas/`, `skills/obsidian-cli/`): four standalone complex skills for working with Obsidian vaults.
+
+### Changed
+
+- **Delivery agent auto-offload** (`agents/delivery.md`): Step 5 now checks CLAUDE.md file size after every update. If it exceeds 35 KB, the largest memory section is offloaded to `docs/` automatically. Consolidation threshold lowered from 15 to 8 entries, max from 15 to 10.
+- **CLAUDE.md reduced from 48 KB to 37 KB**: extracted §7.3-7.6 (language rules, content boundary, contributor checklist) to `docs/voice-guide.md` and §14 takeover protocol to `docs/subagent-orchestration.md`. Core rules remain inline; detailed reference tables are now pointers to docs/.
+- **Init upgrade-path** (`agents/init.md`): now detects and inserts both §6 (Mandatory Working Agreements) and §7 (Document Hygiene) on existing projects.
 
 ## [2.15.1] - 2026-05-23
 
