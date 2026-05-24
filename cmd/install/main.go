@@ -41,6 +41,7 @@ var claudeJSON string
 func main() {
 	parseFlags()
 	resolveClaudePaths()
+	resolveSettingsJSON()
 
 	printWelcomeBanner()
 
@@ -91,6 +92,7 @@ func main() {
 
 	sectionHeader("Global Config")
 	ensureGlobalClaudeMD()
+	registerHooks()
 
 	fmt.Println("Registering MCP servers in ~/.claude.json...")
 	backupPath := registerMCPServers(context7Key, memChoice)
