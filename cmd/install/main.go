@@ -65,6 +65,9 @@ func main() {
 	sectionHeader("Install Mode")
 	installMode := promptInstallMode()
 
+	sectionHeader("Work-Logs Output")
+	promptLogsMode()
+
 	ensureDir(claudeDir)
 	loadManifest()
 	if prev := manifest.InstalledVersion; prev != "" {

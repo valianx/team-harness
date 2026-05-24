@@ -25,6 +25,9 @@ var manifest = struct {
 	FormatVersion    string                   `json:"format_version"`
 	InstalledVersion string                   `json:"installed_version"`
 	UpdatedAt        string                   `json:"updated_at,omitempty"`
+	LogsMode         string                   `json:"logs-mode,omitempty"`
+	LogsPath         string                   `json:"logs-path,omitempty"`
+	LogsSubfolder    string                   `json:"logs-subfolder,omitempty"`
 	Files            map[string]manifestEntry `json:"files"`
 }{
 	FormatVersion: "1",
@@ -57,6 +60,9 @@ func loadManifest() {
 		FormatVersion    string                   `json:"format_version"`
 		InstalledVersion string                   `json:"installed_version"`
 		UpdatedAt        string                   `json:"updated_at,omitempty"`
+		LogsMode         string                   `json:"logs-mode,omitempty"`
+		LogsPath         string                   `json:"logs-path,omitempty"`
+		LogsSubfolder    string                   `json:"logs-subfolder,omitempty"`
 		Files            map[string]manifestEntry `json:"files"`
 	}
 	if jsonErr := json.Unmarshal(data, &loaded); jsonErr != nil {
@@ -68,6 +74,9 @@ func loadManifest() {
 	manifest.FormatVersion = loaded.FormatVersion
 	manifest.InstalledVersion = loaded.InstalledVersion
 	manifest.UpdatedAt = loaded.UpdatedAt
+	manifest.LogsMode = loaded.LogsMode
+	manifest.LogsPath = loaded.LogsPath
+	manifest.LogsSubfolder = loaded.LogsSubfolder
 	manifest.Files = loaded.Files
 }
 

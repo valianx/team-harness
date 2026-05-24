@@ -26,6 +26,7 @@ func printSummary(claudeJSONBackup string, mem MemoryMCPChoice, context7Preserve
 	fmt.Printf("  unchanged: %s\n", colorValue(fmt.Sprintf("%d", len(stats.Unchanged))))
 
 	printModeSummary(mode)
+	printLogsSummary()
 
 	fmt.Println()
 	fmt.Println("MCP servers in ~/.claude.json:")
@@ -166,6 +167,17 @@ func printModeSummary(mode InstallMode) {
 			effortPart = fmt.Sprintf("effort: %s → %s", stdEffort, override.Effort)
 		}
 		fmt.Printf("  %-20s %s | %s\n", name, modelPart, effortPart)
+	}
+}
+
+// printLogsSummary prints the work-logs output mode line in the summary block.
+func printLogsSummary() {
+	fmt.Println()
+	switch manifest.LogsMode {
+	case "obsidian":
+		fmt.Printf("Work-logs output: obsidian → %s\n", colorValue(manifest.LogsPath))
+	default:
+		fmt.Println("Work-logs output: local")
 	}
 }
 
