@@ -225,11 +225,100 @@ session-docs/{feature-name}/
   00-gcp-costs.md          ← gcp-cost-analyzer (cost report)
 ```
 
+**Step 0 — Resolve session-docs base path.**
+
+Read `~/.claude/.team-harness.json`. Parse the `logs-mode` field:
+- If file does not exist, or `logs-mode` is `"local"` or absent → `base_path = "session-docs"` (relative to cwd, current behavior).
+- If `logs-mode` is `"obsidian"`:
+  - Read `logs-path` (absolute path to vault root) and `logs-subfolder` (default: `"work-logs"`).
+  - Derive `repo_name` from `basename` of the working directory.
+  - `base_path = "{logs-path}/{logs-subfolder}/{repo_name}"` (absolute path).
+  - If `logs-path` is empty or missing → fall back to `"local"` mode, print warning.
+- Store `base_path` for all subsequent path construction.
+- Store `logs_mode` ("local" or "obsidian") for frontmatter injection decision.
+
+The session-docs root for this pipeline run is: `{base_path}/{YYYY-MM-DD}_{feature-name}/` where the date is today's date in ISO format (e.g., `2026-05-24`).
+
 **At task start:**
-1. Use Glob to check for existing `session-docs/{feature-name}/`. If it exists, **read `00-state.md` first** (pipeline checkpoint), then read other files as needed to resume.
+1. Use Glob to check for existing `{base_path}/{YYYY-MM-DD}_{feature-name}/`. If it exists, **read `00-state.md` first** (pipeline checkpoint), then read other files as needed to resume.
 2. Create the folder if it doesn't exist.
 3. Ensure `.gitignore` includes `/session-docs`.
-4. Pass `{feature-name}` to every agent so they write to the correct folder.
+4. Pass the resolved session-docs path to every agent so they write to the correct folder.
+
+### Frontmatter Injection (Obsidian Mode Only)
+
+When `logs_mode` is `"obsidian"`, prepend YAML frontmatter to session-doc files:
+
+**Files you write directly** (`00-state.md`, `00-task-intake.md`, `00-knowledge-context.md`): include frontmatter when creating them.
+
+**Files agents write** (`01-architecture.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, etc.): after each agent returns successfully, read the file. If it does not start with `---`, prepend:
+
+```yaml
+---
+repo: {repo_name}
+repo_path: {working_directory}
+feature: {feature_name}
+pipeline_type: {type}
+date: {YYYY-MM-DD}
+agent: {agent_name}
+tags:
+  - work-logs
+  - {repo_name}
+  - {file_role}
+---
+```
+
+Where `file_role` is derived from the filename: `architecture`, `task-list`, `implementation`, `testing`, `validation`, `security`, `delivery`, etc.
+
+**Excluded from frontmatter:** `00-execution-events.jsonl`, `*.excalidraw`, `failure-brief.md`.
+
+### Obsidian Base File (First Run)
+
+On the first Obsidian-mode pipeline run, if `{logs-path}/{logs-subfolder}/work-logs.base` does not exist, create it with:
+
+```yaml
+filters:
+  and:
+    - file.inFolder("work-logs")
+    - 'file.ext == "md"'
+
+formulas:
+  age_days: '(now() - file.ctime).days'
+
+properties:
+  repo:
+    displayName: "Repository"
+  feature:
+    displayName: "Feature"
+  pipeline_type:
+    displayName: "Type"
+  agent:
+    displayName: "Agent"
+
+views:
+  - type: table
+    name: "All Runs"
+    order:
+      - date
+      - repo
+      - feature
+      - pipeline_type
+      - agent
+      - file.name
+    groupBy:
+      property: repo
+      direction: ASC
+
+  - type: table
+    name: "Recent"
+    limit: 20
+    order:
+      - date
+      - repo
+      - feature
+      - agent
+      - file.name
+```
 
 ---
 
@@ -729,6 +818,7 @@ If any check fails (except ambiguities), fix it in-place. This is automatic — 
 **Invoke via Task tool** with context (Tier 2-4 only):
 - Task description and scope from `00-task-intake.md`
 - Feature name for session-docs
+- Session-docs path: {resolved_session_docs_path}
 - Any relevant file paths or code references
 - Reference to `00-knowledge-context.md` (if it exists — agent reads it directly for past insights)
 - **`mode: root-cause`** when `type: fix` (instructs architect to write `01-root-cause.md` instead of `01-architecture.md`)
@@ -782,6 +872,7 @@ Next: ratify the plan (qa checks every AC has a Work Plan step)
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs
+- Session-docs path: {resolved_session_docs_path}
 - Pointer to `00-task-intake.md` (AC) and `01-architecture.md` (Work Plan)
 - Mode: `ratify-plan`
 - Instruction: "Read the Work Plan and the AC. Confirm that every AC is covered by at least one Work Plan step. Do NOT validate any code (there is none yet). Return verdict: `pass` if all AC are covered, or `fail` with the list of AC not covered by any plan step."
@@ -826,6 +917,7 @@ Routing to architect to revise Work Plan
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs.
+- Session-docs path: {resolved_session_docs_path}
 - Pointers to `00-task-intake.md`, `01-architecture.md` (or `01-root-cause.md` for `type: fix`), `02-task-list.md`.
 - `type` field from `00-state.md` (so the plan-reviewer can gate Rules 7 + 8 on `type: fix | hotfix`).
 - Mode: default (the plan-reviewer has one mode).
@@ -1013,6 +1105,7 @@ fi
 
 **Invoke via Task tool** with context (only when `pre_fix_test_required: true`):
 - Feature name for session-docs
+- Session-docs path: {resolved_session_docs_path}
 - Pointer to `00-task-intake.md` (reproduction steps + expected behaviour + AC)
 - Pointer to `01-root-cause.md` (Regression Test Approach section — for `type: fix` Tier 2-4)
 - For `type: hotfix` or `bug_tier: 1` with operator-declared `[regression-test: required]` (no `01-root-cause.md`): pointer to the th-orchestrator's one-sentence prose plan in the STAGE-GATE-1 record
@@ -1086,6 +1179,7 @@ PRs within the same round run **in parallel** in separate worktrees (same worktr
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs.
+- Session-docs path: {resolved_session_docs_path}
 - **PR identifier** (e.g., `PR-1`) — the implementer scopes its work to this PR's section in `02-task-list.md`.
 - Brief summary of architecture decisions (from architect's status block summary, NOT from re-reading 01-architecture.md).
 - Reference to `00-knowledge-context.md` (if it exists — agent reads it directly).
@@ -1332,6 +1426,7 @@ When the previous gate (Phase 3 verify) shows that any iteration happened, **alw
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs
+- Session-docs path: {resolved_session_docs_path}
 - Pointer to `00-task-intake.md` (original description + current AC)
 - Pointer to `02-implementation.md`, `03-testing.md`, `04-validation.md`, and `04-security.md` (if it exists)
 
@@ -1459,6 +1554,7 @@ Then return your status block and exit.
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs
+- Session-docs path: {resolved_session_docs_path}
 - Summary of what was built, tested, and validated (from status block summaries, NOT re-reading session-docs)
 - **`skip-version: true`** if the th-orchestrator explicitly requests it.
 
@@ -1500,6 +1596,7 @@ When skipped, log `phase.end` to `00-execution-events.jsonl` with `phase: "4.5-i
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs
+- Session-docs path: {resolved_session_docs_path}
 - `mode: internal`
 - Base ref (`main` by default) and head ref (the branch `delivery` just pushed)
 - Pre-fetched diff: run `git diff origin/main...origin/{branch}` in the th-orchestrator's main context, capture stdout, and pass it inline (zero Bash from the reviewer)

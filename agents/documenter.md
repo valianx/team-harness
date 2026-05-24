@@ -150,6 +150,9 @@ Write all documentation in the language specified by the th-orchestrator in the 
 ## Workflow
 
 1. **Read `00-research.md`** from `session-docs/{feature-name}/`.
+
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 2. **Read vault config** from `~/.claude/config/obsidian-vaults.json`.
 3. **Plan the page set** — determine which pages to create based on the subject classification and research content. List them before writing.
 4. **Create the target folder** in the vault if it does not exist.
@@ -190,6 +193,10 @@ Write all documentation in the language specified by the th-orchestrator in the 
 ```
 
 ---
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 ## Return Protocol
 

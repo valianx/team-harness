@@ -132,6 +132,8 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `04-validation.md` — understand acceptance criteria to satisfy
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
    **Per-PR scoping (pipeline_version: 2).** If the th-orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `02-task-list.md`. If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the th-orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
    **Backward compat (pipeline_version: 1 or `02-task-list.md` absent).** Fall back to the legacy contract: follow the full Work Plan in `01-architecture.md` and validate against the feature-wide AC list in `00-task-intake.md`. The th-orchestrator does not pass a PR identifier in legacy mode.
@@ -294,6 +296,10 @@ When implementation reveals a technical constraint that affects an acceptance cr
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write your implementation summary to `session-docs/{feature-name}/02-implementation.md`:
 

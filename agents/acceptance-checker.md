@@ -52,6 +52,8 @@ This agent reads the intake **as captured at the start of the pipeline** (the "O
 
 1. **Glob `session-docs/{feature-name}/`** — confirm the folder exists. If it doesn't, return `status: blocked` immediately with `issues: session-docs not found`.
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 2. **Read these files in this order:**
    - `00-task-intake.md` — extract the **Original Description** block (verbatim quoted text the user / `/issue` provided) AND the **current AC list**.
    - `02-implementation.md` — Files Created/Modified, Architecture Decisions Followed, Deviations from Architecture.
@@ -147,6 +149,10 @@ Scan `00-task-intake.md` for `[CONSTRAINT-DISCOVERED: ...]` tags that may have b
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write the audit report to `session-docs/{feature-name}/06-acceptance-check.md`:
 

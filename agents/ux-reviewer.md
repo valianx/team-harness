@@ -34,6 +34,8 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 ---
 
+**Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 ## Operating Modes
 
 ### Mode: enrich (Stage 1 — invoked after architect)
@@ -158,6 +160,10 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 ```
 
 ---
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 ## Return Protocol
 

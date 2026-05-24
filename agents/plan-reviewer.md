@@ -62,6 +62,8 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 1. **Glob `session-docs/{feature-name}/`** — confirm the folder exists. If it doesn't, return `status: blocked` immediately with `issues: session-docs not found`.
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 2. **Determine the design doc filename from the `type` field** in the task payload (sourced from `00-state.md`):
    - `type: feature | refactor | enhancement` → design doc is `01-architecture.md`.
    - `type: fix` → design doc is `01-root-cause.md`. (Bug-fix Flow — Rules 7 + 8 are active.)
@@ -329,6 +331,10 @@ For each PR section in `02-task-list.md`:
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write the audit report to `session-docs/{feature-name}/01-plan-review.md`. **Overwrite** on every invocation — no iteration history in the report itself (the report is itself subject to the consolidated-documents rule).
 

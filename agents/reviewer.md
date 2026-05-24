@@ -54,6 +54,8 @@ The tier classification is enforced at dispatch time by the skill — the review
 
 1. **Check for existing session context** — use Glob to look for `session-docs/` related to this PR. If session-docs exist, read them to understand architecture decisions and acceptance criteria from the pipeline.
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 2. **Session-docs are optional for reviewer** — most PRs reviewed via `/review-pr` won't have session-docs (they are ephemeral). Proceed without them.
 
 3. **Create session-docs folder if it doesn't exist** — create `session-docs/{feature-name}/` for your review summary (`04-review.md`). Use the PR branch name as feature name (kebab-case). Ensure `.gitignore` includes `/session-docs`.
@@ -356,6 +358,10 @@ The reviewer does NOT publish the review. It returns the `review_body` inline in
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write your review summary to `session-docs/{feature-name}/04-review.md`:
 

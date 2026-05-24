@@ -256,6 +256,8 @@ For each business rule provided in the context:
 
 1. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. If it exists, read ALL files inside (task intake, architecture decisions, implementation details, prior test work).
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 2. **Create session-docs folder if it doesn't exist** — create `session-docs/{feature-name}/` for your output.
 
 3. **Ensure `.gitignore` includes `session-docs`** — check and add `/session-docs` if missing.
@@ -441,6 +443,10 @@ These pitfalls have been observed repeatedly across NestJS services. Surface the
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write your summary to `session-docs/{feature-name}/03-testing.md`:
 

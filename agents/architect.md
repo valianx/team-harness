@@ -51,6 +51,8 @@ If the file you are about to overwrite is already very large (>30 KB or >800 lin
 
 2. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. If it exists, read ALL files inside to understand previous work (task intake, prior architecture decisions, implementation progress, test strategy, validation status).
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 3. **Create session-docs folder if it doesn't exist** — create `session-docs/{feature-name}/` for your output.
 
 3. **Ensure `.gitignore` includes `session-docs`** — check and add `/session-docs` if missing.
@@ -775,6 +777,10 @@ When you discover a technical constraint during design that invalidates or modif
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write your analysis to `session-docs/{feature-name}/01-architecture.md`.
 

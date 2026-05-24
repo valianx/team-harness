@@ -326,6 +326,8 @@ Used by `/cross-repo` to evaluate existing code against business rules from a sy
 
 1. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. If it exists, read ALL files inside to understand previous work (task intake, architecture decisions, implementation progress, test results).
 
+   **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
+
 2. **Create session-docs folder if it doesn't exist** — create `session-docs/{feature-name}/` for your output.
 
 3. **Ensure `.gitignore` includes `session-docs`** — check and add `/session-docs` if missing.
@@ -537,6 +539,10 @@ Write the report to `session-docs/{feature-name}/04-validation.md`:
 ---
 
 ## Session Documentation
+
+**Document format:** Structure your output file with two top-level sections:
+1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
+2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
 Write the validation report to `session-docs/{feature-name}/04-validation.md` (see Phase 3 above for the full template).
 
