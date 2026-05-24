@@ -182,6 +182,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `reviewer` | Reviews PRs on GitHub, approves or requests changes | No | — |
 | `init` | Bootstraps CLAUDE.md and project conventions | No | — |
 | `documenter` | Transforms architect research into diagram-first Obsidian documentation | No | `02-documentation.md` |
+| `ux-reviewer` | Reviews frontend tasks for UI/UX quality — accessibility, responsiveness, component reuse | No | `01-ux-review.md` (enrich), `04-ux-validation.md` (validate) |
 | `diagrammer` | Generates Excalidraw diagrams from architect analysis | No | `05-diagram.md` |
 | `gcp-cost-analyzer` | Analyzes GCP costs, inventories resources, fetches recommendations, produces optimization report | No | `00-gcp-costs.md` |
 
@@ -215,6 +216,8 @@ session-docs/{feature-name}/
   04-security.md           ← security (only if security-sensitive)
   04-review.md             ← reviewer
   05-delivery.md           ← delivery
+  01-ux-review.md          ← ux-reviewer (enrich: UI/UX AC additions)
+  04-ux-validation.md      ← ux-reviewer (validate: UI/UX findings)
   02-documentation.md      ← documenter (manifest: pages, diagrams, dispatch requests)
   05-diagram.md            ← diagrammer (summary)
   diagram.excalidraw       ← diagrammer (output)
@@ -494,6 +497,16 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - User explicitly requests security review
      - GitHub issue has a `security` label
      - **Task type is `fix` or `hotfix`** — security agent runs ALWAYS for bugs (operator override; defense-in-depth: many bugs have non-obvious security implications, and fixes can introduce new vulnerabilities). For `type: fix` / `type: hotfix`, `security-sensitive` is **forced to `true`** regardless of the other criteria above. This is a hard requirement of the Bug-fix Flow — see `ref-special-flows.md` § Bug-fix Flow. **Tier modulation:** for `type: fix` / `type: hotfix`, the `security-sensitive: true` default is preserved for Tier 3+ and derived from the tier (see Tier classification below). Tier 1 (docs/trivial) and Tier 2 (light) skip the security agent because the impacted scope is non-functional or non-production code; if a Tier 1 / Tier 2 fix touches a security-sensitive path, the path signal auto-promotes the tier to 3+. The "always on for bugs" rule survives semantically: security runs for every Tier 3+ bug, and the tier system is what determines whether the bug is Tier 3+.
+
+   - **Frontend-scope:** `true` | `false` — set to `true` if ANY of these apply:
+     - Task touches UI components, pages, views, or layouts
+     - Task modifies CSS, Tailwind classes, styled-components, or design tokens
+     - Task adds or changes forms, modals, navigation, or interactive elements
+     - Task touches files matching: `components/**`, `pages/**`, `views/**`, `layouts/**`, `*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.css`, `*.scss`, `styles/**`, `ui/**`
+     - Request mentions UI/UX keywords: `UI`, `UX`, `botón`, `button`, `formulario`, `form`, `modal`, `layout`, `responsive`, `diseño`, `pantalla`, `vista`, `componente`, `accesibilidad`, `accessibility`
+     - User explicitly requests UX review
+     - GitHub issue has a `frontend`, `ui`, or `ux` label
+     When `frontend-scope: true`: the `ux-reviewer` agent is dispatched in Stage 1 (enrich mode, after architect) and Stage 3 (validate mode, in parallel with tester/qa/security). The ux-reviewer adds UI/UX AC in enrich mode and validates them in validate mode. Only `critical` findings (WCAG A violations) block delivery; all other findings are recommendations.
 
    - **Bug tier (only when `type: fix` or `type: hotfix`):** `0` | `1` | `2` | `3` | `4`. The tier determines how much of the Bug-fix Pipeline runs against a given fix — trivial bugs skip ceremony, critical bugs add prior-art research and extended security analysis. Combine three signals; high-tier signals win, default to Tier 3 when ambiguous, operator declarations override auto-classification.
 
@@ -2044,6 +2057,7 @@ feature: {kebab-case-name}
 type: feature | fix | refactor | hotfix | enhancement | spike | research
 complexity: standard | complex
 security_sensitive: true | false
+frontend_scope: true | false
 
 # Filled in Phase 0b
 ac_count: 5
@@ -2671,6 +2685,7 @@ All special flows are detailed in `ref-special-flows.md`. Read it on-demand when
 | Bug-fix | `type: fix` | architect produces `01-root-cause.md` (1pg) instead of `01-architecture.md`; Phase 2.0 inserts a mandatory regression test before Phase 2; `security` runs always (forced `security-sensitive: true`); delivery routes CHANGELOG to `### Fixed` and PR title to `fix(area):`; implementer scope-discipline contract bars tangential refactors |
 | Hotfix | `type: hotfix` | Same as Bug-fix; Phase 1 (root-cause analysis) skipped — th-orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 still mandatory. PR title appends `(hotfix)` suffix |
 | Security-sensitive | `security-sensitive: true` | Phase 3 adds `security` agent in parallel (already forced `true` for `type: fix` / `type: hotfix`) |
+| Frontend-scope | `frontend-scope: true` | Phase 1 adds `ux-reviewer` (enrich mode, after architect) to add UI/UX AC; Phase 3 adds `ux-reviewer` (validate mode, in parallel with tester/qa/security) to validate UI/UX criteria. Only `critical` findings block delivery |
 | Database changes | DB migration involved | Design must include migration strategy + rollback |
 | Research | `type: research` | Architect only (research mode) → skip Phases 2-5 |
 | Spike | `type: spike` | Implementer only (no design, no tests) → ask user: formalize/discard/investigate |
