@@ -305,10 +305,6 @@ func promptInstallMode() InstallMode {
 	defer input.Close()
 
 	scan := bufio.NewScanner(input)
-	fmt.Println()
-	fmt.Println("Install mode")
-	fmt.Println("============")
-	fmt.Println()
 	fmt.Println("  [s] standard  — default. Canonical matrix as documented in agents/README.md.")
 	fmt.Println("                  Best quality, highest API cost.")
 	fmt.Println("  [l] low-cost  — for developers on lower-tier Anthropic plans (Free, Pro,")

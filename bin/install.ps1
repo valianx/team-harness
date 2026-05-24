@@ -69,7 +69,9 @@ try {
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $proc.WaitForExit()
-    exit $proc.ExitCode
+    # Do NOT call 'exit' here — it closes the terminal window when run via
+    # 'irm | iex'. Letting the script end naturally returns to the prompt.
+    $LASTEXITCODE = $proc.ExitCode
 } finally {
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
 }
