@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.1] - 2026-05-23
+
+### Fixed
+
+- **`/th-update` version check** (`skills/th-update.md`): the skill now compares the latest release tag against the installed version from the manifest before downloading. If versions match, prints "up to date" and exits immediately — no download, no extract, no copy. Previously it always downloaded and replaced all files regardless of version.
+
 ## [2.17.0] - 2026-05-23
 
 ### Added
