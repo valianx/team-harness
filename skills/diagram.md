@@ -8,14 +8,23 @@ $ARGUMENTS — describe what to diagram. Examples:
 - "how the th-orchestrator delegates to agents"
 - A topic without description → the th-orchestrator infers what to visualize
 
+## Flags
+
+- `--vault [name]` — write the `.excalidraw` file to the Obsidian vault instead of session-docs. Reads `~/.claude/config/obsidian-vaults.json`; uses the named vault or `default` if no name given.
+- `--folder <name>` — subfolder within the vault (only with `--vault`). Default: vault root.
+
 ## What happens
 
-1. Pass to the `th-orchestrator` agent:
+1. Parse `--vault` and `--folder` flags from `$ARGUMENTS` (strip them from the description).
+2. Pass to the `th-orchestrator` agent:
 
 ```
 Direct Mode Task: diagram
-Description: {$ARGUMENTS}
-Output: {path where .excalidraw file should be saved, or "ask the user"}
+Description: {$ARGUMENTS without flags}
+Output: {vault_path/folder/diagram.excalidraw if --vault, else "ask the user"}
+Vault: {vault name or null}
+Vault path: {resolved path from obsidian-vaults.json or null}
+Folder: {folder name or null}
 ```
 
 ## Rules

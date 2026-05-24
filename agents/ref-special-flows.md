@@ -1,6 +1,6 @@
 ---
 name: ref-special-flows
-description: Reference file for th-orchestrator special flows (research, spike, plan, parallel dispatch, refactor, simple). Read on-demand by the th-orchestrator — not a standalone agent.
+description: Reference file for th-orchestrator special flows (research, spike, plan, parallel dispatch, refactor, docs, simple). Read on-demand by the th-orchestrator — not a standalone agent.
 model: opus
 color: cyan
 ---
@@ -692,6 +692,152 @@ session-docs/
 - Coverage gate runs the ENTIRE test suite, not per-module
 - Failed modules are reported, not auto-retried
 - If `--coverage-only` flag: skip Phase 2, run only Phase 1 + consolidated coverage measurement
+
+---
+
+## Documentation Flow
+
+When the user asks to document a service, database, API, library, infrastructure, or product — typically via `/docs` or conversational requests like "documenta en obsidian el servicio X", "document the auth service", "genera documentación del API de pagos".
+
+### Phase 0 — Intake
+
+1. **Read vault config** — read `~/.claude/config/obsidian-vaults.json`. If missing, stop and ask the operator for the vault path. If a `--vault` flag was passed, use that vault entry; otherwise use the `default` vault.
+2. **Parse topics** — extract what to document. Multi-topic detection: commas, "and"/"y", or enumerated lists produce multiple doc tasks.
+3. **Parse language** — `--lang <code>` flag or explicit language request. Default: `en`. The language applies to all prose in the documentation; structural elements (YAML keys, Mermaid syntax, code blocks) remain in English.
+4. **Parse folder** — `--folder <name>` flag or derived from topic name (kebab-case).
+5. **Classify doc subject** per topic: `service` | `database` | `api` | `library` | `infrastructure` | `product`. This classification guides the architect's research scope and the documenter's page structure.
+6. **Write `00-task-intake.md`** with: topics, vault path, folder, language, subject classification per topic.
+7. **Write initial `00-state.md`** — `type: docs`, `phase: 0`.
+
+### Phase 1 — Research (per topic)
+
+Invoke `architect` in **research mode** with explicit scope per subject classification:
+
+| Subject | Architect Research Scope |
+|---------|--------------------------|
+| `service` | Source code, CLAUDE.md, README, CHANGELOG, docs/, API endpoints, config, architecture |
+| `database` | Migrations, schema files, models/entities, ER relationships, indexes, access patterns |
+| `api` | Route definitions, OpenAPI spec, middleware, request/response types, auth, error handling |
+| `library` | Public API surface, exports, usage patterns in codebase, package metadata |
+| `infrastructure` | Dockerfile, docker-compose, CI/CD workflows, deploy scripts, env vars, monitoring |
+| `product` | All of the above — full-scope investigation |
+
+Instruction to architect: "Research mode. Investigate {topic} for documentation purposes. Produce `00-research.md` covering architecture, components, data flows, configuration, and key decisions. The output will be consumed by the documenter agent — be thorough but structured."
+
+**Multi-topic:** if 2+ topics, dispatch one architect research per topic in parallel (separate session-docs subfolders or sequential research rounds into the same `00-research.md` with clear section separation).
+
+Output: `00-research.md` in `session-docs/{feature-name}/`.
+
+### Phase 2a — Write
+
+Invoke `documenter` with the research findings and metadata:
+
+```
+Task context:
+- research: session-docs/{feature-name}/00-research.md
+- vault_path: {from Phase 0}
+- folder: {from Phase 0}
+- language: {from Phase 0}
+- subject: {classification from Phase 0}
+```
+
+The documenter:
+1. Reads `00-research.md`
+2. Plans the page set (index + sub-pages based on subject classification)
+3. Writes all pages to the vault folder with diagram-first layout
+4. Writes `02-documentation.md` manifest listing all pages, diagram counts, and Excalidraw/Canvas dispatch requests
+
+Output: Obsidian vault pages + `session-docs/{feature-name}/02-documentation.md`.
+
+### Phase 2b — Diagrams (conditional)
+
+Read `02-documentation.md`. If the manifest lists Excalidraw or Canvas dispatch requests:
+
+- **Excalidraw requests:** dispatch `diagrammer` (Excalidraw agent) per flagged page. Input: the `00-research.md` section relevant to the diagram + the target path in the vault. The diagrammer writes `.excalidraw.md` files directly to the vault folder.
+- **Canvas requests:** dispatch canvas creation using the json-canvas skill pattern. Input: the page structure from the manifest + node/edge relationships. Output: `.canvas` file in the vault folder.
+
+If no external diagram requests, skip Phase 2b.
+
+**Multi-topic parallel:** when documenting multiple topics, each topic's Phase 2a + 2b runs independently. If worktrees are available, dispatch in parallel.
+
+### Phase 3 — Review
+
+Invoke `qa` in validation mode. The QA agent reads `00-research.md` (the source of truth) and the vault folder (the output) and validates:
+
+| Check | Criterion | Verdict |
+|-------|-----------|---------|
+| **Coverage** | Every major section in `00-research.md` has a corresponding doc page | PASS / FAIL |
+| **Navigation** | Index page exists with wikilinks to all sub-pages | PASS / FAIL |
+| **Diagram density** | Every page has at least 1 diagram (Mermaid or Excalidraw embed) | PASS / FAIL |
+| **Diagram-first layout** | Diagrams appear before their explanatory text | PASS / FAIL |
+| **Cross-links** | All `[[wikilinks]]` resolve to real pages in the folder | PASS / FAIL |
+| **Language** | All prose matches the specified language | PASS / FAIL |
+| **Frontmatter** | Every page has valid YAML frontmatter with tags and aliases | PASS / FAIL |
+| **No orphan text** | No section longer than 5 paragraphs without a visual | PASS / FAIL |
+
+Output: `04-validation.md` with per-check verdict + overall PASS/FAIL.
+
+### DOC-GATE — Human Checkpoint
+
+Present to the operator:
+
+```
+Documentation complete: {topic(s)}
+Vault: {path}
+Folder: {folder name}
+Pages: {count} | Diagrams: {inline + external count}
+QA: {PASS or FAIL with details}
+
+Options:
+1. Approve — documentation is complete
+2. Revise — {specific feedback} → documenter iterates on flagged pages
+```
+
+If **revise**: feed the operator's feedback + QA findings back to the documenter for targeted page updates. Max 3 iteration rounds. After each iteration, re-run QA (Phase 3) on the updated pages only.
+
+If **approve**: write `00-state.md` with `status: complete`.
+
+### Multi-Topic Orchestration
+
+When 2+ topics are detected at Phase 0:
+
+```
+Phase 0:  Parse all topics + shared metadata (vault, language)
+Phase 1:  Architect researches each topic (parallel if worktrees available)
+Phase 2a: Documenter writes each topic (parallel if worktrees available)
+Phase 2b: Diagram dispatch per topic (parallel)
+Phase 3:  QA validates ALL topics together (cross-topic wikilinks, consistent style)
+DOC-GATE: Single gate for all topics
+```
+
+Each topic gets its own session-docs subfolder pattern: `session-docs/docs-{topic-name}/`. The QA phase validates across all topics to ensure consistency.
+
+### Session-docs for documentation pipeline
+
+```
+session-docs/{feature-name}/
+  00-state.md              # Pipeline state (type: docs)
+  00-task-intake.md        # Topics, vault, folder, language, subject classification
+  00-research.md           # Architect research findings
+  02-documentation.md      # Documenter manifest (pages, diagrams, dispatch requests)
+  04-validation.md         # QA validation report
+```
+
+### Direct mode (for other agents)
+
+Other agents or top-level Claude can invoke the documenter directly without the full pipeline, when research is already available:
+
+```
+Task(subagent_type=documenter, prompt="
+  Research file: {path to research or structured input}
+  Vault path: {vault path}
+  Folder: {folder name}
+  Language: {en|es|...}
+  Subject: {service|database|api|library|infrastructure|product}
+")
+```
+
+This skips Phases 0, 1, 3 and the DOC-GATE. The caller is responsible for research quality and review.
 
 ---
 

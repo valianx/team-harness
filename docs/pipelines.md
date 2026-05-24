@@ -300,3 +300,62 @@ Recommendation logic: 0 criticals + 0 high → `(a) approve`; 0 criticals + 1+ h
 Atomic `gh api POST .../reviews` with `body + event + comments[]`. The `event` field maps directly from the operator's choice. Worktree and all temp draft files are removed after publishing (or by the EXIT trap on early exit).
 
 The context prune reminder (`/compact`) is printed at the end — PR review context is heavy (5–30K tokens).
+
+---
+
+## Documentation Pipeline
+
+**Trigger:** `/docs <topic>`, `@th-orchestrator documenta en obsidian X`, or any request classified as `type: docs`.
+
+**Purpose:** Generate structured Obsidian documentation for a service, database, API, library, infrastructure setup, or product. Diagram-first layout — every concept gets a visual before prose.
+
+### Phase overview
+
+| Phase | Agent | Output |
+|-------|-------|--------|
+| 0 — Intake | th-orchestrator | `00-task-intake.md` (topics, vault, folder, language, subject classification) |
+| 1 — Research | architect (research mode) | `00-research.md` |
+| 2a — Write | documenter | Obsidian vault pages + `02-documentation.md` manifest |
+| 2b — Diagrams | diagrammer / canvas (conditional) | `.excalidraw.md` and `.canvas` files in vault |
+| 3 — Review | qa | `04-validation.md` |
+| DOC-GATE | operator | approve / revise (max 3 iterations) |
+
+### Diagram requirements
+
+Every documentation page must have at least one diagram. Selection guide:
+
+| Content Type | Diagram | Format |
+|-------------|---------|--------|
+| Flows, pipelines, decisions | Mermaid flowchart | Inline |
+| Auth flows, API calls, sequences | Mermaid sequence | Inline |
+| Database schema | Mermaid ER | Inline |
+| State machines, lifecycle | Mermaid state | Inline |
+| System architecture overview | Excalidraw | External (Phase 2b) |
+| Concept maps, navigation | Canvas | External (Phase 2b) |
+
+### Multi-topic support
+
+When 2+ topics are detected ("documenta X, Y, y Z"), each topic runs Phase 1 + 2a + 2b independently (parallel if worktrees available). QA validates all topics together for cross-topic consistency.
+
+### Language
+
+Default: English. Override with `--lang <code>`. Prose follows the specified language; structural elements (YAML, Mermaid, code blocks) stay in English.
+
+### Session-docs
+
+```
+session-docs/{feature-name}/
+  00-state.md
+  00-task-intake.md
+  00-research.md
+  02-documentation.md    # manifest (pages, diagrams, dispatch requests)
+  04-validation.md
+```
+
+### QA validation checks
+
+Coverage (research → pages), navigation (index + wikilinks), diagram density (1+ per page), diagram-first layout, cross-link resolution, language consistency, frontmatter validity, no orphan text blocks (5+ paragraphs without a visual).
+
+### Direct mode
+
+The documenter agent can be invoked directly (without the full pipeline) when research is already available. The caller provides the research content, vault path, folder, language, and subject classification. This skips Phases 0, 1, 3 and the DOC-GATE.

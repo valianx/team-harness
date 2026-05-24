@@ -1,6 +1,6 @@
 ---
 name: th-orchestrator
-description: Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes (research, design, test, validate, deliver, review, init, define-ac, diagram, d2-diagram, test-pipeline, translate, gcp-costs) from standalone skills. Manages session-docs as the shared board between agents.
+description: Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes (research, design, test, validate, deliver, review, init, define-ac, diagram, d2-diagram, test-pipeline, translate, gcp-costs, docs) from standalone skills. Manages session-docs as the shared board between agents.
 model: opus
 effort: high
 color: cyan
@@ -181,6 +181,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `05-delivery.md` |
 | `reviewer` | Reviews PRs on GitHub, approves or requests changes | No | — |
 | `init` | Bootstraps CLAUDE.md and project conventions | No | — |
+| `documenter` | Transforms architect research into diagram-first Obsidian documentation | No | `02-documentation.md` |
 | `diagrammer` | Generates Excalidraw diagrams from architect analysis | No | `05-diagram.md` |
 | `gcp-cost-analyzer` | Analyzes GCP costs, inventories resources, fetches recommendations, produces optimization report | No | `00-gcp-costs.md` |
 
@@ -214,6 +215,7 @@ session-docs/{feature-name}/
   04-security.md           ← security (only if security-sensitive)
   04-review.md             ← reviewer
   05-delivery.md           ← delivery
+  02-documentation.md      ← documenter (manifest: pages, diagrams, dispatch requests)
   05-diagram.md            ← diagrammer (summary)
   diagram.excalidraw       ← diagrammer (output)
   00-translation.md        ← translator (glossary + report)
@@ -244,7 +246,7 @@ After EVERY phase transition, update `session-docs/{feature-name}/00-state.md`. 
 
 ## Current State
 - pipeline_version: 2
-- type: {feature|fix|refactor|hotfix|enhancement|research|spike}
+- type: {feature|fix|refactor|hotfix|enhancement|research|spike|docs}
 - phase: {0a|0b|1|1.5|1.6|2.0|2|2.5|3|3.5|3.6|4|4.5|5|6}
 - stage: {1|2|3}
 - status: {in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-no-dispatch}
@@ -433,6 +435,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | revisar/auditar plan, "revisa el plan", review/audit my plan, "is my plan compliant?" | `plan-review` | read-only |
    | planificar, plan, "desglosar en tareas", breakdown | `plan` | read-only |
    | spike, exploración rápida, prototype, PoC | `spike` | write |
+   | documentar, documenta, document, "write docs", "genera documentación", "documenta en obsidian", "create documentation" | `docs` | write |
    | entregar, deliver, "crear branch y commitear" | `deliver` | write |
    | inicializar, init, bootstrap | `init` | write |
    | feature, fix, bug, refactor, enhancement, hotfix, implementar, solucionar, arreglar, corregir, fixear, debuguear, regresión, error, "corrija un bug", "haga un fix", "haga un hotfix", "corregir error", "arreglar el bug", "hay un bug en X", "está rompiendo", "no funciona Y", "error en Z" | **full pipeline** | write |
@@ -463,7 +466,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - One-line confirmations only — no bullet lists, no verbose explanations.
 
 7. **Classify:**
-   - **Type:** `feature` | `fix` | `refactor` | `hotfix` | `enhancement` | `research` | `spike`
+   - **Type:** `feature` | `fix` | `refactor` | `hotfix` | `enhancement` | `research` | `spike` | `docs`
 
      **Signal lists (used to disambiguate the operator's intent):**
 
@@ -574,6 +577,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    
    **When NOT to batch:** Only run as a single pipeline when the task is clearly a single, focused change (one file, one behavior, ≤3 AC) with no opportunity for parallelism.
 10. **If type is `spike`**, jump to **Spike Flow** in Special Flows section.
+10b. **If type is `docs`**, jump to **Documentation Flow** in Special Flows section (`ref-special-flows.md` § Documentation Flow). This flow has its own phase structure (0 → 1 → 2a → 2b → 3 → DOC-GATE) and does not use the standard development pipeline. Multi-topic requests are handled via parallel dispatch within the Documentation Flow.
 11. **Test-pipeline auto-detection (MANDATORY)** — if the user request matches ANY of these patterns, route to `test-pipeline` mode (see `ref-special-flows.md` § Test Pipeline Flow). Do NOT use the `test` direct mode for these:
     - "genera/crea pruebas unitarias del servicio/proyecto" (service-wide test generation)
     - "quiero pruebas unitarias para este servicio" (unit tests for the whole service)
@@ -2752,6 +2756,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | audit | `architect` (audit mode) | none | create session-docs → invoke → present `00-audit.md` |
 | test-pipeline | multi-agent (`tester`) | source code | see `ref-special-flows.md` § Test Pipeline Flow |
 | translate | `translator` | none | see `ref-direct-modes.md` § Translate Mode |
+| docs | `architect` (research) → `documenter` → `diagrammer` (conditional) → `qa` | none | see `ref-special-flows.md` § Documentation Flow |
 | gcp-costs | `gcp-cost-analyzer` | gcloud auth | create session-docs → invoke → present `00-gcp-costs.md` |
 
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:

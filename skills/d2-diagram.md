@@ -10,15 +10,24 @@ $ARGUMENTS — describe what to diagram. Examples:
 - "class diagram of the User domain model"
 - A topic without full description → the th-orchestrator infers what to visualize from the codebase
 
+## Flags
+
+- `--vault [name]` — write the `.d2` and `.svg` files to the Obsidian vault instead of session-docs. Reads `~/.claude/config/obsidian-vaults.json`; uses the named vault or `default` if no name given.
+- `--folder <name>` — subfolder within the vault (only with `--vault`). Default: vault root.
+
 ## What happens
 
-1. Pass to the `th-orchestrator` agent:
+1. Parse `--vault` and `--folder` flags from `$ARGUMENTS` (strip them from the description).
+2. Pass to the `th-orchestrator` agent:
 
 ```
 Direct Mode Task: d2-diagram
-Description: {$ARGUMENTS}
+Description: {$ARGUMENTS without flags}
 Skill path: .claude/skills/d2-diagram/
-Output: session-docs/{feature}/diagram.d2
+Output: {vault_path/folder/diagram.d2 if --vault, else session-docs/{feature}/diagram.d2}
+Vault: {vault name or null}
+Vault path: {resolved path from obsidian-vaults.json or null}
+Folder: {folder name or null}
 ```
 
 ## Rules

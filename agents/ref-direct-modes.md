@@ -56,6 +56,16 @@ Full report: session-docs/{feature-name}/01-plan-review.md
 
 When invoked with `Direct Mode Task: diagram`:
 
+### Step 0 — Resolve output path
+
+If the task payload includes `Vault:` (non-null):
+1. Read `~/.claude/config/obsidian-vaults.json`. If missing, report `status: blocked` with "obsidian-vaults.json not found".
+2. Resolve the vault path from the config (use the named vault or `default`).
+3. If `Folder:` is set, append it to the vault path. Create the folder if it does not exist.
+4. Set output path to `{vault_path}/{folder}/diagram.excalidraw` (Excalidraw files render natively in Obsidian with the Excalidraw plugin).
+
+If no `Vault:` in payload → use default: `session-docs/{feature}/diagram.excalidraw`.
+
 ### Step 1 — Architect analyzes codebase context
 
 Invoke `architect` in **research mode** via Task tool with:
@@ -71,7 +81,7 @@ Invoke `diagrammer` via Task tool with:
 - Feature name
 - Path to architect's analysis: `session-docs/{feature}/00-research.md`
 - Path to skill: `.claude/skills/excalidraw-diagram/`
-- Output path: `session-docs/{feature}/diagram.excalidraw`
+- Output path: `{resolved output path from Step 0}`
 - **Expected sections:** list the major sections from the architect's analysis
 
 ### Step 2.5 — Validate diagrammer output (MANDATORY)
@@ -86,7 +96,7 @@ After the diagrammer returns `status: success`, **read the `.excalidraw` file** 
 
 ### Step 3 — Report to user
 
-Present output file path, summary, and renderer setup instructions if needed:
+Present output file path and summary. If output is in an Obsidian vault, note that the Excalidraw plugin is required to render it. If output is in session-docs, present renderer setup instructions:
 ```bash
 cd .claude/skills/excalidraw-diagram/references
 uv sync
@@ -98,6 +108,16 @@ uv run playwright install chromium
 ## LikeC4 Diagram Mode
 
 When invoked with `Direct Mode Task: likec4-diagram`:
+
+### Step 0 — Resolve output path
+
+If the task payload includes `Vault:` (non-null):
+1. Read `~/.claude/config/obsidian-vaults.json`. If missing, report `status: blocked` with "obsidian-vaults.json not found".
+2. Resolve the vault path from the config (use the named vault or `default`).
+3. If `Folder:` is set, append it to the vault path. Create the folder if it does not exist.
+4. Set output path to `{vault_path}/{folder}/diagram.c4`.
+
+If no `Vault:` in payload → use default: `session-docs/{feature}/diagram.c4`.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -114,7 +134,7 @@ Invoke `likec4-diagrammer` via Task tool with:
 - Feature name
 - Path to architect's analysis: `session-docs/{feature}/00-research.md`
 - Path to skill: `.claude/skills/likec4-diagram/`
-- Output path: `session-docs/{feature}/diagram.c4`
+- Output path: `{resolved output path from Step 0}`
 
 Gate: if `status: failed` → report to user. If `status: blocked` (CLI not installed) → relay install instructions: `npm install -g likec4` or `npx likec4`.
 
@@ -129,6 +149,16 @@ Present output file path, view names, and how to render:
 ## D2 Diagram Mode
 
 When invoked with `Direct Mode Task: d2-diagram`:
+
+### Step 0 — Resolve output path
+
+If the task payload includes `Vault:` (non-null):
+1. Read `~/.claude/config/obsidian-vaults.json`. If missing, report `status: blocked` with "obsidian-vaults.json not found".
+2. Resolve the vault path from the config (use the named vault or `default`).
+3. If `Folder:` is set, append it to the vault path. Create the folder if it does not exist.
+4. Set output path to `{vault_path}/{folder}/diagram.d2`.
+
+If no `Vault:` in payload → use default: `session-docs/{feature}/diagram.d2`.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -145,7 +175,7 @@ Invoke `d2-diagrammer` via Task tool with:
 - Feature name
 - Path to architect's analysis: `session-docs/{feature}/00-research.md`
 - Path to skill: `.claude/skills/d2-diagram/`
-- Output path: `session-docs/{feature}/diagram.d2`
+- Output path: `{resolved output path from Step 0}`
 
 Gate: if `status: failed` → report to user. If `status: blocked` (d2 not installed) → relay install instructions.
 
