@@ -13,6 +13,7 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 | **Hotfix** | `@th-orchestrator hotfix <urgent fix>` | Fast-path bug-fix that skips architect root-cause. Regression test still mandatory. |
 | **Refactor** | `@th-orchestrator refactor <X>` · `@th-orchestrator rename <X>` | Structure-only changes. Existing tests guard against behavior drift. |
 | **Security-sensitive** | Auto-triggered by path patterns (`auth/`, `middleware/`, `db/`, etc.) or keywords | Forces `security` agent in parallel during verify. Cannot be downgraded. |
+| **Frontend-scope** | Auto-triggered by path patterns (`components/`, `pages/`, `*.tsx`, `*.vue`, CSS) or UI/UX keywords | Adds `ux-reviewer` in Stage 1 (enrich: UI/UX AC) and Stage 3 (validate: accessibility, responsiveness, component reuse). Only critical findings block. |
 | **Database changes** | Auto-triggered when diff touches migration files | Architect declares migration strategy; plan-reviewer validates reversibility. |
 | **Test pipeline** | `/test-pipeline` · `@th-orchestrator run the test pipeline` | Service-wide coverage analysis. No code changes; produces a prioritized test list. |
 | **Research** | `/research <topic>` · `@th-orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `01-research.md`, no code committed. |

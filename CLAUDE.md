@@ -411,6 +411,7 @@ Routing table for this repo:
 | Security review of hooks, installer, or MCP (elevated privileges on user's machine) | `security` | OWASP/CWE-aligned report |
 | Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |
 | Documentation (`type: docs`) | th-orchestrator → `architect` (research mode) → `documenter` → `diagrammer` (conditional) → `qa` | `00-research.md` + Obsidian vault pages + `02-documentation.md` manifest + `04-validation.md` |
+| Frontend-scope tasks (`frontend-scope: true`) | Standard pipeline + `ux-reviewer` (enrich after architect in Stage 1, validate in parallel in Stage 3) | `01-ux-review.md` + `04-ux-validation.md` |
 | Bug fix (`type: fix`) | th-orchestrator → `architect` (root-cause mode) → `tester` (Phase 2.0 regression test) → `implementer` (scope-discipline) → `tester` + `qa` + `security` (always, parallel) → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
 | Hotfix (`type: hotfix`) | same as bug fix, Phase 1 skipped (no `01-root-cause.md`); th-orchestrator emits 1-sentence prose plan at STAGE-GATE-1 | full feature backbone minus `01-root-cause.md`; PR title appends `(hotfix)` suffix |
 
