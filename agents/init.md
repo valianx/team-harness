@@ -270,52 +270,99 @@ Insert the following block VERBATIM. Same text in every repo. No per-project ada
 - Do not delete, rewrite, or skip tests to make a build green — fix the code or fix the test with a documented rationale in the PR body.
 ```
 
-**7. Architecture Decisions**
+**7. Document Hygiene**
+
+Insert the following block VERBATIM. Same text in every repo. Do NOT compress, split, or paraphrase.
+
+```markdown
+## 7. Document Hygiene
+
+CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`.
+
+### 7.1 Size rules
+
+| Section | Max entries in CLAUDE.md | Overflow target |
+|---------|------------------------|-----------------|
+| Architecture Decisions (§8) | 10 | `docs/decisions.md` |
+| Patterns & Conventions (§9) | 10 | `docs/patterns.md` |
+| Known Constraints (§10) | 10 | `docs/constraints.md` |
+| Testing Conventions (§11) | 10 | `docs/testing.md` |
+
+When a section exceeds its limit, the delivery agent extracts older entries to the overflow file and replaces the section body with a pointer:
+
+```
+See `docs/decisions.md` for the full log. Recent entries kept inline below.
+```
+
+### 7.2 What belongs in CLAUDE.md vs docs/
+
+| CLAUDE.md | docs/ |
+|-----------|-------|
+| Golden commands (copy-paste ready) | Extended decision rationale |
+| Tech stack summary (one table) | Migration guides, ADRs |
+| Current conventions (active rules) | Historical patterns, superseded decisions |
+| Architectural boundaries (one-liners) | Detailed constraint analysis |
+| Pointers to docs/ files | The detailed content itself |
+
+### 7.3 docs/ structure
+
+| File | Content | Updated by |
+|------|---------|-----------|
+| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | delivery agent |
+| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | delivery agent (auto-offload) |
+| `docs/patterns.md` | Patterns overflow (pattern + example path) | delivery agent (auto-offload) |
+| `docs/constraints.md` | Constraints overflow (constraint + detail) | delivery agent (auto-offload) |
+| `docs/testing.md` | Testing conventions overflow (convention + description) | delivery agent (auto-offload) |
+
+The delivery agent creates overflow files on first offload. Agents read `docs/knowledge.md` before every task; overflow files are read on-demand when the CLAUDE.md pointer section is relevant.
+```
+
+**8. Architecture Decisions**
 <!-- Populated by delivery agent after each feature. Leave empty at init. -->
 
-**8. Patterns & Conventions**
+**9. Patterns & Conventions**
 <!-- Populated by delivery agent after each feature. Leave empty at init. -->
 
-**9. Known Constraints**
+**10. Known Constraints**
 <!-- Populated by delivery agent after each feature. Leave empty at init. -->
 
-**10. Testing Conventions**
+**11. Testing Conventions**
 <!-- Populated by delivery agent after each feature. Leave empty at init. -->
 
-**11. Interfaces & Contracts** *(backend/fullstack only)*
+**12. Interfaces & Contracts** *(backend/fullstack only)*
 - HTTP endpoints location and how to add new ones
 - Event schemas/topics (if applicable)
 - DTO/validation conventions
 
-**12. Page & Routing Structure** *(frontend/fullstack only)*
+**13. Page & Routing Structure** *(frontend/fullstack only)*
 - How pages/routes are organized
 - Dynamic routes, layouts, metadata conventions
 
-**13. State & Data Patterns** *(frontend/fullstack only)*
+**14. State & Data Patterns** *(frontend/fullstack only)*
 - Server state vs client state approach
 - Form handling patterns
 - Caching strategies
 
-**14. Security & Compliance** *(backend/fullstack only)*
+**15. Security & Compliance** *(backend/fullstack only)*
 - AuthN/AuthZ boundary notes
 - Secrets handling (env vars, secret manager)
 - PII/logging redaction rules
 
-**15. Performance & Accessibility** *(frontend/fullstack only)*
+**16. Performance & Accessibility** *(frontend/fullstack only)*
 - Core Web Vitals targets (if defined)
 - Image/bundle optimization approach
 - WCAG compliance level (if defined)
 
-**16. Observability** *(backend/fullstack only)*
+**17. Observability** *(backend/fullstack only)*
 - Logging format and required fields
 - Tracing conventions
 - Metrics (if present)
 
-**17. Git & Delivery Conventions**
+**18. Git & Delivery Conventions**
 
 Branch naming, commit format, PR/CHANGELOG requirements, and safe-change policy are documented in §6 Mandatory Working Agreements (during-work and post-work sub-blocks). This section is intentionally a pointer to keep one source of truth.
 
-**18. Subagent Orchestration**
+**19. Subagent Orchestration**
 Include a routing table based on the detected project type.
 
 | Intent | Subagent | Output |
@@ -332,7 +379,7 @@ Escalation rules:
 - DB schema changes → recommend architecture review
 - Accessibility-sensitive → route to frontend architect
 
-**19. When to Ask Humans**
+**20. When to Ask Humans**
 - Business rule ambiguity
 - Production data migrations
 - Changes impacting payments/auth/admin/PII

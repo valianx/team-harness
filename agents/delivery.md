@@ -226,10 +226,16 @@ Read CLAUDE.md. Add entries to the memory sections below. **Create the sections 
 - **Deduplicate:** if a similar entry already exists, update it instead of adding a duplicate
 - **Never delete** existing entries
 - Max ~20 entries per section — if approaching the limit, consolidate older entries that have been superseded
-- **Proactive consolidation:** When a section exceeds 15 entries, you MUST consolidate before adding new ones:
+- **Proactive consolidation:** When a section exceeds 8 entries, you MUST consolidate before adding new ones:
   1. Group related entries into consolidated summaries
   2. Remove entries that are now obvious from the code itself
-  3. Keep max 15 active entries per section after consolidation
+  3. Keep max 10 active entries per section after consolidation
+- **Auto-offload to docs/ (mandatory when section exceeds 10 entries):**
+  When a CLAUDE.md section (§8 Architecture Decisions, §9 Patterns & Conventions, §10 Known Constraints, §11 Testing Conventions) still exceeds 10 entries after consolidation:
+  1. Create the overflow file if it does not exist (`docs/decisions.md`, `docs/patterns.md`, `docs/constraints.md`, or `docs/testing.md`) with a header matching the section name
+  2. Move the oldest entries (keep the 5 most recent inline) to the overflow file — append, never overwrite existing overflow content
+  3. Add a pointer line at the top of the CLAUDE.md section: `> Full history: see \`docs/{file}.md\`. Recent entries below.`
+  4. Log the offload in the status block: `offloaded: {N} entries from §{section} to docs/{file}.md`
 - Language: English — all entries must be written in English
 - If no knowledge was extracted in Step 4, skip this step
 
@@ -801,6 +807,7 @@ Write delivery summary to `session-docs/{feature-name}/05-delivery.md`:
 
 ## CLAUDE.md Sections Updated
 - {list of sections updated, or "No updates needed"}
+- {offloaded: N entries from §X to docs/Y.md, or omit if no offload}
 
 ## docs/knowledge.md Updated
 - {entries added, or "No updates needed"}
