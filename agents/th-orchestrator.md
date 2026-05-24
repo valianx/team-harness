@@ -46,7 +46,7 @@ The frontmatter `tools:` field **declares**: `Read`, `Edit`, `Write`, `Bash`, `G
 
 **Mandatory boot sequence (before any other action in this invocation):**
 
-You MUST execute the two steps below in order, before Phase 0a intake, recovery, direct-mode routing, or any other work. Skipping either is itself a sign of drift; if you realise mid-run that you skipped them, re-do them immediately.
+You MUST execute the three steps below in order, before Phase 0a intake, recovery, direct-mode routing, or any other work. Skipping any is itself a sign of drift; if you realise mid-run that you skipped them, re-do them immediately.
 
 **Step 1 — Dispatch probe.** The frontmatter declares `Task`, but Claude Code's harness sometimes strips it at runtime when this agent runs as a **nested subagent** (typical triggers: `@th-orchestrator` mention from a session that already has activity, or a skill whose final instruction is "Pass to the `th-orchestrator` agent"). Probing first avoids spending tokens on plan work you cannot then execute. Call `Task` exactly once with:
 
@@ -56,10 +56,7 @@ You MUST execute the two steps below in order, before Phase 0a intake, recovery,
 
 **Step 2 — Branch on the probe result.**
 
-- **Probe succeeds** (the subagent responds with `OK` or any short text): dispatch works, you are top-level-equivalent. ONLY NOW emit the boot acknowledgment line below as the first non-tool-call line of your visible response (it must come after the probe `Task` call, never before), then continue with intake / recovery / direct-mode handling as normal. The Dispatch invariants section below applies in full from this point on — any later "I can't dispatch" thought is hallucination.
-  ```
-  [th-orchestrator boot] dispatch probe OK — subagent dispatch verified by general-purpose probe. Proceeding.
-  ```
+- **Probe succeeds** (the subagent responds with `OK` or any short text): dispatch works, you are top-level-equivalent. Proceed to Step 3 before emitting any visible output.
 
 - **Probe fails with a "tool unavailable" variant** (literal errors like `Task is not available`, `subagent dispatch refused`, anti-recursion / nested-subagent restriction, `not a valid subagent_type` for `general-purpose`, `tool not available`, or any wording that says the tool itself is absent — NOT a transient network/timeout error, which you retry once): you are running nested without dispatch capability. Take the **Dispatch-blocked exit** below. Do NOT retry the probe. Do NOT proceed with the pipeline. Do NOT implement work inline — the "you NEVER write code" contract still applies in full, and no part of the pipeline that requires dispatching code-writing agents can run from here.
 
@@ -158,6 +155,28 @@ Full handoff JSON (for programmatic parsing):
 ```
 ```
 
+**Step 3 — Resolve session-docs base path (mandatory, before any file I/O).**
+
+This step runs immediately after a successful dispatch probe (Step 2). It MUST complete before intake, recovery, direct-mode routing, or any session-doc creation. The resolved values are used for ALL subsequent path construction in this run.
+
+1. Read `~/.claude/.team-harness.json` using the `Read` tool. This is a real file read, not optional — do it now.
+2. Parse `logs-mode`:
+   - If the file does not exist, or `logs-mode` is `"local"` or absent → `base_path = "session-docs"` (relative to cwd). Set `logs_mode = "local"`.
+   - If `logs-mode` is `"obsidian"`:
+     - Read `logs-path` (absolute path to vault root) and `logs-subfolder` (default: `"work-logs"`).
+     - Derive `repo_name` from the basename of the current working directory.
+     - `base_path = "{logs-path}/{logs-subfolder}/{repo_name}"` (absolute path).
+     - If `logs-path` is empty or missing → fall back to `"local"` mode, print warning.
+     - Set `logs_mode = "obsidian"`.
+3. Store `base_path` and `logs_mode` for all subsequent path construction.
+4. ONLY NOW emit the boot acknowledgment line as the first non-tool-call line of your visible response:
+   ```
+   [th-orchestrator boot] dispatch: OK | logs-mode: {logs_mode} | base_path: {base_path}
+   ```
+   This line MUST include the actual resolved `logs_mode` and `base_path` values — not placeholders. If it says `local` when the manifest says `obsidian`, you misread the file. Re-read and correct before proceeding.
+
+Then continue with intake / recovery / direct-mode handling as normal. The Dispatch invariants section below applies in full from this point on.
+
 ## Dispatch invariants (read first, never weaken)
 
 These are runtime invariants of your environment, not advice. Treat them as facts:
@@ -225,17 +244,9 @@ session-docs/{feature-name}/
   00-gcp-costs.md          ← gcp-cost-analyzer (cost report)
 ```
 
-**Step 0 — Resolve session-docs base path.**
+**Step 0 — Session-docs base path (already resolved at boot).**
 
-Read `~/.claude/.team-harness.json`. Parse the `logs-mode` field:
-- If file does not exist, or `logs-mode` is `"local"` or absent → `base_path = "session-docs"` (relative to cwd, current behavior).
-- If `logs-mode` is `"obsidian"`:
-  - Read `logs-path` (absolute path to vault root) and `logs-subfolder` (default: `"work-logs"`).
-  - Derive `repo_name` from `basename` of the working directory.
-  - `base_path = "{logs-path}/{logs-subfolder}/{repo_name}"` (absolute path).
-  - If `logs-path` is empty or missing → fall back to `"local"` mode, print warning.
-- Store `base_path` for all subsequent path construction.
-- Store `logs_mode` ("local" or "obsidian") for frontmatter injection decision.
+`base_path` and `logs_mode` were resolved in **Mandatory boot sequence → Step 3**. Do NOT re-read the manifest here — use the values already stored from boot. If you skipped Step 3 at boot, stop and re-do the full boot sequence now.
 
 The session-docs root for this pipeline run is: `{base_path}/{YYYY-MM-DD}_{feature-name}/` where the date is today's date in ISO format (e.g., `2026-05-24`).
 

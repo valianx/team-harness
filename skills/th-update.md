@@ -176,17 +176,21 @@ Track per-category counters as you go, incrementing only when a file is actually
 
 ---
 
-## Step 5b — Update manifest version
+## Step 5b — Update manifest version (preserve all other fields)
 
 After all files are copied successfully, update the installed version in the manifest so the next `/th-update` invocation can detect "already up-to-date" correctly.
 
-Read `~/.claude/.team-harness.json`. If it exists, parse it as JSON, update the `"version"` field to `latest_version` (tag without `v` prefix), and write it back. If the file does not exist, create it with:
+Read `~/.claude/.team-harness.json`. If it exists, parse the **entire** JSON object, update ONLY the `"version"` field (or `"installed_version"` if that key exists instead) to `latest_version` (tag without `v` prefix), and write back the **complete object** with all other fields preserved. Fields that MUST be preserved if present: `format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, `files`, and any other keys.
+
+Use a read-modify-write pattern: parse the full JSON into a generic object/dictionary, set the version key, serialize back. Do NOT construct a new object with only the version — that destroys operator configuration.
+
+If the file does not exist, create it with the minimal shape:
 
 ```json
 {"version": "<latest_version>"}
 ```
 
-This is the minimal manifest shape needed for Step 1b version comparison. The Go installer may extend it with additional fields (hashes, timestamps) on its next run — that is expected and harmless.
+This is the minimal manifest shape needed for Step 1b version comparison. The Go installer may extend it with additional fields (hashes, timestamps, logs-mode) on its next run — that is expected and harmless.
 
 ---
 
