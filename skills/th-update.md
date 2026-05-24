@@ -2,28 +2,7 @@ Pull the latest team-harness release into `~/.claude/` inline, without launching
 
 ## Voice
 
-You speak as a professional instrument: formal, neutral, declarative. The following rules apply to every response you produce — chat replies, status blocks, session-doc prose, memory writes, self-corrections, apologies, and error messages. There is no informal-chat-mode loophole.
-
-**Forbidden in any response:**
-- Enthusiasm markers: "Perfecto", "Excelente", "Genial", "Listo", "Great", "Excellent".
-- Emoji decoration of routine status (`✅`, `⚠️`, `🎉`, `✨`).
-- First-person personality: "Creo que", "Me parece", "I think", "I believe".
-- Anthropomorphic framing: "Yo voy a", "I'll go", "Quiero ayudarte", "Let me".
-- Affirmations directed at the operator: "Buena pregunta", "Tenés razón", "That makes sense".
-- Filler closings: "Espero que esto te sirva", "Hope this helps", "Let me know if anything else comes up".
-- Colloquialisms: "La cagué", "Mea culpa", "shippeo", "bakeado", "wrappear", "no vuelvo a asumirlo".
-- Marketing tone: "potente", "innovador", superlatives.
-
-**Required:**
-- Declarative statements of fact: "The command returned exit code 0", "Three options are available".
-- Direct action descriptions: "X was executed", "Y was updated", "Z requires manual action by the operator".
-- Concise summaries: a status block, a table, or a 2-3 sentence outcome. No padding, no celebration.
-
-**Correct form for a self-correction:** `Push to a previously merged branch was incorrect. Future runs verify with gh pr view before pushing additional commits.`
-
-**Incorrect form (forbidden):** `Mea culpa. La cagué pusheando. No vuelvo a asumirlo.`
-
-The operator can chat in any language; you reply in the operator's chat language, but the voice rules above apply regardless of language.
+Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no first-person personality, no filler closings. Session-docs prose follows the operator's chat language; structural elements (headers, field names, status-block keys) stay English.
 
 Analyze the input: $ARGUMENTS
 
@@ -84,6 +63,44 @@ failed to resolve latest release tag from https://github.com/valianx/team-harnes
 and stop. Do not retry.
 
 Store the tag for use in subsequent steps.
+
+---
+
+## Step 1b — Compare against installed version (skip if up-to-date)
+
+Read the installed version from the th-orchestrator agent file:
+
+```bash
+installed=$(grep -m1 '^var version\|^## team-harness' ~/.claude/agents/th-orchestrator.md 2>/dev/null | head -1)
+```
+
+If that doesn't work, try reading the manifest:
+
+```bash
+installed_version=$(cat ~/.claude/.claude-dev-team-manifest.json 2>/dev/null | grep -o '"version":"[^"]*"' | head -1 | sed 's/"version":"//;s/"//')
+```
+
+Compare the resolved tag (e.g., `v2.17.0`) against the installed version. The tag has a `v` prefix; the manifest version does not. Strip the `v` prefix for comparison:
+
+```bash
+latest_version=${tag#v}
+```
+
+**If the versions match** (`latest_version` equals `installed_version`), print:
+
+```
+team-harness up to date
+-----------------------
+installed: v<installed_version>
+latest:    <tag>
+
+No update needed. To force a full reinstall, use the installer:
+  curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
+```
+
+and stop. Do not download, extract, or copy anything.
+
+**If the versions differ or the installed version cannot be determined** (manifest missing, grep failed), proceed to Step 2.
 
 ---
 
@@ -226,7 +243,7 @@ No emoji, no leading marker, no rephrasing. Print this even on a partial-failure
 - This skill does NOT route through the th-orchestrator.
 - This skill does NOT launch the Go installer binary, `install.sh`, `install.ps1`, or `install.cmd`. The previous version of this skill did, and the binary's output was unreadable to the agent because the binary ran in a separate process (a new console window on Windows). This skill drives the update entirely inline so the summary and any errors stay in the agent's transcript.
 - This skill does NOT prompt the operator interactively. There are no credentials to capture — `MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, and `CONTEXT7_API_KEY` were already written to `~/.claude.json` during the original bootstrap install and are not touched here.
-- This skill does NOT compare versions or print a "you have X, latest is Y" line. The operator gets the release tag back; if they need to compare against their installed version, they read `~/.claude/.claude-dev-team-manifest.json` themselves.
+- This skill compares the latest release tag against the installed version (from manifest). If they match, it prints "up to date" and exits without downloading. To force a full reinstall regardless, use the installer one-liner.
 - This skill does NOT write to `session-docs/`.
 - This skill does NOT retry on network failure. The agent surfaces the error and the operator re-invokes `/th-update` when their connection is back.
 - The skill always overwrites. Operators who customize agents should fork the repo or contribute upstream — local edits to `~/.claude/agents/*.md` are explicitly out of scope.
