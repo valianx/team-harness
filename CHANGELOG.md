@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-05-23
+
+### Changed
+
+- **Slim Voice blocks** (`agents/*.md`): replaced the 24-line Voice block in 18 non-orchestrator agents with a 3-line summary. The th-orchestrator keeps the full block as the only agent that communicates with the operator. Saves ~392 lines of duplicated context, reducing token consumption per agent dispatch.
+
 ## [2.16.0] - 2026-05-23
 
 ### Added
