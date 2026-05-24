@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-05-23
+
+### Added
+
+- **UX Reviewer agent** (`agents/ux-reviewer.md`): Opus/high agent for UI/UX review on frontend tasks. Auto-dispatched when `frontend-scope: true`. Participates in Stage 1 (enrich mode — adds accessibility, responsiveness, interaction states, component reuse AC) and Stage 3 (validate mode — checks WCAG compliance, component duplication, frontend pattern consistency in parallel with tester/qa/security). Only critical findings (WCAG A violations) block delivery; all other findings are recommendations.
+- **`frontend-scope` classification** in th-orchestrator Phase 0a Step 7: auto-detected via file paths (`components/`, `pages/`, `*.tsx`, `*.vue`, CSS) and UI/UX keywords (`button`, `form`, `modal`, `responsive`, `accessibility`). Same pattern as `security-sensitive`.
+
 ## [2.16.1] - 2026-05-23
 
 ### Changed
