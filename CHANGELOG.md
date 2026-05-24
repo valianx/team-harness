@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-05-24
+
+### Added
+
+- **Orchestrator nesting guard** (`hooks/orchestrator-guard.sh`, `hooks/config.json`): PreToolUse hook on the `Agent` tool that blocks `subagent_type=th-orchestrator` calls. Prevents the nesting problem where the orchestrator loses the Task tool at depth 1. All three platforms (Windows, macOS, Linux).
+- **Global CLAUDE.md orchestrator rule** (`cmd/install/global_claude_md.go`): installer injects an idempotent "th-orchestrator inline execution" section into `~/.claude/CLAUDE.md`, instructing Claude Code to run the orchestrator at top level (depth 0) instead of spawning it as a subagent. Wrapped in HTML comment markers for safe updates across installs.
+- **Installer "Global Config" section** (`cmd/install/main.go`): new install phase that writes system-wide rules to `~/.claude/CLAUDE.md` after file installation. Currently handles the orchestrator inline-execution rule.
+
 ## [2.19.1] - 2026-05-24
 
 ### Fixed

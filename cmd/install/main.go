@@ -24,7 +24,7 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.19.1"
+var version = "2.20.0"
 
 // forceFlag is preserved as a no-op for backward compatibility. The installer
 // always overwrites embedded files; this flag once disabled the conflict gate,
@@ -88,6 +88,9 @@ func main() {
 	existingC7 := mapGet(existing, "context7")
 	existingC7Key := strings.TrimSpace(mapGetString(existingC7, "headers", "CONTEXT7_API_KEY"))
 	context7Preserved := context7Key == existingC7Key && isValidContext7Key(existingC7Key)
+
+	sectionHeader("Global Config")
+	ensureGlobalClaudeMD()
 
 	fmt.Println("Registering MCP servers in ~/.claude.json...")
 	backupPath := registerMCPServers(context7Key, memChoice)
