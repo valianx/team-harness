@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-05-23
+
+### Fixed
+
+- **Duplicate "Install Mode" header** (`cmd/install/prompts.go`): removed the internal header from `promptInstallMode()` — `sectionHeader("Install Mode")` in main.go already provides it.
+- **Terminal closes after install** (`bin/install.ps1`): replaced `exit $proc.ExitCode` with `$LASTEXITCODE` assignment so the terminal stays open after `irm | iex` installs.
+
 ## [2.18.0] - 2026-05-23
 
 ### Added
