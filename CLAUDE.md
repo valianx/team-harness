@@ -257,63 +257,56 @@ The three things a developer already knows how to ask for — a work plan, an im
 
 ### 7.3 Language — English-only repo content
 
-Every committed artefact is in English: `README.md`, all files under `docs/`, `agents/*.md`, `skills/*.md`, `CLAUDE.md`, `cmd/install/*.go` strings, `bin/install.{sh,ps1,cmd}` echoes, `hooks/*.sh` echoes, `.github/workflows/*.yml`, `CHANGELOG.md`, commit messages, PR titles and bodies.
+Every committed artefact is in English. Session-docs prose follows the operator's chat language (structure stays English). Live chat is not a committed artefact — operator may chat in any language.
 
-**Why:** team-harness is open-source and targets an international developer audience. Mixed-language repos are jarring, harder to grep, and force readers through a translation step. Live chat is ephemeral; repo content is the durable artefact that outlives any conversation.
+**Documented exceptions:** security/reviewer report bodies (Spanish per contract), th-orchestrator Step 6 routing table (bilingual intent patterns). Full language boundary table, session-docs rules, and contributor checklist are in `docs/voice-guide.md`.
 
-**Session-docs are NOT committed artefacts.** `session-docs/` is gitignored (see `.gitignore` line 2) — it is local working memory on each operator's machine, not published. The English-only rule does NOT cover session-doc PROSE content. Agent-composed prose inside session-doc bodies (analyses, summaries, decisions, hot context insights, verdict rationales) follows the **operator's chat language**. Structural elements that must remain machine-readable across operators stay English regardless: section headers (`## TL;DR`, `## Current State`, `## Agent Results`), field names (`status:`, `phase:`, `verdict:`), status-block keys, closed-set enum values (`success`, `pass`, `fail`, `APPROVE`), filenames (`01-architecture.md`), `dispatch_handoff` JSON keys. The boundary is **structure = English, body prose = operator language**.
+---
 
-**Documented exceptions** (committed artefacts where Spanish is allowed):
+## 7b. Document Hygiene
 
-- **`agents/security.md` report-body template, `04-security.md` report bodies, `agents/reviewer.md` review-body templates, `04-internal-review.md` / `05-internal-review.md` reviewer outputs.** The two agents are spec'd to produce Spanish-language reports per their existing contracts. The Spanish output is **only the body of those session-doc reports** (and the GitHub PR-review comment posted by `reviewer` in fresh mode). The agent's system prompt itself, the agent's status-block fields, and any framework-level field remain English. Note: under the session-docs rule above, the report body would already follow operator language; the security/reviewer contracts are the legacy expression of that rule applied selectively to committed PR comments as well.
-- **`agents/th-orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language and the th-orchestrator routes correctly. This is the explicit bridge between any-language chat and English-only repo content. The patterns themselves are not operator-facing text — they are intent classifiers.
+CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`.
 
-**`agents/translator.md` example glossary tables** are domain illustrations (Spanish source → English target translation examples), not operator copy. They illustrate what the translator does, not how team-harness speaks to the operator. They are out of scope for this guide.
+### File size cap
 
-**Live chat is NOT a committed artefact.** The English-only rule does NOT apply to chat replies — the operator may chat in any language and Claude replies in the operator's language. The rule scopes English to the durable repo surface only.
+**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing. Structural sections (§1-§7) are exempt — they shrink by extracting detailed tables/protocols to docs/ files (as done with §7.4-7.6 → `docs/voice-guide.md` and §14 protocol → `docs/subagent-orchestration.md`).
 
-### 7.4 Operator-supplied content boundary
+### Section size rules
 
-The agent never composes Spanish (post-audit, with the §7.3 exceptions). The operator may supply Spanish content, and the agent preserves it verbatim.
+| Section | Max entries in CLAUDE.md | Overflow target |
+|---------|------------------------|-----------------|
+| Architecture Decisions (§8) | 10 | `docs/decisions.md` |
+| Patterns & Conventions (§9) | 10 | `docs/patterns.md` |
+| Known Constraints (§10) | 10 | `docs/constraints.md` |
+| Testing Conventions (§11) | 10 | `docs/testing.md` |
 
-| What | Who composes it | Language |
-|---|---|---|
-| `summary:` field of a status block | Agent | English (machine-parseable surface) |
-| `status:` / `verdict:` / `event:` literal values (`success`, `pass`, `APPROVE`) | Agent (closed-set values) | English (literal tokens) |
-| `output:` path containing feature-name segment | Operator-supplied feature name passed through | Whatever the operator chose |
-| Session-doc filename (e.g. `01-architecture.md`) | Agent (structural) | English |
-| Session-doc section headers (`## TL;DR`, `## Current State`, `## Agent Results`, `## Handoff`) | Agent (structural) | English |
-| Session-doc table column headers, field labels (`Status:`, `Phase:`, `Last:`, `Next:`) | Agent (structural) | English |
-| `dispatch_handoff` JSON keys (`schema_version`, `next_dispatch`, `phase`, `autonomy`) | Agent (machine-parseable surface) | English |
-| Feature name (e.g. `exportación-de-facturas`) | Operator-supplied | Whatever the operator chose |
-| `00-task-intake.md` Original Description block | Operator-quoted | Whatever the operator said |
-| Prose body content inside session-doc sections (analyses, rationales, summaries, insights, narrative verdicts) | Agent | **Operator's chat language** (session-docs are gitignored — see §7.3) |
-| Prose body content in committed agent reports — `04-security.md`, `04-internal-review.md`, `05-internal-review.md` | Agent | Spanish (per §7.3 documented exception) |
-| Status-block `summary:` of every agent (including security, reviewer) | Agent | English (machine-parseable, always) |
-| Prose anywhere else (committed) | Agent | English (per §7.3) |
+When a section exceeds its limit, the delivery agent extracts older entries to the overflow file and replaces the section body with a pointer:
 
-**Rule of thumb (two-axis):**
-- **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on where it lives.
-- **Where does it live?** Gitignored session-docs → operator's chat language. Committed repo file → English (with the documented §7.3 exceptions).
+```
+See `docs/decisions.md` for the full log. Recent entries kept inline below.
+```
 
-### 7.5 th-orchestrator as the canonical entry point
+### What belongs in CLAUDE.md vs docs/
 
-When documenting how to invoke the system, treat `@th-orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+| CLAUDE.md | docs/ |
+|-----------|-------|
+| Golden commands (copy-paste ready) | Extended decision rationale |
+| Tech stack summary (one table) | Migration guides, ADRs |
+| Current conventions (active rules) | Historical patterns, superseded decisions |
+| Architectural boundaries (one-liners) | Detailed constraint analysis |
+| Pointers to docs/ files | The detailed content itself |
 
-The operator's mental model is: th-orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+### docs/ structure
 
-### 7.6 Application checklist (for contributors)
+| File | Content | Updated by |
+|------|---------|-----------|
+| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | delivery agent |
+| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | delivery agent (auto-offload) |
+| `docs/patterns.md` | Patterns overflow (pattern + example path) | delivery agent (auto-offload) |
+| `docs/constraints.md` | Constraints overflow (constraint + detail) | delivery agent (auto-offload) |
+| `docs/testing.md` | Testing conventions overflow (convention + description) | delivery agent (auto-offload) |
 
-Before opening a PR that adds or modifies operator-facing copy, walk through this checklist:
-
-- [ ] No enthusiasm markers, no emoji decoration of routine status messages.
-- [ ] No first-person personality or anthropomorphic framing.
-- [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
-- [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, session-doc templates). Exception: `/status` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/th-orchestrator.md` Step 6 routing table.
-- [ ] If the change documents how to invoke the system, the example uses `@th-orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
-
-`tests/test_agent_structure.py` Suite 25 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).
+The delivery agent creates overflow files on first offload. Agents read `docs/knowledge.md` before every task; overflow files are read on-demand when the CLAUDE.md pointer section is relevant.
 
 ---
 
@@ -384,39 +377,9 @@ Routing table for this repo:
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
 - Changing the th-orchestrator pipeline → architecture review mandatory; update `agents/th-orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
-> **Limitation — nested-context dispatch.** When `th-orchestrator` is invoked from a context where another agent is already active — for example, via an `@th-orchestrator` mention inside an ongoing agent session, via a skill that itself runs inside a parent agent, or via a chained orchestrator dispatch — the Claude Code harness strips the `Task` tool as an anti-recursion safety measure. The orchestrator cannot dispatch specialist agents and emits a `dispatch_handoff` directive instead.
->
-> **When this triggers:** any path where the orchestrator is NOT the first agent started from the user's top-level session.
->
-> **Correct invocation patterns:**
-> - From an interactive Claude Code session: type `@th-orchestrator <task>` directly — this is top-level and the `Task` tool is available.
-> - From a skill: skills route to the orchestrator via `Task(subagent_type=th-orchestrator, ...)` from top-level — this works correctly.
-> - From another agent: the other agent must emit a `dispatch_handoff` block back to top-level Claude, which then takes over per the protocol below.
->
-> **What to expect when the limitation triggers:** the orchestrator emits a "Dispatch handoff" response with a human-readable summary followed by a JSON block. Top-level Claude reads the summary, dispatches the named agent directly, and continues the pipeline — no user action needed.
+> **Limitation — nested-context dispatch.** When `th-orchestrator` runs nested (not top-level), the `Task` tool is stripped. The orchestrator emits a `dispatch_handoff` directive; top-level Claude takes over automatically. Full protocol in `docs/subagent-orchestration.md`.
 
-**Universal rule — auto-takeover on `blocked-no-dispatch` (applies regardless of how the th-orchestrator was invoked):**
-
-When the `th-orchestrator` subagent returns a response containing **"Dispatch handoff — top-level Claude takes over now"**, or when an existing `session-docs/{feature}/00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. This is not a user-decision point — the user already authorised the pipeline; the nested-context Task strip is a runtime detour, not a new authorisation.
-
-**Handoff payload (canonical).** The th-orchestrator emits a structured JSON `dispatch_handoff` block in its response (and embeds the same block in `00-state.md` § `## Handoff`). Top-level Claude parses that JSON to extract the variable fields — `next_dispatch.agent`, `phase`, `autonomy`, `round`, `state_ref`, `probe_error` — and follows the static protocol below. Treat the JSON as ground truth; if any prose contradicts it, JSON wins.
-
-**Takeover protocol (static, identical for every handoff):**
-
-1. Do NOT ask the user "should I take over?" The directive in the th-orchestrator's response is itself the authorisation.
-2. Do NOT re-invoke `@th-orchestrator` or any skill that routes via `Task(subagent_type=th-orchestrator, ...)` — that recreates the nested context and the boot probe will fail again.
-3. Parse `dispatch_handoff.next_dispatch.agent` from the JSON. If `state_ref` is set, read that state file (`## Current State` + `## Agent Results` + `## Handoff`). Read `agents/{next_dispatch.agent}.md` for the agent's contract (tools, inputs, status block). If `dispatch_handoff.phase.number` is set, also read the matching Phase section of `agents/th-orchestrator.md`.
-4. Dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session. Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the th-orchestrator's checkpointing protocol. Iterate per the th-orchestrator contract (max 3 iterations on `failed`/`blocked`).
-5. Continue through the remaining phases of the pipeline (Phase 3 verifies in parallel: `tester` + `qa` + `security` when sensitive; Phase 3.5 acceptance-gate; Phase 3.6 `acceptance-checker`; Phase 4 `delivery`). Respect gate semantics:
-   - **STAGE-GATE-2** (between PRs in Stage 2): if `dispatch_handoff.autonomy.granted` is `true`, skip silently; otherwise stop and ask the user.
-   - **STAGE-GATE-3** (before push in Stage 3): always stop and ask the user — autonomy never covers this gate.
-6. Top-level Claude still inherits the "you NEVER write code/tests/docs" contract during the takeover — dispatch agents for each phase, do not write `02-implementation.md` / `03-testing.md` / `04-validation.md` / `04-security.md` / `05-delivery.md` / `06-acceptance-check.md` inline.
-7. Mirror PR-level progress into `02-task-list.md` (Status field + AC checkbox) at each PR transition.
-8. Report to the user only at pipeline completion, at a mandatory STAGE-GATE, or when a non-recoverable failure needs human input.
-
-This rule applies to **every** entry mode: `@th-orchestrator` mention, skill routing (`/issue`, `/recover`, `/plan`, `/design`, `/deliver`, `/validate`, `/research`, `/spike`, `/test`, etc.), or another agent's referral. The `blocked-no-dispatch` state is the system's documented self-healing path — leaving it open for the user to resolve manually defeats the purpose.
-
-**`blocked-manual-push` handling** — when the `delivery` agent returns `status: blocked-manual-push`, the th-orchestrator emits a STOP block with the compare URL and `session-docs/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. The th-orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
+**Universal rule — auto-takeover on `blocked-no-dispatch`:** when the th-orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. Parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. This is not a user-decision point. Full takeover protocol (8 steps), handoff JSON schema, and `blocked-manual-push` handling are in `docs/subagent-orchestration.md`.
 
 ---
 

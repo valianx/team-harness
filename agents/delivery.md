@@ -230,6 +230,12 @@ Read CLAUDE.md. Add entries to the memory sections below. **Create the sections 
   1. Group related entries into consolidated summaries
   2. Remove entries that are now obvious from the code itself
   3. Keep max 10 active entries per section after consolidation
+- **File size check (mandatory after every CLAUDE.md update):**
+  After writing entries, check CLAUDE.md file size. If it exceeds 35 KB:
+  1. Identify the largest memory section (§8-§11) by line count
+  2. Offload that section using the auto-offload procedure below
+  3. Re-check. Repeat until under 35 KB or all sections are at minimum (5 entries each)
+  4. If still over 35 KB after offloading all memory sections, report in status block: `claude_md_size_warning: {size} bytes — structural sections need manual extraction to docs/`
 - **Auto-offload to docs/ (mandatory when section exceeds 10 entries):**
   When a CLAUDE.md section (§8 Architecture Decisions, §9 Patterns & Conventions, §10 Known Constraints, §11 Testing Conventions) still exceeds 10 entries after consolidation:
   1. Create the overflow file if it does not exist (`docs/decisions.md`, `docs/patterns.md`, `docs/constraints.md`, or `docs/testing.md`) with a header matching the section name

@@ -188,6 +188,19 @@ If consulted, follow the playbook (resolve-library-id → get-library-docs) — 
    - Print: `Inserted Mandatory Working Agreements section into CLAUDE.md (position: after §5 / end-of-file).`
 4. **Renumbering.** **Never auto-renumber the rest of the file.** Numbers in a user's customised CLAUDE.md may not match the template and rewriting them is risky. The newly-inserted section keeps the verbatim heading `## 6. Mandatory Working Agreements`. If it collides with the user's existing §6, the user is expected to manually renumber at their own pace. The status line tells the user what happened.
 
+**§7 Document Hygiene upgrade-path (same pattern as §6):**
+
+1. **Detection.** Use Grep with the exact regex `^## (?:\d+\.\s+)?Document Hygiene\s*$` against the existing CLAUDE.md. This tolerates numbered forms (e.g., `## 7. Document Hygiene`) and the un-numbered form (`## Document Hygiene`).
+2. **If found.** Do nothing. Print: `Document Hygiene section already present in CLAUDE.md — no change.`
+3. **If not found.** Insert the section:
+   - Look for the Mandatory Working Agreements section (any numbered form) using Grep.
+   - If present, insert the Document Hygiene block immediately after the Mandatory Working Agreements section ends (right before the next `## ` heading).
+   - If absent, insert at the very end of the file with a leading comment: `<!-- Inserted by init: Document Hygiene section was missing -->`.
+   - Print: `Inserted Document Hygiene section into CLAUDE.md (position: after §6 / end-of-file).`
+4. **Renumbering.** Same rule as §6 — never auto-renumber. The inserted section keeps the verbatim heading `## 7. Document Hygiene`.
+
+**Run both upgrade-path checks (§6 then §7) in sequence** on every existing CLAUDE.md before proceeding to section generation.
+
 For a completely new CLAUDE.md (no existing file), ask the user whether to proceed, then generate all sections from scratch.
 
 Create or update `CLAUDE.md` at repository root. Include only sections relevant to the detected project type.
@@ -279,7 +292,11 @@ Insert the following block VERBATIM. Same text in every repo. Do NOT compress, s
 
 CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`.
 
-### 7.1 Size rules
+### 7.1 File size cap
+
+**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing.
+
+### 7.2 Section size rules
 
 | Section | Max entries in CLAUDE.md | Overflow target |
 |---------|------------------------|-----------------|
@@ -294,7 +311,7 @@ When a section exceeds its limit, the delivery agent extracts older entries to t
 See `docs/decisions.md` for the full log. Recent entries kept inline below.
 ```
 
-### 7.2 What belongs in CLAUDE.md vs docs/
+### 7.3 What belongs in CLAUDE.md vs docs/
 
 | CLAUDE.md | docs/ |
 |-----------|-------|
@@ -304,7 +321,7 @@ See `docs/decisions.md` for the full log. Recent entries kept inline below.
 | Architectural boundaries (one-liners) | Detailed constraint analysis |
 | Pointers to docs/ files | The detailed content itself |
 
-### 7.3 docs/ structure
+### 7.4 docs/ structure
 
 | File | Content | Updated by |
 |------|---------|-----------|
