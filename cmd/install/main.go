@@ -24,7 +24,7 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.19.0"
+var version = "2.19.1"
 
 // forceFlag is preserved as a no-op for backward compatibility. The installer
 // always overwrites embedded files; this flag once disabled the conflict gate,
@@ -53,6 +53,15 @@ func main() {
 	fmt.Printf("  platform: %s\n", colorLabel(runtime.GOOS))
 	fmt.Println()
 
+	ensureDir(claudeDir)
+	loadManifest()
+	if prev := manifest.InstalledVersion; prev != "" {
+		fmt.Printf("Detected previous install (version %s). Updating...\n", prev)
+	} else {
+		fmt.Println("Fresh install.")
+	}
+	fmt.Println()
+
 	sectionHeader("Dependencies")
 	checkDependencies()
 
@@ -67,14 +76,6 @@ func main() {
 
 	sectionHeader("Work-Logs Output")
 	promptLogsMode()
-
-	ensureDir(claudeDir)
-	loadManifest()
-	if prev := manifest.InstalledVersion; prev != "" {
-		fmt.Printf("Detected previous install (version %s). Updating...\n", prev)
-	} else {
-		fmt.Println("Fresh install.")
-	}
 	fmt.Println()
 
 	sectionHeader("Installing Files")

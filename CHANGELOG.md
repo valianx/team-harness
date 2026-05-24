@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.1] - 2026-05-24
+
+### Fixed
+
+- **`/th-update` destroys manifest config** (`skills/th-update.md`): Step 5b now uses read-modify-write to preserve all existing manifest fields (`logs-mode`, `logs-path`, `logs-subfolder`, etc.) instead of overwriting with `{"version":"..."}` only.
+- **Installer `loadManifest()` ordering** (`cmd/install/main.go`): moved `loadManifest()` before interactive prompts so `promptLogsMode()` can read existing config from disk without being overwritten afterwards.
+- **Boot sequence enforces manifest read** (`agents/th-orchestrator.md`): session-docs path resolution (`logs-mode`/`base_path`) is now part of the mandatory 3-step boot sequence (new Step 3) instead of a skippable Step 0. Boot acknowledgment line now prints detected `logs-mode` and `base_path` for immediate visibility.
+
 ## [2.19.0] - 2026-05-24
 
 ### Added
