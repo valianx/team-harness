@@ -9,7 +9,7 @@
     {
       "name": "th",
       "displayName": "Team Harness",
-      "source": ".",
+      "source": {"source": "github", "repo": "valianx/team-harness"},
       "description": "Orchestrated Claude Code agent system: architect, implement, test, and deliver via a multi-agent pipeline",
       "version": "2.29.0",
       "category": "development",
