@@ -26,7 +26,7 @@
 
 ```
 /plugin marketplace update team-harness-marketplace
-/plugin install th
+/reload-plugins
 ```
 
 ---
