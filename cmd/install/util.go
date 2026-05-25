@@ -39,32 +39,72 @@ func readLineFrom(scan *bufio.Scanner) string {
 	return ""
 }
 
+// promptMenu prints the prompt and reads a single-character menu choice from
+// an interactive input source. valid is the set of accepted lower-case
+// characters; defaultVal is returned when the user presses Enter without
+// typing, or when no interactive source is available (CI/non-interactive).
+//
+// This function is retained for the test suite (tty_test.go). The interactive
+// install path now uses the huh TUI form; this function is only called from
+// the non-interactive fallback in session_docs.go and is covered by regression
+// tests that verify the /dev/tty-over-stdin behaviour.
+func promptMenu(prompt string, valid map[string]bool, defaultVal string) string {
+	input := openInteractiveInput()
+	if input == nil {
+		return defaultVal
+	}
+	defer input.Close()
+	scan := newScanner(input)
+
+	const maxAttempts = 3
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		fmt.Print(prompt)
+		var raw string
+		if scan.Scan() {
+			raw = strings.TrimSpace(scan.Text())
+		}
+
+		if raw == "" {
+			return defaultVal
+		}
+
+		if isPasteInput(raw) {
+			fmt.Fprintf(os.Stderr, "  Pasted content ignored. This prompt accepts only: %s\n", validKeysSorted(valid))
+			if attempt < maxAttempts {
+				fmt.Fprintln(os.Stderr, "  Try again.")
+			}
+			continue
+		}
+
+		lower := strings.ToLower(raw[:1])
+		if valid[lower] {
+			return lower
+		}
+
+		fmt.Fprintf(os.Stderr, "  Invalid input %q. Expected one of: %s\n", raw, validKeysSorted(valid))
+		if attempt < maxAttempts {
+			fmt.Fprintln(os.Stderr, "  Try again.")
+		}
+	}
+	fmt.Fprintf(os.Stderr, "Error: too many invalid attempts. Aborting.\n")
+	os.Exit(1)
+	return "" // unreachable
+}
+
 // promptMenuWith prints prompt and reads a single-character menu choice.
 // valid is the set of accepted lower-case characters; defaultVal is returned
-// when the user presses Enter without typing, or when no interactive source
-// is available (CI/non-interactive).
+// when the user presses Enter without typing.
 //
-// scan is the caller-supplied scanner, used only when stdin is a TTY
-// (normal interactive shell). When stdin is NOT a TTY — the curl | bash case,
-// where bash has the rest of install.sh sitting in the pipe — this function
-// opens /dev/tty directly instead of reading from scan. Reading from the
-// caller-supplied scan in that situation would consume install.sh leftover
-// bytes (e.g., "exit $?\n") as operator input, triggering the paste-detection
-// error incorrectly.
+// scan is the caller-supplied scanner. When stdin is NOT a TTY (curl | bash
+// case), the function opens /dev/tty directly instead of reading from scan to
+// avoid consuming bash's remaining stdin bytes as operator input.
 //
-// Invalid single-character input triggers a re-prompt (up to maxAttempts=3).
-// Multi-character or structured input (starting with '{', '[', '"') exits
-// immediately: the scanner buffer is now polluted with remaining lines, and
-// there is no safe way to flush a bufio.Scanner mid-stream. The operator must
-// re-run the installer and answer prompts one at a time.
+// This function is retained for the test suite (tty_test.go). The interactive
+// install path now uses the huh TUI form.
 func promptMenuWith(prompt string, valid map[string]bool, defaultVal string, scan *bufio.Scanner) string {
-	// When stdin is a TTY the caller's scanner is safe to use directly.
-	// When stdin is a pipe (curl | bash), open /dev/tty so we read from the
-	// operator's keyboard rather than the pipe carrying install.sh bytes.
 	if !isTerminal() {
 		input := openInteractiveInput()
 		if input == nil {
-			// No interactive source — accept the default silently.
 			return defaultVal
 		}
 		defer input.Close()
@@ -104,10 +144,7 @@ func promptMenuWith(prompt string, valid map[string]bool, defaultVal string, sca
 }
 
 // isPasteInput returns true when the input looks like pasted multi-character
-// or structured content rather than a deliberate single-key press. This guards
-// against the scanner-buffer-leak failure mode: when an operator pastes a JSON
-// snippet or URL at a y/n prompt, the scanner absorbs the first line but leaves
-// the remaining lines in the underlying buffer, corrupting subsequent prompts.
+// or structured content rather than a deliberate single-key press.
 func isPasteInput(s string) bool {
 	if len(s) > 1 {
 		return true

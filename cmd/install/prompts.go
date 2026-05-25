@@ -15,28 +15,15 @@ type MemoryMCPChoice struct {
 	Preserved   bool   // true when the existing entry was kept without change
 }
 
-// promptMemoryMCPURL determines the Memory MCP URL and Bearer token from
-// existing config, env vars, or an interactive prompt. There is intentionally
-// NO default URL fallback — falling back silently produced misleading runtime
-// errors (a "connection refused" trace pointing at the removed default host
-// when the operator had pointed the MCP somewhere else entirely). Every
-// install requires the operator to make an explicit URL choice; the installer
-// never fabricates one. This is an open-source distribution — the MCP can
-// live on any host (Railway/Render/Fly/Docker/local), so no specific URL is
-// canonical to this repo.
+// promptMemoryMCPURL determines the Memory MCP URL and Bearer token for
+// non-interactive installs. It is only called from collectConfigNonInteractive.
 //
-// Decision priority for URL (when --force is NOT set):
+// Decision priority (when --force is NOT set):
 //  1. Existing valid mcpServers.memory in ~/.claude.json → preserve URL+bearer.
-//  2. MEMORY_MCP_URL env var (non-interactive / CI / scripted installs).
-//  3. /dev/tty or stdin TTY available → prompt the user interactively.
-//  4. No interactive source and no env var → ERROR + exit 1.
+//  2. MEMORY_MCP_URL env var.
+//  3. No env var and no TTY → ERROR + exit 1.
 //
-// Bearer token (only prompted when URL was NOT preserved):
-//  1. MEMORY_MCP_BEARER env var (non-interactive / CI / scripted installs).
-//  2. No interactive source → empty (unauthenticated).
-//  3. Interactive TTY or /dev/tty → optional prompt; empty input means unauthenticated.
-//
-// With --force: skips step 1 of URL preservation and re-prompts both URL and bearer.
+// The interactive (TUI) path is handled by runTUIForm in tui.go.
 func promptMemoryMCPURL() MemoryMCPChoice {
 	existing := readExistingMCPServers()
 	existingMemory, _ := existing["memory"].(map[string]interface{})
@@ -45,40 +32,9 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 		if looksLikeValidMemoryEntry(existingMemory) {
 			existingURL := urlFromEntry(existingMemory)
 			existingBearer := bearerFromEntry(existingMemory)
-
-			// Non-interactive (CI / scripted re-installs): preserve silently
-			// so an automated re-run doesn't break on a Keep/Change prompt.
-			// hasInteractiveInput also checks /dev/tty so curl | bash users
-			// (stdin is a pipe but /dev/tty is available) reach the prompt.
-			if !hasInteractiveInput() {
-				fmt.Printf("  Memory MCP URL: preserving existing %s (non-interactive)\n", existingURL)
-				return MemoryMCPChoice{URL: existingURL, BearerToken: existingBearer, Preserved: true}
-			}
-
-			// Interactive: surface the existing value and let the user decide.
-			// Common case where the previous install accepted a wrong default
-			// and the user wants to override on the next run.
-			fmt.Println()
-			fmt.Printf("  Existing Memory MCP URL: %s\n", colorValue(existingURL))
-			if existingBearer != "" {
-				fmt.Println("  Existing Memory MCP bearer: (preserved)")
-			}
-			choice := promptMenu("  Keep [Y] / Change [c]? [Y]: ",
-				map[string]bool{"y": true, "c": true}, "y")
-			if choice == "y" {
-				return MemoryMCPChoice{URL: existingURL, BearerToken: existingBearer, Preserved: true}
-			}
-			fmt.Println("  Changing Memory MCP URL — going to interactive prompt.")
-			// Operator explicitly chose Change. Skip the env var check so the prompt
-			// always fires interactively — they want to replace the value with what
-			// they paste, not silently inherit MEMORY_MCP_URL.
-			input := openInteractiveInput()
-			if input == nil {
-				fmt.Fprintln(os.Stderr, "Error: Change selected but no interactive input source is available.")
-				os.Exit(1)
-			}
-			defer input.Close()
-			return promptURLInteractive(bufio.NewScanner(input))
+			// Non-interactive: preserve silently.
+			fmt.Printf("  Memory MCP URL: preserving existing %s (non-interactive)\n", existingURL)
+			return MemoryMCPChoice{URL: existingURL, BearerToken: existingBearer, Preserved: true}
 		}
 		if isLegacyStdioMemoryEntry(existingMemory) {
 			fmt.Println("  Legacy stdio mcpServers.memory entry detected (v1 shape pointing at")
@@ -88,9 +44,7 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 		}
 	}
 
-	// Env var takes precedence over interactive prompt (per prompt, independently).
 	envURL := strings.TrimSpace(os.Getenv("MEMORY_MCP_URL"))
-
 	if envURL != "" {
 		if err := validateMCPURL(envURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: MEMORY_MCP_URL=%q is invalid: %s\n", envURL, err)
@@ -100,10 +54,8 @@ func promptMemoryMCPURL() MemoryMCPChoice {
 		return MemoryMCPChoice{URL: envURL, BearerToken: promptMemoryMCPBearer()}
 	}
 
-	// No env var — try to open an interactive input source (stdin TTY or /dev/tty).
-	input := openInteractiveInput()
-	if input == nil {
-		fmt.Fprintln(os.Stderr, `Memory MCP URL is required for non-interactive installs.
+	// No env var in non-interactive mode: error with helpful message.
+	fmt.Fprintln(os.Stderr, `Memory MCP URL is required for non-interactive installs.
   Detected: no controlling terminal available (stdin is a pipe and /dev/tty is inaccessible).
   Options:
     1. Run with the URL inline:
@@ -111,51 +63,21 @@ func promptMemoryMCPURL() MemoryMCPChoice {
            curl -fsSL https://valianx.github.io/team-harness/install.sh | bash -s -- --force
     2. Run interactively in a real terminal (TTY available).
   There is no default URL.`)
-		os.Exit(1)
-	}
-	defer input.Close()
-
-	return promptURLInteractive(bufio.NewScanner(input))
+	os.Exit(1)
+	return MemoryMCPChoice{} // unreachable
 }
 
-// promptURLInteractive shows the URL prompt on an interactive terminal. It
-// accepts two formats:
+// promptMemoryMCPBearer returns the bearer token from the MEMORY_MCP_BEARER
+// env var, or "" when the var is not set. Used by the non-interactive path only.
 //
-//   - A bare URL (`https://your-mcp.example.com/mcp`) — proceeds to the bearer
-//     prompt afterwards.
-//   - A full mcpServers.memory JSON snippet starting with `{` (as copied from
-//     the context-harness-mcp dashboard) — parsed directly to extract URL +
-//     Bearer in one paste; the bearer prompt is then skipped.
-func promptURLInteractive(scan *bufio.Scanner) MemoryMCPChoice {
-	fmt.Println()
-	fmt.Println("Paste either:")
-	fmt.Println("  • the bare URL of your Knowledge Graph MCP, OR")
-	fmt.Println("  • the full JSON snippet from your context-harness-mcp /dashboard")
-	fmt.Println("    (we parse it and skip the separate bearer prompt).")
-	fmt.Println("There is no default — empty input is rejected (no silent localhost fallback).")
-	fmt.Println()
-	fmt.Print("Memory MCP URL: ")
-
-	raw := strings.TrimSpace(readLineFrom(scan))
-	if raw == "" {
-		fmt.Fprintln(os.Stderr, "Error: empty Memory MCP URL.")
-		fmt.Fprintln(os.Stderr, "  Paste the URL of your Knowledge Graph MCP server (https://... or http://...)")
-		fmt.Fprintln(os.Stderr, "  or the full JSON snippet from your context-harness-mcp /dashboard.")
-		os.Exit(1)
+// The function name is kept for backward compat with tty_test.go and
+// preservation_test.go which test this env-var path directly.
+func promptMemoryMCPBearer() string {
+	if env := strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")); env != "" {
+		fmt.Println("  Memory MCP bearer: (loaded from MEMORY_MCP_BEARER env var)")
+		return env
 	}
-
-	// Smart-paste: if the input opens a JSON object, slurp the rest of the
-	// snippet (across multiple lines) and extract URL + Bearer.
-	if strings.HasPrefix(raw, "{") {
-		return parseSnippetPaste(raw, scan)
-	}
-
-	if err := validateMCPURL(raw); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %q is not a valid URL: %s\n", raw, err)
-		fmt.Fprintln(os.Stderr, "  URL must start with http:// or https://")
-		os.Exit(1)
-	}
-	return MemoryMCPChoice{URL: raw, BearerToken: promptMemoryMCPBearer()}
+	return ""
 }
 
 // snippetMaxLines caps how many lines parseSnippetPaste will read while
@@ -236,90 +158,6 @@ func extractFromSnippet(raw string) (url, bearer string, err error) {
 		}
 	}
 	return url, bearer, nil
-}
-
-// promptMemoryMCPBearer captures the optional Bearer token for the Memory MCP.
-//
-// Decision priority:
-//  1. MEMORY_MCP_BEARER env var (non-interactive / CI / scripted installs).
-//  2. No interactive source → empty (unauthenticated).
-//  3. Interactive TTY or /dev/tty → prompt; Enter → empty (unauthenticated).
-//
-// The returned string is the raw token (the "Bearer " prefix is added later by
-// buildMemoryEntry when writing the Authorization header).
-func promptMemoryMCPBearer() string {
-	if env := strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")); env != "" {
-		fmt.Println("  Memory MCP bearer: (loaded from MEMORY_MCP_BEARER env var)")
-		return env
-	}
-
-	// MEMORY_MCP_BEARER not set — try to prompt interactively.
-	input := openInteractiveInput()
-	if input == nil {
-		return ""
-	}
-	defer input.Close()
-
-	scan := bufio.NewScanner(input)
-	fmt.Println()
-	fmt.Println("Memory MCP Bearer token (optional)")
-	fmt.Println("==================================")
-	fmt.Println()
-	fmt.Println("If your Memory MCP requires authentication, paste the JWT here. For")
-	fmt.Println("context-harness-mcp deployments, generate one at <base-url>/dashboard.")
-	fmt.Println("Press Enter to skip (local / unauthenticated MCPs need no token).")
-	fmt.Println()
-	fmt.Print("Bearer token: ")
-	return strings.TrimSpace(readLineFrom(scan))
-}
-
-// promptInstallMode determines the install mode via:
-//
-//  1. INSTALL_MODE env var (non-interactive / CI / scripted installs).
-//  2. No interactive source and no env var → default ModeStandard (preserves v1.1.0 behaviour).
-//  3. Interactive TTY or /dev/tty → prompt with [s] standard (default) / [l] low-cost menu.
-//
-// The env var is validated: unknown values exit 1 with a clear error. The default
-// is always ModeStandard so an unset env var behaves identically to v1.1.0.
-func promptInstallMode() InstallMode {
-	if env := strings.TrimSpace(os.Getenv("INSTALL_MODE")); env != "" {
-		switch env {
-		case string(ModeStandard):
-			fmt.Printf("  Install mode: standard (loaded from INSTALL_MODE env var)\n")
-			return ModeStandard
-		case string(ModeLowCost):
-			fmt.Printf("  Install mode: low-cost (loaded from INSTALL_MODE env var)\n")
-			return ModeLowCost
-		default:
-			fmt.Fprintf(os.Stderr, "Error: INSTALL_MODE=%q is invalid. Accepted values: standard, low-cost\n", env)
-			os.Exit(1)
-		}
-	}
-
-	// No env var — try to prompt interactively.
-	input := openInteractiveInput()
-	if input == nil {
-		// Non-interactive with no env var: default to standard (v1.1.0 behaviour).
-		return ModeStandard
-	}
-	defer input.Close()
-
-	scan := bufio.NewScanner(input)
-	fmt.Println("  [s] standard  — default. Canonical matrix as documented in agents/README.md.")
-	fmt.Println("                  Best quality, highest API cost.")
-	fmt.Println("  [l] low-cost  — for developers on lower-tier Anthropic plans (Free, Pro,")
-	fmt.Println("                  or tight personal budget). Uniform sonnet matrix (effort:")
-	fmt.Println("                  medium or high). Lower API cost. Accepts documented quality")
-	fmt.Println("                  trade-offs (rougher analysis across the board, more Phase 3")
-	fmt.Println("                  iteration loops, weaker security audit caught by the human")
-	fmt.Println("                  reviewer at STAGE-GATE).")
-	fmt.Println("                  See agents/README.md §\"Low-cost mode\".")
-	fmt.Println()
-	choice := promptMenuWith("Install mode [s/l]? [s]: ", map[string]bool{"s": true, "l": true}, "s", scan)
-	if choice == "l" {
-		return ModeLowCost
-	}
-	return ModeStandard
 }
 
 // validateMCPURL returns an error if the URL does not start with http:// or https://.

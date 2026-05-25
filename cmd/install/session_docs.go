@@ -1,33 +1,60 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
 )
 
+// promptInstallMode determines install mode for non-interactive installs only.
+// It is called from collectConfigNonInteractive. The interactive path uses the
+// TUI form's Select field in buildInstallOptionsGroup.
+//
+// Priority:
+//  1. INSTALL_MODE env var.
+//  2. No env var → default ModeStandard (preserves v1.1.0 behaviour).
+func promptInstallMode() InstallMode {
+	if env := strings.TrimSpace(os.Getenv("INSTALL_MODE")); env != "" {
+		switch env {
+		case string(ModeStandard):
+			fmt.Printf("  Install mode: standard (loaded from INSTALL_MODE env var)\n")
+			return ModeStandard
+		case string(ModeLowCost):
+			fmt.Printf("  Install mode: low-cost (loaded from INSTALL_MODE env var)\n")
+			return ModeLowCost
+		default:
+			fmt.Fprintf(os.Stderr, "Error: INSTALL_MODE=%q is invalid. Accepted values: standard, low-cost\n", env)
+			os.Exit(1)
+		}
+	}
+	// No env var in non-interactive mode: default to standard.
+	return ModeStandard
+}
+
 // promptLogsMode determines the work-logs output mode. Decision priority:
 //
 //  1. Existing manifest.LogsMode (loaded from .team-harness.json) → always preserved.
-//  2. LOGS_MODE env var (first-time or --force installs).
-//  3. Interactive TTY → prompt with [l] local / [o] obsidian menu (first-time only).
-//  4. No env var, no existing config, no TTY → default to "local" silently.
+//  2. LOGS_MODE env var (first-time installs only).
+//  3. No env var, no existing config → default "local" silently.
 //
 // Once set, the installer never modifies logs config. To change it, the
-// operator edits ~/.claude/.team-harness.json directly.
+// operator edits ~/.claude/.team-harness.json directly. The interactive path
+// (TUI form) handles first-time setup via buildInstallOptionsGroup.
 func promptLogsMode() {
 	if manifest.LogsMode != "" {
-		promptLogsModePreserveOrChange()
+		displayPath := manifest.LogsMode
+		if manifest.LogsMode == "obsidian" && manifest.LogsPath != "" {
+			displayPath = fmt.Sprintf("obsidian → %s", manifest.LogsPath)
+		}
+		fmt.Printf("  Work-logs mode: %s (preserved)\n", displayPath)
 		return
 	}
-
 	if env := strings.TrimSpace(os.Getenv("LOGS_MODE")); env != "" {
 		promptLogsModeFromEnv(env)
 		return
 	}
-
-	promptLogsModeInteractive()
+	// No env var, no existing config: default to local.
+	manifest.LogsMode = "local"
 }
 
 // promptLogsModeFromEnv sets manifest fields from the LOGS_MODE env var.
@@ -52,53 +79,4 @@ func promptLogsModeFromEnv(env string) {
 		fmt.Fprintf(os.Stderr, "Error: LOGS_MODE=%q is invalid. Accepted values: local, obsidian\n", env)
 		os.Exit(1)
 	}
-}
-
-// promptLogsModePreserveOrChange handles the case where an existing
-// manifest.LogsMode was loaded from disk. Always preserves — the installer
-// never modifies user-configured logs settings. To change logs-mode, the
-// operator edits ~/.claude/.team-harness.json directly.
-func promptLogsModePreserveOrChange() {
-	displayPath := manifest.LogsMode
-	if manifest.LogsMode == "obsidian" && manifest.LogsPath != "" {
-		displayPath = fmt.Sprintf("obsidian → %s", manifest.LogsPath)
-	}
-	fmt.Printf("  Work-logs mode: %s (preserved)\n", displayPath)
-}
-
-// promptLogsModeInteractive shows the [l]/[o] menu and, when obsidian is
-// selected, prompts for the vault path. Falls back to "local" silently
-// when no TTY is available (backward compatibility).
-func promptLogsModeInteractive() {
-	input := openInteractiveInput()
-	if input == nil {
-		// Non-interactive with no env var and no existing config: default to local.
-		manifest.LogsMode = "local"
-		return
-	}
-	defer input.Close()
-
-	scan := bufio.NewScanner(input)
-	fmt.Println("  [l] local     — ./session-docs/{date}_{feature}/ relative to each project (default)")
-	fmt.Println("  [o] obsidian  — writes to work-logs/ in an Obsidian vault with metadata")
-	fmt.Println()
-	choice := promptMenuWith("  Work-logs output [l/o]? [l]: ",
-		map[string]bool{"l": true, "o": true}, "l", scan)
-
-	if choice == "l" {
-		manifest.LogsMode = "local"
-		return
-	}
-
-	// Obsidian selected: prompt for vault path.
-	fmt.Println()
-	fmt.Print("  Absolute path to your Obsidian vault (folder containing .obsidian/): ")
-	path := strings.TrimSpace(readLineFrom(scan))
-	if path == "" {
-		fmt.Fprintln(os.Stderr, "Error: Obsidian vault path cannot be empty.")
-		os.Exit(1)
-	}
-	manifest.LogsMode = "obsidian"
-	manifest.LogsPath = path
-	manifest.LogsSubfolder = "work-logs"
 }

@@ -87,7 +87,7 @@ team-harness/
 - `agents/` — system prompts only. One `.md` = one agent.
 - `skills/` — slash-command entry points. Most are thin: parse args → route to th-orchestrator. A few are standalone (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`).
 - `hooks/` — keep these **generic and portable** (no personal tokens, no private endpoints). User-specific hooks belong in `~/.claude/hooks/`, not here.
-- `cmd/install/` — Go installer source. No third-party deps (stdlib-only). Compiled with `CGO_ENABLED=0` for static single-file binaries.
+- `cmd/install/` — Go installer source. Uses `charm.land/huh/v2` for TUI. Compiled with `CGO_ENABLED=0` for static single-file binaries.
 
 **Ephemeral content** (not committed): `session-docs/`.
 
@@ -97,7 +97,7 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | Go 1.23 (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). Agents, skills, and hooks are embedded at compile time via `//go:embed all:agents skills hooks` in `assets.go` (repo root) — the binary is self-contained and requires no repo clone at runtime. The `all:` prefix includes `agents/_shared/` which holds cross-cutting snippets. |
+| Installer | Go 1.23+ (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). Agents, skills, and hooks are embedded at compile time via `//go:embed all:agents skills hooks` in `assets.go` (repo root) — the binary is self-contained and requires no repo clone at runtime. The `all:` prefix includes `agents/_shared/` which holds cross-cutting snippets. TUI powered by `charm.land/huh/v2` (bubbletea, lipgloss transitive). |
 | Bootstrap scripts | Bash (`install.sh`) + PowerShell (`install.ps1`) + cmd.exe (`install.cmd`) — detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call). Served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via a GitHub Pages workflow. Zero Python, zero `uv` required. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
@@ -113,7 +113,7 @@ team-harness/
 - `standard` (default) — copies agent files byte-identical to the source-repo `agents/*.md`. Canonical quality contract; recommended for operators on Anthropic Max or Team plans.
 - `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight during install, using the canonical matrix declared in `cmd/install/modes.go`. All 17 agents run on `sonnet`; effort is `medium` or `high` per agent. Suitable for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). Trade-offs, per-agent assignments, and the full matrix are documented in [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
-**No package manager, no lockfile, no build for the installer.** The Go installer is stdlib-only with zero third-party deps.
+**Dependencies.** The installer uses `charm.land/huh/v2` for the interactive TUI (form inputs, masked secrets, select groups, progress spinner). Transitive deps: bubbletea v2, lipgloss v2, bubbles v2. Binary size: 7.9–8.5 MB across targets. No package manager or build step beyond `go build`.
 
 ---
 

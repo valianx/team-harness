@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 // skipNames mirrors bin/install.py's SKIP_NAMES.
@@ -27,6 +28,13 @@ var stats = struct {
 	Updated   []string
 	Unchanged []string
 }{}
+
+// installProgressCount tracks the number of files processed so far during a
+// spinner-guarded install run. It is incremented atomically by copyEmbeddedFile
+// and copyAgentFile after each file is handled (regardless of outcome).
+// The progress spinner polls this counter to update its title in real time.
+// Reset to 0 at the start of each runInstallWithSpinner call.
+var installProgressCount atomic.Int64
 
 // shouldSkip returns true for names that must never be installed.
 func shouldSkip(name string) bool {
@@ -103,22 +111,26 @@ func copyEmbeddedFile(srcPath, dest string, executable bool) {
 	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
 		if writeErr := writeBytesToDest(srcData, dest, executable); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
+			installProgressCount.Add(1)
 			return
 		}
 		recordManifest(dest, srcHash)
 		stats.Installed = append(stats.Installed, dest)
+		installProgressCount.Add(1)
 		return
 	}
 
 	destHash, err := hashFile(dest)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot hash %s: %v\n", dest, err)
+		installProgressCount.Add(1)
 		return
 	}
 
 	if destHash == srcHash {
 		recordManifest(dest, srcHash)
 		stats.Unchanged = append(stats.Unchanged, dest)
+		installProgressCount.Add(1)
 		return
 	}
 
@@ -127,10 +139,12 @@ func copyEmbeddedFile(srcPath, dest string, executable bool) {
 	// destination are not a supported customization path.
 	if writeErr := writeBytesToDest(srcData, dest, executable); writeErr != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
+		installProgressCount.Add(1)
 		return
 	}
 	recordManifest(dest, srcHash)
 	stats.Updated = append(stats.Updated, dest)
+	installProgressCount.Add(1)
 }
 
 // copyAgentFile installs a single agent .md file from the embedded FS with
@@ -160,22 +174,26 @@ func copyAgentFile(srcPath, dest string, mode InstallMode) {
 	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
 		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
+			installProgressCount.Add(1)
 			return
 		}
 		recordManifest(dest, transformedHash)
 		stats.Installed = append(stats.Installed, dest)
+		installProgressCount.Add(1)
 		return
 	}
 
 	destHash, hashErr := hashFile(dest)
 	if hashErr != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot hash %s: %v\n", dest, hashErr)
+		installProgressCount.Add(1)
 		return
 	}
 
 	if destHash == transformedHash {
 		recordManifest(dest, transformedHash)
 		stats.Unchanged = append(stats.Unchanged, dest)
+		installProgressCount.Add(1)
 		return
 	}
 
@@ -184,10 +202,12 @@ func copyAgentFile(srcPath, dest string, mode InstallMode) {
 	// destination are not a supported customization path.
 	if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
+		installProgressCount.Add(1)
 		return
 	}
 	recordManifest(dest, transformedHash)
 	stats.Updated = append(stats.Updated, dest)
+	installProgressCount.Add(1)
 }
 
 // hashBytes returns the sha256 hex of the given byte slice.
