@@ -124,17 +124,9 @@ All commands run from the repo root.
 
 | Intent | Command |
 |---|---|
-| Install via plugin (recommended) | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
-| Install — one-liner (Unix / macOS) | `curl -fsSL https://valianx.github.io/team-harness/install.sh \| bash` |
-| Install — one-liner (Windows PowerShell) | `irm https://valianx.github.io/team-harness/install.ps1 \| iex` |
-| Install — one-liner (Windows cmd.exe) | `curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd` |
-| Non-interactive install | `CONTEXT7_API_KEY=<key> MEMORY_MCP_URL=https://<url>/mcp [MEMORY_MCP_BEARER=<jwt>] curl -fsSL https://valianx.github.io/team-harness/install.sh \| bash` |
-| Force-reset MCP config in ~/.claude.json | Append `--force` after the pipe (bash): `bash /dev/stdin --force` |
-| Build / test installer from source (contributors) | `go run ./cmd/install` (embed picks up local working-tree bytes) |
-| Build installer binary from source (requires Go 1.23+) | `go build ./cmd/install` |
-| View which files the installer would touch | Run the installer — it reports installed / updated / unchanged |
-| Enable notification hooks | Open `hooks/config.json`, copy the section for your OS, merge it into `~/.claude/settings.json` under `"hooks"` |
-| Validate agents/skills health | `/lint` inside Claude Code |
+| Install plugin | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
+| Build installer from source (contributors) | `go run ./cmd/install` |
+| Validate agents/skills health | `/th:lint` inside Claude Code |
 | Run the free verification suite (policy-block + structure + YAML frontmatter) | `bash tests/run-all.sh` |
 | Run only the policy-block functional tests | `bash tests/test_policy_block.sh` |
 | Run only the agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |
@@ -149,7 +141,7 @@ All commands run from the repo root.
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
 - **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`). `init`, `architect`, `agent-builder` use `opus`; others generally use `sonnet`.
-- **th-orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `th-orchestrator`. Exceptions: standalone utilities (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`).
+- **th-orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `th-orchestrator`. Exceptions: standalone utilities (`/th:lint`, `/th:status`, `/th:memory`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** A workspace is the shared working directory for a single pipeline session — the place where agents and the operator collaborate. Each pipeline run creates its own isolated workspace, separate from all others. Agents use it as their primary communication channel (each reads previous agents' output and writes its own). The operator uses it as a review surface to inspect decisions, risks, and outcomes. Agents communicate through files in `workspaces/{feature-name}/`, never through return values. `workspaces/` is always git-ignored.
 - **Dual-mode workspaces.** Pipeline workspaces can be output to a local `./workspaces/` directory (default) or to a configured Obsidian vault (`work-logs/{repo-name}/{date}_{feature}/`). The mode is configured via `logs-mode` in `~/.claude/.team-harness.json`. The th-orchestrator resolves the base path once at pipeline start and passes it to every agent — agents are unaware of the mode. When Obsidian mode is active, files receive YAML frontmatter with repo, feature, pipeline, date, and agent metadata.
 - **Human-first document format.** Every session-doc file uses a two-section layout: `## Review Summary` (human-readable decisions, risks, trade-offs — scannable in under 2 minutes) followed by `## Technical Detail` (full content for agent-to-agent communication). This applies in both local and Obsidian modes.
