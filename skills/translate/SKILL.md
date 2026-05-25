@@ -12,7 +12,7 @@ Examples: `/th:translate`, `/th:translate src/`, `/th:translate src/components/`
    - Detect source language from existing strings (default: Spanish)
    - Target language: English neutral (always)
 
-2. Pass to the `th-orchestrator` agent:
+2. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: translate
@@ -29,7 +29,7 @@ Examples: `/th:translate glossary`, `/th:translate glossary-only`
 
 1. Build the glossary without modifying any code. Useful for reviewing terms before committing to translations.
 
-2. Pass to the `th-orchestrator` agent:
+2. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: translate
@@ -46,7 +46,7 @@ Examples: `/th:translate apply`, `/th:translate translate-only`
 
 1. Apply translations using an existing glossary. Assumes i18n infrastructure is already set up. Useful for incremental translation after new strings are added.
 
-2. Pass to the `th-orchestrator` agent:
+2. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: translate
@@ -60,7 +60,7 @@ Examples: `/th:translate apply`, `/th:translate translate-only`
 ## Mode 4 — No input provided
 
 1. Default to full project translation.
-2. Pass to the `th-orchestrator` agent:
+2. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: translate
@@ -75,8 +75,8 @@ Examples: `/th:translate apply`, `/th:translate translate-only`
 
 ## Important
 
-- Always invoke the `th-orchestrator` agent — do NOT invoke the `translator` agent directly
-- The th-orchestrator will route to the `translator` agent
+- Always invoke the `orchestrator` agent — do NOT invoke the `translator` agent directly
+- The orchestrator will route to the `translator` agent
 - Output: `workspaces/{feature-name}/00-translation.md`
 - Glossary is saved to `docs/glossary.md` in the project root
 - The translator agent modifies source code (replaces hardcoded strings with i18n keys)

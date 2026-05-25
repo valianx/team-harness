@@ -804,13 +804,13 @@ Write the full report to `workspaces/{feature-name}/00-gcp-costs.md` (see Phase 
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: gcp-cost-analyzer

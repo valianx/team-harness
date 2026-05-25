@@ -18,10 +18,10 @@ Use the detected mode in the payload below. When in doubt, ask the user: "Do you
 1. Extract the issue number
 2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier A — read a single issue". Use `gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems` when `has_gh=true`; curl fallback otherwise.
 3. If the issue cannot be fetched automatically, tell the user: "Issue #{number} could not be fetched. Paste the issue body as text instead — planning works without GitHub."
-4. **Assess issue quality** before passing to th-orchestrator:
+4. **Assess issue quality** before passing to orchestrator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
-5. Pass ALL the issue data to the `th-orchestrator` agent:
+5. Pass ALL the issue data to the `orchestrator` agent:
    ```
    Planning Task:
    - Mode: {plan | plan-and-execute}
@@ -42,7 +42,7 @@ Use the detected mode in the payload below. When in doubt, ask the user: "Do you
 1. Do NOT create a GitHub issue — the input task is the source of the breakdown; issues are created at the end as a result.
 2. Analyze the description to determine:
    - **Title**: short, imperative summary (max 70 chars)
-3. Pass the task to the `th-orchestrator` agent:
+3. Pass the task to the `orchestrator` agent:
    ```
    Planning Task:
    - Mode: {plan | plan-and-execute}
@@ -70,8 +70,8 @@ Ask the user: "Provide a GitHub issue number (#123), a URL, or describe the prob
 
 ## Important
 
-- **You read issues. The th-orchestrator does NOT** — it receives the data from you.
-- Always invoke the `th-orchestrator` agent — do NOT execute any pipeline yourself
-- **Mode `plan`**: th-orchestrator runs SPECIFY → DESIGN (planning mode) → create tasks → stop
-- **Mode `plan-and-execute`**: th-orchestrator runs SPECIFY → DESIGN (planning mode) → create tasks → then executes each task through the full pipeline
-- **No GitHub? No problem.** The th-orchestrator will auto-detect `gh` availability. If unavailable, tasks are written as markdown files in `workspaces/{feature-name}/tasks/` instead of GitHub issues.
+- **You read issues. The orchestrator does NOT** — it receives the data from you.
+- Always invoke the `orchestrator` agent — do NOT execute any pipeline yourself
+- **Mode `plan`**: orchestrator runs SPECIFY → DESIGN (planning mode) → create tasks → stop
+- **Mode `plan-and-execute`**: orchestrator runs SPECIFY → DESIGN (planning mode) → create tasks → then executes each task through the full pipeline
+- **No GitHub? No problem.** The orchestrator will auto-detect `gh` availability. If unavailable, tasks are written as markdown files in `workspaces/{feature-name}/tasks/` instead of GitHub issues.

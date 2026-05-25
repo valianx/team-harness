@@ -123,7 +123,7 @@ func readSourceFrontmatter(agentName string) (model, effort string) {
 
 // agentPrintOrder gives a stable output order for the per-agent diff lines.
 var agentPrintOrder = []string{
-	"th-orchestrator", "architect", "agent-builder", "security", "reviewer", "qa",
+	"orchestrator", "architect", "agent-builder", "security", "reviewer", "qa",
 	"gcp-cost-analyzer", "init", "documenter", "ux-reviewer", "implementer",
 	"plan-reviewer", "tester", "acceptance-checker", "diagrammer",
 	"likec4-diagrammer", "d2-diagrammer", "translator", "delivery",

@@ -1,4 +1,4 @@
-Recover an interrupted pipeline or batch from where it left off. Routes through the th-orchestrator with full recovery context.
+Recover an interrupted pipeline or batch from where it left off. Routes through the orchestrator with full recovery context.
 
 Analyze the input: $ARGUMENTS
 
@@ -14,7 +14,7 @@ Analyze the input: $ARGUMENTS
    - If `status: complete` → tell user: "Pipeline '{feature}' already completed. Nothing to recover."
    - If phase and next_action are present → proceed
    - If state file is corrupted or missing key fields → tell user: "State file is incomplete. Showing what's there:" and display the raw content
-6. Pass recovery context to the `th-orchestrator` agent:
+6. Pass recovery context to the `orchestrator` agent:
    ```
    Recover Pipeline:
    - Feature: {feature-name}
@@ -52,7 +52,7 @@ Recovers ALL interrupted tasks from a multi-task batch (parallel dispatch via wo
    | 3 | refresh-flow | RUNNING | .claude/worktrees/task-103 | resume via worktree |
    | 5 | middleware | FAILED | (removed) | re-launch from scratch |
    ```
-7. Pass batch recovery context to the `th-orchestrator` agent:
+7. Pass batch recovery context to the `orchestrator` agent:
    ```
    Recover Batch:
    - Batch Progress File: workspaces/batch-progress.md
@@ -70,7 +70,7 @@ Recovers ALL interrupted tasks from a multi-task batch (parallel dispatch via wo
      ...
    ```
 
-The th-orchestrator will:
+The orchestrator will:
 - For tasks with existing worktrees: launch `claude --worktree {name} --tmux --dangerously-skip-permissions --continue` to resume the session
 - For tasks with removed worktrees but existing state: create new worktree and launch with `/th:recover {feature}`
 - For tasks with no state at all: re-launch from scratch with `/th:issue #{number}`
@@ -101,13 +101,13 @@ The th-orchestrator will:
 - If workspaces folder doesn't exist → "No workspaces found in this project."
 - If state file exists but is empty → "State file is empty. The pipeline may not have started properly."
 - If a worktree is listed in batch but doesn't exist on disk → mark it as "removed" and suggest re-launch
-- If the th-orchestrator fails to recover → it will report the issue. The skill does not retry.
+- If the orchestrator fails to recover → it will report the issue. The skill does not retry.
 
 ---
 
 ## Important
 
-- **You read state. The th-orchestrator does NOT** — it receives the recovery context from you.
-- Always invoke the `th-orchestrator` agent — do NOT execute any pipeline yourself
-- The th-orchestrator uses the Recovery Instructions to know exactly what to do next
-- For batch recovery, the th-orchestrator re-launches worktree instances — it does NOT run the pipelines itself
+- **You read state. The orchestrator does NOT** — it receives the recovery context from you.
+- Always invoke the `orchestrator` agent — do NOT execute any pipeline yourself
+- The orchestrator uses the Recovery Instructions to know exactly what to do next
+- For batch recovery, the orchestrator re-launches worktree instances — it does NOT run the pipelines itself

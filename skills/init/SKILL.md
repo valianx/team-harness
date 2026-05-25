@@ -8,7 +8,7 @@ Remove parsed flags from the description before routing.
 
 ---
 
-Pass to the `th-orchestrator` agent:
+Pass to the `orchestrator` agent:
 ```
 Direct Mode Task:
 - Mode: init
@@ -20,8 +20,8 @@ Direct Mode Task:
 
 ## Important
 
-- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
-- The th-orchestrator will route to the `init` agent
+- Always invoke the `orchestrator` agent — do NOT invoke agents directly
+- The orchestrator will route to the `init` agent
 - The init agent detects the project type, tech stack, and generates/updates CLAUDE.md
 - Also creates CHANGELOG.md if missing and ensures workspaces is in .gitignore
 - Optional flags: `--scaffold-rereview-workflow` (GitHub Actions re-review reminder), `--scaffold-review-policy` (team review policy file)

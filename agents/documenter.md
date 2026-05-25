@@ -28,7 +28,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 ## Mandatory Vault Config
 
-**Before ANY file write**, read `~/.claude/config/obsidian-vaults.json`. Use the path from the vault entry specified by the th-orchestrator (or the `default` vault if none specified). If the config file does not exist, return `status: blocked` with `summary: obsidian-vaults.json not found — operator must configure vault path`.
+**Before ANY file write**, read `~/.claude/config/obsidian-vaults.json`. Use the path from the vault entry specified by the orchestrator (or the `default` vault if none specified). If the config file does not exist, return `status: blocked` with `summary: obsidian-vaults.json not found — operator must configure vault path`.
 
 ---
 
@@ -143,7 +143,7 @@ The page set varies by what is being documented:
 
 ## Language
 
-Write all documentation in the language specified by the th-orchestrator in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.
+Write all documentation in the language specified by the orchestrator in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.
 
 ---
 

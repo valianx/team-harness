@@ -44,7 +44,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 **Init typically runs standalone** without prior workspaces context.
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If invoked as part of a pipeline (auto-init from th-orchestrator), workspaces may exist.
+1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If invoked as part of a pipeline (auto-init from orchestrator), workspaces may exist.
 
 2. **Create workspaces folder if needed** — create `workspaces/{feature-name}/` for your init report (`00-init.md`). Use `init` as feature name when standalone, or the pipeline's feature name when auto-init.
 
@@ -227,7 +227,7 @@ Insert the following block VERBATIM. Same text in every repo. No per-project ada
 ```markdown
 ## 6. Mandatory Working Agreements
 
-> These are the minimum agreements that keep the codebase aligned across humans, agents, and outside contributors. They apply to every change in this repo, whether it goes through the th-orchestrator pipeline or is a manual commit. If a rule conflicts with a more specific instruction in §5 Architectural Conventions, the more specific one wins — but the rules below are the floor, not the ceiling.
+> These are the minimum agreements that keep the codebase aligned across humans, agents, and outside contributors. They apply to every change in this repo, whether it goes through the orchestrator pipeline or is a manual commit. If a rule conflicts with a more specific instruction in §5 Architectural Conventions, the more specific one wins — but the rules below are the floor, not the ceiling.
 
 ### 6.1 Pre-work (read before you touch code)
 
@@ -478,7 +478,7 @@ Scaffold the GitHub Actions re-review reminder workflow into the consumer repo.
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly. If init runs standalone (no workspaces context), skip this step.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly. If init runs standalone (no workspaces context), skip this step.
 
 **On start:** append `| {YYYY-MM-DD HH:MM} | init | init | started | — | — |`
 **On end:** append `| {YYYY-MM-DD HH:MM} | init | init | completed | {Nm} | {success/failed} |`
@@ -487,7 +487,7 @@ The th-orchestrator writes observability events to `workspaces/{feature-name}/00
 
 ## Return Protocol
 
-When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: init
@@ -499,4 +499,4 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of TBD items, or "none"}
 ```
 
-Do NOT repeat the full CLAUDE.md content in your final message — it's already written to the file. The th-orchestrator uses this status block to report results.
+Do NOT repeat the full CLAUDE.md content in your final message — it's already written to the file. The orchestrator uses this status block to report results.

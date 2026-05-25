@@ -8,7 +8,7 @@ Every agent file is Markdown with YAML frontmatter:
 
 ```md
 ---
-name: th-orchestrator
+name: orchestrator
 description: Central hub that coordinates the pipeline.
 model: opus
 effort: high
@@ -33,8 +33,8 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 
 | Agent | Model | Effort | Tools (allowlist) | Role |
 |---|---|---|---|---|
-| `th-orchestrator` | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, all 9 `mcp__memory__*` (KG read + write) | Central hub. Coordinates the pipeline and routes to all other agents. |
-| `architect` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Architecture design, research, planning, audits. **No Bash** (read-only on system). KG read-only (Phase 6 writes stay in th-orchestrator). |
+| `orchestrator` | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, all 9 `mcp__memory__*` (KG read + write) | Central hub. Coordinates the pipeline and routes to all other agents. |
+| `architect` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Architecture design, research, planning, audits. **No Bash** (read-only on system). KG read-only (Phase 6 writes stay in orchestrator). |
 | `agent-builder` | opus | `max` | Read, Edit, Write, Glob, Grep, Bash | Create / improve agents and skills. |
 | `security` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). KG read-only for prior-vuln lookup. |
 | `reviewer` | opus | `max` | Read, Glob, Grep, Edit, Write, Bash | GitHub PR review. Bash limited to `git`/`gh` for diff retrieval. |
@@ -52,18 +52,18 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | `documenter` | opus | `high` | Read, Edit, Write, Glob, Grep, Bash | Diagram-first Obsidian documentation from architect research. |
 | `ux-reviewer` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__get-library-docs` | UI/UX review for frontend tasks — accessibility, responsiveness, component reuse. Dispatched when `frontend-scope: true`. |
 | `delivery` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep | Docs, changelog, version, branch, commit, PR. |
-| `reviewer-consolidator` | opus | `high` | Read, Edit, Write, Glob, Grep | Merges 2-3 focused review drafts (security/architecture/style) into a single unified review. De-duplicates findings, surfaces contradictions, determines verdict. Invoked by th-orchestrator after parallel focused reviewer passes in multi-reviewer mode. |
+| `reviewer-consolidator` | opus | `high` | Read, Edit, Write, Glob, Grep | Merges 2-3 focused review drafts (security/architecture/style) into a single unified review. De-duplicates findings, surfaces contradictions, determines verdict. Invoked by orchestrator after parallel focused reviewer passes in multi-reviewer mode. |
 
-Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`) loaded on-demand by the th-orchestrator. They are not invocable subagents — their `model` field is vestigial and not enforced by `/th:lint`.
+Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`) loaded on-demand by the orchestrator. They are not invocable subagents — their `model` field is vestigial and not enforced by `/th:lint`.
 
-Plus `_shared/gh-fallback.md` — a cross-cutting snippet (not an invocable agent) installed to `~/.claude/agents/_shared/`. Contains the single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `delivery.md`, `th-orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
+Plus `_shared/gh-fallback.md` — a cross-cutting snippet (not an invocable agent) installed to `~/.claude/agents/_shared/`. Contains the single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `delivery.md`, `orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
 
 ## Earn the model AND the effort AND the tools
 
 Three principles drive the matrix above:
 
-1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa, gcp-cost-analyzer, agent-builder, init, th-orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers, translator) run on `sonnet` — the heavy thinking has already been done upstream.
-2. **Effort by depth of judgement required.** `max` for irreversible analysis (architecture, security audits, PR reviews, agent design). `high` for solid analytical work that doesn't need exhaustive exploration (th-orchestrator routing, qa validation, FinOps prioritisation, implementer following a Work Plan). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`.
+1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa, gcp-cost-analyzer, agent-builder, init, orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers, translator) run on `sonnet` — the heavy thinking has already been done upstream.
+2. **Effort by depth of judgement required.** `max` for irreversible analysis (architecture, security audits, PR reviews, agent design). `high` for solid analytical work that doesn't need exhaustive exploration (orchestrator routing, qa validation, FinOps prioritisation, implementer following a Work Plan). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`.
 3. **Tools by capability boundary.** The `tools` field is the **agency boundary** — what the agent literally cannot do regardless of what its prompt instructs. Read-only auditors (`architect`, `security`, `qa`, `acceptance-checker`) lose `Bash` so they cannot mutate the host even by accident. Builders (`implementer`, `tester`, `delivery`, diagrammers, `translator`, `init`, `agent-builder`) keep `Bash` but the harness gates destructive commands at `PreToolUse` (see `hooks/config.json`). Permission surface = agency boundary; tighten one and the prompt becomes a softer guardrail backed by a hard one.
 
 ## Low-cost mode
@@ -78,7 +78,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 
 | Agent | Standard model | Standard effort | Low-cost model | Low-cost effort | Notes |
 |---|---|---|---|---|---|
-| `th-orchestrator` | opus | high | sonnet | high | Coordination + gate routing; effort stays high so STAGE-GATE logic executes correctly. |
+| `orchestrator` | opus | high | sonnet | high | Coordination + gate routing; effort stays high so STAGE-GATE logic executes correctly. |
 | `architect` | opus | max | sonnet | high | Design work; effort high preserves depth-of-search. Human reads at STAGE-GATE-1. |
 | `agent-builder` | opus | max | sonnet | high | Agent/skill authoring; effort high preserves design depth. Human reviews the diff at PR time. |
 | `security` | opus | max | sonnet | high | Security audit; effort high is the cap. Human reads `04-security.md` at STAGE-GATE-2/3. |

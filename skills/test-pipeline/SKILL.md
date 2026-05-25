@@ -10,7 +10,7 @@ Analyze the input: $ARGUMENTS
    - `--skip-security` --- omit security scan step from per-module tasks
    - `--modules auth,payments,...` --- test only specified modules (skip decomposition)
    - `--coverage-only` --- only run Phase 1 (coverage config) + consolidated coverage run, skip test generation
-4. Pass to the `th-orchestrator` agent:
+4. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: test-pipeline
@@ -21,7 +21,7 @@ Analyze the input: $ARGUMENTS
 ## Mode 2 --- No input provided
 
 1. Use the current working directory as the service path
-2. Pass to the `th-orchestrator` agent:
+2. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: test-pipeline
@@ -33,7 +33,7 @@ Analyze the input: $ARGUMENTS
 
 ## Important
 
-- Always invoke the `th-orchestrator` agent --- do NOT invoke agents directly
-- The th-orchestrator will analyze the service, decompose into modules, and dispatch tester agents in parallel
+- Always invoke the `orchestrator` agent --- do NOT invoke agents directly
+- The orchestrator will analyze the service, decompose into modules, and dispatch tester agents in parallel
 - Output: `workspaces/test-pipeline/05-consolidation.md` (final quality report)
 - Coverage gate: **80% branch coverage service-wide is mandatory** --- pipeline iterates until met or max 3 loops

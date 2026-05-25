@@ -26,12 +26,12 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 ## Scope discipline for `type: fix` and `type: hotfix` (Bug-fix Mode)
 
-When the th-orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-PR scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
+When the orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-PR scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
 
 ### Allowed changes (this PR)
 
 - Source-code changes that directly cause the regression test (`02-regression-test.md` → `regression_test_path`) to flip from failing to passing.
-- Source-code changes in the files declared in `01-root-cause.md` § `## Bug Location` and `## Scope of Fix` (or, for `type: hotfix`, the files declared in the th-orchestrator's one-sentence prose plan at STAGE-GATE-1).
+- Source-code changes in the files declared in `01-root-cause.md` § `## Bug Location` and `## Scope of Fix` (or, for `type: hotfix`, the files declared in the orchestrator's one-sentence prose plan at STAGE-GATE-1).
 - New tests authored by you ONLY if (a) they cover the same defect at a different layer (e.g., the regression is a unit test; you add a controller-layer integration test of the same code path), OR (b) the existing test suite leaves a gap that the bug fix exposes.
 - Adjacent comments that explain the fix (a one-line `// fix(area-#N): {why}` comment is allowed at the changed lines).
 
@@ -63,7 +63,7 @@ If implementation reveals a file outside the `01-root-cause.md` § `## Scope of 
 
 1. Annotate `02-implementation.md` under a `## Scope Drift` section with `[SCOPE-DRIFT: file X required for AC-N]` and a one-line justification.
 2. Surface it in your status block (it's already there per the standard implementer contract).
-3. The th-orchestrator may route back to the architect to update `01-root-cause.md` § `## Scope of Fix` and re-run Phase 1.6 (plan-review) before continuing.
+3. The orchestrator may route back to the architect to update `01-root-cause.md` § `## Scope of Fix` and re-run Phase 1.6 (plan-review) before continuing.
 
 Scope-drift is firm but has a documented widening path. The PR reviewer at STAGE-GATE-3 is the last line of defense for diffs that drifted without annotation.
 
@@ -87,7 +87,7 @@ In addition to the standard `agent / status / output / summary / context7_consul
 - `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`.
 - `follow_ups_spotted: {N}` — count of `[FOLLOW-UP]` annotations added to `02-implementation.md` § `## Follow-ups Spotted`. Zero is a valid value.
 
-The th-orchestrator gates Phase 2 on `regression_test_passes: true`. If `false`, the implementer is iterated (subject to max-3).
+The orchestrator gates Phase 2 on `regression_test_passes: true`. If `false`, the implementer is iterated (subject to max-3).
 
 ---
 
@@ -132,11 +132,11 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`.
 
-   **Per-PR scoping (pipeline_version: 2).** If the th-orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the th-orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
+   **Per-PR scoping (pipeline_version: 2).** If the orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
-   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The th-orchestrator does not pass a PR identifier in legacy mode.
+   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The orchestrator does not pass a PR identifier in legacy mode.
 
-   **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The th-orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
+   **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
 3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -283,7 +283,7 @@ When implementation reveals a technical constraint that affects an acceptance cr
 
 1. **Annotate the spec** — open `01-plan.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC in `## Review Summary` using the Edit tool
 2. **Document in your output** — mention the deviation in `02-implementation.md` under "Deviations from Architecture"
-3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The th-orchestrator will reconcile before verification.
+3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The orchestrator will reconcile before verification.
 
 **Examples:**
 - AC says "use WebSocket for real-time updates" but the framework only supports SSE → annotate and implement with SSE
@@ -349,13 +349,13 @@ Write your implementation summary to `workspaces/{feature-name}/02-implementatio
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: implementer
@@ -372,7 +372,7 @@ issues: {list of blockers, or "none"}
 The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness.
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix`):**
-- `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`. The th-orchestrator gates Phase 2 on this; `false` triggers iteration (subject to max-3).
+- `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`. The orchestrator gates Phase 2 on this; `false` triggers iteration (subject to max-3).
 - `follow_ups_spotted: {N}` — count of `[FOLLOW-UP]` annotations you added to `02-implementation.md` § `## Follow-ups Spotted` (other issues you spotted but did NOT fix per the scope-discipline contract). Zero is a valid value.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.

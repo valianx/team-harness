@@ -85,7 +85,7 @@ Score the response before using it:
 - {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
 ```
 
-If the decision is load-bearing (the API you're using might have changed between training cutoff and now), surface it in your status block via the `context7_consult` counter (see §5) so the th-orchestrator can decide whether to escalate.
+If the decision is load-bearing (the API you're using might have changed between training cutoff and now), surface it in your status block via the `context7_consult` counter (see §5) so the orchestrator can decide whether to escalate.
 
 ---
 

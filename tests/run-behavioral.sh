@@ -40,18 +40,18 @@ if ! command -v claude >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ ! -f "$HOME/.claude/agents/th-orchestrator.md" ]; then
-    echo "ERROR: ~/.claude/agents/th-orchestrator.md not found."
+if [ ! -f "$HOME/.claude/agents/orchestrator.md" ]; then
+    echo "ERROR: ~/.claude/agents/orchestrator.md not found."
     echo "Run \`uv run bin/install.py\` first to install the agents."
     exit 1
 fi
 
-# Sanity check: warn if installed th-orchestrator differs from repo source. The
+# Sanity check: warn if installed orchestrator differs from repo source. The
 # behavioral tests probe the INSTALLED version, so divergence is a false signal.
-if ! diff -q "$HOME/.claude/agents/th-orchestrator.md" "$REPO_ROOT/agents/th-orchestrator.md" >/dev/null 2>&1; then
-    echo "WARN: ~/.claude/agents/th-orchestrator.md differs from repo source."
+if ! diff -q "$HOME/.claude/agents/orchestrator.md" "$REPO_ROOT/agents/orchestrator.md" >/dev/null 2>&1; then
+    echo "WARN: ~/.claude/agents/orchestrator.md differs from repo source."
     echo "      Behavioral tests will probe the INSTALLED version."
-    echo "      If you've edited agents/th-orchestrator.md recently, run:"
+    echo "      If you've edited agents/orchestrator.md recently, run:"
     echo "        uv run bin/install.py"
     echo "      to propagate. Continuing anyway in 3s..."
     sleep 3

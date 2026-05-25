@@ -1,4 +1,4 @@
-Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the th-orchestrator.
+Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the orchestrator.
 
 ## Voice
 
@@ -284,7 +284,7 @@ Agent Results
 -------------
 | Agent          | Phase                 | Status   | Summary                                     |
 |----------------|-----------------------|----------|---------------------------------------------|
-| th-orchestrator   | 0a-intake             | success  | feature classified standard, 8 AC           |
+| orchestrator   | 0a-intake             | success  | feature classified standard, 8 AC           |
 | architect      | 1-design              | success  | 3 PRs, 11 AC                                |
 | implementer    | 2-implement (PR-1)    | success  | jwt issuance endpoint                       |
 | tester         | 3-verify (PR-3) iter 0| fail     | AC-3 null check missing in login.ts:42      |
@@ -326,7 +326,7 @@ Round R2 (1 PR, started 14:21:49, closed 14:31:02):
 
 ## Important
 
-- This skill does NOT route through the th-orchestrator
+- This skill does NOT route through the orchestrator
 - Read-only — never modifies workspaces
 - Works even if no `.gitignore` or CLAUDE.md exists
 - If `00-state.md` is missing but workspaces folder exists, report the folder as "no state file (legacy?)"

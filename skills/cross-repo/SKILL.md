@@ -1,6 +1,6 @@
 Analyze the input: $ARGUMENTS
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `th-orchestrator` agent. You orchestrate the multi-repo analysis yourself using tmux, Agent tool, and the existing specialized agents.
+**IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent. You orchestrate the multi-repo analysis yourself using tmux, Agent tool, and the existing specialized agents.
 
 ## Voice
 
@@ -175,7 +175,7 @@ mkdir -p "$WORK_DIR/results"
 
 **If parallel (default):** Launch one tmux session per repo. Each session runs a Claude instance that executes ALL agents for that repo sequentially (agents within a repo are fast; the parallelism is across repos).
 
-**Concurrency cap: max 5 repos in parallel.** If more than 5 repos, use waves (same as th-orchestrator batch dispatch).
+**Concurrency cap: max 5 repos in parallel.** If more than 5 repos, use waves (same as orchestrator batch dispatch).
 
 For each repo, create a prompt file at `$WORK_DIR/prompt-{repo-name}.md`:
 

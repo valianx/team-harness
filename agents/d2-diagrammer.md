@@ -1,6 +1,6 @@
 ---
 name: d2-diagrammer
-description: Generates D2 diagrams from architect analysis. Invoked by the th-orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
+description: Generates D2 diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
 model: sonnet
 effort: medium
 color: orange
@@ -39,7 +39,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 **Before starting ANY work:**
 
-1. **Read the th-orchestrator's invocation** — extract:
+1. **Read the orchestrator's invocation** — extract:
    - Path to architect's analysis: `workspaces/{feature}/00-research.md`
    - Path to skill: `.claude/skills/d2-diagram/`
    - Output path: `workspaces/{feature}/diagram.d2`
@@ -237,13 +237,13 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
+The orchestrator writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: d2-diagrammer
@@ -268,4 +268,4 @@ issues: {blocking issues if failed/blocked, or "none"}
 - Windows: `winget install terrastruct.d2`
 - macOS/Linux: `curl -fsSL https://d2lang.com/install.sh | sh -s --`
 
-Do NOT repeat the full workspaces content in your final message. The th-orchestrator uses this status block to validate completeness.
+Do NOT repeat the full workspaces content in your final message. The orchestrator uses this status block to validate completeness.

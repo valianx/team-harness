@@ -1,12 +1,12 @@
-Create an Excalidraw diagram that visually argues a concept, workflow, or architecture. Routes through the th-orchestrator which delegates to the excalidraw-diagram skill.
+Create an Excalidraw diagram that visually argues a concept, workflow, or architecture. Routes through the orchestrator which delegates to the excalidraw-diagram skill.
 
 ## Input
 
 $ARGUMENTS — describe what to diagram. Examples:
 - "the dev-team pipeline flow"
 - "authentication flow for the login system"
-- "how the th-orchestrator delegates to agents"
-- A topic without description → the th-orchestrator infers what to visualize
+- "how the orchestrator delegates to agents"
+- A topic without description → the orchestrator infers what to visualize
 
 ## Flags
 
@@ -16,7 +16,7 @@ $ARGUMENTS — describe what to diagram. Examples:
 ## What happens
 
 1. Parse `--vault` and `--folder` flags from `$ARGUMENTS` (strip them from the description).
-2. Pass to the `th-orchestrator` agent:
+2. Pass to the `orchestrator` agent:
 
 ```
 Direct Mode Task: diagram
@@ -29,7 +29,7 @@ Folder: {folder name or null}
 
 ## Rules
 
-- Always invoke the `th-orchestrator` agent — do NOT invoke the excalidraw-diagram skill directly
-- The th-orchestrator will load the excalidraw-diagram skill context and generate the diagram
+- Always invoke the `orchestrator` agent — do NOT invoke the excalidraw-diagram skill directly
+- The orchestrator will load the excalidraw-diagram skill context and generate the diagram
 - The skill handles render validation (Playwright render loop) internally
 - Output is a `.excalidraw` file (and optionally a PNG preview)

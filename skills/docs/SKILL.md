@@ -1,6 +1,6 @@
 ---
 name: docs
-description: "Generate Obsidian documentation for a service, database, API, library, or product. Routes through the th-orchestrator documentation pipeline: architect researches → documenter writes → diagram agents visualize → QA validates."
+description: "Generate Obsidian documentation for a service, database, API, library, or product. Routes through the orchestrator documentation pipeline: architect researches → documenter writes → diagram agents visualize → QA validates."
 ---
 
 # /th:docs — Documentation Pipeline
@@ -33,7 +33,7 @@ Pass all topics to the orchestrator. It handles parallel dispatch (one research+
 
 ## Route
 
-Pass to the `th-orchestrator` agent with this task context:
+Pass to the `orchestrator` agent with this task context:
 
 ```
 Task: documentation
@@ -46,4 +46,4 @@ Vault: {parsed vault name, default: from config}
 Operator request: {original user input}
 ```
 
-The th-orchestrator handles the full documentation pipeline (see `ref-special-flows.md` § Documentation Flow).
+The orchestrator handles the full documentation pipeline (see `ref-special-flows.md` § Documentation Flow).

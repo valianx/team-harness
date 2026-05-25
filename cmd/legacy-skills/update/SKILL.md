@@ -1,4 +1,4 @@
-Pull the latest team-harness release into `~/.claude/` inline, without launching the Go installer binary. This is a standalone utility — does NOT route through the th-orchestrator.
+Pull the latest team-harness release into `~/.claude/` inline, without launching the Go installer binary. This is a standalone utility — does NOT route through the orchestrator.
 
 > **Plugin installations only:** If team-harness was installed as a Claude Code plugin, updates are handled automatically. Use `/plugin marketplace update` instead. This skill is for Go installer installations only.
 
@@ -74,10 +74,10 @@ Store the tag for use in subsequent steps.
 
 ## Step 1b — Compare against installed version (skip if up-to-date)
 
-Read the installed version from the th-orchestrator agent file:
+Read the installed version from the orchestrator agent file:
 
 ```bash
-installed=$(grep -m1 '^var version\|^## team-harness' ~/.claude/agents/th-orchestrator.md 2>/dev/null | head -1)
+installed=$(grep -m1 '^var version\|^## team-harness' ~/.claude/agents/orchestrator.md 2>/dev/null | head -1)
 ```
 
 If that doesn't work, try reading the manifest:
@@ -189,7 +189,7 @@ Track per-category counters as you go, incrementing only when a file is actually
 
    For each file, check whether it exists at `~/.claude/commands/<name>.md`. If it does, remove it with `rm -f`. Track the names of files actually removed in a `legacy_commands_removed` list. If none are found, the list is empty. This cleanup is idempotent — safe to run on a fresh install (the files simply won't be present).
 
-5. **Legacy cleanup — `orchestrator.md` removal (one-shot, v2.6.0 rename migration)**. After the agent copy in step 1, check whether `~/.claude/agents/orchestrator.md` still exists on disk. If it does, remove it with `rm -f` (no error if missing — the file disappears silently on systems that already migrated). Track this in a `legacy_agent_removed` flag (boolean) so the operator-facing summary can surface the cleanup. This is a one-time migration: the v2.6.0 release renamed the `orchestrator` agent to `th-orchestrator`, and existing installs would otherwise carry both the stale and the new file side-by-side. The check is conditional and idempotent — safe to re-run.
+5. **Legacy cleanup — `orchestrator.md` removal (one-shot, v2.6.0 rename migration)**. After the agent copy in step 1, check whether `~/.claude/agents/orchestrator.md` still exists on disk. If it does, remove it with `rm -f` (no error if missing — the file disappears silently on systems that already migrated). Track this in a `legacy_agent_removed` flag (boolean) so the operator-facing summary can surface the cleanup. This is a one-time migration: the v2.6.0 release renamed the `orchestrator` agent to `orchestrator`, and existing installs would otherwise carry both the stale and the new file side-by-side. The check is conditional and idempotent — safe to re-run.
 
 **File-copy failure handling.** If any individual copy fails (permission denied, disk full, source not found after extraction), print the failing source path and destination path and stop. Do not roll back files already written; report counters as they stood at the failure.
 
@@ -247,7 +247,7 @@ skills:   <skills_count> directories installed to ~/.claude/skills/
 hooks:    <hooks_count>
 ```
 
-If `legacy_agent_removed` is true (the v2.6.0 one-shot orchestrator-to-th-orchestrator migration fired this run), append one line immediately after the `hooks:` line:
+If `legacy_agent_removed` is true (the v2.6.0 one-shot orchestrator-to-orchestrator migration fired this run), append one line immediately after the `hooks:` line:
 
 ```
 legacy:   removed ~/.claude/agents/orchestrator.md
@@ -291,7 +291,7 @@ No emoji, no leading marker, no rephrasing. Print this even on a partial-failure
 
 ## Important
 
-- This skill does NOT route through the th-orchestrator.
+- This skill does NOT route through the orchestrator.
 - This skill does NOT launch the Go installer binary, `install.sh`, `install.ps1`, or `install.cmd`. The previous version of this skill did, and the binary's output was unreadable to the agent because the binary ran in a separate process (a new console window on Windows). This skill drives the update entirely inline so the summary and any errors stay in the agent's transcript.
 - This skill does NOT prompt the operator interactively. There are no credentials to capture — `MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, and `CONTEXT7_API_KEY` were already written to `~/.claude.json` during the original bootstrap install and are not touched here.
 - This skill compares the latest release tag against the installed version (from manifest). If they match, it prints "up to date" and exits without downloading. To force a full reinstall regardless, use the installer one-liner.

@@ -67,25 +67,25 @@ Hard rule: when asked to "review", "audit", or "validate" a plan / inventory / t
 
 ### Routing when asked to "review the plan"
 
-If the th-orchestrator passes a task like "review the plan", "audit substance", "validate coverage of the architecture", "revisa el plan":
+If the orchestrator passes a task like "review the plan", "audit substance", "validate coverage of the architecture", "revisa el plan":
 
 1. If the concern is **plan-shape** (one PR per service, per-PR ACs in GWT, consolidated docs, …) → return `status: blocked` with `summary: route to plan-reviewer agent`.
 2. If the concern is **substance coverage of AC vs Work Plan** → invoke Ratify-Plan Mode (append to `01-plan.md`). Do NOT create a separate file.
 3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: route back to architect for in-place refinement of 01-plan.md`.
 
-The th-orchestrator must pick one of the three. If the instruction is ambiguous, return `status: blocked` and ask. Do not silently improvise a fourth path.
+The orchestrator must pick one of the three. If the instruction is ambiguous, return `status: blocked` and ask. Do not silently improvise a fourth path.
 
 ---
 
 ## Operating Modes
 
-Detect the mode from the th-orchestrator's instructions.
+Detect the mode from the orchestrator's instructions.
 
 ### Validate Mode (default)
 
 Used inside the pipeline after implementation. Validates code against existing AC from `01-plan.md` § Task List.
 
-- **Trigger:** th-orchestrator invokes for verification, or no explicit mode specified
+- **Trigger:** orchestrator invokes for verification, or no explicit mode specified
 - **Flow:** Phase 0 → Phase 2 → Phase 3 (skip Phase 1 — AC already exist in `01-plan.md` § Task List)
 - **Output:** `workspaces/{feature-name}/04-validation.md`
 
@@ -95,7 +95,7 @@ In validate mode, you read AC from `01-plan.md` § Task List and check the imple
 
 Used standalone to define acceptance criteria for a feature or issue, outside the pipeline.
 
-- **Trigger:** th-orchestrator invokes with "define-ac mode" or "define acceptance criteria"
+- **Trigger:** orchestrator invokes with "define-ac mode" or "define acceptance criteria"
 - **Flow:** Phase 0 → Phase 1 → write AC output
 - **Output:** Present the defined criteria to the user and write to `workspaces/{feature-name}/00-acceptance-criteria.md`
 
@@ -103,7 +103,7 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa + security cycle.
 
-- **Trigger:** th-orchestrator invokes with `mode: ratify-plan`
+- **Trigger:** orchestrator invokes with `mode: ratify-plan`
 - **Flow:** Phase 0 (read intake + architecture) → Plan-AC Mapping → return verdict
 - **Output:** brief append to `workspaces/{feature-name}/01-plan.md` under `## Plan Ratification (Phase 1.5)` — do NOT create a new file.
 
@@ -149,15 +149,15 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of uncovered AC, or "none"}
 ```
 
-This mode is read-only and short — typical run is 2-3 minutes of agent time, ~3-5K tokens. Worth it only when the Work Plan has 4+ steps or 4+ AC; for trivial tasks the th-orchestrator should skip Phase 1.5.
+This mode is read-only and short — typical run is 2-3 minutes of agent time, ~3-5K tokens. Worth it only when the Work Plan has 4+ steps or 4+ AC; for trivial tasks the orchestrator should skip Phase 1.5.
 
 ---
 
 ### Reconcile Mode (Phase 2.5 — constraint reconciliation)
 
-Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer or architect annotated `[CONSTRAINT-DISCOVERED: …]` next to one or more AC in `01-plan.md` § Review Summary and the th-orchestrator triaged at least one constraint as **non-trivial**. Your job is to decide, per AC, whether the AC stays as-is, is amended, or is dropped — without rewriting any AC yourself.
+Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer or architect annotated `[CONSTRAINT-DISCOVERED: …]` next to one or more AC in `01-plan.md` § Review Summary and the orchestrator triaged at least one constraint as **non-trivial**. Your job is to decide, per AC, whether the AC stays as-is, is amended, or is dropped — without rewriting any AC yourself.
 
-- **Trigger:** th-orchestrator invokes with `mode: reconcile`
+- **Trigger:** orchestrator invokes with `mode: reconcile`
 - **Flow:** Phase 0 (read plan + architecture + implementation) → Per-AC reconciliation decisions → return verdict
 - **Output:** brief append to `workspaces/{feature-name}/04-validation.md` under `## Reconciliation Decisions (Phase 2.5)` — do NOT create a new file.
 
@@ -167,7 +167,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 2. Read each `[CONSTRAINT-DISCOVERED: …]` annotation, the affected AC, and the relevant pieces of `01-plan.md` and `02-implementation.md` to understand why the constraint surfaced.
 3. For each annotated AC, decide one of three outcomes:
    - **(a) keep** — the constraint can be worked around in code or testing; AC remains as written.
-   - **(b) amend** — propose a new wording that captures the discovered constraint while preserving the user's intent. Show the new AC text. Do NOT apply the change yourself — the th-orchestrator does that.
+   - **(b) amend** — propose a new wording that captures the discovered constraint while preserving the user's intent. Show the new AC text. Do NOT apply the change yourself — the orchestrator does that.
    - **(c) drop** — the original promise is no longer feasible with the discovered constraint. The user must be informed before the pipeline continues. Provide a one-line justification grounded in the Original Description.
 4. **Do NOT** validate code (Phase 3 will do that). **Do NOT** modify `01-plan.md` or any AC. Your output is decisions, not edits.
 
@@ -199,9 +199,9 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of dropped AC with one-line reason, or "none"}
 ```
 
-`verdict: clean` means every constraint resolved into "keep". `amendments` means at least one AC needs rewording (th-orchestrator applies). `drops` means the th-orchestrator must stop and confirm with the user before continuing to Phase 3.
+`verdict: clean` means every constraint resolved into "keep". `amendments` means at least one AC needs rewording (orchestrator applies). `drops` means the orchestrator must stop and confirm with the user before continuing to Phase 3.
 
-This mode is read-only and short — typical run is 2-3 minutes of agent time, ~2-4K tokens. Skipped entirely when no `[CONSTRAINT-DISCOVERED]` annotations exist or when all constraints are trivial (th-orchestrator handles those inline).
+This mode is read-only and short — typical run is 2-3 minutes of agent time, ~2-4K tokens. Skipped entirely when no `[CONSTRAINT-DISCOVERED]` annotations exist or when all constraints are trivial (orchestrator handles those inline).
 
 ---
 
@@ -442,15 +442,15 @@ Responsive Criteria:
 
 **This phase runs in validate mode (default).** Read the acceptance criteria, then read source code and compare against them.
 
-**Per-PR scoping (pipeline_version: 2).** When the th-orchestrator invokes you in Stage 2 with a `PR identifier` (e.g., `PR-1`), read **the AC block of that specific PR** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-PR AC block is your validation scope: validate exactly those ACs against the code of this PR. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this PR (by construction the union of per-PR ACs covers it).
+**Per-PR scoping (pipeline_version: 2).** When the orchestrator invokes you in Stage 2 with a `PR identifier` (e.g., `PR-1`), read **the AC block of that specific PR** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-PR AC block is your validation scope: validate exactly those ACs against the code of this PR. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this PR (by construction the union of per-PR ACs covers it).
 
-**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a PR identifier — the th-orchestrator does not pass one in legacy mode.
+**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a PR identifier — the orchestrator does not pass one in legacy mode.
 
 **Distinction from Phase 1.5 (ratify-plan mode) and Phase 1.6 (plan-reviewer).** Phase 1.5 (this agent, mode `ratify-plan`) validates that the Work Plan covers every AC — substance coverage. Phase 1.6 (the `plan-reviewer` agent — different file) audits plan-shape rules — one PR per service, per-PR ACs in GWT, consolidated documents. Validate-mode (this section) is Phase 3 (per PR in Stage 2): code vs AC. Three distinct phases, three distinct concerns.
 
 **AC formats:** Accept both `Given/When/Then` and `VERIFY: {condition}` formats. For VERIFY criteria, check that the code satisfies the stated condition and provide file:line evidence just like GWT criteria.
 
-**Spec annotations:** If any AC still has a `[CONSTRAINT-DISCOVERED]` tag (wasn't reconciled by the th-orchestrator), treat the annotation as context — validate against the AC as written but note the discrepancy in your report under Warnings.
+**Spec annotations:** If any AC still has a `[CONSTRAINT-DISCOVERED]` tag (wasn't reconciled by the orchestrator), treat the annotation as context — validate against the AC as written but note the discrepancy in your report under Warnings.
 
 ### Bug-fix mode contract (validate mode for type: fix and type: hotfix)
 
@@ -477,7 +477,7 @@ The `04-validation.md` template for bug-fix mode adds a `Verified by` column on 
 2. **AC-2**: Regression test exists at `tests/date-range/picker.spec.ts` — PASS — `tests/date-range/picker.spec.ts:18-34` (test `should_exclude_to_boundary` fails on pre-fix, passes on post-fix) — verified by `02-regression-test.md` (authoring) + `03-testing.md` (post-fix suite).
 ```
 
-**`security-sensitive: true` is forced for `type: fix | hotfix`** at Phase 0a Step 7 in the th-orchestrator. The security agent runs in parallel with you at Phase 3 regardless of any other criterion. The qa validate-mode is unchanged by this — security findings live in `04-security.md`, not in your scope.
+**`security-sensitive: true` is forced for `type: fix | hotfix`** at Phase 0a Step 7 in the orchestrator. The security agent runs in parallel with you at Phase 3 regardless of any other criterion. The qa validate-mode is unchanged by this — security findings live in `04-security.md`, not in your scope.
 
 1. **Verify each criterion** — check the code implements what was specified
 2. **Check test coverage** — ensure tests exist for the defined criteria
@@ -571,13 +571,13 @@ Before marking validation as complete:
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The th-orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In validate mode: an AC mentions a specific tool or library that may have a known `tool-gotcha` entity (e.g., "uses Prisma" → query `"Prisma gotchas"`).
@@ -587,8 +587,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 **How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in th-orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the th-orchestrator will pick it up.
-- Re-query for the same term the th-orchestrator already queried (look at `00-knowledge-context.md` first).
+- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
+- Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -597,7 +597,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-When invoked by the th-orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: qa
@@ -615,20 +615,20 @@ issues: {list of failed criteria, or "none"}
 ```
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix` in validate mode):**
-- `regression_test_referenced: true | false | null` — for `bug_tier: 2 | 3 | 4`: `true` when AC-2 (regression-test-exists) is mapped in `04-validation.md` with file:line evidence pointing to both `02-regression-test.md` (authoring) and `03-testing.md` (post-fix suite confirmation); `false` blocks the acceptance gate. For `bug_tier: 1` with Phase 2.0 skipped (no-behavior-change): set to `null` — Phase 2.0 produced no `02-regression-test.md`, so there is nothing to reference. The acceptance gate accepts `null` only when the th-orchestrator confirms `regression_test_status: skipped` in `00-state.md`.
+- `regression_test_referenced: true | false | null` — for `bug_tier: 2 | 3 | 4`: `true` when AC-2 (regression-test-exists) is mapped in `04-validation.md` with file:line evidence pointing to both `02-regression-test.md` (authoring) and `03-testing.md` (post-fix suite confirmation); `false` blocks the acceptance gate. For `bug_tier: 1` with Phase 2.0 skipped (no-behavior-change): set to `null` — Phase 2.0 produced no `02-regression-test.md`, so there is nothing to reference. The acceptance gate accepts `null` only when the orchestrator confirms `regression_test_status: skipped` in `00-state.md`.
 - `reproduction_steps_validated: true | false` — `true` when AC-1 (reproduction-no-longer-bug) — or its Tier 1 equivalent ("the diff resolves the cited issue") — is confirmed. `false` blocks the acceptance gate.
 
 **Mandatory tool-usage fields:**
 - `memory_consult` — count of Knowledge Graph queries made this run. Zero is a valid value.
-- `kg_save_candidates` — names of KG entities you propose the th-orchestrator persist (empty list `[]` is valid).
+- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
 
-The th-orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl`.
+The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl`.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The th-orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
 ### Failure Brief (validate mode only, when `status: failed`)
 
-When you finish validate mode with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the th-orchestrator can route the iteration without re-reading `04-validation.md`. Create the file if it doesn't exist.
+When you finish validate mode with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route the iteration without re-reading `04-validation.md`. Create the file if it doesn't exist.
 
 ```markdown
 ## Iteration {N} — qa — {YYYY-MM-DD HH:MM}
@@ -645,4 +645,4 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 - ...
 ```
 
-Keep the brief tight: 5-10 lines per iteration. The th-orchestrator reads ONLY this file to decide routing.
+Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing.

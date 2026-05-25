@@ -6,21 +6,30 @@ import (
 	"strings"
 )
 
-const orchestratorRuleMarkerStart = "<!-- th-orchestrator-dispatch-rule:start -->"
-const orchestratorRuleMarkerEnd = "<!-- th-orchestrator-dispatch-rule:end -->"
+const orchestratorRuleMarkerStart = "<!-- orchestrator-dispatch-rule:start -->"
+const orchestratorRuleMarkerEnd = "<!-- orchestrator-dispatch-rule:end -->"
 
-const orchestratorRule = `<!-- th-orchestrator-dispatch-rule:start -->
-## th-orchestrator dispatch
+const orchestratorRule = `<!-- orchestrator-dispatch-rule:start -->
+## orchestrator dispatch
 
-Invoke the th-orchestrator as a subagent: ` + "`Agent(subagent_type='th-orchestrator', ...)`" + `. The orchestrator dispatches phase agents (architect, implementer, tester, qa, security, delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
-<!-- th-orchestrator-dispatch-rule:end -->`
+Invoke the orchestrator as a subagent: ` + "`Agent(subagent_type='orchestrator', ...)`" + `. The orchestrator dispatches phase agents (architect, implementer, tester, qa, security, delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
+<!-- orchestrator-dispatch-rule:end -->`
 
 // ensureGlobalClaudeMD creates or updates ~/.claude/CLAUDE.md with the
 // orchestrator dispatch rule. The rule is wrapped in HTML comment markers
 // for idempotent updates — if the markers exist, the section is replaced;
 // otherwise it is appended.
+
+// legacyMarkerStart / legacyMarkerEnd are the v1 inline-rule markers written by
+// installer versions before v2.0 — kept to migrate users off the old format.
 const legacyMarkerStart = "<!-- th-orchestrator-inline-rule:start -->"
 const legacyMarkerEnd = "<!-- th-orchestrator-inline-rule:end -->"
+
+// legacyDispatchMarkerStart / legacyDispatchMarkerEnd are the v2 dispatch-rule
+// markers written by installer versions v2.0–v2.28 (th-orchestrator era) — kept
+// to migrate users off the old agent name without leaving a duplicate block.
+const legacyDispatchMarkerStart = "<!-- th-orchestrator-dispatch-rule:start -->"
+const legacyDispatchMarkerEnd = "<!-- th-orchestrator-dispatch-rule:end -->"
 
 func ensureGlobalClaudeMD() {
 	home, _ := os.UserHomeDir()
@@ -31,7 +40,7 @@ func ensureGlobalClaudeMD() {
 		existing = string(data)
 	}
 
-	// Migrate from legacy inline-rule markers to the new dispatch-rule markers.
+	// Migrate from v1 inline-rule markers to the current dispatch-rule markers.
 	if strings.Contains(existing, legacyMarkerStart) {
 		startIdx := strings.Index(existing, legacyMarkerStart)
 		endIdx := strings.Index(existing, legacyMarkerEnd)
@@ -43,6 +52,23 @@ func ensureGlobalClaudeMD() {
 				return
 			}
 			fmt.Println("  ~/.claude/CLAUDE.md: orchestrator rule migrated (inline → subagent dispatch)")
+			return
+		}
+	}
+
+	// Migrate from v2 th-orchestrator-dispatch-rule markers to the current
+	// orchestrator-dispatch-rule markers (rename migration, v2.0–v2.28 → v2.29+).
+	if strings.Contains(existing, legacyDispatchMarkerStart) {
+		startIdx := strings.Index(existing, legacyDispatchMarkerStart)
+		endIdx := strings.Index(existing, legacyDispatchMarkerEnd)
+		if endIdx > startIdx {
+			endIdx += len(legacyDispatchMarkerEnd)
+			existing = existing[:startIdx] + orchestratorRule + existing[endIdx:]
+			if err := os.WriteFile(path, []byte(existing), 0o644); err != nil {
+				fmt.Fprintf(os.Stderr, "  [warn] cannot migrate ~/.claude/CLAUDE.md: %v\n", err)
+				return
+			}
+			fmt.Println("  ~/.claude/CLAUDE.md: orchestrator rule migrated (th-orchestrator → orchestrator)")
 			return
 		}
 	}

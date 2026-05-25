@@ -1,6 +1,6 @@
 Analyze the input: $ARGUMENTS
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `th-orchestrator` agent or any other agent. Execute all steps yourself using the tools available to you (Bash, Glob, Read, Grep, Agent).
+**IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all steps yourself using the tools available to you (Bash, Glob, Read, Grep, Agent).
 
 ## Voice
 
@@ -48,7 +48,7 @@ Parse the arguments:
    - **Critical Rules** (the `## Critical Rules` section — every rule is a pass/fail criterion)
    - **NEVER statements** (grep for `NEVER` — each is a boundary that must not be crossed)
    - **Operating modes** (from `## Operating Modes` section)
-   - **Expected output** (session-doc filename from `## Session Documentation` or th-orchestrator team table)
+   - **Expected output** (session-doc filename from `## Session Documentation` or orchestrator team table)
    - **Model** (from frontmatter `model:` field)
 
 If the agent file doesn't exist, report error and stop.

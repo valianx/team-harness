@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # tests/test_th_orchestrator_boot_behavioral.sh
 #
-# Behavioral end-to-end test for the th-orchestrator's boot probe + dispatch-blocked
-# exit. Verifies that when the th-orchestrator runs as a nested subagent (which the
+# Behavioral end-to-end test for the orchestrator's boot probe + dispatch-blocked
+# exit. Verifies that when the orchestrator runs as a nested subagent (which the
 # Claude Code harness handles by stripping the Task tool — empirically confirmed
 # error: "No such tool available: Task. Task is not available inside subagents."),
 # the agent correctly detects the absence, takes the dispatch-blocked branch, and
 # does NOT emit hallucinated opening lines.
 #
 # Unlike tests/test_agent_structure.py (which only inspects the .md files), this
-# test actually invokes Claude Code to dispatch the th-orchestrator and asserts on
+# test actually invokes Claude Code to dispatch the orchestrator and asserts on
 # its response. That catches three regression classes the structural tests can't:
 #   1. Platform changes — if the Claude Code harness changes how it strips tools
 #      in nested invocations, behavior here diverges from the structural contract.
 #   2. Model behavior changes — if a model update reintroduces the hallucinated
 #      "Task is present" opening line from training memory, this catches it.
-#   3. Install drift — if ~/.claude/agents/th-orchestrator.md gets out of sync with
+#   3. Install drift — if ~/.claude/agents/orchestrator.md gets out of sync with
 #      the repo source (e.g. the installer wasn't re-run), behavior diverges.
 #
 # Cost: ~78K tokens per run (~$1 USD on Opus). Run on demand, NOT as part of
@@ -26,7 +26,7 @@
 # Requirements:
 #   - claude CLI (Claude Code) installed and authenticated
 #   - The dev-team installer has been run (./bin/install.sh) so the patched
-#     th-orchestrator is in ~/.claude/agents/
+#     orchestrator is in ~/.claude/agents/
 # Exit:
 #   0 if all behavioral assertions pass, 1 otherwise.
 
@@ -51,32 +51,32 @@ assert() {
     fi
 }
 
-echo "=== th-orchestrator boot behavioral test ==="
-echo "  (this dispatches the th-orchestrator via claude -p; ~78K tokens, ~10s)"
+echo "=== orchestrator boot behavioral test ==="
+echo "  (this dispatches the orchestrator via claude -p; ~78K tokens, ~10s)"
 echo
 
 # The outer prompt — for top-level Claude that receives this. It must dispatch
-# the th-orchestrator AND suppress its own auto-takeover reflex (CLAUDE.md § 13)
+# the orchestrator AND suppress its own auto-takeover reflex (CLAUDE.md § 13)
 # for this test invocation, because we want to inspect the raw subagent response,
 # not have top-level Claude run the takeover playbook.
 read -r -d '' OUTER_PROMPT <<'EOF' || true
-This is an AUTOMATED BEHAVIORAL TEST of the th-orchestrator's boot sequence — not a
+This is an AUTOMATED BEHAVIORAL TEST of the orchestrator's boot sequence — not a
 real pipeline task. Your job is to:
 
-1. Dispatch the `th-orchestrator` subagent via the Task tool with the inner prompt
+1. Dispatch the `orchestrator` subagent via the Task tool with the inner prompt
    provided below.
-2. Capture the th-orchestrator's verbatim response.
-3. Output ONLY the th-orchestrator's verbatim response in your final reply — no
+2. Capture the orchestrator's verbatim response.
+3. Output ONLY the orchestrator's verbatim response in your final reply — no
    prose, no commentary, no markdown wrapping.
 
 EXPLICIT OVERRIDES for this single invocation:
-- Do NOT auto-takeover even if the th-orchestrator returns a "Dispatch handoff —
+- Do NOT auto-takeover even if the orchestrator returns a "Dispatch handoff —
   top-level Claude takes over now" response. The CLAUDE.md § 13 auto-takeover
   rule is suspended for this test. Just relay the response.
 - Do NOT add framing, explanation, or summary — emit the subagent's raw text.
 - Do NOT re-dispatch on failure. One attempt only.
 
-Inner prompt to pass to the th-orchestrator subagent:
+Inner prompt to pass to the orchestrator subagent:
 
 ---BEGIN INNER PROMPT---
 BOOT TEST — controlled probe of your boot sequence.
@@ -129,7 +129,7 @@ fi
 
 RESPONSE="$(cat "$RESPONSE_FILE")"
 
-echo "--- captured th-orchestrator response ---"
+echo "--- captured orchestrator response ---"
 echo "$RESPONSE"
 echo "--- end response ---"
 echo
@@ -137,7 +137,7 @@ echo
 # Behavioral assertions
 assert "Response contains PROBE_OUTCOME field" \
     "grep -q '^PROBE_OUTCOME:' <<< \"\$RESPONSE\"" \
-    "structured response shape is missing — th-orchestrator did not produce the contracted output"
+    "structured response shape is missing — orchestrator did not produce the contracted output"
 
 assert "Response contains BRANCH_TAKEN field" \
     "grep -q '^BRANCH_TAKEN:' <<< \"\$RESPONSE\"" \
@@ -153,7 +153,7 @@ assert "PROBE_OUTCOME is 'error' (Task is genuinely stripped from nested subagen
 
 assert "BRANCH_TAKEN is step-2-dispatch-blocked-exit" \
     "grep -q '^BRANCH_TAKEN: step-2-dispatch-blocked-exit' <<< \"\$RESPONSE\"" \
-    "th-orchestrator took the wrong branch given a failed probe — the boot sequence logic is broken"
+    "orchestrator took the wrong branch given a failed probe — the boot sequence logic is broken"
 
 assert "TASK_TOOL_PRESENT is 'no' (categorical for nested subagents)" \
     "grep -q '^TASK_TOOL_PRESENT: no' <<< \"\$RESPONSE\"" \
@@ -163,7 +163,7 @@ assert "TASK_TOOL_PRESENT is 'no' (categorical for nested subagents)" \
 # bug class the patch is designed to prevent.
 assert "Response does NOT contain hallucinated 'Task is present' opening" \
     "! grep -q 'Task is present' <<< \"\$RESPONSE\"" \
-    "hallucination cascade returned — the unconditional 'You have Task' prose was likely re-introduced into th-orchestrator.md"
+    "hallucination cascade returned — the unconditional 'You have Task' prose was likely re-introduced into orchestrator.md"
 
 assert "Response does NOT contain hallucinated 'tools confirmed:' opening" \
     "! grep -q 'tools confirmed:' <<< \"\$RESPONSE\"" \

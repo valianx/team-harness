@@ -4,7 +4,7 @@ Analyze the input: $ARGUMENTS
 
 ## Mode 1 — Feature name provided
 
-1. Pass to the `th-orchestrator` agent:
+1. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: test
@@ -22,7 +22,7 @@ Analyze the input: $ARGUMENTS
 
 ## Important
 
-- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
-- The th-orchestrator will route to the `tester` agent
+- Always invoke the `orchestrator` agent — do NOT invoke agents directly
+- The orchestrator will route to the `tester` agent
 - Requires existing workspaces with implementation docs
 - Output: tests created + `workspaces/{feature-name}/03-testing.md`

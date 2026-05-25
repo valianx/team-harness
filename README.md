@@ -22,24 +22,31 @@
 | `local` | `./workspaces/` in each project | Default. Simple, no extra config. |
 | `obsidian` | Obsidian vault path you provide | Cross-project visibility. Workspaces appear as searchable notes in your vault. |
 
+### Update
+
+```
+/plugin marketplace update team-harness-marketplace
+/plugin install th
+```
+
 ---
 
 ## Quick start
 
 After install, open Claude Code. The entry points are:
 
-- `/th:orchestrator` — the front door to the whole pipeline (or use `@th-orchestrator` in chat)
+- `/th:orchestrator` — the front door to the whole pipeline (or use `@th:orchestrator` in chat)
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
 - `/th:update` — update to the latest release
 
 ```
-@th-orchestrator give me the work plan for this task: <description>
-@th-orchestrator implement it
-@th-orchestrator open the PR
-@th-orchestrator recover <feature>
+@th:orchestrator give me the work plan for this task: <description>
+@th:orchestrator implement it
+@th:orchestrator open the PR
+@th:orchestrator recover <feature>
 ```
 
-> **The th-orchestrator is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route to the same agent under the hood.
+> **The orchestrator is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route to the same agent under the hood.
 
 ---
 

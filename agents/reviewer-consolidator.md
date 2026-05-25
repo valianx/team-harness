@@ -19,7 +19,7 @@ The consolidated review body follows the same language contract as `agents/revie
 
 ## Input contract
 
-The th-orchestrator invokes you with one of two input sets:
+The orchestrator invokes you with one of two input sets:
 
 **Multi-focused reviewer path (when `--multi` or auto-multi was active):**
 - 2-3 reviewer draft files: `.claude/pr-review-draft-security.md`, `.claude/pr-review-draft-architecture.md`, `.claude/pr-review-draft-style.md` (one per focus that ran)

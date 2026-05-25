@@ -5,8 +5,8 @@ Analyze the input: $ARGUMENTS
 ## Parse flags
 
 Before processing modes, check if the input contains flags:
-- `--skip-version` → pass `skip-version: true` to the th-orchestrator payload. Remove the flag from the input before processing.
-- `--skip-delivery` → pass `skip-delivery: true` to the th-orchestrator payload. Remove the flag. When set, the th-orchestrator runs the full pipeline (specify → design → implement → verify) but STOPS before delivery. Used in batch mode where delivery is consolidated.
+- `--skip-version` → pass `skip-version: true` to the orchestrator payload. Remove the flag from the input before processing.
+- `--skip-delivery` → pass `skip-delivery: true` to the orchestrator payload. Remove the flag. When set, the orchestrator runs the full pipeline (specify → design → implement → verify) but STOPS before delivery. Used in batch mode where delivery is consolidated.
 
 ---
 
@@ -15,10 +15,10 @@ Before processing modes, check if the input contains flags:
 1. Extract the issue number
 2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier A — read a single issue". Run the probe to set `has_gh`. When `has_gh=true`, use `gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems`. When `has_gh=false`, attempt the curl Tier A fallback. If both fail, prompt the operator to paste the issue body using the escape-hatch template.
 3. If issue data cannot be obtained automatically, tell the user: "Issue #{number} could not be fetched automatically. Paste the issue body as text below, or paste the URL and re-run."
-4. **Assess issue quality** before passing to th-orchestrator:
+4. **Assess issue quality** before passing to orchestrator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
-5. Pass ALL the issue data to the `th-orchestrator` agent:
+5. Pass ALL the issue data to the `orchestrator` agent:
    ```
    GitHub Issue Task:
    - Issue: #{number}
@@ -40,10 +40,10 @@ Before processing modes, check if the input contains flags:
 1. Extract all issue numbers from the input
 2. **Detection + fallback:** same as Mode 1 — see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Use `gh` when available; curl fallback otherwise. Apply per-issue.
 3. If any issue fails to load (both `gh` and curl unavailable), report which ones failed and continue with the rest.
-4. **Assess each issue's quality** before passing to th-orchestrator:
+4. **Assess each issue's quality** before passing to orchestrator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
-5. Pass ALL issues as a batch to the `th-orchestrator` agent:
+5. Pass ALL issues as a batch to the `orchestrator` agent:
    ```
    GitHub Issue Batch (N tasks):
 
@@ -60,7 +60,7 @@ Before processing modes, check if the input contains flags:
    - Issue: #{number}
    ...
    ```
-   The th-orchestrator will create `workspaces/batch-progress.md` to track all tasks.
+   The orchestrator will create `workspaces/batch-progress.md` to track all tasks.
 
 ---
 
@@ -104,7 +104,7 @@ Before processing modes, check if the input contains flags:
    gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems
    ```
 4. Confirm the created issue number with the user
-5. Pass the issue data to the `th-orchestrator` agent using the format from Mode 1
+5. Pass the issue data to the `orchestrator` agent using the format from Mode 1
 
 ---
 
@@ -122,7 +122,7 @@ Ask the user: "Provide a GitHub issue number (#123), multiple issues (#12 #13 #1
 
 ## Important
 
-- **You read/create issues.** The th-orchestrator does NOT read issues — it receives the data from you.
-- Always invoke the `th-orchestrator` agent to handle the task — do NOT execute the development pipeline yourself
-- The th-orchestrator manages the full team: architect → implementer → tester → qa → delivery
-- The th-orchestrator will handle project board updates (move to "In Progress", comment, move to "In Review") using the issue number you provide
+- **You read/create issues.** The orchestrator does NOT read issues — it receives the data from you.
+- Always invoke the `orchestrator` agent to handle the task — do NOT execute the development pipeline yourself
+- The orchestrator manages the full team: architect → implementer → tester → qa → delivery
+- The orchestrator will handle project board updates (move to "In Progress", comment, move to "In Review") using the issue number you provide

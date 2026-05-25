@@ -1,6 +1,6 @@
 Dispatch a small, well-scoped task to a separate Claude session so the current session keeps moving. Designed for fire-and-forget work the developer would otherwise context-switch to handle: a typo fix, a version bump, a dependency upgrade, a one-line config change, a doc update, a missing `loading.tsx` for an App Router segment.
 
-**This is NOT** a way to outsource an unbounded feature. The pipeline (th-orchestrator + agents) exists for that — `/th:issue`, `/th:plan`, or just typing the feature description routes through the full SDD pipeline with verification gates. `/th:background` is the opposite: it accepts that the gates are too heavy for a 30-second change and offers a structured fast-path.
+**This is NOT** a way to outsource an unbounded feature. The pipeline (orchestrator + agents) exists for that — `/th:issue`, `/th:plan`, or just typing the feature description routes through the full SDD pipeline with verification gates. `/th:background` is the opposite: it accepts that the gates are too heavy for a 30-second change and offers a structured fast-path.
 
 ## Voice
 
@@ -119,7 +119,7 @@ Ask the user: "What would you like to dispatch in the background? Provide a one-
 
 ## Important
 
-- **`/th:background` does NOT invoke the th-orchestrator.** This is a deliberately different surface — the th-orchestrator and its gates exist precisely because most tasks are not eligible for fast-path. If you find yourself wanting to bypass the gates often, the cost is the gates being too heavy, not the gates being wrong; raise it as a `team-harness` issue instead of widening `/th:background`'s eligibility criteria.
+- **`/th:background` does NOT invoke the orchestrator.** This is a deliberately different surface — the orchestrator and its gates exist precisely because most tasks are not eligible for fast-path. If you find yourself wanting to bypass the gates often, the cost is the gates being too heavy, not the gates being wrong; raise it as a `team-harness` issue instead of widening `/th:background`'s eligibility criteria.
 - **`/th:background` does NOT run the dispatched command.** The user owns the actual fire. The skill only validates eligibility, builds the command, and explains how to monitor it.
 - **The dispatched session inherits the user's `~/.claude/` config**, including the `policy-block.sh` PreToolUse hook. Destructive commands stay blocked even in the background session.
 - For multiple parallel tasks, `/th:tmux` is the right tool — it manages tmux panes, dependency analysis, and aggregates results. `/th:background` is for a single fire-and-forget.

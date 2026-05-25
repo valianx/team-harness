@@ -19,7 +19,7 @@ This guide covers migration from the Go installer to the Claude Code plugin dist
 | `/th-update` | `/th:update` |
 | All other `/skill-name` commands | `/th:skill-name` |
 
-The namespace prefix `th:` is mandatory in plugin mode. The orchestrator (`@th-orchestrator`) continues to work unchanged in chat mentions.
+The namespace prefix `th:` is mandatory in plugin mode. The orchestrator (`@th:orchestrator`) continues to work unchanged in chat mentions.
 
 ### File locations
 
@@ -40,7 +40,7 @@ Skills now use the directory format. Each skill lives at `skills/<name>/SKILL.md
 
 - **Agents** — all 19 agents in `agents/` are unchanged. Names, models, and contracts are identical.
 - **Pipeline behavior** — all pipelines (feature, fix, hotfix, research, docs, review) run identically.
-- **th-orchestrator as entry point** — `@th-orchestrator` in chat still routes to the same orchestrator agent.
+- **orchestrator as entry point** — `@th:orchestrator` in chat still routes to the same orchestrator agent.
 - **Workspaces** — pipeline workspaces (local `./workspaces/` or Obsidian vault) work identically.
 - **Low-cost mode** — available via the Go installer (the plugin cannot transform frontmatter on install).
 - **`.team-harness.json` manifest** — config file location and format unchanged.

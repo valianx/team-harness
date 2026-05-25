@@ -13,7 +13,7 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 **Documented exceptions** (committed artefacts where Spanish is allowed):
 
 - **`agents/security.md` report-body template, `04-security.md` report bodies, `agents/reviewer.md` review-body templates, `04-internal-review.md` / `05-internal-review.md` reviewer outputs.** The two agents produce Spanish-language reports per their contracts. The Spanish output is only the body of those session-doc reports (and the GitHub PR-review comment). The agent's system prompt, status-block fields, and framework-level fields remain English.
-- **`agents/th-orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language.
+- **`agents/orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language.
 
 **`agents/translator.md` example glossary tables** are domain illustrations, not operator copy. Out of scope for this guide.
 
@@ -43,11 +43,11 @@ The agent never composes Spanish (post-audit, with the §7.3 exceptions). The op
 - **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on where it lives.
 - **Where does it live?** Gitignored workspaces → operator's chat language. Committed repo file → English (with the documented §7.3 exceptions).
 
-## th-orchestrator as the Canonical Entry Point (§7.5)
+## orchestrator as the Canonical Entry Point (§7.5)
 
-When documenting how to invoke the system, treat `@th-orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+When documenting how to invoke the system, treat `@th:orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
 
-The operator's mental model is: th-orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+The operator's mental model is: orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
 
 ## Application Checklist for Contributors (§7.6)
 
@@ -57,7 +57,7 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
 - [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, session-doc templates). Exception: `/status` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/th-orchestrator.md` Step 6 routing table.
-- [ ] If the change documents how to invoke the system, the example uses `@th-orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
+- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/orchestrator.md` Step 6 routing table.
+- [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 
 `tests/test_agent_structure.py` Suite 25 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).

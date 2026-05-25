@@ -1,13 +1,13 @@
 #!/bin/bash
-# notify-stage.sh — Invoked by the th-orchestrator at stage boundaries (4 toasts/pipeline).
+# notify-stage.sh — Invoked by the orchestrator at stage boundaries (4 toasts/pipeline).
 # Reads a JSON payload from stdin, detects the current OS, derives a one-line message
 # from the stage fields, and routes to the matching ~/.claude/hooks/notify-{os}.sh.
 #
-# Payload schema (piped from th-orchestrator):
+# Payload schema (piped from orchestrator):
 #   {"stage":N,"label":"<label>","status":"<complete|FAILED|BLOCKED>",
 #    "feature":"<name>","summary":"<1-line ≤120 chars>","cwd":"<project root>"}
 #
-# Exit 0 on every path — never bubbles errors back to the th-orchestrator.
+# Exit 0 on every path — never bubbles errors back to the orchestrator.
 
 PAYLOAD=$(cat)
 

@@ -109,7 +109,7 @@ When the MCP backend serves >1 developer, the content-policy stakes change. The 
 
 ### Required in multi-tenant mode
 
-- **Author attribution on `[decision]` nodes.** Decisions are the highest-stakes type — readers need to know whose call it was. Promote `Decided by: <author-or-team>, <date>` to a required observation on every `[decision]` entry. The `session_start` / `session_end` tools provide the author proxy via `session_id`; th-orchestrator Phase 6 attaches the session_id to the `create_nodes` call.
+- **Author attribution on `[decision]` nodes.** Decisions are the highest-stakes type — readers need to know whose call it was. Promote `Decided by: <author-or-team>, <date>` to a required observation on every `[decision]` entry. The `session_start` / `session_end` tools provide the author proxy via `session_id`; orchestrator Phase 6 attaches the session_id to the `create_nodes` call.
 - **Project tag on every node.** The MCP's `project` field on nodes (set via `mark_superseded.project` etc.) becomes the namespace for multi-tenant scoping. Single-operator KG can leave it at `global`; team KG must set it explicitly. Recommendation: use the bare repo slug (e.g., `zippy-payments`, `team-harness`, `context-harness-mcp`). Cross-cutting constraints (PR-hygiene, branching conventions) stay at `global`.
 
 ### When in doubt — split the deployment
@@ -120,7 +120,7 @@ If a developer's work spans contexts that should not cross-leak (e.g., a persona
 
 ## How the policy is applied
 
-- **At write time**: the `th-orchestrator` (and any agent that persists to the KG) must filter content against this policy before calling `create_entities` / `add_observations`. If an observation falls in the forbidden zone, it is omitted silently; if it falls in the gray zone, it is omitted by default.
+- **At write time**: the `orchestrator` (and any agent that persists to the KG) must filter content against this policy before calling `create_entities` / `add_observations`. If an observation falls in the forbidden zone, it is omitted silently; if it falls in the gray zone, it is omitted by default.
 - **On export**: `export.py` trusts that the local KG already complies — it performs no curation of its own.
 - **On import**: `import.py` trusts that the source file already complies — no filtering either.
 
@@ -142,7 +142,7 @@ All KG content is written in **English**, regardless of the conversation languag
 **Version**: 0.1 (initial draft, 2026-04-22).
 
 **Implementation status**:
-- ✅ Filter wired into `th-orchestrator.md` Phase 6 (Knowledge Save).
+- ✅ Filter wired into `orchestrator.md` Phase 6 (Knowledge Save).
 - ✅ Backend-agnostic — applies to any MCP server registered as `mcpServers.memory`. For `context-harness-mcp`: the server-side `internal/validate/` Content Filter enforces a subset (size + secrets + taxonomy) at write time as defense-in-depth.
 
-This policy is **normative for humans and agents**. The th-orchestrator's filter is the first line of defense at write time.
+This policy is **normative for humans and agents**. The orchestrator's filter is the first line of defense at write time.

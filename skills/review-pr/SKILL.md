@@ -147,9 +147,9 @@ Dispatch review agents based on tier classification. ALL Bash happens in the mai
 
 **The `WORKTREE` path MUST be passed to every agent invocation so they read files at the correct state.**
 
-#### Multi-reviewer path (when `multi_reviewer=true`, dispatched via th-orchestrator)
+#### Multi-reviewer path (when `multi_reviewer=true`, dispatched via orchestrator)
 
-9a. For each focus in `focuses`, dispatch the th-orchestrator with:
+9a. For each focus in `focuses`, dispatch the orchestrator with:
    ```
    Direct Mode Task:
    - Mode: review
@@ -182,7 +182,7 @@ Dispatch review agents based on tier classification. ALL Bash happens in the mai
      - Changed files: {file list from step 6}
      ```
 
-9c. After all agents complete, dispatch the th-orchestrator in consolidation mode:
+9c. After all agents complete, dispatch the orchestrator in consolidation mode:
    ```
    Direct Mode Task:
    - Mode: review-consolidate
@@ -194,7 +194,7 @@ Dispatch review agents based on tier classification. ALL Bash happens in the mai
    - Author: {author}
    - URL: {url}
    ```
-   The th-orchestrator invokes the `reviewer-consolidator` agent which reads all draft files and writes `.claude/pr-review-final.md` and `.claude/pr-review-inline.json`.
+   The orchestrator invokes the `reviewer-consolidator` agent which reads all draft files and writes `.claude/pr-review-final.md` and `.claude/pr-review-inline.json`.
 
 9d. After consolidation, proceed to Phase 4 using `.claude/pr-review-final.md` and `.claude/pr-review-inline.json`.
 
@@ -204,7 +204,7 @@ For Tier 0 / 1: dispatch reviewer only.
 For Tier 2: dispatch reviewer; if `has_workspaces=true`, also dispatch qa in parallel.
 For Tier 3 / 4: dispatch reviewer, qa (if `has_workspaces=true`), and security in parallel.
 
-10. Pass ALL gathered data to the `th-orchestrator` agent:
+10. Pass ALL gathered data to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: review
@@ -285,7 +285,7 @@ Replace `{current_user}` with the output of `gh api user --jq '.login'`. When `h
 
 ### Step 3.5a — Update summary only
 
-1. Re-invoke the th-orchestrator with the same PR data but with mode `update-body`:
+1. Re-invoke the orchestrator with the same PR data but with mode `update-body`:
    ```
    Direct Mode Task:
    - Mode: review
@@ -296,7 +296,7 @@ Replace `{current_user}` with the output of `gh api user --jq '.login'`. When `h
    - Existing review body: {current body text}
    - Instruction: Generate an updated summary incorporating any new observations.
    ```
-2. The th-orchestrator invokes the reviewer in `update-body` mode and writes the new body to `.claude/pr-review-draft.md`.
+2. The orchestrator invokes the reviewer in `update-body` mode and writes the new body to `.claude/pr-review-draft.md`.
 3. Read `.claude/pr-review-draft.md` and show to the user for approval.
 4. On approval, publish with PUT. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When `has_gh=true`: use `gh api -X PUT`. When `has_gh=false` and a token is available: use `curl -X PUT`. When neither is available: instruct the operator to run the curl command with their token.
    ```bash
@@ -313,7 +313,7 @@ Replace `{current_user}` with the output of `gh api user --jq '.login'`. When `h
    ```
    If no inline comments exist, tell the user: "The prior review has no inline comments to reply to. Use option (a) to update the summary instead." Then re-show the menu.
 2. Display the list and ask the user to select a `comment_id`.
-3. Re-invoke the th-orchestrator with mode `reply`:
+3. Re-invoke the orchestrator with mode `reply`:
    ```
    Direct Mode Task:
    - Mode: review
@@ -327,7 +327,7 @@ Replace `{current_user}` with the output of `gh api user --jq '.login'`. When `h
      - original_body: {the inline comment text}
    - Instruction: Generate a focused reply to this thread.
    ```
-4. The th-orchestrator invokes the reviewer in `reply` mode and writes the reply to `.claude/pr-review-reply-draft.md`.
+4. The orchestrator invokes the reviewer in `reply` mode and writes the reply to `.claude/pr-review-reply-draft.md`.
 5. Read `.claude/pr-review-reply-draft.md` and show to the user for approval.
 6. On approval, publish the reply. **Detection + fallback:** Tier B — same pattern as step 3.5a. Use `gh api` when available, curl fallback when token present, operator instruction otherwise.
    ```bash
@@ -430,7 +430,7 @@ f. **Verify the review was posted.** After the API call, check the exit code. If
   cleanup
   ```
 
-**Context prune reminder (MANDATORY).** Each `/th:review-pr` invocation accumulates 5-30K tokens in the main context (PR metadata, full diff, file lists from `gh` and `git` outputs in Phase 1, plus the th-orchestrator's status block, plus Phase 5 publish outputs). Subagents die between PRs but the **main context does not** — successive reviews in the same session compound linearly.
+**Context prune reminder (MANDATORY).** Each `/th:review-pr` invocation accumulates 5-30K tokens in the main context (PR metadata, full diff, file lists from `gh` and `git` outputs in Phase 1, plus the orchestrator's status block, plus Phase 5 publish outputs). Subagents die between PRs but the **main context does not** — successive reviews in the same session compound linearly.
 
 Your **final response** to the user MUST include this reminder block (verbatim or equivalent — do NOT shorten it, do NOT phrase it as optional):
 
@@ -466,8 +466,8 @@ Ask the user: "Provide a PR number or URL to review. Example: `#45`, `45`, or `h
 
 ## Important
 
-- Always invoke the `th-orchestrator` agent — do NOT invoke agents directly
-- The th-orchestrator coordinates agents (reviewer, qa, security, reviewer-consolidator) with all data inline (zero Bash in sub-agents)
+- Always invoke the `orchestrator` agent — do NOT invoke agents directly
+- The orchestrator coordinates agents (reviewer, qa, security, reviewer-consolidator) with all data inline (zero Bash in sub-agents)
 - ALL Bash commands run in this skill (main context) — agents do ZERO Bash
 - **Agents read files from `$WORKTREE/path/to/file`, NOT from the operator's current checkout.** Pass `$WORKTREE` to every agent dispatch.
 - **Multi-PR safety:** worktree name includes the PR number — concurrent PR reviews in the same session do not conflict.

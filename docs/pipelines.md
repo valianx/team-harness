@@ -1,49 +1,49 @@
 # Pipelines reference
 
-This document describes every pipeline the th-orchestrator supports. Each section covers when to use the pipeline, the phases it runs, and the artifacts it produces.
+This document describes every pipeline the orchestrator supports. Each section covers when to use the pipeline, the phases it runs, and the artifacts it produces.
 
-For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-works.md). For agent contracts and the full routing table, see [`agents/th-orchestrator.md`](../agents/th-orchestrator.md) and [`agents/ref-special-flows.md`](../agents/ref-special-flows.md).
+For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-works.md). For agent contracts and the full routing table, see [`agents/orchestrator.md`](../agents/orchestrator.md) and [`agents/ref-special-flows.md`](../agents/ref-special-flows.md).
 
 ## Quick reference
 
 | Pipeline | How to invoke | What it does |
 |---|---|---|
-| **Feature** | `@th-orchestrator <describe new feature>` | New functionality via SDD flow (architect → implementer → verify → delivery). Default when no other intent is detected. |
-| **Bug-fix** | `@th-orchestrator <bug report>` · `/issue #N` (from GitHub issue) | Bug correction with 4-tier classification (0–4). Tier auto-determines ceremony. |
-| **Hotfix** | `@th-orchestrator hotfix <urgent fix>` | Fast-path bug-fix that skips architect root-cause. Regression test still mandatory. |
-| **Refactor** | `@th-orchestrator refactor <X>` · `@th-orchestrator rename <X>` | Structure-only changes. Existing tests guard against behavior drift. |
+| **Feature** | `@th:orchestrator <describe new feature>` | New functionality via SDD flow (architect → implementer → verify → delivery). Default when no other intent is detected. |
+| **Bug-fix** | `@th:orchestrator <bug report>` · `/issue #N` (from GitHub issue) | Bug correction with 4-tier classification (0–4). Tier auto-determines ceremony. |
+| **Hotfix** | `@th:orchestrator hotfix <urgent fix>` | Fast-path bug-fix that skips architect root-cause. Regression test still mandatory. |
+| **Refactor** | `@th:orchestrator refactor <X>` · `@th:orchestrator rename <X>` | Structure-only changes. Existing tests guard against behavior drift. |
 | **Security-sensitive** | Auto-triggered by path patterns (`auth/`, `middleware/`, `db/`, etc.) or keywords | Forces `security` agent in parallel during verify. Cannot be downgraded. |
 | **Frontend-scope** | Auto-triggered by path patterns (`components/`, `pages/`, `*.tsx`, `*.vue`, CSS) or UI/UX keywords | Adds `ux-reviewer` in Stage 1 (enrich: UI/UX AC) and Stage 3 (validate: accessibility, responsiveness, component reuse). Only critical findings block. |
 | **Database changes** | Auto-triggered when diff touches migration files | Architect declares migration strategy; plan-reviewer validates reversibility. |
-| **Test pipeline** | `/test-pipeline` · `@th-orchestrator run the test pipeline` | Service-wide coverage analysis. No code changes; produces a prioritized test list. |
-| **Research** | `/research <topic>` · `@th-orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `01-research.md`, no code committed. |
-| **Spike** | `/spike <prototype>` · `@th-orchestrator spike <X>` | Throwaway prototype to validate a technical approach. No delivery. |
-| **Plan** | `/plan <task>` · `/design <feature>` · `@th-orchestrator give me the work plan` | Stage 1 only (intake → architect → plan-review → STAGE-GATE-1). Stops without implementing. |
-| **PR review** | `/review-pr #N` · `@th-orchestrator review PR #N` | 5-phase enriched review with worktree, tier-aware multi-agent dispatch (reviewer + qa + security at Tier 3+), explicit decision menu. |
+| **Test pipeline** | `/test-pipeline` · `@th:orchestrator run the test pipeline` | Service-wide coverage analysis. No code changes; produces a prioritized test list. |
+| **Research** | `/research <topic>` · `@th:orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `01-research.md`, no code committed. |
+| **Spike** | `/spike <prototype>` · `@th:orchestrator spike <X>` | Throwaway prototype to validate a technical approach. No delivery. |
+| **Plan** | `/plan <task>` · `/design <feature>` · `@th:orchestrator give me the work plan` | Stage 1 only (intake → architect → plan-review → STAGE-GATE-1). Stops without implementing. |
+| **PR review** | `/review-pr #N` · `@th:orchestrator review PR #N` | 5-phase enriched review with worktree, tier-aware multi-agent dispatch (reviewer + qa + security at Tier 3+), explicit decision menu. |
 | **PR review (multi)** | `/review-pr #N --multi` | Multi-reviewer parallel: reviewer-security + reviewer-architecture + reviewer-style consolidated by `reviewer-consolidator`. |
 
 ### Reading the table
 
-- **`@th-orchestrator <phrase>`** invocations use intent detection — the orchestrator classifies the phrase and routes to the appropriate pipeline. Slash-command invocations skip the classification step.
-- For full intent-detection patterns and Spanish triggers, see [`agents/th-orchestrator.md`](../agents/th-orchestrator.md) Step 6.
+- **`@th:orchestrator <phrase>`** invocations use intent detection — the orchestrator classifies the phrase and routes to the appropriate pipeline. Slash-command invocations skip the classification step.
+- For full intent-detection patterns and Spanish triggers, see [`agents/orchestrator.md`](../agents/orchestrator.md) Step 6.
 - For tier-system details (auto-detection rules, paths, keywords), see the **Bug-fix pipeline** section below.
 
 ### Pipelines NOT in this list
 
-`docs/pipelines.md` covers multi-phase pipelines that dispatch multiple agents through staged gates. Standalone utility skills (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`, `/trace`, `/background`, `/eval`, `/cross-repo`) and direct modes (`/audit`, `/diagram`, `/translate`, `/security`, `/define-ac`, `/validate`, `/recover`, `/deliver`, `/gcp-costs`, `/init`) are operator-facing surfaces but do not run a multi-phase pipeline. Their contracts live in the respective `skills/*.md` and `agents/*.md` files. The orchestrator routes them directly (see `agents/th-orchestrator.md` Step 6 routing table).
+`docs/pipelines.md` covers multi-phase pipelines that dispatch multiple agents through staged gates. Standalone utility skills (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`, `/trace`, `/background`, `/eval`, `/cross-repo`) and direct modes (`/audit`, `/diagram`, `/translate`, `/security`, `/define-ac`, `/validate`, `/recover`, `/deliver`, `/gcp-costs`, `/init`) are operator-facing surfaces but do not run a multi-phase pipeline. Their contracts live in the respective `skills/*.md` and `agents/*.md` files. The orchestrator routes them directly (see `agents/orchestrator.md` Step 6 routing table).
 
 ---
 
 ## Feature pipeline (standard SDD flow)
 
-**When to use.** New features, enhancements, API additions, non-trivial refactors, or any work that requires a design decision before implementation. Default when no special intent is detected. Invoke via `@th-orchestrator <describe new feature>`.
+**When to use.** New features, enhancements, API additions, non-trivial refactors, or any work that requires a design decision before implementation. Default when no special intent is detected. Invoke via `@th:orchestrator <describe new feature>`.
 
 ### Phases
 
 | Phase | Agent | Output |
 |---|---|---|
-| Phase 0a — Classify & Read | th-orchestrator | `00-state.md` initialized, KG session started |
-| Phase 0b — Intake | th-orchestrator | `00-task-intake.md` |
+| Phase 0a — Classify & Read | orchestrator | `00-state.md` initialized, KG session started |
+| Phase 0b — Intake | orchestrator | `00-task-intake.md` |
 | Phase 1 — Design | architect | `01-architecture.md`, `02-task-list.md` |
 | Phase 1.5 — Plan Ratification | qa | AC validation against Work Plan |
 | Phase 1.6 — Plan Review | plan-reviewer | `01-plan-review.md` — pass/concerns/fail verdict |
@@ -52,14 +52,14 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 | Phase 2 — Implementation | implementer | code, `02-implementation.md` |
 | Phase 2.5 — Constraint Reconciliation | qa | keep/amend/drop decision when a hidden constraint surfaces |
 | Phase 3 — Verify | tester, qa, security (parallel) | `03-testing.md`, `04-validation.md`, `04-security.md` |
-| Phase 3.5 — Acceptance Gate | th-orchestrator | re-routes to implementer if any AC is missing a passing test |
+| Phase 3.5 — Acceptance Gate | orchestrator | re-routes to implementer if any AC is missing a passing test |
 | Phase 3.6 — Acceptance Check | acceptance-checker | `06-acceptance-check.md` — independent spec-vs-delivery comparison |
 | **STAGE-GATE-2** | operator | Per-PR approval (skipped with autonomy) |
 | Phase 4 — Delivery | delivery | CHANGELOG entry, version bump, branch, commit |
 | Phase 4.5 — Internal Review | reviewer | `05-internal-review.md` — advisory top-3 issues |
 | **STAGE-GATE-3** | operator | Final ship/amend/abort |
 | Phase 5 — GitHub | delivery | PR opened on GitHub (`Fixes #N`, labels) |
-| Phase 6 — KG Capture | th-orchestrator | `process-insight` node written to Memory MCP |
+| Phase 6 — KG Capture | orchestrator | `process-insight` node written to Memory MCP |
 
 **STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires between PR batches and is skipped when the operator granted `approve autonomous` at GATE-1.
 
@@ -121,7 +121,7 @@ When signals are ambiguous, the default is Tier 3 (conservative). The architect 
 
 Differences from the bug-fix pipeline:
 
-- Phase 1 (architect root-cause) is **skipped entirely**. The th-orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead.
+- Phase 1 (architect root-cause) is **skipped entirely**. The orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead.
 - Phase 2.0 (regression test) is **still mandatory**. There is no fallback.
 - PR title appends `(hotfix)` suffix: `fix(area): <summary> (hotfix)`.
 
@@ -155,7 +155,7 @@ Migration strategy is mandatory for all database-touching PRs: migrations must b
 
 ## Test pipeline (/test-pipeline)
 
-**When to use.** Service-wide test coverage analysis or a structured test pass across multiple components without a feature change. Triggered by `/test-pipeline` or `@th-orchestrator run the test pipeline`.
+**When to use.** Service-wide test coverage analysis or a structured test pass across multiple components without a feature change. Triggered by `/test-pipeline` or `@th:orchestrator run the test pipeline`.
 
 The `tester` agent runs in coverage mode, reports coverage gaps, and produces a prioritized list of tests to add. No implementation or delivery phases run.
 
@@ -163,17 +163,17 @@ The `tester` agent runs in coverage mode, reports coverage gaps, and produces a 
 
 ## Research / Spike flow (type: research or spike)
 
-**When to use.** Time-boxed investigation of an unknown (technology evaluation, feasibility analysis, performance profiling, cost modeling). No code changes are committed. Triggered by `/research <topic>`, `/spike <prototype>`, `@th-orchestrator investigate <X>`, or `@th-orchestrator spike <X>`.
+**When to use.** Time-boxed investigation of an unknown (technology evaluation, feasibility analysis, performance profiling, cost modeling). No code changes are committed. Triggered by `/research <topic>`, `/spike <prototype>`, `@th:orchestrator investigate <X>`, or `@th:orchestrator spike <X>`.
 
-The th-orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `01-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
+The orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `01-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
 
 ---
 
 ## Plan flow (type: plan)
 
-**When to use.** Design-only run: the operator wants `01-architecture.md` + `02-task-list.md` but will not immediately implement. Triggered by `/plan`, `/design`, or `@th-orchestrator give me the work plan`.
+**When to use.** Design-only run: the operator wants `01-architecture.md` + `02-task-list.md` but will not immediately implement. Triggered by `/plan`, `/design`, or `@th:orchestrator give me the work plan`.
 
-Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. No implementation dispatched. The operator can resume implementation later via `@th-orchestrator implement it`.
+Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. No implementation dispatched. The operator can resume implementation later via `@th:orchestrator implement it`.
 
 ---
 
@@ -181,7 +181,7 @@ Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. No implementation dispatc
 
 **When to use.** Fires automatically between Phase 3 (Verify) and STAGE-GATE-2 for every PR in every pipeline.
 
-Phase 3.5 is the th-orchestrator re-reading the three verify artifacts (`03-testing.md`, `04-validation.md`, `04-security.md`) and the original AC list. If any AC from `02-task-list.md` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
+Phase 3.5 is the orchestrator re-reading the three verify artifacts (`03-testing.md`, `04-validation.md`, `04-security.md`) and the original AC list. If any AC from `02-task-list.md` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
 
 ---
 
@@ -196,7 +196,7 @@ When the `gh` CLI is unavailable or unauthenticated, skills degrade through four
 | C | (reserved) |
 | D | Project-board operations skipped silently |
 
-When write via `curl` also fails, `delivery` returns `status: blocked-manual-push`. The th-orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md`. The operator opens the PR manually, then replies `pr opened #N` to continue.
+When write via `curl` also fails, `delivery` returns `status: blocked-manual-push`. The orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md`. The operator opens the PR manually, then replies `pr opened #N` to continue.
 
 Full contract: [`agents/_shared/gh-fallback.md`](../agents/_shared/gh-fallback.md).
 
@@ -218,7 +218,7 @@ Re-review automation: optionally scaffold `.github/workflows/team-harness-rerevi
 
 ## PR review (enriched) — v2.15.0
 
-**When to use.** Review an open pull request with worktree-accurate file context and tier-aware multi-agent dispatch. Invoke via `/review-pr #N` or `@th-orchestrator review PR #N`. Add `--multi` for parallel focused reviewers (see Multi-reviewer flow above).
+**When to use.** Review an open pull request with worktree-accurate file context and tier-aware multi-agent dispatch. Invoke via `/review-pr #N` or `@th:orchestrator review PR #N`. Add `--multi` for parallel focused reviewers (see Multi-reviewer flow above).
 
 The `/review-pr` skill runs a 5-phase pipeline that provides accurate file context, parallel multi-agent analysis, and an explicit operator decision menu.
 
@@ -307,7 +307,7 @@ The context prune reminder (`/compact`) is printed at the end — PR review cont
 
 ## Documentation Pipeline
 
-**Trigger:** `/docs <topic>`, `@th-orchestrator documenta en obsidian X`, or any request classified as `type: docs`.
+**Trigger:** `/docs <topic>`, `@th:orchestrator documenta en obsidian X`, or any request classified as `type: docs`.
 
 **Purpose:** Generate structured Obsidian documentation for a service, database, API, library, infrastructure setup, or product. Diagram-first layout — every concept gets a visual before prose.
 
@@ -315,7 +315,7 @@ The context prune reminder (`/compact`) is printed at the end — PR review cont
 
 | Phase | Agent | Output |
 |-------|-------|--------|
-| 0 — Intake | th-orchestrator | `00-task-intake.md` (topics, vault, folder, language, subject classification) |
+| 0 — Intake | orchestrator | `00-task-intake.md` (topics, vault, folder, language, subject classification) |
 | 1 — Research | architect (research mode) | `00-research.md` |
 | 2a — Write | documenter | Obsidian vault pages + `02-documentation.md` manifest |
 | 2b — Diagrams | diagrammer / canvas (conditional) | `.excalidraw.md` and `.canvas` files in vault |
