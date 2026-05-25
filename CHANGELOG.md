@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.31.0] - 2026-05-25
+
+### Added
+
+- Token usage tracking in execution events (`tokens`, `duration_ms` per phase, `total_tokens` at session end)
+- Troubleshooting guide (`docs/troubleshooting.md`) for plugin install and config issues
+- `/th:setup` writes orchestrator dispatch rule to `~/.claude/CLAUDE.md` with operator language detection
+- `security_sensitive` and `frontend_scope` fields persisted in `00-state.md` (survive context compaction)
+
+### Changed
+
+- Renamed `agents/th-orchestrator.md` to `agents/orchestrator.md` — plugin namespace is now `th:orchestrator` (was `th:th-orchestrator`)
+- Skills `status`, `trace`, `recover` now resolve workspace path from `.team-harness.json` logs-mode (obsidian support)
+- Dispatch rule uses `th:orchestrator` namespace for plugin compatibility
+- Plugin version bumped to force cache refresh after frontmatter fixes
+
+### Fixed
+
+- Skill YAML frontmatter: added `name` and `description` fields for plugin discovery (was showing 0 skills)
+- Removed duplicate `name:` lines outside frontmatter caused by sed corruption
+- Plugin install README uses `/reload-plugins` instead of `/plugin install` for updates
+
+### Removed
+
+- `/th:update` skill hidden from plugin (moved to `cmd/legacy-skills/`) — updates via `/plugin marketplace update`
+
 ## [2.30.0] - 2026-05-25
 
 ### Changed
