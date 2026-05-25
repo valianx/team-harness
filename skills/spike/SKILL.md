@@ -2,7 +2,6 @@
 name: spike
 description: Quick prototype to test a technical hypothesis.
 ---
-name: spike
 
 Analyze the input: $ARGUMENTS
 

@@ -2,7 +2,6 @@
 name: review-pr
 description: Review a pull request on GitHub.
 ---
-name: review-pr
 
 Analyze the input: $ARGUMENTS
 

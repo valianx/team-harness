@@ -2,7 +2,6 @@
 name: plan
 description: Break a broad scope into parallel tasks with dispatch labels.
 ---
-name: plan
 
 Analyze the input: $ARGUMENTS
 

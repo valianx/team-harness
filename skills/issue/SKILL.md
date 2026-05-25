@@ -2,7 +2,6 @@
 name: issue
 description: Fetch a GitHub issue and route it through the pipeline.
 ---
-name: issue
 
 Analyze the input: $ARGUMENTS
 

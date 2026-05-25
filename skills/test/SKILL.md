@@ -2,7 +2,6 @@
 name: test
 description: Design and run tests for a feature or component.
 ---
-name: test
 
 Analyze the input: $ARGUMENTS
 

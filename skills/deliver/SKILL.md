@@ -2,7 +2,6 @@
 name: deliver
 description: Create branch, commit, and open a PR for completed work.
 ---
-name: deliver
 
 Analyze the input: $ARGUMENTS
 

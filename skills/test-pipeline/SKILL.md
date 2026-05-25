@@ -2,7 +2,6 @@
 name: test-pipeline
 description: Run the test pipeline for a feature.
 ---
-name: test-pipeline
 
 Analyze the input: $ARGUMENTS
 

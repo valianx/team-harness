@@ -2,7 +2,6 @@
 name: audit
 description: Analyze codebase architecture, health, and technical debt.
 ---
-name: audit
 
 Analyze the input: $ARGUMENTS
 

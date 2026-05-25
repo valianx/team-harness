@@ -2,7 +2,6 @@
 name: init
 description: Initialize CLAUDE.md and project conventions for a repository.
 ---
-name: init
 
 ## Parse flags
 

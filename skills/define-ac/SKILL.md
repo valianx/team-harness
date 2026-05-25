@@ -2,7 +2,6 @@
 name: define-ac
 description: Define acceptance criteria for a feature or task.
 ---
-name: define-ac
 
 Analyze the input: $ARGUMENTS
 

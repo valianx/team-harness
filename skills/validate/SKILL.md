@@ -2,7 +2,6 @@
 name: validate
 description: Validate an implementation against its acceptance criteria.
 ---
-name: validate
 
 Analyze the input: $ARGUMENTS
 

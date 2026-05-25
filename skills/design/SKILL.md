@@ -2,7 +2,6 @@
 name: design
 description: Design the architecture and work plan for a task.
 ---
-name: design
 
 Analyze the input: $ARGUMENTS
 
