@@ -54,7 +54,23 @@ If obsidian mode:
 2. Ask for the subfolder within the vault (default: `work-logs`).
 3. Verify the vault path exists. If not, warn and ask to confirm or re-enter.
 
-### 4. Write manifest
+### 4. Write orchestrator dispatch rule
+
+Read `~/.claude/CLAUDE.md`. If it does not contain the orchestrator dispatch rule (look for `<!-- orchestrator-dispatch-rule:start -->`), append this block:
+
+```markdown
+<!-- orchestrator-dispatch-rule:start -->
+## orchestrator dispatch
+
+Invoke the orchestrator as a subagent: `Agent(subagent_type='th:orchestrator', ...)`. The orchestrator dispatches phase agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
+<!-- orchestrator-dispatch-rule:end -->
+```
+
+If the rule already exists (markers found), replace the block between markers with the version above. This ensures the subagent_type matches the plugin namespace.
+
+Also check for legacy markers (`<!-- th-orchestrator-inline-rule:start -->` or `<!-- th-orchestrator-dispatch-rule:start -->`) and replace them with the current version.
+
+### 5. Write manifest
 
 Write `~/.claude/.team-harness.json` with:
 ```json
@@ -70,7 +86,7 @@ Write `~/.claude/.team-harness.json` with:
 
 Preserve existing fields (like `files`) if the manifest already exists.
 
-### 5. Verify connectivity
+### 6. Verify connectivity
 
 Test each MCP server:
 - **Memory:** call `mcp__memory__read_graph` (or equivalent). Report success or failure.
@@ -78,7 +94,7 @@ Test each MCP server:
 
 If a server fails, show the error and suggest troubleshooting steps (check URL, check API key, check network).
 
-### 6. Show summary
+### 7. Show summary
 
 Display a structured summary:
 
@@ -95,7 +111,7 @@ Team Harness setup complete.
   Reconfigure: /th:setup
 ```
 
-### 7. Idempotency
+### 8. Idempotency
 
 This skill can be run multiple times safely. Each run:
 - Shows current config values as defaults
