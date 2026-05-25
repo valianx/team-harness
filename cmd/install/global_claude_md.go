@@ -13,6 +13,8 @@ const orchestratorRule = `<!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
 Invoke the orchestrator as a subagent: ` + "`Agent(subagent_type='th:orchestrator', ...)`" + `. The orchestrator dispatches phase agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
+
+When dispatching the orchestrator, detect the operator's chat language and include it in the prompt: ` + "`Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.`" + ` This ensures the orchestrator and all downstream agents write in the operator's language.
 <!-- orchestrator-dispatch-rule:end -->`
 
 // ensureGlobalClaudeMD creates or updates ~/.claude/CLAUDE.md with the
