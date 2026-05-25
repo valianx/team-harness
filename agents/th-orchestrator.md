@@ -591,18 +591,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    **If `session_start` is unavailable** (server returns an error or the tool is not exposed) → log `KG session: unavailable, skipping attribution` and continue without `session.json`. Downstream writes will succeed without `session_id` (the field is optional on `create_nodes`). The pipeline never fails on session-management errors.
 
-1c. **MANDATORY — Create session-docs immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title. Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
-   - `status: classifying`
-   - `logs_mode: {logs_mode}` (from boot)
-   - `docs_root: {docs_root}` (the full resolved path)
-   - The full `## Phase Checklist` (all phases unchecked) — this is the structural guardrail against phase skipping
-   - TL;DR: `Now`: "Phase 0a intake — classifying task." `Last`: "Pipeline created." `Next`: "Classification, then Phase 0b SPECIFY." `Open issues`: "none".
-
-   This ensures session-docs exist before any deep investigation begins. If the task is later classified as Tier 0 (Step 7), delete the session-docs directory — Tier 0 does not use session-docs.
-
-   When `logs_mode` is `"obsidian"`, include YAML frontmatter per the Frontmatter Injection rules above.
-
-1d. **MANDATORY — Detect operator language.**
+1c. **MANDATORY — Detect operator language.**
 
    Analyze the operator's first message to determine their chat language. Store the result as `operator_language` (ISO 639-1 code: `es`, `en`, `pt`, `fr`, `de`, etc.).
 
@@ -612,7 +601,26 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - If invoked via a skill (Direct Mode Task payload), detect from the last conversational message before the skill, or default to `en`.
    - The operator can override at any time ("responde en español", "switch to English"). Update `operator_language` in `00-state.md` under `## Current State` accordingly.
 
-   Write `operator_language: {code}` in `00-state.md` under `## Current State` (alongside the existing fields). The boot acknowledgment line has already been emitted at this point (boot completes before Phase 0a), so `operator_language` is recorded only in `00-state.md` — not in the boot line.
+   This step runs BEFORE creating session-docs so that `00-state.md` is written with the correct language from the start.
+
+1d. **MANDATORY — Create session-docs immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title. Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
+   - `status: classifying`
+   - `logs_mode: {logs_mode}` (from boot)
+   - `events_file: {events_file}` (from boot)
+   - `operator_language: {operator_language}` (from Step 1c)
+   - `docs_root: {docs_root}` (the full resolved path)
+   - The full `## Phase Checklist` (all phases unchecked) — this is the structural guardrail against phase skipping
+   - TL;DR (written in `operator_language`): `Now`: "Phase 0a intake — classifying task." `Last`: "Pipeline created." `Next`: "Classification, then Phase 0b SPECIFY." `Open issues`: "none".
+
+   This ensures session-docs exist before any deep investigation begins. If the task is later classified as Tier 0 (Step 7), delete the session-docs directory — Tier 0 does not use session-docs.
+
+   When `logs_mode` is `"obsidian"`, include YAML frontmatter per the Frontmatter Injection rules above.
+
+1e. **MANDATORY — Initialize execution events file.** Immediately after creating `00-state.md`, create the execution events file at `{docs_root}/{events_file}`. In obsidian mode, write the full initialization (frontmatter + heading + opening fence per the "Execution Events File Initialization" section above). In local mode, the file is created implicitly on first `cat >>` append. Append the first event immediately:
+
+   ```jsonl
+   {"ts":"<ISO>","event":"session.start","project":"<repo_name>","feature":"<feature_name>"}
+   ```
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `session-docs/{feature-name}/00-knowledge-context.md`:
    ```markdown
@@ -2996,7 +3004,7 @@ On failure or iteration:
 
 > Operator language: {operator_language}. Write session-docs prose in this language; structural elements (headers, field names, status-block keys) stay in English.
 
-This ensures agents follow the "session-docs prose follows the operator's chat language" Voice rule even though they never see the operator's original messages. The `operator_language` value comes from Phase 0a Step 1d detection or from `00-state.md` on recovery. When `operator_language` is `en`, the instruction still applies (agents default to English anyway, but the explicit instruction prevents ambiguity).
+This ensures agents follow the "session-docs prose follows the operator's chat language" Voice rule even though they never see the operator's original messages. The `operator_language` value comes from Phase 0a Step 1c detection or from `00-state.md` on recovery. When `operator_language` is `en`, the instruction still applies (agents default to English anyway, but the explicit instruction prevents ambiguity).
 
 ### Status block expectations:
 Every agent returns a compact status block as its final message. You use this to gate phases without re-reading session-docs. See agent Return Protocol for format.
