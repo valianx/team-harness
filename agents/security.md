@@ -207,7 +207,7 @@ issues: {critical and high finding titles, or "none"}
 1. **Read CLAUDE.md** — understand project type, tech stack, conventions, known security decisions
 2. **Detect project type** — backend, frontend, or fullstack
 3. **Map the entry points** — read `package.json`, `requirements.txt`, `go.mod`, `pom.xml`, `build.gradle`, or equivalent to understand the dependency tree and framework
-4. **Read existing session docs** (if pipeline mode) — `00-task-intake.md` for scope, `01-architecture.md` for design, `02-implementation.md` for changed files
+4. **Read existing session docs** (if pipeline mode) — `00-task-intake.md` for scope, `01-plan.md` for design (§ Architecture), `02-implementation.md` for changed files
 5. **Identify technology-specific risk surface:**
    - Node.js/Express: prototype pollution, path traversal via `__proto__`, unsafe `eval`
    - Django/Flask: SSTI, CSRF middleware, SECRET_KEY exposure

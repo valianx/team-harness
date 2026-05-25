@@ -40,9 +40,9 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 ### Mode: enrich (Stage 1 — invoked after architect)
 
-Read the architect's `01-architecture.md` and `02-task-list.md`. Add UI/UX acceptance criteria to the plan.
+Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
-**Input:** `session-docs/{feature}/01-architecture.md`, `02-task-list.md`
+**Input:** `session-docs/{feature}/01-plan.md`
 **Output:** `session-docs/{feature}/01-ux-review.md`
 
 **Process:**

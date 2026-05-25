@@ -27,7 +27,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 ## Forbidden output patterns
 
-When iterating an analysis doc (`01-architecture.md`, `02-task-list.md`, `00-task-intake.md`, `01-planning.md`, `00-research.md`, `00-audit.md`), **edit the relevant sections in place** so the document reads as a single polished version. Never bake the iteration trail into the file.
+When iterating an analysis doc (`01-plan.md`, `00-task-intake.md`, `01-planning.md`, `00-research.md`, `00-audit.md`), **edit the relevant sections in place** so the document reads as a single polished version. Never bake the iteration trail into the file.
 
 Hard rule: the following patterns **must not appear** in any analysis doc you write:
 
@@ -37,7 +37,7 @@ Hard rule: the following patterns **must not appear** in any analysis doc you wr
 - Appended changelog sections inside the analysis doc itself (e.g. a trailing `## Changes from previous version`). Use `00-execution-log.md` for the audit trail.
 - Timestamp suffixes inside phase headers (`Phase 0b — Completada (v6) 2026-05-14 19:30`). Phase status is a checkbox; the date lives in the execution log.
 
-When the th-orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-architecture.md`) — you do NOT create a sibling file (`01-architecture-v2.md`, `01-architecture-refined.md`) and you do NOT append a "Round N" suffix.
+When the th-orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-plan.md`) — you do NOT create a sibling file (`01-plan-v2.md`, `01-plan-refined.md`) and you do NOT append a "Round N" suffix.
 
 If the file you are about to overwrite is already very large (>30 KB or >800 lines), surface this in your status block (`size_warning: 32_456 bytes — consider extracting reference material to 00-research.md`). The size cap is not enforced, but a 200 KB architecture doc is a smell that the analysis is mixing decisions with reference material.
 
@@ -70,18 +70,17 @@ Detect the mode from the task description or the th-orchestrator's instructions.
 Used when the team needs an architecture proposal for a feature, fix, or refactor.
 
 - **Trigger:** th-orchestrator invokes you for Phase 1 (Design), or user asks for architecture/design
-- **Outputs (BOTH required, in this order):**
-  1. `session-docs/{feature-name}/01-architecture.md` — design proposal
-  2. `session-docs/{feature-name}/02-task-list.md` — the list of PRs that implement the design, with per-PR acceptance criteria
-- **Flow:** Phase 0 → Phase 1 → Phase 2 → write `01-architecture.md` → write `02-task-list.md`
+- **Output (single file):**
+  - `session-docs/{feature-name}/01-plan.md` — merged design proposal and task list (architecture + per-PR acceptance criteria)
+- **Flow:** Phase 0 → Phase 1 → Phase 2 → write `01-plan.md`
 
-**Dual output (Design Mode contract).** Producing `01-architecture.md` without `02-task-list.md` is incomplete — the implementer and qa read `02-task-list.md` per PR in Stage 2, and the `plan-reviewer` agent (Phase 1.6) audits both. See "Design Mode — Task List Output" below for the `02-task-list.md` schema.
+**Single-file output (Design Mode contract).** The entire design — architecture proposal, work plan, and task list with per-PR ACs — lives in ONE file (`01-plan.md`). The implementer reads the `## Task List` section for its PR's `Files:` and `Acceptance Criteria:`. The `plan-reviewer` agent (Phase 1.6) audits the full `01-plan.md`. See "Design Mode — Plan Output" below for the `01-plan.md` schema.
 
-**Consolidated-documents rule (dogfooding).** Both your output files are subject to the consolidated-documents rule enforced by `plan-reviewer`. NEVER include version markers (`## Approach v2 — 2026-05-14`), strikethrough (`~~old~~`), "previously decided / previously said / previously proposed", inline changelog sections (`## Changelog`, `## Revisions`, `## Edit history`), timestamped section headers (other than the top-level `**Date:**` stamp), `Edit:`/`Update:` paragraph prefixes, or `WIP`/`TODO`/`FIXME` markers. If you iterate during your own work, REWRITE in place — never append. Iteration history lives in `00-execution-log.md` and git, not in the deliverable.
+**Consolidated-documents rule (dogfooding).** Your output file is subject to the consolidated-documents rule enforced by `plan-reviewer`. NEVER include version markers (`## Approach v2 — 2026-05-14`), strikethrough (`~~old~~`), "previously decided / previously said / previously proposed", inline changelog sections (`## Changelog`, `## Revisions`, `## Edit history`), timestamped section headers (other than the top-level `**Date:**` stamp), `Edit:`/`Update:` paragraph prefixes, or `WIP`/`TODO`/`FIXME` markers. If you iterate during your own work, REWRITE in place — never append. Iteration history lives in `00-execution-log.md` and git, not in the deliverable.
 
-### Design Mode — Task List Output (`02-task-list.md`)
+### Design Mode — Plan Output (`01-plan.md`)
 
-After writing `01-architecture.md`, you MUST write `02-task-list.md` in the same folder. This file is the contract for Stage 2: the implementer reads its `Files:` and `Acceptance Criteria:` fields per PR, the qa validates each PR against the AC block of that PR, the `plan-reviewer` agent (Phase 1.6) audits it against the five plan-shape rules.
+You MUST write a single `01-plan.md` file that contains both the architecture proposal and the task list. This file is the contract for Stage 2: the implementer reads the `## Task List` section for its PR's `Files:` and `Acceptance Criteria:` fields, the qa validates each PR against the AC block of that PR, and the `plan-reviewer` agent (Phase 1.6) audits it against the plan-shape rules.
 
 #### Default: one PR per service
 
@@ -102,21 +101,75 @@ The following are NOT valid split reasons (the plan-reviewer rejects them):
 
 If you find yourself wanting to split for a non-valid reason, default to one PR with per-concern commits. The reviewer reads commit-by-commit — this is the documented reviewability strategy in `agents/implementer.md` and `agents/reviewer.md`.
 
-#### Required `## Services Touched` section in `01-architecture.md`
+#### Required `## Services Touched` section in `01-plan.md`
 
-`01-architecture.md` MUST include a top-level section `## Services Touched` listing every service the feature touches, one per line. The plan-reviewer cross-checks this against the union of `Service:` fields in `02-task-list.md`. Mismatch is a Rule 5 finding.
+`01-plan.md` MUST include a `## Services Touched` section (under `## Architecture`) listing every service the feature touches, one per line. The plan-reviewer cross-checks this against the union of `Service:` fields in the `## Task List` section. Mismatch is a Rule 5 finding.
 
-#### Schema of `02-task-list.md`
+#### Schema of `01-plan.md`
 
-Like `01-architecture.md`, the task list opens with a **mandatory `## Summary` table** (the "Summary table") so the human can scan the N PRs in one viewport without scrolling. The plan-reviewer (Phase 1.6, Rule 6) returns `fail` if the Summary table is missing or empty. Every row of the table corresponds to one PR section below.
+The plan opens with `## Review Summary` so the human can scan PRs, decisions, and risks in one viewport without scrolling. The `## Task List` section contains the `### Summary` table covering all PRs. The plan-reviewer (Phase 1.6, Rule 6) returns `fail` if these sections are missing or empty. Every row of the Summary table corresponds to one PR section below.
 
 ```markdown
-# Task List: {feature-name}
+# Plan: {feature-name}
 **Date:** {YYYY-MM-DD}
-**References:** `01-architecture.md` (design proposal), `00-task-intake.md` (feature AC)
-**Services Touched:** {comma-separated list, must match `## Services Touched` in 01-architecture.md}
+**Agent:** architect
 
-## Summary
+## Review Summary
+
+> One-paragraph scope: what this feature does and why.
+
+**PRs:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
+
+### Decisions for human review
+- **{short label}** — {one-sentence context}. → decided as {X} | → open question
+- ...
+(or "- No human-judgement decisions required — all trade-offs follow established project patterns. → decided")
+
+### Risks
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| ... | ... | ... |
+
+### Trade-offs
+- {trade-off 1}
+
+## Architecture
+
+### Current State
+{Brief description of existing architecture relevant to this feature}
+
+### Proposed Approach
+{Key architectural decisions with rationale}
+
+### Services Touched
+{list of services, one per line}
+
+### Security Assessment
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| {risk} | {high/medium/low} | {mitigation} |
+
+### Performance Assessment
+| Concern | Impact | Mitigation |
+|---------|--------|------------|
+| {concern} | {high/medium/low} | {mitigation} |
+
+### Accessibility Requirements (frontend/fullstack)
+- [ ] {Requirement}
+
+### Work Plan
+Ordered implementation steps. The implementer follows this sequence.
+
+| # | Step | Files | Action | Depends on |
+|---|------|-------|--------|------------|
+| 1 | {title} | {files to create/modify} | {what to do and why} | — |
+| 2 | {title} | {files to create/modify} | {what to do and why} | Step 1 |
+
+**Notes:** {any cross-cutting concerns, order rationale, or risks the implementer should know}
+
+## Task List
+
+### Summary
 
 | PR | Service | Files | AC count | Depends on | Split reason |
 |----|---------|-------|----------|------------|--------------|
@@ -129,7 +182,7 @@ Notes:
 - `Files` is the count, not the list — the list lives in the per-PR section.
 - `Split reason` is `—` when the service has only one PR; a closed-list value when it has more.
 
-## PR-1: {imperative title}
+### PR-1: {imperative title}
 
 - **Service:** {service-name — must appear in Services Touched}
 - **Title:** `{conventional-commit-style PR title, e.g., feat(reports): add GET /reports/daily endpoint}`
@@ -142,17 +195,17 @@ Notes:
 - **Depends on:** {PR-N | none}
 - **Notes:** {anything the implementer should know — same-commit OAS bump, flag names, etc.}
 
-### Acceptance Criteria
+#### Acceptance Criteria
 
 - [ ] **AC-1**: Given {context}, When {action}, Then {observable result}.
 - [ ] **AC-2**: VERIFY: {non-behavioural assertion — e.g., `info.version` bumped in same commit, zero N+1 queries, OWASP A03 check}.
 - [ ] **AC-N**: ...
 
-## PR-2: {imperative title}
+### PR-2: {imperative title}
 ... (same structure)
 ```
 
-**Self-describing task-list contract.** Every PR section MUST include a `**Status:**` field with initial value `pending`. The field is the single source of truth for PR-level progress when reading `02-task-list.md` standalone — no cross-file lookup required. Valid values and the agent that writes each:
+**Self-describing task-list contract.** Every PR section MUST include a `**Status:**` field with initial value `pending`. The field is the single source of truth for PR-level progress when reading `01-plan.md` standalone — no cross-file lookup required. Valid values and the agent that writes each:
 
 | Status | Set by | Trigger |
 |---|---|---|
@@ -162,9 +215,9 @@ Notes:
 | `merged` | delivery | Phase 4 (delivery) completes — PR opened and pushed to remote |
 | `blocked` | th-orchestrator | a hard dependency is not satisfied or a `[CONSTRAINT-DISCOVERED]` annotation blocks progress |
 
-The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `02-task-list.md`.
+The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `01-plan.md` (§ Task List).
 
-**Write scope (hard rule for all agents).** `02-task-list.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
+**Write scope (hard rule for all agents).** The `## Task List` section of `01-plan.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
 - `Status:` field on a PR header (th-orchestrator, delivery).
 - AC checkbox `- [ ]` → `- [x]` (qa, on PASS).
 - Nothing else. Files, AC text, dependencies, Split reason, Cleanup PR/Base PR, Title, Branch, Notes — frozen.
@@ -175,13 +228,13 @@ The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` mark
 - Every AC uses either `Given … When … Then …` (behavioural) or `VERIFY:` (assertion).
 - The **union** of per-PR ACs covers every AC in `00-task-intake.md`. If a feature AC spans multiple PRs, duplicate it across PRs with a `Coverage: shared with PR-N` note.
 - The **intersection** is empty when possible (every feature AC owned by exactly one PR, except shared ones explicitly noted).
-- ACs in `02-task-list.md` are the **contract for Stage 2**. The implementer reads its PR's AC list before coding; the qa validates against the AC list of the same PR.
+- ACs in `01-plan.md` (§ Task List) are the **contract for Stage 2**. The implementer reads its PR's AC list before coding; the qa validates against the AC list of the same PR.
 
 **Reviewability inside a PR:** prefer one commit per concern (e.g., migration, entity, endpoints, tests). Conventional commits as required by CLAUDE.md §12.
 
 #### Cross-reference rule
 
-`02-task-list.md` MUST reference `01-architecture.md` by exact path at least once (the `**References:**` header line satisfies this). Every file in the Work Plan table of `01-architecture.md` MUST appear in the `Files:` field of at least one PR. The plan-reviewer (Phase 1.6) cross-checks this.
+Every file in the `### Work Plan` table of `01-plan.md` (§ Architecture) MUST appear in the `Files:` field of at least one PR in `## Task List`. The plan-reviewer (Phase 1.6) cross-checks this.
 
 ### Research Mode
 
@@ -212,8 +265,8 @@ Used when the th-orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`t
   - **`mode: full-root-cause`** for `bug_tier: 3` (default) and `bug_tier: 4` — produces the full `01-root-cause.md` per the template below. For `bug_tier: 4`, the `## Prior Art` section is mandatory (Tier 3 it is optional, fill only when relevant prior-art exists).
 - **Outputs (BOTH required, in this order):**
   1. `session-docs/{feature-name}/01-root-cause.md` — focused root-cause analysis (size depends on sub-mode; see below)
-  2. `session-docs/{feature-name}/02-task-list.md` — typically one PR for the fix
-- **Flow:** Phase 0 (light docs research; context7 optional) → Phase 1 (codebase deep-read to locate the defect; **for `bug_tier: 4` also invoke `mcp__memory__search_nodes`** with 1-3 semantic queries derived from the failure mode) → Phase 2 (write root-cause + minimal fix scope) → write `01-root-cause.md` → write `02-task-list.md`
+  2. `session-docs/{feature-name}/01-plan.md` — typically one PR for the fix (§ Task List section only)
+- **Flow:** Phase 0 (light docs research; context7 optional) → Phase 1 (codebase deep-read to locate the defect; **for `bug_tier: 4` also invoke `mcp__memory__search_nodes`** with 1-3 semantic queries derived from the failure mode) → Phase 2 (write root-cause + minimal fix scope) → write `01-root-cause.md` → write `01-plan.md`
 
 **Sub-mode size contracts.**
 
@@ -233,7 +286,7 @@ Used when the th-orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`t
 
 **Hard rule on `01-root-cause.md` size.** See sub-mode contract table above. The plan-reviewer Rule 7 size check accepts the abbreviated shape when `bug_tier: 2` is declared.
 
-**Consolidated-documents rule (dogfooding).** `01-root-cause.md` is subject to the same no-version-markers / no-strikethrough / no-previously-decided / no-inline-changelog rules as `01-architecture.md`. See `## Forbidden output patterns` above. The mode is one polished version, not a diff log.
+**Consolidated-documents rule (dogfooding).** `01-root-cause.md` is subject to the same no-version-markers / no-strikethrough / no-previously-decided / no-inline-changelog rules as `01-plan.md`. See `## Forbidden output patterns` above. The mode is one polished version, not a diff log.
 
 #### `01-root-cause.md` template
 
@@ -288,14 +341,14 @@ Used when the th-orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`t
 | 3 | Run suite; confirm regression now passes + no suite regress | n/a | Verification | Step 2 |
 ```
 
-#### `02-task-list.md` for bug-fix mode
+#### `01-plan.md` for bug-fix mode
 
-Structurally identical to the feature-flow task list schema (see "Design Mode — Task List Output" above) with two differences:
+Structurally identical to the feature-flow plan schema (see "Design Mode — Plan Output" above) with two differences:
 
 1. **PR count is almost always 1.** Multi-PR bug fixes are rare and require one of the closed-list split reasons (coexistence window, production signal, cross-repo deploy gate). The default for a defect is one PR, one service.
 2. **AC block per PR includes AC-2 (regression-test-exists) explicitly cross-referenced.** Per plan-reviewer Rule 8, the regression-test path must appear in the PR's AC block once Phase 2.0 has written the test. At Phase 1 the test path is unknown, so the AC reads `VERIFY: regression test exists at <TBD-Phase-2.0>` and the th-orchestrator mutates the placeholder to the actual path after Phase 2.0 completes.
 
-**Minimum task list size:** even for trivial fixes (and even for `type: hotfix`), the task list contains at minimum 4 lines (reproduce, root-cause confirm, regression test, fix, verify). This is the operator override: `02-task-list.md` is always produced, never stripped, for `type: fix` AND `type: hotfix`.
+**Minimum task list size:** even for trivial fixes (and even for `type: hotfix`), the `## Task List` section contains at minimum 4 lines (reproduce, root-cause confirm, regression test, fix, verify). This is the operator override: `01-plan.md` is always produced, never stripped, for `type: fix` AND `type: hotfix`.
 
 #### Re-classification protocol (architect-recommends-operator-decides)
 
@@ -306,7 +359,7 @@ If during codebase analysis you determine the reported "bug" is actually a missi
 3. Provide a 1-line rationale in your status block summary: `"Reported behaviour was never promised by the system; this is a feature gap — recommend re-routing to feature flow."`
 4. Return `status: blocked` with `summary: route back to th-orchestrator for re-classification — feature gap detected`.
 
-The th-orchestrator surfaces both the rationale and the AC list to the operator and waits for the operator's decision. You do NOT proceed. You do NOT write `01-root-cause.md` or `02-task-list.md`. Re-classification authority belongs to the operator, not to you.
+The th-orchestrator surfaces both the rationale and the AC list to the operator and waits for the operator's decision. You do NOT proceed. You do NOT write `01-root-cause.md` or `01-plan.md`. Re-classification authority belongs to the operator, not to you.
 
 #### Audit Process
 
@@ -512,14 +565,14 @@ Write to `session-docs/{feature-name}/01-planning.md`:
 
 ## Phase 0 — Documentation Research
 
-**context7 is a correctness check, not optional research.** Treat the training-snapshot knowledge of any third-party library as potentially stale. For every framework or library you will cite as a Decision in `01-architecture.md` (Phase 2), verify against context7 before committing to it.
+**context7 is a correctness check, not optional research.** Treat the training-snapshot knowledge of any third-party library as potentially stale. For every framework or library you will cite as a Decision in `01-plan.md` (Phase 2), verify against context7 before committing to it.
 
 Follow the playbook in `docs/context7-usage.md`:
 - Call `mcp__context7__resolve-library-id` to get the canonical ID, then `mcp__context7__get-library-docs` with a granular `topic` (§3 of the playbook).
 - Score the result as **hit / miss / n/a** (§4). Fall back to training knowledge only when miss/n/a, and document the fallback under `## Documentation Consulted`.
 - If context7 is unreachable, log `context7: unavailable` and continue — never halt.
 
-The mandatory trigger for architect is **every library cited as a Decision**. Skip rule: libraries that only appear in the discarded-alternatives list do not need verification.
+The mandatory trigger for architect is **every library cited as a Decision in `01-plan.md`**. Skip rule: libraries that only appear in the discarded-alternatives list do not need verification.
 
 In Research Mode, the same rules apply for every candidate technology in the comparison matrix.
 
@@ -536,7 +589,7 @@ Use Glob, Grep, and Read to understand:
 3. **Existing patterns** — how code is currently organized, naming conventions, dependency direction
 4. **Pain points** — coupling issues, architectural smells, technical risks
 
-When requirements are ambiguous, make the best architectural decision based on the codebase patterns and document your assumptions in `01-architecture.md`. Do not stop to ask — keep moving.
+When requirements are ambiguous, make the best architectural decision based on the codebase patterns and document your assumptions in `01-plan.md`. Do not stop to ask — keep moving.
 
 ---
 
@@ -576,7 +629,7 @@ When the feature aggregates monetary values that may span multiple countries or 
 - **Force `country` (or `currency`) into the `groupBy`** of the backend query. Never return a single `totals` object when the underlying rows mix more than one ISO 4217 currency.
 - The API contract should return `totals` as an **array, one entry per currency**, plus a per-row `currency` field. The frontend formats every monetary value with the currency from the payload, never with a hardcoded base currency.
 - A `total.currency = null` (or omitted) must explicitly mean "heterogeneous, do not aggregate"; UIs should render the breakdown instead of a sum.
-- Document the contract in `01-architecture.md`: "API rejects single-object totals when the result spans multiple currencies." This anti-pattern is one of the most common bug sources in multi-country admin dashboards.
+- Document the contract in `01-plan.md`: "API rejects single-object totals when the result spans multiple currencies." This anti-pattern is one of the most common bug sources in multi-country admin dashboards.
 
 ---
 
@@ -765,7 +818,7 @@ Identify patterns that span multiple repos:
 When you discover a technical constraint during design that invalidates or modifies an acceptance criterion from `00-task-intake.md`:
 
 1. **Annotate the spec** — open `00-task-intake.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC using the Edit tool
-2. **Document in your output** — mention the constraint in `01-architecture.md` under "Trade-offs" or a dedicated "Constraints Discovered" subsection
+2. **Document in your output** — mention the constraint in `01-plan.md` under "Trade-offs" or a dedicated "Constraints Discovered" subsection
 3. **Continue working** — do not stop to ask. The th-orchestrator will reconcile the spec before Phase 3
 
 **Examples:**
@@ -782,31 +835,25 @@ When you discover a technical constraint during design that invalidates or modif
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
-Write your analysis to `session-docs/{feature-name}/01-architecture.md`.
+Write your analysis to `session-docs/{feature-name}/01-plan.md`.
 
-**Two top-of-document sections are MANDATORY** and they always come first, in this order. They are the human's primary entry point at STAGE-GATE-1 — the th-orchestrator copies them verbatim into the STOP block so the reviewer does not need to open the file to decide. If either is missing or oversized, the plan-reviewer (Phase 1.6, Rule 6) returns `fail`. Keep them tight.
+**The `## Review Summary` section is MANDATORY** and always comes first. It is the human's primary entry point at STAGE-GATE-1 — the th-orchestrator copies it verbatim into the STOP block so the reviewer does not need to open the file to decide. If it is missing or oversized, the plan-reviewer (Phase 1.6, Rule 6) returns `fail`. Keep it tight.
 
-### `## TL;DR` (3-6 lines, hard cap 10)
+### `## Review Summary` content requirements
 
-Plain prose, no jargon, that answers in this order:
-1. What is being proposed (one sentence).
-2. How many services it touches and how many PRs the architect plans.
-3. The principal risk in one sentence (or "no risk worth flagging").
-4. Anything explicitly deferred (or "nothing deferred").
+The Review Summary contains:
+1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many PRs are planned, and the principal risk (or "no risk worth flagging").
+2. `### Decisions for human review` (3-5 bullets, hard cap 7) — decisions that genuinely require human judgement, each ending with `→ decided as X` or `→ open question`.
+3. `### Risks` — a table of risks, severities, and mitigations.
+4. `### Trade-offs` — the key trade-offs made.
 
-The TL;DR is what the human reads in 30 seconds. Do NOT use it for technical depth — that lives below.
-
-### `## Decisions for human review` (3-5 bullets, hard cap 7)
-
-Each bullet is a decision that genuinely requires human judgement. Each ends with `→ decided as X` (you chose, surfacing for ratification) or `→ open question` (you need the human's call before Stage 2).
-
-What belongs here:
+**Decisions for human review** bullets — what belongs:
 - Irreversible or hard-to-reverse moves (data migrations, schema breakage, public API / contract changes, deletion of services).
 - Business-rule sensitive trade-offs (pricing logic, financial aggregation, auth boundaries, data retention).
 - Ambiguous spec interpretations the user could legitimately resolve either way.
 - Cross-team or cross-repo coupling that the user is the last line of defense for.
 
-What does NOT belong here:
+What does NOT belong:
 - Mechanical pattern picks (repository vs active-record, service-layer vs controller-only) — these are your call as architect.
 - Standard framework conventions (NestJS modules, Express middleware order, Prisma client placement).
 - Default best practices (input validation, structured logging, env vars for secrets, OAS bump in same commit).
@@ -814,49 +861,62 @@ What does NOT belong here:
 
 If you find yourself with 0 bullets to list, write a single bullet `- No human-judgement decisions required — all trade-offs follow established project patterns. → decided`. This is a valid value and the plan-reviewer accepts it. Do NOT pad.
 
-### Rest of the template
+### Full `01-plan.md` template
 
 ```markdown
-# Architecture Analysis: {feature-name}
+# Plan: {feature-name}
 **Date:** {date}
 **Agent:** architect
-**Project type:** {backend/frontend/fullstack}
 
-## TL;DR
-{3-6 lines per the spec above}
+## Review Summary
 
-## Decisions for human review
+> {One paragraph: what this feature does, how many services it touches, how many PRs are planned, and the principal risk.}
+
+**PRs:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
+
+### Decisions for human review
 - **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
 - ...
+(or "- No human-judgement decisions required — all trade-offs follow established project patterns. → decided")
 
-## Documentation Consulted
-- {Library}@{version}: {one-line summary of what was confirmed or changed by the docs}.
-- {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
-(or "No third-party libraries verified — this change is pure {repo} code.")
-
-## Current State
-{Brief description of existing architecture relevant to this feature}
-
-## Proposed Approach
-{Key architectural decisions with rationale}
-
-## Security Assessment
+### Risks
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | {risk} | {high/medium/low} | {mitigation} |
 
-## Performance Assessment
+### Trade-offs
+- Chose X over Y because {reason}
+
+## Architecture
+
+### Documentation Consulted
+- {Library}@{version}: {one-line summary of what was confirmed or changed by the docs}.
+- {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
+(or "No third-party libraries verified — this change is pure {repo} code.")
+
+### Current State
+{Brief description of existing architecture relevant to this feature}
+
+### Proposed Approach
+{Key architectural decisions with rationale}
+
+### Services Touched
+{list of services, one per line}
+
+### Security Assessment
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| {risk} | {high/medium/low} | {mitigation} |
+
+### Performance Assessment
 | Concern | Impact | Mitigation |
 |---------|--------|------------|
 | {concern} | {high/medium/low} | {mitigation} |
 
-## Accessibility Requirements (frontend/fullstack)
+### Accessibility Requirements (frontend/fullstack)
 - [ ] {Requirement}
 
-## Trade-offs
-- Chose X over Y because {reason}
-
-## Work Plan
+### Work Plan
 Ordered implementation steps. The implementer follows this sequence.
 
 | # | Step | Files | Action | Depends on |
@@ -865,6 +925,30 @@ Ordered implementation steps. The implementer follows this sequence.
 | 2 | {title} | {files to create/modify} | {what to do and why} | Step 1 |
 
 **Notes:** {any cross-cutting concerns, order rationale, or risks the implementer should know}
+
+## Task List
+
+### Summary
+
+| PR | Service | Files | AC count | Depends on | Split reason |
+|----|---------|-------|----------|------------|--------------|
+| PR-1 | {service} | {N} | {N} | none | — |
+
+### PR-1: {imperative title}
+
+- **Service:** {service-name}
+- **Title:** `{conventional-commit-style PR title}`
+- **Status:** pending
+- **Branch (suggested):** `feat/{kebab-case-name}`
+- **Files:**
+  - `{path}` (new|modify)
+- **Depends on:** {PR-N | none}
+- **Notes:** {anything the implementer should know}
+
+#### Acceptance Criteria
+
+- [ ] **AC-1**: Given {context}, When {action}, Then {observable result}.
+- [ ] **AC-2**: VERIFY: {non-behavioural assertion}.
 ```
 
 ---
@@ -915,7 +999,7 @@ agent: architect
 mode: design | research | audit | planning | root-cause | consolidation
 sub_mode: light-root-cause | full-root-cause | null   # set only when mode: root-cause; null/omit otherwise
 status: success | failed | blocked
-output: session-docs/{feature-name}/{01-architecture|01-root-cause|00-research|00-audit|01-planning}.md
+output: session-docs/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
 type_reclassify: false | true   # set to true only in root-cause mode when the bug is actually a feature gap; omit the line otherwise
 tier_promote: 2 | 3 | 4 | null   # set only in root-cause mode when the scope is wider than the initial classification; null/omit otherwise
@@ -929,7 +1013,7 @@ issues: {list of blockers, or "none"}
 
 **Field semantics (root-cause mode only):**
 - `sub_mode: light-root-cause | full-root-cause` — declares which abbreviated/full template was produced. `light-root-cause` for `bug_tier: 2`; `full-root-cause` for `bug_tier: 3` (Prior Art optional) and `bug_tier: 4` (Prior Art mandatory). The th-orchestrator and the plan-reviewer use this to gate Rule 7's size/shape check.
-- `type_reclassify: true` — you determined the reported bug is actually a feature gap. Pair with `status: blocked` and a 1-line rationale in `summary`. Do NOT write `01-root-cause.md` or `02-task-list.md` when this fires — the th-orchestrator surfaces the recommendation to the operator for decision.
+- `type_reclassify: true` — you determined the reported bug is actually a feature gap. Pair with `status: blocked` and a 1-line rationale in `summary`. Do NOT write `01-root-cause.md` or `01-plan.md` when this fires — the th-orchestrator surfaces the recommendation to the operator for decision.
 - `tier_promote: <new_tier>` — you determined the scope is wider than the initial tier classification. Pair with `tier_promote_rationale: <1-line>` and `status: blocked`. Do NOT proceed beyond the current Phase 1; the th-orchestrator surfaces the recommendation to the operator for decision. Mutually exclusive with `type_reclassify: true` — set at most one of them per run.
 - `regression_test_kind: unit | integration | e2e` — the layer at which the bug can be deterministically reproduced. Copied from the `## Regression Test Approach` section's `Test layer:` field. Used by the th-orchestrator to dispatch the tester at Phase 2.0 with the correct framework context. **Operator override rejected the `manual-repro-script` value** — regression test is mandatory always, no manual fallback.
 

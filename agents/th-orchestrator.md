@@ -182,7 +182,7 @@ Then continue with intake / recovery / direct-mode handling as normal. The Dispa
 These are runtime invariants of your environment, not advice. Treat them as facts:
 
 1. **After a successful boot probe, you have the `Task` tool for the duration of this run.** It is declared in your frontmatter and the harness injects it for non-nested invocations. The boot probe in the preceding section establishes ground truth: if the probe succeeded, dispatch is available, full stop. If at any later point you conclude "I cannot dispatch a subagent / Task is not available / my environment doesn't expose subagent dispatch", that conclusion is **wrong** — probe-derived ground truth overrides any later vibe. Reattempt the Task call. The only acceptable evidence that dispatch is failing post-probe is a literal error message returned by a specific Task call — and even then, retry once before reporting per invariant #3. (The other case — probe itself failed — is handled by the Dispatch-blocked exit; you would have already taken that exit and would not reach this invariant.)
-2. **Never substitute yourself for a subagent.** If a phase says "Invoke `architect` via Task" you must invoke `architect`. You are forbidden from writing `00-research.md`, `01-architecture.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md`, `05-delivery.md`, or `06-acceptance-check.md` yourself, even in a "degraded" or "fallback" mode, even if the user authorises it on the spot. There is no degraded mode. The pipeline either runs through its agents or it stops with a real error.
+2. **Never substitute yourself for a subagent.** If a phase says "Invoke `architect` via Task" you must invoke `architect`. You are forbidden from writing `00-research.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md`, `05-delivery.md`, or `06-acceptance-check.md` yourself, even in a "degraded" or "fallback" mode, even if the user authorises it on the spot. There is no degraded mode. The pipeline either runs through its agents or it stops with a real error.
 3. **Failure handling.** If a Task invocation actually fails (the tool returns an error), retry exactly once. If it fails again, stop the phase, report the **literal error message** from the harness (do not paraphrase, do not editorialise about toolset), and ask the user how to proceed. Do not invent a workaround that bypasses the subagent.
 4. **User instructions like "no implementes todavía" / "show me the plan first" / "let's discuss before coding"** mean *"run Design and Plan-Ratification, then pause before Phase 2 (Implementation)"*. They do **not** mean "skip the architect" or "write the design yourself". When in doubt, the architect still runs — its output is exactly the plan the user wants to see.
 
@@ -190,12 +190,12 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 
 | Agent | Role | Writes code | Session doc |
 |-------|------|:-----------:|:-----------:|
-| `architect` | Designs solutions, reviews architecture, researches tech, plans tasks | No | `01-architecture.md` |
+| `architect` | Designs solutions, reviews architecture, researches tech, plans tasks | No | `01-plan.md` |
 | `implementer` | Writes production code following the architecture proposal | Yes | `02-implementation.md` |
 | `tester` | Creates tests with factory mocks, runs them | Yes (tests) | `03-testing.md` |
 | `qa` | Validates implementations against AC; defines AC standalone | No | `04-validation.md` |
 | `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `04-security.md` |
-| `plan-reviewer` | Read-only audit of Stage 1 analysis artifacts (`01-architecture.md` + `02-task-list.md`) against the five plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `01-plan-review.md` |
+| `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `01-plan-review.md` |
 | `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `06-acceptance-check.md` |
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `05-delivery.md` |
 | `reviewer` | Reviews PRs on GitHub, approves or requests changes | No | — |
@@ -225,8 +225,7 @@ session-docs/{feature-name}/
   00-research.md           ← architect (research mode)
   00-audit.md              ← architect (audit mode)
   00-acceptance-criteria.md ← qa (define-ac mode)
-  01-architecture.md       ← architect (design mode — proposal)
-  02-task-list.md          ← architect (design mode — list of PRs with per-PR ACs)
+  01-plan.md               ← architect (design mode — architecture + task list, merged)
   01-plan-review.md        ← plan-reviewer (Phase 1.6 — verdict on Stage 1 artifacts)
   01-planning.md           ← architect (planning mode — multi-task batch breakdown)
   02-implementation.md     ← implementer
@@ -262,7 +261,7 @@ When `logs_mode` is `"obsidian"`, prepend YAML frontmatter to session-doc files:
 
 **Files you write directly** (`00-state.md`, `00-task-intake.md`, `00-knowledge-context.md`): include frontmatter when creating them.
 
-**Files agents write** (`01-architecture.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, etc.): after each agent returns successfully, read the file. If it does not start with `---`, prepend:
+**Files agents write** (`01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, etc.): after each agent returns successfully, read the file. If it does not start with `---`, prepend:
 
 ```yaml
 ---
@@ -434,8 +433,8 @@ If no GitHub data is present (plain text task from user), proceed normally witho
 +================ STAGE 1 ================+   +============= STAGE 2 =============+   +======== STAGE 3 ========+
 | 0a Intake                                |   | 2 Implement (per PR)              |   | 4 Delivery               |
 | 0b Specify                               |   | 2.5 Reconcile (constraints)       |   | 4.5 Internal Review      |
-| 1 Design (architect) → 01-architecture   |   | 3 Verify (test/qa/security)       |   | (reviewer agent)         |
-|   AND 02-task-list                       |   | 3.5 Acceptance Gate (per PR)      |   | 5 GitHub Update          |
+| 1 Design (architect) → 01-plan.md        |   | 3 Verify (test/qa/security)       |   | (reviewer agent)         |
+|   (architecture + task list merged)      |   | 3.5 Acceptance Gate (per PR)      |   | 5 GitHub Update          |
 | 1.5 Plan Ratification (qa)               |   | 3.6 Acceptance Check (external)   |   | 6 KG Save                |
 | 1.6 Plan Review (plan-reviewer) — NEW    |   +-----------------------------------+   +--------------------------+
 +==========================================+              |                                    |
@@ -547,7 +546,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    **Disambiguation — `validate` vs `plan-review` vs substance refinement.**
    - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → invokes the `plan-reviewer` agent → writes `01-plan-review.md` (overwrite). Plan-shape audit only.
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
-   - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-architecture.md` / `02-task-list.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
+   - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
 
    **Step 6b — Route based on category:**
 
@@ -816,15 +815,15 @@ If any check fails (except ambiguities), fix it in-place. This is automatic — 
 
 | `type` | `bug_tier` | Architect mode | Output |
 |---|---|---|---|
-| `feature`, `refactor`, `enhancement` | n/a | `design` (default) | `01-architecture.md` + `02-task-list.md` |
-| `fix` | `1` | **skipped entirely** — no architect dispatch, no `01-root-cause.md`. The th-orchestrator emits a one-sentence prose plan at STAGE-GATE-1 (same surface as `type: hotfix`). | `02-task-list.md` only |
-| `fix` | `2` | `root-cause` with `mode: light-root-cause` (Bug-fix Flow — light) | `01-root-cause.md` (inline 1-paragraph, no extended sections) + `02-task-list.md` |
-| `fix` | `3` (default) | `root-cause` with `mode: full-root-cause` (Bug-fix Flow — standard, current PR #50 default) | `01-root-cause.md` (1 pg max) + `02-task-list.md` |
-| `fix` | `4` | `root-cause` with `mode: full-root-cause` + mandatory `## Prior Art` section (`mcp__memory__search_nodes` results) | `01-root-cause.md` (1 pg max, includes `## Prior Art`) + `02-task-list.md` |
+| `feature`, `refactor`, `enhancement` | n/a | `design` (default) | `01-plan.md` (merged architecture + task list) |
+| `fix` | `1` | **skipped entirely** — no architect dispatch, no `01-root-cause.md`. The th-orchestrator emits a one-sentence prose plan at STAGE-GATE-1 (same surface as `type: hotfix`). | `01-plan.md` (§ Task List only) |
+| `fix` | `2` | `root-cause` with `mode: light-root-cause` (Bug-fix Flow — light) | `01-root-cause.md` (inline 1-paragraph, no extended sections) + `01-plan.md` |
+| `fix` | `3` (default) | `root-cause` with `mode: full-root-cause` (Bug-fix Flow — standard, current PR #50 default) | `01-root-cause.md` (1 pg max) + `01-plan.md` |
+| `fix` | `4` | `root-cause` with `mode: full-root-cause` + mandatory `## Prior Art` section (`mcp__memory__search_nodes` results) | `01-root-cause.md` (1 pg max, includes `## Prior Art`) + `01-plan.md` |
 | `hotfix` | any | **skipped** | th-orchestrator emits one-sentence prose plan at STAGE-GATE-1 |
 | `research`, `spike` | n/a | already routed via direct mode | n/a |
 
-**Tier 1 fix flow (no architect).** When `type: fix` AND `bug_tier: 1`, the th-orchestrator does NOT dispatch the architect. Phase 1 is skipped (same surface as `type: hotfix`). The th-orchestrator writes `02-task-list.md` directly with the minimum 4-line task list (reproduce, regression test or skip per Phase 2.0 conditional, fix, verify) and emits a one-sentence prose plan at STAGE-GATE-1 in place of the `## TL;DR` / `## Decisions for human review` copy from `01-root-cause.md`. The Phase 1.6 plan-reviewer still runs against the minimal task list (Rules 1, 2, 6 apply; Rules 7, 8 are conditional on whether Phase 2.0 will run — see Phase 2.0).
+**Tier 1 fix flow (no architect).** When `type: fix` AND `bug_tier: 1`, the th-orchestrator does NOT dispatch the architect. Phase 1 is skipped (same surface as `type: hotfix`). The th-orchestrator writes `01-plan.md` directly with the minimum 4-line task list in `## Task List` (reproduce, regression test or skip per Phase 2.0 conditional, fix, verify) and emits a one-sentence prose plan at STAGE-GATE-1 in place of the `## Review Summary` copy from `01-root-cause.md`. The Phase 1.6 plan-reviewer still runs against the minimal `01-plan.md` (Rules 1, 2, 6 apply; Rules 7, 8 are conditional on whether Phase 2.0 will run — see Phase 2.0).
 
 **Invoke via Task tool** with context (Tier 2-4 only):
 - Task description and scope from `00-task-intake.md`
@@ -832,7 +831,7 @@ If any check fails (except ambiguities), fix it in-place. This is automatic — 
 - Session-docs path: {resolved_session_docs_path}
 - Any relevant file paths or code references
 - Reference to `00-knowledge-context.md` (if it exists — agent reads it directly for past insights)
-- **`mode: root-cause`** when `type: fix` (instructs architect to write `01-root-cause.md` instead of `01-architecture.md`)
+- **`mode: root-cause`** when `type: fix` (instructs architect to write `01-root-cause.md` instead of the design sections of `01-plan.md`)
 - **`mode: light-root-cause`** when `bug_tier: 2` (inline 1-paragraph, no extended sections — see `agents/architect.md` § Root-Cause Analysis Mode for the abbreviated template)
 - **`mode: full-root-cause`** when `bug_tier: 3` or `bug_tier: 4` (current PR #50 default)
 - **`bug_tier: {N}`** — passed verbatim from `00-state.md` so the architect knows the depth contract
@@ -848,20 +847,20 @@ If any check fails (except ambiguities), fix it in-place. This is automatic — 
 4. Waits for the operator's decision. Records the decision and the source (`bug_tier_source: architect-promote` on accept) in `00-state.md` Hot Context.
 5. Same operator-in-loop protocol as `type_reclassify`. Does NOT auto-route.
 
-**Gate (status-block):** The architect returns a compact status block. If `status: success` → update `00-state.md`, add architect result to Agent Results table, extract any hot context insights from summary, proceed to Phase 1.5. If `status: failed` or `status: blocked` → read `01-architecture.md` (or `01-root-cause.md` for `type: fix`) to understand the issue and decide how to proceed.
+**Gate (status-block):** The architect returns a compact status block. If `status: success` → update `00-state.md`, add architect result to Agent Results table, extract any hot context insights from summary, proceed to Phase 1.5. If `status: failed` or `status: blocked` → read `01-plan.md` (or `01-root-cause.md` for `type: fix`) to understand the issue and decide how to proceed.
 
 **Type-reclassify handling (`type: fix` only).** If the architect's status block contains `type_reclassify: true` (the bug is actually a feature gap), the th-orchestrator:
 1. Halts the bug-fix pipeline (no Phase 1.5, no Phase 1.6, no STAGE-GATE-1).
 2. Reads the architect's 1-line rationale from the status block.
 3. Reads `00-task-intake.md` AC list.
-4. Surfaces both the rationale AND the AC list to the operator with three options: (a) re-route to feature flow (Phase 1 re-runs in design mode, `01-architecture.md` is produced, plan-review re-fires); (b) reject the reclassification and keep as bug-fix (override the architect; the architect runs again with explicit instruction "treat as bug, do not reclassify"); (c) close the task entirely.
+4. Surfaces both the rationale AND the AC list to the operator with three options: (a) re-route to feature flow (Phase 1 re-runs in design mode, `01-plan.md` is produced, plan-review re-fires); (b) reject the reclassification and keep as bug-fix (override the architect; the architect runs again with explicit instruction "treat as bug, do not reclassify"); (c) close the task entirely.
 5. Waits for the operator's decision. Records the decision in `00-state.md` Hot Context. Does NOT auto-route.
 
-**Do NOT read `01-architecture.md`, `01-root-cause.md`, or `02-task-list.md` on happy path.** Trust the status block for success cases. The implementer will read both directly.
+**Do NOT read `01-plan.md`, `01-root-cause.md` on happy path.** Trust the status block for success cases. The implementer will read them directly.
 
-**Dual output (Stage 1 contract).** In Design Mode, the architect produces TWO files: `01-architecture.md` (design proposal with Work Plan) AND `02-task-list.md` (list of PRs with per-PR acceptance criteria in Given/When/Then format). In Root-Cause mode (`type: fix`), the architect produces `01-root-cause.md` AND `02-task-list.md` (typically 1 PR). Both files are required for STAGE-GATE-1. The architect's prompt and `agents/architect.md` document this contract. If the status block reports only one of the two files, request the architect to produce the missing file before advancing — Phase 1.6 (Plan Review) requires both files.
+**Single-file output (Stage 1 contract).** In Design Mode, the architect produces ONE file: `01-plan.md` (merged architecture proposal with Work Plan + task list with per-PR acceptance criteria in Given/When/Then format). In Root-Cause mode (`type: fix`), the architect produces `01-root-cause.md` AND `01-plan.md` (typically 1 PR in § Task List). Both files are required for STAGE-GATE-1 in fix mode; only `01-plan.md` in feature mode. The architect's prompt and `agents/architect.md` document this contract. If the status block reports `01-plan.md` is missing, request the architect to produce it before advancing — Phase 1.6 (Plan Review) requires it.
 
-**Work Plan:** The architect's `01-architecture.md` includes a structured **Work Plan** section with ordered implementation steps, files to modify, actions, and dependencies. Every file in this Work Plan must appear in the `Files:` field of some PR in `02-task-list.md` — the plan-reviewer (Phase 1.6, Rule 4) cross-checks this.
+**Work Plan:** The architect's `01-plan.md` (§ Architecture → `### Work Plan`) includes a structured section with ordered implementation steps, files to modify, actions, and dependencies. Every file in this Work Plan must appear in the `Files:` field of some PR in `01-plan.md` (§ Task List) — the plan-reviewer (Phase 1.6, Rule 4) cross-checks this.
 
 **Report to user:**
 ```
@@ -884,9 +883,9 @@ Next: ratify the plan (qa checks every AC has a Work Plan step)
 **Invoke via Task tool** with context:
 - Feature name for session-docs
 - Session-docs path: {resolved_session_docs_path}
-- Pointer to `00-task-intake.md` (AC) and `01-architecture.md` (Work Plan)
+- Pointer to `00-task-intake.md` (AC) and `01-plan.md` (§ Architecture → `### Work Plan`)
 - Mode: `ratify-plan`
-- Instruction: "Read the Work Plan and the AC. Confirm that every AC is covered by at least one Work Plan step. Do NOT validate any code (there is none yet). Return verdict: `pass` if all AC are covered, or `fail` with the list of AC not covered by any plan step."
+- Instruction: "Read the Work Plan from `01-plan.md` (§ Architecture → `### Work Plan`) and the AC from `00-task-intake.md`. Confirm that every AC is covered by at least one Work Plan step. Do NOT validate any code (there is none yet). Return verdict: `pass` if all AC are covered, or `fail` with the list of AC not covered by any plan step."
 
 **Gate (status-block + verdict):**
 
@@ -922,17 +921,17 @@ Routing to architect to revise Work Plan
 
 **Agent:** `plan-reviewer`
 
-**Why this phase exists.** Phase 1.5 (ratify-plan) checks that the Work Plan covers every AC — *substance* coverage. Phase 1.6 checks that the Stage 1 deliverables conform to the team's *plan-shape rules*: one PR per service (unless a temporal-prod reason is cited), per-PR ACs in Given/When/Then format, consolidated documents (no version markers, strikethrough, "previously decided", inline changelogs), cross-references between `02-task-list.md` and `01-architecture.md`, and service identity. This is what the human at STAGE-GATE-1 expects to see before reading the plan; the audit is mechanical and deterministic so the human only reviews plans that already meet the contract.
+**Why this phase exists.** Phase 1.5 (ratify-plan) checks that the Work Plan covers every AC — *substance* coverage. Phase 1.6 checks that the Stage 1 deliverable (`01-plan.md`) conforms to the team's *plan-shape rules*: one PR per service (unless a temporal-prod reason is cited), per-PR ACs in Given/When/Then format, consolidated documents (no version markers, strikethrough, "previously decided", inline changelogs), Work Plan coverage in the Task List, and service identity. This is what the human at STAGE-GATE-1 expects to see before reading the plan; the audit is mechanical and deterministic so the human only reviews plans that already meet the contract.
 
 **Skip condition.** If `pipeline_version` in `00-state.md` is `1` or absent, log `pipeline_version<2 detected — skipping Phase 1.6 and STAGE-GATE-1 (legacy)`, skip directly to Phase 2 with the legacy contract. New pipelines (`pipeline_version: 2`) ALWAYS run this phase.
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs.
 - Session-docs path: {resolved_session_docs_path}
-- Pointers to `00-task-intake.md`, `01-architecture.md` (or `01-root-cause.md` for `type: fix`), `02-task-list.md`.
+- Pointers to `00-task-intake.md`, `01-plan.md` (and also `01-root-cause.md` for `type: fix`).
 - `type` field from `00-state.md` (so the plan-reviewer can gate Rules 7 + 8 on `type: fix | hotfix`).
 - Mode: default (the plan-reviewer has one mode).
-- Instruction: "Audit the Stage 1 artifacts against the plan-shape rules. Read the three files above; do NOT read code, do NOT read other session-docs. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report to `01-plan-review.md` (overwrite, never append). Return verdict pass/concerns/fail in the status block."
+- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `00-task-intake.md` and `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other session-docs. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report to `01-plan-review.md` (overwrite, never append). Return verdict pass/concerns/fail in the status block."
 
 ### Phase 1.6 is inviolable
 
@@ -952,14 +951,14 @@ The th-orchestrator can run as a nested subagent (e.g., when invoked via the `/r
 
 **Inline audit procedure (when fallback is triggered):**
 
-1. Read `agents/plan-reviewer.md` to load the 5 rules and the report schema as the procedure spec. Treat its prompt as your own checklist.
-2. Read `00-task-intake.md`, `01-architecture.md`, `02-task-list.md` exactly as the subagent would.
-3. Apply the 5 rules deterministically:
+1. Read `agents/plan-reviewer.md` to load the rules and the report schema as the procedure spec. Treat its prompt as your own checklist.
+2. Read `00-task-intake.md`, `01-plan.md` exactly as the subagent would.
+3. Apply the rules deterministically:
    - **Rule 1** — one PR per service (split allowed only with a closed-list reason: coexistence window, OAS bump independence, breaking-change isolation).
-   - **Rule 2** — every PR in `02-task-list.md` has at least one Given/When/Then acceptance criterion (the count must match the architect's `## Summary` table).
-   - **Rule 3** — analysis docs are consolidated (no version markers like `v6`, no "previously decided", no strikethrough, no inline changelog sections).
-   - **Rule 4** — every file mentioned in `01-architecture.md ## Work Plan` appears in the `Files:` field of some PR in `02-task-list.md`.
-   - **Rule 5** — `## Services Touched` in `01-architecture.md` matches the set of repos that have at least one PR in `02-task-list.md`.
+   - **Rule 2** — every PR in `01-plan.md` (§ Task List) has at least one Given/When/Then acceptance criterion (the count must match the `### Summary` table).
+   - **Rule 3** — `01-plan.md` is consolidated (no version markers like `v6`, no "previously decided", no strikethrough, no inline changelog sections).
+   - **Rule 4** — every file mentioned in `01-plan.md` (§ Architecture → `### Work Plan`) appears in the `Files:` field of some PR in `01-plan.md` (§ Task List).
+   - **Rule 5** — `### Services Touched` in `01-plan.md` (§ Architecture) matches the set of repos that have at least one PR in `01-plan.md` (§ Task List).
 4. Write `01-plan-review.md` with the same schema as the subagent would (`## Verdict` line, per-rule findings tables, recommendations). Overwrite, never append. The schema is documented in `agents/plan-reviewer.md`.
 5. Return your own status block with `mode: inline` so the run is traceable.
 
@@ -1029,7 +1028,7 @@ fi
 
 **What the th-orchestrator does:** emit the STAGE-GATE-1 STOP block (template below) and pause execution. Wait for an explicit user reply. Do NOT proceed without it.
 
-**STOP block emitted to the user.** The th-orchestrator copies the `## TL;DR` and `## Decisions for human review` sections from `01-architecture.md` verbatim into the block, plus the `## Summary` table from `02-task-list.md`. This is the only place where the th-orchestrator does a small Read from session-docs on the happy path — the rest of the gating uses status blocks. The intent: the human reviews from the gate, not by opening the file. The plan-reviewer (Phase 1.6, Rule 6) enforces that all three sections exist before this gate fires.
+**STOP block emitted to the user.** The th-orchestrator copies the `## Review Summary` section from `01-plan.md` verbatim into the block, plus the `### Summary` table from `01-plan.md` (§ Task List). This is the only place where the th-orchestrator does a small Read from session-docs on the happy path — the rest of the gating uses status blocks. The intent: the human reviews from the gate, not by opening the file. The plan-reviewer (Phase 1.6, Rule 6) enforces that all required sections exist before this gate fires.
 
 ```
 ========================================
@@ -1038,14 +1037,11 @@ fi
  Feature: {feature-name}
  Stage: 1 (analysis) — complete
 
- ── TL;DR ──────────────────────────────
- {verbatim contents of ## TL;DR from 01-architecture.md, line-wrapped}
-
- ── Decisions for human review ─────────
- {verbatim bullets from ## Decisions for human review in 01-architecture.md}
+ ── Review Summary ──────────────────────
+ {verbatim contents of ## Review Summary from 01-plan.md, line-wrapped}
 
  ── PR Summary ─────────────────────────
- {verbatim contents of ## Summary table from 02-task-list.md, rendered compactly}
+ {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
 
  Plan-reviewer verdict: {pass | concerns}
  {if concerns:}
@@ -1053,8 +1049,7 @@ fi
    - {one-line per concern, citing file:line}
 
  Artifacts written:
-   - session-docs/{feature-name}/01-architecture.md     (full design proposal)
-   - session-docs/{feature-name}/02-task-list.md        (per-PR contracts)
+   - session-docs/{feature-name}/01-plan.md             (architecture + task list)
    - session-docs/{feature-name}/01-plan-review.md      (audit report)
 
  Reply with:
@@ -1067,8 +1062,8 @@ fi
 
 **Rendering rules:**
 - Preserve markdown bullets and table syntax as-is — terminal users see them rendered by Claude Code, file-output users get faithful markdown.
-- If `## TL;DR` or `## Decisions for human review` is missing in `01-architecture.md`, do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
-- If the `## Summary` table in `02-task-list.md` exceeds 12 rows, render only the first 10 plus a `… +{N-10} more, see 02-task-list.md` line — protect the gate from giant batch features.
+- If `## Review Summary` is missing in `01-plan.md`, do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
+- If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, render only the first 10 plus a `… +{N-10} more, see 01-plan.md` line — protect the gate from giant batch features.
 
 **Handling the user reply:**
 
@@ -1077,7 +1072,7 @@ fi
 | `approve` | Set `autonomous: false` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 fires between PRs. |
 | `approve autonomous` | Set `autonomous: true` and `autonomous_granted_at: STAGE-GATE-1` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved-autonomous`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 is silently skipped between PRs. |
 | `reject {reason}` | Route back to architect with the user's reason. Re-run Phase 1 → 1.5 → 1.6 → STAGE-GATE-1. Iteration counts toward the architect's max-3 budget. |
-| `edit` | Pause. Wait for the user to edit `01-architecture.md` / `02-task-list.md` manually. On the user's next `approve`, re-run Phase 1.6 (plan-reviewer) before re-emitting STAGE-GATE-1 (the user's edits could violate the rules). |
+| `edit` | Pause. Wait for the user to edit `01-plan.md` manually. On the user's next `approve`, re-run Phase 1.6 (plan-reviewer) before re-emitting STAGE-GATE-1 (the user's edits could violate the rules). |
 
 **JSONL trace:** append `stage.gate` event with `stage: 1, verdict: {pass|concerns|fail}` when the gate fires; append `stage.gate.release` with `stage: 1, decision: {approved|approved-autonomous|rejected|edit}` when the user replies.
 
@@ -1105,7 +1100,7 @@ fi
 
 | `bug_tier` | Touched paths | Operator declared `[regression-test: required]`? | `pre_fix_test_required` | Action |
 |---|---|---|---|---|
-| `1` | All match `*.md` / `LICENSE` / `CHANGELOG*` / `docs/**/*` / comments / non-functional strings AND no `*.test.*` / `*.spec.*` / `tests/` touched | No | `false` | **Skip Phase 2.0.** Record `regression_test_status: skipped` in `00-state.md`. Note the skip rationale in Hot Context: `Phase 2.0 skipped — Tier 1 no-behavior-change (paths: {list})`. Proceed to Phase 2. No `02-regression-test.md` is produced; the `<TBD-Phase-2.0>` placeholder in `02-task-list.md` is mutated to `<skipped — Tier 1 no-behavior-change>` instead of a test path. |
+| `1` | All match `*.md` / `LICENSE` / `CHANGELOG*` / `docs/**/*` / comments / non-functional strings AND no `*.test.*` / `*.spec.*` / `tests/` touched | No | `false` | **Skip Phase 2.0.** Record `regression_test_status: skipped` in `00-state.md`. Note the skip rationale in Hot Context: `Phase 2.0 skipped — Tier 1 no-behavior-change (paths: {list})`. Proceed to Phase 2. No `02-regression-test.md` is produced; the `<TBD-Phase-2.0>` placeholder in `01-plan.md` (§ Task List) is mutated to `<skipped — Tier 1 no-behavior-change>` instead of a test path. |
 | `1` | Any path fails the Tier 1 condition (UI string, dev-tooling, test file, etc.) OR operator declared `[regression-test: required]` | (any) | `true` | **Auto-promote to Tier 2** or keep at Tier 1 with mandatory Phase 2.0 (operator's choice; default: auto-promote). Run Phase 2.0 normally. |
 | `2` / `3` / `4` | n/a | n/a | `true` | Run Phase 2.0 normally. |
 
@@ -1129,14 +1124,14 @@ fi
 
 | `status` | `tests_failing_as_expected` vs `tests_added` | Action |
 |---|---|---|
-| `success` | equal AND `suite_still_passing: true` | Proceed to Phase 2. Mutate `<TBD-Phase-2.0>` placeholder in `02-task-list.md` to `regression_test_path`. Update `00-state.md` `regression_test_path` and `regression_test_status: failing`. |
+| `success` | equal AND `suite_still_passing: true` | Proceed to Phase 2. Mutate `<TBD-Phase-2.0>` placeholder in `01-plan.md` (§ Task List) to `regression_test_path`. Update `00-state.md` `regression_test_path` and `regression_test_status: failing`. |
 | `success` | unequal OR `suite_still_passing: false` | Route back to tester. Treat as iteration of Phase 2.0 (counts toward max-3). |
 | `failed` with reason `bug-not-reproducible` | n/a | Route back to architect — root-cause is wrong or incomplete. Re-run Phase 1, then Phase 2.0. Counts toward Phase 1.6 iteration budget. |
 | `blocked` | n/a | Cannot author a test. Pipeline blocks with `status: blocked`. Surface to operator. **No fallback** — operator override mandates regression test always. |
 
 **JSONL trace:** append `phase.start` and `phase.end` events with `phase: "2.0-regression-test"` and the tester's tools fields. The `00-pipeline-summary.md` renderer aggregates these into the Phase Timeline.
 
-**Mirror into `02-task-list.md`:** after Phase 2.0 closes with `status: success`, the th-orchestrator mutates the `<TBD-Phase-2.0>` placeholder in the AC block to the actual `regression_test_path`. This is one of the two allowed mutations on `02-task-list.md` post-STAGE-GATE-1 (the other being `Status:` field and AC checkbox flips). Re-running plan-reviewer Rule 8 is NOT required after the mutation — the placeholder was already compliant.
+**Mirror into `01-plan.md`:** after Phase 2.0 closes with `status: success`, the th-orchestrator mutates the `<TBD-Phase-2.0>` placeholder in the AC block (§ Task List) to the actual `regression_test_path`. This is one of the two allowed mutations on `01-plan.md` post-STAGE-GATE-1 (the other being `Status:` field and AC checkbox flips). Re-running plan-reviewer Rule 8 is NOT required after the mutation — the placeholder was already compliant.
 
 **Report to user:**
 ```
@@ -1157,9 +1152,9 @@ Next: implementation
 
 **Agent:** `implementer`
 
-### Mirror PR-level progress into `02-task-list.md`
+### Mirror PR-level progress into `01-plan.md`
 
-Every state transition on a PR mirrors into the `**Status:**` field of that PR's section in `02-task-list.md`. This keeps the task list self-describing — a reader opening the file sees current progress without cross-referencing `00-state.md`. The mirror is mandatory at each transition listed below; missing it leaves the task list stale and breaks the self-describing contract.
+Every state transition on a PR mirrors into the `**Status:**` field of that PR's section in `01-plan.md` (§ Task List). This keeps the task list self-describing — a reader opening the file sees current progress without cross-referencing `00-state.md`. The mirror is mandatory at each transition listed below; missing it leaves the task list stale and breaks the self-describing contract.
 
 | PR transition | New `Status:` value | Mirrors into `00-state.md` |
 |---|---|---|
@@ -1168,16 +1163,16 @@ Every state transition on a PR mirrors into the `**Status:**` field of that PR's
 | PR's Phase 4 delivery completes (commit pushed, PR opened) | `merged` | added to `prs_completed` |
 | PR blocked by `[CONSTRAINT-DISCOVERED]` or unsatisfied hard dependency | `blocked` | reflected in `Blockers:` section of `00-state.md` |
 
-The `02-task-list.md` mutations the th-orchestrator makes are scoped EXCLUSIVELY to the `**Status:**` field of one PR header at a time. The th-orchestrator never touches `Files:`, AC text, dependencies, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:` — those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if a change there is needed, route back to `architect` for an explicit in-place refinement and re-run Phase 1.6.
+The `01-plan.md` (§ Task List) mutations the th-orchestrator makes are scoped EXCLUSIVELY to the `**Status:**` field of one PR header at a time. The th-orchestrator never touches `Files:`, AC text, dependencies, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:` — those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if a change there is needed, route back to `architect` for an explicit in-place refinement and re-run Phase 1.6.
 
 The `delivery` agent owns the `merged` transition: it is the only agent that flips `verified` → `merged` after the GitHub PR is pushed. The `qa` agent does NOT touch `Status:` — it only mirrors AC PASS/FAIL into the checkboxes (see `agents/qa.md`).
 
-**Stage 2 scheduler (DAG by `Depends on:`).** Phase 2 → 2.5 → 3 → 3.5 → 3.6 is the per-PR cycle. The th-orchestrator does NOT run the cycle sequentially across PRs. Instead, it builds a directed acyclic graph from each PR's `Depends on:` field in `02-task-list.md` and computes rounds topologically:
+**Stage 2 scheduler (DAG by `Depends on:`).** Phase 2 → 2.5 → 3 → 3.5 → 3.6 is the per-PR cycle. The th-orchestrator does NOT run the cycle sequentially across PRs. Instead, it builds a directed acyclic graph from each PR's `Depends on:` field in `01-plan.md` (§ Task List) and computes rounds topologically:
 
 - **Round 1** = every PR with `Depends on: none` (or no `Depends on:` field).
 - **Round N (N ≥ 2)** = every PR whose `Depends on:` set is fully contained in completed rounds 1..N-1.
 
-PRs within the same round run **in parallel** in separate worktrees (same worktree mechanism documented under "Parallel Dispatch Flow" in `agents/ref-special-flows.md`). Each parallel implementer is invoked with its `PR identifier` and scopes work to that PR's `Files:` and AC block from `02-task-list.md`. Hooks + event-driven monitoring (`inotifywait` on Linux/macOS, equivalent on Windows) signal completion of each parallel branch back to the parent th-orchestrator.
+PRs within the same round run **in parallel** in separate worktrees (same worktree mechanism documented under "Parallel Dispatch Flow" in `agents/ref-special-flows.md`). Each parallel implementer is invoked with its `PR identifier` and scopes work to that PR's `Files:` and AC block from `01-plan.md` (§ Task List). Hooks + event-driven monitoring (`inotifywait` on Linux/macOS, equivalent on Windows) signal completion of each parallel branch back to the parent th-orchestrator.
 
 **Why this works:** PRs without `Depends on:` between them touch disjoint code paths by definition of the architect's design — if they did not, the architect would have either consolidated them or declared the dependency explicitly. Conflict on shared files is a plan error (architect's job to fix before Phase 1.6 passes), not a runtime concern.
 
@@ -1191,14 +1186,14 @@ PRs within the same round run **in parallel** in separate worktrees (same worktr
 **Invoke via Task tool** with context:
 - Feature name for session-docs.
 - Session-docs path: {resolved_session_docs_path}
-- **PR identifier** (e.g., `PR-1`) — the implementer scopes its work to this PR's section in `02-task-list.md`.
-- Brief summary of architecture decisions (from architect's status block summary, NOT from re-reading 01-architecture.md).
+- **PR identifier** (e.g., `PR-1`) — the implementer scopes its work to this PR's section in `01-plan.md` (§ Task List).
+- Brief summary of architecture decisions (from architect's status block summary, NOT from re-reading `01-plan.md`).
 - Reference to `00-knowledge-context.md` (if it exists — agent reads it directly).
-- **Per-PR contract instruction:** "Read your assigned PR's section in `02-task-list.md`. The `Files:` and `Acceptance Criteria:` fields are your contract. Do not exceed the `Files:` scope without annotating `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md`."
-- **Work Plan instruction:** "Follow the Work Plan in `01-architecture.md` for steps belonging to your PR. Report any deviations in `02-implementation.md`."
+- **Per-PR contract instruction:** "Read your assigned PR's section in `01-plan.md` (§ Task List). The `Files:` and `Acceptance Criteria:` fields are your contract. Do not exceed the `Files:` scope without annotating `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md`."
+- **Work Plan instruction:** "Follow the Work Plan in `01-plan.md` (§ Architecture → `### Work Plan`) for steps belonging to your PR. Report any deviations in `02-implementation.md`."
 - **Spec feedback instruction:** "If implementation reveals a constraint that affects an AC, annotate `00-task-intake.md` with `[CONSTRAINT-DISCOVERED: description]` next to the affected AC. Make the best implementation decision and keep moving."
 
-**Backward compat.** If `02-task-list.md` does not exist (`pipeline_version: 1`), the implementer reads `00-task-intake.md` directly for the AC list and follows the Work Plan in `01-architecture.md` as before. Do NOT inject a `PR identifier` in that case — the legacy contract has no per-PR scoping.
+**Backward compat.** If `01-plan.md` does not exist (`pipeline_version: 1`), the implementer reads `00-task-intake.md` directly for the AC list and follows any available Work Plan as before. Do NOT inject a `PR identifier` in that case — the legacy contract has no per-PR scoping.
 
 **Gate (status-block):** The implementer returns a compact status block. If `status: success` → update `00-state.md`, add result to Agent Results table, extract hot context (e.g., new dependencies, gotchas), proceed to Phase 3. If `status: failed` → read `02-implementation.md` to understand the issue.
 
@@ -1262,7 +1257,7 @@ Count the constraints and classify each as **trivial** or **non-trivial**:
 
 - **All constraints are trivial** → reconcile inline (the current behaviour). For each annotation: rewrite the affected AC, remove the tag, log the change in Hot Context, briefly inform the user: "AC-{N} updated: {what changed and why}". Proceed to Phase 3.
 
-- **Any non-trivial constraint** → invoke `qa` in new mode `reconcile`. Pass: feature name, pointer to `00-task-intake.md` (with annotations), pointer to `01-architecture.md` and `02-implementation.md`. Instruction: "Review each [CONSTRAINT-DISCOVERED] annotation against the original Original Description block. For each, decide: (a) AC stays as-is — the constraint can be worked around; (b) AC is amended — propose the new wording; (c) AC is dropped — the original promise is no longer feasible and the user must be notified. Do NOT change any AC yourself; return your decisions in `04-validation.md` under a `## Reconciliation Decisions` section."
+- **Any non-trivial constraint** → invoke `qa` in new mode `reconcile`. Pass: feature name, pointer to `00-task-intake.md` (with annotations), pointer to `01-plan.md` and `02-implementation.md`. Instruction: "Review each [CONSTRAINT-DISCOVERED] annotation against the original Original Description block. For each, decide: (a) AC stays as-is — the constraint can be worked around; (b) AC is amended — propose the new wording; (c) AC is dropped — the original promise is no longer feasible and the user must be notified. Do NOT change any AC yourself; return your decisions in `04-validation.md` under a `## Reconciliation Decisions` section."
 
 - After `qa` returns, the th-orchestrator applies the decisions:
   - For each (a): remove the `[CONSTRAINT-DISCOVERED]` tag, AC unchanged.
@@ -2396,7 +2391,7 @@ All numbers come from `00-execution-events.jsonl` — never re-invent them by wa
 
 The Phase Timeline renderer adapts to the `type` field in `00-state.md`:
 
-- For `type: fix`: Phase 1 row displays the architect's root-cause-analysis output (`01-root-cause.md`), not `01-architecture.md`.
+- For `type: fix`: Phase 1 row displays the architect's root-cause-analysis output (`01-root-cause.md` + `01-plan.md`), not just `01-plan.md`.
 - For `type: hotfix`: Phase 1 row is rendered as `Phase 1 — skipped (hotfix)` (single-line entry).
 - For both: a new `Phase 2.0 — Regression Test` row slots between STAGE-GATE-1 and Phase 2.
 - Phase 1.5 row is skipped when ratify-plan was skipped (existing behaviour — bug fixes usually have ≤3 AC).
@@ -2790,7 +2785,7 @@ All special flows are detailed in `ref-special-flows.md`. Read it on-demand when
 
 | Flow | Trigger | Key Difference from Full Pipeline |
 |------|---------|----------------------------------|
-| Bug-fix | `type: fix` | architect produces `01-root-cause.md` (1pg) instead of `01-architecture.md`; Phase 2.0 inserts a mandatory regression test before Phase 2; `security` runs always (forced `security-sensitive: true`); delivery routes CHANGELOG to `### Fixed` and PR title to `fix(area):`; implementer scope-discipline contract bars tangential refactors |
+| Bug-fix | `type: fix` | architect produces `01-root-cause.md` (1pg) + `01-plan.md` instead of just `01-plan.md`; Phase 2.0 inserts a mandatory regression test before Phase 2; `security` runs always (forced `security-sensitive: true`); delivery routes CHANGELOG to `### Fixed` and PR title to `fix(area):`; implementer scope-discipline contract bars tangential refactors |
 | Hotfix | `type: hotfix` | Same as Bug-fix; Phase 1 (root-cause analysis) skipped — th-orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 still mandatory. PR title appends `(hotfix)` suffix |
 | Security-sensitive | `security-sensitive: true` | Phase 3 adds `security` agent in parallel (already forced `true` for `type: fix` / `type: hotfix`) |
 | Frontend-scope | `frontend-scope: true` | Phase 1 adds `ux-reviewer` (enrich mode, after architect) to add UI/UX AC; Phase 3 adds `ux-reviewer` (validate mode, in parallel with tester/qa/security) to validate UI/UX criteria. Only `critical` findings block delivery |
@@ -2864,7 +2859,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | research | `architect` (research mode) | none | create session-docs → invoke → present `00-research.md` |
 | review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill |
 | init | `init` | none | invoke → report generated files |
-| design | `architect` (design mode) | none | intake + specify → invoke → present `01-architecture.md` |
+| design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
 | test | `tester` | `02-implementation.md` + `00-task-intake.md` (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** |
 | validate | `qa` (validate mode) | `00-task-intake.md` + implementation | check AC exist. If missing → tell user to run `/define-ac` first. Do NOT invoke without AC. |
 | deliver | `delivery` | implementation + tests + validation | verify `02-implementation.md`, `03-testing.md`, AND `04-validation.md` exist. If any missing → tell user. |

@@ -40,38 +40,38 @@ Every mode has exactly one canonical output. If a request does not map to one of
 | Mode | Output file | Append or overwrite | Notes |
 |---|---|---|---|
 | Validate (default, Phase 3) | `session-docs/{feature}/04-validation.md` | overwrite per iteration | Per-PR validation report |
-| Validate (default, Phase 3) — AC checkbox mirror | `session-docs/{feature}/02-task-list.md` (checkbox flips only) | targeted edit, see below | Mirror each PASS AC to its checkbox; NEVER touch other fields |
+| Validate (default, Phase 3) — AC checkbox mirror | `session-docs/{feature}/01-plan.md` (§ Task List, checkbox flips only) | targeted edit, see below | Mirror each PASS AC to its checkbox; NEVER touch other fields |
 | Define-AC (standalone) | `session-docs/{feature}/00-acceptance-criteria.md` | overwrite | Standalone AC definition |
-| Ratify-Plan (Phase 1.5) | `session-docs/{feature}/01-architecture.md` (append `## Plan Ratification` section) | append section only | NEVER a separate file |
+| Ratify-Plan (Phase 1.5) | `session-docs/{feature}/01-plan.md` (append `## Plan Ratification` section) | append section only | NEVER a separate file |
 | Reconcile (Phase 2.5) | `session-docs/{feature}/00-task-intake.md` (annotate `[CONSTRAINT-RESOLVED]`) | inline annotation | NEVER a separate file |
 | Review (cross-repo) | passed to the caller via status block (no session-doc file written) | n/a | Used by `/cross-repo` only |
 | Failure brief (any mode, when failing) | `session-docs/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
 
-### Validate Mode — AC checkbox mirror in `02-task-list.md`
+### Validate Mode — AC checkbox mirror in `01-plan.md`
 
-For each AC the validate-mode run produces a verdict in `04-validation.md`, the corresponding checkbox in `02-task-list.md` MUST be kept in sync:
+For each AC the validate-mode run produces a verdict in `04-validation.md`, the corresponding checkbox in `01-plan.md` (§ Task List) MUST be kept in sync:
 
 - AC verdict **PASS** → flip `- [ ] **AC-X.Y.Z**: …` to `- [x] **AC-X.Y.Z**: …` for that specific line. Match by the exact `**AC-X.Y.Z**` identifier; never edit anything else on the line, never re-flow text.
 - AC verdict **FAIL** or any non-PASS → leave the checkbox as `- [ ]`. Do not partially mark.
 - A re-flip from `- [x]` back to `- [ ]` is allowed only on a follow-up iteration where the AC regresses to FAIL (rare). Log the regression in the failure brief.
 
-This is the **only** edit you are allowed to make on `02-task-list.md`. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: 02-task-list.md scope drift requested — route to architect`.
+This is the **only** edit you are allowed to make on `01-plan.md`. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: 01-plan.md scope drift requested — route to architect`.
 
 ## Files I MUST NOT write
 
 Hard rule: when asked to "review", "audit", or "validate" a plan / inventory / task list / architecture document, do **not** create any of the following. They have been observed as failure modes; they fragment the deliverable and force the user to read in parallel.
 
-- `01-coverage-review.md`, `02-flow-coverage.md`, `01-substance-review.md`, or any other `*-review.md` sibling to `01-architecture.md` / `02-task-list.md`.
-- A `qa-reports/` directory, or any per-PR audit file (`qa-reports/PR-N.md`, `PR-N-review.md`) **before implementation exists**. Pre-implementation per-PR concerns belong inside the AC block of that PR in `02-task-list.md`.
-- Any sibling of `01-plan-review.md`. The canonical plan-shape audit is `plan-reviewer`'s output (a different agent); if substance review is needed, **edit `01-architecture.md` / `02-task-list.md` in place** (see Routing below) instead of producing a parallel synthesis.
+- `01-coverage-review.md`, `02-flow-coverage.md`, `01-substance-review.md`, or any other `*-review.md` sibling to `01-plan.md`.
+- A `qa-reports/` directory, or any per-PR audit file (`qa-reports/PR-N.md`, `PR-N-review.md`) **before implementation exists**. Pre-implementation per-PR concerns belong inside the AC block of that PR in `01-plan.md` (§ Task List).
+- Any sibling of `01-plan-review.md`. The canonical plan-shape audit is `plan-reviewer`'s output (a different agent); if substance review is needed, **edit `01-plan.md` in place** (see Routing below) instead of producing a parallel synthesis.
 
 ### Routing when asked to "review the plan"
 
 If the th-orchestrator passes a task like "review the plan", "audit substance", "validate coverage of the architecture", "revisa el plan":
 
 1. If the concern is **plan-shape** (one PR per service, per-PR ACs in GWT, consolidated docs, …) → return `status: blocked` with `summary: route to plan-reviewer agent`.
-2. If the concern is **substance coverage of AC vs Work Plan** → invoke Ratify-Plan Mode (append to `01-architecture.md`). Do NOT create a separate file.
-3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: route back to architect for in-place refinement of 01-architecture.md / 02-task-list.md`.
+2. If the concern is **substance coverage of AC vs Work Plan** → invoke Ratify-Plan Mode (append to `01-plan.md`). Do NOT create a separate file.
+3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: route back to architect for in-place refinement of 01-plan.md`.
 
 The th-orchestrator must pick one of the three. If the instruction is ambiguous, return `status: blocked` and ask. Do not silently improvise a fourth path.
 
@@ -105,12 +105,12 @@ Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the a
 
 - **Trigger:** th-orchestrator invokes with `mode: ratify-plan`
 - **Flow:** Phase 0 (read intake + architecture) → Plan-AC Mapping → return verdict
-- **Output:** brief append to `session-docs/{feature-name}/01-architecture.md` under `## Plan Ratification (Phase 1.5)` — do NOT create a new file.
+- **Output:** brief append to `session-docs/{feature-name}/01-plan.md` under `## Plan Ratification (Phase 1.5)` — do NOT create a new file.
 
 **Process:**
 
 1. Read `00-task-intake.md` and extract the AC list (AC-1, AC-2, …).
-2. Read `01-architecture.md` and extract the Work Plan steps (the ordered list of files / actions / dependencies the architect produced).
+2. Read `01-plan.md` and extract the Work Plan steps from `## Architecture` → `### Work Plan` (the ordered list of files / actions / dependencies the architect produced).
 3. For each AC, find at least one Work Plan step that, when executed, would satisfy it. Build a one-pass coverage table:
    - AC-1 → step 2 (auth.service.ts: validate token) — **covered**
    - AC-2 → step 4 (auth.controller.ts: 401 on invalid) — **covered**
@@ -118,7 +118,7 @@ Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the a
 4. If every AC is covered → `verdict: pass`. If any AC has no covering step → `verdict: fail` with the list of uncovered AC.
 5. **Do NOT** validate code, run tests, check implementation quality — there is no code yet. **Do NOT** propose new AC or rewrite existing AC. **Do NOT** suggest implementation details. Your only job is plan-vs-AC coverage.
 
-**Append to `01-architecture.md`:**
+**Append to `01-plan.md`:**
 
 ```markdown
 ## Plan Ratification (Phase 1.5)
@@ -142,7 +142,7 @@ agent: qa
 status: success | failed | blocked
 mode: ratify-plan
 verdict: pass | fail
-output: session-docs/{feature-name}/01-architecture.md (Plan Ratification section)
+output: session-docs/{feature-name}/01-plan.md (Plan Ratification section)
 summary: {N}/{N} AC covered (or: {M}/{N} AC covered, {K} gap)
 issues: {list of uncovered AC, or "none"}
 ```
@@ -162,7 +162,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 **Process:**
 
 1. Read the **Original Description** block in `00-task-intake.md` (the user's verbatim request, captured before any reconciliation).
-2. Read each `[CONSTRAINT-DISCOVERED: …]` annotation, the affected AC, and the relevant pieces of `01-architecture.md` and `02-implementation.md` to understand why the constraint surfaced.
+2. Read each `[CONSTRAINT-DISCOVERED: …]` annotation, the affected AC, and the relevant pieces of `01-plan.md` and `02-implementation.md` to understand why the constraint surfaced.
 3. For each annotated AC, decide one of three outcomes:
    - **(a) keep** — the constraint can be worked around in code or testing; AC remains as written.
    - **(b) amend** — propose a new wording that captures the discovered constraint while preserving the user's intent. Show the new AC text. Do NOT apply the change yourself — the th-orchestrator does that.
@@ -213,7 +213,7 @@ Used by `/review-pr` to validate a PR's changes against session-docs AC (if the 
 
 1. Read `Worktree:` path from the dispatch. All file reads MUST use `$WORKTREE/path/to/file`, not the operator's current checkout.
 2. Read `Session-docs path:` from the dispatch. If absent or `"none"`, skip cleanly — emit `qa_status: skipped-no-ac` in the output file and return.
-3. From `{SESSION_DOCS_PATH}/02-task-list.md` (or `00-task-intake.md`), extract the AC relevant to this PR.
+3. From `{SESSION_DOCS_PATH}/01-plan.md` (§ Task List, or `00-task-intake.md`), extract the AC relevant to this PR.
 4. For each AC, check whether the diff and changed files satisfy it. Use the `Worktree` path to read full file context beyond the diff when needed.
 5. Write findings to `.claude/pr-review-qa.md`.
 
@@ -436,9 +436,9 @@ Responsive Criteria:
 
 **This phase runs in validate mode (default).** Read the acceptance criteria, then read source code and compare against them.
 
-**Per-PR scoping (pipeline_version: 2).** When the th-orchestrator invokes you in Stage 2 with a `PR identifier` (e.g., `PR-1`), read **the AC block of that specific PR** in `session-docs/{feature-name}/02-task-list.md` — not the feature-wide AC list. The per-PR AC block is your validation scope: validate exactly those ACs against the code of this PR. The feature-wide AC list in `00-task-intake.md` is context, not the contract for this PR (by construction the union of per-PR ACs covers it).
+**Per-PR scoping (pipeline_version: 2).** When the th-orchestrator invokes you in Stage 2 with a `PR identifier` (e.g., `PR-1`), read **the AC block of that specific PR** in `session-docs/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-PR AC block is your validation scope: validate exactly those ACs against the code of this PR. The feature-wide AC list in `00-task-intake.md` is context, not the contract for this PR (by construction the union of per-PR ACs covers it).
 
-**Backward compat (pipeline_version: 1 or `02-task-list.md` absent).** Fall back to the legacy behaviour: read `00-task-intake.md` for the full AC list and validate the whole feature. Do NOT scope to a PR identifier — the th-orchestrator does not pass one in legacy mode.
+**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read `00-task-intake.md` for the full AC list and validate the whole feature. Do NOT scope to a PR identifier — the th-orchestrator does not pass one in legacy mode.
 
 **Distinction from Phase 1.5 (ratify-plan mode) and Phase 1.6 (plan-reviewer).** Phase 1.5 (this agent, mode `ratify-plan`) validates that the Work Plan covers every AC — substance coverage. Phase 1.6 (the `plan-reviewer` agent — different file) audits plan-shape rules — one PR per service, per-PR ACs in GWT, consolidated documents. Validate-mode (this section) is Phase 3 (per PR in Stage 2): code vs AC. Three distinct phases, three distinct concerns.
 

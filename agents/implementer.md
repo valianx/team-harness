@@ -26,7 +26,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 ## Scope discipline for `type: fix` and `type: hotfix` (Bug-fix Mode)
 
-When the th-orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-PR scoping (`Files:` field of `02-task-list.md`). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
+When the th-orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-PR scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
 
 ### Allowed changes (this PR)
 
@@ -127,18 +127,17 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 
 2. **Check for existing session context** — use Glob to look for `session-docs/{feature-name}/`. Read ALL files:
    - `00-task-intake.md` — original task definition and feature-wide scope (context, not your scope).
-   - `01-architecture.md` — **CRITICAL: this is your blueprint.** Follow the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies).
-   - `02-task-list.md` (if present) — **CRITICAL when the th-orchestrator assigned you a PR identifier.** Read your assigned PR's section: `Files:` is the file scope you must not exceed, `Acceptance Criteria:` is the contract you must satisfy, `Notes:` flags constraints (e.g., same-commit OAS bump). The feature-wide AC list in `00-task-intake.md` is for context; your PR's AC block is the contract.
+   - `01-plan.md` — **CRITICAL: this is your blueprint.** Read `## Architecture` for the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies). Read `## Task List` for your assigned PR's `Files:` scope and `Acceptance Criteria:`.
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `04-validation.md` — understand acceptance criteria to satisfy
 
    **Path override:** If a `Session-docs path:` was provided in the dispatch, use that path as the session-docs folder instead of `session-docs/{feature-name}/`.
 
-   **Per-PR scoping (pipeline_version: 2).** If the th-orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `02-task-list.md`. If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the th-orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
+   **Per-PR scoping (pipeline_version: 2).** If the th-orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the th-orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
-   **Backward compat (pipeline_version: 1 or `02-task-list.md` absent).** Fall back to the legacy contract: follow the full Work Plan in `01-architecture.md` and validate against the feature-wide AC list in `00-task-intake.md`. The th-orchestrator does not pass a PR identifier in legacy mode.
+   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in `01-plan.md` (§ Architecture) and validate against the feature-wide AC list in `00-task-intake.md`. The th-orchestrator does not pass a PR identifier in legacy mode.
 
-   **You NEVER write to `02-task-list.md`.** It is the Stage 1 contract — frozen for you. The th-orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
+   **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The th-orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
 3. **Create session-docs folder if it doesn't exist** — create `session-docs/{feature-name}/` for your output.
 
@@ -157,7 +156,7 @@ Before writing any code, you MUST complete two steps: read session context and r
 ### Step 1 — Read session context
 
 1. **Read CLAUDE.md** — understand project conventions, golden commands, tech stack
-2. **Read the architecture proposal** (`01-architecture.md`) — understand what to build, component boundaries, security considerations, trade-offs
+2. **Read the plan** (`01-plan.md`) — read `## Architecture` to understand what to build, component boundaries, security considerations, trade-offs; read `## Task List` for your PR's files and acceptance criteria
 3. **Read acceptance criteria** (`04-validation.md` or `00-task-intake.md`) — understand what "done" looks like
 4. **Explore the codebase** — use Glob, Grep, and Read to understand:
    - Existing patterns for similar features
@@ -193,13 +192,13 @@ If the service uses OpenTelemetry (`@opentelemetry/sdk-node`, `auto-instrumentat
 
 ## Phase 1 — Follow the Work Plan
 
-The architect's `01-architecture.md` includes a **Work Plan** with ordered implementation steps, files, actions, and dependencies. Use it as your execution roadmap:
+The architect's `01-plan.md` (§ Architecture → `### Work Plan`) includes **Work Plan** with ordered implementation steps, files, actions, and dependencies. Use it as your execution roadmap:
 
 1. **Read the Work Plan** — follow the step order and file sequence. The architect already analyzed dependencies.
 2. **Validate against codebase** — quickly verify that the files and patterns referenced still match reality.
 3. **Note deviations** — if you need to deviate from the plan (missing file, different pattern, discovered constraint), proceed with the best decision and document it in `02-implementation.md` under "Deviations from Architecture".
 
-If no Work Plan exists in `01-architecture.md` (legacy or skipped design), create your own brief plan:
+If no Work Plan exists in `01-plan.md` (legacy or skipped design), create your own brief plan:
 1. List files to create or modify — ordered by dependency (lowest-level first)
 2. For each file: what it does, which architecture decision it implements, dependencies it needs
 3. Identify risks — anything that could break existing functionality
@@ -320,7 +319,7 @@ Write your implementation summary to `session-docs/{feature-name}/02-implementat
 | {path} | {what changed and why} |
 
 ## Architecture Decisions Followed
-- {Decision from 01-architecture.md} → {How it was implemented}
+- {Decision from 01-plan.md} → {How it was implemented}
 
 ## Deviations from Architecture
 - {Any deviation and why it was necessary}

@@ -186,7 +186,7 @@ Agents write outputs to `session-docs/{feature-name}/`:
 - `00-task-intake.md` — task spec (written by th-orchestrator)
 - `00-execution-log.md` — execution timeline
 - `00-research.md` — research output (architect, research mode)
-- `01-architecture.md` — architecture proposal (architect, design mode)
+- `01-plan.md` — architecture + task list (architect, design mode — merged)
 - `01-planning.md` — task breakdown (architect, planning mode)
 
 ---

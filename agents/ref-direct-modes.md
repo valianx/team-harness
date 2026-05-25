@@ -13,21 +13,21 @@ This file is read on-demand by the th-orchestrator when executing a direct mode.
 
 ## Plan Review Mode (standalone audit of Stage 1 artifacts)
 
-**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous th-orchestrator run, without re-running the full pipeline. Common trigger: developer hand-edits `01-architecture.md` or `02-task-list.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
+**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous th-orchestrator run, without re-running the full pipeline. Common trigger: developer hand-edits `01-plan.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
 
 **Routing:** the user invokes `/plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
 
 **Process:**
 
 1. Glob `session-docs/{feature-name}/`. If the folder does not exist, return a friendly message asking the user to first run `/design` or to confirm the feature name.
-2. Confirm `01-architecture.md` and `02-task-list.md` both exist. If only `01-architecture.md` is present, prompt the user: "no `02-task-list.md` — this looks like a legacy plan (pipeline_version 1) or an incomplete design. Run `/design {feature}` to produce both, or invoke `/plan-review` after the architect has emitted the task list."
-3. Invoke `plan-reviewer` via Task tool with the standard input contract (feature name + pointers to the three files).
+2. Confirm `01-plan.md` exists. If it is absent but `01-architecture.md` is present, prompt the user: "no `01-plan.md` — this looks like a legacy plan (pipeline_version 1) or an incomplete design. Run `/design {feature}` to produce the merged plan, or invoke `/plan-review` after the architect has emitted `01-plan.md`."
+3. Invoke `plan-reviewer` via Task tool with the standard input contract (feature name + pointer to `01-plan.md`).
 4. Wait for the agent's status block. Read `verdict` and `findings` counts.
 5. Print the verdict and findings inline to the user. Direct mode does NOT emit a STAGE-GATE-1 STOP block — there is no pipeline to gate. The user is invoking interactively for information.
 6. If `verdict: pass` → confirm "plan-shape OK". If `verdict: concerns` or `fail` → enumerate the findings file:line, one per line, and point the user to `01-plan-review.md` for the full report.
 
 **Behaviour:**
-- Read-only. Direct mode never modifies `01-architecture.md` or `02-task-list.md` (consistent with `plan-reviewer`'s tool allowlist).
+- Read-only. Direct mode never modifies `01-plan.md` (consistent with `plan-reviewer`'s tool allowlist).
 - The agent writes its report to `01-plan-review.md` (overwriting any prior report) so subsequent direct-mode invocations always reflect the latest plan state.
 - Does not append `stage.gate` events to JSONL — there is no pipeline. The agent's `00-execution-log.md` entry is enough.
 

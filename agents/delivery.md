@@ -167,7 +167,7 @@ Read session-docs and extract **only knowledge that applies beyond this feature*
 
 | Source | Extract |
 |--------|---------|
-| `01-architecture.md` | Decisions with rationale, trade-offs evaluated, new patterns adopted |
+| `01-plan.md` | Decisions with rationale, trade-offs evaluated, new patterns adopted (§ Review Summary and § Architecture) |
 | `02-implementation.md` | Patterns applied that set precedent, new dependencies added, gotchas discovered |
 | `03-testing.md` | Reusable factories, testing strategies that apply to future features |
 | `04-validation.md` | System constraints discovered, validation patterns |
@@ -683,7 +683,7 @@ Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to v
 
 **Inputs (read-only).** Use the session-docs you already loaded in Step 0 + the artifacts from later steps:
 - `session-docs/{feature-name}/00-task-intake.md` (or the issue body) — what was asked.
-- `session-docs/{feature-name}/01-architecture.md` — what was designed; surprises, constraints, alternatives rejected.
+- `session-docs/{feature-name}/01-plan.md` — what was designed; surprises, constraints, alternatives rejected (§ Architecture and § Review Summary).
 - `session-docs/{feature-name}/02-implementation.md` — what was actually built; deviations from the plan.
 - `session-docs/{feature-name}/03-testing.md` + `04-validation.md` — what the AC look like in practice.
 - The CHANGELOG entry you wrote in Step 7.
