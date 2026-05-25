@@ -1,3 +1,7 @@
+---
+description: Quick prototype to test a technical hypothesis.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

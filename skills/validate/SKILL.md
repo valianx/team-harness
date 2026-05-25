@@ -1,3 +1,7 @@
+---
+description: Validate an implementation against its acceptance criteria.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

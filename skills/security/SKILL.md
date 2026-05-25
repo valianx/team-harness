@@ -1,3 +1,7 @@
+---
+description: Run a security audit against OWASP, CWE, and ASVS.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

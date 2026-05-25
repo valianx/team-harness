@@ -1,3 +1,7 @@
+---
+description: Orchestrate multiple Claude Code instances in parallel.
+---
+
 Orchestrate multiple Claude Code instances in parallel using tmux sessions. Use when you need to run independent tasks simultaneously (e.g., backend + frontend, multiple workers). This is a standalone utility — does NOT route through the orchestrator.
 
 ## Voice

@@ -1,3 +1,7 @@
+---
+description: Analyze codebase architecture, health, and technical debt.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

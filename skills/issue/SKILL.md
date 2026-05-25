@@ -1,3 +1,7 @@
+---
+description: Fetch a GitHub issue and route it through the pipeline.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

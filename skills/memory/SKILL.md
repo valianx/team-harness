@@ -1,3 +1,7 @@
+---
+description: Search, inspect, and manage the Knowledge Graph.
+---
+
 Manage the Knowledge Graph (cross-project memory). Search, inspect, prune, and consolidate entities. This is a standalone utility — does NOT route through the orchestrator.
 
 ## Voice

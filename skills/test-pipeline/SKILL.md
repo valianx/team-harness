@@ -1,3 +1,7 @@
+---
+description: Run the test pipeline for a feature.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

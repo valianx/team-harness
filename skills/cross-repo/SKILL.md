@@ -1,3 +1,7 @@
+---
+description: Analyze dependencies and changes across multiple repositories.
+---
+
 Analyze the input: $ARGUMENTS
 
 **IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent. You orchestrate the multi-repo analysis yourself using tmux, Agent tool, and the existing specialized agents.

@@ -1,3 +1,7 @@
+---
+description: Analyze GCP infrastructure costs and optimization opportunities.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

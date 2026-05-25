@@ -1,3 +1,7 @@
+---
+description: Validate health of agents, skills, and hooks in the system.
+---
+
 Validate the health of agents and skills in this dev-team system. Run all 4 checks below **in sequence**, then show the consolidated report.
 
 **IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).

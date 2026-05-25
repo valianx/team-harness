@@ -1,3 +1,7 @@
+---
+description: Review a pull request on GitHub.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

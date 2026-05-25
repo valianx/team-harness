@@ -1,3 +1,7 @@
+---
+description: Initialize CLAUDE.md and project conventions for a repository.
+---
+
 ## Parse flags
 
 Before routing, check for optional flags in `$ARGUMENTS`:

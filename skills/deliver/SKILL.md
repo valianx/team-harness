@@ -1,3 +1,7 @@
+---
+description: Create branch, commit, and open a PR for completed work.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

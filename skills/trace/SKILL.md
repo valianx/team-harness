@@ -1,3 +1,7 @@
+---
+description: Show pipeline observability for a single feature.
+---
+
 Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
 
 ## Voice

@@ -1,3 +1,7 @@
+---
+description: Discover, extract, and translate UI strings for i18n.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

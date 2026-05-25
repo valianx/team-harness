@@ -1,3 +1,7 @@
+---
+description: Design the architecture and work plan for a task.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

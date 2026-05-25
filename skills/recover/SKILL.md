@@ -1,3 +1,7 @@
+---
+description: Resume an interrupted pipeline from where it left off.
+---
+
 Recover an interrupted pipeline or batch from where it left off. Routes through the orchestrator with full recovery context.
 
 Analyze the input: $ARGUMENTS

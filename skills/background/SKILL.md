@@ -1,3 +1,7 @@
+---
+description: Dispatch a task to a background Claude session.
+---
+
 Dispatch a small, well-scoped task to a separate Claude session so the current session keeps moving. Designed for fire-and-forget work the developer would otherwise context-switch to handle: a typo fix, a version bump, a dependency upgrade, a one-line config change, a doc update, a missing `loading.tsx` for an App Router segment.
 
 **This is NOT** a way to outsource an unbounded feature. The pipeline (orchestrator + agents) exists for that — `/th:issue`, `/th:plan`, or just typing the feature description routes through the full SDD pipeline with verification gates. `/th:background` is the opposite: it accepts that the gates are too heavy for a 30-second change and offers a structured fast-path.

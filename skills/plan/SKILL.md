@@ -1,3 +1,7 @@
+---
+description: Break a broad scope into parallel tasks with dispatch labels.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---

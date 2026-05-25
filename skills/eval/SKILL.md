@@ -1,3 +1,7 @@
+---
+description: Evaluate and score agent or pipeline performance.
+---
+
 Analyze the input: $ARGUMENTS
 
 **IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all steps yourself using the tools available to you (Bash, Glob, Read, Grep, Agent).

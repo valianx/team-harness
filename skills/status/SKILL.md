@@ -1,3 +1,7 @@
+---
+description: Show current state of all pipelines in workspaces.
+---
+
 Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the orchestrator.
 
 ## Voice

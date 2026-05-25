@@ -1,3 +1,7 @@
+---
+description: Define acceptance criteria for a feature or task.
+---
+
 Analyze the input: $ARGUMENTS
 
 ---
