@@ -1,12 +1,13 @@
 {
   "name": "th",
   "displayName": "Team Harness",
-  "version": "2.28.0",
+  "version": "2.29.0",
   "description": "Orchestrated Claude Code agent system: architect, implement, test, and deliver via a multi-agent pipeline with a single orchestrator entry point.",
   "author": {
     "name": "Mario Gutierrez"
   },
   "repository": "https://github.com/valianx/team-harness",
   "license": "MIT",
-  "keywords": ["orchestration", "agents", "workflow", "development"]
+  "keywords": ["orchestration", "agents", "workflow", "development"],
+  "hooks": "./.claude-plugin/hooks.json"
 }

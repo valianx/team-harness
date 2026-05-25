@@ -11,7 +11,7 @@
       "displayName": "Team Harness",
       "source": ".",
       "description": "Orchestrated Claude Code agent system: architect, implement, test, and deliver via a multi-agent pipeline",
-      "version": "2.28.0",
+      "version": "2.29.0",
       "category": "development",
       "tags": ["orchestration", "agents", "workflow"],
       "author": {
