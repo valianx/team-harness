@@ -2,7 +2,6 @@
 name: research
 description: Investigate a technology, migration, or approach.
 ---
-name: research
 
 Analyze the input: $ARGUMENTS
 

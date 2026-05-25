@@ -2,7 +2,6 @@
 name: security
 description: Run a security audit against OWASP, CWE, and ASVS.
 ---
-name: security
 
 Analyze the input: $ARGUMENTS
 

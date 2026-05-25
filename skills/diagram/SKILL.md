@@ -2,7 +2,6 @@
 name: diagram
 description: Create an Excalidraw diagram for a concept or workflow.
 ---
-name: diagram
 
 Create an Excalidraw diagram that visually argues a concept, workflow, or architecture. Routes through the orchestrator which delegates to the excalidraw-diagram skill.
 

@@ -2,7 +2,6 @@
 name: gcp-costs
 description: Analyze GCP infrastructure costs and optimization opportunities.
 ---
-name: gcp-costs
 
 Analyze the input: $ARGUMENTS
 

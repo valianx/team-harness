@@ -2,7 +2,6 @@
 name: setup
 description: Configure Team Harness — MCP servers, workspace mode, and orchestrator dispatch rule. Run after installing the plugin or to reconfigure.
 ---
-name: setup
 
 Configure the Team Harness system. Run this after installing the plugin or to reconfigure existing settings.
 

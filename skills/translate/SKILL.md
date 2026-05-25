@@ -2,7 +2,6 @@
 name: translate
 description: Discover, extract, and translate UI strings for i18n.
 ---
-name: translate
 
 Analyze the input: $ARGUMENTS
 
