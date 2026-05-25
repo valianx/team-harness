@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.25.0] - 2026-05-25
+
+### Fixed
+
+- Intake step ordering: operator language detection (Step 1c) now runs before session-docs creation (Step 1d), ensuring `00-state.md` is written with the correct language from the start.
+- Added mandatory Step 1e (execution events file initialization) immediately after `00-state.md` creation, preventing missing observability traces.
+
+### Changed
+
+- Installer now deploys points 6-8 to the `~/.claude/CLAUDE.md` orchestrator block: mandatory session-docs, operator language propagation, and execution events at every phase transition.
+
 ## [2.24.0] - 2026-05-25
 
 ### Changed
