@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-05-25
+
 ### Added
 
 - Merge/push guard in th-orchestrator — refuses to merge PRs or push until Phase 3 (Verify) and STAGE-GATE-3 are complete. Operator instructions like "merge them" do not override without explicit "skip verification" acknowledgment.

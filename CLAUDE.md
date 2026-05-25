@@ -106,7 +106,7 @@ team-harness/
 | Config | JSON (`hooks/config.json`) + `~/.claude.json` merge for `mcpServers` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 
-**Current version:** `2.27.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
+**Current version:** `2.28.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
