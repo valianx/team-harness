@@ -1,10 +1,13 @@
 ---
+name: gcp-costs
 description: Analyze GCP infrastructure costs and optimization opportunities.
 ---
+name: gcp-costs
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: gcp-costs
 
 ## Mode 1 — Full analysis (default)
 
@@ -58,6 +61,7 @@ Examples: `/th:gcp-costs --quick`, `/th:gcp-costs --quick project-abc`
    ```
 
 ---
+name: gcp-costs
 
 ## Important
 

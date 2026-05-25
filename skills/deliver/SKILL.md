@@ -1,10 +1,13 @@
 ---
+name: deliver
 description: Create branch, commit, and open a PR for completed work.
 ---
+name: deliver
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: deliver
 
 ## Mode 1 — Feature name provided
 
@@ -23,6 +26,7 @@ Analyze the input: $ARGUMENTS
 4. If none found, tell the user: "No implementation found in workspaces/. Run the implementation pipeline first, or provide a feature name."
 
 ---
+name: deliver
 
 ## Important
 

@@ -1,10 +1,13 @@
 ---
+name: translate
 description: Discover, extract, and translate UI strings for i18n.
 ---
+name: translate
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: translate
 
 ## Mode 1 — Full translation (default)
 
@@ -76,6 +79,7 @@ Examples: `/th:translate apply`, `/th:translate translate-only`
    ```
 
 ---
+name: translate
 
 ## Important
 

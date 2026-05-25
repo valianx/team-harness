@@ -1,12 +1,15 @@
 ---
+name: recover
 description: Resume an interrupted pipeline from where it left off.
 ---
+name: recover
 
 Recover an interrupted pipeline or batch from where it left off. Routes through the orchestrator with full recovery context.
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: recover
 
 ## Mode 1 — Feature name provided (`/th:recover my-feature`)
 
@@ -34,6 +37,7 @@ Analyze the input: $ARGUMENTS
    ```
 
 ---
+name: recover
 
 ## Mode 2 — Batch recovery (`/th:recover --batch`)
 
@@ -81,6 +85,7 @@ The orchestrator will:
 - Track progress in `batch-progress.md` as normal
 
 ---
+name: recover
 
 ## Mode 3 — No input provided (`/th:recover`)
 
@@ -99,6 +104,7 @@ The orchestrator will:
    ```
 
 ---
+name: recover
 
 ## Error Handling
 
@@ -108,6 +114,7 @@ The orchestrator will:
 - If the orchestrator fails to recover → it will report the issue. The skill does not retry.
 
 ---
+name: recover
 
 ## Important
 

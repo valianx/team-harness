@@ -1,6 +1,8 @@
 ---
+name: memory
 description: Search, inspect, and manage the Knowledge Graph.
 ---
+name: memory
 
 Manage the Knowledge Graph (cross-project memory). Search, inspect, prune, and consolidate entities. This is a standalone utility — does NOT route through the orchestrator.
 
@@ -32,6 +34,7 @@ The operator can chat in any language; you reply in the operator's chat language
 Analyze the input: $ARGUMENTS
 
 ---
+name: memory
 
 ## Actions
 
@@ -213,6 +216,7 @@ Examples:
 ```
 
 ---
+name: memory
 
 ## Error Handling
 
@@ -221,6 +225,7 @@ Examples:
 - If `delete_entities` fails → report the error, do not retry
 
 ---
+name: memory
 
 ## Important
 

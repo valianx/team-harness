@@ -1,10 +1,13 @@
 ---
+name: plan
 description: Break a broad scope into parallel tasks with dispatch labels.
 ---
+name: plan
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: plan
 
 ## Step 0 — Detect intent
 
@@ -16,6 +19,7 @@ Before processing the input, determine if the user wants **plan only** or **plan
 Use the detected mode in the payload below. When in doubt, ask the user: "Do you want to just create the task breakdown (plan), or also implement each task (plan-and-execute)?"
 
 ---
+name: plan
 
 ## Mode 1 — Issue number or URL (`#123`, `123`, URL)
 
@@ -40,6 +44,7 @@ Use the detected mode in the payload below. When in doubt, ask the user: "Do you
    ```
 
 ---
+name: plan
 
 ## Mode 2 — Text description (not a number or URL)
 
@@ -58,12 +63,14 @@ Use the detected mode in the payload below. When in doubt, ask the user: "Do you
    ```
 
 ---
+name: plan
 
 ## Mode 3 — No input provided
 
 Ask the user: "Provide a GitHub issue number (#123), a URL, or describe the problem you want to plan and break down into tasks."
 
 ---
+name: plan
 
 ## Error Handling
 

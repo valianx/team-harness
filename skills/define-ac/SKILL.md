@@ -1,10 +1,13 @@
 ---
+name: define-ac
 description: Define acceptance criteria for a feature or task.
 ---
+name: define-ac
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: define-ac
 
 ## Mode 1 — Issue number or URL
 
@@ -37,6 +40,7 @@ Analyze the input: $ARGUMENTS
 Ask the user: "Provide a GitHub issue number or describe the feature to define acceptance criteria for."
 
 ---
+name: define-ac
 
 ## Important
 

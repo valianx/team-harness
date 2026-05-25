@@ -1,10 +1,13 @@
 ---
+name: test-pipeline
 description: Run the test pipeline for a feature.
 ---
+name: test-pipeline
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: test-pipeline
 
 ## Mode 1 --- Path or service name provided
 
@@ -34,6 +37,7 @@ Analyze the input: $ARGUMENTS
    ```
 
 ---
+name: test-pipeline
 
 ## Important
 

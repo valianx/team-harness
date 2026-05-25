@@ -1,10 +1,13 @@
 ---
+name: validate
 description: Validate an implementation against its acceptance criteria.
 ---
+name: validate
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: validate
 
 ## Mode 1 — Feature name provided
 
@@ -23,6 +26,7 @@ Analyze the input: $ARGUMENTS
 4. If none found, tell the user: "No implementation found in workspaces/. Implement first or provide a feature name."
 
 ---
+name: validate
 
 ## Important
 

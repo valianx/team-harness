@@ -1,6 +1,8 @@
 ---
+name: trace
 description: Show pipeline observability for a single feature.
 ---
+name: trace
 
 Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
 
@@ -32,6 +34,7 @@ The operator can chat in any language; you reply in the operator's chat language
 Analyze the input: $ARGUMENTS
 
 ---
+name: trace
 
 ## Usage
 
@@ -49,6 +52,7 @@ Parse `$ARGUMENTS`:
 If `$ARGUMENTS` is empty or just whitespace, print the usage block above and exit cleanly.
 
 ---
+name: trace
 
 ## File locations
 
@@ -63,6 +67,7 @@ workspaces/{feature-name}/00-execution-events.jsonl  (local mode)
 These are written by the **orchestrator** during pipeline runs (see `agents/orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). If either is missing, the pipeline ran before observability was wired up or was interrupted before the orchestrator could write it.
 
 ---
+name: trace
 
 ## Default mode (no flag) — pipeline summary
 
@@ -89,6 +94,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
    ```
 
 ---
+name: trace
 
 ## `--jsonl` mode — raw events
 
@@ -125,6 +131,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
    (where `{events_file}` is the resolved path, e.g., `workspaces/{feature-name}/00-execution-events.md`)
 
 ---
+name: trace
 
 ## `--tools` mode — tool effectiveness aggregate
 
@@ -179,6 +186,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
 4. If `jq` is not available, fall back to printing only the `## Tool Effectiveness` section of the summary.
 
 ---
+name: trace
 
 ## `--fails` mode — failures, dispatch issues, iterations
 
@@ -246,6 +254,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
    Print results verbatim with a header.
 
 ---
+name: trace
 
 ## Error handling
 
@@ -255,6 +264,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
 - **Permission errors reading workspaces:** report the OS error and exit cleanly.
 
 ---
+name: trace
 
 ## What `/th:trace` does NOT do
 
@@ -264,6 +274,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
 - It does not invoke any other agent. Read-only file reads + `jq` / `tail` / `grep` via Bash only.
 
 ---
+name: trace
 
 ## Relationship to `/th:status`
 

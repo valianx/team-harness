@@ -1,6 +1,8 @@
 ---
+name: lint
 description: Validate health of agents, skills, and hooks in the system.
 ---
+name: lint
 
 Validate the health of agents and skills in this dev-team system. Run all 4 checks below **in sequence**, then show the consolidated report.
 
@@ -32,6 +34,7 @@ You speak as a professional instrument: formal, neutral, declarative. The follow
 The operator can chat in any language; you reply in the operator's chat language, but the voice rules above apply regardless of language.
 
 ---
+name: lint
 
 ## Check 1 — agnix (config linting)
 
@@ -47,6 +50,7 @@ The operator can chat in any language; you reply in the operator's chat language
    - **FAIL** if any errors exist → suggest running `agnix --fix .`
 
 ---
+name: lint
 
 ## Check 2 — Sync between project and global
 
@@ -69,6 +73,7 @@ Result:
 - **FAIL** if any project file is missing from global or has different content
 
 ---
+name: lint
 
 ## Check 3 — Agent structure validation
 
@@ -89,6 +94,7 @@ Result:
 - **FAIL** if any agent is missing any mandatory section
 
 ---
+name: lint
 
 ## Check 4 — Guardrails validation
 
@@ -109,6 +115,7 @@ Result:
 - **FAIL** — not used for this check (guardrails are advisory)
 
 ---
+name: lint
 
 ## Check 5 — orchestrator coherence
 
@@ -129,6 +136,7 @@ Result:
 - **FAIL** if team table references a non-existent agent, or session-doc output conflict exists
 
 ---
+name: lint
 
 ## Check 6 — Cross-agent consistency
 
@@ -142,6 +150,7 @@ Result:
 - **FAIL** if role boundary contradictions or session-doc write conflicts exist
 
 ---
+name: lint
 
 ## Check 7 — Model + effort matrix (canonical)
 
@@ -183,6 +192,7 @@ Result:
 - **FAIL** if any model/effort mismatch, missing `effort`, or `effort: low` is found
 
 ---
+name: lint
 
 ## --fix Mode
 
@@ -208,6 +218,7 @@ Report a summary of fixes applied after the main report.
 If `--fix` is NOT present, skip this section entirely.
 
 ---
+name: lint
 
 ## Output Format
 

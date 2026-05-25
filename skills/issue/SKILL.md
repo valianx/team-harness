@@ -1,10 +1,13 @@
 ---
+name: issue
 description: Fetch a GitHub issue and route it through the pipeline.
 ---
+name: issue
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: issue
 
 ## Parse flags
 
@@ -13,6 +16,7 @@ Before processing modes, check if the input contains flags:
 - `--skip-delivery` → pass `skip-delivery: true` to the orchestrator payload. Remove the flag. When set, the orchestrator runs the full pipeline (specify → design → implement → verify) but STOPS before delivery. Used in batch mode where delivery is consolidated.
 
 ---
+name: issue
 
 ## Mode 1 — Single issue number or URL (`#123`, `123`, URL)
 
@@ -38,6 +42,7 @@ Before processing modes, check if the input contains flags:
    ```
 
 ---
+name: issue
 
 ## Mode 2 — Multiple issues (`#12 #13 #14`, `12, 13, 14`)
 
@@ -67,6 +72,7 @@ Before processing modes, check if the input contains flags:
    The orchestrator will create `workspaces/batch-progress.md` to track all tasks.
 
 ---
+name: issue
 
 ## Mode 3 — Text description (not a number or URL)
 
@@ -111,12 +117,14 @@ Before processing modes, check if the input contains flags:
 5. Pass the issue data to the `orchestrator` agent using the format from Mode 1
 
 ---
+name: issue
 
 ## Mode 4 — No input provided
 
 Ask the user: "Provide a GitHub issue number (#123), multiple issues (#12 #13 #14), or a task description to create a new issue."
 
 ---
+name: issue
 
 ## Error Handling
 

@@ -1,6 +1,8 @@
 ---
+name: background
 description: Dispatch a task to a background Claude session.
 ---
+name: background
 
 Dispatch a small, well-scoped task to a separate Claude session so the current session keeps moving. Designed for fire-and-forget work the developer would otherwise context-switch to handle: a typo fix, a version bump, a dependency upgrade, a one-line config change, a doc update, a missing `loading.tsx` for an App Router segment.
 
@@ -32,6 +34,7 @@ You speak as a professional instrument: formal, neutral, declarative. The follow
 The operator can chat in any language; you reply in the operator's chat language, but the voice rules above apply regardless of language.
 
 ---
+name: background
 
 ## Phase 1 — Eligibility check (MANDATORY)
 
@@ -62,6 +65,7 @@ If all rows in the right column are clear and at least the first three rows in t
 - "speed up the report" — vague verb, no concrete change
 
 ---
+name: background
 
 ## Phase 2 — Build the dispatch command
 
@@ -88,6 +92,7 @@ Replace:
 - `> /tmp/background-{slug}.log 2>&1 &` runs the process in the background of the user's shell, redirects all output to a log, and returns control immediately.
 
 ---
+name: background
 
 ## Phase 3 — Present + log
 
@@ -103,6 +108,7 @@ Print three blocks to the user, in this order:
 Then **stop**. Do NOT run the command yourself — the user owns the dispatch. The point of `/th:background` is that the user is in control of when it actually fires; the skill only validates and prepares.
 
 ---
+name: background
 
 ## Phase 4 — On completion (manual, by the user)
 
@@ -114,12 +120,14 @@ The user runs the command, the dispatched Claude session executes the task, and 
 OS-native notification on completion is OPT-IN: if the user has the `Stop` hook enabled (see `hooks/README.md` § "Opt-in: notify when Claude finishes a turn"), the dispatched session will fire it. If not, the user polls the log.
 
 ---
+name: background
 
 ## Mode 2 — No input provided
 
 Ask the user: "What would you like to dispatch in the background? Provide a one-sentence task description. The skill will check whether it qualifies for the fast-path; tasks that need verification, security review, or the full pipeline will be rejected."
 
 ---
+name: background
 
 ## Important
 

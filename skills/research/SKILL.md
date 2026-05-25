@@ -1,10 +1,13 @@
 ---
+name: research
 description: Investigate a technology, migration, or approach.
 ---
+name: research
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: research
 
 ## Mode 1 — Topic or question provided
 
@@ -20,6 +23,7 @@ Analyze the input: $ARGUMENTS
 Ask the user: "What technology, library, or approach do you want to research? Example: 'zod vs yup for validation', 'monorepo strategies', 'server components with our stack'."
 
 ---
+name: research
 
 ## Important
 

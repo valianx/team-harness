@@ -1,10 +1,13 @@
 ---
+name: review-pr
 description: Review a pull request on GitHub.
 ---
+name: review-pr
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: review-pr
 
 ## Flag parsing (run before all modes)
 
@@ -25,6 +28,7 @@ DEFAULT_FOCUSES = ["security", "architecture", "style"]
 ```
 
 ---
+name: review-pr
 
 ## Mode 1 — PR number or URL provided
 
@@ -461,12 +465,14 @@ Estimate `{estimated_kb}` from the size of the diff you handled in Phase 1: smal
 **Terminate.** Do NOT perform any additional actions after the context prune reminder — no second pass for inline comments, no follow-up reviews, no supplementary observations. The review is complete.
 
 ---
+name: review-pr
 
 ## Mode 2 — No input provided
 
 Ask the user: "Provide a PR number or URL to review. Example: `#45`, `45`, or `https://github.com/owner/repo/pull/45`."
 
 ---
+name: review-pr
 
 ## Important
 

@@ -1,10 +1,13 @@
 ---
+name: audit
 description: Analyze codebase architecture, health, and technical debt.
 ---
+name: audit
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: audit
 
 ## Mode 1 — Specific target
 
@@ -43,6 +46,7 @@ Analyze the input: $ARGUMENTS
    ```
 
 ---
+name: audit
 
 ## Important
 

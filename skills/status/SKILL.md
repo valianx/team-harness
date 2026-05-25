@@ -1,6 +1,8 @@
 ---
+name: status
 description: Show current state of all pipelines in workspaces.
 ---
+name: status
 
 Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the orchestrator.
 
@@ -36,6 +38,7 @@ The operator can chat in any language; you reply in the operator's chat language
 Analyze the input: $ARGUMENTS
 
 ---
+name: status
 
 ## What to scan
 
@@ -53,6 +56,7 @@ Analyze the input: $ARGUMENTS
 5. **Verify live processes** — run `tmux list-sessions 2>/dev/null` (via WSL if on Windows: `wsl -e tmux list-sessions 2>/dev/null`). Map tmux session names to worktree/task names to determine which tasks have a live Claude Code process running
 
 ---
+name: status
 
 ## Display format
 
@@ -97,6 +101,7 @@ Highlight:
 - Stale pipelines (last updated > 1h ago with status != complete) — mark as "stale?"
 
 ---
+name: status
 
 ## Refined `Status` value set
 
@@ -123,6 +128,7 @@ No active pipelines in workspaces/.
 ```
 
 ---
+name: status
 
 ## How to detect live processes
 
@@ -153,6 +159,7 @@ For each worktree path, check:
 If found, extract the same fields as regular workspaces.
 
 ---
+name: status
 
 ## Actions (optional arguments)
 
@@ -162,6 +169,7 @@ If found, extract the same fields as regular workspaces.
 - **`clean`** — list completed pipelines and ask user which to delete (also offers to remove completed worktrees)
 
 ---
+name: status
 
 ## `<feature-name>` mode — narrative renderer
 
@@ -327,6 +335,7 @@ Round R2 (1 PR, started 14:21:49, closed 14:31:02):
 ```
 
 ---
+name: status
 
 ## Important
 
