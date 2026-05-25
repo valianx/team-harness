@@ -1,10 +1,13 @@
 ---
+name: design
 description: Design the architecture and work plan for a task.
 ---
+name: design
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: design
 
 ## Mode 1 — Issue number or URL
 
@@ -37,6 +40,7 @@ Analyze the input: $ARGUMENTS
 Ask the user: "Provide a GitHub issue number or describe the feature to design."
 
 ---
+name: design
 
 ## Important
 

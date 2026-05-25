@@ -1,6 +1,8 @@
 ---
+name: cross-repo
 description: Analyze dependencies and changes across multiple repositories.
 ---
+name: cross-repo
 
 Analyze the input: $ARGUMENTS
 
@@ -32,6 +34,7 @@ You speak as a professional instrument: formal, neutral, declarative. The follow
 The operator can chat in any language; you reply in the operator's chat language, but the voice rules above apply regardless of language.
 
 ---
+name: cross-repo
 
 ## Parse Arguments
 
@@ -53,6 +56,7 @@ Parse:
 - **--no-parallel:** run repos sequentially instead of in parallel (for low-resource environments)
 
 ---
+name: cross-repo
 
 ## Mode Detection
 
@@ -64,6 +68,7 @@ Parse:
 | `--list-profiles` | **List** | Show available profiles and flows |
 
 ---
+name: cross-repo
 
 ## Phase 0 — Intake & Validation
 
@@ -140,6 +145,7 @@ Evaluate this service in the context of its role in the flow:
 ```
 
 ---
+name: cross-repo
 
 ## Phase 1 — Fan-Out (Parallel Analysis)
 
@@ -278,6 +284,7 @@ Report progress as summaries arrive:
 ```
 
 ---
+name: cross-repo
 
 ## Phase 2 — Fan-In (Consolidation)
 
@@ -300,6 +307,7 @@ Also copy each per-hop summary to {output-dir}/ as individual files.
 ```
 
 ---
+name: cross-repo
 
 ## Phase 3 — Profile Feedback (if profile exists)
 
@@ -330,6 +338,7 @@ Update profile? [y/n/selective]
 If user confirms, update the profile and flow files accordingly.
 
 ---
+name: cross-repo
 
 ## Phase 4 — Output
 
@@ -380,6 +389,7 @@ rm -rf /tmp/cross-repo-*  # clean temp work directory
 ```
 
 ---
+name: cross-repo
 
 ## Utility: --list-profiles
 
@@ -402,6 +412,7 @@ Use: /th:cross-repo --profile banco-x --flow deposito
 Read each `system-profiles/*/profile.md` header and list `system-profiles/*/flows/*.md` files.
 
 ---
+name: cross-repo
 
 ## Error Handling
 

@@ -1,6 +1,8 @@
 ---
+name: tmux
 description: Orchestrate multiple Claude Code instances in parallel.
 ---
+name: tmux
 
 Orchestrate multiple Claude Code instances in parallel using tmux sessions. Use when you need to run independent tasks simultaneously (e.g., backend + frontend, multiple workers). This is a standalone utility — does NOT route through the orchestrator.
 
@@ -32,6 +34,7 @@ The operator can chat in any language; you reply in the operator's chat language
 Analyze the input: $ARGUMENTS
 
 ---
+name: tmux
 
 ## Environment Detection (MANDATORY FIRST STEP)
 
@@ -62,6 +65,7 @@ Store this as `$TMUX` and use it everywhere below. Examples:
 - WSL/Linux/macOS: `tmux list-sessions`
 
 ---
+name: tmux
 
 ## Parse Arguments
 
@@ -70,6 +74,7 @@ Format: `<action> [session_name] [payload]`
 If no arguments provided, show usage help (see bottom of this file).
 
 ---
+name: tmux
 
 ## Actions
 
@@ -139,6 +144,7 @@ Display results as a formatted table.
 2. Confirm: "All tmux sessions terminated"
 
 ---
+name: tmux
 
 ## Usage Help
 
@@ -166,6 +172,7 @@ Examples:
 ```
 
 ---
+name: tmux
 
 ## Important
 

@@ -1,6 +1,8 @@
 ---
+name: init
 description: Initialize CLAUDE.md and project conventions for a repository.
 ---
+name: init
 
 ## Parse flags
 
@@ -11,6 +13,7 @@ Before routing, check for optional flags in `$ARGUMENTS`:
 Remove parsed flags from the description before routing.
 
 ---
+name: init
 
 Pass to the `orchestrator` agent:
 ```
@@ -21,6 +24,7 @@ Direct Mode Task:
 ```
 
 ---
+name: init
 
 ## Important
 

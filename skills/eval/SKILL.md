@@ -1,6 +1,8 @@
 ---
+name: eval
 description: Evaluate and score agent or pipeline performance.
 ---
+name: eval
 
 Analyze the input: $ARGUMENTS
 
@@ -32,6 +34,7 @@ You speak as a professional instrument: formal, neutral, declarative. The follow
 The operator can chat in any language; you reply in the operator's chat language, but the voice rules above apply regardless of language.
 
 ---
+name: eval
 
 ## Mode 1 — Agent name + scenario (or --all)
 
@@ -75,11 +78,13 @@ Each scenario file has this structure:
 
 ```markdown
 ---
+name: eval
 name: {scenario name}
 mode: {operating mode to test — e.g., "design", "research", "audit"}
 difficulty: {easy|medium|hard}
 needs_scaffold: {true|false — default false. Set true when the agent reads filesystem}
 ---
+name: eval
 
 ## Input
 {The prompt/task to give the agent}
@@ -277,6 +282,7 @@ After all scenarios for the agent:
 ```
 
 ---
+name: eval
 
 ## Mode 2 — --list
 
@@ -294,6 +300,7 @@ eval-scenarios/
 ```
 
 ---
+name: eval
 
 ## Mode 3 — --create {agent-name}
 
@@ -312,6 +319,7 @@ Auto-generate a scenario from the agent's definition:
 If `--scenario {name}` is given, generate only one scenario with that name and ask the user for the input prompt.
 
 ---
+name: eval
 
 ## Mode 4 — No input
 

@@ -1,10 +1,13 @@
 ---
+name: security
 description: Run a security audit against OWASP, CWE, and ASVS.
 ---
+name: security
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: security
 
 ## Mode 1 — Project or area provided
 
@@ -36,6 +39,7 @@ Examples: `/th:security`, `/th:security auth`, `/th:security api`, `/th:security
    ```
 
 ---
+name: security
 
 ## Important
 

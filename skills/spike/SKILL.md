@@ -1,10 +1,13 @@
 ---
+name: spike
 description: Quick prototype to test a technical hypothesis.
 ---
+name: spike
 
 Analyze the input: $ARGUMENTS
 
 ---
+name: spike
 
 ## Mode 1 — Text description
 
@@ -21,6 +24,7 @@ Analyze the input: $ARGUMENTS
 Ask the user: "Describe what you want to spike — what hypothesis or approach do you want to test quickly?"
 
 ---
+name: spike
 
 ## Important
 
