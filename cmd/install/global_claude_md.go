@@ -12,7 +12,7 @@ const orchestratorRuleMarkerEnd = "<!-- orchestrator-dispatch-rule:end -->"
 const orchestratorRule = `<!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
-Invoke the orchestrator as a subagent: ` + "`Agent(subagent_type='orchestrator', ...)`" + `. The orchestrator dispatches phase agents (architect, implementer, tester, qa, security, delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
+Invoke the orchestrator as a subagent: ` + "`Agent(subagent_type='th:orchestrator', ...)`" + `. The orchestrator dispatches phase agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
 <!-- orchestrator-dispatch-rule:end -->`
 
 // ensureGlobalClaudeMD creates or updates ~/.claude/CLAUDE.md with the
