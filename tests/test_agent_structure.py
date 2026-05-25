@@ -1315,6 +1315,35 @@ for label, marker in orch_obs_checks:
         f"marker '{marker}' not found",
     )
 
+# --- th-orchestrator.md: Phase Transition Protocol (event append + state update atomic) ---
+
+phase_transition_checks = [
+    ("Phase Transition Protocol section header",
+     "### Phase Transition Protocol"),
+    ("Protocol is declared atomic",
+     "atomic"),
+    ("Step 1 appends event FIRST",
+     "This step comes FIRST"),
+    ("Step 1 documents phase.end append",
+     '"event":"phase.end"'),
+    ("Step 1 documents phase.start append",
+     '"event":"phase.start"'),
+    ("Step 1 documents gate event append",
+     '"event":"gate"'),
+    ("Step 2 updates 00-state.md",
+     "Update `00-state.md`"),
+    ("Step 3 proceeds to next dispatch only after 1+2",
+     "only after steps 1 and 2 are done"),
+    ("Enforcement rule prevents dispatch without event append",
+     "MUST NOT call `Agent()` or `Task()` for the next phase until the event has been appended"),
+]
+for label, marker in phase_transition_checks:
+    check(
+        f"th-orchestrator.md observability: {label}",
+        marker in orch,
+        f"marker '{marker}' not found — Phase Transition Protocol may have been removed or weakened",
+    )
+
 # --- skills/trace.md exists with the four modes ---
 
 trace_path = SKILLS_DIR / "trace.md"

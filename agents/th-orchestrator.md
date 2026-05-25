@@ -408,6 +408,23 @@ views:
 
 After EVERY phase transition, update `{docs_root}/00-state.md`. This is your persistent memory — if context compacts, this file tells you exactly where you are. `docs_root` is the fully resolved workspaces path stored in `## Current State`.
 
+### Phase Transition Protocol (atomic — execute all 3 steps, never partial)
+
+At EVERY phase boundary, execute these three steps as a single atomic unit. Skipping any step is a contract violation — if you realize mid-run that you skipped one, stop and backfill immediately before continuing.
+
+1. **Append event to `{events_file}`.**
+   - When a phase completes: append `{"ts":"<ISO>","event":"phase.end","phase":"<N>","name":"<name>","agent":"<agent>","status":"<status>","tools":{...}}`.
+   - When a phase starts: append `{"ts":"<ISO>","event":"phase.start","phase":"<N>","name":"<name>","agent":"<agent>"}`.
+   - When a gate is reached: append `{"ts":"<ISO>","event":"gate","gate":"<gate-name>","action":"<stop|approved>"}`.
+   - At pipeline end: append `{"ts":"<ISO>","event":"session.end",...}` and close the code fence (obsidian mode).
+   - **This step comes FIRST** because events are append-only and must reflect real-time — backfilling after the fact loses timestamp accuracy.
+
+2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `## Current State` fields, mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
+
+3. **Proceed to next dispatch** — only after steps 1 and 2 are done.
+
+**Enforcement rule:** the orchestrator MUST NOT call `Agent()` or `Task()` for the next phase until the event has been appended and the state file has been updated. If context compaction occurred and you lost track, read `{events_file}` — if the last event does not match the last `[x]` in the Phase Checklist, backfill the missing events before continuing.
+
 ```markdown
 # Pipeline State: {feature-name}
 **Last updated:** {timestamp}
