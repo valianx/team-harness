@@ -15,6 +15,13 @@
 /th:setup
 ```
 
+`/th:setup` configures the two required MCP servers (Memory and context7) and the **logs mode** — where pipeline workspaces are stored:
+
+| Mode | Where | When to use |
+|---|---|---|
+| `local` | `./workspaces/` in each project | Default. Simple, no extra config. |
+| `obsidian` | Obsidian vault path you provide | Cross-project visibility. Workspaces appear as searchable notes in your vault. |
+
 ---
 
 ## Quick start
@@ -41,10 +48,10 @@ After install, open Claude Code. The entry points are:
 **Required:**
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) — the runtime team-harness depends on
 - [context7](https://context7.com/) API key — for library docs retrieval
-- A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — there is no default URL; the installer requires an explicit value
+- A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — there is no default URL; `/th:setup` requires an explicit value
 
 **Recommended:**
-- [`gh`](https://cli.github.com/) CLI — for GitHub integration (`/issue`, `/deliver`, `/review-pr`). When absent, skills fall back to `curl` or operator-paste paths.
+- [`gh`](https://cli.github.com/) CLI — for GitHub integration (`/th:issue`, `/th:deliver`, `/th:review-pr`). When absent, skills fall back to `curl` or operator-paste paths.
 
 ---
 
@@ -54,7 +61,7 @@ After install, open Claude Code. The entry points are:
 |---|---|
 | [How it works](./docs/how-it-works.md) | Pipeline walkthrough, why a harness, what ships |
 | [Pipelines reference](./docs/pipelines.md) | All 8+ pipelines, tier classification, phase tables, gate semantics |
-| [Installation guide](./docs/install.md) | Modes, env vars (`INSTALL_MODE`), `--force`, from source, updating |
+| [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
 | [Changelog](./CHANGELOG.md) | Release history |
