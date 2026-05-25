@@ -9,44 +9,11 @@
 
 ## Install
 
-### Via Plugin (recommended)
-
-1. Add the marketplace:
-   ```
-   /plugin marketplace add valianx/team-harness
-   ```
-
-2. Install the plugin:
-   ```
-   /plugin install th
-   ```
-
-3. Configure:
-   ```
-   /th:setup
-   ```
-
-### Via Binary (alternative — offline / CI / low-cost mode)
-
-**macOS / Linux / WSL**
-
-```bash
-curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 ```
-
-**Windows (PowerShell)**
-
-```powershell
-irm https://valianx.github.io/team-harness/install.ps1 | iex
+/plugin marketplace add valianx/team-harness
+/plugin install th
+/th:setup
 ```
-
-**Windows (cmd.exe)**
-
-```cmd
-curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd
-```
-
-The installer walks through three prompts (Memory MCP URL, context7 API key, install mode) and writes agents, skills, and hooks into `~/.claude/`. Restart Claude Code after install.
 
 ---
 
