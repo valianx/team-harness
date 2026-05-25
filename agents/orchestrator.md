@@ -353,6 +353,8 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 - next_action: {what to do next}
 - regression_test_path: {path | null}        # set at Phase 2.0 (type: fix | hotfix); null otherwise
 - regression_test_status: {failing | passing | skipped | null}  # failing before Phase 2; passing after Phase 3; skipped for Tier 1 no-behavior-change
+- security_sensitive: {true|false}             # set at Phase 0a Step 7; determines if security agent runs at Phase 3
+- frontend_scope: {true|false}                 # set at Phase 0a Step 7; determines if ux-reviewer runs at Phase 1 and 3
 - bug_tier: {0 | 1 | 2 | 3 | 4 | null}        # set at Phase 0a Step 7 for type: fix | hotfix; null otherwise
 - bug_tier_source: {auto | operator | architect-promote | null}  # how the tier was set; null for non-bug runs
 - logs_mode: {local|obsidian}              # resolved at boot from manifest; persisted here for recovery
