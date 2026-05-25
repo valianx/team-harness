@@ -2,7 +2,6 @@
 name: status
 description: Show current state of all pipelines in workspaces.
 ---
-name: status
 
 Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the orchestrator.
 
@@ -38,11 +37,12 @@ The operator can chat in any language; you reply in the operator's chat language
 Analyze the input: $ARGUMENTS
 
 ---
-name: status
 
 ## What to scan
 
-1. Use Glob to find all `workspaces/*/00-state.md` files
+**Step 0 — Resolve workspaces path.** Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`, use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name` is the basename of the current working directory). If `logs-mode` is `"local"` or the file is missing, use `workspaces/` (relative to cwd). Use this resolved path for ALL glob patterns below.
+
+1. Use Glob to find all `{resolved-path}/*/00-state.md` files
 2. For each found, read the file and extract:
    - Feature name (from folder name)
    - Current phase
@@ -56,7 +56,6 @@ name: status
 5. **Verify live processes** — run `tmux list-sessions 2>/dev/null` (via WSL if on Windows: `wsl -e tmux list-sessions 2>/dev/null`). Map tmux session names to worktree/task names to determine which tasks have a live Claude Code process running
 
 ---
-name: status
 
 ## Display format
 
@@ -101,7 +100,6 @@ Highlight:
 - Stale pipelines (last updated > 1h ago with status != complete) — mark as "stale?"
 
 ---
-name: status
 
 ## Refined `Status` value set
 
@@ -128,7 +126,6 @@ No active pipelines in workspaces/.
 ```
 
 ---
-name: status
 
 ## How to detect live processes
 
@@ -159,7 +156,6 @@ For each worktree path, check:
 If found, extract the same fields as regular workspaces.
 
 ---
-name: status
 
 ## Actions (optional arguments)
 
@@ -169,7 +165,6 @@ name: status
 - **`clean`** — list completed pipelines and ask user which to delete (also offers to remove completed worktrees)
 
 ---
-name: status
 
 ## `<feature-name>` mode — narrative renderer
 
@@ -335,7 +330,6 @@ Round R2 (1 PR, started 14:21:49, closed 14:31:02):
 ```
 
 ---
-name: status
 
 ## Important
 

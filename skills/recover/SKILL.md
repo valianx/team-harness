@@ -8,11 +8,14 @@ Recover an interrupted pipeline or batch from where it left off. Routes through 
 Analyze the input: $ARGUMENTS
 
 ---
-name: recover
+
+## Step 0 — Resolve workspaces path
+
+Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`, use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name` is the basename of the current working directory). If `logs-mode` is `"local"` or the file is missing, use `workspaces/` (relative to cwd). Replace all `workspaces/` references below with the resolved path.
 
 ## Mode 1 — Feature name provided (`/th:recover my-feature`)
 
-1. Check that `workspaces/{feature}/00-state.md` exists
+1. Check that `{resolved-path}/{feature}/00-state.md` exists
 2. If not found, tell the user: "No pipeline state found for '{feature}'. Use `/th:status` to see active pipelines."
 3. Read `workspaces/{feature}/00-state.md` in full
 4. Read `workspaces/{feature}/00-execution-log.md` if it exists (for timing context)
@@ -36,7 +39,6 @@ name: recover
    ```
 
 ---
-name: recover
 
 ## Mode 2 — Batch recovery (`/th:recover --batch`)
 
@@ -84,7 +86,6 @@ The orchestrator will:
 - Track progress in `batch-progress.md` as normal
 
 ---
-name: recover
 
 ## Mode 3 — No input provided (`/th:recover`)
 
@@ -103,7 +104,6 @@ name: recover
    ```
 
 ---
-name: recover
 
 ## Error Handling
 
@@ -113,7 +113,6 @@ name: recover
 - If the orchestrator fails to recover → it will report the issue. The skill does not retry.
 
 ---
-name: recover
 
 ## Important
 
