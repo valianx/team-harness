@@ -105,6 +105,7 @@ team-harness/
 | Memory MCP | External service (e.g., `context-harness-mcp` on Railway/Render/Fly/Docker). Configured by URL in `~/.claude.json`. Not bundled in this repo. |
 | Config | JSON (`hooks/config.json`) + `~/.claude.json` merge for `mcpServers` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
+| Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`), Go installer as alternative for offline/CI/low-cost mode |
 
 **Current version:** `2.28.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
 
@@ -123,6 +124,7 @@ All commands run from the repo root.
 
 | Intent | Command |
 |---|---|
+| Install via plugin (recommended) | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
 | Install — one-liner (Unix / macOS) | `curl -fsSL https://valianx.github.io/team-harness/install.sh \| bash` |
 | Install — one-liner (Windows PowerShell) | `irm https://valianx.github.io/team-harness/install.ps1 \| iex` |
 | Install — one-liner (Windows cmd.exe) | `curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd` |

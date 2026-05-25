@@ -9,6 +9,25 @@
 
 ## Install
 
+### Via Plugin (recommended)
+
+1. Add the marketplace:
+   ```
+   /plugin marketplace add valianx/team-harness
+   ```
+
+2. Install the plugin:
+   ```
+   /plugin install th
+   ```
+
+3. Configure:
+   ```
+   /th:setup
+   ```
+
+### Via Binary (alternative — offline / CI / low-cost mode)
+
 **macOS / Linux / WSL**
 
 ```bash
@@ -33,7 +52,11 @@ The installer walks through three prompts (Memory MCP URL, context7 API key, ins
 
 ## Quick start
 
-After install, open Claude Code and talk to the th-orchestrator — it is the front door to the whole system. The `plan-reviewer` agent audits the architecture and task-list before each plan gate, emitting a pass/concerns/fail verdict.
+After install, open Claude Code. The entry points are:
+
+- `/th:orchestrator` — the front door to the whole pipeline (or use `@th-orchestrator` in chat)
+- `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
+- `/th:update` — update to the latest release
 
 ```
 @th-orchestrator give me the work plan for this task: <description>
@@ -42,7 +65,7 @@ After install, open Claude Code and talk to the th-orchestrator — it is the fr
 @th-orchestrator recover <feature>
 ```
 
-> **The th-orchestrator is the canonical entry point.** Skills like `/design`, `/deliver`, `/recover` are optional shortcuts that route to the same agent under the hood.
+> **The th-orchestrator is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route to the same agent under the hood.
 
 ---
 

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Claude Code plugin format (`.claude-plugin/plugin.json`) with marketplace distribution
+- `/th:setup` skill for interactive MCP and workspace configuration
+- `hooks/hooks.json` for plugin-mode hook registration
+- `.claude-plugin/marketplace.json` for custom marketplace distribution
+- Migration guide (`docs/plugin-migration.md`) for existing installer users
+
+### Changed
+- All 30 flat skills restructured from `skills/*.md` to `skills/<name>/SKILL.md` directory format
+- All internal skill references updated to `/th:skill-name` namespace
+- Go installer updated to copy skill directories instead of flat files
+- `/th:update` updated for directory-based skills with legacy orphan cleanup
+- Skill counter in `summary.go` now checks `/skills/` path
+
+### Removed
+- Flat skill files (`skills/*.md`) — replaced by directory format (`skills/<name>/SKILL.md`)
+- `.mcp.json` — MCP configuration handled by `/th:setup` instead of plugin userConfig
+
 ## [2.28.0] - 2026-05-25
 
 ### Added
