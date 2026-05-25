@@ -311,11 +311,12 @@ After EVERY phase transition, update `{docs_root}/00-state.md`. This is your per
 At EVERY phase boundary, execute these three steps as a single atomic unit. Skipping any step is a contract violation — if you realize mid-run that you skipped one, stop and backfill immediately before continuing.
 
 1. **Append event to `{events_file}`.**
-   - When a phase completes: append `{"ts":"<ISO>","event":"phase.end","phase":"<N>","name":"<name>","agent":"<agent>","status":"<status>","tools":{...}}`.
+   - When a phase completes: append `{"ts":"<ISO>","event":"phase.end","phase":"<N>","name":"<name>","agent":"<agent>","status":"<status>","tools":{...},"tokens":<N>,"duration_ms":<N>}`. Extract `tokens` (total_tokens) and `duration_ms` from the Agent() call result metadata.
    - When a phase starts: append `{"ts":"<ISO>","event":"phase.start","phase":"<N>","name":"<name>","agent":"<agent>"}`.
    - When a gate is reached: append `{"ts":"<ISO>","event":"gate","gate":"<gate-name>","action":"<stop|approved>"}`.
-   - At pipeline end: append `{"ts":"<ISO>","event":"session.end",...}` and close the code fence (obsidian mode).
+   - At pipeline end: append `{"ts":"<ISO>","event":"session.end","total_tokens":<sum of all phase tokens>,"total_duration_ms":<sum of all phase durations>}` and close the code fence (obsidian mode).
    - **This step comes FIRST** because events are append-only and must reflect real-time — backfilling after the fact loses timestamp accuracy.
+   - **Token tracking is mandatory.** Every `phase.end` event MUST include `tokens` and `duration_ms`. If the Agent() result does not expose usage metadata, estimate from the agent's status block or write `"tokens":0` — never omit the field.
 
 2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `## Current State` fields, mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
 
@@ -358,6 +359,7 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 - events_file: {00-execution-events.jsonl|00-execution-events.md}  # resolved at boot from logs_mode; persisted for recovery
 - docs_root: {full absolute path}          # fully resolved workspaces path for this run — all file refs use this
 - operator_language: {en|es|pt|fr|de|...} # ISO 639-1 code; detected at Phase 0a Step 1d; default en
+- total_tokens: {N}                       # running sum of tokens across all phases; updated at every phase.end
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -378,10 +380,10 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 - [ ] 6 — KG Save
 
 ## Agent Results
-| Agent | Phase | Status | Summary |
-|-------|-------|--------|---------|
-| orchestrator | 0b-specify | success | spec context prepared with 5 AC, passed to architect |
-| architect | 1-design | success | proposed repository pattern |
+| Agent | Phase | Status | Tokens | Summary |
+|-------|-------|--------|--------|---------|
+| orchestrator | 0b-specify | success | 12,450 | spec context prepared with 5 AC, passed to architect |
+| architect | 1-design | success | 48,200 | proposed repository pattern |
 
 ## Hot Context
 <!-- Pipeline-specific insights discovered DURING this run (not from knowledge graph).
