@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`), Go installer as alternative for offline/CI/low-cost mode |
 
-**Current version:** `2.30.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
+**Current version:** `2.31.0` (see `cmd/install/main.go` `version` variable and `CHANGELOG.md`).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
