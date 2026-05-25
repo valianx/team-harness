@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-05-24
+
+### Changed
+
+- **Session-docs consolidated from 12 files to 7** — `01-architecture.md` + `02-task-list.md` merged into single `01-plan.md` (human-first: Review Summary → Architecture → Task List). `00-task-intake.md` eliminated (architect writes spec directly into plan). `01-plan-review.md` merged into `01-plan.md` § Plan Review. `06-acceptance-check.md` merged into `04-validation.md` § Drift Analysis. `05-delivery.md` merged into `00-state.md` § Delivery.
+- **Execution log replaced with JSONL event trace** — `00-execution-log.md` (lossy markdown table) replaced by `00-execution-events.jsonl` with per-agent token counts, tool usage, duration, and MCP call tracking. Queryable via `jq` or `/trace`.
+- **Agent status blocks now include `tools:` self-reporting** — all 17 agents report per-tool-type usage counts (`read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N`) in their status blocks. The th-orchestrator combines this with Agent() harness metadata (tokens, duration) for JSONL events.
+- **`context7_consult:` standardized** across all 17 agents that return status blocks.
+
 ## [2.21.0] - 2026-05-24
 
 ### Added
