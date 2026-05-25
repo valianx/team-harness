@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-05-24
+
 ### Added
 
 - **Charm huh TUI installer** (`cmd/install/tui.go`, `cmd/install/tui_styles.go`): replaces raw `bufio.Scanner` prompts with a polished `charm.land/huh/v2` multi-group form. Features: password-masked inputs for API keys and bearer tokens, radio-select fields for install mode and work-logs output, Keep/Change confirmation for existing values, JSON snippet paste detection with raw-reader fallback, progress spinner during file copy, and lipgloss brand-palette styling. Non-interactive (CI / env-var) paths are preserved unchanged. First third-party dependencies introduced: `charm.land/huh/v2` and its transitive dependencies (bubbletea v2, lipgloss v2, bubbles v2); binary size increases from ~4.5 MB to ~8-8.5 MB (under 20 MB soft cap).
