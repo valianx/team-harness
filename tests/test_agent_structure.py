@@ -15,11 +15,15 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
 import sys
 from pathlib import Path
+
+if sys.stdout.encoding and sys.stdout.encoding.lower().startswith("cp"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO_ROOT / "agents"
@@ -523,9 +527,9 @@ check("skills/status.md documents the 7 refined Status values",
                                     "autonomous", "iterating", "complete", "paused"]),
       "one or more refined Status values missing from /status")
 
-check("skills/status.md <feature-name> mode reads 00-execution-events.jsonl",
-      "<feature-name>" in status_md and "00-execution-events.jsonl" in status_md,
-      "/status <feature> does not consume the JSONL trace")
+check("skills/status.md <feature-name> mode reads execution events (dual-format: .md or .jsonl)",
+      "<feature-name>" in status_md and "00-execution-events.md" in status_md and "00-execution-events.jsonl" in status_md,
+      "/status <feature> does not reference both execution events formats")
 
 check("skills/status.md timeline declares the event types it renders",
       all(e in status_md for e in ["stage.gate", "stage.gate.release", "stage.gate.skipped",
@@ -1319,8 +1323,10 @@ if trace_path.exists():
     trace_md = read(trace_path)
     trace_checks = [
         ("default mode reads 00-pipeline-summary.md", "00-pipeline-summary.md"),
-        ("--jsonl mode tails 00-execution-events.jsonl",
-         "tail -n 30 session-docs/{feature-name}/00-execution-events.jsonl"),
+        ("--jsonl mode tails events file (dual-format: .md or .jsonl)",
+         "00-execution-events.md"),
+        ("--jsonl mode falls back to .jsonl",
+         "00-execution-events.jsonl"),
         ("--tools mode aggregates with jq",
          '.event == "phase.end" and .tools'),
         ("--fails mode filters dispatch.blocked + iterations + gate.fail",

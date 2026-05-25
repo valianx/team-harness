@@ -169,12 +169,12 @@ Do NOT repeat the full output content in the return block — it's in the file.
 
 ### Execution Log Protocol (mandatory)
 
-The th-orchestrator writes observability events to `session-docs/{feature}/00-execution-events.jsonl`. Agents do not write to that file directly — they return timing data in their status blocks and the th-orchestrator propagates the events.
+The th-orchestrator writes observability events to `session-docs/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). Agents do not write to that file directly — they return timing data in their status blocks and the th-orchestrator propagates the events.
 
 ### Session Documentation Protocol (mandatory)
 
 Agents write outputs to `session-docs/{feature-name}/`:
-- `00-execution-events.jsonl` — observability event trace (th-orchestrator only)
+- `00-execution-events.jsonl` / `00-execution-events.md` — observability event trace (th-orchestrator only; `.jsonl` in local mode, `.md` in obsidian mode)
 - `00-research.md` — research output (architect, research mode)
 - `01-plan.md` — architect output: spec (§ Review Summary) + architecture (§ Architecture) + task list (§ Task List)
 - `01-planning.md` — task breakdown (architect, planning mode)
@@ -382,7 +382,7 @@ Write design rationale to `session-docs/{agent-name}/01-agent-design.md`:
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `session-docs/{agent-name}/00-execution-events.jsonl`. You do not write to that file directly.
+The th-orchestrator writes observability events to `session-docs/{agent-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly.
 
 ---
 

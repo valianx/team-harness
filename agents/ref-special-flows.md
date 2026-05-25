@@ -226,7 +226,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 |---|---|---|---|---|---|
 | `01-plan.md` | **Yes (always)** | Yes | Yes | Yes | Bug report content + reproduction steps (§ Review Summary) + tasks of the fix (§ Task List). Minimum 4 lines; Tier 1 may be 3 lines when Phase 2.0 is skipped (reproduce-or-cite, fix, verify) |
 | `00-state.md` | Yes | Yes | Yes | Yes | Standard schema, `type: fix`, `bug_tier: N`, `bug_tier_source` |
-| `00-execution-events.jsonl` | Yes | Yes | Yes | Yes | Standard event trace |
+| `00-execution-events.jsonl` / `.md` | Yes | Yes | Yes | Yes | Standard event trace (`.jsonl` local mode, `.md` obsidian mode) |
 | `00-pipeline-summary.md` | Yes | Yes | Yes | Yes | Standard rollup |
 | `01-root-cause.md` | **No (Phase 1 skipped)** | Yes — `mode: light-root-cause`, ≤30 lines | Yes — `mode: full-root-cause`, 1 pg max | Yes — `mode: full-root-cause` + mandatory `## Prior Art`, 1 pg max + ≤15 lines | file:line + mechanism + scope |
 | `01-plan.md § Plan Review` | Yes | Yes | Yes | Yes | plan-reviewer appends this section; includes Rules 7 + 8 (gated on `type: fix | hotfix`) |
@@ -667,18 +667,22 @@ When Phase 3 sends tasks back:
 session-docs/
   test-pipeline/                        # th-orchestrator coordination
     00-state.md                         # pipeline checkpoint
-    00-execution-events.jsonl           # event trace (th-orchestrator only)
+    00-execution-events.jsonl           # event trace (th-orchestrator only, local mode)
+    00-execution-events.md              # event trace (th-orchestrator only, obsidian mode)
     01-plan.md                          # service analysis & task list (§ Review Summary + § Task List)
     batch-progress.md                   # multi-task tracking
     05-consolidation.md                 # final merged report
   test-pipeline-coverage-config/        # Round 1 blocker
-    00-execution-events.jsonl
+    00-execution-events.jsonl           # local mode
+    00-execution-events.md              # obsidian mode
     03-testing.md
   test-pipeline-test-infra/             # Round 1 blocker (conditional)
-    00-execution-events.jsonl
+    00-execution-events.jsonl           # local mode
+    00-execution-events.md              # obsidian mode
     03-testing.md
   test-pipeline-{module-name}/          # Round 2 per-module (one per module)
-    00-execution-events.jsonl
+    00-execution-events.jsonl           # local mode
+    00-execution-events.md              # obsidian mode
     03-testing.md
 ```
 

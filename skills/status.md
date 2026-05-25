@@ -185,9 +185,18 @@ The detailed mode renders a structured narrative for one feature. **It is read-o
    - **Hot Context** — render the `## Hot Context` bullets.
    - **Recovery Instructions** — render ONLY if `status` is `paused`, `paused_for_amend`, `blocked`, or the `Process` column was `DEAD` in the no-args view. Otherwise hide — recovery hints are noise when the pipeline is healthy.
 
-4. **Read `00-execution-events.jsonl`** (if it exists at `session-docs/{feature-name}/00-execution-events.jsonl`). Parse line by line into a list of events. Apply the Timeline rules below to produce the `## Timeline` section.
+4. **Read the events file.** Detect dual-format:
+   1. Use Glob to check for `session-docs/{feature-name}/00-execution-events.md`. If found, use it.
+   2. If not found, check for `session-docs/{feature-name}/00-execution-events.jsonl`.
+   3. If neither exists: render `Timeline\n--------\n(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash, exit code 0.
 
-   If `00-execution-events.jsonl` does not exist: render `Timeline\n--------\n(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash, exit code 0.
+   For the `.md` variant, extract the JSONL content from inside the code fence before parsing:
+   ```bash
+   sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' session-docs/{feature-name}/00-execution-events.md
+   ```
+   For the `.jsonl` variant, read directly.
+
+   Parse line by line into a list of events. Apply the Timeline rules below to produce the `## Timeline` section.
 
 5. **Render Timeline** using the rules below.
 
@@ -245,7 +254,7 @@ PRs within a round are listed in ascending PR identifier order, regardless of wh
 
 | Condition | Behaviour |
 |---|---|
-| `00-execution-events.jsonl` missing | TL;DR + Current State + Agent Results render normally. Timeline renders `(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash. |
+| `00-execution-events.md` and `00-execution-events.jsonl` both missing | TL;DR + Current State + Agent Results render normally. Timeline renders `(no events recorded — pre-refactor pipeline or trace not initialized)`. No crash. |
 | `pipeline_version: 1` or field absent | Stage column in no-args table shows `—`; Status uses the raw `status` value. In detailed view: TL;DR renders if present, otherwise `(not available — legacy pipeline, pipeline_version<2)`. Timeline degrades as above. |
 | `## Agent Results` empty | Renders the table header row + `(no agent results yet)`. |
 | Malformed JSONL line | Skip the line silently, count it. Surface as `Timeline (skipped N malformed events)` if any. |

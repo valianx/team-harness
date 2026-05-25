@@ -169,11 +169,14 @@ This step runs immediately after a successful dispatch probe (Step 2). It MUST c
      - If `logs-path` is empty or missing → fall back to `"local"` mode, print warning.
      - Set `logs_mode = "obsidian"`.
 3. Store `base_path` and `logs_mode` for all subsequent path construction.
-4. ONLY NOW emit the boot acknowledgment line as the first non-tool-call line of your visible response:
+4. Resolve `events_file`:
+   - If `logs_mode == "obsidian"` → `events_file = "00-execution-events.md"`
+   - If `logs_mode == "local"` → `events_file = "00-execution-events.jsonl"`
+5. ONLY NOW emit the boot acknowledgment line as the first non-tool-call line of your visible response:
    ```
-   [th-orchestrator boot] dispatch: OK | logs-mode: {logs_mode} | base_path: {base_path}
+   [th-orchestrator boot] dispatch: OK | logs-mode: {logs_mode} | base_path: {base_path} | events_file: {events_file}
    ```
-   This line MUST include the actual resolved `logs_mode` and `base_path` values — not placeholders. If it says `local` when the manifest says `obsidian`, you misread the file. Re-read and correct before proceeding.
+   This line MUST include the actual resolved `logs_mode`, `base_path`, and `events_file` values — not placeholders. If it says `local` when the manifest says `obsidian`, you misread the file. Re-read and correct before proceeding.
 
 Then continue with intake / recovery / direct-mode handling as normal. The Dispatch invariants section below applies in full from this point on.
 
@@ -253,7 +256,8 @@ Session-docs is the communication channel between agents. Each agent reads previ
 session-docs/{feature-name}/
   00-state.md              ← you write this (th-orchestrator) — pipeline state + delivery info
   00-knowledge-context.md  ← you write this (th-orchestrator) — knowledge graph results
-  00-execution-events.jsonl ← you write this (th-orchestrator) — append-only event trace (JSONL)
+  00-execution-events.jsonl ← you write this (th-orchestrator, local mode) — append-only event trace (JSONL)
+  00-execution-events.md    ← you write this (th-orchestrator, obsidian mode) — same content, markdown wrapper
   00-init.md               ← init (bootstrap report)
   00-research.md           ← architect (research mode)
   00-audit.md              ← architect (audit mode)
@@ -313,7 +317,42 @@ tags:
 
 Where `file_role` is derived from the filename: `architecture`, `task-list`, `implementation`, `testing`, `validation`, `security`, `delivery`, etc.
 
-**Excluded from frontmatter:** `00-execution-events.jsonl`, `*.excalidraw`, `failure-brief.md`.
+**Excluded from frontmatter:** `00-execution-events.md` (has its own frontmatter, written at initialization), `00-execution-events.jsonl` (local mode, not a markdown file), `*.excalidraw`, `failure-brief.md`.
+
+### Execution Events File Initialization (Obsidian Mode)
+
+When `events_file` is `00-execution-events.md` (obsidian mode) and the file does not yet exist, the first append creates it with YAML frontmatter, a heading, and an opening code fence before the first JSON line. The file structure is:
+
+```
+---
+repo: {repo_name}
+repo_path: {working_directory}
+feature: {feature_name}
+pipeline_type: {type}
+date: {YYYY-MM-DD}
+agent: th-orchestrator
+tags:
+  - work-logs
+  - {repo_name}
+  - execution-trace
+---
+
+# Execution Events
+
+(opening ```jsonl fence here — starts the JSONL code block)
+(each JSON event line appended here via cat >>)
+(closing ``` fence appended at pipeline.end)
+```
+
+Write the header block (frontmatter + heading + opening ` ```jsonl ` fence line) with a Write tool call during pipeline initialization. All subsequent `cat >>` appends land inside the open code fence, after the opening fence line.
+
+**Fence closure at pipeline end.** At `pipeline.end`, after appending the final JSON line, append the closing fence:
+
+```bash
+printf '```\n' >> {docs_root}/{events_file}
+```
+
+When `events_file` is `00-execution-events.jsonl` (local mode), no initialization or fence closure is needed — events are appended as raw JSONL lines from the first append onward.
 
 ### Obsidian Base File (First Run)
 
@@ -399,7 +438,9 @@ After EVERY phase transition, update `{docs_root}/00-state.md`. This is your per
 - bug_tier: {0 | 1 | 2 | 3 | 4 | null}        # set at Phase 0a Step 7 for type: fix | hotfix; null otherwise
 - bug_tier_source: {auto | operator | architect-promote | null}  # how the tier was set; null for non-bug runs
 - logs_mode: {local|obsidian}              # resolved at boot from manifest; persisted here for recovery
+- events_file: {00-execution-events.jsonl|00-execution-events.md}  # resolved at boot from logs_mode; persisted for recovery
 - docs_root: {full absolute path}          # fully resolved session-docs path for this run — all file refs use this
+- operator_language: {en|es|pt|fr|de|...} # ISO 639-1 code; detected at Phase 0a Step 1d; default en
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -434,7 +475,7 @@ After EVERY phase transition, update `{docs_root}/00-state.md`. This is your per
 ## Recovery Instructions
 If reading this after context compaction:
 1. Read this file for pipeline state — use `docs_root` from § Current State for all file paths (do not re-derive from manifest)
-2. Read 00-execution-events.jsonl for timing (or use `/trace {feature}`)
+2. Read `{events_file}` for timing (or use `/trace {feature}`)
 3. {exactly what to do next}
 ```
 
@@ -560,6 +601,18 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    This ensures session-docs exist before any deep investigation begins. If the task is later classified as Tier 0 (Step 7), delete the session-docs directory — Tier 0 does not use session-docs.
 
    When `logs_mode` is `"obsidian"`, include YAML frontmatter per the Frontmatter Injection rules above.
+
+1d. **MANDATORY — Detect operator language.**
+
+   Analyze the operator's first message to determine their chat language. Store the result as `operator_language` (ISO 639-1 code: `es`, `en`, `pt`, `fr`, `de`, etc.).
+
+   Detection rules:
+   - Infer the language from the operator's message text (the original request, not a skill payload).
+   - If the message is ambiguous or too short to determine (e.g., "fix auth bug"), default to `en`.
+   - If invoked via a skill (Direct Mode Task payload), detect from the last conversational message before the skill, or default to `en`.
+   - The operator can override at any time ("responde en español", "switch to English"). Update `operator_language` in `00-state.md` under `## Current State` accordingly.
+
+   Write `operator_language: {code}` in `00-state.md` under `## Current State` (alongside the existing fields). The boot acknowledgment line has already been emitted at this point (boot completes before Phase 0a), so `operator_language` is recorded only in `00-state.md` — not in the boot line.
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `session-docs/{feature-name}/00-knowledge-context.md`:
    ```markdown
@@ -1064,25 +1117,26 @@ Routing to architect to revise plan (iteration {N}/3)
 
 ```bash
 # Check idempotency first
-if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==1))" 2>/dev/null || echo 0)" = "0" ]; then
+if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==1))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
     python3 -c "import json,sys; print(json.dumps({'stage':1,'label':'analysis','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{1-line summary ≤120 chars, no quotes}" "{project root}" | bash ~/.claude/hooks/notify-stage.sh
   else
     # append stage.notify.skipped with reason: wrapper-missing
-    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+    cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":1,"reason":"wrapper-missing"}
 JSONL
   fi
   # append stage.notify regardless of wrapper outcome
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":1,"label":"analysis","status":"{complete|FAILED}","summary":"{1-line summary}"}
 JSONL
 else
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":1,"reason":"already-fired"}
 JSONL
 fi
 ```
+> **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, the idempotency `python3` command reads through the `.md` wrapper. Wrap the file read with the `events_content` extraction pattern before piping to the JSON parse (see `## Content extraction for dual-format events file`).
 
 **Rewrite TL;DR** (row 5 of §5.2): On `pass` or `concerns`: `Now`: "STAGE-GATE-1 about to emit." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: any concerns (rules 3/4/5/6 hits, if any). On `fail`: `Now`: "Architect revising plan (iter N/3) — rules {1, 2} failing." `Open issues`: failing rule numbers and affected PRs.
 
@@ -1286,23 +1340,24 @@ Next: verify (tester + qa in parallel)
 
 ```bash
 # Fire only when this is the last PR's Phase 2 in the last round
-if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==2))" 2>/dev/null || echo 0)" = "0" ]; then
+if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==2))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
     python3 -c "import json,sys; print(json.dumps({'stage':2,'label':'implementation batch','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N} PRs implemented across {M} rounds. {K} files touched." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
   else
-    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+    cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":2,"reason":"wrapper-missing"}
 JSONL
   fi
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":2,"label":"implementation batch","status":"{complete|FAILED}","summary":"{1-line summary}"}
 JSONL
 else
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":2,"reason":"already-fired"}
 JSONL
 fi
 ```
+> **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, use the `events_content` extraction pattern before the `python3` idempotency check (see `## Content extraction for dual-format events file`).
 
 ### Phase 2.5 — Constraint Reconciliation (between Phase 2 and Phase 3)
 
@@ -1335,7 +1390,7 @@ Count the constraints and classify each as **trivial** or **non-trivial**:
 
 #### Step 3 — Log
 
-Append a `phase.end` event to `00-execution-events.jsonl` with `phase: "2.5-reconciliation"`, `status: "success"`, and `extra: {"trivial": N, "non_trivial": N, "dropped_ac": N}`.
+Append a `phase.end` event to `{docs_root}/{events_file}` with `phase: "2.5-reconciliation"`, `status: "success"`, and `extra: {"trivial": N, "non_trivial": N, "dropped_ac": N}`.
 
 If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .non_trivial: 0` and proceed to Phase 3.
 
@@ -1445,7 +1500,7 @@ After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceab
 
 Update `00-state.md` with the Phase 3.5 result. If gate passes, write a single line in Hot Context: `Acceptance gate: {N}/{N} AC verified, {test count} tests, security {clean|N findings}`. Also persist `last_tests_count: {N}` in Hot Context for the test-ratchet baseline used by the next iteration (if any).
 
-When the test-ratchet step matters (subsequent iterations), append a `gate.fail` or `gate.pass` event to `00-execution-events.jsonl` with `extra: {"tests_before": last_tests_count, "tests_after": tests_count, "tests_deleted": N}` so the trace records ratchet outcomes for offline analysis.
+When the test-ratchet step matters (subsequent iterations), append a `gate.fail` or `gate.pass` event to `{docs_root}/{events_file}` with `extra: {"tests_before": last_tests_count, "tests_after": tests_count, "tests_deleted": N}` so the trace records ratchet outcomes for offline analysis.
 
 **Report to user:**
 ```
@@ -1531,23 +1586,24 @@ If verdict is `concerns`, list each concern as one line in the report so the use
 
 ```bash
 # Fire only when this is the last PR's Phase 3.6 (or 3.5) in the last round
-if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
+if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
     python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} PRs. Tests: {sum}. Security: {clean|N findings}." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
   else
-    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+    cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":3,"reason":"wrapper-missing"}
 JSONL
   fi
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":3,"label":"verify","status":"{complete|FAILED}","summary":"{1-line summary}"}
 JSONL
 else
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":3,"reason":"already-fired"}
 JSONL
 fi
 ```
+> **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, use the `events_content` extraction pattern before the `python3` idempotency check (see `## Content extraction for dual-format events file`).
 
 ---
 
@@ -1665,7 +1721,7 @@ Next: internal review (or Phase 5 if skipped)
 | `type: hotfix` AND single-file fix | **No** — keep hotfixes fast. |
 | `complexity: complex`, OR diff > 50 lines, OR > 2 files, OR security-sensitive | **Yes** |
 
-When skipped, log `phase.end` to `00-execution-events.jsonl` with `phase: "4.5-internal-review"`, `status: "skipped"`, and proceed to Phase 5.
+When skipped, log `phase.end` to `{docs_root}/{events_file}` with `phase: "4.5-internal-review"`, `status: "skipped"`, and proceed to Phase 5.
 
 **Invoke via Task tool** with context:
 - Feature name for session-docs
@@ -1704,23 +1760,24 @@ The th-orchestrator passes `04-internal-review.md` content to `delivery` for opt
 **Emit Stage 4 toast (per `## Stage-end notification protocol`).** After Phase 4.5 returns (or is skipped), before emitting the STAGE-GATE-3 STOP block. Status: `complete` on success; `FAILED` if delivery push rejected; `BLOCKED` if `status: paused_for_amend`.
 
 ```bash
-if [ "$(python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==4))" 2>/dev/null || echo 0)" = "0" ]; then
+if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==4))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
     python3 -c "import json,sys; print(json.dumps({'stage':4,'label':'delivery','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED|BLOCKED}" "{feature}" "Branch {branch}. Version {old} to {new}. Internal review: {C}C/{S}S/{N}N." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
   else
-    cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+    cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":4,"reason":"wrapper-missing"}
 JSONL
   fi
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify","feature":"{feature}","stage":4,"label":"delivery","status":"{complete|FAILED|BLOCKED}","summary":"{1-line summary}"}
 JSONL
 else
-  cat >> session-docs/{feature}/00-execution-events.jsonl <<JSONL
+  cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":4,"reason":"already-fired"}
 JSONL
 fi
 ```
+> **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, use the `events_content` extraction pattern before the `python3` idempotency check (see `## Content extraction for dual-format events file`).
 
 **Cost:** one reviewer invocation (~5-15K tokens depending on diff size). **Saves:** human review time and merge churn when the PR has obvious issues. The bound is the diff-size gate above — never run on trivial changes.
 
@@ -2095,7 +2152,7 @@ The Phase 6 final-state handoff prompts the user to run `/compact` between featu
 
 **Trigger:** when, at the end of any phase, you estimate the cumulative th-orchestrator context above ~40% of the model's effective window for this session (Anthropic's harness-design article: *"long-context scenarios collapse agent success from 40-50% to under 10% without proper state management"* — the inflection is around 40-50%, so 40% is the conservative trigger).
 
-How to estimate cheaply: sum `tokens_in + tokens_out` from the JSONL events written so far for this pipeline (`jq -s 'map(select(.feature=="{name}")) | map(.tokens_in // 0 + .tokens_out // 0) | add' session-docs/{name}/00-execution-events.jsonl`), plus a flat 5K for prompt/system overhead. For Opus 4.7 1M context, 40% ≈ 400K tokens — generous; this rarely triggers on standard pipelines but matters on complex iterations.
+How to estimate cheaply: sum `tokens_in + tokens_out` from the JSONL events written so far for this pipeline (`jq -s 'map(select(.feature=="{name}")) | map(.tokens_in // 0 + .tokens_out // 0) | add' {docs_root}/{events_file}`), plus a flat 5K for prompt/system overhead. For Opus 4.7 1M context, 40% ≈ 400K tokens — generous; this rarely triggers on standard pipelines but matters on complex iterations. In obsidian mode, extract JSONL content from the `.md` wrapper before piping to `jq` (see `## Content extraction for dual-format events file`).
 
 **Action when triggered (between phases, never mid-phase):**
 
@@ -2117,7 +2174,7 @@ How to estimate cheaply: sum `tokens_in + tokens_out` from the JSONL events writ
    The pipeline state is durable. Either choice continues cleanly.
    ```
 3. **Stop after the prompt.** Do NOT auto-decide between `/compact` and `/clear` — the user owns that. Wait for the user's response (or for them to run a slash command) before starting the next phase.
-4. Log a `compaction.trigger` event to `00-execution-events.jsonl`:
+4. Log a `compaction.trigger` event to `{docs_root}/{events_file}`:
    ```json
    {"ts":"...","event":"compaction.trigger","feature":"{name}","phase":"end-of-{phase}","extra":{"tokens_estimated":N,"window_pct":42}}
    ```
@@ -2126,9 +2183,9 @@ This trigger never fires more than once per phase boundary. If the user opts to 
 
 ---
 
-## Pipeline Metrics (DEPRECATED — replaced by 00-pipeline-summary.md + 00-execution-events.jsonl)
+## Pipeline Metrics (DEPRECATED — replaced by 00-pipeline-summary.md + {events_file})
 
-> **Deprecation notice (2026-05-21).** The `pipeline-metrics.json` artifact described in this section was specified but never written in practice. Empirical check across all real pipelines showed **0 files of this name** while the spec demanded one per run. The canonical observability stack is now `00-pipeline-summary.md` (human-readable, "Pipeline Summary Protocol" below) + `00-execution-events.jsonl` (machine-readable, "Execution Events JSONL" below). The schema is retained as historical reference until a follow-up cleanup PR removes it. **Do NOT write `pipeline-metrics.json` in new pipelines.**
+> **Deprecation notice (2026-05-21).** The `pipeline-metrics.json` artifact described in this section was specified but never written in practice. Empirical check across all real pipelines showed **0 files of this name** while the spec demanded one per run. The canonical observability stack is now `00-pipeline-summary.md` (human-readable, "Pipeline Summary Protocol" below) + `{events_file}` (machine-readable, "Execution Events JSONL" below — `00-execution-events.jsonl` in local mode, `00-execution-events.md` in obsidian mode). The schema is retained as historical reference until a follow-up cleanup PR removes it. **Do NOT write `pipeline-metrics.json` in new pipelines.**
 
 At the end of every pipeline run (single or batch), write metrics to `session-docs/{feature-name}/pipeline-metrics.json`. The schema below is the **canonical** format — agents and skills that consume metrics expect every field.
 
@@ -2195,9 +2252,9 @@ This data enables trend analysis: which types of issues need more iterations, wh
 
 ---
 
-## Done.yml (DEPRECATED — replaced by pipeline.end status in 00-execution-events.jsonl)
+## Done.yml (DEPRECATED — replaced by pipeline.end status in {events_file})
 
-> **Deprecation notice (2026-05-21).** The `done.yml` artifact described in this section was specified but never written in practice (0 files across all real pipelines). Its "did this ship clean?" question is now answered by the trailing `pipeline.end` event's `status` field plus the `gate.pass`/`gate.fail` history in `00-execution-events.jsonl`. The schema is retained as historical reference until a follow-up cleanup PR removes it. **Do NOT write `done.yml` in new pipelines.**
+> **Deprecation notice (2026-05-21).** The `done.yml` artifact described in this section was specified but never written in practice (0 files across all real pipelines). Its "did this ship clean?" question is now answered by the trailing `pipeline.end` event's `status` field plus the `gate.pass`/`gate.fail` history in `{events_file}` (`00-execution-events.jsonl` in local mode, `00-execution-events.md` in obsidian mode). The schema is retained as historical reference until a follow-up cleanup PR removes it. **Do NOT write `done.yml` in new pipelines.**
 
 Anthropic's harness-design article puts it bluntly: *"define completion criteria in external, testable files"*. The th-orchestrator currently decides "the pipeline is done" implicitly by walking through Phases 3.5 and 3.6 — there is no single artifact you can `cat` and conclude "yes, this shipped clean". `done.yml` fixes that.
 
@@ -2286,7 +2343,7 @@ Both must agree. If Phase 3.5 says proceed but `done.yml` evaluates to `false` a
 
 ## Execution Events JSONL (canonical observability — mandatory)
 
-`session-docs/{feature-name}/00-execution-events.jsonl` is the **canonical machine-readable trace of the pipeline.** Append one JSON object per line, append-only, never rewritten. Coupled with `00-pipeline-summary.md` (see "Pipeline Summary Protocol" below), this is the observability stack — the legacy `pipeline-metrics.json` and `done.yml` artifacts are deprecated (see their banners below).
+`{docs_root}/{events_file}` is the **canonical machine-readable trace of the pipeline.** In local mode (`{events_file}` = `00-execution-events.jsonl`) this is a raw JSONL file; in obsidian mode (`{events_file}` = `00-execution-events.md`) the same JSONL content is wrapped in a markdown code fence so Obsidian indexes the file. Append one JSON object per line, append-only, never rewritten. Coupled with `00-pipeline-summary.md` (see "Pipeline Summary Protocol" below), this is the observability stack — the legacy `pipeline-metrics.json` and `done.yml` artifacts are deprecated (see their banners below).
 
 This is the audit log Anthropic recommends in the harness-design article: *"Wire tracing in on day one. Retrofitting observability is painful and the place where real agent bugs hide."* The JSONL format is queryable with `jq`, supports streaming, and survives compaction (it lives on disk, not in your context).
 
@@ -2359,22 +2416,58 @@ Every line is a JSON object with these fields:
 Append one line at a time using a here-doc to a `>>` redirect, e.g.:
 
 ```bash
-cat >> session-docs/{feature-name}/00-execution-events.jsonl <<JSONL
+cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"phase.end","feature":"{feature-name}","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"summary":"..."}
 JSONL
 ```
 
+### Content extraction for dual-format events file
+
+When reading the events file for `jq` or `python3` processing, use this extraction pattern to handle both `.md` (obsidian mode) and `.jsonl` (local mode) formats:
+
+- For `.md` files: extract content between the opening ` ```jsonl ` fence and the closing ` ``` ` fence (excluding the fence lines themselves). Skip frontmatter and the `# Execution Events` heading.
+- For `.jsonl` files: read the file directly — no extraction needed.
+
+Conceptual helper (the th-orchestrator applies this logic when constructing read commands):
+
+```bash
+events_content() {
+  if [[ "$1" == *.md ]]; then
+    sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' "$1"
+  else
+    cat "$1"
+  fi
+}
+```
+
+In practice, prefix `jq` and `python3 -c` commands with appropriate content extraction when operating on `{docs_root}/{events_file}` in obsidian mode. In local mode, the commands work unchanged on the raw `.jsonl` file.
+
+**Example — reading events in both modes:**
+
+```bash
+# Obsidian mode: extract JSONL content from inside the code fence, then pipe to jq
+sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' {docs_root}/{events_file} | jq -s '...'
+
+# Local mode: pipe directly to jq
+jq -s '...' {docs_root}/{events_file}
+```
+
+The idempotency checks and stage-notify dedup patterns (see `## Stage-end notification protocol`) follow this extraction pattern when `{events_file}` ends in `.md`.
+
 Do NOT pretty-print — one JSON object per line, no array wrapper, no trailing comma. This keeps the file streamable and easily filterable with `jq`:
 
 ```bash
-# How long did design take across all features?
-jq -s 'map(select(.event=="phase.end" and .phase=="1-design")) | map(.duration_ms) | add' session-docs/*/00-execution-events.jsonl
+# How long did design take across all features? (local mode — raw .jsonl)
+jq -s 'map(select(.event=="phase.end" and .phase=="1-design")) | map(.duration_ms) | add' {docs_root}/*/00-execution-events.jsonl
 
-# Which features had iterations?
-jq -s 'map(select(.event=="iteration.start")) | group_by(.feature) | map({feature: .[0].feature, iterations: length})' session-docs/*/00-execution-events.jsonl
+# Same query in obsidian mode — extract content from .md wrapper first
+sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' {docs_root}/*/00-execution-events.md | jq -s 'map(select(.event=="phase.end" and .phase=="1-design")) | map(.duration_ms) | add'
+
+# Which features had iterations? (local mode)
+jq -s 'map(select(.event=="iteration.start")) | group_by(.feature) | map({feature: .[0].feature, iterations: length})' {docs_root}/*/00-execution-events.jsonl
 ```
 
-The `00-execution-events.jsonl` is the canonical observability artifact — machine-readable and queryable with `jq`. The former `00-execution-log.md` markdown table has been retired; the JSONL is the single source of truth for timing and phase events.
+`{docs_root}/{events_file}` is the canonical observability artifact — machine-readable and queryable with `jq`. The former `00-execution-log.md` markdown table has been retired; the JSONL content (whether in a raw `.jsonl` or inside a `.md` code fence) is the single source of truth for timing and phase events.
 
 ### Populating the `tools` field on `phase.end`
 
@@ -2449,7 +2542,7 @@ The **TL;DR** is the contract: a human running `cat session-docs/*/00-pipeline-s
 
 ### Counts derivation
 
-All numbers come from `00-execution-events.jsonl` — never re-invent them by walking session-docs. The summary is a render of the trace, not an independent source of truth.
+All numbers come from `{docs_root}/{events_file}` — never re-invent them by walking session-docs. The summary is a render of the trace, not an independent source of truth. In obsidian mode, extract JSONL content from the `.md` wrapper before parsing (see `## Content extraction for dual-format events file`).
 
 - Phase duration → sum of `duration_ms` on `phase.end` events for that phase.
 - Iterations → count of `iteration.start` events.
@@ -2471,7 +2564,7 @@ The Phase Timeline renderer adapts to the `type` field in `00-state.md`:
 
 ### Failure modes — never block the pipeline on summary errors
 
-- Write fails → log to `00-execution-events.jsonl` and continue. Re-attempt at next phase transition.
+- Write fails → log to `{docs_root}/{events_file}` and continue. Re-attempt at next phase transition.
 - Counts mismatch the JSONL → re-read the JSONL and re-derive. The JSONL wins.
 - Trace JSONL is missing → render the summary with `(no trace recorded)` placeholders. Do not crash.
 
@@ -2530,7 +2623,7 @@ Before constructing the payload, the th-orchestrator MUST:
 
 ### JSONL event schema
 
-Two new event types appended to `00-execution-events.jsonl`:
+Two new event types appended to `{docs_root}/{events_file}`:
 
 ```jsonl
 {"ts":"<ISO>","event":"stage.notify","feature":"<name>","stage":1,"label":"analysis","status":"complete","summary":"<1-line>"}
@@ -2539,10 +2632,14 @@ Two new event types appended to `00-execution-events.jsonl`:
 
 ### Idempotency (dedup across `/recover` and context compaction)
 
-Before firing a toast for stage N, check `00-execution-events.jsonl` for a prior `stage.notify` event with the same `stage` field using a structured JSON parse (not grep — unanchored regex can false-positive on summary text):
+Before firing a toast for stage N, check `{docs_root}/{events_file}` for a prior `stage.notify` event with the same `stage` field using a structured JSON parse (not grep — unanchored regex can false-positive on summary text):
 
 ```bash
-python3 -c "import json; print(sum(1 for l in open('session-docs/{feature}/00-execution-events.jsonl') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==N))" 2>/dev/null || echo 0
+# Local mode (.jsonl):
+python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==N))" 2>/dev/null || echo 0
+
+# Obsidian mode (.md) — extract content from code fence first:
+sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' {docs_root}/{events_file} | python3 -c "import json,sys; print(sum(1 for l in sys.stdin if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==N))" 2>/dev/null || echo 0
 ```
 
 If the count is non-zero, skip the toast and append `stage.notify.skipped` with `reason: already-fired`. This prevents duplicate toasts when the th-orchestrator is resumed after context compaction or `/recover`.
@@ -2895,6 +2992,12 @@ On failure or iteration:
 - What you expect from this agent
 - If iterating: what failed and what needs to change
 
+**Language propagation.** Every agent dispatch prompt MUST include the following instruction:
+
+> Operator language: {operator_language}. Write session-docs prose in this language; structural elements (headers, field names, status-block keys) stay in English.
+
+This ensures agents follow the "session-docs prose follows the operator's chat language" Voice rule even though they never see the operator's original messages. The `operator_language` value comes from Phase 0a Step 1d detection or from `00-state.md` on recovery. When `operator_language` is `en`, the instruction still applies (agents default to English anyway, but the explicit instruction prevents ambiguity).
+
 ### Status block expectations:
 Every agent returns a compact status block as its final message. You use this to gate phases without re-reading session-docs. See agent Return Protocol for format.
 
@@ -2962,7 +3065,11 @@ When context is compacted (auto or manual), recovery is simple because state liv
 
 1. **Read `session-docs/{feature-name}/00-state.md`** — this has your pipeline checkpoint: current phase, iteration count, agent results, hot context, and exact recovery instructions.
 2. **Read `session-docs/batch-progress.md`** (if batch) — for multi-task state.
-3. **Read `session-docs/{feature-name}/00-execution-events.jsonl`** — for timing and what ran (or use `/trace {feature}`).
+3. **Read `{docs_root}/{events_file}`** — for timing and what ran (or use `/trace {feature}`). The `events_file` value is stored in `00-state.md` `## Current State`; recover it from there (see `events_file` recovery below).
 4. **Follow the Recovery Instructions** in `00-state.md` — they tell you exactly what to do next.
 
 **Do NOT re-read all session-docs.** The state file has everything you need to resume. Only read specific agent outputs if you need to debug a failure.
+
+**`operator_language` recovery.** When recovering from `00-state.md`, read `operator_language` from `## Current State`. If the field does not exist (legacy pipeline), default to `en`. Apply the recovered value to all subsequent agent dispatch prompts.
+
+**`events_file` recovery.** When recovering from `00-state.md`, read `events_file` from `## Current State`. If the field does not exist (legacy pipeline), re-derive it from `logs_mode`: `obsidian` → `00-execution-events.md`; `local` → `00-execution-events.jsonl`.
