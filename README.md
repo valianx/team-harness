@@ -85,6 +85,7 @@ After install, open Claude Code. The entry points are:
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
+| [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |
 
 ---
