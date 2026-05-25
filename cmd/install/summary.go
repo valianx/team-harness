@@ -60,10 +60,10 @@ func printSummary(claudeJSONBackup string, mem MemoryMCPChoice, context7Preserve
 }
 
 // countInstalledAssets counts the number of agent files (installed under an
-// "agents" path segment), skill files (installed under a "commands" path
-// segment), and hook files (installed under a "hooks" path segment) across all
-// outcome buckets. A file is counted only once regardless of which bucket it
-// landed in.
+// "agents" path segment), skill files (installed under a "skills" or "commands"
+// path segment), and hook files (installed under a "hooks" path segment) across
+// all outcome buckets. A file is counted only once regardless of which bucket
+// it landed in.
 func countInstalledAssets() (agents, skills, hooks int) {
 	all := make([]string, 0, len(stats.Installed)+len(stats.Updated)+len(stats.Unchanged))
 	all = append(all, stats.Installed...)
@@ -74,7 +74,7 @@ func countInstalledAssets() (agents, skills, hooks int) {
 		switch {
 		case strings.Contains(fp, "/agents/"):
 			agents++
-		case strings.Contains(fp, "/commands/"):
+		case strings.Contains(fp, "/skills/") || strings.Contains(fp, "/commands/"):
 			skills++
 		case strings.Contains(fp, "/hooks/"):
 			hooks++

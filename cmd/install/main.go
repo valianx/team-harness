@@ -340,7 +340,7 @@ func installAgents(mode InstallMode) {
 }
 
 // installSkills copies all skill directories to ~/.claude/skills/<name>/.
-// As of v2.29.0 all skills use the directory format (skills/<name>/SKILL.md).
+// All skills use the directory format (skills/<name>/SKILL.md).
 // Legacy flat .md files in skills/ are no longer shipped.
 func installSkills() {
 	entries, err := readEmbeddedDir("skills")
