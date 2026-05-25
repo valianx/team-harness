@@ -90,7 +90,7 @@ Notifies **only** when Claude is waiting for the user. No toasts for permission 
 
 **Use this when:** you have `skipDangerousModePermissionPrompt: true` or a similar autonomy setting and don't want a Windows Action Center full of look-alike toasts. This is the new default in `hooks/config.json`.
 
-**Trade-off:** you will not be notified when a tool fails. You'll see the failure in Claude's output if you're watching — and `gate.fail` events still land in `session-docs/{feature}/00-execution-events.jsonl` for pipeline runs (queryable via `/trace <feature> --fails`).
+**Trade-off:** you will not be notified when a tool fails. You'll see the failure in Claude's output if you're watching — and `gate.fail` events still land in `session-docs/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode) for pipeline runs (queryable via `/trace <feature> --fails`).
 
 ### Preset 2 — `default-quiet` (legacy default before `ultra-quiet`)
 

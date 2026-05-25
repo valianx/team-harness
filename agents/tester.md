@@ -639,7 +639,7 @@ When re-invoked for gap coverage (from Phase 3 coverage gate), the task payload 
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
 
 ---
 

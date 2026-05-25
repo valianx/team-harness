@@ -69,7 +69,8 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 - `session-docs/{feature}/02-task-list.md` — PR table with Given/When/Then AC per PR and `Status:` field
 - `session-docs/{feature}/01-plan-review.md` — plan-reviewer verdict
 - `session-docs/{feature}/00-state.md` — live pipeline state (TL;DR + phase + agent results)
-- `session-docs/{feature}/00-execution-events.jsonl` — append-only JSONL trace
+- `session-docs/{feature}/00-execution-events.jsonl` — append-only JSONL trace (local mode)
+- `session-docs/{feature}/00-execution-events.md` — same trace wrapped in YAML frontmatter + code fence (obsidian mode)
 - `session-docs/{feature}/00-pipeline-summary.md` — human-readable rollup
 
 ---

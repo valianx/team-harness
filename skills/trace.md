@@ -33,7 +33,7 @@ Analyze the input: $ARGUMENTS
 
 ```
 /trace <feature-name>           Print 00-pipeline-summary.md verbatim (default mode)
-/trace <feature-name> --jsonl   Tail the last 30 lines of 00-execution-events.jsonl
+/trace <feature-name> --jsonl   Tail the last 30 events (auto-detects .md or .jsonl format)
 /trace <feature-name> --tools   Aggregate tool usage across the pipeline
 /trace <feature-name> --fails   Filter to failures, dispatch issues, iterations
 ```
@@ -52,7 +52,8 @@ For every mode, the two source artifacts are:
 
 ```
 session-docs/{feature-name}/00-pipeline-summary.md
-session-docs/{feature-name}/00-execution-events.jsonl
+session-docs/{feature-name}/00-execution-events.md    (obsidian mode)
+session-docs/{feature-name}/00-execution-events.jsonl  (local mode)
 ```
 
 These are written by the **th-orchestrator** during pipeline runs (see `agents/th-orchestrator.md` → "Execution Events JSONL" + "Pipeline Summary Protocol"). If either is missing, the pipeline ran before observability was wired up or was interrupted before the th-orchestrator could write it.
@@ -75,7 +76,7 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
 
 2. Read the file and print it verbatim.
 
-3. If `session-docs/{feature-name}/00-execution-events.jsonl` also exists, append at the bottom:
+3. If `session-docs/{feature-name}/00-execution-events.md` or `session-docs/{feature-name}/00-execution-events.jsonl` exists, append at the bottom:
    ```
    ---
    For raw events: /trace {feature-name} --jsonl
@@ -87,11 +88,14 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
 
 ## `--jsonl` mode — raw events
 
-1. Glob-check `session-docs/{feature-name}/00-execution-events.jsonl`. If absent, report:
-   ```
-   No event trace recorded for '{feature-name}'.
-   ```
-   Exit cleanly.
+1. Detect the events file:
+   1. Use Glob to check for `session-docs/{feature-name}/00-execution-events.md`. If found, use it (`events_file = ...md`).
+   2. If not found, check for `session-docs/{feature-name}/00-execution-events.jsonl`. If found, use it (`events_file = ...jsonl`).
+   3. If neither exists, report:
+      ```
+      No event trace recorded for '{feature-name}'.
+      ```
+      Exit cleanly.
 
 2. Print header:
    ```
@@ -99,8 +103,12 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
    ===============================
    ```
 
-3. Use Bash to run:
+3. Use Bash to extract and tail the events. For the `.md` variant, strip the YAML frontmatter and code fence wrapper before tailing:
    ```bash
+   # For .md: extract JSONL content from inside the ```jsonl fence
+   sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' session-docs/{feature-name}/00-execution-events.md | tail -n 30
+
+   # For .jsonl: read directly
    tail -n 30 session-docs/{feature-name}/00-execution-events.jsonl
    ```
 
@@ -108,16 +116,26 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
 
 5. Append at the bottom:
    ```
-   Full trace: cat session-docs/{feature-name}/00-execution-events.jsonl
+   Full trace: cat {events_file}
    ```
+   (where `{events_file}` is the resolved path, e.g., `session-docs/{feature-name}/00-execution-events.md`)
 
 ---
 
 ## `--tools` mode — tool effectiveness aggregate
 
-1. Verify both `00-pipeline-summary.md` and `00-execution-events.jsonl` exist. If JSONL is missing, fall back to printing only the `## Tool Effectiveness` section of the summary (Read the summary, slice between `## Tool Effectiveness` and the next `## ` heading).
+1. Verify both `00-pipeline-summary.md` and the events file (`00-execution-events.md` or `00-execution-events.jsonl`) exist. If the events file is missing, fall back to printing only the `## Tool Effectiveness` section of the summary (Read the summary, slice between `## Tool Effectiveness` and the next `## ` heading).
 
-2. If `jq` is available, aggregate per-agent tool usage from the JSONL:
+   Detect events file: check for `.md` first (Glob), then `.jsonl`.
+
+2. If `jq` is available, aggregate per-agent tool usage from the events content:
+
+   For the `.md` variant, extract JSONL content first:
+   ```bash
+   sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' session-docs/{feature-name}/00-execution-events.md | jq -s '...'
+   ```
+
+   For the `.jsonl` variant:
    ```bash
    jq -s '
      map(select(.event == "phase.end" and .tools)) |
@@ -160,10 +178,22 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
 
 ## `--fails` mode — failures, dispatch issues, iterations
 
-1. Verify `00-execution-events.jsonl` exists. If absent, report and exit.
+1. Detect the events file: check for `00-execution-events.md` first (Glob), then `00-execution-events.jsonl`. If neither exists, report and exit.
 
-2. If `jq` is available, filter the trace:
+2. If `jq` is available, filter the trace. For the `.md` variant, extract content first:
    ```bash
+   # .md variant
+   sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' session-docs/{feature-name}/00-execution-events.md | jq -s '
+     map(select(
+       .event == "dispatch.blocked" or
+       .event == "iteration.start"   or
+       .event == "gate.fail"         or
+       .event == "policy.deny"       or
+       (.event == "phase.end" and .status != "success")
+     ))
+   '
+
+   # .jsonl variant
    jq -s '
      map(select(
        .event == "dispatch.blocked" or
@@ -199,10 +229,15 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
      • {ts} ({phase}): {summary}
    ```
 
-4. If `jq` is not available, fall back to a plain `grep`-style filter:
+4. If `jq` is not available, fall back to a plain `grep`-style filter against whichever events file was found:
    ```bash
    grep -E '"event":"(dispatch\.blocked|iteration\.start|gate\.fail|policy\.deny)"' \
-        session-docs/{feature-name}/00-execution-events.jsonl
+        {events_file}
+   ```
+   For the `.md` variant, pipe through `sed` first to strip the frontmatter and fence:
+   ```bash
+   sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' session-docs/{feature-name}/00-execution-events.md \
+     | grep -E '"event":"(dispatch\.blocked|iteration\.start|gate\.fail|policy\.deny)"'
    ```
    Print results verbatim with a header.
 
@@ -220,7 +255,7 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
 ## What `/trace` does NOT do
 
 - It does not write or modify any file under `session-docs/`. Strict read-only contract — same rule as `/status`.
-- It does not aggregate across multiple features. For cross-pipeline analysis, run `jq` manually over `session-docs/*/00-execution-events.jsonl`. A future `/metrics` skill may add aggregation once we have 5-10 traces to validate the shape.
+- It does not aggregate across multiple features. For cross-pipeline analysis, run `jq` manually over `session-docs/*/00-execution-events.jsonl` (local mode) or `session-docs/*/00-execution-events.md` (obsidian mode). A future `/metrics` skill may add aggregation once we have 5-10 traces to validate the shape.
 - It does not modify or invalidate the trace. If the JSONL is corrupted, the renderer skips bad lines; it never deletes or rewrites them.
 - It does not invoke any other agent. Read-only file reads + `jq` / `tail` / `grep` via Bash only.
 
@@ -237,4 +272,4 @@ These are written by the **th-orchestrator** during pipeline runs (see `agents/t
 | "What failed and why?" | `/trace <feature> --fails` |
 | "Show me the raw event log." | `/trace <feature> --jsonl` |
 
-`/status <feature>` is the deep narrative; `/trace <feature>` is the rollup. They read the same JSONL plus, in `/trace`'s case, the rendered summary MD.
+`/status <feature>` is the deep narrative; `/trace <feature>` is the rollup. They read the same events file (`.md` or `.jsonl` depending on mode) plus, in `/trace`'s case, the rendered summary MD.

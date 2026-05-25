@@ -478,7 +478,7 @@ Scaffold the GitHub Actions re-review reminder workflow into the consumer repo.
 
 ## Execution Log Protocol
 
-The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly. If init runs standalone (no session-docs context), skip this step.
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly. If init runs standalone (no session-docs context), skip this step.
 
 **On start:** append `| {YYYY-MM-DD HH:MM} | init | init | started | — | — |`
 **On end:** append `| {YYYY-MM-DD HH:MM} | init | init | completed | {Nm} | {success/failed} |`

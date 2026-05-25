@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Execution events trace file uses `.md` format with YAML frontmatter and code-fenced JSONL in obsidian mode (`00-execution-events.md`); local mode unchanged (`.jsonl`). Skills `/trace` and `/status` detect both formats automatically.
+- th-orchestrator now detects operator chat language at intake and propagates it to all dispatched agents via `operator_language` field, ensuring session-docs prose follows the operator's language.
+
 ## [2.23.0] - 2026-05-24
 
 ### Added
