@@ -138,7 +138,7 @@ checks_orch = [
     ("pipeline_version field", "pipeline_version"),
     ("plan-reviewer in team", "plan-reviewer"),
     ("02-task-list.md artifact", "02-task-list.md"),
-    ("01-plan-review.md artifact", "01-plan-review.md"),
+    ("Plan Review appended to 01-plan.md", "01-plan.md § Plan Review"),
     ("stage.gate event", "stage.gate"),
     ("stage.gate.release event", "stage.gate.release"),
     ("stage.gate.skipped event", "stage.gate.skipped"),
@@ -375,7 +375,7 @@ if pr_path.exists():
         ("forbidden pattern: previously decided", "previously decided"),
         ("forbidden pattern: inline changelog", "inline changelog"),
         ("verdict in Return Protocol", "verdict: pass | concerns | fail"),
-        ("output file path", "01-plan-review.md"),
+        ("output file path", "01-plan.md § Plan Review"),
         ("override mechanism: Plan-reviewer override", "Plan-reviewer override"),
         ("Services Touched reference (Rule 5)", "Services Touched"),
         ("read-only: no Edit on analysis files",
@@ -749,10 +749,11 @@ check("th-orchestrator.md keeps max-3 budget for plan-review round trips",
 check("th-orchestrator.md Phase 1.6 is declared inviolable",
       "Phase 1.6 is inviolable" in orchestrator_md,
       "th-orchestrator.md does not declare Phase 1.6 as inviolable")
-check("th-orchestrator.md requires 01-plan-review.md present before STAGE-GATE-1",
-      "01-plan-review.md` MUST exist" in orchestrator_md
-      or "01-plan-review.md MUST exist" in orchestrator_md,
-      "th-orchestrator.md does not require 01-plan-review.md presence before STAGE-GATE-1")
+check("th-orchestrator.md requires Plan Review section present before STAGE-GATE-1",
+      "Plan Review` section" in orchestrator_md
+      or "## Plan Review` section" in orchestrator_md
+      or "Plan Review` section with a `**Verdict:**" in orchestrator_md,
+      "th-orchestrator.md does not require Plan Review section presence before STAGE-GATE-1")
 
 # 10. th-orchestrator.md defines inline fallback when Task subagent invocation fails
 check("th-orchestrator.md defines inline fallback for plan-review subagent failures",

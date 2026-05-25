@@ -31,7 +31,7 @@ When the user wants to quickly test a technical hypothesis without full pipeline
 1. **Intake** — classify as `spike`, complexity always `simple`
 2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found.
 3. **Skip Design** — no architecture proposal needed
-4. **Write minimal `00-task-intake.md`** — just: description, what to test, success criteria
+4. **Prepare minimal spec context** — just: description, what to test, success criteria (passed inline to the implementer dispatch)
 5. **Invoke `implementer`** with: "This is a spike — write exploratory code to test: {description}. No tests needed. Focus on proving whether {hypothesis} works. Document what you found in `02-implementation.md`."
 6. **Skip Phases 3-5** (no testing, validation, delivery, or GitHub update)
 7. **Present results** to the user:
@@ -54,21 +54,21 @@ When the user wants to quickly test a technical hypothesis without full pipeline
 
 Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeline per task).
 
-**Distinction from normal pipeline mode.** Plan flow's architect output is `01-planning.md` — a task breakdown for **multi-task batch orchestration** across worktrees, with dispatch labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and size estimates. This is structurally different from `02-task-list.md`, which the architect produces in **normal pipeline mode** (single-feature, sequential PRs, per-PR ACs in Given/When/Then). The two files coexist for different consumers:
+**Distinction from normal pipeline mode.** Plan flow's architect output is `01-planning.md` — a task breakdown for **multi-task batch orchestration** across worktrees, with dispatch labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and size estimates. This is structurally different from `01-plan.md`, which the architect produces in **normal pipeline mode** (single-feature, sequential PRs, per-PR ACs in Given/When/Then). The two files coexist for different consumers:
 
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
 | `01-planning.md` | planning mode (`/plan`, `/plan plan-and-execute`) | th-orchestrator (multi-task dispatch) | break a broad scope into N parallel tasks |
-| `02-task-list.md` | design mode (normal pipeline) | implementer + qa + plan-reviewer | list of sequential PRs with per-PR ACs |
+| `01-plan.md` | design mode (normal pipeline) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List) |
 
-Inside each task dispatched by `plan-and-execute`, the child th-orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `02-task-list.md` for that task's PRs. The parent batch th-orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
+Inside each task dispatched by `plan-and-execute`, the child th-orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's PRs. The parent batch th-orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
 
 ### Planning phase (both modes)
 
 1. **Intake** — classify as `plan` or `plan-and-execute`. Do NOT move GitHub issues to "In Progress" yet.
 2. **MANDATORY — Query KG** — call `search_nodes` with 2-3 semantic queries. Write `00-knowledge-context.md` if results found.
 3. **Specify** — full SPECIFY as normal (codebase investigation, AC, scope). Update GitHub issue if `needs-specify: true`.
-4. **Design (planning mode)** — invoke `architect` in planning mode. Architect produces task breakdown in `01-planning.md`. **Does NOT produce `02-task-list.md`** — that file belongs to design mode.
+4. **Design (planning mode)** — invoke `architect` in planning mode. Architect produces task breakdown in `01-planning.md`. **Does NOT produce `01-plan.md`** — that file belongs to design mode.
 5. **Validate sizing** — read `01-planning.md`. If any task has >20 AC or looks like a full feature, re-invoke architect to split. Max 1 retry.
 6. **Create tasks** — **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier B — create an issue" and § "Tier A — list repo labels". Use the standard detection probe to set `has_gh`.
    - **gh available:** create one GitHub issue per task via `gh issue create` using **SDD issue template**. Labels from repo (`gh label list`), assignee `@me`, project board if exists. Comment on parent issue.
@@ -121,7 +121,7 @@ The Tier System modulates the Bug-fix Pipeline depth so trivial fixes skip cerem
 | Tier | Name | Phase 1 (root-cause) | Phase 2.0 (pre-fix regression test) | Phase 3 agents | Session-docs | Estimated agent runs |
 |---|---|---|---|---|---|---|
 | **0** | Trivial/Cosmetic | **Skip** | **Skip** | tester only (suite no-regress; no full audit) | **NONE** — no session-docs created | ~1 |
-| **1** | Docs/Trivial | **Skip** — no `01-root-cause.md`. th-orchestrator emits one-sentence prose plan at STAGE-GATE-1 (same surface as `type: hotfix`). | **Conditional skip** — only when there is no behavior change (see condition below). | tester (suite no-regress) only | Yes — `00-state.md`, `00-task-intake.md` | ~3 |
+| **1** | Docs/Trivial | **Skip** — no `01-root-cause.md`. th-orchestrator emits one-sentence prose plan at STAGE-GATE-1 (same surface as `type: hotfix`). | **Conditional skip** — only when there is no behavior change (see condition below). | tester (suite no-regress) only | Yes — `00-state.md`, `01-plan.md` | ~3 |
 | **2** | Light fix | Inline `01-root-cause.md` — 1 paragraph for `## Mechanism` + 1 paragraph for `## Scope of Fix`, no extended sections. Architect dispatched with `mode: light-root-cause`. | Mandatory | tester + qa | Yes — full | ~5 |
 | **3** | Standard fix | Full `01-root-cause.md` (current PR #50 default). Architect dispatched with `mode: full-root-cause`. `## Prior Art` section optional. | Mandatory | tester + qa + security | Yes — full | ~7 |
 | **4** | Critical/Security | Full `01-root-cause.md` + **mandatory `## Prior Art` section** (architect invokes `mcp__memory__search_nodes`). Architect dispatched with `mode: full-root-cause`. | Mandatory | tester + qa + security (**extended analysis** — adjacent-code surface + prior-art cross-reference) | Yes — full + prior-art | ~9 |
@@ -134,7 +134,7 @@ The Tier 1 candidate skips Phase 2.0 ONLY when ALL of these conditions hold:
 - No `*.test.*`, `*.spec.*`, or `tests/` paths touched.
 - Operator did NOT declare `[regression-test: required]`.
 
-Otherwise — UI strings (Tier 2 minimum, pragmatic not permissive), dev-tooling, test-fixture changes, etc. — Tier 1 still requires a regression test, OR the candidate is auto-promoted to Tier 2 at classification time. The conditional skip is recorded in `00-state.md` as `regression_test_status: skipped`, in the JSONL trace as `phase.skipped` with `reason: tier-1-no-behavior-change`, and in `02-task-list.md` by mutating the `<TBD-Phase-2.0>` placeholder to `<skipped — Tier 1 no-behavior-change>`.
+Otherwise — UI strings (Tier 2 minimum, pragmatic not permissive), dev-tooling, test-fixture changes, etc. — Tier 1 still requires a regression test, OR the candidate is auto-promoted to Tier 2 at classification time. The conditional skip is recorded in `00-state.md` as `regression_test_status: skipped`, in the JSONL trace as `phase.skipped` with `reason: tier-1-no-behavior-change`, and in `01-plan.md` (§ Task List) by mutating the `<TBD-Phase-2.0>` placeholder to `<skipped — Tier 1 no-behavior-change>`.
 
 #### Auto-classification signals
 
@@ -200,7 +200,7 @@ Auto-classify as Tier 0 ONLY when ALL of the following hold:
 - Signal 2: `README.md` matches Tier 1 path pattern.
 - Signal 3: none.
 - Classification: `bug_tier: 1` (auto). All touched paths match `*.md`, no test paths touched, no `[regression-test: required]` declaration → Phase 2.0 skipped.
-- Pipeline: th-orchestrator skips Phase 1 (no architect). Phase 1.6 plan-reviewer runs against the minimal `02-task-list.md`. STAGE-GATE-1 with one-sentence prose plan. Phase 2 (implementer fixes the typo). Phase 3 (tester suite no-regress + qa simplified validation). No security. ~3 agent runs total.
+- Pipeline: th-orchestrator skips Phase 1 (no architect). Phase 1.6 plan-reviewer runs against the minimal `01-plan.md`. STAGE-GATE-1 with one-sentence prose plan. Phase 2 (implementer fixes the typo). Phase 3 (tester suite no-regress + qa simplified validation). No security. ~3 agent runs total.
 
 **Example B — Tier 2, light fix:**
 - Operator request: "fix bug in .github/workflows/ci.yml — the matrix doesn't include Python 3.12"
@@ -224,20 +224,19 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 
 | Artifact | Tier 1 | Tier 2 | Tier 3 | Tier 4 | Content notes |
 |---|---|---|---|---|---|
-| `00-task-intake.md` | Yes | Yes | Yes | Yes | Bug report content + reproduction steps from operator |
+| `01-plan.md` | **Yes (always)** | Yes | Yes | Yes | Bug report content + reproduction steps (§ Review Summary) + tasks of the fix (§ Task List). Minimum 4 lines; Tier 1 may be 3 lines when Phase 2.0 is skipped (reproduce-or-cite, fix, verify) |
 | `00-state.md` | Yes | Yes | Yes | Yes | Standard schema, `type: fix`, `bug_tier: N`, `bug_tier_source` |
 | `00-execution-events.jsonl` | Yes | Yes | Yes | Yes | Standard event trace |
 | `00-pipeline-summary.md` | Yes | Yes | Yes | Yes | Standard rollup |
 | `01-root-cause.md` | **No (Phase 1 skipped)** | Yes — `mode: light-root-cause`, ≤30 lines | Yes — `mode: full-root-cause`, 1 pg max | Yes — `mode: full-root-cause` + mandatory `## Prior Art`, 1 pg max + ≤15 lines | file:line + mechanism + scope |
-| `01-plan-review.md` | Yes | Yes | Yes | Yes | plan-reviewer output, includes Rules 7 + 8 (gated on `type: fix | hotfix`) |
-| `02-task-list.md` | **Yes (always)** | Yes | Yes | Yes | Tasks of the fix. Minimum 4 lines; Tier 1 may be 3 lines when Phase 2.0 is skipped (reproduce-or-cite, fix, verify) |
+| `01-plan.md § Plan Review` | Yes | Yes | Yes | Yes | plan-reviewer appends this section; includes Rules 7 + 8 (gated on `type: fix | hotfix`) |
 | `02-regression-test.md` | **Conditional skip** — only when no behavior change (see Tier 1 condition above); otherwise Yes | Yes | Yes | Yes | tester's failing test (path + content + how to run) BEFORE implementer touches anything |
 | `02-implementation.md` | Yes | Yes | Yes | Yes | implementer's report |
 | `03-testing.md` | Yes — suite no-regress only | Yes | Yes | Yes | tester's post-fix verification |
 | `04-validation.md` | Yes — Tier 1 simplified template (≤15 lines, no per-AC table) | Yes — default bug-fix contract | Yes — default bug-fix contract | Yes — default bug-fix contract | qa validation |
 | `04-security.md` | **No** | **No** | **Yes (mandatory)** | **Yes (mandatory + extended analysis)** | security agent — see "Why security is tier-gated" below |
-| `05-delivery.md` | Yes | Yes | Yes | Yes | delivery report |
-| `06-acceptance-check.md` | Conditional (per existing complexity/iteration gate) | Conditional | Conditional | Conditional | acceptance-checker output |
+| `00-state.md § Delivery` | Yes | Yes | Yes | Yes | delivery agent appends this section |
+| `04-validation.md § Drift Analysis` | Conditional (per existing complexity/iteration gate) | Conditional | Conditional | Conditional | acceptance-checker appends this section |
 
 **Why security is tier-gated.** PR #50 set `security-sensitive: true` for every bug as a defense-in-depth override. The Tier System refines that override: security runs for every Tier 3+ bug (Tier 4 includes extended analysis cross-referencing prior art), and Tier 1 / Tier 2 fixes skip security because the impacted scope is non-functional (docs, dev-tooling, test infra). The auto-escalation rule guarantees that any fix touching a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, etc.) lands at Tier 3+ at classification time — so a Tier 1 / Tier 2 run cannot accidentally bypass security on sensitive paths. Many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information); the path-pattern auto-escalation captures these without forcing security on every typo-in-docs fix.
 
@@ -246,19 +245,19 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | Phase | Owner | Output | Notes |
 |---|---|---|---|
 | 0a Intake | th-orchestrator | `00-state.md` initial | KG session start, KG query, CLAUDE.md read, type classified as `fix`, `bug_tier` classified (1-4), `security-sensitive: true` forced for Tier 3+ |
-| 0b Specify | th-orchestrator | `00-task-intake.md` (bug-report format) | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
+| 0b Specify | th-orchestrator | Spec context (bug-report format) passed inline to architect; architect incorporates into `01-plan.md` § Review Summary | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
 | 0.5 Bootstrap | th-orchestrator | — | Same as feature flow |
 | 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
 | 1.5 Plan ratification | qa (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
-| 1.6 Plan review | plan-reviewer | `01-plan-review.md` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
-| STAGE-GATE-1 | th-orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + PR Summary from `02-task-list.md`. Tier 1: one-sentence prose plan replaces TL;DR copy |
+| 1.6 Plan review | plan-reviewer | `01-plan.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
+| STAGE-GATE-1 | th-orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + PR Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
 | **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
 | 2.5 Reconcile | th-orchestrator + qa (reconcile) | — | Same as feature flow |
 | 3 Verify | tester + qa + security (tier-gated) | `03-testing.md`, `04-validation.md`, `04-security.md` (Tier 3+) | Tier 1: tester (suite no-regress) + qa (simplified). Tier 2: tester + qa. Tier 3: tester + qa + security. Tier 4: tester + qa + security (extended analysis) |
 | 3.5 Acceptance gate | th-orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1) |
-| 3.6 Acceptance check | acceptance-checker | `06-acceptance-check.md` | Conditional per existing gates |
-| 4 Delivery | delivery | `05-delivery.md` | CHANGELOG `### Fixed`, PR title `fix(area):`, Bug Report section in PR body, `Fixes #N` |
+| 3.6 Acceptance check | acceptance-checker | `04-validation.md § Drift Analysis` | Conditional per existing gates |
+| 4 Delivery | delivery | `00-state.md § Delivery` | CHANGELOG `### Fixed`, PR title `fix(area):`, Bug Report section in PR body, `Fixes #N` |
 | 4.5 Internal review | reviewer (mode: internal) | — | Conditional per diff-size gate |
 | STAGE-GATE-3 | th-orchestrator | STOP block | ship / amend / abort |
 | 5 GitHub update | th-orchestrator | — | Comment with regression test path + Before/After (regression test omitted for Tier 1 skipped) |
@@ -272,16 +271,16 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 
 **Dispatch:** th-orchestrator invokes `tester` via Task with:
 - Feature name for session-docs
-- Pointer to `00-task-intake.md` (reproduction steps + expected behaviour + AC)
+- Pointer to `01-plan.md` (§ Review Summary — reproduction steps + expected behaviour + AC)
 - Pointer to `01-root-cause.md` (Regression Test Approach section)
 - `mode: pre-fix-regression`
-- Instruction: "Write a failing test that captures the bug described in `00-task-intake.md` reproduction steps. The test MUST fail against the current codebase. Do NOT modify any source code — test files only. Output the test path in your status block; write your summary to `02-regression-test.md`."
+- Instruction: "Write a failing test that captures the bug described in `01-plan.md` § Review Summary (reproduction steps). The test MUST fail against the current codebase. Do NOT modify any source code — test files only. Output the test path in your status block; write your summary to `02-regression-test.md`."
 
 **Gate (th-orchestrator):**
 
 | `status` | `tests_failing_as_expected` vs `tests_added` | Action |
 |---|---|---|
-| `success` | equal AND `suite_still_passing: true` | Proceed to Phase 2. Mutate `<TBD-Phase-2.0>` placeholder in `02-task-list.md` to `regression_test_path` |
+| `success` | equal AND `suite_still_passing: true` | Proceed to Phase 2. Mutate `<TBD-Phase-2.0>` placeholder in `01-plan.md` (§ Task List) to `regression_test_path` |
 | `success` | unequal OR `suite_still_passing: false` | Route back to tester; treat as iteration of Phase 2.0 (max-3) |
 | `failed` with `regression_test_status: bug-not-reproducible` | n/a | Route back to architect — root-cause is wrong. Re-run Phase 1, then Phase 2.0. Counts toward Phase 1.6 iteration budget |
 | `blocked` | n/a | Cannot author a test. Pipeline blocks with `status: blocked`; surface to operator. **No fallback** |
@@ -295,13 +294,13 @@ Documented inline in `agents/implementer.md` under `## Scope discipline for type
 Documented in `agents/plan-reviewer.md`. Fire only when the th-orchestrator's task payload declares `type: fix` or `type: hotfix`:
 
 - **Rule 7** — `01-root-cause.md` declares a `## Regression Test Approach` section with Test layer (unit / integration / e2e), Test scaffold, Failing assertion. Size cap on `01-root-cause.md` ≤120 lines (>120 = `concerns` finding).
-- **Rule 8** — every PR in `02-task-list.md` has an AC referencing the regression test path: `VERIFY: regression test exists at <path>` (or `<TBD-Phase-2.0>` before Phase 2.0 runs).
+- **Rule 8** — every PR in `01-plan.md` (§ Task List) has an AC referencing the regression test path: `VERIFY: regression test exists at <path>` (or `<TBD-Phase-2.0>` before Phase 2.0 runs).
 
 ### qa validate-mode for `type: fix | hotfix`
 
 `agents/qa.md` validate mode adds two boolean fields to the status block:
 - `regression_test_referenced: true | false` — confirms the per-AC mapping in `04-validation.md` cross-references `02-regression-test.md`
-- `reproduction_steps_validated: true | false` — confirms the AC-1 (reproduction-no-longer-bug) was checked against `00-task-intake.md` Reproduction steps
+- `reproduction_steps_validated: true | false` — confirms the AC-1 (reproduction-no-longer-bug) was checked against `01-plan.md` § Review Summary (Reproduction steps)
 
 ### Type classification — auto-detect bug-fix vs hotfix
 
@@ -353,7 +352,7 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 
 ### Session-docs artifact set (type: hotfix)
 
-Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `02-task-list.md` is **still produced** (minimum 4-line task list: reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `01-plan-review.md`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md`, `05-delivery.md`, `06-acceptance-check.md`.
+Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `01-plan.md` is **still produced** (§ Task List minimum: 4-line task list — reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `01-plan.md § Plan Review`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md`, `00-state.md § Delivery`, `04-validation.md § Drift Analysis`.
 
 ### Operator-facing surface
 
@@ -385,8 +384,8 @@ v1 detects hotfix by keyword in natural language (auto-classification + operator
 When `type: refactor`:
 
 1. **Specify** — ACs focus on `VERIFY:` format (same API, same behavior, improved structure)
-2. **Design** — architect focuses on target structure, not new features. The dual-output contract still applies: `01-architecture.md` AND `02-task-list.md` (pipeline_version 2). Per-PR ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then — both formats are accepted by the `plan-reviewer` Rule 2 regex.
-3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-PR scope from `02-task-list.md` `Files:` field still applies."
+2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline_version 2). Per-PR ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then — both formats are accepted by the `plan-reviewer` Rule 2 regex.
+3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-PR scope from `01-plan.md` (§ Task List) `Files:` field still applies."
 4. **Verify** — tester runs **existing tests first** before writing new ones. If existing tests fail → the refactor broke something. New tests only for structural improvements (e.g., new module boundaries).
 5. **Delivery** — as normal, gated by STAGE-GATE-3.
 
@@ -426,7 +425,6 @@ A dedicated pipeline for achieving **80% branch coverage service-wide**. Decompo
 
 9. **If `--modules` flag provided** --- skip decomposition, create tasks only for specified modules.
 10. **Write session-docs:**
-    - `session-docs/test-pipeline/00-task-intake.md` --- service path, stack, module list, task list, coverage baseline
     - `session-docs/test-pipeline/00-state.md` --- initial pipeline state
     - `session-docs/test-pipeline/batch-progress.md` --- task table (reusing multi-task format)
 
@@ -669,18 +667,18 @@ When Phase 3 sends tasks back:
 session-docs/
   test-pipeline/                        # th-orchestrator coordination
     00-state.md                         # pipeline checkpoint
-    00-execution-log.md                 # all agents append
-    00-task-intake.md                   # service analysis & task list
+    00-execution-events.jsonl           # event trace (th-orchestrator only)
+    01-plan.md                          # service analysis & task list (§ Review Summary + § Task List)
     batch-progress.md                   # multi-task tracking
     05-consolidation.md                 # final merged report
   test-pipeline-coverage-config/        # Round 1 blocker
-    00-execution-log.md
+    00-execution-events.jsonl
     03-testing.md
   test-pipeline-test-infra/             # Round 1 blocker (conditional)
-    00-execution-log.md
+    00-execution-events.jsonl
     03-testing.md
   test-pipeline-{module-name}/          # Round 2 per-module (one per module)
-    00-execution-log.md
+    00-execution-events.jsonl
     03-testing.md
 ```
 
@@ -706,7 +704,7 @@ When the user asks to document a service, database, API, library, infrastructure
 3. **Parse language** — `--lang <code>` flag or explicit language request. Default: `en`. The language applies to all prose in the documentation; structural elements (YAML keys, Mermaid syntax, code blocks) remain in English.
 4. **Parse folder** — `--folder <name>` flag or derived from topic name (kebab-case).
 5. **Classify doc subject** per topic: `service` | `database` | `api` | `library` | `infrastructure` | `product`. This classification guides the architect's research scope and the documenter's page structure.
-6. **Write `00-task-intake.md`** with: topics, vault path, folder, language, subject classification per topic.
+6. **Prepare spec context** with: topics, vault path, folder, language, subject classification per topic. This context is passed inline to the architect dispatch; the architect incorporates it into `01-plan.md` § Review Summary.
 7. **Write initial `00-state.md`** — `type: docs`, `phase: 0`.
 
 ### Phase 1 — Research (per topic)
@@ -817,7 +815,7 @@ Each topic gets its own session-docs subfolder pattern: `session-docs/docs-{topi
 ```
 session-docs/{feature-name}/
   00-state.md              # Pipeline state (type: docs)
-  00-task-intake.md        # Topics, vault, folder, language, subject classification
+  01-plan.md               # Topics, vault, folder, language, subject classification (§ Review Summary) + task breakdown (§ Task List)
   00-research.md           # Architect research findings
   02-documentation.md      # Documenter manifest (pages, diagrams, dispatch requests)
   04-validation.md         # QA validation report

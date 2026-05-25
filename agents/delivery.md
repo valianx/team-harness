@@ -21,7 +21,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
 - **NEVER** bump the version when the th-orchestrator passes `skip-version: true` in the task context. If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: th-orchestrator requested skip"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `00-task-intake.md` (AC list) + `04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: blocked`. The th-orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/th-orchestrator.md` "Done.yml" deprecation banner.)
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: blocked`. The th-orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/th-orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 
@@ -48,7 +48,7 @@ Formal, neutral, declarative. No enthusiasm markers, no emoji decoration, no fir
 
 4. **Ensure `.gitignore` includes `session-docs`** — check and add `/session-docs` if missing.
 
-5. **Write your output** to `session-docs/{feature-name}/05-delivery.md` when done.
+5. **Append your output** as a `## Delivery` section to `session-docs/{feature-name}/00-state.md`. If a prior `## Delivery` section exists, replace it in place.
 
 ---
 
@@ -70,7 +70,7 @@ Determine `{feature_name}` in this order:
 
 **Before doing anything else**, verify the verification stage actually passed. The th-orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the session-docs.
 
-1. Read `session-docs/{feature-name}/00-task-intake.md` and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
+1. Read `session-docs/{feature-name}/01-plan.md` § Task List and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
 2. Read `session-docs/{feature-name}/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
 3. Read `session-docs/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table.
 4. If `04-security.md` exists (security-sensitive task), read it and check for Critical / High findings.
@@ -81,7 +81,7 @@ Determine `{feature_name}` in this order:
 - `04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
 - Any expected session-doc is missing.
 
-When aborting, write `session-docs/{feature-name}/05-delivery.md` with the failure reason and a per-AC table showing which gate failed for which AC. Do NOT create a branch, do NOT commit.
+When aborting, append a `## Delivery` section to `session-docs/{feature-name}/00-state.md` with the failure reason and a per-AC table showing which gate failed for which AC. Do NOT create a branch, do NOT commit.
 
 If everything passes, continue to Step 1.
 
@@ -94,7 +94,7 @@ If everything passes, continue to Step 1.
 
 ### Step 2 — Detect GitHub issue
 
-Check `session-docs/{feature-name}/00-task-intake.md` for a `## GitHub Issue` section. If found, extract the **issue number** and fetch its metadata.
+Check `session-docs/{feature-name}/01-plan.md` § Review Summary for a `## GitHub Issue` section. If found, extract the **issue number** and fetch its metadata.
 
 **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Run the detection probe first (sets `has_gh` flag used in Step 2b). Use `gh issue view {number} --json number,title,labels,assignees,projectItems` when `has_gh=true`; fall back to curl or the local-file escape hatch when `has_gh=false`.
 
@@ -167,7 +167,7 @@ Read session-docs and extract **only knowledge that applies beyond this feature*
 
 | Source | Extract |
 |--------|---------|
-| `01-architecture.md` | Decisions with rationale, trade-offs evaluated, new patterns adopted |
+| `01-plan.md` | Decisions with rationale, trade-offs evaluated, new patterns adopted (§ Review Summary and § Architecture) |
 | `02-implementation.md` | Patterns applied that set precedent, new dependencies added, gotchas discovered |
 | `03-testing.md` | Reusable factories, testing strategies that apply to future features |
 | `04-validation.md` | System constraints discovered, validation patterns |
@@ -274,7 +274,7 @@ Example:
 If the feature was non-trivial (had >2 AC or documented significant decisions), archive the final spec for future reference:
 
 1. Create `docs/specs/` directory if it doesn't exist
-2. Copy the content of `session-docs/{feature-name}/00-task-intake.md` to `docs/specs/{feature-name}.md`
+2. Copy the `## Review Summary` section of `session-docs/{feature-name}/01-plan.md` to `docs/specs/{feature-name}.md`
 3. Add a header line: `**Status:** DELIVERED | **Date:** {date}`
 4. Stage the file: `git add docs/specs/{feature-name}.md`
 
@@ -422,13 +422,13 @@ Before staging, run the project's quality gates. Discover the commands from CLAU
 | Tests | `package.json` `scripts.test`, `make test`, `pytest`, `cargo test` | Abort, report failing tests |
 | Build (when a build step exists) | `package.json` `scripts.build`, `make build` | Abort, report build error |
 
-Run each check. If ANY fails, return `status: failed` with the command output captured in `05-delivery.md` under "DoD Failures". Do NOT proceed to commit.
+Run each check. If ANY fails, return `status: failed` with the command output captured in `00-state.md § Delivery` under "DoD Failures". Do NOT proceed to commit.
 
 If a check command does not exist in the project (e.g. no `lint` script), skip that row and note it in the delivery summary — do NOT invent a command.
 
 ### Step 9c — Acceptance Matrix
 
-Build the AC traceability matrix from `00-task-intake.md`, `03-testing.md`, `04-validation.md` and (if it exists) `04-security.md`. Save it to `session-docs/{feature-name}/acceptance-matrix.md`:
+Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `04-validation.md` and (if it exists) `04-security.md`. Save it to `session-docs/{feature-name}/acceptance-matrix.md`:
 
 ```markdown
 # Acceptance Matrix: {feature-name}
@@ -572,12 +572,12 @@ gh pr create --base main \
 
 ## Bug Report (conditional — mandatory for type: fix and type: hotfix; omit entirely otherwise)
 
-**Reported behaviour:** {1-2 sentences from 00-task-intake.md § Bug Report → Reported behaviour}
+**Reported behaviour:** {1-2 sentences from 01-plan.md § Review Summary → Bug Report → Reported behaviour}
 
-**Expected behaviour:** {1-2 sentences from 00-task-intake.md § Bug Report → Expected behaviour}
+**Expected behaviour:** {1-2 sentences from 01-plan.md § Review Summary → Bug Report → Expected behaviour}
 
 **Reproduction steps:**
-1. {step from 00-task-intake.md}
+1. {step from 01-plan.md § Review Summary}
 2. {step}
 3. ...
 
@@ -682,8 +682,8 @@ Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to v
 **Purpose.** Build the team's institutional knowledge automatically. Each completed task that passes its acceptance criteria represents a learning — what worked, what surprised, what conventions emerged — and persisting that as a `process-insight` node in the KG makes it searchable by future agents on future tasks. This is **passive capture**: no human curates the entry; the delivery agent synthesises it from the session it just witnessed.
 
 **Inputs (read-only).** Use the session-docs you already loaded in Step 0 + the artifacts from later steps:
-- `session-docs/{feature-name}/00-task-intake.md` (or the issue body) — what was asked.
-- `session-docs/{feature-name}/01-architecture.md` — what was designed; surprises, constraints, alternatives rejected.
+- `session-docs/{feature-name}/01-plan.md` § Review Summary — what was asked and approved at STAGE-GATE-1.
+- `session-docs/{feature-name}/01-plan.md` — what was designed; surprises, constraints, alternatives rejected (§ Architecture and § Review Summary).
 - `session-docs/{feature-name}/02-implementation.md` — what was actually built; deviations from the plan.
 - `session-docs/{feature-name}/03-testing.md` + `04-validation.md` — what the AC look like in practice.
 - The CHANGELOG entry you wrote in Step 7.
@@ -785,10 +785,10 @@ The th-orchestrator propagates this into the `kg_passive_capture` sub-field of t
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
-Write delivery summary to `session-docs/{feature-name}/05-delivery.md`:
+Append delivery summary as a `## Delivery` section to `session-docs/{feature-name}/00-state.md`. If a prior `## Delivery` section exists, replace it in place.
 
 ```markdown
-# Delivery Summary: {feature-name}
+## Delivery
 **Date:** {date}
 **Agent:** delivery
 **Project type:** {backend/frontend/fullstack}
@@ -845,17 +845,7 @@ Write delivery summary to `session-docs/{feature-name}/05-delivery.md`:
 
 ## Execution Log Protocol
 
-At the **start** and **end** of your work, append an entry to `session-docs/{feature-name}/00-execution-log.md`.
-
-If the file doesn't exist, create it with the header:
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
-
-**On start:** append `| {YYYY-MM-DD HH:MM} | delivery | 4-delivery | started | — | — |`
-**On end:** append `| {YYYY-MM-DD HH:MM} | delivery | 4-delivery | completed | {Nm} | {success/failed} |`
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
 
 ---
 
@@ -866,8 +856,10 @@ When invoked by the th-orchestrator via Task tool, your **FINAL message** must b
 ```
 agent: delivery
 status: success | failed | blocked | blocked-manual-push
-output: session-docs/{feature-name}/05-delivery.md
+output: session-docs/{feature-name}/00-state.md § Delivery
 summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections updated}
+context7_consult: hit:N miss:N skipped:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}
 ```
 
@@ -876,11 +868,13 @@ issues: {list of blockers, or "none"}
 ```
 agent: delivery
 status: blocked-manual-push
-output: session-docs/{feature-name}/05-delivery.md
+output: session-docs/{feature-name}/00-state.md § Delivery
 manual_action_required: true
 manual_action_file: session-docs/{feature-name}/inputs/pr-body.md
 manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1
 summary: PR not created automatically (gh unavailable). Operator paste required.
+context7_consult: hit:N miss:N skipped:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: none
 ```
 

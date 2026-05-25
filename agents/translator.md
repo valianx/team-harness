@@ -568,17 +568,7 @@ Write the full translation report to `session-docs/{feature-name}/00-translation
 
 ## Execution Log Protocol
 
-At the **start** and **end** of your work, append an entry to `session-docs/{feature-name}/00-execution-log.md`.
-
-If the file doesn't exist, create it with the header:
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
-
-**On start:** append `| {YYYY-MM-DD HH:MM} | translator | {mode} | started | — | — |`
-**On end:** append `| {YYYY-MM-DD HH:MM} | translator | {mode} | completed | {Nm} | {success/failed} |`
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
 
 ---
 
@@ -592,6 +582,7 @@ status: success | failed | blocked
 output: session-docs/{feature-name}/00-translation.md
 summary: {1-2 sentences: N strings translated across N files, i18n library used, glossary with N terms}
 context7_consult: hit:N miss:N skipped:M
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {any strings that couldn't be translated or build failures, or "none"}
 glossary: docs/glossary.md
 ```

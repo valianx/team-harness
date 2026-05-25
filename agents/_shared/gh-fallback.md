@@ -328,7 +328,7 @@ non-GitHub remote), consumers report this new status value:
 ```
 agent: delivery
 status: blocked-manual-push
-output: session-docs/{feature}/05-delivery.md
+output: session-docs/{feature}/00-state.md § Delivery
 manual_action_required: true
 manual_action_file: session-docs/{feature}/inputs/pr-body.md
 manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1

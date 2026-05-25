@@ -53,7 +53,7 @@ Used when the th-orchestrator dispatches you for **Phase 2.0** of the Bug-fix Fl
 #### Step 1 — Read the bug-report context
 
 Read the following in order:
-1. `session-docs/{feature-name}/00-task-intake.md` — Bug Report block (Reported behaviour / Expected behaviour / Reproduction steps / Observed result / Environment / AC).
+1. `session-docs/{feature-name}/01-plan.md` § Review Summary — Bug Report block (Reported behaviour / Expected behaviour / Reproduction steps / Observed result / Environment / AC).
 2. `session-docs/{feature-name}/01-root-cause.md` — `## Regression Test Approach` section (Test layer / Test scaffold / Failing assertion). For `type: hotfix` there is no `01-root-cause.md`; use the th-orchestrator's one-sentence prose plan from the STAGE-GATE-1 record (passed in the task payload).
 
 The `Test layer:` field tells you which layer reproduces the bug deterministically — unit, integration, or e2e. The `Failing assertion:` field tells you the specific assertion that fails today.
@@ -67,7 +67,7 @@ Same as default-mode Phase 0: read `CLAUDE.md`, detect the test framework, ident
 Author **one test file** (or extend an existing one) containing **one or more failing tests** that capture the bug:
 
 - **Test name describes the bug, not the fix.** Example: `should_return_404_when_user_lookup_fails_with_special_chars` (good). `should_handle_special_chars` (vague — describes a feature, not a bug).
-- **AAA pattern.** Arrange the scenario from `00-task-intake.md` reproduction steps. Act on the system. Assert the expected behaviour from the bug report.
+- **AAA pattern.** Arrange the scenario from `01-plan.md` § Review Summary reproduction steps. Act on the system. Assert the expected behaviour from the bug report.
 - **Factory pattern for mocks.** Same rule as default mode — no inline mocks.
 - **Scope.** Test files only. **Do NOT modify any source code.** The implementer in Phase 2 will modify source to make the test pass.
 
@@ -133,6 +133,7 @@ suite_still_passing: true | false
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [...]
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {blockers — e.g., "bug-not-reproducible" — or "none"}
 ```
 
@@ -287,7 +288,7 @@ Before writing any test:
 
 Tests verify the **acceptance criteria** from the spec. They are **ordered by the changed files** for dependency correctness.
 
-1. **Read the spec** — read `session-docs/{feature-name}/00-task-intake.md` (or AC passed by the th-orchestrator). Extract the full list of acceptance criteria.
+1. **Read the spec** — read `session-docs/{feature-name}/01-plan.md` § Task List (per-PR AC block) or AC passed by the th-orchestrator. Extract the full list of acceptance criteria.
 2. **Map the changes** — read session-docs and git diff to determine what was modified. List every file, service, component, or endpoint that was added or changed.
 3. **AC Coverage Mapping** — for each acceptance criterion, identify which changed file(s) implement it and which test(s) will verify it. Every AC must map to at least one test. If an AC cannot be mapped to a test, flag it.
    - **AC formats:** Both `Given/When/Then` and `VERIFY: {condition}` are valid. For VERIFY criteria, write a test that asserts the stated condition holds true.
@@ -638,17 +639,7 @@ When re-invoked for gap coverage (from Phase 3 coverage gate), the task payload 
 
 ## Execution Log Protocol
 
-At the **start** and **end** of your work, append an entry to `session-docs/{feature-name}/00-execution-log.md`.
-
-If the file doesn't exist, create it with the header:
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
-
-**On start:** append `| {YYYY-MM-DD HH:MM} | tester | 3-verify | started | — | — |`
-**On end:** append `| {YYYY-MM-DD HH:MM} | tester | 3-verify | completed | {Nm} | {success/failed} |`
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
 
 ---
 
@@ -691,6 +682,7 @@ regression_test_status: failing | passing | skipped  # pre-fix-regression: 'fail
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of failing tests, or "none"}
 ```
 

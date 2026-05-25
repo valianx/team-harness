@@ -60,7 +60,7 @@ Targeted audit of a specific area (e.g., "audit authentication", "audit API endp
 
 Invoked as part of the main pipeline after implementation, to verify no security regressions were introduced. **Scoped strictly to changed files only.**
 
-- **Trigger:** th-orchestrator invokes for a specific feature, passing `00-task-intake.md` context and list of changed files
+- **Trigger:** th-orchestrator invokes for a specific feature, passing `01-plan.md` § Review Summary context and list of changed files
 - **Output:** `session-docs/{feature-name}/04-security.md`
 - **Flow:** Phase 0 → Phase 1 (only changed files) → Phase 2 (only changed files) → Phase 4 (report)
 - **Scope rule:** In pipeline mode, ONLY analyze files listed as created/modified by the implementer. Do NOT scan global config, dependencies, or other files unless they were explicitly changed. This keeps the audit fast and focused on regressions introduced by the current feature.
@@ -120,6 +120,7 @@ summary: {N critical, M high findings, or "no findings"}
 context7_consult: hit:0 miss:0 skipped:1
 memory_consult: search_nodes:0 open_nodes:0
 kg_save_candidates: []
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {critical and high finding titles, or "none"}
 ```
 
@@ -207,7 +208,7 @@ issues: {critical and high finding titles, or "none"}
 1. **Read CLAUDE.md** — understand project type, tech stack, conventions, known security decisions
 2. **Detect project type** — backend, frontend, or fullstack
 3. **Map the entry points** — read `package.json`, `requirements.txt`, `go.mod`, `pom.xml`, `build.gradle`, or equivalent to understand the dependency tree and framework
-4. **Read existing session docs** (if pipeline mode) — `00-task-intake.md` for scope, `01-architecture.md` for design, `02-implementation.md` for changed files
+4. **Read existing session docs** (if pipeline mode) — `01-plan.md` § Review Summary for scope, `01-plan.md` § Architecture for design, `02-implementation.md` for changed files
 5. **Identify technology-specific risk surface:**
    - Node.js/Express: prototype pollution, path traversal via `__proto__`, unsafe `eval`
    - Django/Flask: SSTI, CSRF middleware, SECRET_KEY exposure
@@ -707,17 +708,7 @@ Write the full report to `session-docs/{feature-name}/04-security.md` (see Phase
 
 ## Execution Log Protocol
 
-At the **start** and **end** of your work, append an entry to `session-docs/{feature-name}/00-execution-log.md`.
-
-If the file doesn't exist, create it with the header:
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
-
-**On start:** append `| {YYYY-MM-DD HH:MM} | security | {audit/focused/pipeline} | started | — | — |`
-**On end:** append `| {YYYY-MM-DD HH:MM} | security | {mode} | completed | {Nm} | {success/failed} |`
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
 
 ---
 
@@ -753,6 +744,7 @@ summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, 
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {critical and high findings titles, or "none"}
 ```
 

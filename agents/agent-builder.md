@@ -169,24 +169,14 @@ Do NOT repeat the full output content in the return block — it's in the file.
 
 ### Execution Log Protocol (mandatory)
 
-Every agent appends to `session-docs/{feature}/00-execution-log.md`:
-
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
-
-On start: `| {YYYY-MM-DD HH:MM} | {agent} | {phase} | started | — | — |`
-On end: `| {YYYY-MM-DD HH:MM} | {agent} | {phase} | completed | {Nm} | {success/failed} |`
+The th-orchestrator writes observability events to `session-docs/{feature}/00-execution-events.jsonl`. Agents do not write to that file directly — they return timing data in their status blocks and the th-orchestrator propagates the events.
 
 ### Session Documentation Protocol (mandatory)
 
 Agents write outputs to `session-docs/{feature-name}/`:
-- `00-task-intake.md` — task spec (written by th-orchestrator)
-- `00-execution-log.md` — execution timeline
+- `00-execution-events.jsonl` — observability event trace (th-orchestrator only)
 - `00-research.md` — research output (architect, research mode)
-- `01-architecture.md` — architecture proposal (architect, design mode)
+- `01-plan.md` — architect output: spec (§ Review Summary) + architecture (§ Architecture) + task list (§ Task List)
 - `01-planning.md` — task breakdown (architect, planning mode)
 
 ---
@@ -392,7 +382,7 @@ Write design rationale to `session-docs/{agent-name}/01-agent-design.md`:
 
 ## Execution Log Protocol
 
-Append to `session-docs/{agent-name}/00-execution-log.md` on start and end.
+The th-orchestrator writes observability events to `session-docs/{agent-name}/00-execution-events.jsonl`. You do not write to that file directly.
 
 ---
 

@@ -213,4 +213,6 @@ diagrams_inline: {Mermaid count}
 diagrams_external: {Excalidraw + Canvas count flagged for dispatch}
 language: {en|es|...}
 summary: {1-2 sentences}
+context7_consult: hit:N miss:N skipped:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 ```

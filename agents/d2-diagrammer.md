@@ -237,17 +237,7 @@ Write your summary to `session-docs/{feature}/05-diagram.md`:
 
 ## Execution Log Protocol
 
-At the **start** and **end** of your work, append an entry to `session-docs/{feature}/00-execution-log.md`.
-
-If the file doesn't exist, create it with the header:
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
-
-**On start:** append `| {YYYY-MM-DD HH:MM} | d2-diagrammer | diagram | started | — | — |`
-**On end:** append `| {YYYY-MM-DD HH:MM} | d2-diagrammer | diagram | completed | {Nm} | {success/failed} |`
+The th-orchestrator writes observability events to `session-docs/{feature}/00-execution-events.jsonl`. You do not write to that file directly — return your timing data in the status block and the th-orchestrator propagates it.
 
 ---
 
@@ -264,6 +254,8 @@ diagram_type: {architecture|sequence|ER|class|flowchart}
 node_count: {N}
 validation_cycles: {N}/3
 summary: {1-2 sentences: diagram type, pattern used, what's shown}
+context7_consult: hit:N miss:N skipped:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {blocking issues if failed/blocked, or "none"}
 ```
 

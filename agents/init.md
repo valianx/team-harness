@@ -478,16 +478,7 @@ Scaffold the GitHub Actions re-review reminder workflow into the consumer repo.
 
 ## Execution Log Protocol
 
-At the **start** and **end** of your work, append an entry to `session-docs/{feature-name}/00-execution-log.md` (if a session-docs context exists).
-
-If no session-docs folder is in use (init is typically run standalone), skip this step.
-
-If the file doesn't exist but session-docs folder exists, create it with the header:
-```markdown
-# Execution Log
-| Timestamp | Agent | Phase | Action | Duration | Status |
-|-----------|-------|-------|--------|----------|--------|
-```
+The th-orchestrator writes observability events to `session-docs/{feature-name}/00-execution-events.jsonl`. You do not write to that file directly. If init runs standalone (no session-docs context), skip this step.
 
 **On start:** append `| {YYYY-MM-DD HH:MM} | init | init | started | — | — |`
 **On end:** append `| {YYYY-MM-DD HH:MM} | init | init | completed | {Nm} | {success/failed} |`
@@ -503,6 +494,8 @@ agent: init
 status: success | failed | blocked
 output: session-docs/{feature-name}/00-init.md, CLAUDE.md, CHANGELOG.md
 summary: {1-2 sentences: project type, tech stack, what was created/updated}
+context7_consult: hit:N miss:N skipped:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of TBD items, or "none"}
 ```
 
