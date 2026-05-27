@@ -56,7 +56,10 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 
 Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`) loaded on-demand by the orchestrator. They are not invocable subagents — their `model` field is vestigial and not enforced by `/th:lint`.
 
-Plus `_shared/gh-fallback.md` — a cross-cutting snippet (not an invocable agent) installed to `~/.claude/agents/_shared/`. Contains the single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `delivery.md`, `orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
+Plus two cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
+
+- `_shared/gh-fallback.md` — single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `delivery.md`, `orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
+- `_shared/operational-rules.md` — cross-cutting voice, language register, git safety, and pipeline integrity rules. Referenced by all 19 agent `## Voice` sections via `§ "Voice"` and `§ "Language register"`. Centralizes rules that were previously duplicated inline in every agent file.
 
 ## Earn the model AND the effort AND the tools
 
