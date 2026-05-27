@@ -129,7 +129,8 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
 | 3 — Verify | `tester` + `qa` + `security`* | code + `01-plan.md` | `03-testing.md`, `04-validation.md`, `04-security.md` | parallel dispatch |
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
-| 3.6 — Acceptance Check | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — |
+| 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
+| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — |
 | STAGE-GATE-2 | human (skippable if autonomous) | between PRs | next / stop | default STOP |
 | 4 — Delivery | `delivery` | all workspaces | branch + commit | — |
 | **STAGE-GATE-3** | **human** | PR ready | ship / amend / abort | **MANDATORY STOP** |
@@ -326,6 +327,40 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 
 **Merge/push guard:** the orchestrator MUST NOT merge a PR or push to remote until Phase 3 (Verify) is `[x]` for that PR AND STAGE-GATE-3 is `[x]`. An instruction like "mergealos" or "merge them" does NOT override this — the operator must explicitly say "skip verification" (which the orchestrator logs as `[~skipped: operator override]` with a warning).
 
+### Artifact Verification Protocol
+
+After every agent dispatch that returns `status: success`, the orchestrator verifies the expected session-doc exists on disk before proceeding. This step sits between the `phase.end` event append (step 1) and the `00-state.md` update (step 2) of the Phase Transition Protocol — conceptually step 1.5.
+
+**Agent → Expected artifact mapping:**
+
+| Agent | Phase | Expected artifact |
+|-------|-------|-------------------|
+| `architect` | 1 (design mode) | `01-plan.md` |
+| `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
+| `implementer` | 2 | `02-implementation.md` |
+| `tester` | 3 | `03-testing.md` |
+| `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
+| `qa` | 3 (validate mode) | `04-validation.md` |
+| `qa` | 1.5 (ratify-plan mode) | (no file — verdict is in status block only) |
+| `security` | 3 | `04-security.md` |
+| `delivery` | 4 | `00-state.md` update (delivery section) |
+| `reviewer` | 4.5 (internal mode) | `04-internal-review.md` |
+| `acceptance-checker` | 3.6 | `04-validation.md` (§ Drift Analysis appended) |
+| `plan-reviewer` | 1.6 | `01-plan.md` (§ Plan Review appended) |
+
+**Verification mechanic:**
+
+1. After the agent returns `status: success`, use `Read` to check that the expected file exists at `{docs_root}/{expected_artifact}`.
+2. If the file exists and is non-empty → proceed to step 2 (update `00-state.md`).
+3. If the file does not exist or is empty:
+   a. Append an event: `{"ts":"<ISO>","event":"artifact.missing","feature":"<name>","phase":"<N>","agent":"<agent>","expected_file":"<path>","action":"retry"}`.
+   b. Re-dispatch the agent exactly once with an explicit instruction: "Your previous run returned status: success but the expected artifact `{expected_artifact}` was not found at `{docs_root}/{expected_artifact}`. Produce the artifact before returning."
+   c. If the retry also returns without the artifact: append `{"ts":"<ISO>","event":"artifact.missing","feature":"<name>","phase":"<N>","agent":"<agent>","expected_file":"<path>","action":"escalate"}`, set `status: blocked` in `00-state.md`, and escalate to the operator with the missing file path.
+
+**Agents that do not produce files** (e.g., `qa` in `ratify-plan` mode returns a verdict in the status block only) are exempt from artifact verification. The mapping table above marks these with "(no file)".
+
+**This protocol is mandatory.** Skipping artifact verification is a contract violation equivalent to skipping a phase. The protocol catches silent agent failures where the status block says `success` but the agent did not write its output — a class of bug that propagates downstream as missing context for the next agent.
+
 ```markdown
 # Pipeline State: {feature-name}
 **Last updated:** {timestamp}
@@ -339,7 +374,7 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 ## Current State
 - pipeline_version: 2
 - type: {feature|fix|refactor|hotfix|enhancement|research|spike|docs}
-- phase: {0a|0b|1|1.5|1.6|2.0|2|2.5|3|3.5|3.6|4|4.5|5|6}
+- phase: {0a|0b|1|1.5|1.6|2.0|2|2.5|3|3.5|3.75|3.6|4|4.5|5|6}
 - stage: {1|2|3}
 - status: {in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-no-dispatch}
 - iteration: {N}/3
@@ -376,6 +411,8 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 - [ ] 2 — Implement (per PR)
 - [ ] 3 — Verify (tester + qa + security in parallel)
 - [ ] 3.5 — Acceptance Gate
+- [ ] 3.75 — Build Verification
+- [ ] 3.6 — Acceptance Check (mandatory)
 - [ ] 4 — Delivery
 - [ ] STAGE-GATE-3 — Human approves push (mandatory stop)
 - [ ] 5 — GitHub Update
@@ -1448,38 +1485,68 @@ Iterating ({N}/3): routing to implementer
 
 This phase costs almost no tokens — it parses 2-3 small tables. The cost-vs-confidence tradeoff is heavily on the side of correctness.
 
-**Rewrite TL;DR** (row 12 of §5.2): On pass: `Now`: "Phase 3.6 acceptance-check running (or skipped)." `Last`: "PR-{i} Phase 3.5 PASS — {N}/{N} AC verified, test-ratchet OK." `Next`: "Phase 3.6 then STAGE-GATE-2 (or autonomous continue)." On fail: `Now`: "Iterating (iter N/3) for PR-{i}." `Last`: "Phase 3.5 FAIL — {failing AC list}." `Open issues`: failing AC identifiers.
+**Rewrite TL;DR** (row 12 of §5.2): On pass: `Now`: "Phase 3.75 build-verification running." `Last`: "PR-{i} Phase 3.5 PASS — {N}/{N} AC verified, test-ratchet OK." `Next`: "Phase 3.75 build check, then Phase 3.6 acceptance-check." On fail: `Now`: "Iterating (iter N/3) for PR-{i}." `Last`: "Phase 3.5 FAIL — {failing AC list}." `Open issues`: failing AC identifiers.
 
 ---
 
-## Phase 3.6 — Acceptance Check (external audit, conditional)
+## Phase 3.75 — Build Verification
+
+**Owner:** You (orchestrator) — not a subagent dispatch.
+
+**When to run:** After Phase 3.5 (acceptance gate) passes and BEFORE Phase 3.6 (acceptance check). This is an orchestrator-owned step, not an agent dispatch.
+
+**Why this phase exists:** Build failures that reach Phase 4 (delivery) waste the cost of Phase 3.6 + Phase 4 + Phase 4.5 and can result in broken PRs. Verifying the build compiles and lint passes before the acceptance-checker runs ensures Phase 3.6 operates on code that is known to be structurally sound. This is a reinforcement at the orchestrator level — the delivery agent's Step 9b DoD checklist also verifies build/lint/test before commit, serving as a safety net for problems introduced by multi-PR merges.
+
+**Build command detection — order of precedence:**
+
+1. **CLAUDE.md golden commands** (section "Golden Commands") — search for entries labeled `build`, `lint`, `typecheck`. Use these if found.
+2. **`package.json` scripts** — look for `build`, `lint`, `typecheck` in the `scripts` object.
+3. **`Makefile`** — look for targets `build`, `lint`.
+4. **`go.mod` exists** → `go build ./...`
+5. **`Cargo.toml` exists** → `cargo build`
+
+If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end","feature":"<name>","phase":"3.75-build-verification","agent":"orchestrator","status":"skipped","summary":"no build/lint commands detected"}` and proceed to Phase 3.6.
+
+**Execution:**
+
+1. Run the detected build command via Bash.
+2. Run the detected lint command via Bash (separate invocation).
+3. If both pass (exit code 0) → append `phase.end` event with `status: "success"`, proceed to Phase 3.6.
+4. If either fails:
+   a. Append event: `{"ts":"<ISO>","event":"build.failed","feature":"<name>","phase":"3.75-build-verification","command":"<cmd>","exit_code":<N>}`.
+   b. Re-dispatch the implementer with the failure output: "Build verification failed. Command `{cmd}` returned exit code {N}. Output: {stderr/stdout}. Fix the build/lint error and confirm the fix."
+   c. After the implementer returns, re-run the build/lint commands (1 retry).
+   d. If the retry also fails: set `status: blocked` in `00-state.md`, escalate to the operator with the full failure output.
+
+**Iteration budget:** max 2 attempts total (1 original + 1 retry after implementer fix). This is separate from the Phase 3 iteration budget.
+
+**Phase Checklist integration:** Phase 3.75 is tracked in the execution events JSONL but does NOT add a line to the Phase Checklist template in `00-state.md` — it is a sub-step of the verification stage, not a top-level phase. The orchestrator logs `phase.start` and `phase.end` events with `phase: "3.75-build-verification"`.
+
+**Report to user:**
+```
+Build verification PASS
+  build: {command} — exit 0
+  lint: {command} — exit 0
+Next: acceptance check (Phase 3.6)
+```
+
+Or on failure:
+```
+Build verification FAILED
+  {command} — exit {N}
+  {first 20 lines of error output}
+Routing to implementer to fix build
+```
+
+**Rewrite TL;DR**: On pass: `Now`: "Phase 3.6 acceptance-check running." `Last`: "Phase 3.75 build verification passed." On fail: `Now`: "Build failed — implementer fixing." `Open issues`: "build/lint failure in {command}".
+
+---
+
+## Phase 3.6 — Acceptance Check (mandatory)
 
 **Agent:** `acceptance-checker`
 
-**When to run (gate by complexity — do NOT invoke on every pipeline):**
-
-This phase is the third line of defense, but it is also overhead for simple changes. Run it only when the cost is justified:
-
-| Condition | Run Phase 3.6? |
-|---|---|
-| `complexity: complex` (set in Phase 0a Step 7) | **Yes** |
-| Touched > 3 files across different modules | **Yes** |
-| User passed `--audit` flag explicitly | **Yes** |
-| Any iteration occurred in Phase 3 (one or more verify retries) | **Yes** — drift risk is higher |
-| `type: hotfix` AND single-file fix | **No** — Phase 3 + 3.5 are sufficient; speed matters |
-| `complexity: standard` AND ≤3 files AND 0 iterations | **No** — log "Phase 3.6 skipped (not warranted)" and proceed to Phase 4 |
-
-This follows Anthropic's cost-effectiveness rule: *"The evaluator is not a fixed yes-or-no decision. It is worth the cost when the task sits beyond what the current model does reliably solo."*
-
-When skipped, the report to user includes the reason:
-```
-Acceptance check — SKIPPED (complexity: standard, 2 files, 0 iterations)
-  Acceptance-checker is gated by complexity to avoid overhead on simple changes.
-  Use `--audit` on the next run if you want a full audit anyway.
-Next: delivery
-```
-
-When the previous gate (Phase 3 verify) shows that any iteration happened, **always run Phase 3.6** even on standard complexity — drift accumulates with iterations.
+**When to run:** Always. Phase 3.6 runs unconditionally after Phase 3.5 (acceptance gate) passes. The only exception is `type: hotfix` AND single-file fix — speed matters for trivially scoped urgent fixes, and Phase 3 + 3.5 are sufficient.
 
 **This is the third line of defense:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, which contains the formalized original description and AC as written by the architect at Stage 1) and the actually delivered artifacts. It catches drift that `tester` and `qa` cannot catch because they only validate the **current** AC list — not whether the AC list still matches what was approved at STAGE-GATE-1.
 
@@ -1511,12 +1578,12 @@ Next: {delivery | iterate | escalate}
 
 If verdict is `concerns`, list each concern as one line in the report so the user sees them before delivery proceeds.
 
-**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "PR-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "PR-{i} Phase 3.6 verdict={pass|concerns}." On skipped: `Last`: "PR-{i} Phase 3.6 skipped (not warranted)." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
+**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "PR-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "PR-{i} Phase 3.6 verdict={pass|concerns}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
 
-**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 (or Phase 3.5 if 3.6 was skipped/not warranted) of the **last PR** completes — not after every PR's Phase 3. Determine "last PR" as the final PR in the final round of the DAG (all rounds done). Status: `complete` on pass/concerns/skipped, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
+**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 of the **last PR** completes — not after every PR's Phase 3. Determine "last PR" as the final PR in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
 
 ```bash
-# Fire only when this is the last PR's Phase 3.6 (or 3.5) in the last round
+# Fire only when this is the last PR's Phase 3.6 in the last round (or Phase 3.5 for hotfix+single-file)
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
     python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} PRs. Tests: {sum}. Security: {clean|N findings}." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
@@ -1634,25 +1701,17 @@ Delivery complete
 Next: internal review (or Phase 5 if skipped)
 ```
 
-**Rewrite TL;DR** (row 17 of §5.2): `Now`: "Phase 4.5 internal-review running (or skipped)." `Last`: "Phase 4 delivery done — branch {branch}, version {old → new}." `Next`: "STAGE-GATE-3 (mandatory human approve before push)." `Open issues`: "none" (or delivery errors if any).
+**Rewrite TL;DR** (row 17 of §5.2): `Now`: "Phase 4.5 internal-review running." `Last`: "Phase 4 delivery done — branch {branch}, version {old → new}." `Next`: "STAGE-GATE-3 (mandatory human approve before push)." `Open issues`: "none" (or delivery errors if any).
 
 ---
 
-## Phase 4.5 — Internal Review (advisory, gated by diff size)
+## Phase 4.5 — Internal Review (mandatory, advisory)
 
 **Agent:** `reviewer` (mode: `internal`)
 
 **Why this phase exists:** Cognition's Devin team reported that as agent-generated code volume grows, *"the bottleneck shifted from writing code to reviewing it."* A pre-PR pass that surfaces the riskiest 1-3 things in the diff before the human opens the PR cuts review-fatigue without replacing the human review. This phase is **advisory** — it does not block delivery and does not publish to GitHub.
 
-**When to run:**
-
-| Condition | Run Phase 4.5? |
-|---|---|
-| Diff has ≤ 50 lines AND ≤ 2 files | **No** — nothing meaningful to summarize. Skip. |
-| `type: hotfix` AND single-file fix | **No** — keep hotfixes fast. |
-| `complexity: complex`, OR diff > 50 lines, OR > 2 files, OR security-sensitive | **Yes** |
-
-When skipped, log `phase.end` to `{docs_root}/{events_file}` with `phase: "4.5-internal-review"`, `status: "skipped"`, and proceed to Phase 5.
+**When to run:** Always. Phase 4.5 runs unconditionally after Phase 4 (delivery) completes. The only exception is `type: hotfix` AND single-file fix — speed matters for trivially scoped urgent fixes.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces
@@ -1710,7 +1769,7 @@ fi
 ```
 > **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, use the `events_content` extraction pattern before the `python3` idempotency check (see `## Content extraction for dual-format events file`).
 
-**Cost:** one reviewer invocation (~5-15K tokens depending on diff size). **Saves:** human review time and merge churn when the PR has obvious issues. The bound is the diff-size gate above — never run on trivial changes.
+**Cost:** one reviewer invocation (~5-15K tokens depending on diff size). **Saves:** human review time and merge churn when the PR has obvious issues.
 
 ---
 

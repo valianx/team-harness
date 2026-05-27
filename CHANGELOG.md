@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Artifact Verification Protocol in orchestrator — verifies session-doc exists on disk after every agent dispatch, retry-once on missing, block on double failure
+- Phase 3.75 — Build Verification step between acceptance gate and acceptance check, routes build/lint failures to implementer before delivery
+- Artifact verification documentation for special flows (research, spike, hotfix, simple) in ref-special-flows.md
+- Suite 29 in test_agent_structure.py with 9 assertions for pipeline enforcement improvements
+- Pipeline integrity rule in operational-rules.md: artifact verification is mandatory after every agent dispatch
+
+### Changed
+
+- Phase 3.6 (Acceptance Check) is now mandatory — conditional skip table removed; only exception: hotfix + single-file fix
+- Phase 4.5 (Internal Review) is now mandatory — conditional skip table removed; only exception: hotfix + single-file fix
+
 ## [2.31.0] - 2026-05-25
 
 ### Added

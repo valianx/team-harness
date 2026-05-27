@@ -3471,6 +3471,89 @@ check(
     "CHANGELOG [Unreleased] must mention the comment-only option",
 )
 
+# Suite 29 — Pipeline enforcement improvements (artifact verification, mandatory phases, build check)
+print("\n--- Suite 29: Pipeline enforcement improvements ---")
+
+_orch_v29 = open(AGENTS / "orchestrator.md").read()
+_oprules_v29 = open(AGENTS / "_shared" / "operational-rules.md").read()
+_refflows_v29 = open(AGENTS / "ref-special-flows.md").read()
+
+# (1) orchestrator.md contains the Artifact Verification Protocol section
+check(
+    "orchestrator.md has Artifact Verification Protocol section",
+    "### Artifact Verification Protocol" in _orch_v29,
+    "orchestrator.md must contain '### Artifact Verification Protocol'",
+)
+
+# (2) orchestrator.md contains the agent-to-artifact mapping table
+check(
+    "orchestrator.md has agent-to-artifact mapping table",
+    "Agent → Expected artifact mapping" in _orch_v29
+    or ("| Agent | Phase | Expected artifact |" in _orch_v29),
+    "orchestrator.md must contain the agent-to-artifact mapping table",
+)
+
+# (3) Phase 3.6 title does NOT contain 'conditional'
+_phase36_title_match = [
+    l for l in _orch_v29.splitlines()
+    if l.startswith("## Phase 3.6")
+]
+check(
+    "Phase 3.6 title does not contain 'conditional'",
+    len(_phase36_title_match) > 0
+    and "conditional" not in _phase36_title_match[0].lower(),
+    "Phase 3.6 title must not contain 'conditional'",
+)
+
+# (4) Phase 3.6 title contains 'mandatory'
+check(
+    "Phase 3.6 title contains 'mandatory'",
+    len(_phase36_title_match) > 0
+    and "mandatory" in _phase36_title_match[0].lower(),
+    "Phase 3.6 title must contain 'mandatory'",
+)
+
+# (5) Phase 4.5 title does NOT contain 'gated by diff size'
+_phase45_title_match = [
+    l for l in _orch_v29.splitlines()
+    if l.startswith("## Phase 4.5")
+]
+check(
+    "Phase 4.5 title does not contain 'gated by diff size'",
+    len(_phase45_title_match) > 0
+    and "gated by diff size" not in _phase45_title_match[0].lower(),
+    "Phase 4.5 title must not contain 'gated by diff size'",
+)
+
+# (6) Phase 4.5 title contains 'mandatory'
+check(
+    "Phase 4.5 title contains 'mandatory'",
+    len(_phase45_title_match) > 0
+    and "mandatory" in _phase45_title_match[0].lower(),
+    "Phase 4.5 title must contain 'mandatory'",
+)
+
+# (7) orchestrator.md contains Phase 3.75 — Build Verification
+check(
+    "orchestrator.md has Phase 3.75 — Build Verification",
+    "## Phase 3.75" in _orch_v29 and "Build Verification" in _orch_v29,
+    "orchestrator.md must contain '## Phase 3.75 — Build Verification'",
+)
+
+# (8) operational-rules.md contains artifact verification rule
+check(
+    "operational-rules.md has artifact verification rule",
+    "Artifact verification is mandatory" in _oprules_v29,
+    "operational-rules.md must contain artifact verification rule under Pipeline integrity",
+)
+
+# (9) ref-special-flows.md documents artifact verification in special flows
+check(
+    "ref-special-flows.md has Artifact Verification in Special Flows section",
+    "## Artifact Verification in Special Flows" in _refflows_v29,
+    "ref-special-flows.md must document artifact verification per special flow",
+)
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

@@ -353,10 +353,11 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 - Phase 2 (Implementation) — scope-discipline contract still applies.
 - Phase 3 (Verify) — `security` agent still runs always (defense-in-depth override).
 - Phase 3.5 (Acceptance Gate) — same.
-- Phase 3.6 (Acceptance Check) — already skipped by existing gate for hotfix + single-file fix.
+- Phase 3.75 (Build Verification) — runs normally (hotfix code must still compile).
+- Phase 3.6 (Acceptance Check) — **SKIPPED** for hotfix + single-file fix (the only exception to mandatory Phase 3.6; speed override). For multi-file hotfixes, Phase 3.6 runs.
 - STAGE-GATE-2 — irrelevant in practice (hotfix is typically 1 PR / 1 round).
 - Phase 4 (Delivery) — same `### Fixed` routing; PR title gains `(hotfix)` suffix.
-- Phase 4.5 (Internal Review) — already skipped by existing gate for hotfix + single-file fix.
+- Phase 4.5 (Internal Review) — **SKIPPED** for hotfix + single-file fix (the only exception to mandatory Phase 4.5; speed override). For multi-file hotfixes, Phase 4.5 runs.
 - STAGE-GATE-3 — always mandatory.
 - Phases 5 (GitHub Update) and 6 (KG Save) — same.
 
@@ -868,3 +869,42 @@ When the user explicitly says "simple", "just implement", "skip design", "no tes
 3. **Never skip Specify (Phase 0b)** — the spec is always needed, even for simple tasks
 4. **Never skip Delivery (Phase 4)** — every change needs a branch, commit, and PR
 5. **Log the skip** in `00-state.md` under Hot Context: "User requested skip: {what was skipped}"
+
+---
+
+## Artifact Verification in Special Flows
+
+Every special flow that skips phases must explicitly document which artifact verifications are skipped and why. The Artifact Verification Protocol (see `orchestrator.md` § Artifact Verification Protocol) runs for every agent that IS dispatched — it is only exempt for phases that are skipped entirely.
+
+### Research Flow
+
+- **Phases skipped:** 2-5 (implementation, verify, delivery, GitHub update).
+- **Artifact verification runs for:** `architect` → `00-research.md`. The orchestrator verifies `00-research.md` exists after the architect returns.
+- **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
+- **Phase 3.6 and 4.5:** not applicable (Phases 3-4 skipped entirely).
+- **Phase 3.75 (build verification):** not applicable (no implementation to build).
+
+### Spike Flow
+
+- **Phases skipped:** 1 (design), 3-5 (verify, delivery, GitHub update).
+- **Artifact verification runs for:** `implementer` → `02-implementation.md`. The orchestrator verifies `02-implementation.md` exists after the implementer returns.
+- **Artifact verification skipped for:** `architect` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
+- **Phase 3.6 and 4.5:** not applicable (Phases 3-4 skipped entirely).
+- **Phase 3.75 (build verification):** not applicable (no verify stage).
+
+### Hotfix sub-flow
+
+- **Phases skipped:** Phase 1 (no architect, no `01-root-cause.md`).
+- **Artifact verification runs for:** all agents that ARE dispatched — `tester` (Phase 2.0 → `02-regression-test.md`, Phase 3 → `03-testing.md`), `implementer` (Phase 2 → `02-implementation.md`), `qa` (Phase 3 → `04-validation.md`), `security` (Phase 3 → `04-security.md`), `delivery` (Phase 4).
+- **Artifact verification skipped for:** `architect` (not dispatched — Phase 1 skipped).
+- **Phase 3.6 (Acceptance Check):** SKIPPED for `type: hotfix` AND single-file fix (speed override — the only exception to mandatory Phase 3.6). For hotfixes with multi-file scope, Phase 3.6 runs normally.
+- **Phase 4.5 (Internal Review):** SKIPPED for `type: hotfix` AND single-file fix (speed override — the only exception to mandatory Phase 4.5). For hotfixes with multi-file scope, Phase 4.5 runs normally.
+- **Phase 3.75 (Build Verification):** runs normally (hotfix code must still compile).
+
+### Simple Mode (user-initiated)
+
+- **Phases skipped:** only what the user requested (see above).
+- **Artifact verification runs for:** all agents that ARE dispatched in the remaining phases.
+- **Artifact verification skipped for:** agents in phases the user explicitly skipped.
+- **Phase 3.6 and 4.5:** run normally if verify and delivery phases are not skipped. If the user says "just implement" (skip Design + Verify), Phase 3.6 and 4.5 are not applicable.
+- **Phase 3.75 (Build Verification):** runs if Phase 3 (verify) runs; skipped if the user skipped verify.
