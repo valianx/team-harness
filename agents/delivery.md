@@ -364,6 +364,7 @@ This step is gateway-aware: if the project does not have an external gateway (or
 **Step 9.1 — Find the version file.** Use Glob to search the project root for these files in order:
 
 ```
+.claude-plugin/plugin.json
 package.json
 pyproject.toml
 Cargo.toml
@@ -374,12 +375,13 @@ version.txt
 VERSION
 ```
 
-Read the first match and extract the current version.
+Read the first match and extract the current version. For `.claude-plugin/plugin.json`, read the `"version"` field — this is the canonical version source for Claude Code plugins distributed via marketplace.
 
 **Step 9.2 — Increment the version:**
 
 | File | How to bump |
 |------|-------------|
+| `.claude-plugin/plugin.json` | Edit the `"version"` field |
 | `package.json` | Edit the `"version"` field |
 | `pyproject.toml` | Edit `[project].version` or `[tool.poetry].version` |
 | `Cargo.toml` | Edit `[package].version` |
