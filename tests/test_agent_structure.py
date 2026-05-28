@@ -1101,6 +1101,187 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 18 — Pipeline Manifest read-first (Phase 2.0 regression assertions)
+# ---------------------------------------------------------------------------
+# These assertions MUST FAIL before the implementer touches docs/skill.
+# They verify the hardening introduced in fix/takeover-protocol-hardening:
+#   (a) A "Takeover Pipeline Manifest" exists at the START of the Takeover
+#       Protocol in docs/subagent-orchestration.md — before step 1.
+#   (b) The manifest carries read-first + lazy-load framing.
+#   (c) The manifest names every mandatory gate/stage in pipeline order.
+#   (d) The manifest and the managed block in setup/SKILL.md both carry the
+#       comply imperative ("skipping any is a defect" / "honor EVERY gate").
+#   (e) Drift no-regression guards: stale session-doc names are absent from
+#       the steps 6-7 region; correct names are present there (C1 + C2).
+#   (f) update/SKILL.md does NOT contain a second copy of the block content (C3).
+#
+# AC coverage: AC-5 (detail), AC-8 (cross-ref), AC-1–AC-4 (substance).
+# Resolution: resolved against _subagent_orch_md (content of
+#   docs/subagent-orchestration.md) and setup_skill_md / update_skill_md.
+# ---------------------------------------------------------------------------
+
+update_skill_md = read(SKILLS_DIR / "update" / "SKILL.md")
+
+# -- (a) Manifest exists and appears BEFORE the first numbered step ----------
+# Position check: index of the manifest header must be lower than the index
+# of the first numbered step ("1. Do NOT ask") within _subagent_orch_md.
+_manifest_header = "Takeover Pipeline Manifest"
+_first_step_marker = "1. Do NOT ask"
+_manifest_idx = _subagent_orch_md.find(_manifest_header)
+_first_step_idx = _subagent_orch_md.find(_first_step_marker)
+check(
+    "subagent-orchestration.md contains 'Takeover Pipeline Manifest' header",
+    _manifest_idx != -1,
+    "Pipeline Manifest read-first block is missing from docs/subagent-orchestration.md",
+)
+check(
+    "Takeover Pipeline Manifest appears BEFORE the first numbered step in the protocol",
+    _manifest_idx != -1 and _first_step_idx != -1 and _manifest_idx < _first_step_idx,
+    f"manifest index ({_manifest_idx}) must precede step-1 index ({_first_step_idx}); "
+    "manifest must be placed at the START of the Takeover Protocol, above the 8 steps",
+)
+
+# -- (b) Read-first + lazy-load framing --------------------------------------
+# Presence assertions on _subagent_orch_md (the verbose doc).
+# NOTE: these are PRESENCE assertions — different purpose from the ABSENCE
+# assertions in section (e) below.  Do not reuse the same region/variable.
+check(
+    "subagent-orchestration.md manifest carries 'read this first' framing",
+    "read this first" in _subagent_orch_md,
+    "manifest header must instruct the reader to read it before the 8 steps",
+)
+check(
+    "subagent-orchestration.md manifest carries lazy-load framing ('read each stage' or 'do NOT read them all up front')",
+    "read each stage" in _subagent_orch_md or "do NOT read them all up front" in _subagent_orch_md,
+    "manifest must state that stage detail is read lazily, not all up front",
+)
+
+# -- (c) Ordered gate/stage names present in manifest region ----------------
+# Resolved against _takeover_contract (CLAUDE.md + _subagent_orch_md) for
+# compatibility with the existing pattern used in lines 1004-1020 above.
+# PRESENCE assertions — different from the ABSENCE assertions in (e).
+for _gate_name in (
+    "STAGE-GATE-1",
+    "Phase 1.6",
+    "Phase 2.0",
+    "Phase 3.5",
+    "STAGE-GATE-3",
+    "Acceptance",
+    "00-execution-events",
+    "00-pipeline-summary",
+    "00-state",
+):
+    check(
+        f"Takeover Pipeline Manifest names gate/stage '{_gate_name}'",
+        _gate_name in _subagent_orch_md,
+        f"'{_gate_name}' must appear in docs/subagent-orchestration.md as part of the manifest",
+    )
+
+# -- (d) Comply imperative in manifest (doc) AND in managed block (skill) ---
+# (d1) comply imperative in the verbose doc
+check(
+    "subagent-orchestration.md manifest carries comply imperative (skipping any / MUST complete / honor every gate)",
+    "skipping any" in _subagent_orch_md
+    or "MUST complete every item" in _subagent_orch_md
+    or "MUST execute every stage" in _subagent_orch_md
+    or "honor every gate" in _subagent_orch_md
+    or "honor EVERY gate" in _subagent_orch_md,
+    "manifest must declare that skipping a stage/gate is a defect, not a shortcut",
+)
+# (d2) comply imperative inside the managed block in setup/SKILL.md.
+# Extract the managed block content between the markers so the assertion
+# is scoped to that block and not to the surrounding instructional text.
+_TAKEOVER_START = "<!-- nested-dispatch-takeover:start -->"
+_TAKEOVER_END = "<!-- nested-dispatch-takeover:end -->"
+_block_start_idx = setup_skill_md.find(_TAKEOVER_START)
+_block_end_idx = setup_skill_md.find(_TAKEOVER_END)
+_managed_block_content = (
+    setup_skill_md[_block_start_idx:_block_end_idx + len(_TAKEOVER_END)]
+    if _block_start_idx != -1 and _block_end_idx != -1
+    else ""
+)
+check(
+    "skills/setup/SKILL.md managed block carries comply imperative (skipping any / honor EVERY gate)",
+    "skipping any" in _managed_block_content or "honor EVERY gate" in _managed_block_content,
+    "the nested-dispatch-takeover block itself must state the comply imperative, "
+    "not merely point to the manifest",
+)
+# (d3) managed block references "Takeover Pipeline Manifest" by name
+check(
+    "skills/setup/SKILL.md managed block references 'Takeover Pipeline Manifest'",
+    "Takeover Pipeline Manifest" in _managed_block_content,
+    "block must point to the manifest by name so the reader knows where to find "
+    "the ordered stage list",
+)
+
+# -- (e) Drift no-regression guards — C1 (region-anchored) + C2 (annotated) -
+# C1: assertions are scoped to the steps 6-7 region of _subagent_orch_md,
+#     NOT a global `not in` over the whole document.  This prevents false
+#     failures if those names appear legitimately in other sections (e.g.
+#     historical prose or an example).
+#
+# C2 annotation: ABSENCE assertions (stale names must NOT appear) and
+#     PRESENCE assertions (correct names MUST appear) operate on different
+#     strings:
+#     - Absence assertions: _steps_6_7_region (the stale file names)
+#     - Presence assertions: _subagent_orch_md (correct schema names)
+#     They are intentionally kept separate to avoid ambiguity between
+#     "must be here" and "must NOT be here".
+#
+# Slice the region between the first mention of "6." and "8." in the
+# Takeover Protocol section.  Using a text anchor avoids hard-coding
+# line numbers (which change as the doc is edited).
+_step6_marker = "6. Top-level Claude"
+_step8_marker = "8. Report to the user"
+_s6 = _subagent_orch_md.find(_step6_marker)
+_s8 = _subagent_orch_md.find(_step8_marker)
+# If the step markers are absent the slice is empty string, which means
+# *all* absence assertions will pass trivially — but the doc-structure
+# assertions above will have already flagged the missing content.
+_steps_6_7_region = (
+    _subagent_orch_md[_s6:_s8] if _s6 != -1 and _s8 != -1 and _s6 < _s8 else ""
+)
+
+# ABSENCE assertions (C1) — stale names must not appear in steps 6-7 region.
+# Operating on: _steps_6_7_region
+for _stale_name in ("06-acceptance-check.md", "05-delivery.md", "02-task-list.md"):
+    check(
+        f"steps 6-7 region does NOT contain stale session-doc name '{_stale_name}'",
+        _stale_name not in _steps_6_7_region,
+        f"'{_stale_name}' is a stale file name; steps 6-7 must use current schema names",
+    )
+
+# PRESENCE assertions (C2) — correct schema names must appear in the doc.
+# Operating on: _subagent_orch_md (broader scope, not the absence slice).
+for _correct_name in (
+    "04-validation.md",
+    "00-state.md",
+    "01-plan.md",
+):
+    check(
+        f"subagent-orchestration.md contains correct schema name '{_correct_name}'",
+        _correct_name in _subagent_orch_md,
+        f"'{_correct_name}' must appear in the doc as the current schema replacement",
+    )
+
+# -- (f) No second copy guard — C3 (content check, not marker check) --------
+# update/SKILL.md NAMES the markers in its extraction instructions (step 6).
+# A naive `not in` check for the marker strings would pass even if update
+# contained a duplicate of the block content.  The guard must check for a
+# stable wording substring of the BLOCK CONTENT, not the markers themselves.
+# Using "honor EVERY gate" as the stable anchor: if that phrase appears in
+# update_skill_md, a second copy of the hardened block content is present.
+check(
+    "skills/update/SKILL.md does NOT contain a second copy of the managed block content",
+    "honor EVERY gate" not in update_skill_md
+    and "skipping any is a defect" not in update_skill_md,
+    "update/SKILL.md must not duplicate the block content — it extracts from "
+    "setup/SKILL.md at runtime; a content copy here indicates unintended duplication "
+    "(note: marker strings are legitimately present in update's extraction instructions "
+    "and are NOT checked here)",
+)
+
+# ---------------------------------------------------------------------------
 # Suite 19 — Agent identity & cross-reference consistency
 # ---------------------------------------------------------------------------
 # Regression guards for "I renamed/removed an agent and broke 5 references"
