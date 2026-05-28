@@ -3598,6 +3598,97 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 30 — ClickUp skill + orchestrator intents (v2.34.0)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 30: ClickUp skill + orchestrator intents ===")
+
+CLICKUP_TOOLS = [
+    "clickup_filter_tasks",
+    "clickup_search",
+    "clickup_get_task",
+    "clickup_create_task_comment",
+    "clickup_update_task",
+    "clickup_find_member_by_name",
+    "clickup_resolve_assignees",
+]
+
+clickup_skill_path = SKILLS_DIR / "clickup" / "SKILL.md"
+check(
+    "skills/clickup/SKILL.md exists",
+    clickup_skill_path.exists(),
+    f"missing file at {clickup_skill_path}",
+)
+
+if clickup_skill_path.exists():
+    skill_text = read(clickup_skill_path)
+    fm = parse_frontmatter(skill_text)
+    check(
+        "skills/clickup/SKILL.md frontmatter has name: clickup",
+        fm.get("name") == "clickup",
+        f"expected name: clickup, got: {fm.get('name')}",
+    )
+    check(
+        "skills/clickup/SKILL.md frontmatter has non-empty description",
+        bool(fm.get("description")),
+        "description field missing or empty",
+    )
+    # Sub-command documentation anchors
+    check(
+        "skills/clickup/SKILL.md documents `setup` sub-command",
+        "### `setup`" in skill_text or "### setup" in skill_text or "`setup` —" in skill_text,
+        "setup sub-command anchor missing",
+    )
+    check(
+        "skills/clickup/SKILL.md documents `tasks` sub-command",
+        "### `tasks`" in skill_text or "### tasks" in skill_text or "`tasks` —" in skill_text,
+        "tasks sub-command anchor missing",
+    )
+    check(
+        "skills/clickup/SKILL.md documents `task <id>` sub-command",
+        "task <id>" in skill_text or "task <ID>" in skill_text,
+        "task <id> sub-command anchor missing",
+    )
+    # MCP tool names verbatim in SKILL.md
+    missing_in_skill = [t for t in CLICKUP_TOOLS if t not in skill_text]
+    check(
+        "skills/clickup/SKILL.md references all 7 ClickUp MCP tools verbatim",
+        not missing_in_skill,
+        f"missing tool names: {missing_in_skill}",
+    )
+    # Standalone declaration (no orchestrator routing)
+    check(
+        "skills/clickup/SKILL.md declares it does NOT route through the orchestrator",
+        "does NOT route through the orchestrator" in skill_text
+        or "DOES NOT" in skill_text.upper(),
+        "skill must declare standalone status",
+    )
+
+# Orchestrator Step 6c block + verbatim tool names
+orchestrator_text = read(AGENTS_DIR / "orchestrator.md")
+check(
+    "orchestrator.md has Step 6c — ClickUp conversational intents block",
+    "Step 6c — ClickUp conversational intents" in orchestrator_text,
+    "missing Step 6c header — operator's natural-language ClickUp ops must have a route",
+)
+check(
+    "orchestrator.md Step 6c documents Name-vs-ID resolution protocol",
+    "Name-vs-ID resolution" in orchestrator_text,
+    "missing Name-vs-ID resolution anchor",
+)
+check(
+    "orchestrator.md Step 6c documents Status pass-through (no hardcoded enum)",
+    "Status pass-through" in orchestrator_text,
+    "missing Status pass-through anchor",
+)
+missing_in_orchestrator = [t for t in CLICKUP_TOOLS if t not in orchestrator_text]
+check(
+    "orchestrator.md Step 6c references all 7 ClickUp MCP tools verbatim",
+    not missing_in_orchestrator,
+    f"missing tool names: {missing_in_orchestrator}",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
