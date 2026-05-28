@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.35.1] - 2026-05-28
+
+### Fixed
+
+- `/th:clickup` now stores its config in the `clickup` key of the shared plugin config `~/.claude/.team-harness.json` instead of a separate `~/.claude/clickup.json`. All read/write paths merge-preserve the existing keys (`logs-*`, `files` manifest, version metadata). Consolidates all Team Harness settings into one operator-private file.
+
+### Changed
+
+- Documented the single-config-file convention in `CLAUDE.md §5`: skills must not create their own `.json` config files in `~/.claude/`; settings belong under a namespaced key inside `~/.claude/.team-harness.json` (sole exception: Claude Code's native `~/.claude/settings.json`).
+
 ## [2.35.0] - 2026-05-28
 
 ### Added
