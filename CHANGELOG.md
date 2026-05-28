@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Nested-dispatch takeover protocol now requires reading a **Takeover Pipeline Manifest** at the start of `docs/subagent-orchestration.md` before executing any stage. The manifest front-loads the complete ordered map of stages and gates (anti-skip), enforces a comply imperative ("skipping any stage or gate is a defect, not a shortcut"), and lazy-loads per-stage detail. The managed `nested-dispatch-takeover` block in `~/.claude/CLAUDE.md` carries the comply imperative inline. Stale session-doc names in steps 6-7 of the takeover protocol (`06-acceptance-check.md`, `05-delivery.md`, `02-task-list.md`) corrected to the current schema (`04-validation.md § Drift Analysis`, `00-state.md`, `01-plan.md § Task List`). Covered by 17 new Suite 18 assertions (911/911 green).
+
 ### Changed
 
 - `README.md` Update section now leads with `/th:update` (the recommended command — refreshes catalog, downloads the new version, syncs managed blocks) followed by `/reload-plugins`. The previous two-step `/plugin marketplace update` + reload sequence was incorrect (catalog refresh does not download files); it is demoted to a manual-fallback note for troubleshooting only.
