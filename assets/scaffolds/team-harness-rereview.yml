@@ -79,5 +79,5 @@ jobs:
               owner,
               repo,
               issue_number: pr,
-              body: `[team-harness] New commits detected (head: \`${sha.slice(0, 7)}\`).\nRun \`@th-orchestrator review-pr #${pr}\` to refresh the review.`
+              body: `[team-harness] New commits detected (head: \`${sha.slice(0, 7)}\`).\nRun \`@th:orchestrator review-pr #${pr}\` to refresh the review.`
             });
