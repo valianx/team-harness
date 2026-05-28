@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Deprecated the Go installer (`bin/install.{sh,ps1,cmd}` + `cmd/install/`); the Claude Code plugin (`/plugin marketplace add valianx/team-harness` + `/plugin install th` + `/th:setup`) is now the canonical install path. Deprecation banners added to runtime (`cmd/install/main.go`) and script comments; binary remains functional for legacy/offline/CI/low-cost mode use cases. Documentation across `README.md`, `docs/`, `CLAUDE.md §3`, `agents/README.md`, `skills/README.md`, and `site/index.html` updated to reflect the canonical path. New `bin/README.md` documents the legacy bootstrap scripts.
+
+### Fixed
+
+- Namespace syntax in `site/index.html` (6 occurrences) and `assets/scaffolds/team-harness-rereview.yml` (1 occurrence): `@th-orchestrator` / `th-orchestrator` (hyphen) corrected to `@th:orchestrator` / `th:orchestrator` (colon) to match the plugin namespace.
+
 ## [2.32.0] - 2026-05-27
 
 ### Added
