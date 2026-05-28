@@ -50,7 +50,7 @@ Config schema:
   "workspace_id": "<required>",
   "team_id": "<optional>",
   "default_list_id": "<optional>",
-  "default_status_filter": ["closed", "done"]
+  "default_status_filter": ["done", "closed"]
 }
 ```
 
@@ -70,7 +70,12 @@ Configure or reconfigure ClickUp credentials and defaults.
   - `workspace_id` (required — reject empty input with "workspace_id is required").
   - `team_id` (optional — press Enter to skip or keep current).
   - `default_list_id` (optional — press Enter to skip or keep current).
-  - `default_status_filter` (optional — comma-separated list of status names to exclude; press Enter to keep current or use `["closed", "done"]` as the default for a fresh install).
+  - `default_status_filter` — the default exclusion set is `["done", "closed"]`. Do **not** ask the operator to type this from scratch. Instead, inform them which statuses are excluded by default and offer the option to change them, e.g.:
+    `By default these statuses are excluded from task listings: done, closed. Press Enter to keep them, or type a comma-separated list to override (e.g. "done, closed, archived"):`
+    - Pressing Enter keeps the default (fresh install) or the current array (reconfigure) unchanged.
+    - If the operator types a value, split it on commas into an array, trim whitespace, and drop empty entries (e.g. `done, closed, archived` → `["done", "closed", "archived"]`).
+    - To exclude nothing, the operator types the literal `none`, which stores `[]`.
+    - Always store the parsed array, never the operator's raw string.
 - Before writing, back up the existing config file to `~/.claude/clickup.json.bak-YYYYMMDD-HHMMSS` (timestamp in UTC). If no file exists, skip the backup step.
 - Write the new config as pretty-printed JSON to `~/.claude/clickup.json`.
 - Print a confirmation table showing the saved values. Re-running the sub-command is idempotent: it displays current values as defaults and overwrites only what the operator changes.

@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `/th:clickup setup` no longer asks the operator to type `default_status_filter` from scratch (which yielded a single status). It now informs the operator that `done` and `closed` are excluded by default, lets Enter keep that default, and accepts an optional comma-separated override parsed into an array.
 - Namespace syntax in `site/index.html` (6 occurrences) and `assets/scaffolds/team-harness-rereview.yml` (1 occurrence): `@th-orchestrator` / `th-orchestrator` (hyphen) corrected to `@th:orchestrator` / `th:orchestrator` (colon) to match the plugin namespace.
 
 ## [2.32.0] - 2026-05-27
