@@ -15,7 +15,7 @@ Honor `tools:` frontmatter when an agent is invoked via `@mention` — strip `Ta
 
 When a Claude Code agent is invoked via `@mention` from inside an already-active session, Claude Code wraps the invocation as `Task(subagent_type=<agent>, ...)`. The runtime then strips `Task` from the agent's available toolset as an anti-recursion guard — **even when the agent's `tools:` frontmatter explicitly declares `Task`**.
 
-This breaks **hub-style agents** that exist specifically to orchestrate other subagents. The user's mental model when typing `@th-orchestrator` is "the orchestrator agent runs and dispatches subagents". The actual behavior is "the orchestrator runs, detects it has no `Task`, and produces a verbose handoff for top-level Claude to execute".
+This breaks **hub-style agents** that exist specifically to orchestrate other subagents. The user's mental model when typing `@th:orchestrator` is "the orchestrator agent runs and dispatches subagents". The actual behavior is "the orchestrator runs, detects it has no `Task`, and produces a verbose handoff for top-level Claude to execute".
 
 The workaround works (handoff pattern is well-documented and self-healing) but introduces:
 
@@ -52,7 +52,7 @@ tools: [Read, Edit, Write, Bash, Glob, Grep, Task, ...]
 
 When invoked from top-level (e.g., user opens a session and `Task` is dispatched once to `orchestrator`), `Task` is available and the orchestrator can call `Task(subagent_type=architect, ...)`, etc.
 
-When invoked via `@th-orchestrator` mention from inside an active session, `Task` is stripped despite being declared in `tools:`. The orchestrator detects this via a boot probe and emits a dispatch handoff. Top-level Claude reads the handoff and takes over the orchestration role.
+When invoked via `@th:orchestrator` mention from inside an active session, `Task` is stripped despite being declared in `tools:`. The orchestrator detects this via a boot probe and emits a dispatch handoff. Top-level Claude reads the handoff and takes over the orchestration role.
 
 ### Alternatives considered
 
@@ -69,12 +69,12 @@ When invoked via `@th-orchestrator` mention from inside an active session, `Task
 
 ### Workaround we ship today
 
-Documented at https://github.com/valianx/team-harness/blob/main/agents/th-orchestrator.md (Dispatch-blocked exit section) and https://github.com/valianx/team-harness/blob/main/CLAUDE.md (§13 Universal rule — auto-takeover on `blocked-no-dispatch`). PR https://github.com/valianx/team-harness/pull/15 reduces the handoff token cost from ~3k to ~300 via a structured JSON payload, but the round-trip itself remains until this upstream change lands.
+Documented at https://github.com/valianx/team-harness/blob/main/agents/orchestrator.md (Dispatch-blocked exit section) and https://github.com/valianx/team-harness/blob/main/CLAUDE.md (§14 Universal rule — auto-takeover on `blocked-no-dispatch`). PR https://github.com/valianx/team-harness/pull/15 reduces the handoff token cost from ~3k to ~300 via a structured JSON payload, but the round-trip itself remains until this upstream change lands.
 
 ### Environment
 
 - Claude Code CLI version: any recent (issue is consistent across releases).
-- Reproducibility: deterministic via `@th-orchestrator` mention on any agent that declares `Task`.
+- Reproducibility: deterministic via `@th:orchestrator` mention on any agent that declares `Task`.
 
 ### Related
 
