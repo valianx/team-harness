@@ -1070,6 +1070,17 @@ check(
     "the block must clarify that ~/.claude/agents/ absence is not a failure",
 )
 
+check(
+    "orchestrator.md has '### Final Pipeline Sanity Check' section",
+    "### Final Pipeline Sanity Check" in orchestrator_md,
+    "missing Final Pipeline Sanity Check section — post-Phase-4 artifact catch-all is required",
+)
+check(
+    "orchestrator.md contains both 'pipeline.incomplete' and 'blocked-incomplete' literals",
+    "pipeline.incomplete" in orchestrator_md and "blocked-incomplete" in orchestrator_md,
+    "both the JSONL event name and the status enum value must be present in orchestrator.md",
+)
+
 # ---------------------------------------------------------------------------
 # Suite 19 — Agent identity & cross-reference consistency
 # ---------------------------------------------------------------------------

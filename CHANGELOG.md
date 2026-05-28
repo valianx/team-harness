@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Final Pipeline Sanity Check in orchestrator — after Phase 4 delivery returns `success`, verifies all expected artifacts (derived from `00-state.md § Agent Results`) are present and non-empty before proceeding to Phase 5. Failure appends a `pipeline.incomplete` event, sets `status: blocked-incomplete`, and escalates to the operator with the list of missing files; no retry (per-phase Artifact Verification Protocol already retried once per agent).
 - New managed block `nested-dispatch-takeover` written to `~/.claude/CLAUDE.md` by `/th:setup`. The block tells top-level Claude how to auto-recover from a nested-context `dispatch_handoff` from any repo, not only from `team-harness`. Block content references `docs/subagent-orchestration.md` for the full 8-step protocol and notes the `~/.claude/agents/` red herring (plugin agents live under `~/.claude/plugins/cache/.../th/<ver>/agents/`).
 
 ### Changed

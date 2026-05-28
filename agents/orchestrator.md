@@ -361,6 +361,56 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 
 **This protocol is mandatory.** Skipping artifact verification is a contract violation equivalent to skipping a phase. The protocol catches silent agent failures where the status block says `success` but the agent did not write its output — a class of bug that propagates downstream as missing context for the next agent.
 
+### Final Pipeline Sanity Check
+
+After `delivery` returns `status: success` at Phase 4, and before any reporting that implies "pipeline complete" (and before Phase 5 — GitHub Update), the orchestrator MUST execute this check. It is mandatory with no skip condition. Pipelines that never reach Phase 4 success are not affected.
+
+**Trigger:** Phase 4 delivery returns `status: success` → run this check → only then proceed to Phase 5 and final reporting.
+
+**Mechanic:**
+
+1. Read `{docs_root}/00-state.md § Agent Results` and enumerate all rows with `status: success`.
+2. For each `(agent, phase)` row with `status: success`, consult the canonical mapping table in `### Artifact Verification Protocol` to resolve the expected artifact. Do NOT duplicate the table here — the `### Artifact Verification Protocol` table is the single source of truth.
+3. Exclude rows whose expected artifact is marked `(no file)` in that table (e.g., `qa` in `ratify-plan` mode).
+4. For each remaining expected artifact, use `Read` to verify:
+   - The file exists at `{docs_root}/{expected_artifact}`.
+   - The file is non-empty (file size > 0).
+   Content semantics are NOT checked — presence and non-empty status only. This matches the per-phase Artifact Verification Protocol mechanic.
+5. Build two lists: `present_artifacts` (verified) and `missing_artifacts` (absent or empty).
+
+**Success path** (`missing_artifacts` is empty):
+
+- Append `{"ts":"<ISO>","event":"pipeline.complete","feature":"<name>","verified_artifacts":<N>}` to `{docs_root}/{events_file}`.
+- Proceed to Phase 5 (GitHub Update) and all subsequent phases normally.
+
+**Failure path** (`missing_artifacts` is non-empty):
+
+- Append `{"ts":"<ISO>","event":"pipeline.incomplete","feature":"<name>","missing_artifacts":[<list>],"action":"escalate"}` to `{docs_root}/{events_file}`.
+- Set `status: blocked-incomplete` in `{docs_root}/00-state.md § Current State`.
+- **No retry.** The per-phase Artifact Verification Protocol already retried once per agent before letting the phase pass. This check is a catch-all smoke test, not a second retry layer.
+- Escalate to the operator with a STOP block that lists every missing file and the recovery action.
+- **Do NOT emit any "pipeline complete" signal.** Phase 5 (GitHub Update) and Phase 6 (KG Save) do NOT execute in this state. Note: Phase 4 delivery already created the PR on the remote — it remains in a valid state on remote. The operator can resolve the missing artifacts and resume Phases 5–6 via `/th:recover`.
+
+**Pipeline-type awareness:** the expected-artifact list is derived dynamically from `00-state.md § Agent Results`, not from a hardcoded static list. This means:
+
+- A `docs` pipeline that never dispatched `security` does NOT expect `04-security.md`.
+- A `fix` pipeline (Tier 2–4) that dispatched `tester` in `pre-fix-regression` mode DOES expect `02-regression-test.md`.
+- A `feat` pipeline with `frontend-scope: true` DOES expect `01-ux-review.md` and `04-ux-validation.md` (because `ux-reviewer` appears in Agent Results).
+
+**STOP block template for failure path:**
+
+```
+FINAL PIPELINE SANITY CHECK — INCOMPLETE
+
+The following expected artifacts are missing or empty in `{docs_root}`:
+{list each missing file on its own line}
+
+Pipeline status set to `blocked-incomplete`. Phase 5 (GitHub Update) and Phase 6 (KG Save) have NOT been executed.
+The PR created by delivery is valid on remote.
+
+Next action: run `/th:recover` to investigate. Identify which agent produced `status: success` without writing its artifact, then re-dispatch that agent.
+```
+
 ```markdown
 # Pipeline State: {feature-name}
 **Last updated:** {timestamp}
@@ -376,7 +426,7 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 - type: {feature|fix|refactor|hotfix|enhancement|research|spike|docs}
 - phase: {0a|0b|1|1.5|1.6|2.0|2|2.5|3|3.5|3.75|3.6|4|4.5|5|6}
 - stage: {1|2|3}
-- status: {in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-no-dispatch}
+- status: {in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-no-dispatch|blocked-incomplete}
 - iteration: {N}/3
 - autonomous: {true|false}
 - autonomous_granted_at: {STAGE-GATE-1 | STAGE-GATE-2-after-round-R{N} | null}
@@ -2348,7 +2398,7 @@ Every line is a JSON object with these fields:
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 timestamp with timezone (e.g. `2026-05-01T14:00:00-03:00`). |
-| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`. |
+| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `pipeline.complete`, `pipeline.incomplete`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`. |
 | `feature` | yes | Feature name (kebab-case, matches the workspaces folder). |
 | `phase` | conditional | Phase identifier (e.g. `0a-intake`, `1-design`, `1-root-cause`, `2-implement`, `2.0-regression-test`, `3-verify`, `1.5-ratify-plan`, `1.6-plan-review`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
 | `stage` | conditional | Stage number (`1` / `2` / `3`). Required for `stage.gate*` events. |
@@ -2399,6 +2449,8 @@ Every line is a JSON object with these fields:
 | `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
 | `stage.notify` | After invoking `hooks/notify-stage.sh` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
 | `stage.notify.skipped` | When toast emission is skipped — either because `stage.notify` for that stage already exists in the JSONL (`reason: already-fired`), or the wrapper is absent (`reason: wrapper-missing`). |
+| `pipeline.complete` | Immediately after the Final Pipeline Sanity Check passes (all expected artifacts present and non-empty). Emitted before Phase 5. |
+| `pipeline.incomplete` | Immediately after the Final Pipeline Sanity Check fails (one or more expected artifacts missing or empty). Sets `status: blocked-incomplete`; Phase 5 and Phase 6 do NOT execute. |
 | `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
 
 ### Implementation note
