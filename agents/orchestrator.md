@@ -697,6 +697,47 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    - **Unclear** → **ask a clarifying question.** Do NOT guess. Example: "Is the goal to translate the app (translate mode) or to implement a translation feature (full pipeline)?"
 
+   **Step 6c — ClickUp conversational intents (MCP-direct, no pipeline).**
+
+   ClickUp ops are routed to MCP tools directly when the operator references a specific task.
+   This is NOT a direct mode and NOT the full pipeline — the orchestrator calls the MCP tool,
+   reports the result, and exits the routing step. The pipeline is not engaged.
+
+   **Trigger condition.** The utterance MUST contain a task identifier:
+   - literal `task <ID>` where ID is alphanumeric (ClickUp task IDs match `[0-9a-z]+`)
+   - `#<ID>` (prefix form)
+   - `task "<name>"` or `task '<name>'` (quoted name)
+   - `task <name>` (unquoted name) only when the rest of the utterance starts with one of the action verbs below.
+
+   If no task identifier is present, fall through to Step 6a (the utterance is handled as a regular
+   intent — pipeline routing applies).
+
+   | Intent Pattern (es/en) | MCP Tool | Notes |
+   |------------------------|----------|-------|
+   | "deja/dejá un comentario corto en task \<id\|name\>: \<texto\>" / "leave a short comment on task \<id\|name\>: \<text\>" / "comenta en task \<id\|name\>: \<texto\>" | `clickup_create_task_comment` | Comment body is the literal text after the colon. |
+   | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Pass status verbatim from operator (no enum validation — see Status pass-through note). |
+   | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
+   | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Pass `<state>` verbatim. |
+   | "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into Step 7 (Classify) as full pipeline. |
+   | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
+
+   **Name-vs-ID resolution.** When the operator references a task by name (not ID):
+   1. Call `clickup_search` with the name as query.
+   2. If 0 matches: ask the operator to refine. Do not call the action tool.
+   3. If 1 match: present `ID | Title | Status` and confirm `[Y/n]` before calling the action tool.
+   4. If 2-5 matches: present a numbered list; ask the operator to pick a number; confirm before calling.
+   5. If >5 matches: report the count and ask the operator to refine the name.
+   Never call the action MCP tool without an explicit confirmation when the input is by name.
+
+   **Status pass-through.** ClickUp workspaces define arbitrary statuses per list. The orchestrator
+   passes the operator's literal status string to `clickup_update_task`. If the MCP returns an
+   invalid-status error, surface the error message verbatim and ask the operator for the correct
+   status name. No hardcoded enum.
+
+   **MCP tools referenced (verbatim).** `clickup_filter_tasks`, `clickup_search`,
+   `clickup_get_task`, `clickup_create_task_comment`, `clickup_update_task`,
+   `clickup_find_member_by_name`, `clickup_resolve_assignees`.
+
    **Rules:**
    - Always default to the most complete submode when a direct mode has options.
    - If the request mixes a direct mode with development work (e.g., "translate and add settings page"), treat as full pipeline.
