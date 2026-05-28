@@ -6,8 +6,8 @@ Slash-command entry points. Each skill is a directory with a `SKILL.md` file tha
 
 Every skill lives at `skills/<name>/SKILL.md`. This format is compatible with both the Claude Code plugin (auto-discovers all `SKILL.md` files) and the Go installer (copies the full directory recursively).
 
-When the plugin is active, skills are invoked as `/th:<name>`.
-When installed via the Go binary installer, skills are invoked as `/<name>`.
+When the plugin is active (canonical path), skills are invoked as `/th:<name>`.
+When installed via the legacy Go binary installer, skills are invoked as `/<name>`.
 
 ### Complex skill — subfolder with references
 
@@ -33,7 +33,8 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 1. Create `skills/<name>/SKILL.md` with frontmatter and a body.
 2. Default behaviour: parse args, route to orchestrator with a descriptive mode. Use existing skills as templates.
 3. For skills with supporting material, add `skills/<name>/references/` with the relevant files.
-4. Run `./bin/install.sh` (or `.\bin\install.ps1` on Windows) to propagate via the Go installer, or `/plugin reload th` in plugin mode.
+4. **Plugin (canonical):** run `/plugin reload th` inside Claude Code to pick up the new skill.
+   **Legacy (contributors):** run `go run ./cmd/install` from the repo root to propagate via the Go installer.
 5. Add a `CHANGELOG.md` entry under `[Unreleased]`.
 6. Open a PR.
 

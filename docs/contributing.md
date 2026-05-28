@@ -13,6 +13,8 @@ See [`CLAUDE.md` §6](../CLAUDE.md) for the full set. The floor:
 
 ## Testing local edits
 
+> **Note for end-users:** The Go installer (`go run ./cmd/install` and the bootstrap scripts in `bin/`) is the legacy install path as of v2.33.0. End-users install via the Claude Code plugin (`/plugin install th`). The Go installer remains the propagation tool for contributors editing agents, skills, or hooks locally.
+
 Use `go run ./cmd/install` from the repo root. The `//go:embed` directive snapshots your working-tree `agents/`, `skills/`, `hooks/` at compile time, so the install reflects your edits exactly.
 
 The bootstrap scripts (`./bin/install.sh` / `.\bin\install.ps1`) always download the released binary — they don't use your local clone.

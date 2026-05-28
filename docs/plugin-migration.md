@@ -42,7 +42,7 @@ Skills now use the directory format. Each skill lives at `skills/<name>/SKILL.md
 - **Pipeline behavior** — all pipelines (feature, fix, hotfix, research, docs, review) run identically.
 - **orchestrator as entry point** — `@th:orchestrator` in chat still routes to the same orchestrator agent.
 - **Workspaces** — pipeline workspaces (local `./workspaces/` or Obsidian vault) work identically.
-- **Low-cost mode** — available via the Go installer (the plugin cannot transform frontmatter on install).
+- **Low-cost mode** — only available via the legacy Go installer; the plugin cannot transform frontmatter on install. See [`docs/install.md` § Legacy installer](./install.md#legacy-installer-contributors--offline--ci).
 - **`.team-harness.json` manifest** — config file location and format unchanged.
 
 ---
@@ -125,12 +125,12 @@ Run `/plugin reload th` or restart Claude Code. Plugin skills require a reload a
 
 If the Go installer left behind flat `.md` files under `~/.claude/commands/` that have no plugin equivalent, run `/th:update` which includes a legacy orphan cleanup step for directory-format migrations.
 
-### Low-cost mode not available in plugin
+### Low-cost mode (legacy Go installer only)
 
-The plugin does not transform frontmatter on install. To use low-cost mode (all agents on `sonnet` / `medium` effort), use the Go installer:
+The plugin does not transform frontmatter on install. To use low-cost mode (all agents on `sonnet` / `medium` effort), use the legacy Go installer:
 
 ```bash
 INSTALL_MODE=low-cost curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 ```
 
-The Go installer and plugin can coexist — the installer writes to `~/.claude/` and the plugin writes to the plugin root. Install plugin first, then run the low-cost installer to overwrite the agent files with the low-cost variants.
+The Go installer is the legacy install path as of v2.33.0 — it remains functional for this use case. The installer writes to `~/.claude/` and the plugin writes to the plugin root; they can coexist. See [`docs/install.md` § Legacy installer](./install.md#legacy-installer-contributors--offline--ci) for full details.

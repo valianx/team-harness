@@ -1,18 +1,36 @@
 # Installation guide
 
-Detailed installation reference. For the **quick one-liner**, see the [README](../README.md#install).
+Detailed installation reference. For the **canonical install**, see the [README](../README.md#install).
 
 ---
 
-## One-liner install
+## Plugin install (canonical)
 
-The three commands in the README's Install section are the canonical install path. The bootstrap script detects your OS and architecture, downloads the latest released binary from GitHub Releases, and runs it. Agents, skills, and hooks are embedded in the binary (no separate downloads) and written directly to `~/.claude/`.
+The Claude Code plugin is the canonical install path. Run the following three commands inside Claude Code:
+
+```
+/plugin marketplace add valianx/team-harness
+/plugin install th
+/th:setup
+```
+
+`/th:setup` configures the two required MCP servers (Memory and context7) and sets your **logs mode** (local `./workspaces/` or an Obsidian vault). After setup, restart Claude Code to pick up the new agents and skills.
+
+---
+
+## Legacy installer (contributors / offline / CI)
+
+> **Note:** The Go binary installer is the legacy install path as of v2.33.0. It remains functional for offline environments, CI pipelines, and operators who require `low-cost` mode (the plugin cannot transform frontmatter on install). End-users installing for the first time should use the plugin path above.
+
+The bootstrap scripts detect your OS and architecture, download the latest released binary from GitHub Releases, and run it. Agents, skills, and hooks are embedded in the binary (no separate downloads) and written directly to `~/.claude/`.
+
+See [`bin/README.md`](../bin/README.md) for the full legacy bootstrap documentation.
 
 After install, **restart Claude Code** to pick up the new agents and MCP servers.
 
 ---
 
-## What the installer asks
+### What the installer asks
 
 On an interactive terminal, the installer walks through three prompts in order:
 
@@ -22,7 +40,7 @@ On an interactive terminal, the installer walks through three prompts in order:
 
 ---
 
-## Install modes
+### Install modes
 
 | Mode | Who it's for | What changes |
 |---|---|---|
@@ -31,9 +49,7 @@ On an interactive terminal, the installer walks through three prompts in order:
 
 Low-cost trades documented quality for lower API cost. Standard is the default precisely because Max / Team operators should stay there. See [`agents/README.md §"Low-cost mode"`](../agents/README.md#low-cost-mode) for the full matrix and trade-off analysis.
 
----
-
-## Non-interactive install (CI / scripts)
+### Non-interactive install (CI / scripts)
 
 Set env vars instead of prompting:
 
@@ -53,7 +69,7 @@ curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 
 ---
 
-## Reset MCP config
+### Reset MCP config
 
 Pass `--force` to reset existing `mcpServers` entries in `~/.claude.json` (bypass the Keep/Change preservation menu):
 
@@ -112,7 +128,9 @@ The canonical entry point after install is the `orchestrator` agent. Type `@th:o
 
 ## Updating
 
-Re-run the one-liner. Unchanged files are skipped; files that differ from the embedded release bytes are overwritten.
+**Plugin (canonical):** run `/plugin marketplace update team-harness-marketplace` then `/reload-plugins` inside Claude Code.
+
+**Legacy installer:** re-run the bootstrap. Unchanged files are skipped; files that differ from the embedded release bytes are overwritten.
 
 ```bash
 curl -fsSL https://valianx.github.io/team-harness/install.sh | bash

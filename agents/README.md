@@ -106,7 +106,8 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 
 Per the top-level `CLAUDE.md`, agent changes route through the `architect` subagent first, and the `agent-builder` agent writes the prompt. After editing:
 
-1. Run `./bin/install.sh` (or `uv run bin/install.py`) to propagate into your own `~/.claude/`.
+1. **Plugin (canonical):** run `/plugin reload th` inside Claude Code to pick up changes.
+   **Legacy (contributors):** run `go run ./cmd/install` from the repo root to propagate into your own `~/.claude/`. The `./bin/install.sh` / `.\bin\install.ps1` bootstrap scripts download the released binary — they don't use the local clone.
 2. Add a `CHANGELOG.md` entry under `[Unreleased]`.
 3. Open a PR.
 
