@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.35.0] - 2026-05-28
+
 ### Added
 
 - New `/th:clickup` skill with three sub-commands (`setup`, `tasks`, `task <id>`) and orchestrator conversational intent patterns (Step 6c) for ClickUp task ops (comment, status change, close, route-to-pipeline) routed directly to ClickUp MCP tools.
