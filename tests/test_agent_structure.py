@@ -1038,6 +1038,38 @@ check(
     "drift detected — enum value must match in all three files",
 )
 
+# --- nested-dispatch-takeover block (v2.33.1) ---
+# The block is written by /th:setup to ~/.claude/CLAUDE.md so top-level Claude
+# can auto-recover from a dispatch_handoff in ANY repo, not just team-harness.
+# Only the skill surface is asserted; the Go installer will be removed in a
+# follow-up task and is intentionally not mirrored.
+
+NESTED_TAKEOVER_MARKER_START = "<!-- nested-dispatch-takeover:start -->"
+NESTED_TAKEOVER_MARKER_END = "<!-- nested-dispatch-takeover:end -->"
+
+setup_skill_md = read(SKILLS_DIR / "setup" / "SKILL.md")
+
+check(
+    "skills/setup/SKILL.md contains nested-dispatch-takeover start marker",
+    NESTED_TAKEOVER_MARKER_START in setup_skill_md,
+    "setup SKILL.md must declare the new managed block start marker",
+)
+check(
+    "skills/setup/SKILL.md contains nested-dispatch-takeover end marker",
+    NESTED_TAKEOVER_MARKER_END in setup_skill_md,
+    "setup SKILL.md must declare the new managed block end marker",
+)
+check(
+    "skills/setup/SKILL.md nested block references docs/subagent-orchestration.md",
+    "docs/subagent-orchestration.md" in setup_skill_md,
+    "the block must point operators to the full 8-step protocol",
+)
+check(
+    "skills/setup/SKILL.md nested block names the red-herring '~/.claude/agents/'",
+    "~/.claude/agents/" in setup_skill_md and "plugins/cache" in setup_skill_md,
+    "the block must clarify that ~/.claude/agents/ absence is not a failure",
+)
+
 # ---------------------------------------------------------------------------
 # Suite 19 — Agent identity & cross-reference consistency
 # ---------------------------------------------------------------------------
