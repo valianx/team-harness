@@ -44,6 +44,16 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def skill_path(name: str) -> Path:
+    """Resolve a skill name to its file, supporting both the subdirectory
+    layout (`skills/<name>/SKILL.md`, current) and the legacy flat layout
+    (`skills/<name>.md`). Prefers the subdirectory form when present."""
+    sub = SKILLS_DIR / name / "SKILL.md"
+    if sub.exists():
+        return sub
+    return SKILLS_DIR / f"{name}.md"
+
+
 def parse_frontmatter(text: str) -> dict[str, str]:
     if not text.startswith("---"):
         return {}
@@ -141,7 +151,7 @@ checks_orch = [
     ("approve autonomous gate phrase", "approve autonomous"),
     ("pipeline_version field", "pipeline_version"),
     ("plan-reviewer in team", "plan-reviewer"),
-    ("02-task-list.md artifact", "02-task-list.md"),
+    ("01-plan.md Task List section", "Task List"),
     ("Plan Review appended to 01-plan.md", "01-plan.md § Plan Review"),
     ("stage.gate event", "stage.gate"),
     ("stage.gate.release event", "stage.gate.release"),
@@ -154,7 +164,7 @@ checks_orch = [
     ("STAGE-GATE-2 partial-fail handling", "partial-fail"),
     ("after_round JSONL field", "after_round"),
     ("STAGE-GATE-1 surfaces TL;DR inline", "TL;DR"),
-    ("STAGE-GATE-1 surfaces Decisions for human review inline", "Decisions for human review"),
+    ("STAGE-GATE-1 surfaces Review Summary inline", "Review Summary"),
     ("STAGE-GATE-1 surfaces PR Summary inline", "PR Summary"),
     ("STAGE-GATE-1 protects against giant Summary table", "+{N-10} more"),
     ("test-ratchet", "Test-ratchet check"),
@@ -306,7 +316,7 @@ for os_key in ("windows", "macos", "linux"):
 print()
 print("=== Suite 10: skills/background.md ===")
 
-bg_path = SKILLS_DIR / "background.md"
+bg_path = skill_path("background")
 check("skills/background.md exists", bg_path.exists())
 if bg_path.exists():
     bg = read(bg_path)
@@ -344,8 +354,8 @@ check("docs/pipelines.md mentions Internal Review",
       "Internal Review" in pipelines_md)
 
 skills_readme = read(SKILLS_DIR / "README.md")
-check("skills/README.md lists /background as standalone",
-      "/background" in skills_readme)
+check("skills/README.md lists /th:background as standalone",
+      "/th:background" in skills_readme)
 
 # ---------------------------------------------------------------------------
 # Suite 12 — plan-reviewer contract + 3-stage gates wiring across agents
@@ -366,8 +376,7 @@ if pr_path.exists():
         ("Rule 6 (human-readability sections)", "Rule 6"),
         ("TL;DR section requirement", "## TL;DR"),
         ("Decisions for human review section", "## Decisions for human review"),
-        ("Summary table requirement on 02-task-list.md", "## Summary"),
-        ("TL;DR hard cap of 10 lines", "10 lines"),
+        ("Summary table requirement on 01-plan.md § Task List", "## Summary"),
         ("Decisions hard cap of 7 bullets", "7 bullets"),
         ("temporal-prod reason: coexistence window", "coexistence window"),
         ("temporal-prod reason: production signal", "production signal"),
@@ -395,9 +404,9 @@ if pr_path.exists():
 
 # architect.md must declare the dual output and the Services Touched section
 architect = read(AGENTS_DIR / "architect.md")
-check("architect.md declares dual-output (01-architecture.md + 02-task-list.md)",
-      "02-task-list.md" in architect and "Dual output" in architect,
-      "dual-output contract not documented in architect.md")
+check("architect.md declares single-file output (01-plan.md)",
+      "01-plan.md" in architect and "Single-file output" in architect,
+      "single-file output contract (01-plan.md) not documented in architect.md")
 check("architect.md declares the closed list of temporal-prod reasons",
       all(reason in architect for reason in
           ["coexistence window", "production signal", "cross-repo deploy gate"]),
@@ -411,18 +420,18 @@ check("architect.md per-PR template uses Given/When/Then",
       "Given/When/Then format not documented in architect")
 
 # architect.md must require the human-readability sections
-check("architect.md requires ## TL;DR section in 01-architecture.md",
+check("architect.md requires ## TL;DR section (root-cause mode)",
       "## TL;DR" in architect and "MANDATORY" in architect,
       "TL;DR section not declared mandatory in architect.md")
 check("architect.md requires ## Decisions for human review section",
       "## Decisions for human review" in architect,
       "Decisions for human review section not documented")
-check("architect.md requires ## Summary table in 02-task-list.md",
+check("architect.md requires ## Summary table in 01-plan.md § Task List",
       "## Summary" in architect and "Summary table" in architect,
-      "Summary table not required in 02-task-list.md schema")
-check("architect.md spells out TL;DR is 3-6 lines (hard cap 10)",
-      "3-6 lines" in architect and ("hard cap 10" in architect or "cap 10" in architect),
-      "TL;DR size guidance missing")
+      "Summary table not required in 01-plan.md § Task List schema")
+check("architect.md spells out Review Summary opening is ≤5 sentences",
+      "≤5 sentences" in architect,
+      "Review Summary size guidance (≤5 sentences) missing")
 check("architect.md spells out Decisions is 3-5 bullets (hard cap 7)",
       "3-5 bullets" in architect and ("hard cap 7" in architect or "cap 7" in architect),
       "Decisions for human review size guidance missing")
@@ -433,20 +442,20 @@ check("architect.md allows 'No human-judgement decisions' as valid value",
       "No human-judgement decisions" in architect,
       "fallback bullet for zero decisions not documented")
 
-# qa.md must declare per-PR scoping when 02-task-list.md is present
+# qa.md must declare per-PR scoping when 01-plan.md § Task List is present
 qa_md = read(AGENTS_DIR / "qa.md")
-check("qa.md validate-mode reads 02-task-list.md per PR",
-      "02-task-list.md" in qa_md,
-      "02-task-list.md per-PR scoping not documented in qa.md")
+check("qa.md validate-mode reads 01-plan.md per PR",
+      "01-plan.md" in qa_md,
+      "01-plan.md per-PR scoping not documented in qa.md")
 check("qa.md distinguishes Phase 1.5 (ratify) from Phase 1.6 (plan-review)",
       "Phase 1.5" in qa_md and "Phase 1.6" in qa_md and "plan-reviewer" in qa_md,
       "qa.md does not document the distinction with plan-reviewer")
 
 # implementer.md must declare per-PR scoping + SCOPE-DRIFT annotation
 impl_md = read(AGENTS_DIR / "implementer.md")
-check("implementer.md reads 02-task-list.md for per-PR ACs",
-      "02-task-list.md" in impl_md,
-      "implementer.md does not read 02-task-list.md")
+check("implementer.md reads 01-plan.md for per-PR ACs",
+      "01-plan.md" in impl_md,
+      "implementer.md does not read 01-plan.md")
 check("implementer.md declares SCOPE-DRIFT annotation",
       "SCOPE-DRIFT" in impl_md,
       "SCOPE-DRIFT annotation pattern not documented")
@@ -459,8 +468,8 @@ check("ref-direct-modes.md adds Plan Review direct mode",
 
 # ref-special-flows.md updates plan flow vs design mode distinction
 ref_flows = read(AGENTS_DIR / "ref-special-flows.md")
-check("ref-special-flows.md distinguishes 01-planning.md vs 02-task-list.md",
-      "01-planning.md" in ref_flows and "02-task-list.md" in ref_flows,
+check("ref-special-flows.md distinguishes 01-planning.md vs 01-plan.md",
+      "01-planning.md" in ref_flows and "01-plan.md" in ref_flows,
       "plan flow vs design mode distinction not documented")
 check("ref-special-flows.md addresses double-gating in plan-and-execute",
       "double-gating" in ref_flows.lower() or "No double-gating" in ref_flows,
@@ -485,8 +494,9 @@ check("docs/pipelines.md mentions STAGE-GATE-2", "STAGE-GATE-2" in pipelines_md,
       "STAGE-GATE-2 not documented in docs/pipelines.md")
 check("docs/pipelines.md mentions STAGE-GATE-3", "STAGE-GATE-3" in pipelines_md,
       "STAGE-GATE-3 not documented in docs/pipelines.md")
-check("README.md mentions plan-reviewer", "plan-reviewer" in top_readme,
-      "plan-reviewer not surfaced in top-level README")
+# (README.md no longer enumerates agents — minimal landing page; the roster
+#  lives in agents/README.md, covered by the check above. See the relocation
+#  note for the gate identifiers immediately above.)
 
 # ---------------------------------------------------------------------------
 # Suite 13 — human-readable state (## TL;DR + /status timeline)
@@ -517,7 +527,7 @@ for phase_label in ("Phase 0a", "Phase 1.6", "STAGE-GATE-1", "Phase 2 ", "Phase 
 # (this check expands to 8 phase-label assertions; counted as one logical check group)
 
 # skills/status.md changes
-status_md = read(SKILLS_DIR / "status.md")
+status_md = read(skill_path("status"))
 check("skills/status.md no-args table has Stage column",
       "Stage" in status_md and "| Stage |" in status_md,
       "Stage column not added to /status no-args table")
@@ -633,7 +643,7 @@ check("init.md still creates docs/knowledge.md placeholder (option a)",
       "init.md no longer documents creating docs/knowledge.md — option (a) violated")
 
 # 10. memory skill documents new types
-mem_skill = read(SKILLS_DIR / "memory.md")
+mem_skill = read(skill_path("memory"))
 for new_type in ("project", "service", "stack-profile"):
     check(f"skills/memory.md documents '{new_type}' as a type filter",
           new_type in mem_skill,
@@ -688,7 +698,7 @@ check("CHANGELOG.md [Unreleased] mentions Mandatory Working Agreements",
 #   orchestrator.md: explicit plan-review routing + qa-substance ban
 # Triggered by a real failure in a downstream pipeline that accumulated
 # 01-coverage-review.md, 02-flow-coverage.md and a qa-reports/PR-N.md tree
-# alongside 01-architecture.md / 02-task-list.md instead of refining them
+# alongside 01-plan.md instead of refining it
 # in place. These checks assert the guardrails are in the prompts so the
 # same drift cannot recur silently.
 # ---------------------------------------------------------------------------
@@ -728,7 +738,7 @@ for ban in ("Version markers", "Previously decided", "Strikethrough"):
           f"architect.md does not list '{ban}' as a forbidden pattern")
 
 # 5. architect.md ban applies to the canonical analysis docs
-for doc in ("01-architecture.md", "02-task-list.md", "00-task-intake.md"):
+for doc in ("01-plan.md", "01-planning.md", "01-root-cause.md"):
     check(f"architect.md forbidden-patterns section names {doc}",
           "Forbidden output patterns" in architect_md and doc in architect_md,
           f"architect.md does not name {doc} as in-place-edit target")
@@ -789,23 +799,23 @@ for status in ("in-progress", "verified", "merged", "blocked"):
     check(f"architect.md task-list contract names Status value '{status}'",
           status in architect_md,
           f"architect.md does not enumerate Status value '{status}'")
-check("architect.md restricts post-gate writes on 02-task-list.md",
+check("architect.md restricts post-gate writes on 01-plan.md",
       "Write scope (hard rule for all agents)" in architect_md
       or "After STAGE-GATE-1 release, the only mutations allowed" in architect_md,
-      "architect.md does not pin the post-gate write scope on 02-task-list.md")
+      "architect.md does not pin the post-gate write scope on 01-plan.md")
 
-# 13. qa.md mirrors AC PASS into 02-task-list.md checkboxes
-check("qa.md declares the AC-checkbox mirror in 02-task-list.md",
-      "AC checkbox mirror in `02-task-list.md`" in qa_md,
+# 13. qa.md mirrors AC PASS into 01-plan.md § Task List checkboxes
+check("qa.md declares the AC-checkbox mirror in 01-plan.md",
+      "AC checkbox mirror in `01-plan.md`" in qa_md,
       "qa.md does not declare the AC-checkbox mirror contract")
-check("qa.md restricts edits on 02-task-list.md to checkbox flips",
-      "only** edit you are allowed to make on `02-task-list.md`" in qa_md
-      or "only edit you are allowed to make on 02-task-list.md" in qa_md,
-      "qa.md does not pin its edit scope on 02-task-list.md to checkbox flips")
+check("qa.md restricts edits on 01-plan.md to checkbox flips",
+      "only** edit you are allowed to make on `01-plan.md`" in qa_md
+      or "only edit you are allowed to make on 01-plan.md" in qa_md,
+      "qa.md does not pin its edit scope on 01-plan.md to checkbox flips")
 
 # 14. orchestrator.md mirrors PR transitions to the Status field
-check("orchestrator.md declares Mirror PR-level progress into 02-task-list.md",
-      "Mirror PR-level progress into `02-task-list.md`" in orchestrator_md,
+check("orchestrator.md declares Mirror PR-level progress into 01-plan.md",
+      "Mirror PR-level progress into `01-plan.md`" in orchestrator_md,
       "orchestrator.md does not declare the Status mirror contract")
 for transition in ("in-progress", "verified", "merged", "blocked"):
     check(f"orchestrator.md Status mirror table names '{transition}'",
@@ -816,11 +826,11 @@ check("orchestrator.md hands the 'merged' transition to delivery",
       or "delivery agent owns the merged transition" in orchestrator_md,
       "orchestrator.md does not assign the merged transition to delivery")
 
-# 15. implementer.md acknowledges it never writes 02-task-list.md
-check("implementer.md says it never writes to 02-task-list.md",
-      "NEVER write to `02-task-list.md`" in implementer_md
-      or "never write to 02-task-list.md" in implementer_md.lower(),
-      "implementer.md does not declare that it never writes to 02-task-list.md")
+# 15. implementer.md acknowledges it never writes 01-plan.md
+check("implementer.md says it never writes to 01-plan.md",
+      "NEVER write to `01-plan.md`" in implementer_md
+      or "never write to 01-plan.md" in implementer_md.lower(),
+      "implementer.md does not declare that it never writes to 01-plan.md")
 
 # ---------------------------------------------------------------------------
 # Suite 17 — Backend-agnostic naming for the knowledge graph
@@ -961,7 +971,13 @@ check(
     "orchestrator must refuse to merge PRs until Phase 3 and STAGE-GATE-3 are complete",
 )
 
-# --- CLAUDE.md § 13 ---
+# --- CLAUDE.md § 13/14 + docs/subagent-orchestration.md ---
+# CLAUDE.md §14 carries the universal rule and points to the full 8-step protocol
+# in docs/subagent-orchestration.md. The detailed semantics (autonomy gating,
+# invocation-mode coverage, the explicit "do NOT ask the user" imperative) live
+# in that doc, so the takeover-contract markers below resolve against either file.
+_subagent_orch_md = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_takeover_contract = claude_md + "\n" + _subagent_orch_md
 check(
     "CLAUDE.md has universal auto-takeover rule",
     "Universal rule — auto-takeover" in claude_md
@@ -979,24 +995,27 @@ check(
     "rule must reference the same trigger phrase the orchestrator response uses",
 )
 check(
-    "CLAUDE.md rule explicitly says do NOT ask the user",
-    "Do NOT ask the user" in claude_md or "do NOT ask the user" in claude_md,
+    "takeover rule explicitly says do NOT ask the user",
+    "Do NOT ask the user" in _takeover_contract
+    or "do NOT ask the user" in _takeover_contract
+    or "not a user-decision point" in _takeover_contract,
     "rule must be imperative about not waiting for user confirmation",
 )
 check(
-    "CLAUDE.md rule covers STAGE-GATE-2 autonomy semantics",
-    "STAGE-GATE-2" in claude_md and ("autonomous" in claude_md or "autonomy" in claude_md),
+    "takeover rule covers STAGE-GATE-2 autonomy semantics",
+    "STAGE-GATE-2" in _takeover_contract
+    and ("autonomous" in _takeover_contract or "autonomy" in _takeover_contract),
     "takeover must respect autonomy gating between PRs (either word is acceptable; the new JSON-handoff design uses `autonomy.granted`).",
 )
 check(
-    "CLAUDE.md rule covers STAGE-GATE-3 always-mandatory",
-    "STAGE-GATE-3" in claude_md,
+    "takeover rule covers STAGE-GATE-3 always-mandatory",
+    "STAGE-GATE-3" in _takeover_contract,
     "STAGE-GATE-3 always needs human approval — takeover must not bypass it",
 )
 check(
-    "CLAUDE.md rule applies regardless of invocation mode",
-    "regardless of how the orchestrator was invoked" in claude_md
-    or "every entry mode" in claude_md,
+    "takeover rule applies regardless of invocation mode",
+    "regardless of how the orchestrator was invoked" in _takeover_contract
+    or "every entry mode" in _takeover_contract,
     "must be explicit that the rule covers @mention, skills, and agent referrals",
 )
 
@@ -1183,9 +1202,10 @@ for ref in sorted(plausible_agent_refs):
 # 5. Phase numbers mentioned in orchestrator.md are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "2.0", "2", "2.5", "3", "3.5", "3.6", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5", "1.6", "2.0", "2", "2.5", "3", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
+    # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
 }
 # Extract `Phase X` mentions, case-insensitive.
 phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", orchestrator_md_v19))
@@ -1197,13 +1217,15 @@ check(
     "to the canonical set or fix the typo",
 )
 
-# 6. Every skill file (top-level .md) has a frontmatter name that — if present —
-#    matches its filename. Skills can omit frontmatter; only check when present.
-SKILL_FILES = sorted(
-    p.stem for p in SKILLS_DIR.glob("*.md") if p.stem != "README"
+# 6. Every skill (subdirectory `skills/<name>/SKILL.md` or legacy flat
+#    `skills/<name>.md`) has a frontmatter name that — if present — matches its
+#    skill name. Skills can omit frontmatter; only check when present.
+SKILL_NAMES = sorted(
+    {p.parent.name for p in SKILLS_DIR.glob("*/SKILL.md")}
+    | {p.stem for p in SKILLS_DIR.glob("*.md") if p.stem != "README"}
 )
-for skill_file in SKILL_FILES:
-    path = SKILLS_DIR / f"{skill_file}.md"
+for skill_name in SKILL_NAMES:
+    path = skill_path(skill_name)
     text = read(path)
     if not text.startswith("---"):
         continue  # skill without frontmatter — allowed
@@ -1212,9 +1234,9 @@ for skill_file in SKILL_FILES:
     if not declared:
         continue
     check(
-        f"skills/{skill_file}.md frontmatter name matches filename (if declared)",
-        declared == skill_file,
-        f"frontmatter name='{declared}' but file is '{skill_file}.md'",
+        f"skills/{skill_name} frontmatter name matches skill name (if declared)",
+        declared == skill_name,
+        f"frontmatter name='{declared}' but skill is '{skill_name}'",
     )
 
 # 7. Every skill name listed in skills/README.md "Routes to orchestrator" line
@@ -1226,7 +1248,9 @@ routes_line_match = re.search(
     skills_readme_v19,
 )
 if routes_line_match:
-    declared_routing_skills = set(re.findall(r"/([a-z][a-z0-9-]+)", routes_line_match.group(1)))
+    # Skills are namespaced `/th:<name>`; strip the optional `th:` prefix so we
+    # resolve the bare skill name (e.g. `/th:issue` → `issue`), not `th`.
+    declared_routing_skills = set(re.findall(r"/(?:th:)?([a-z][a-z0-9-]+)", routes_line_match.group(1)))
     for skill_name in sorted(declared_routing_skills):
         file_exists = (SKILLS_DIR / f"{skill_name}.md").exists()
         dir_exists = (SKILLS_DIR / skill_name / "SKILL.md").exists()
@@ -1339,7 +1363,7 @@ for label, marker in phase_transition_checks:
 
 # --- skills/trace.md exists with the four modes ---
 
-trace_path = SKILLS_DIR / "trace.md"
+trace_path = skill_path("trace")
 check("skills/trace.md exists", trace_path.exists())
 if trace_path.exists():
     trace_md = read(trace_path)
@@ -1367,7 +1391,7 @@ if trace_path.exists():
 
 # --- skills/status.md reads 00-pipeline-summary.md ---
 
-status_md = read(SKILLS_DIR / "status.md")
+status_md = read(skill_path("status"))
 check(
     "skills/status.md <feature-name> mode reads 00-pipeline-summary.md",
     "00-pipeline-summary.md" in status_md,
@@ -1375,8 +1399,8 @@ check(
 )
 check(
     "skills/status.md points to /trace for deeper observability",
-    "/trace" in status_md,
-    "narrative renderer does not advertise /trace",
+    "/th:trace" in status_md,
+    "narrative renderer does not advertise /th:trace",
 )
 
 # --- Agent status blocks: memory_consult + kg_save_candidates on read-only KG agents ---
@@ -1480,6 +1504,9 @@ delivery_kg_checks = [
 claude_md = read(REPO_ROOT / "CLAUDE.md")
 readme_md = read(REPO_ROOT / "README.md")
 prompts_go = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+# The interactive empty-input validation moved from prompts.go to the huh/v2 TUI
+# layer (tui.go); prompts.go now holds only the non-interactive path.
+tui_go = read(REPO_ROOT / "cmd" / "install" / "tui.go")
 
 # Only the CHANGELOG [Unreleased] block is checked for the doc-surface rule;
 # historical entries below it document past behaviour with the URLs that were
@@ -1509,8 +1536,8 @@ no_default_url_checks = [
      "const defaultMemoryMCPURL" not in prompts_go),
     ("cmd/install/prompts.go errors out in non-interactive without MEMORY_MCP_URL env var",
      "Memory MCP URL is required for non-interactive installs" in prompts_go),
-    ("cmd/install/prompts.go errors out on empty interactive input",
-     "empty Memory MCP URL" in prompts_go),
+    ("cmd/install/tui.go errors out on empty interactive input",
+     "URL is required — no default URL exists" in tui_go),
     ("CHANGELOG [Unreleased] block does NOT name a specific host:port for the Memory MCP URL",
      "localhost:7654" not in changelog_unreleased),
 ]
@@ -1521,7 +1548,7 @@ for label, condition in delivery_kg_checks:
 
 # --- skills/memory.md: mark_superseded + hard-delete sub-command ---
 
-memory_skill = read(SKILLS_DIR / "memory.md")
+memory_skill = read(skill_path("memory"))
 
 memory_skill_checks = [
     ("/memory prune uses mark_superseded as default (soft-delete)",
@@ -1765,6 +1792,9 @@ print("=== Suite 23: Low-cost mode ===")
 agents_readme = read(AGENTS_DIR / "README.md")
 modes_go = read(REPO_ROOT / "cmd" / "install" / "modes.go")
 prompts_go_lc = read(REPO_ROOT / "cmd" / "install" / "prompts.go")
+# INSTALL_MODE handling moved out of prompts.go into workspaces.go (env-var
+# parsing) + main.go (wiring); prompts.go no longer references it.
+workspaces_go = read(REPO_ROOT / "cmd" / "install" / "workspaces.go")
 
 # (a) agents/README.md contains a ## Low-cost mode section.
 check(
@@ -1866,11 +1896,11 @@ check(
     "ModeLowCost constant missing or has wrong value",
 )
 
-# (h) cmd/install/prompts.go references INSTALL_MODE.
+# (h) cmd/install/workspaces.go references INSTALL_MODE (env-var fallback).
 check(
-    "cmd/install/prompts.go references INSTALL_MODE env var",
-    "INSTALL_MODE" in prompts_go_lc,
-    "prompts.go does not reference INSTALL_MODE — env-var fallback not implemented",
+    "cmd/install/workspaces.go references INSTALL_MODE env var",
+    "INSTALL_MODE" in workspaces_go,
+    "workspaces.go does not reference INSTALL_MODE — env-var fallback not implemented",
 )
 
 # (i) cmd/install/modes.go declares lowCostMatrix with all 17 agents.
@@ -2039,23 +2069,27 @@ check(
     "install.ps1 still calls api.github.com — should use releases/latest/download directly",
 )
 
-# (l) README.md ## Install section references the GitHub Pages URL (AC-11: one-liners visible).
+# (l) The legacy Go-installer one-liner relocated from README.md to docs/install.md.
+# README.md is now a minimal, plugin-first landing page; the Go installer is
+# deprecated (CLAUDE.md §3), so its bootstrap URL and clone path live in the
+# install reference. AC-11 is now satisfied by docs/install.md.
 top_readme = read(REPO_ROOT / "README.md")
+install_md_pages = read(REPO_ROOT / "docs" / "install.md")
 PAGES_INSTALL_SH = "valianx.github.io/team-harness/install.sh"
 check(
-    "README.md ## Install references the GitHub Pages install.sh URL (AC-11)",
-    PAGES_INSTALL_SH in top_readme,
-    f"README.md does not reference '{PAGES_INSTALL_SH}' — one-liner install not surfaced",
+    "docs/install.md references the GitHub Pages install.sh URL (AC-11)",
+    PAGES_INSTALL_SH in install_md_pages,
+    f"docs/install.md does not reference '{PAGES_INSTALL_SH}' — one-liner install not surfaced",
 )
 
-# (m) README.md positions one-liners before the clone-and-run path (AC-11: primary vs secondary).
-# The Pages URL must appear before the "From source" or "clone" heading.
-pages_url_pos = top_readme.find(PAGES_INSTALL_SH)
-from_source_pos = top_readme.lower().find("from source")
+# (m) docs/install.md positions the one-liner before the clone-and-run path
+# (AC-11: primary vs secondary). The Pages URL must appear before "From source".
+pages_url_pos = install_md_pages.find(PAGES_INSTALL_SH)
+from_source_pos = install_md_pages.lower().find("from source")
 check(
-    "README.md one-liner (Pages URL) appears before 'From source' section (AC-11: primary path)",
+    "docs/install.md one-liner (Pages URL) appears before 'From source' section (AC-11: primary path)",
     pages_url_pos != -1 and from_source_pos != -1 and pages_url_pos < from_source_pos,
-    "README.md must show the Pages one-liner BEFORE the 'From source' clone section",
+    "docs/install.md must show the Pages one-liner BEFORE the 'From source' clone section",
 )
 
 # (n) Bootstrap scripts do NOT clear the environment before exec-ing the binary.
@@ -2316,9 +2350,10 @@ _ORCHESTRATOR_EXAMPLE_PATTERN = re.compile(
     r"@th:orchestrator.*(plan|implement|PR|recover)", re.IGNORECASE
 )
 check(
-    "voice: orchestrator.md contains @th:orchestrator dev-natural example (plan/implement/PR/recover)",
-    _ORCHESTRATOR_EXAMPLE_PATTERN.search(_orch_md) is not None,
-    "agents/orchestrator.md does not contain an @th:orchestrator dev-natural example",
+    "voice: dev-natural @th:orchestrator example (plan/implement/PR/recover) in orchestrator.md or how-it-works.md",
+    _ORCHESTRATOR_EXAMPLE_PATTERN.search(_orch_md) is not None
+    or _ORCHESTRATOR_EXAMPLE_PATTERN.search(_how_it_works_md) is not None,
+    "neither agents/orchestrator.md nor docs/how-it-works.md contains an @th:orchestrator dev-natural example",
 )
 
 # (10) No first-person personality phrases in agent output templates (status-block / report regions).
@@ -2659,7 +2694,7 @@ check(
 check(
     "ref-special-flows.md Bug-fix Flow declares full workspaces artifact set",
     "01-root-cause.md" in _ref_flows_bf and "02-regression-test.md" in _ref_flows_bf and
-    "02-task-list.md" in _ref_flows_bf and "04-security.md" in _ref_flows_bf,
+    "01-plan.md" in _ref_flows_bf and "04-security.md" in _ref_flows_bf,
     "Full workspaces artifact set not declared in Bug-fix Flow",
 )
 check(
@@ -2685,8 +2720,8 @@ check(
 )
 check(
     "ref-special-flows.md notes /hotfix slash command deferred to v2",
-    "/hotfix" in _ref_flows_bf and ("v2" in _ref_flows_bf.lower() or "deferred" in _ref_flows_bf.lower()),
-    "/hotfix v2 deferral not documented",
+    "/th:hotfix" in _ref_flows_bf and ("v2" in _ref_flows_bf.lower() or "deferred" in _ref_flows_bf.lower()),
+    "/th:hotfix v2 deferral not documented",
 )
 
 # ---------------------------------------------------------------------------
@@ -3095,7 +3130,7 @@ check(
 )
 
 # (14) skills/issue.md references the shared snippet (added in PR-5).
-_issue_skill = read(SKILLS_DIR / "issue.md")
+_issue_skill = read(skill_path("issue"))
 check(
     "skills/issue.md references agents/_shared/gh-fallback.md",
     "agents/_shared/gh-fallback.md" in _issue_skill,
@@ -3103,7 +3138,7 @@ check(
 )
 
 # (15) skills/review-pr.md references the shared snippet (added in PR-6).
-_review_pr_skill = read(SKILLS_DIR / "review-pr.md")
+_review_pr_skill = read(skill_path("review-pr"))
 check(
     "skills/review-pr.md references agents/_shared/gh-fallback.md",
     "agents/_shared/gh-fallback.md" in _review_pr_skill,
@@ -3145,7 +3180,7 @@ check(
 )
 
 # (18) skills/init.md passes --scaffold-rereview-workflow flag through.
-_init_skill = read(SKILLS_DIR / "init.md")
+_init_skill = read(skill_path("init"))
 check(
     "skills/init.md passes --scaffold-rereview-workflow flag to init agent",
     "--scaffold-rereview-workflow" in _init_skill,
@@ -3221,7 +3256,7 @@ check(
 )
 
 # (21) skills/review-pr.md has Step 1.5 policy load (added in PR-10).
-_rvpr = read(SKILLS_DIR / "review-pr.md")
+_rvpr = read(skill_path("review-pr"))
 check(
     "skills/review-pr.md has Step 1.5 policy load section",
     "Step 1.5" in _rvpr and "review-policy.md" in _rvpr,
@@ -3274,7 +3309,7 @@ check(
 print()
 print("=== Suite 28: /review-pr enriched (v2.15.0) ===")
 
-_rvpr_v28 = read(SKILLS_DIR / "review-pr.md")
+_rvpr_v28 = read(skill_path("review-pr"))
 _reviewer_v28 = read(AGENTS_DIR / "reviewer.md")
 _qa_v28 = read(AGENTS_DIR / "qa.md")
 _security_v28 = read(AGENTS_DIR / "security.md")
@@ -3517,9 +3552,9 @@ check(
 # Suite 29 — Pipeline enforcement improvements (artifact verification, mandatory phases, build check)
 print("\n--- Suite 29: Pipeline enforcement improvements ---")
 
-_orch_v29 = open(AGENTS / "orchestrator.md").read()
-_oprules_v29 = open(AGENTS / "_shared" / "operational-rules.md").read()
-_refflows_v29 = open(AGENTS / "ref-special-flows.md").read()
+_orch_v29 = read(AGENTS_DIR / "orchestrator.md")
+_oprules_v29 = read(AGENTS_DIR / "_shared" / "operational-rules.md")
+_refflows_v29 = read(AGENTS_DIR / "ref-special-flows.md")
 
 # (1) orchestrator.md contains the Artifact Verification Protocol section
 check(
