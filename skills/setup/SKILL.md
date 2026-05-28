@@ -57,7 +57,7 @@ If obsidian mode:
 2. Ask for the subfolder within the vault (default: `work-logs`).
 3. Verify the vault path exists. If not, warn and ask to confirm or re-enter.
 
-### 4. Write orchestrator dispatch rule
+### 4a. Write orchestrator dispatch rule
 
 Read `~/.claude/CLAUDE.md`. If it does not contain the orchestrator dispatch rule (look for `<!-- orchestrator-dispatch-rule:start -->`), append this block:
 
@@ -80,6 +80,30 @@ Read `~/.claude/CLAUDE.md`. If it does not contain the orchestrator dispatch rul
 If the rule already exists (markers found), replace the block between markers with the version above. This ensures the subagent_type matches the plugin namespace.
 
 Also check for legacy markers (`<!-- th-orchestrator-inline-rule:start -->` or `<!-- th-orchestrator-dispatch-rule:start -->`) and replace them with the current version.
+
+### 4b. Write nested-dispatch-takeover rule
+
+Read `~/.claude/CLAUDE.md`. If the file does not contain the nested-dispatch-takeover block (look for `<!-- nested-dispatch-takeover:start -->`), append the block below at the end of the file.
+
+If the block already exists (markers found), replace the content between the markers with the canonical version below. This is the idempotence contract: insert if missing, replace between markers if present. Do NOT add migration logic for legacy markers — this block is new in v2.33.1 and has no prior marker variants.
+
+```markdown
+<!-- nested-dispatch-takeover:start -->
+## nested-dispatch-takeover
+
+**When this fires:** A subagent response contains the phrase `Dispatch handoff — top-level Claude takes over now`, or an existing `workspaces/{feature}/00-state.md` has `status: blocked-no-dispatch`. Cause: the orchestrator was invoked from a nested context (another agent, a chained dispatch) and the Claude Code harness stripped its `Task` tool as an anti-recursion safety measure.
+
+**Minimum actions (do NOT ask the operator for permission — the original task is the authorisation):**
+
+1. Parse the `dispatch_handoff` JSON block embedded in the subagent's response (or read it from the `## Handoff` section of `00-state.md` if `state_ref` is provided).
+2. Dispatch the named agent directly via `Task(subagent_type={next_agent}, ...)` from the top-level session. Do NOT re-invoke `@th:orchestrator` or any skill that routes through it — that recreates the nested context and the same Task strip happens again.
+3. Continue the pipeline through subsequent phases. Respect STAGE-GATE-2 autonomy semantics and STAGE-GATE-3 always-mandatory human approval.
+
+**Full protocol:** see `docs/subagent-orchestration.md` in the `team-harness` repo (8-step takeover contract, handoff JSON schema, `blocked-manual-push` handling).
+
+**Red herring:** if `~/.claude/agents/` does not exist, this is NOT a failure. Plugin-installed agents live under `~/.claude/plugins/cache/.../th/<version>/agents/`. The `subagent_type` strings are namespaced (`th:architect`, `th:implementer`, etc.) and the harness resolves them from the plugin path.
+<!-- nested-dispatch-takeover:end -->
+```
 
 ### 5. Write manifest
 
