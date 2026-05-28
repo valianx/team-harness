@@ -454,35 +454,36 @@
       <div class="install-block">
 
         <div class="install-item">
-          <div class="install-label">macOS / Linux / WSL</div>
+          <div class="install-label">Step 1 — Add the marketplace</div>
           <div class="install-row">
-            <code class="install-code" id="cmd-unix">curl -fsSL https://valianx.github.io/team-harness/install.sh | bash</code>
-            <button class="copy-btn" onclick="copyCmd('cmd-unix', this)">copy</button>
+            <code class="install-code" id="cmd-step1">/plugin marketplace add valianx/team-harness</code>
+            <button class="copy-btn" onclick="copyCmd('cmd-step1', this)">copy</button>
           </div>
         </div>
 
         <div class="install-item">
-          <div class="install-label">Windows — PowerShell</div>
+          <div class="install-label">Step 2 — Install the plugin</div>
           <div class="install-row">
-            <code class="install-code" id="cmd-ps1">irm https://valianx.github.io/team-harness/install.ps1 | iex</code>
-            <button class="copy-btn" onclick="copyCmd('cmd-ps1', this)">copy</button>
+            <code class="install-code" id="cmd-step2">/plugin install th</code>
+            <button class="copy-btn" onclick="copyCmd('cmd-step2', this)">copy</button>
           </div>
         </div>
 
         <div class="install-item">
-          <div class="install-label">Windows — cmd.exe</div>
+          <div class="install-label">Step 3 — Configure and verify</div>
           <div class="install-row">
-            <code class="install-code" id="cmd-cmd">curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd</code>
-            <button class="copy-btn" onclick="copyCmd('cmd-cmd', this)">copy</button>
+            <code class="install-code" id="cmd-step3">/th:setup</code>
+            <button class="copy-btn" onclick="copyCmd('cmd-step3', this)">copy</button>
           </div>
         </div>
 
       </div>
       <p class="prose" style="margin-top:16px;">
-        The installer walks you through three prompts (Memory MCP URL, context7 API key,
-        install mode) and writes agents + skills + hooks into <span class="inline-code">~/.claude/</span>.
+        Run these three commands inside Claude Code. <span class="inline-code">/th:setup</span>
+        configures the Memory MCP server, context7 API key, and logs mode, then writes
+        everything into <span class="inline-code">~/.claude/</span>.
         Restart Claude Code after install.
-        Full options and env-var setup in <a href="https://github.com/valianx/team-harness/blob/main/docs/install.md" style="color:var(--accent);">docs/install.md</a>.
+        Full reference in <a href="https://github.com/valianx/team-harness/blob/main/docs/install.md" style="color:var(--accent);">docs/install.md</a>.
       </p>
     </div>
   </section>
@@ -499,18 +500,18 @@
         all coordinated through workspaces files that persist across sessions.
       </p>
       <p class="prose" style="margin-top:12px;">
-        The front door is the th-orchestrator agent. Open Claude Code and type:
+        The front door is the th:orchestrator agent. Open Claude Code and type:
       </p>
       <div class="install-item" style="margin-top:14px; max-width:600px;">
         <div class="install-row">
-          <code class="install-code" id="cmd-start">@th-orchestrator give me the work plan for this task: &lt;description&gt;</code>
+          <code class="install-code" id="cmd-start">@th:orchestrator give me the work plan for this task: &lt;description&gt;</code>
           <button class="copy-btn" onclick="copyCmd('cmd-start', this)">copy</button>
         </div>
       </div>
       <p class="prose" style="margin-top:14px;">
-        The th-orchestrator opens a pipeline, stops for mandatory human approvals at each
+        The th:orchestrator opens a pipeline, stops for mandatory human approvals at each
         stage gate, and picks up exactly where it left off after a restart via
-        <span class="inline-code">@th-orchestrator recover &lt;feature&gt;</span>.
+        <span class="inline-code">@th:orchestrator recover &lt;feature&gt;</span>.
       </p>
     </div>
   </section>
@@ -563,7 +564,7 @@
 
         <div class="agent-card">
           <div class="agent-header">
-            <span class="agent-name">th-orchestrator</span>
+            <span class="agent-name">th:orchestrator</span>
             <span class="agent-pill" style="background:var(--role-cyan);color:var(--role-cyan-t);">hub</span>
           </div>
           <p class="agent-desc">Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes from standalone skills. Manages workspaces as the shared board between agents.</p>
@@ -614,7 +615,7 @@
             <span class="agent-name">acceptance-checker</span>
             <span class="agent-pill" style="background:var(--role-pink);color:var(--role-pink-t);">validation</span>
           </div>
-          <p class="agent-desc">External auditor that compares the original spec against the actual delivered artifacts. Detects drift between "what was asked" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the th-orchestrator uses to decide whether to proceed to Delivery. Read-only.</p>
+          <p class="agent-desc">External auditor that compares the original spec against the actual delivered artifacts. Detects drift between "what was asked" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the th:orchestrator uses to decide whether to proceed to Delivery. Read-only.</p>
         </div>
 
         <div class="agent-card">
