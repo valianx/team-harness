@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Session-scoped config override: operators can override `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id` per chat session without modifying the persistent `~/.claude/.team-harness.json`. Precedence: session override > persistent config > built-in default. The resolved config is stored in `00-state.md § Current State` (never written to the persistent file). MCP URLs, API keys, and agent model/effort settings are explicitly excluded (those remain `/th:setup` territory). The ClickUp skill gains a `--workspace` flag for per-session workspace switching. `/recover` re-applies the session override from `00-state.md` when resuming a pipeline. Suite 32 contract tests cover all seven acceptance criteria.
+
 - Output discipline: agents and skills now operate silently during execution and emit a single structured report only on completion or error (Silently On Success, Report Once On Error). Internal tool calls (config reads, file existence checks, verification steps) are no longer narrated to the operator. Observability is preserved via `operation.*` nested events in `00-execution-events.jsonl/md` (`operation.start` / `operation.end` / `operation.error`). Rolled out across `orchestrator`, `architect`, `implementer`, `tester`, `qa`, `security`, `delivery`, `init`, and skills `lint`, `memory`, `setup`, `status`, `trace`. `agents/_shared/output-template.md` provides the canonical output contract; `docs/observability.md` documents the `operation.*` schema. A `/th:lint` guardrail (Suite 31) enforces the contract on every new agent/skill commit.
 
 ### Fixed

@@ -177,6 +177,16 @@ This skill calls the following ClickUp MCP tools. Tool names are used verbatim �
 
 ---
 
+### Session-scoped workspace override
+
+Within a pipeline run, read the resolved `workspace_id` from `00-state.md` § Current State if it exists. If not present in state, fall back to the persistent `clickup.workspace_id` from `~/.claude/.team-harness.json`.
+
+When running standalone (outside a pipeline, no `00-state.md` available), a `--workspace <id>` flag prevails over the persistent `clickup.workspace_id` for that run.
+
+This flow does not write the persistent config file — the `single-config-file` rule preserves the document. Session overrides are read-only on `~/.claude/.team-harness.json`.
+
+---
+
 ## Important
 
 - This skill does NOT route through the orchestrator. The `task <id>` sub-command prepares a handoff payload and prints it for the operator to forward to `@th:orchestrator` — the skill itself never invokes another agent.
