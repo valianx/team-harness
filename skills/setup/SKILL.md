@@ -155,3 +155,9 @@ This skill can be run multiple times safely. Each run:
 - Only writes files that changed
 - Backs up `~/.claude.json` before every write
 - Never deletes existing MCP server entries (only adds or updates memory + context7)
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. Step 6 (MCP verification) is the primary silent-on-success operation in this skill: a successful connectivity probe produces no operator-facing output beyond the final summary table in Step 7. A failed probe surfaces one line of error + one line of suggestion, then continues to Step 7 to report the failure in the summary.

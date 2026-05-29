@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.36.5` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.36.6` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -234,6 +234,21 @@ Good: Verify complete.
         Next: acceptance gate.
 ```
 
+### 7.1.1 Internal chatter — IN/OUT table
+
+The table below defines which operations are silent vs operator-facing. Extended
+examples and edge cases are in `docs/voice-guide.md`.
+
+| Category | On success | On failure | Rationale |
+|----------|-----------|------------|-----------|
+| Config load (read `.team-harness.json`, resolve paths) | SILENT — log `operation.*` event | one-line error + suggestion | The operator does not need to see each config read |
+| MCP verify (memory / context7 connectivity probe) | SILENT — log `operation.*` event | one-line error + suggestion | Connectivity OK is noise; failure is actionable |
+| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the orchestrator boot |
+| Phase-transition status blocks | PERMITTED (operator-facing) | PERMITTED | The operator needs to know which stage is active |
+| Tool error (any tool call fails) | n/a | SURFACE one-line summary + next-step; full output → events | Errors are always reported — never raw dumps |
+
+**Internal chatter** = mechanical progress on steps the operator did not ask to see (config, connectivity, init). **Operator-facing** = decisions, plans, results, STOP blocks, and stage transitions. When uncertain: output that answers something the operator asked is operator-facing; output that narrates how the system reaches that answer is Internal chatter.
+
 ### 7.2 Vocabulary — dev-natural verbs at the operator surface
 
 The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the three pipeline stages. The operator never learns `Phase 1.5`, `Phase 3.6`, or `STAGE-GATE-2`. Those are internal mechanics.
@@ -269,49 +284,6 @@ CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not 
 **CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing. Structural sections (§1-§7) are exempt — they shrink by extracting detailed tables/protocols to docs/ files (as done with §7.4-7.6 → `docs/voice-guide.md` and §14 protocol → `docs/subagent-orchestration.md`).
 
 ### Section size rules
-
-| Section | Max entries in CLAUDE.md | Overflow target |
-|---------|------------------------|-----------------|
-| Architecture Decisions (§8) | 10 | `docs/decisions.md` |
-| Patterns & Conventions (§9) | 10 | `docs/patterns.md` |
-| Known Constraints (§10) | 10 | `docs/constraints.md` |
-| Testing Conventions (§11) | 10 | `docs/testing.md` |
-
-When a section exceeds its limit, the delivery agent extracts older entries to the overflow file and replaces the section body with a pointer:
-
-```
-See `docs/decisions.md` for the full log. Recent entries kept inline below.
-```
-
-### What belongs in CLAUDE.md vs docs/
-
-| CLAUDE.md | docs/ |
-|-----------|-------|
-| Golden commands (copy-paste ready) | Extended decision rationale |
-| Tech stack summary (one table) | Migration guides, ADRs |
-| Current conventions (active rules) | Historical patterns, superseded decisions |
-| Architectural boundaries (one-liners) | Detailed constraint analysis |
-| Pointers to docs/ files | The detailed content itself |
-
-### docs/ structure
-
-| File | Content | Updated by |
-|------|---------|-----------|
-| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | delivery agent |
-| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | delivery agent (auto-offload) |
-| `docs/patterns.md` | Patterns overflow (pattern + example path) | delivery agent (auto-offload) |
-| `docs/constraints.md` | Constraints overflow (constraint + detail) | delivery agent (auto-offload) |
-| `docs/testing.md` | Testing conventions overflow (convention + description) | delivery agent (auto-offload) |
-
-The delivery agent creates overflow files on first offload. Agents read `docs/knowledge.md` before every task; overflow files are read on-demand when the CLAUDE.md pointer section is relevant.
-
----
-
-## 7b. Document Hygiene
-
-CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`.
-
-### Size rules
 
 | Section | Max entries in CLAUDE.md | Overflow target |
 |---------|------------------------|-----------------|

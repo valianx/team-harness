@@ -646,3 +646,9 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 ```
 
 Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. AC scanning (reading implementation files, comparing against criteria) is silent on success. Failures surface as one-line summary per failing AC in the status block.

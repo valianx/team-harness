@@ -723,3 +723,9 @@ When you finish with `status: failed`, **append** an iteration entry to `workspa
 ```
 
 Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing — no re-reads of the full test report.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. Test runner output (stdout of `npm test`, `pytest`, etc.) is silent on success. Failures surface as one-line summary + the failing test path, not a full test dump.
