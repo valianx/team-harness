@@ -79,7 +79,7 @@ Determine `{feature_name}` in this order:
 - Any AC is missing a `PASS` in `04-validation.md`.
 - Any AC has no test in `03-testing.md` AC Coverage table.
 - `04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
-- Any expected session-doc is missing.
+- Any expected workspace doc is missing.
 
 When aborting, append a `## Delivery` section to `workspaces/{feature-name}/00-state.md` with the failure reason and a per-AC table showing which gate failed for which AC. Do NOT create a branch, do NOT commit.
 

@@ -25,7 +25,7 @@ color: blue
 - `model` — `opus` for agents whose work is **analysis or coordination** (cannot fail); `sonnet` for agents whose work is **execution following a plan** (write code, tests, diagrams, commits, docs).
 - `effort` — reasoning level when the agent is active. Allowed: `medium` | `high` | `xhigh` | `max`. **`low` is forbidden by project policy** (the floor is `medium`). Tune per agent based on how much judgement the role demands; the matrix in the Roster below is canonical.
 - `color` — arbitrary colour label for display.
-- `tools` — comma-separated allowlist of tools the agent can invoke (capability scoping). The runtime restricts the agent to this set; tools not listed are unavailable. Read-only agents (`security`, `acceptance-checker`, `qa`) MUST NOT include `Bash`, `Edit`, or `Write` beyond their own session-doc. Agents that need external research include `WebFetch`, `WebSearch`. Agents that build (implementer, tester, delivery, diagrammers) include `Bash`. The canonical allowlist per agent lives in each agent's frontmatter and is the source of truth.
+- `tools` — comma-separated allowlist of tools the agent can invoke (capability scoping). The runtime restricts the agent to this set; tools not listed are unavailable. Read-only agents (`security`, `acceptance-checker`, `qa`) MUST NOT include `Bash`, `Edit`, or `Write` beyond their own workspace doc. Agents that need external research include `WebFetch`, `WebSearch`. Agents that build (implementer, tester, delivery, diagrammers) include `Bash`. The canonical allowlist per agent lives in each agent's frontmatter and is the source of truth.
 
 ## Roster
 
@@ -39,12 +39,12 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | `security` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). KG read-only for prior-vuln lookup. |
 | `reviewer` | opus | `max` | Read, Glob, Grep, Edit, Write, Bash | GitHub PR review. Bash limited to `git`/`gh` for diff retrieval. |
 | `qa` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Acceptance criteria definition and validation. **No Bash** (read-only on system). KG read-only for AC-pattern lookup. |
-| `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own session-doc). |
+| `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own workspace doc). |
 | `gcp-cost-analyzer` | opus | `high` | Read, Bash, Glob, Grep, Write | GCP cost / resource inventory reports. Bash limited to `gcloud`/`bq` reads. |
 | `init` | opus | `medium` | Read, Edit, Write, Glob, Grep, Bash | Bootstrap `CLAUDE.md` in any repo. |
 | `implementer` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, NotebookEdit | Production code following the architect's Work Plan. |
 | `tester` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Test suites with factory mocks. KG read-only for test-pattern lookup. |
-| `acceptance-checker` | sonnet | `medium` | Read, Glob, Grep, Write | External audit comparing original spec vs delivered artifacts (Phase 3.6, non-binding verdict). **No Bash, no Edit** (write-only on its own session-doc). |
+| `acceptance-checker` | sonnet | `medium` | Read, Glob, Grep, Write | External audit comparing original spec vs delivered artifacts (Phase 3.6, non-binding verdict). **No Bash, no Edit** (write-only on its own workspace doc). |
 | `diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash, WebFetch | Excalidraw diagrams (render-validate loop). |
 | `likec4-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | LikeC4 diagrams (architecture-as-code). |
 | `d2-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | D2 diagrams. |

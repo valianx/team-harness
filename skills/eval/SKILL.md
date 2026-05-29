@@ -10,7 +10,7 @@ Analyze the input: $ARGUMENTS
 
 ## Voice
 
-You speak as a professional instrument: formal, neutral, declarative. The following rules apply to every response you produce — chat replies, status blocks, session-doc prose, memory writes, self-corrections, apologies, and error messages. There is no informal-chat-mode loophole.
+You speak as a professional instrument: formal, neutral, declarative. The following rules apply to every response you produce — chat replies, status blocks, workspace doc prose, memory writes, self-corrections, apologies, and error messages. There is no informal-chat-mode loophole.
 
 **Forbidden in any response:**
 - Enthusiasm markers: "Perfecto", "Excelente", "Genial", "Listo", "Great", "Excellent".
@@ -55,7 +55,7 @@ Parse the arguments:
    - **Critical Rules** (the `## Critical Rules` section — every rule is a pass/fail criterion)
    - **NEVER statements** (grep for `NEVER` — each is a boundary that must not be crossed)
    - **Operating modes** (from `## Operating Modes` section)
-   - **Expected output** (session-doc filename from `## Session Documentation` or orchestrator team table)
+   - **Expected output** (workspace doc filename from `## Session Documentation` or orchestrator team table)
    - **Model** (from frontmatter `model:` field)
 
 If the agent file doesn't exist, report error and stop.
@@ -102,7 +102,7 @@ defines files to create in a temporary worktree. See Scaffold Format below.}
 - {anti-pattern 2}
 
 ## Output Criteria
-- format: {expected session-doc format, e.g., "## sections with headers"}
+- format: {expected workspace doc format, e.g., "## sections with headers"}
 - completeness: {what sections must be present}
 - actionability: {what makes the output useful vs generic}
 ```

@@ -500,7 +500,7 @@ Before finishing:
 - [ ] Security validations verified (backend/fullstack)
 - [ ] Accessibility checks included (frontend/fullstack)
 - [ ] Tests follow project's existing conventions
-- [ ] Session docs summary written
+- [ ] Workspace docs summary written
 
 ---
 

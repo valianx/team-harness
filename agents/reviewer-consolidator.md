@@ -15,7 +15,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ## Language contract
 
-The consolidated review body follows the same language contract as `agents/reviewer.md`: Spanish for the review body sections posted to GitHub and session-doc outputs (the §7.3 documented exception). English for status block fields, section headers in workspaces, and this agent's system prompt.
+The consolidated review body follows the same language contract as `agents/reviewer.md`: Spanish for the review body sections posted to GitHub and workspace doc outputs (the §7.3 documented exception). English for status block fields, section headers in workspaces, and this agent's system prompt.
 
 ## Input contract
 

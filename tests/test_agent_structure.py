@@ -1111,7 +1111,7 @@ check(
 #   (c) The manifest names every mandatory gate/stage in pipeline order.
 #   (d) The manifest and the managed block in setup/SKILL.md both carry the
 #       comply imperative ("skipping any is a defect" / "honor EVERY gate").
-#   (e) Drift no-regression guards: stale session-doc names are absent from
+#   (e) Drift no-regression guards: stale workspace doc names are absent from
 #       the steps 6-7 region; correct names are present there (C1 + C2).
 #   (f) update/SKILL.md does NOT contain a second copy of the block content (C3).
 #
@@ -1321,7 +1321,7 @@ _steps_6_7_region = (
 # Operating on: _steps_6_7_region
 for _stale_name in ("06-acceptance-check.md", "05-delivery.md", "02-task-list.md"):
     check(
-        f"steps 6-7 region does NOT contain stale session-doc name '{_stale_name}'",
+        f"steps 6-7 region does NOT contain stale workspace doc name '{_stale_name}'",
         _stale_name not in _steps_6_7_region,
         f"'{_stale_name}' is a stale file name; steps 6-7 must use current schema names",
     )
@@ -2609,7 +2609,7 @@ for _agent_file in AGENTS_DIR.glob("*.md"):
     elif _name == "reviewer.md":
         # Allow the Phase 0–Phase 3 operational sections that contain the Spanish
         # report-body templates (AC-11 documented exception: reviewer output bodies
-        # posted to GitHub and session-doc outputs stay Spanish per the contract).
+        # posted to GitHub and workspace doc outputs stay Spanish per the contract).
         _rev_ops = _extract_section(
             _content, "## Phase 0 — Parse Inline Data", "## Session Documentation"
         )

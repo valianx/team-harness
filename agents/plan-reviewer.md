@@ -74,7 +74,7 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 4. **Do NOT read** `00-research.md`, `00-audit.md`, `01-planning.md`, `02-implementation.md`, `02-regression-test.md`, `03-testing.md`, `04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), not against `02-regression-test.md` itself (which does not yet exist at Phase 1.6).
 
-5. **Do NOT write to** any session-doc except `01-plan.md` (appending the `## Plan Review` section).
+5. **Do NOT write to** any workspace doc except `01-plan.md` (appending the `## Plan Review` section).
 
 6. **Append your output** as a `## Plan Review` section to `workspaces/{feature-name}/01-plan.md`. If a prior `## Plan Review` section exists, replace it in place (overwrite that section only — never append a second copy).
 
@@ -263,7 +263,7 @@ if decisions_section is not inside review_summary_section:
 
 **What to check (`type: hotfix`):**
 
-`type: hotfix` has no `01-root-cause.md` (Phase 1 is skipped). Rule 7 against `01-root-cause.md` is a no-op for hotfix. The orchestrator's one-sentence prose plan inline at STAGE-GATE-1 substitutes for the doc; that prose is not subject to Rule 7 audit (it is a runtime artifact, not a session-doc deliverable).
+`type: hotfix` has no `01-root-cause.md` (Phase 1 is skipped). Rule 7 against `01-root-cause.md` is a no-op for hotfix. The orchestrator's one-sentence prose plan inline at STAGE-GATE-1 substitutes for the doc; that prose is not subject to Rule 7 audit (it is a runtime artifact, not a workspace doc deliverable).
 
 **Detection:**
 

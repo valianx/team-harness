@@ -10,7 +10,7 @@ Validate the health of agents and skills in this dev-team system. Run all 4 chec
 
 ## Voice
 
-You speak as a professional instrument: formal, neutral, declarative. The following rules apply to every response you produce — chat replies, status blocks, session-doc prose, memory writes, self-corrections, apologies, and error messages. There is no informal-chat-mode loophole.
+You speak as a professional instrument: formal, neutral, declarative. The following rules apply to every response you produce — chat replies, status blocks, workspace doc prose, memory writes, self-corrections, apologies, and error messages. There is no informal-chat-mode loophole.
 
 **Forbidden in any response:**
 - Enthusiasm markers: "Perfecto", "Excelente", "Genial", "Listo", "Great", "Excellent".
@@ -127,13 +127,13 @@ Cross-reference the orchestrator's team table against actual agent files.
    - For each agent in the team table → verify a corresponding `.md` file exists in `agents/`
    - For each agent `.md` file (excluding orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note
    - Report: agents in table but missing file, agents with file but not in table/standalone note
-4. **Session-doc conflicts:** Extract the `Session doc` column from the team table. Check for duplicate output files (two agents writing to the same session-doc). Report any duplicates.
+4. **Workspace-doc conflicts:** Extract the `Workspace doc` column from the team table. Check for duplicate output files (two agents writing to the same workspace doc). Report any duplicates.
 5. **Direct modes coherence:** Read the Direct Modes table in `orchestrator.md`. For each agent referenced in the direct modes table, verify it exists as a file in `agents/`.
 
 Result:
-- **PASS** if all cross-references are consistent and no session-doc conflicts
+- **PASS** if all cross-references are consistent and no workspace doc conflicts
 - **WARN** if agents exist as files but aren't referenced (could be legitimate standalone agents)
-- **FAIL** if team table references a non-existent agent, or session-doc output conflict exists
+- **FAIL** if team table references a non-existent agent, or workspace doc output conflict exists
 
 ---
 name: lint
@@ -143,11 +143,11 @@ name: lint
 Analyze agent definitions for contradictions and overlap.
 
 1. **Role boundary check:** For each agent, extract its "NEVER" statements (e.g., "NEVER writes code", "NEVER modify files"). Cross-check against the orchestrator's team table `Writes code` column. Report contradictions (e.g., agent says "NEVER writes code" but orchestrator marks it as "Yes" for writes code).
-2. **Session-doc write conflicts:** For each agent, search for the session-doc filename it writes to (from `## Session Documentation` section or output references). Verify no two agents write to the same file. Report conflicts.
+2. **Workspace-doc write conflicts:** For each agent, search for the workspace doc filename it writes to (from `## Session Documentation` section or output references). Verify no two agents write to the same file. Report conflicts.
 
 Result:
 - **PASS** if no contradictions or write conflicts found
-- **FAIL** if role boundary contradictions or session-doc write conflicts exist
+- **FAIL** if role boundary contradictions or workspace doc write conflicts exist
 
 ---
 name: lint

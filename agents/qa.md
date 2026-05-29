@@ -44,7 +44,7 @@ Every mode has exactly one canonical output. If a request does not map to one of
 | Define-AC (standalone) | `workspaces/{feature}/00-acceptance-criteria.md` | overwrite | Standalone AC definition |
 | Ratify-Plan (Phase 1.5) | `workspaces/{feature}/01-plan.md` (append `## Plan Ratification` section) | append section only | NEVER a separate file |
 | Reconcile (Phase 2.5) | `workspaces/{feature}/01-plan.md` § Review Summary (annotate `[CONSTRAINT-RESOLVED]`) | inline annotation | NEVER a separate file |
-| Review (cross-repo) | passed to the caller via status block (no session-doc file written) | n/a | Used by `/th:cross-repo` only |
+| Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
 | Failure brief (any mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
 
 ### Validate Mode — AC checkbox mirror in `01-plan.md`

@@ -29,7 +29,7 @@ This agent reads the **approved plan** (`01-plan.md` § Review Summary, as appro
 
 ## Critical Rules
 
-- **NEVER** modify any session-doc except `04-validation.md` (appending the `## Drift Analysis` section)
+- **NEVER** modify any workspace doc except `04-validation.md` (appending the `## Drift Analysis` section)
 - **NEVER** modify source code, tests, configuration, or any project file
 - **NEVER** argue with tester / qa / security — your job is independent comparison, not refereeing
 - **ALWAYS** read the **original** description (the quoted block in `01-plan.md` § Review Summary), not just the current AC list in § Task List
@@ -64,7 +64,7 @@ This agent reads the **approved plan** (`01-plan.md` § Review Summary, as appro
 
 3. **Do NOT read** `01-planning.md`, `00-research.md`, `00-audit.md` — those are design rationale, not delivery evidence. Skip them.
 
-4. **Do NOT write to** `00-state.md`, `01-plan.md`, or any other session-doc except `04-validation.md`.
+4. **Do NOT write to** `00-state.md`, `01-plan.md`, or any other workspace doc except `04-validation.md`.
 
 5. **Append your output** as a `## Drift Analysis` section to `workspaces/{feature-name}/04-validation.md`. If a prior `## Drift Analysis` section exists, replace it in place.
 

@@ -78,7 +78,7 @@ Score the response before using it:
 | **miss** | Response is empty / generic / talks about a different version. | Retry **once** with a different topic. If still empty, fall back. |
 | **n/a** | Library is not on context7 (returns no resolution from `resolve-library-id`). | Fall back to training knowledge. Do not retry. |
 
-**Fallback contract.** When you fall back, you MUST document it in your session-doc:
+**Fallback contract.** When you fall back, you MUST document it in your workspace doc:
 
 ```markdown
 ## Documentation Consulted
@@ -114,7 +114,7 @@ context7 can fail in three ways. Handle each, never let the agent halt:
 
 | Failure | Symptom | Action |
 |---|---|---|
-| MCP unreachable | Tool call returns an error / 404 / timeout. | Log `context7: unavailable` in the session-doc's `## Documentation Consulted`. Increment `skipped` for all libraries that needed verification. Continue. |
+| MCP unreachable | Tool call returns an error / 404 / timeout. | Log `context7: unavailable` in the workspace doc's `## Documentation Consulted`. Increment `skipped` for all libraries that needed verification. Continue. |
 | `resolve-library-id` returns no match | Library is not on context7. | Log it once in `## Documentation Consulted`. Do not retry. Count as `n/a` (folds into `skipped`). |
 | `get-library-docs` returns empty | Topic was too broad or the library has no docs for that area. | Retry once with a different topic per §3. If still empty, fall back and document. |
 
@@ -122,9 +122,9 @@ The MCP is a nice-to-have, never a blocker. The pipeline must keep moving.
 
 ---
 
-## 7. What goes in the session-doc
+## 7. What goes in the workspace doc
 
-Every session-doc produced by an agent that consulted context7 includes a section:
+Every workspace doc produced by an agent that consulted context7 includes a section:
 
 ```markdown
 ## Documentation Consulted
@@ -134,4 +134,4 @@ Every session-doc produced by an agent that consulted context7 includes a sectio
 
 When no library was touched, write a single bullet: `- No third-party libraries verified — this change is pure {repo} code.`
 
-The reviewer of the session-doc uses this section to understand which decisions are anchored in current docs vs. model knowledge.
+The reviewer of the workspace doc uses this section to understand which decisions are anchored in current docs vs. model knowledge.
