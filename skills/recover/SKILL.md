@@ -114,6 +114,14 @@ The orchestrator will:
 
 ---
 
+### Session-scoped override on recovery
+
+When recovering a pipeline, the resolved override is re-applied from `00-state.md` § Current State — not re-parsed from chat. The orchestrator reads the override fields already stored there and logs `operation.success` with detail `override re-applied from 00-state.md`.
+
+If the operator re-states an override during recovery, the orchestrator treats it as a new session override for the resumed run.
+
+---
+
 ## Important
 
 - **You read state. The orchestrator does NOT** — it receives the recovery context from you.

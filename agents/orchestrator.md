@@ -78,6 +78,27 @@ Triggered only when the boot probe returns a genuine "tool unavailable" error. D
 
 Proceed to intake / recovery / direct-mode handling. No boot acknowledgment line.
 
+### Session-scoped config override
+
+The parse sub-step runs inside Step 2, BEFORE `base_path` resolution, fixing the chicken-egg ordering bug. The load-bearing order is:
+
+1. **parse override** — extract any override intent from the operator's chat message; evaluate membership key-by-key against the whitelist in `CLAUDE.md §5`.
+2. **read persistent** — read `~/.claude/.team-harness.json` as normal.
+3. **apply precedence** — merge with precedence `override > persistent > default` for each of the 4 overridable keys.
+4. **then resolve** — compute `base_path`, `logs_mode`, `events_file`, and `docs_root` from the fully-merged result.
+
+The `base_path` is resolved (override applied) before composing `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. The `{YYYY-MM-DD}_{feature-name}` prefix guarantees a unique directory per run — no collision between runs with different overrides.
+
+**Scope guard.** The override flow is read-only on the persistent file. The orchestrator NEVER writes `~/.claude/.team-harness.json` from the override flow. The resolved config is stored in `00-state.md` § Current State (`resolved config`, no new file).
+
+**Whitelist authority.** `CLAUDE.md §5` is the single source of truth for the whitelist of overridable keys. The parser evaluates membership key-by-key; any key absent from the whitelist is ignored with a one-line WARN that names the rejected key — never the override value (the value may be sensitive and must not appear in operator output or the events file).
+
+**Output Discipline.** This flow follows `agents/_shared/output-template.md` § Output Discipline: silent on success (emits `operation.started` / `operation.success` in the events file only), non-blocking. On an invalid or ambiguous override: emit `operation.failed` with `error` + `suggestion`, surface a one-line WARN to the operator, then fall back to the persistent value and continue.
+
+**No-override case.** When the operator says nothing relevant, the boot falls through to the persistent config and is silent — no extra output, no chatter — indistinguishable from today's boot.
+
+**`/recover`.** On recovery the resolved config is read from `00-state.md` § Current State; the chat is NOT re-parsed. Log `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, treat it as a new session override.
+
 ## Dispatch invariants (read first, never weaken)
 
 These are runtime invariants of your environment, not advice. Treat them as facts:
@@ -319,7 +340,7 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
    - **This step comes FIRST** because events are append-only and must reflect real-time — backfilling after the fact loses timestamp accuracy.
    - **Token tracking is mandatory.** Every `phase.end` event MUST include `tokens` and `duration_ms`. If the Agent() result does not expose usage metadata, estimate from the agent's status block or write `"tokens":0` — never omit the field.
 
-2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `## Current State` fields, mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
+2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `## Current State` fields (including resolved override fields such as `clickup_workspace_id` — the resolved ClickUp workspace id from the session-scoped override, precedence `override > persistent`), mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
 
 3. **Proceed to next dispatch** — only after steps 1 and 2 are done.
 
@@ -447,6 +468,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - docs_root: {full absolute path}          # fully resolved workspaces path for this run — all file refs use this
 - operator_language: {en|es|pt|fr|de|...} # ISO 639-1 code; detected at Phase 0a Step 1d; default en
 - total_tokens: {N}                       # running sum of tokens across all phases; updated at every phase.end
+- clickup_workspace_id: {id | null}       # resolved ClickUp workspace id (precedence override > persistent); null when no ClickUp workspace is configured
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.

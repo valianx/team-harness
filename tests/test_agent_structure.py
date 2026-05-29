@@ -4352,6 +4352,435 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 32 -- Session-scoped config override contract (AC-1..AC-7)
+# ---------------------------------------------------------------------------
+# Structural assertions: verify that the contract markers for the
+# session-scoped override feature exist in the relevant .md files.
+#
+# DESIGN: every assert is anchored to a UNIQUELY-NAMED section heading that
+# the implementer adds. We slice the file to that section first, then assert
+# contract tokens ONLY within the slice. If the anchor is absent the slice
+# is "" and every dependent check fails with a clear detail -- not a
+# false-green. A test-first assert that is green before implementation
+# provides zero regression signal; anchor-scoped slicing eliminates that.
+#
+# Anchors (verbatim -- implementer must use these exactly):
+#   agents/orchestrator.md  : "### Session-scoped config override"
+#   CLAUDE.md (in §5)      : "**Session-scoped config override whitelist**"
+#   skills/clickup/SKILL.md : "### Session-scoped workspace override"
+#   skills/recover/SKILL.md : "### Session-scoped override on recovery"
+#
+# Files checked:
+#   agents/orchestrator.md   -- boot step order, precedence, scope guard,
+#                               Output Discipline ref, /recover re-apply,
+#                               collision guarantee
+#   CLAUDE.md                -- §5 whitelist (4 keys + per-key exclusions)
+#   skills/clickup/SKILL.md  -- --workspace flag + state-based read
+#   skills/recover/SKILL.md  -- re-apply from 00-state.md
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 32: Session-scoped config override contract ===")
+
+_s32_orch = read(AGENTS_DIR / "orchestrator.md")
+_s32_claude = read(REPO_ROOT / "CLAUDE.md")
+_s32_clickup_path = SKILLS_DIR / "clickup" / "SKILL.md"
+_s32_clickup = read(_s32_clickup_path) if _s32_clickup_path.exists() else ""
+_s32_recover_path = skill_path("recover")
+_s32_recover = read(_s32_recover_path) if _s32_recover_path.exists() else ""
+
+
+# ---------------------------------------------------------------------------
+# Slice helpers -- extract text from a named anchor to the next section
+# boundary. Returns "" when the anchor is absent.
+# ---------------------------------------------------------------------------
+
+def _slice_section(text, anchor):
+    # Return text from anchor (inclusive) to the next markdown heading or
+    # EOF. Returns "" if the anchor is not found.
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+def _slice_bullet_section(text, anchor):
+    # Return text from anchor (inclusive) to next heading or blank-line-
+    # separated top-level block. Used for CLAUDE.md §5 whitelist bullet.
+    # Returns "" if anchor absent.
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    boundary = re.search(r"\n(?:#{1,6} |\n[^\s\-\*\d])", rest[1:])
+    if boundary:
+        return rest[: boundary.start() + 1]
+    return rest
+
+
+# ---------------------------------------------------------------------------
+# Anchor A: agents/orchestrator.md "### Session-scoped config override"
+# ---------------------------------------------------------------------------
+_ORCH_ANCHOR = "### Session-scoped config override"
+_ovr = _slice_section(_s32_orch, _ORCH_ANCHOR)
+
+check(
+    "override(anchor-orch): agents/orchestrator.md contains"
+    " '### Session-scoped config override' section",
+    bool(_ovr),
+    f"anchor '{_ORCH_ANCHOR}' not found in orchestrator.md"
+    " -- override(a/a2/b/c/c2/d-v/e/e2/f/h/i/i2) checks will fail",
+)
+
+# (a) All four sequence tokens present in _ovr AND in order.
+_A_TOKENS = ("parse override", "read persistent", "apply precedence", "then resolve")
+_a_tokens_in_slice = bool(_ovr) and all(t in _ovr for t in _A_TOKENS)
+_a_tokens_ordered = False
+if _a_tokens_in_slice:
+    idxs = [_ovr.find(t) for t in _A_TOKENS]
+    _a_tokens_ordered = idxs == sorted(idxs)
+check(
+    "override(a): orchestrator.md § override documents load order"
+    " (parse override -> read persistent -> apply precedence -> then resolve)",
+    _a_tokens_in_slice and _a_tokens_ordered,
+    f"anchor '{_ORCH_ANCHOR}' missing or tokens not in order: {_A_TOKENS}",
+)
+
+# (a2) Same four tokens all present in the slice.
+check(
+    "override(a2): orchestrator.md § override contains all four sequence labels",
+    bool(_ovr)
+    and "parse override" in _ovr
+    and "read persistent" in _ovr
+    and "apply precedence" in _ovr
+    and "then resolve" in _ovr,
+    f"anchor '{_ORCH_ANCHOR}' slice missing one or more of {_A_TOKENS}",
+)
+
+# (b) Literal precedence string in slice.
+check(
+    "override(b): orchestrator.md § override documents precedence"
+    " 'override > persistent > default'",
+    bool(_ovr) and "override > persistent > default" in _ovr,
+    f"anchor '{_ORCH_ANCHOR}' slice does not contain"
+    " literal 'override > persistent > default'",
+)
+
+# (c) Scope guard: "NEVER writes" AND "~/.claude/.team-harness.json" in slice.
+check(
+    "override(c): orchestrator.md § override declares"
+    " NEVER writes ~/.claude/.team-harness.json",
+    bool(_ovr)
+    and "NEVER writes" in _ovr
+    and "~/.claude/.team-harness.json" in _ovr,
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'NEVER writes'"
+    " and/or '~/.claude/.team-harness.json'",
+)
+
+# (c2) "00-state.md" AND "Current State" AND ("no new file" OR "resolved config")
+#      in slice.
+check(
+    "override(c2): orchestrator.md § override declares resolved config stored"
+    " in 00-state.md (no new file)",
+    bool(_ovr)
+    and "00-state.md" in _ovr
+    and "Current State" in _ovr
+    and ("no new file" in _ovr or "resolved config" in _ovr),
+    f"anchor '{_ORCH_ANCHOR}' slice missing '00-state.md', 'Current State',"
+    " or 'no new file'/'resolved config'",
+)
+
+# (d-v) "CLAUDE.md" AND §5 reference AND ("whitelist" OR "overridable") in slice.
+check(
+    "override(d-v): orchestrator.md § override references"
+    " CLAUDE.md §5 as whitelist authority",
+    bool(_ovr)
+    and "CLAUDE.md" in _ovr
+    and ("§5" in _ovr or "section 5" in _ovr.lower())
+    and ("whitelist" in _ovr.lower() or "overridable" in _ovr.lower()),
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'CLAUDE.md §5'"
+    " whitelist/overridable reference",
+)
+
+# (e) "Output Discipline" AND "output-template.md" in slice.
+check(
+    "override(e): orchestrator.md § override references"
+    " Output Discipline (output-template.md)",
+    bool(_ovr) and "Output Discipline" in _ovr and "output-template.md" in _ovr,
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'Output Discipline'"
+    " and/or 'output-template.md'",
+)
+
+# (e2) "operation.success" OR "silent" in slice.
+check(
+    "override(e2): orchestrator.md § override documents silent success"
+    " (operation.success or silent)",
+    bool(_ovr) and ("operation.success" in _ovr or "silent" in _ovr),
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'operation.success' or 'silent'",
+)
+
+# (f) "/recover" AND "00-state.md" AND ("re-apply" OR "re-applied") in slice.
+check(
+    "override(f): orchestrator.md § override documents /recover re-applies"
+    " override from 00-state.md",
+    bool(_ovr)
+    and "/recover" in _ovr
+    and "00-state.md" in _ovr
+    and ("re-apply" in _ovr or "re-applied" in _ovr),
+    f"anchor '{_ORCH_ANCHOR}' slice missing '/recover', '00-state.md',"
+    " or 're-apply'/'re-applied'",
+)
+
+# (h) No-override / fall-through + silent in slice.
+check(
+    "override(h): orchestrator.md § override documents no-override case"
+    " as silent (fall-through, no extra output)",
+    bool(_ovr)
+    and (
+        "no override" in _ovr
+        or "falls through" in _ovr
+        or "fall back" in _ovr
+        or "fall through" in _ovr
+    )
+    and ("silent" in _ovr or "no extra" in _ovr or "no chatter" in _ovr),
+    f"anchor '{_ORCH_ANCHOR}' slice missing no-override/fall-through"
+    " + silent description",
+)
+
+# (i) "base_path" AND "docs_root" AND "before" in slice.
+check(
+    "override(i): orchestrator.md § override documents base_path resolved"
+    " before composing docs_root",
+    bool(_ovr) and "base_path" in _ovr and "docs_root" in _ovr and "before" in _ovr,
+    f"anchor '{_ORCH_ANCHOR}' slice missing 'base_path', 'docs_root', or 'before'",
+)
+
+# (i2) The date+feature prefix pattern AND ("unique" OR "collision") in slice.
+_I2_DATE_PATTERN = "{YYYY-MM-DD}_{feature-name}"
+check(
+    "override(i2): orchestrator.md § override documents unique-directory"
+    " guarantee (date+feature prefix)",
+    bool(_ovr)
+    and _I2_DATE_PATTERN in _ovr
+    and ("unique" in _ovr or "collision" in _ovr),
+    f"anchor '{_ORCH_ANCHOR}' slice missing date+feature pattern"
+    " and/or 'unique'/'collision'",
+)
+
+# ---------------------------------------------------------------------------
+# Anchor B: CLAUDE.md §5 "**Session-scoped config override whitelist**"
+# ---------------------------------------------------------------------------
+_WL_ANCHOR = "**Session-scoped config override whitelist**"
+_wl = _slice_bullet_section(_s32_claude, _WL_ANCHOR)
+
+check(
+    "override(anchor-claude): CLAUDE.md §5 contains"
+    " '**Session-scoped config override whitelist**' marker",
+    bool(_wl),
+    f"anchor '{_WL_ANCHOR}' not found in CLAUDE.md"
+    " -- override(d/*) checks will fail",
+)
+
+# (d) All 4 overridable keys present within _wl.
+_OVERRIDABLE_KEYS = ["logs-mode", "logs-path", "logs-subfolder", "clickup.workspace_id"]
+_missing_keys = [k for k in _OVERRIDABLE_KEYS if k not in _wl]
+check(
+    "override(d): CLAUDE.md §5 whitelist enumerates all 4 overridable keys",
+    bool(_wl) and len(_missing_keys) == 0,
+    (
+        f"CLAUDE.md whitelist slice missing overridable key(s): {_missing_keys}"
+        if _wl
+        else f"anchor '{_WL_ANCHOR}' not found"
+    ),
+)
+
+# Exclusion verbs used across (d-i)..(d-iv)
+_WL_EXCL_VERBS = ("not overridable", "excluded", "-> /th:setup", "/th:setup")
+
+# (d-i) "MCP URL" named as excluded within _wl.
+check(
+    "override(d-i): CLAUDE.md whitelist explicitly excludes MCP URL"
+    " (with exclusion verb)",
+    bool(_wl)
+    and "MCP URL" in _wl
+    and any(v in _wl for v in _WL_EXCL_VERBS),
+    f"anchor '{_WL_ANCHOR}' slice missing 'MCP URL' or exclusion verb"
+    f" {_WL_EXCL_VERBS}",
+)
+
+# (d-ii) API key identifier named as excluded within _wl.
+check(
+    "override(d-ii): CLAUDE.md whitelist explicitly excludes API key(s)"
+    " (context7 / bearer / API key)",
+    bool(_wl)
+    and ("context7" in _wl or "bearer" in _wl or "API key" in _wl)
+    and any(v in _wl for v in _WL_EXCL_VERBS),
+    f"anchor '{_WL_ANCHOR}' slice missing API key identifier or exclusion verb",
+)
+
+# (d-iii) Agent "model" named as excluded within _wl.
+check(
+    "override(d-iii): CLAUDE.md whitelist explicitly excludes agent 'model'",
+    bool(_wl) and "model" in _wl and any(v in _wl for v in _WL_EXCL_VERBS),
+    f"anchor '{_WL_ANCHOR}' slice missing 'model' or exclusion verb",
+)
+
+# (d-iv) Agent "effort" named as excluded within _wl.
+check(
+    "override(d-iv): CLAUDE.md whitelist explicitly excludes agent 'effort'",
+    bool(_wl) and "effort" in _wl and any(v in _wl for v in _WL_EXCL_VERBS),
+    f"anchor '{_WL_ANCHOR}' slice missing 'effort' or exclusion verb",
+)
+
+# ---------------------------------------------------------------------------
+# Anchor C: skills/clickup/SKILL.md "### Session-scoped workspace override"
+# ---------------------------------------------------------------------------
+_CU_ANCHOR = "### Session-scoped workspace override"
+_cu = _slice_section(_s32_clickup, _CU_ANCHOR)
+
+check(
+    "override(anchor-clickup): skills/clickup/SKILL.md contains"
+    " '### Session-scoped workspace override' section",
+    _s32_clickup_path.exists() and bool(_cu),
+    f"anchor '{_CU_ANCHOR}' not found in {_s32_clickup_path}"
+    " -- override(g/*) checks will fail",
+)
+
+# (g) "00-state.md" AND "Current State" AND "workspace" within _cu.
+check(
+    "override(g): skills/clickup/SKILL.md § override documents reading"
+    " workspace_id from 00-state.md § Current State",
+    bool(_cu) and "00-state.md" in _cu and "Current State" in _cu and "workspace" in _cu,
+    f"anchor '{_CU_ANCHOR}' slice missing '00-state.md', 'Current State',"
+    " or 'workspace'",
+)
+
+# (g2) "--workspace" within _cu.
+check(
+    "override(g2): skills/clickup/SKILL.md § override documents --workspace flag",
+    bool(_cu) and "--workspace" in _cu,
+    f"anchor '{_CU_ANCHOR}' slice missing '--workspace'",
+)
+
+# (g3) No-write declaration within _cu.
+check(
+    "override(g3): skills/clickup/SKILL.md § override declares it does not"
+    " write the persistent file",
+    bool(_cu)
+    and (
+        "does not write" in _cu
+        or "single-config-file" in _cu
+        or "preserves" in _cu
+    ),
+    f"anchor '{_CU_ANCHOR}' slice missing no-write declaration"
+    " ('does not write'/'single-config-file'/'preserves')",
+)
+
+# (g-producer) PRODUCER-SIDE: agents/orchestrator.md "## Current State" template
+# must declare `clickup_workspace_id` so the consumer (ClickUp skill) has a field
+# to read.  Verifies the producer↔consumer contract is not broken.
+#
+# Strategy: locate the Current State template region in orchestrator.md by
+# anchoring on the line "## Current State" and slicing to the next "##"-level
+# heading (the Phase Checklist).  Within that slice, assert:
+#   1. `clickup_workspace_id` is declared as a field.
+#   2. The surrounding context ties it to the override/resolved/workspace concept.
+_CS_ANCHOR = "## Current State"
+_cs_idx = _s32_orch.find(_CS_ANCHOR)
+if _cs_idx == -1:
+    _cs_template = ""
+else:
+    _cs_rest = _s32_orch[_cs_idx:]
+    # Terminate at the next "## " heading (sibling-level in the template).
+    _cs_boundary = re.search(r"\n## ", _cs_rest[1:])
+    _cs_template = _cs_rest[: _cs_boundary.start() + 1] if _cs_boundary else _cs_rest
+
+_gp_field_present = "clickup_workspace_id" in _cs_template
+_gp_context_ok = (
+    _gp_field_present
+    and (
+        "override" in _cs_template[
+            max(0, _cs_template.find("clickup_workspace_id") - 200):
+            _cs_template.find("clickup_workspace_id") + 200
+        ]
+        or "resolved" in _cs_template[
+            max(0, _cs_template.find("clickup_workspace_id") - 200):
+            _cs_template.find("clickup_workspace_id") + 200
+        ]
+        or "workspace" in _cs_template[
+            max(0, _cs_template.find("clickup_workspace_id") - 200):
+            _cs_template.find("clickup_workspace_id") + 200
+        ]
+    )
+)
+check(
+    "override(g-producer): agents/orchestrator.md '## Current State' template"
+    " declares field 'clickup_workspace_id' (resolved ClickUp workspace,"
+    " producer side of the override contract)",
+    bool(_cs_template) and _gp_field_present and _gp_context_ok,
+    (
+        f"'## Current State' template region not found in orchestrator.md"
+        if not _cs_template
+        else (
+            "field 'clickup_workspace_id' absent from orchestrator.md"
+            " '## Current State' template — producer never writes the field"
+            " the ClickUp consumer reads (SEC-001 gap)"
+            if not _gp_field_present
+            else "field 'clickup_workspace_id' found but lacks override/resolved/workspace"
+            " context within 200 chars — tie it to the session-scoped override"
+        )
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Anchor D: skills/recover/SKILL.md "### Session-scoped override on recovery"
+# ---------------------------------------------------------------------------
+_RC_ANCHOR = "### Session-scoped override on recovery"
+_rc = _slice_section(_s32_recover, _RC_ANCHOR)
+
+check(
+    "override(anchor-recover): skills/recover/SKILL.md contains"
+    " '### Session-scoped override on recovery' section",
+    _s32_recover_path.exists() and bool(_rc),
+    f"anchor '{_RC_ANCHOR}' not found in {_s32_recover_path}"
+    " -- override(f2) check will fail",
+)
+
+# (f2) "00-state.md" AND "override" AND ("re-applied" OR "Current State") in _rc.
+check(
+    "override(f2): skills/recover/SKILL.md § recovery documents override"
+    " re-applied from 00-state.md",
+    bool(_rc)
+    and "00-state.md" in _rc
+    and "override" in _rc
+    and ("re-applied" in _rc or "Current State" in _rc),
+    f"anchor '{_RC_ANCHOR}' slice missing '00-state.md', 'override',"
+    " or 're-applied'/'Current State'",
+)
+
+# (f3) Literal "override re-applied from 00-state.md" AND "operation.success"
+#      in orchestrator § override slice OR recover § recovery slice.
+_f3_in_orch = (
+    bool(_ovr)
+    and "override re-applied from 00-state.md" in _ovr
+    and "operation.success" in _ovr
+)
+_f3_in_rc = (
+    bool(_rc)
+    and "override re-applied from 00-state.md" in _rc
+    and "operation.success" in _rc
+)
+check(
+    "override(f3): orchestrator § override or recover § recovery documents literal"
+    " 'override re-applied from 00-state.md' + operation.success",
+    _f3_in_orch or _f3_in_rc,
+    "Neither orchestrator.md § override nor recover § recovery contains"
+    " 'override re-applied from 00-state.md' + 'operation.success'",
+)
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

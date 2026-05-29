@@ -51,6 +51,43 @@ Ordered stages and gates (annotate `dispatch_handoff.type` to determine which it
 
 This rule applies to **every** entry mode: `@th:orchestrator` mention, skill routing (`/issue`, `/recover`, `/plan`, `/design`, `/deliver`, `/validate`, `/research`, `/spike`, `/test`, etc.), or another agent's referral. The `blocked-no-dispatch` state is the system's documented self-healing path — leaving it open for the user to resolve manually defeats the purpose.
 
+## Session-Scoped Config Override Protocol
+
+The orchestrator supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; the orchestrator applies it for that pipeline run only.
+
+### Step order (load-bearing)
+
+Runs inside boot Step 2, before `base_path` resolution:
+
+1. Parse override intent from the operator's chat message.
+2. Read the persistent config `~/.claude/.team-harness.json`.
+3. Apply precedence: `override > persistent > default` for each overridable key.
+4. Resolve `base_path`, `logs_mode`, `events_file`, and `docs_root` from the merged result.
+
+This order ensures `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}` is computed from the already-overridden `base_path` — not from the raw persistent value.
+
+### Whitelist (authority: CLAUDE.md §5)
+
+Overridable keys: `logs-mode`, `logs-path`, `logs-subfolder`, `clickup.workspace_id`.
+
+Excluded from override (→ `/th:setup` only): MCP URL, API keys (context7 / bearer), agent `model`, agent `effort`. Attempts to override excluded keys are ignored with a one-line WARN; the pipeline continues with the persistent value.
+
+### Persistence
+
+The resolved config is stored in `00-state.md` § Current State. No new file is created. The override flow is read-only on `~/.claude/.team-harness.json` — it is never written by the override path.
+
+### Output Discipline
+
+Follows `agents/_shared/output-template.md`: silent on success (events file only), one-line WARN + fallback on invalid override, non-blocking. No operator-facing chatter on a clean override.
+
+### `/recover` behavior
+
+On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. The orchestrator logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
+
+### Collision guarantee
+
+`base_path` is resolved (with override applied) before `docs_root` is composed. The `{YYYY-MM-DD}_{feature-name}` prefix ensures each run gets a unique workspace directory. Two runs with different overrides do not share or overwrite each other's workspace.
+
 ## `blocked-manual-push` Handling
 
 When the `delivery` agent returns `status: blocked-manual-push`, the orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. The orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
