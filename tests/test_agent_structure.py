@@ -4856,6 +4856,505 @@ check(
     " 'override re-applied from 00-state.md' + 'operation.success'",
 )
 # ---------------------------------------------------------------------------
+# Suite 33 -- Selective mid-pipeline KG reads on error and security-finding
+#             writes (kg-mid-pipeline, AC-1..AC-9)
+# ---------------------------------------------------------------------------
+# Structural assertions only -- no LLM runtime required.
+# Every check is ANCHOR-SCOPED to prevent false-greens: the contract tokens
+# involved (search_nodes, operation.started, kg_save_candidates, etc.) already
+# appear in the target files for unrelated reasons. We slice to a UNIQUELY-NAMED
+# new heading first, then assert tokens WITHIN that slice. An absent anchor
+# returns "" and all dependent checks fail with a clear detail -- not a
+# false-green.
+#
+# CANONICAL ANCHORS (implementer must use these verbatim):
+#   agents/orchestrator.md  :  "### KG read on error"
+#   agents/orchestrator.md  :  "### KG write on security findings"
+#   agents/orchestrator.md  :  "**No mid-pipeline investigation writes**"
+#   agents/security.md      :  "remediation_text" is NEW -- scoped via the
+#                               KG-access / status-block region containing the
+#                               new contract (the literal is absent today)
+#   agents/implementer.md   :  "kg_prior_art" is NEW literal -- bare presence
+#   agents/acceptance-checker.md : "kg_prior_art" is NEW literal -- bare presence
+#   agents/delivery.md      :  "**No cross-merge with security node types**"
+#                               (new marker in Step 11.5)
+#   docs/kg-content-policy.md : "KG-write-on-security-findings"
+#                               (new write-site mention)
+#
+# Check index → AC mapping:
+#   (1)  AC-1  -- KG-read-on-3.6-fail marker in orchestrator.md (anchor-scoped)
+#   (2)  AC-2  -- KG-read-on-3.75-fail marker in orchestrator.md (anchor-scoped)
+#   (3)  AC-3  -- kg_prior_art field in implementer.md + acceptance-checker.md
+#   (4)  AC-4  -- best-effort / non-blocking phrase in anchor slice
+#   (5)  AC-5  -- remediation_text safe contract in security.md
+#   (6)  AC-6  -- Critical/High-only write contract in security.md
+#   (7)  AC-7  -- content-filter + dedup marker in orchestrator.md (anchor-scoped)
+#   (8)  AC-8  -- cross-dedup contract in orchestrator.md + security.md + delivery.md
+#   (9)  AC-9  -- exclusion marker + session_end unchanged in orchestrator.md
+#   (10) GUARD -- absence of kg.read.*/kg.write.* event family in orchestrator.md
+#                 (design uses operation.* with detail discriminator instead)
+#                 This check is GREEN now and MUST stay green; it is a guard, not
+#                 a contract-presence RED-first check.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 33: Selective mid-pipeline KG reads on error and security-finding writes ===")
+
+_s33_orch = read(AGENTS_DIR / "orchestrator.md")
+_s33_sec = read(AGENTS_DIR / "security.md")
+_s33_impl = read(AGENTS_DIR / "implementer.md")
+_s33_ac_checker_path = AGENTS_DIR / "acceptance-checker.md"
+_s33_ac_checker = read(_s33_ac_checker_path) if _s33_ac_checker_path.exists() else ""
+_s33_deliv = read(AGENTS_DIR / "delivery.md")
+_s33_kg_policy_path = REPO_ROOT / "docs" / "kg-content-policy.md"
+_s33_kg_policy = read(_s33_kg_policy_path) if _s33_kg_policy_path.exists() else ""
+
+# ---------------------------------------------------------------------------
+# Anchor A: agents/orchestrator.md "### KG read on error"
+# (Covers checks (1), (2), and (4))
+# ---------------------------------------------------------------------------
+_KG_READ_ANCHOR = "### KG read on error"
+_kg_read = _slice_section(_s33_orch, _KG_READ_ANCHOR)
+
+check(
+    "kg-mid(anchor-read): agents/orchestrator.md contains"
+    " '### KG read on error' section",
+    bool(_kg_read),
+    f"anchor '{_KG_READ_ANCHOR}' not found in orchestrator.md"
+    " -- kg-mid checks (1)(2)(4) will fail",
+)
+
+# Check (1) -- AC-1: Phase 3.6 fail cases with re-dispatch (A/B/D), Case C excluded.
+# Assert within the anchor slice:
+#   - search_nodes is invoked
+#   - Phase 3.6 scope is declared (acceptance-check / 3.6 / acceptance fail)
+#   - Cases A/B/D are covered (re-dispatch cases)
+#   - Case C is explicitly excluded (no-redispatch / does not trigger / Case C)
+_c1_search_nodes = bool(_kg_read) and "search_nodes" in _kg_read
+_c1_phase36 = bool(_kg_read) and (
+    "3.6" in _kg_read or "acceptance" in _kg_read.lower()
+)
+_c1_cases_abd = bool(_kg_read) and (
+    ("Case A" in _kg_read or "case A" in _kg_read or "A/B/D" in _kg_read or "A, B" in _kg_read)
+    and ("Case B" in _kg_read or "case B" in _kg_read or "B" in _kg_read)
+    and ("Case D" in _kg_read or "case D" in _kg_read or "D" in _kg_read)
+)
+_c1_case_c_excluded = bool(_kg_read) and (
+    "Case C" in _kg_read or "case C" in _kg_read
+) and (
+    "not" in _kg_read.lower()
+    or "excluded" in _kg_read.lower()
+    or "no-redispatch" in _kg_read.lower()
+    or "does not trigger" in _kg_read.lower()
+    or "skip" in _kg_read.lower()
+)
+check(
+    "kg-mid(1/ac-1): orchestrator.md § 'KG read on error' declares"
+    " search_nodes, Phase 3.6 scope (Cases A/B/D), and explicit Case C exclusion",
+    _c1_search_nodes and _c1_phase36 and _c1_cases_abd and _c1_case_c_excluded,
+    (
+        f"anchor '{_KG_READ_ANCHOR}' slice:"
+        f" search_nodes={_c1_search_nodes},"
+        f" phase3.6={_c1_phase36},"
+        f" cases_ABD={_c1_cases_abd},"
+        f" case_C_excluded={_c1_case_c_excluded}"
+    ),
+)
+
+# Check (2) -- AC-2: Phase 3.75 fail scope declared in the same anchor slice.
+_c2_phase375 = bool(_kg_read) and (
+    "3.75" in _kg_read or "build" in _kg_read.lower() or "lint" in _kg_read.lower()
+)
+check(
+    "kg-mid(2/ac-2): orchestrator.md § 'KG read on error' declares"
+    " Phase 3.75 fail scope (build/lint error triggers search_nodes)",
+    bool(_kg_read) and _c1_search_nodes and _c2_phase375,
+    (
+        f"anchor '{_KG_READ_ANCHOR}' slice:"
+        f" search_nodes={_c1_search_nodes},"
+        f" phase3.75_or_build_lint={_c2_phase375}"
+    ),
+)
+
+# Check (4) -- AC-4: best-effort / non-blocking declared in the KG-read anchor slice.
+_c4_nonblocking = bool(_kg_read) and (
+    "non-blocking" in _kg_read
+    or "non_blocking" in _kg_read
+    or "best-effort" in _kg_read
+    or "best_effort" in _kg_read
+    or "non blocking" in _kg_read.lower()
+)
+_c4_operation_failed = bool(_kg_read) and (
+    "operation.failed" in _kg_read
+    or "operation.started" in _kg_read
+    or "operation." in _kg_read
+)
+check(
+    "kg-mid(4/ac-4): orchestrator.md § 'KG read on error' declares"
+    " best-effort non-blocking (log operation.* and continue with n/a)",
+    _c4_nonblocking and _c4_operation_failed,
+    (
+        f"anchor '{_KG_READ_ANCHOR}' slice:"
+        f" non_blocking={_c4_nonblocking},"
+        f" operation_event={_c4_operation_failed}"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) -- AC-3: kg_prior_art field in implementer.md and acceptance-checker.md
+# NOTE: The literal 'kg_prior_art' is NEW (not in either file today).
+# Bare presence is sufficient -- no anchor needed since the literal is unique.
+# The check asserts ONLY the field name presence; NOT the runtime value of
+# 'applied:bool' (structural limit: no LLM runtime available).
+# ---------------------------------------------------------------------------
+_c3_impl = "kg_prior_art" in _s33_impl
+_c3_ac = "kg_prior_art" in _s33_ac_checker
+
+check(
+    "kg-mid(3/ac-3): agents/implementer.md status block declares field 'kg_prior_art'",
+    _c3_impl,
+    "literal 'kg_prior_art' absent from implementer.md"
+    " -- field presence in status block not documented",
+)
+
+check(
+    "kg-mid(3b/ac-3): agents/acceptance-checker.md status block declares field 'kg_prior_art'",
+    _c3_ac,
+    f"literal 'kg_prior_art' absent from acceptance-checker.md ({_s33_ac_checker_path})"
+    " -- field presence in status block not documented",
+)
+
+# ---------------------------------------------------------------------------
+# Anchor B: agents/orchestrator.md "### KG write on security findings"
+# (Covers checks (7) and the orchestrator side of (8))
+# ---------------------------------------------------------------------------
+_KG_WRITE_ANCHOR = "### KG write on security findings"
+_kg_write = _slice_section(_s33_orch, _KG_WRITE_ANCHOR)
+
+check(
+    "kg-mid(anchor-write): agents/orchestrator.md contains"
+    " '### KG write on security findings' section",
+    bool(_kg_write),
+    f"anchor '{_KG_WRITE_ANCHOR}' not found in orchestrator.md"
+    " -- kg-mid checks (7)(8-orch) will fail",
+)
+
+# Check (7) -- AC-7: content-filter + dedup (suggest_node_type + search_nodes) in write anchor.
+_c7_content_filter = bool(_kg_write) and (
+    "content-filter" in _kg_write
+    or "content filter" in _kg_write
+    or "kg-content-policy" in _kg_write
+    or "kg_content_policy" in _kg_write
+)
+_c7_suggest_node_type = bool(_kg_write) and "suggest_node_type" in _kg_write
+_c7_search_nodes = bool(_kg_write) and "search_nodes" in _kg_write
+_c7_create_entities = bool(_kg_write) and (
+    "create_entities" in _kg_write or "add_observations" in _kg_write
+)
+check(
+    "kg-mid(7/ac-7): orchestrator.md § 'KG write on security findings' declares"
+    " content-filter (kg-content-policy) + dedup (suggest_node_type + search_nodes)"
+    " before create_entities/add_observations",
+    _c7_content_filter and _c7_suggest_node_type and _c7_search_nodes and _c7_create_entities,
+    (
+        f"anchor '{_KG_WRITE_ANCHOR}' slice:"
+        f" content_filter={_c7_content_filter},"
+        f" suggest_node_type={_c7_suggest_node_type},"
+        f" search_nodes={_c7_search_nodes},"
+        f" create/add={_c7_create_entities}"
+    ),
+)
+
+# Check (8-orch) -- AC-8 orchestrator side: cross-dedup contract in write anchor.
+# Assert: 'error'/'pattern' node types AND 'process-insight' AND no-cross-merge.
+_c8_orch_error_pattern = bool(_kg_write) and (
+    ('"error"' in _kg_write or "'error'" in _kg_write or "node_type: error" in _kg_write
+     or "type `error`" in _kg_write or "type error" in _kg_write.lower())
+    and
+    ('"pattern"' in _kg_write or "'pattern'" in _kg_write or "node_type: pattern" in _kg_write
+     or "type `pattern`" in _kg_write or "type pattern" in _kg_write.lower())
+)
+_c8_orch_process_insight = bool(_kg_write) and "process-insight" in _kg_write
+_c8_orch_no_cross = bool(_kg_write) and (
+    "no-cross" in _kg_write
+    or "no cross" in _kg_write.lower()
+    or "not merge" in _kg_write.lower()
+    or "do not merge" in _kg_write.lower()
+    or "cross-dedup" in _kg_write
+    or "cross_dedup" in _kg_write
+    or "cross-merge" in _kg_write
+)
+check(
+    "kg-mid(8-orch/ac-8): orchestrator.md § 'KG write on security findings' declares"
+    " cross-dedup: error/pattern types distinct from process-insight, no cross-merge",
+    _c8_orch_error_pattern and _c8_orch_process_insight and _c8_orch_no_cross,
+    (
+        f"anchor '{_KG_WRITE_ANCHOR}' slice:"
+        f" error_pattern_types={_c8_orch_error_pattern},"
+        f" process_insight={_c8_orch_process_insight},"
+        f" no_cross_merge={_c8_orch_no_cross}"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) -- AC-5: remediation_text safe contract in security.md.
+# 'remediation_text' is NEW to security.md (absent today). The literal is
+# unique so bare presence is acceptable; we also check the prohibited list.
+# ---------------------------------------------------------------------------
+_c5_remediation_text = "remediation_text" in _s33_sec
+# Prohibited items from the plan (exploit, CVE, secret/PII, path)
+_c5_no_exploit = bool(_c5_remediation_text) and (
+    "exploit" in _s33_sec or "no exploit" in _s33_sec.lower() or "without exploit" in _s33_sec.lower()
+)
+_c5_no_cve = bool(_c5_remediation_text) and (
+    "CVE" in _s33_sec
+)
+_c5_no_pii = bool(_c5_remediation_text) and (
+    "PII" in _s33_sec or "secret" in _s33_sec.lower()
+)
+_c5_no_path = bool(_c5_remediation_text) and (
+    "path" in _s33_sec.lower()
+)
+check(
+    "kg-mid(5/ac-5): agents/security.md declares remediation_text safe contract"
+    " (field present + prohibited list: exploit, CVE, secret/PII, path)",
+    _c5_remediation_text and _c5_no_exploit and _c5_no_cve and _c5_no_pii and _c5_no_path,
+    (
+        f"security.md:"
+        f" remediation_text={_c5_remediation_text},"
+        f" exploit_mentioned={_c5_no_exploit},"
+        f" CVE_mentioned={_c5_no_cve},"
+        f" PII_secret_mentioned={_c5_no_pii},"
+        f" path_mentioned={_c5_no_path}"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (5b) -- SEC-002: remediation_text producer contract references canonical
+# policy (docs/kg-content-policy.md) as the authority for prohibited content,
+# making the prohibited list open (not exhaustive / closed).
+# Anchor-scoped: slice the 800-char window around 'remediation_text' in
+# security.md -- the SAFE contract lives in that block. The window must contain
+# BOTH 'remediation_text' AND a pointer to kg-content-policy so the contract
+# reads as "see policy for full list" rather than a closed enumeration.
+# Symmetric with kg-mid(7c/sec-004) which guards the write-site (orchestrator).
+# ---------------------------------------------------------------------------
+_c5b_idx = _s33_sec.find("remediation_text")
+_c5b_window = (
+    _s33_sec[max(0, _c5b_idx - 50): _c5b_idx + 800] if _c5b_idx != -1 else ""
+)
+_c5b_has_remediation = _c5b_idx != -1
+_c5b_has_policy_ref = (
+    "kg-content-policy" in _c5b_window
+)
+check(
+    "kg-mid(5b/sec-002): agents/security.md remediation_text safe contract"
+    " references docs/kg-content-policy.md as catch-all authority (producer"
+    " contract non-exhaustive, symmetric with write-site SEC-004 guard)",
+    _c5b_has_remediation and _c5b_has_policy_ref,
+    (
+        f"security.md remediation_text region (800-char window):"
+        f" remediation_text_found={_c5b_has_remediation},"
+        f" kg-content-policy_referenced={_c5b_has_policy_ref}"
+        f" (window='{_c5b_window[:150]}...')"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) -- AC-6: "Critical/High only" write contract in security.md.
+# The concept of Critical/High already exists in security.md (for other reasons),
+# but the KG-write restriction is NEW. We scope to the KG-access region by
+# anchoring on "kg_save_candidates" in the file and checking within a 600-char
+# window that "Critical" and "High" and an exclusion verb appear together.
+# ---------------------------------------------------------------------------
+_c6_idx = _s33_sec.find("kg_save_candidates")
+_c6_window = _s33_sec[max(0, _c6_idx - 100): _c6_idx + 600] if _c6_idx != -1 else ""
+_c6_critical_high = (
+    "Critical" in _c6_window and "High" in _c6_window
+)
+_c6_only_restriction = (
+    "only" in _c6_window.lower()
+    or "Critical/High" in _c6_window
+    or "Critical or High" in _c6_window
+)
+check(
+    "kg-mid(6/ac-6): agents/security.md declares Critical/High-only KG write"
+    " (only Critical/High findings produce kg_save_candidates for KG write)",
+    bool(_c6_window) and _c6_critical_high and _c6_only_restriction,
+    (
+        f"security.md kg_save_candidates context window:"
+        f" critical_high={_c6_critical_high},"
+        f" only_restriction={_c6_only_restriction}"
+        f" (window='{_c6_window[:120]}...')"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (8-sec) -- AC-8 security.md side: cross-dedup contract in security.md.
+# Assert: node_type error/pattern mentioned near kg_save_candidates context.
+# ---------------------------------------------------------------------------
+_c8_sec_window = _s33_sec[max(0, _c6_idx - 200): _c6_idx + 800] if _c6_idx != -1 else ""
+_c8_sec_error_pattern = (
+    ("error" in _c8_sec_window.lower() and "pattern" in _c8_sec_window.lower())
+    and ("node_type" in _c8_sec_window or "node type" in _c8_sec_window.lower()
+         or '`error`' in _c8_sec_window or '`pattern`' in _c8_sec_window)
+)
+check(
+    "kg-mid(8-sec/ac-8): agents/security.md declares node_type error/pattern"
+    " for KG write candidates (cross-dedup contract, security side)",
+    bool(_c8_sec_window) and _c8_sec_error_pattern,
+    (
+        f"security.md kg_save_candidates context:"
+        f" error_pattern_node_type={_c8_sec_error_pattern}"
+        f" (window sample='{_c8_sec_window[:120]}...')"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (8-deliv) -- AC-8 delivery.md side: cross-dedup note in Step 11.5.
+# Anchor: "**No cross-merge with security node types**" (new marker in Step 11.5).
+# ---------------------------------------------------------------------------
+_DELIV_XDEDUP_ANCHOR = "**No cross-merge with security node types**"
+_deliv_xdedup = _slice_section(_s33_deliv, _DELIV_XDEDUP_ANCHOR)
+
+check(
+    "kg-mid(anchor-deliv-xdedup): agents/delivery.md contains"
+    " '**No cross-merge with security node types**' marker in Step 11.5",
+    bool(_deliv_xdedup),
+    f"anchor '{_DELIV_XDEDUP_ANCHOR}' not found in delivery.md"
+    " -- kg-mid check (8-deliv) will fail",
+)
+
+_c8_deliv_process_insight = bool(_deliv_xdedup) and "process-insight" in _deliv_xdedup
+_c8_deliv_error_pattern = bool(_deliv_xdedup) and (
+    "error" in _deliv_xdedup.lower() and "pattern" in _deliv_xdedup.lower()
+)
+_c8_deliv_no_cross = bool(_deliv_xdedup) and (
+    "not merge" in _deliv_xdedup.lower()
+    or "do not merge" in _deliv_xdedup.lower()
+    or "no cross" in _deliv_xdedup.lower()
+    or "cross-merge" in _deliv_xdedup
+)
+check(
+    "kg-mid(8-deliv/ac-8): agents/delivery.md Step 11.5 cross-dedup note declares"
+    " process-insight not merged against error/pattern security node types",
+    _c8_deliv_process_insight and _c8_deliv_error_pattern and _c8_deliv_no_cross,
+    (
+        f"anchor '{_DELIV_XDEDUP_ANCHOR}' slice:"
+        f" process_insight={_c8_deliv_process_insight},"
+        f" error_pattern={_c8_deliv_error_pattern},"
+        f" no_cross={_c8_deliv_no_cross}"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Anchor C: agents/orchestrator.md "**No mid-pipeline investigation writes**"
+# (Covers check (9))
+# ---------------------------------------------------------------------------
+_EXCL_ANCHOR = "**No mid-pipeline investigation writes**"
+_excl = _slice_section(_s33_orch, _EXCL_ANCHOR)
+
+check(
+    "kg-mid(anchor-excl): agents/orchestrator.md contains"
+    " '**No mid-pipeline investigation writes**' exclusion marker",
+    bool(_excl),
+    f"anchor '{_EXCL_ANCHOR}' not found in orchestrator.md"
+    " -- kg-mid check (9) will fail",
+)
+
+# Check (9) -- AC-9: exclusion marker + session_end unchanged in orchestrator.md.
+_c9_no_investigation = bool(_excl) and (
+    "investigation" in _excl.lower()
+    or "no investigation" in _excl.lower()
+    or "not add" in _excl.lower()
+)
+_c9_session_end = bool(_excl) and (
+    "session_end" in _excl
+    or "session end" in _excl.lower()
+)
+_c9_unchanged = bool(_excl) and (
+    "unchanged" in _excl.lower()
+    or "Phase 6" in _excl
+    or "phase 6" in _excl.lower()
+    or "remains" in _excl.lower()
+)
+check(
+    "kg-mid(9/ac-9): orchestrator.md exclusion marker declares no investigation"
+    " writes mid-pipeline and session_end unchanged in Phase 6",
+    _c9_no_investigation and _c9_session_end and _c9_unchanged,
+    (
+        f"anchor '{_EXCL_ANCHOR}' slice:"
+        f" no_investigation={_c9_no_investigation},"
+        f" session_end={_c9_session_end},"
+        f" unchanged/phase6={_c9_unchanged}"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (kg-content-policy) -- AC-7 policy side: write-time filter note in
+# docs/kg-content-policy.md covers the new Phase 3 security-finding write site.
+# Anchor token: "KG-write-on-security-findings" (new, absent today).
+# ---------------------------------------------------------------------------
+_c_policy_new_site = "KG-write-on-security-findings" in _s33_kg_policy
+
+check(
+    "kg-mid(7b/ac-7): docs/kg-content-policy.md mentions"
+    " 'KG-write-on-security-findings' as a covered write site"
+    " (write-time filter now covers Phase 3 security-finding writes)",
+    _c_policy_new_site,
+    "literal 'KG-write-on-security-findings' not found in docs/kg-content-policy.md"
+    " -- write-time filter coverage of the new Phase 3 write site not documented",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7c) -- SEC-004: catch-all clause + policy pointer in write anchor.
+# Defense-in-depth invariant: the content-filter at the KG write site MUST
+# reference `docs/kg-content-policy.md` (the authoritative policy) AND the
+# open-ended catch-all literal `or other forbidden content`. If a future edit
+# narrows the filter to a closed list (dropping the catch-all), the defense
+# silently degrades and SEC-002's gap reopens with no test catching it.
+# Asserted within the '### KG write on security findings' slice (anchor-scoped).
+# ---------------------------------------------------------------------------
+_c7c_policy_pointer = bool(_kg_write) and (
+    "docs/kg-content-policy.md" in _kg_write
+    or "kg-content-policy" in _kg_write
+)
+_c7c_catchall = bool(_kg_write) and "or other forbidden content" in _kg_write
+check(
+    "kg-mid(7c/sec-004): orchestrator.md § 'KG write on security findings'"
+    " content-filter references BOTH docs/kg-content-policy.md policy pointer"
+    " AND catch-all clause 'or other forbidden content'"
+    " (defense-in-depth invariant — SEC-004)",
+    _c7c_policy_pointer and _c7c_catchall,
+    (
+        f"anchor '{_KG_WRITE_ANCHOR}' slice:"
+        f" policy_pointer(docs/kg-content-policy.md)={_c7c_policy_pointer},"
+        f" catchall('or other forbidden content')={_c7c_catchall}"
+        " -- content-filter must reference both; removing either degrades SEC-002 defense"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) -- GUARD (GREEN now, must stay green):
+# agents/orchestrator.md must NOT contain a parallel kg.read.*/kg.write.*
+# event family. The design reuses operation.* with a 'detail' discriminator.
+# This check is intentionally a guard (presence-of-absence assertion).
+# It is labeled clearly so the pass/fail semantics are unambiguous.
+# ---------------------------------------------------------------------------
+_c10_no_kg_read_family = "kg.read." not in _s33_orch
+_c10_no_kg_write_family = "kg.write." not in _s33_orch
+check(
+    "kg-mid(10/guard): agents/orchestrator.md does NOT define a parallel"
+    " kg.read.*/kg.write.* event family (design uses operation.* + detail discriminator)",
+    _c10_no_kg_read_family and _c10_no_kg_write_family,
+    (
+        f"orchestrator.md contains parallel KG event family:"
+        f" kg.read.*={'found' if not _c10_no_kg_read_family else 'absent'},"
+        f" kg.write.*={'found' if not _c10_no_kg_write_family else 'absent'}"
+        " -- use operation.* with detail discriminator instead"
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

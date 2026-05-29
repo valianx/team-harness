@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.37.0] - 2026-05-29
+
 ### Added
+
+- Selective mid-pipeline KG reads on error and security-finding writes: the orchestrator now performs KG `search_nodes` reads before re-dispatching a correcting agent at Phase 3.6 fail (Cases A/B/D — Case C excluded) and Phase 3.75 fail (build/lint error), passing prior-art to the correcting agent. Separately, Critical/High security findings are persisted to the KG (node types `error`/`pattern`) after the final Phase 3 verify pass, with content-filter + dedup gates. `implementer` and `acceptance-checker` gain a `kg_prior_art: hit:N applied:bool | n/a` status-block field. `security` gains a nested `{name, node_type, remediation_text}` form for `kg_save_candidates` (backward-compatible with bare strings). `delivery` Step 11.5 declares cross-dedup exclusion against `error`/`pattern` security nodes. Suite 33 (18 checks) asserts all nine acceptance criteria structurally.
 
 - Neutral-register voice rule: `/th:setup` now writes a third managed block (`voice-rule`) to `~/.claude/CLAUDE.md`, and `/th:update` keeps it in sync alongside the existing two. The block mandates neutral, standard language and forbids country-specific idioms, regionalisms, and dialect slang in every response, in any language. Suite 18 asserts the block's presence and substance in `skills/setup/SKILL.md` and its sync wiring in `skills/update/SKILL.md`.
 

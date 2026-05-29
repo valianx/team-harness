@@ -124,6 +124,8 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {critical and high finding titles, or "none"}
 ```
 
+**`kg_save_candidates` contract for KG-write candidates (pipeline mode).** Only Critical or High severity findings produce KG-write candidates — `kg_save_candidates: []` when all findings are Low, Medium, or Info. Each candidate must be an object `{name, node_type, remediation_text}` (bare string legacy form also accepted for backward compatibility). `node_type` must be `error` or `pattern`. `remediation_text` is the safe remediation guidance (the class of issue and how to avoid or fix it). The `remediation_text` SAFE contract prohibits: NO exploit detail (no working attack payload, no step-by-step exploitation), NO CVE-version specificity (no `CVE-XXXX-NNNN` identifiers pinned to library versions), NO secrets or PII (no tokens, keys, user data, credentials), NO absolute path with user identifier (no `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`), or any other content forbidden by `docs/kg-content-policy.md` (the explicit list above is illustrative, not exhaustive; `docs/kg-content-policy.md` is the authoritative policy). Security writes to node types `error` and `pattern` only (distinct from `process-insight` — do not cross-merge with delivery Step 11.5 passive-capture). The orchestrator applies an additional content-filter pass at write time (Phase 3) as defense-in-depth.
+
 ---
 
 ## Security Standards Reference

@@ -229,8 +229,11 @@ output: workspaces/{feature-name}/04-validation.md § Drift Analysis
 summary: {1-2 sentences: verdict + most relevant finding, or "no drift detected"}
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+kg_prior_art: hit:N applied:bool | n/a
 issues: {list of failing items, or "none"}
 ```
+
+**`kg_prior_art` field:** emit `kg_prior_art: hit:N applied:bool` when the orchestrator passed a `## KG prior-art` block in the re-dispatch prompt (N = number of prior-art results received; `applied: true` if they influenced the audit, `false` if irrelevant). Emit `kg_prior_art: n/a` when no prior-art block was passed.
 
 The `verdict` field is what the orchestrator uses to decide whether to proceed. `status: success` means "the audit ran successfully", not "everything passes" — pay attention to `verdict` separately.
 

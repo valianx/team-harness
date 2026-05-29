@@ -725,6 +725,8 @@ Concatenate the proposed observations into a single text blob. Call `mcp__memory
 
 **Gate 2 — Dedup gate (`search_nodes` pre-flight).**
 
+**No cross-merge with security node types** — this Gate 2 dedup operates on `process-insight` nodes only. Do not merge a `process-insight` passive-capture against a security finding node of type `error` or `pattern`. Those are distinct node types by design: `error`/`pattern` nodes are written by the orchestrator at Phase 3 for security findings (Critical/High); `process-insight` nodes are written here for task-level learnings. The dedup search may return `error`/`pattern` nodes — treat them as non-matching for the purpose of this gate (they are not the same insight type and must not be merged across types).
+
 Call `mcp__memory__search_nodes(query=<first observation, which is the synthesized summary>)`. Inspect the top-3 results:
 
 | Condition | Action |

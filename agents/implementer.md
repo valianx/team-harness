@@ -364,12 +364,15 @@ output: workspaces/{feature-name}/02-implementation.md
 summary: {1-2 sentences: N files created/modified, key patterns used, any deviations}
 context7_consult: hit:N miss:N skipped:M
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+kg_prior_art: hit:N applied:bool | n/a
 regression_test_passes: true | false   # type: fix | hotfix only; omit the line otherwise
 follow_ups_spotted: {N}                 # type: fix | hotfix only; omit the line otherwise
 issues: {list of blockers, or "none"}
 ```
 
 The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness.
+
+**`kg_prior_art` field:** emit `kg_prior_art: hit:N applied:bool` when the orchestrator passed a `## KG prior-art` block in the re-dispatch prompt (N = number of prior-art results received; `applied: true` if they influenced the fix, `false` if irrelevant). Emit `kg_prior_art: n/a` when no prior-art block was passed (first dispatch, or MCP returned empty / was unreachable).
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix`):**
 - `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`. The orchestrator gates Phase 2 on this; `false` triggers iteration (subject to max-3).

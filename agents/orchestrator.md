@@ -1557,6 +1557,24 @@ Next: delivery (or: iterating — implementer fixing N issues)
 **Case C — Criteria issue:** adjust `01-plan.md` § Task List AC, mark the change in the brief, re-run all verifiers.
 **Case D — Security-only:** route the brief to `implementer`, then re-run only `security` (tester+qa already passed; re-run them only if the fix touches test-relevant code).
 
+### KG read on error
+
+This sub-procedure is invoked BEFORE re-dispatching the correcting agent in Phase 3.6 fail (Cases A, B, D) and Phase 3.75 fail. It is NOT invoked for Case C (criteria adjustment) because Case C does not re-dispatch an agent that corrects code — invoking the read in that branch would produce noise with no consumer.
+
+**Scope:** strictly limited to these two failure points with re-dispatch:
+- **Phase 3.6 fail — Cases A/B/D only** (Case C excluded — no-redispatch, no correcting agent to feed prior-art to).
+- **Phase 3.75 fail** — build or lint error triggers the read before re-dispatching the implementer.
+
+**Procedure (invoke inside the re-dispatch branch, before the Task call):**
+
+1. Derive 1-3 semantic queries from the failure context:
+   - For **Phase 3.6 fail (acceptance-check):** read the failing AC identifiers and root-cause type from `failure-brief.md`. Form queries from the failure domain (e.g., `"NestJS JWT validation"`, `"missing null check"`, `"CSRF guard"` — whatever the brief names as the defect area).
+   - For **Phase 3.75 fail (build/lint):** extract the failing command and the first error line. Form queries from the technology and error type (e.g., `"TypeScript import cycle"`, `"ESLint no-unused-vars"`).
+2. Call `mcp__memory__search_nodes` with each query (vector search, top-3 per call). Collect the union of results.
+3. Pass the results to the correcting agent as a `## KG prior-art` block prepended to the re-dispatch prompt. If the result set is empty, pass `n/a`. The consuming agent adds `kg_prior_art: hit:N applied:bool` (or `kg_prior_art: n/a`) to its status block.
+
+**Best-effort, non-blocking.** If the Memory MCP is unreachable or returns an error, log an `operation.failed` event (detail: `kg-read-on-acceptance-fail` for Phase 3.6 failures, `kg-read-on-build-fail` for Phase 3.75 failures) to the execution events file and continue with `n/a` — the read never blocks the re-dispatch. Silent on success: `operation.started` / `operation.success` go to the events file only, no operator chatter.
+
 **Only open the full session-doc if the brief is unclear** (rare — agents are required to make briefs self-sufficient). The default is: brief in, fix out, no re-reads.
 
 **Max 3 iterations.** Each round-trip (implementer fixes → agents re-run) = 1 iteration. Update `00-state.md` iteration count at each loop. If exceeded, try an alternative approach or simplify scope. Escalate to user as last resort.
@@ -1606,6 +1624,23 @@ Iterating ({N}/3): routing to implementer
 This phase costs almost no tokens — it parses 2-3 small tables. The cost-vs-confidence tradeoff is heavily on the side of correctness.
 
 **Rewrite TL;DR** (row 12 of §5.2): On pass: `Now`: "Phase 3.75 build-verification running." `Last`: "PR-{i} Phase 3.5 PASS — {N}/{N} AC verified, test-ratchet OK." `Next`: "Phase 3.75 build check, then Phase 3.6 acceptance-check." On fail: `Now`: "Iterating (iter N/3) for PR-{i}." `Last`: "Phase 3.5 FAIL — {failing AC list}." `Open issues`: failing AC identifiers.
+
+### KG write on security findings
+
+After the last Phase 3 verify pass that succeeds (immediately before STAGE-GATE-2 / delivery), when `security` reported one or more Critical or High findings, persist the `kg_save_candidates` from its status block to the Knowledge Graph. This write runs once on the final successful verify — not on intermediate iterations.
+
+**Procedure (orchestrator-owned, Phase 3, once over the final Critical/High set):**
+
+For each candidate in `security`'s `kg_save_candidates` (may be bare string legacy OR `{name, node_type, remediation_text}` object):
+
+1. **Content-filter pass.** Apply the write-time filter from `docs/kg-content-policy.md`. Discard or rewrite any candidate that contains: exploit details, CVE-version specifics, secrets or PII, absolute paths with user identifiers, or other forbidden content. Only proceed if the candidate passes the filter. When the forbidden content is STRUCTURAL (an exploit detail, a CVE-version identifier, a secret or PII value, a user-path — not merely a phrasing nuance), PREFER discard over rewrite: a silent rewrite risks distorting the security lesson or leaving forbidden residue in the observation.
+2. **Gate 1 — Specificity (`suggest_node_type`).** Call `mcp__memory__suggest_node_type(text=<remediation_text or name>)`. If top-1 confidence < 0.5, skip this candidate (too vague). If top-1 type does not match `error` or `pattern` by a margin ≥ 0.2, skip (type mismatch). This reuses the same gate pattern as delivery Step 11.5.
+3. **Gate 2 — Dedup (`search_nodes`).** Call `mcp__memory__search_nodes(query=<name or first observation>)`. Filter results to `node_type ∈ {error, pattern}` only — do not cross-merge against a `process-insight` node. If a clear match exists among `error`/`pattern` nodes, use `add_observations`; otherwise use `create_entities` with the candidate's `node_type` (`error` or `pattern`).
+4. Call `mcp__memory__create_entities` or `mcp__memory__add_observations` as determined in Gate 2.
+
+**Cross-dedup contract (AC-8).** Security findings use node_type: error or node_type: pattern. The delivery passive-capture (Step 11.5) uses `process-insight`. These are distinct types by construction — do not cross-merge. Gate 2 dedup filters to node types `error`/`pattern` explicitly so a `process-insight` node is never mistaken for a security-finding match. The `process-insight` write at delivery Step 11.5 likewise does not merge against a security node of node_type: error or node_type: pattern.
+
+**Best-effort.** If the MCP is unreachable, log `operation.failed` (detail: `kg-write-security-finding`) and continue. Silent on success.
 
 ---
 
@@ -2083,6 +2118,8 @@ mcp__memory__session_end(
   3. Does this string contain a developer name? → drop or anonymize.
   4. Could this observation be sent to another developer's machine and still be useful? → if no, drop.
 
+**No mid-pipeline investigation writes** — only the two KG-read touchpoints (Phase 3.6 fail Cases A/B/D and Phase 3.75 fail, described in `### KG read on error` above) and the security-finding writes (Phase 3, described in `### KG write on security findings` above) are added mid-pipeline. No investigation writes are added at any other mid-pipeline point. `session_end` remains in Phase 6 (unchanged); the mid-pipeline touchpoints use read/create operations within the already-open session without closing it early.
+
 ### Process Reflection (after KG save)
 
 Before reporting to the user, capture a brief reflection on the **process itself** (not the product). This builds a dataset of what works and what doesn't in the agent system.
@@ -2522,6 +2559,7 @@ Every line is a JSON object with these fields:
 | `pipeline.complete` | Immediately after the Final Pipeline Sanity Check passes (all expected artifacts present and non-empty). Emitted before Phase 5. |
 | `pipeline.incomplete` | Immediately after the Final Pipeline Sanity Check fails (one or more expected artifacts missing or empty). Sets `status: blocked-incomplete`; Phase 5 and Phase 6 do NOT execute. |
 | `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
+| `operation.started` / `operation.success` / `operation.failed` | Silent-on-success operations: config load, MCP connectivity probes, mid-pipeline KG reads on error, and security-finding writes. Use `operation.*` with a `detail` discriminator — do NOT introduce a parallel family of KG-namespaced events (use `operation.*` with `detail` instead). KG-specific `detail` values: `kg-read-on-acceptance-fail` (Phase 3.6 fail read), `kg-read-on-build-fail` (Phase 3.75 fail read), `kg-write-security-finding` (Phase 3 security write). `operation.started` / `operation.success` are silent to the operator (events file only). `operation.failed` surfaces as a one-line summary in the operator report. |
 
 ### Implementation note
 
