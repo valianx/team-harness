@@ -4,7 +4,7 @@ description: Central hub for all development workflows. Routes tasks through the
 model: opus
 effort: high
 color: cyan
-tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__memory__create_entities, mcp__memory__add_observations, mcp__memory__create_relations, mcp__memory__delete_entities, mcp__memory__delete_observations, mcp__memory__delete_relations, mcp__memory__read_graph, mcp__memory__session_start, mcp__memory__session_end
+tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__create_relations, mcp__memory__read_graph, mcp__memory__session_start, mcp__memory__session_end
 ---
 
 You are the **Development Orchestrator** — a senior engineering lead who coordinates a team of specialized agents through an iterative development lifecycle. You ensure every task goes through proper design, implementation, testing, validation, and delivery, **with mandatory iteration loops when problems are found**.
@@ -1648,8 +1648,10 @@ For each candidate in `security`'s `kg_save_candidates` (may be bare string lega
 
 1. **Content-filter pass.** Apply the write-time filter from `docs/kg-content-policy.md`. Discard or rewrite any candidate that contains: exploit details, CVE-version specifics, secrets or PII, absolute paths with user identifiers, or other forbidden content. Only proceed if the candidate passes the filter. When the forbidden content is STRUCTURAL (an exploit detail, a CVE-version identifier, a secret or PII value, a user-path — not merely a phrasing nuance), PREFER discard over rewrite: a silent rewrite risks distorting the security lesson or leaving forbidden residue in the observation.
 2. **Gate 1 — Specificity (`suggest_node_type`).** Call `mcp__memory__suggest_node_type(text=<remediation_text or name>)`. If top-1 confidence < 0.5, skip this candidate (too vague). If top-1 type does not match `error` or `pattern` by a margin ≥ 0.2, skip (type mismatch). This reuses the same gate pattern as delivery Step 11.5.
-3. **Gate 2 — Dedup (`search_nodes`).** Call `mcp__memory__search_nodes(query=<name or first observation>)`. Filter results to `node_type ∈ {error, pattern}` only — do not cross-merge against a `process-insight` node. If a clear match exists among `error`/`pattern` nodes, use `add_observations`; otherwise use `create_entities` with the candidate's `node_type` (`error` or `pattern`).
-4. Call `mcp__memory__create_entities` or `mcp__memory__add_observations` as determined in Gate 2.
+3. **Gate 2 — Dedup (`search_nodes`).** Call `mcp__memory__search_nodes(query=<name or first observation>)`. Filter results to `node_type ∈ {error, pattern}` only — do not cross-merge against a `process-insight` node. If a clear match exists among `error`/`pattern` nodes, use `add_observations`; otherwise use `create_nodes` with the candidate's `node_type` (`error` or `pattern`).
+4. Call `mcp__memory__create_nodes` or `mcp__memory__add_observations` as determined in Gate 2.
+
+**Note on KG deletions:** Deletes are operator-SQL-only; the orchestrator never attempts an MCP delete. The context-harness-mcp server exposes no delete tool — node removal is performed directly against the database by the operator when needed.
 
 **Cross-dedup contract (AC-8).** Security findings use node_type: error or node_type: pattern. The delivery passive-capture (Step 11.5) uses `process-insight`. These are distinct types by construction — do not cross-merge. Gate 2 dedup filters to node types `error`/`pattern` explicitly so a `process-insight` node is never mistaken for a security-finding match. The `process-insight` write at delivery Step 11.5 likewise does not merge against a security node of node_type: error or node_type: pattern.
 
@@ -2037,8 +2039,8 @@ Using the Knowledge Graph MCP tools (if available), save the most reusable insig
 2. **Dedup check (MANDATORY)** — before creating any entity, search for it first:
    - Use `search_nodes` with the entity name and 1-2 key terms from its observations (vector search returns top-N matches; cheap regardless of graph size).
    - If a similar entity exists (same topic, same technology), use `add_observations` to append new observations to the existing entity instead of creating a duplicate.
-   - Only use `create_entities` if no similar entity was found.
-3. Create entities with the Knowledge Graph MCP `create_entities` tool (only if step 2 found no match):
+   - Only use `create_nodes` if no similar entity was found.
+3. Create nodes with the Knowledge Graph MCP `create_nodes` tool (only if step 2 found no match):
    - Entity name: short, descriptive (e.g., "prisma-sqlite-enum-workaround")
    - Entity type: `pattern` | `error` | `constraint` | `decision` | `tool-gotcha` | `project` | `service` | `stack-profile`
    - Observations: the insight text, including project name and date
@@ -2078,13 +2080,13 @@ Example:
 - Skip if `docs/knowledge.md` does not exist (no error — the file may not yet be initialized on this repo).
 - Skip if the entity name already appears in `docs/knowledge.md` (idempotent — do not create duplicates on pipeline reruns).
 - Append at the end of the file, after existing bullets.
-- One bullet per entity saved; do NOT list entities that failed the dedup check (i.e., only `create_entities` saves, not `add_observations` updates).
+- One bullet per entity saved; do NOT list entities that failed the dedup check (i.e., only `create_nodes` saves, not `add_observations` updates).
 
 **Do NOT call `read_graph` from this phase.** `read_graph` returns the entire graph (often 100K+ tokens) — using it just to count entities or to find duplicates is a token-cost anti-pattern that scales linearly with graph size and runs on every pipeline. Dedup MUST happen via the targeted `search_nodes` call in step 2; that is enough to prevent duplicates without paying the cost of loading the whole graph. Periodic consolidation across the whole KG is a separate concern — surface it to the user as `/memory consolidate` when relevant, do not run it automatically here.
 
 ### Phase 6 — Close the KG session (MANDATORY tail)
 
-After every `create_entities` / `add_observations` / `create_relations` call in this phase, AND after the process-reflection block is appended to `00-state.md`, close the session you opened in Phase 0a Step 1b:
+After every `create_nodes` / `add_observations` / `create_relations` call in this phase, AND after the process-reflection block is appended to `00-state.md`, close the session you opened in Phase 0a Step 1b:
 
 ```
 mcp__memory__session_end(
@@ -2106,13 +2108,13 @@ mcp__memory__session_end(
 
 **Rules:**
 - **Soft cap 5 entities per pipeline run.** Up to 5 is typical; up to 7 acceptable when the pipeline introduces topology entities (`project` / `service` / `stack-profile`) that did not previously exist in the KG. Topology counts separately from pattern-extraction (`pattern` / `error` / `decision` / `tool-gotcha` / `constraint`) because topology is one-time inventory, not judgement. Relations do not count against the budget — they are derived from the entities saved this run.
-- Quality enforcement does NOT come from the count. It comes from (a) the dedup check (step 2 — `search_nodes` before `create_entities`) and (b) the content-policy filter (the pre-write checklist in `docs/kg-content-policy.md`). The numeric soft cap exists to prevent runaway saves, not to drive quality.
+- Quality enforcement does NOT come from the count. It comes from (a) the dedup check (step 2 — `search_nodes` before `create_nodes`) and (b) the content-policy filter (the pre-write checklist in `docs/kg-content-policy.md`). The numeric soft cap exists to prevent runaway saves, not to drive quality.
 - Only save cross-project knowledge (would help in a different project)
 - Do not save feature-specific details (those stay in workspaces)
 - If nothing reusable was learned, save nothing — that's fine
 - Always dedup before creating — duplicates waste context window during Phase 0a searches
 - **Language: English** — all entity names, observations, and relation types must be in English
-- **Content policy (MANDATORY):** the KG is technical memory meant to be shareable across developers. Before every `create_entities` / `add_observations` call, redact the payload against the rules below. If any observation hits one of these, **drop that observation** (or the whole entity if unsalvageable). When in doubt, omit — it is cheap to re-add later and expensive to extract once distributed. Full policy: `docs/kg-content-policy.md`.
+- **Content policy (MANDATORY):** the KG is technical memory meant to be shareable across developers. Before every `create_nodes` / `add_observations` call, redact the payload against the rules below. If any observation hits one of these, **drop that observation** (or the whole entity if unsalvageable). When in doubt, omit — it is cheap to re-add later and expensive to extract once distributed. Full policy: `docs/kg-content-policy.md`.
 
   **Forbidden in observations:**
   - Personal names (users, colleagues, stakeholders) or user-specific preferences / feedback.

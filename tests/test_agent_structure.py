@@ -610,7 +610,7 @@ for agent_name in ("architect", "qa", "tester", "security"):
           "Knowledge Graph Access" in agent_text,
           f"{agent_name} missing the KG Access prompt section")
     check(f"agents/{agent_name}.md KG Access section forbids writes",
-          "Knowledge Graph Access" in agent_text and "create_entities" in agent_text and ("Do NOT" in agent_text or "NEVER" in agent_text),
+          "Knowledge Graph Access" in agent_text and "create_nodes" in agent_text and ("Do NOT" in agent_text or "NEVER" in agent_text),
           f"{agent_name} KG Access section does not explicitly forbid writes")
 
 # 6. Excluded agents do NOT have KG read tools (regression guard)
@@ -5047,20 +5047,20 @@ _c7_content_filter = bool(_kg_write) and (
 )
 _c7_suggest_node_type = bool(_kg_write) and "suggest_node_type" in _kg_write
 _c7_search_nodes = bool(_kg_write) and "search_nodes" in _kg_write
-_c7_create_entities = bool(_kg_write) and (
-    "create_entities" in _kg_write or "add_observations" in _kg_write
+_c7_create_nodes = bool(_kg_write) and (
+    "create_nodes" in _kg_write or "add_observations" in _kg_write
 )
 check(
     "kg-mid(7/ac-7): orchestrator.md § 'KG write on security findings' declares"
     " content-filter (kg-content-policy) + dedup (suggest_node_type + search_nodes)"
-    " before create_entities/add_observations",
-    _c7_content_filter and _c7_suggest_node_type and _c7_search_nodes and _c7_create_entities,
+    " before create_nodes/add_observations",
+    _c7_content_filter and _c7_suggest_node_type and _c7_search_nodes and _c7_create_nodes,
     (
         f"anchor '{_KG_WRITE_ANCHOR}' slice:"
         f" content_filter={_c7_content_filter},"
         f" suggest_node_type={_c7_suggest_node_type},"
         f" search_nodes={_c7_search_nodes},"
-        f" create/add={_c7_create_entities}"
+        f" create/add={_c7_create_nodes}"
     ),
 )
 
@@ -6192,6 +6192,216 @@ check(
         f" 01-plan.md_present={_c30_has_plan}"
         " -- line ~49 must reference 01-plan.md; remove 01-architecture.md reference"
     ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Suite 35 -- KG MCP tool-name contract (kg-seam-toolname, AC-1..AC-6)
+# ---------------------------------------------------------------------------
+# Two-clause contract over agents/*.md (and the _shared/ snippets, which
+# are also scanned because they can carry tool references):
+#
+#   Clause (a) -- prefixed subset:
+#     Every mcp__memory__<tool> reference found anywhere in agents/*.md must
+#     be an element of CANONICAL_KG_TOOLS — the exact set the
+#     context-harness-mcp server registers / exposes.  No delete_* tool
+#     exists on the server; no create_entities (renamed to create_nodes).
+#
+#   Clause (b) -- bare deprecated tokens == 0:
+#     The bare tokens create_entities, delete_entities, delete_observations,
+#     delete_relations appear ZERO times in agents/*.md, matched with a
+#     WORD-BOUNDARY regex so that create_nodes and create_relations are NOT
+#     false positives.  This clause is what catches the bare Phase-6
+#     instructions in orchestrator.md (L2040-L2115) that clause (a) alone
+#     would miss — those instructions carry no mcp__memory__ prefix.
+#
+# This test is RED on main (create_entities + delete_* still present).
+# It goes GREEN after the implementer's rename + grant-removal fix.
+# The test CANNOT go green while a single bare or prefixed deprecated name
+# remains in any agents/*.md file.
+#
+# CANONICAL_KG_TOOLS = exactly what context-harness-mcp registers/exposes:
+#   Core CRUD (no delete):  create_nodes, add_observations, create_relations,
+#                           search_nodes, open_nodes, read_graph
+#   Utility / session:      doctor, suggest_node_type, session_start,
+#                           session_end
+#
+# Check index -> AC mapping:
+#   (1) / AC-1  clause-a : every mcp__memory__ ref in canonical set
+#   (2) / AC-1  clause-b : bare deprecated tokens appear 0 times
+#   (3) / AC-3           : no mcp__memory__delete_* reference at all
+#   (4) / AC-4           : orchestrator frontmatter grants only canonical tools
+#   (5) / AC-5           : CANONICAL_KG_TOOLS itself contains no delete_* tool
+#   (6) / AC-6           : CLAUDE.md §11 names Suite 35 + self-referential guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 35: KG MCP tool-name contract ===")
+
+CANONICAL_KG_TOOLS = frozenset({
+    # Core CRUD — registered by nodes.go / relations.go in context-harness-mcp.
+    # No delete_* tool is registered; soft-delete is operator-SQL-only.
+    "create_nodes",
+    "add_observations",
+    "create_relations",
+    "search_nodes",
+    "open_nodes",
+    "read_graph",
+    # Utility / session — exposed by the MCP session layer.
+    "doctor",
+    "suggest_node_type",
+    "session_start",
+    "session_end",
+})
+
+# Bare tokens that the server no longer (or never did) register.
+# Word-boundary matched so sub-tokens of canonical names are not flagged:
+#   \bcreate_entities\b does NOT match create_nodes
+#   \bdelete_entities\b does NOT match delete_observations (different token)
+#   create_relations is NOT in this list (it is canonical and legitimate)
+DEPRECATED_BARE_TOKENS = (
+    "create_entities",
+    "delete_entities",
+    "delete_observations",
+    "delete_relations",
+)
+
+# Regex for prefixed references: captures the tool name after mcp__memory__.
+_s35_prefixed_rx = re.compile(r"mcp__memory__([A-Za-z_]+)")
+
+# Collect every prefixed tool name referenced across agents/*.md.
+# Map: tool_name -> set of filenames that reference it.
+_s35_referenced: dict[str, set[str]] = {}
+for _s35_md in sorted(AGENTS_DIR.glob("*.md")):
+    _s35_text = read(_s35_md)
+    for _s35_tool in _s35_prefixed_rx.findall(_s35_text):
+        _s35_referenced.setdefault(_s35_tool, set()).add(_s35_md.name)
+
+_s35_all_prefixed = set(_s35_referenced)
+_s35_phantom = sorted(_s35_all_prefixed - CANONICAL_KG_TOOLS)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 -- clause (a): prefixed subset
+# Every mcp__memory__<tool> name found in agents/*.md must be in the
+# canonical set.  Failure message lists every phantom name + the files
+# that reference it, so the implementer knows exactly what to fix.
+# ---------------------------------------------------------------------------
+check(
+    "kg-contract(1/ac-1) clause-a:"
+    " every mcp__memory__ ref is in the canonical CH set",
+    _s35_all_prefixed <= CANONICAL_KG_TOOLS,
+    "phantom prefixed names: "
+    + (
+        ", ".join(
+            f"{t} (in: {', '.join(sorted(_s35_referenced[t]))})"
+            for t in _s35_phantom
+        )
+        if _s35_phantom
+        else "none"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-1 -- clause (b): bare deprecated tokens == 0
+# Word-boundary match guarantees create_nodes / create_relations are not
+# flagged.  Failure message lists each token with its files and hit count.
+# This is the clause that catches L2040-L2115 in orchestrator.md.
+# ---------------------------------------------------------------------------
+_s35_bare_hits: dict[str, list[str]] = {}   # token -> ["filename:count", ...]
+for _s35_tok in DEPRECATED_BARE_TOKENS:
+    _s35_bare_rx = re.compile(r"\b" + re.escape(_s35_tok) + r"\b")
+    for _s35_md in sorted(AGENTS_DIR.glob("*.md")):
+        _s35_n = len(_s35_bare_rx.findall(read(_s35_md)))
+        if _s35_n:
+            _s35_bare_hits.setdefault(_s35_tok, []).append(
+                f"{_s35_md.name}:{_s35_n}"
+            )
+
+check(
+    "kg-contract(2/ac-1) clause-b:"
+    " bare deprecated tokens appear ZERO times in agents/*.md",
+    not _s35_bare_hits,
+    "bare deprecated tokens still present: "
+    + (
+        "; ".join(
+            f"{t} -> {', '.join(locs)}"
+            for t, locs in sorted(_s35_bare_hits.items())
+        )
+        if _s35_bare_hits
+        else "none"
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-3 -- no mcp__memory__delete_* reference
+# The server exposes no delete tool.  Any delete_* in the prefixed set is
+# a phantom.  This check reinforces clause (a) with a targeted assertion
+# that also produces a clear "delete tools referenced" message.
+# ---------------------------------------------------------------------------
+_s35_deletes = sorted(t for t in _s35_all_prefixed if t.startswith("delete_"))
+check(
+    "kg-contract(3/ac-3):"
+    " no mcp__memory__delete_* reference (server exposes no delete tool)",
+    not _s35_deletes,
+    "prefixed delete tools still referenced: " + ", ".join(_s35_deletes)
+    if _s35_deletes
+    else "",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-4 -- orchestrator frontmatter grants only canonical tools
+# The frontmatter tools: field is the grant list that Claude Code uses to
+# decide which MCP tools the orchestrator may call.  Every entry prefixed
+# mcp__memory__ must be in CANONICAL_KG_TOOLS.
+# ---------------------------------------------------------------------------
+_s35_orch_text = read(AGENTS_DIR / "orchestrator.md")
+_s35_orch_fm_raw = parse_frontmatter(_s35_orch_text).get("tools", "")
+_s35_orch_kg_granted = set(_s35_prefixed_rx.findall(_s35_orch_fm_raw))
+_s35_orch_phantom = sorted(_s35_orch_kg_granted - CANONICAL_KG_TOOLS)
+check(
+    "kg-contract(4/ac-4):"
+    " orchestrator frontmatter grants only canonical KG tools",
+    _s35_orch_kg_granted <= CANONICAL_KG_TOOLS,
+    "orchestrator grants phantom KG tools: "
+    + ", ".join(_s35_orch_phantom)
+    if _s35_orch_phantom
+    else "",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-5 -- canonical set is delete-free (guard against drift)
+# If a future author accidentally adds a delete_* to CANONICAL_KG_TOOLS
+# in this file, this check fires immediately so the canonical set stays
+# aligned with the server contract.
+# ---------------------------------------------------------------------------
+_s35_canon_deletes = sorted(t for t in CANONICAL_KG_TOOLS if t.startswith("delete_"))
+check(
+    "kg-contract(5/ac-5):"
+    " CANONICAL_KG_TOOLS contains no delete_* tool (guard against set drift)",
+    not _s35_canon_deletes,
+    "canonical set leaked a delete tool: " + ", ".join(_s35_canon_deletes)
+    if _s35_canon_deletes
+    else "",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-6 -- self-referential guard (mirrors Suite 34 checks 28+29)
+# CLAUDE.md §11 must name Suite 35 (the implementer's job — the tester does
+# NOT edit CLAUDE.md; this check enforces that the implementer does).
+# This test file must contain the literal "Suite 35" and the marker
+# "KG MCP tool-name contract" so the guard stays coherent after edits.
+# ---------------------------------------------------------------------------
+_s35_claude_text = read(REPO_ROOT / "CLAUDE.md")
+_s35_self_text = read(Path(__file__).resolve())
+check(
+    "kg-contract(6/ac-6):"
+    " CLAUDE.md §11 names 'Suite 35' and this file defines it"
+    " (self-referential guard -- must stay green post-fix)",
+    "Suite 35" in _s35_claude_text
+    and "Suite 35" in _s35_self_text
+    and "KG MCP tool-name contract" in _s35_self_text,
+    "Suite 35 not registered in CLAUDE.md §11"
+    " or marker literal 'KG MCP tool-name contract' missing in this file"
+    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
 )
 
 

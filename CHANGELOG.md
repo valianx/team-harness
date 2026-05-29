@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.38.2] - 2026-05-29
+
+### Fixed
+
+- Aligned agent Knowledge-Graph MCP tool names to the context-harness-mcp contract: renamed `create_entities`→`create_nodes` across architect/orchestrator/qa/security/tester (13 sites) and removed 3 phantom `delete_*` frontmatter grants (the server exposes no delete tool — deletes are operator-SQL-only). These calls had been silently failing (best-effort skip) since the server-side rename, dropping team-memory writes in 5/6 agents. New Suite 35 contract test (subset + zero-bare-token) prevents recurrence; a CI workflow (.github/workflows/test.yml) now gates `tests/run-all.sh` on every PR.
+
 ## [2.38.1] - 2026-05-29
 
 ### Changed

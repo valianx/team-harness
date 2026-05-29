@@ -120,7 +120,7 @@ If a developer's work spans contexts that should not cross-leak (e.g., a persona
 
 ## How the policy is applied
 
-- **At write time**: the `orchestrator` (and any agent that persists to the KG) must filter content against this policy before calling `create_entities` / `add_observations`. If an observation falls in the forbidden zone, it is omitted silently; if it falls in the gray zone, it is omitted by default. Write-time filter coverage spans three sites: Phase 6 (Knowledge Save), delivery Step 11.5 (passive process-insight capture), and `KG-write-on-security-findings` (Phase 3 — orchestrator writes Critical/High security findings from `security`'s `kg_save_candidates`). All three are governed by this policy; the filter logic is the same at each site.
+- **At write time**: the `orchestrator` (and any agent that persists to the KG) must filter content against this policy before calling `create_nodes` / `add_observations`. If an observation falls in the forbidden zone, it is omitted silently; if it falls in the gray zone, it is omitted by default. Write-time filter coverage spans three sites: Phase 6 (Knowledge Save), delivery Step 11.5 (passive process-insight capture), and `KG-write-on-security-findings` (Phase 3 — orchestrator writes Critical/High security findings from `security`'s `kg_save_candidates`). All three are governed by this policy; the filter logic is the same at each site.
 - **On export**: `export.py` trusts that the local KG already complies — it performs no curation of its own.
 - **On import**: `import.py` trusts that the source file already complies — no filtering either.
 

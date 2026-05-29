@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.38.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.38.2` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -342,7 +342,7 @@ The repo has a verification suite at `tests/` that covers what is testable witho
 - **`tests/test_agent_frontmatter.py`** — YAML frontmatter validity for every `agents/*.md`. Uses PyYAML via `uv run --with PyYAML python` to catch the silent-agent-drop class of bug (an unquoted `": "` inside a description breaks YAML parsing; Claude Code then silently drops the agent from the registered `subagent_type` list with no error surfaced). 19 agents currently parse cleanly.
 - **`tests/run-all.sh`** — wrapper that runs all three suites and exits 0 if all pass.
 
-See `docs/testing.md` for the full reference (when to add a test, what the tests do NOT cover). Suite 34 (34 checks) asserts the plan-review panel centralization contract structurally.
+See `docs/testing.md` for the full reference (when to add a test, what the tests do NOT cover). Suite 34 (34 checks) asserts the plan-review panel centralization contract structurally. Suite 35 (6 checks) asserts the KG MCP tool-name contract: every `mcp__memory__<tool>` reference in `agents/*.md` is a subset of the canonical context-harness-mcp tool set, and bare deprecated tokens (`create_entities`, `delete_*`) appear zero times.
 
 ---
 

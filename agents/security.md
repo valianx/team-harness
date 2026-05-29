@@ -761,7 +761,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 **How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_entities` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
+- Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
 - Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
