@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Enriched `plan-review` direct mode into a three-reviewer panel: `qa` (ratify-plan substance) → `security` (design-review, conditional on security-sensitivity) → `plan-reviewer` (shape + combined verdict, runs last). All findings fold in-place into one `01-plan.md` with zero parallel side-files; one consolidated `## Plan Review` section carries three bold-inline sub-verdicts (`**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) plus a new fifth mode `design-review` in `security.md` that reviews the plan without code. Suite 34 (34 checks) asserts the full centralization contract structurally.
+
 ## [2.37.0] - 2026-05-29
 
 ### Added

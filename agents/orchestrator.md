@@ -701,7 +701,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | ambiguous / mixed concerns | **unclear** | — |
 
    **Disambiguation — `validate` vs `plan-review` vs substance refinement.**
-   - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → invokes the `plan-reviewer` agent → appends `## Plan Review` section to `01-plan.md` (overwrites that section). Plan-shape audit only.
+   - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
 
@@ -1227,6 +1227,19 @@ fi
 > **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, the idempotency `python3` command reads through the `.md` wrapper. Wrap the file read with the `events_content` extraction pattern before piping to the JSON parse (see `## Content extraction for dual-format events file`).
 
 **Rewrite TL;DR** (row 5 of §5.2): On `pass` or `concerns`: `Now`: "STAGE-GATE-1 about to emit." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: any concerns (rules 3/4/5/6 hits, if any). On `fail`: `Now`: "Architect revising plan (iter N/3) — rules {1, 2} failing." `Open issues`: failing rule numbers and affected PRs.
+
+### Plan-review panel centralization contract
+
+All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `plan-review` direct mode) MUST fold their findings in-place into `01-plan.md`. Zero parallel correction-files. The contract:
+
+- **All findings go to `01-plan.md`.** No reviewer creates `04-security.md`, `*-review.md`, `security-reports/`, or any other side-file in the context of a plan review. Every correction, risk identification, and sub-verdict is written directly into the `01-plan.md` body (in-place).
+- **One consolidated `## Plan Review` section.** The section is a single sliceable block from its `##` heading to the next `##` heading. It carries three sub-verdicts authored as **bold inline labels** (NOT as `###` headings — a `###` heading would terminate the `_slice_section` boundary and split the block):
+  - `**Substance (qa):**` — written by `qa` (ratify-plan)
+  - `**Security design-review (security):**` — written by `security` (design-review, conditional)
+  - `**Combined verdict:**` — written by `plan-reviewer` (sole writer of the combined verdict)
+- **`plan-reviewer` is the sole writer of the `## Plan Review` header and the `**Combined verdict:**` block.** It runs last (after qa and security) and reads their sub-verdicts to produce the combined verdict. `qa` and `security` each append only their own labelled sub-verdict and MUST NOT touch the combined verdict.
+- **Idempotent overwrite-in-place.** On repeated invocations, `plan-reviewer` replaces the `## Plan Review` section in `01-plan.md` (overwrite, never append a second copy). `qa` and `security` replace their own labelled sub-verdict lines within the section.
+- **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of this same centralization principle: every correction folds to `01-plan.md`, nothing accretes in side-files. The plan-review panel applies the same rule at Stage 1.
 
 ---
 

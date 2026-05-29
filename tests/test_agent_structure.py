@@ -5355,6 +5355,847 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 34 -- Plan-review enriched three-reviewer panel + centralization
+#             contract (AC-1..AC-11, feature: plan-review-enriched)
+# ---------------------------------------------------------------------------
+# Structural assertions only -- no LLM runtime required.
+# Every contract-presence check is ANCHOR-SCOPED to prevent false-greens:
+# the tokens plan-reviewer, ratify-plan, Plan Review, Plan Ratification
+# already exist in these files for unrelated reasons. We slice to a NEW,
+# uniquely-named anchor the implementer will add, then assert sub-tokens
+# WITHIN the slice. An absent anchor returns "" and all dependent checks
+# fail with a clear detail -- not a false-green (the _slice_section helper
+# defined in Suite 32 returns "" when the anchor is not found).
+#
+# CANONICAL ANCHORS (implementer MUST use these verbatim):
+#   agents/security.md          : "### Design Review Mode (`design-review`)"
+#   agents/ref-direct-modes.md  : "### Review Panel (three reviewers, one plan)"
+#   agents/orchestrator.md      : "### Plan-review panel centralization contract"
+#   agents/plan-reviewer.md     : "### Consolidated Plan Review section (three-reviewer panel)"
+#   agents/qa.md                : "### Plan-review panel (ratify-plan reuse)"
+#   CLAUDE.md (in §5)           : "**Plan-review panel centralization**"
+#
+# RUNTIME SUB-VERDICT LABELS (bold inline labels, NOT ### headings):
+#   "**Substance (qa):**"
+#   "**Security design-review (security):**"
+#   "**Combined verdict:**"
+# These are asserted as SUBSTRINGS within the relevant agent's anchor slice,
+# not as anchors themselves. They must NOT be authored as ### headings
+# (that would split the parent ## Plan Review slice).
+#
+# Check index -> AC mapping:
+#   anchor-sec       : AC-1  -- security.md design-review anchor present
+#   (1) / AC-1       : design-review listed in Operating Modes
+#   (2) / AC-1       : no-code clause in security design-review slice
+#   (3) / AC-1       : DISTINCT from 4 existing modes (Audit/Focused/Pipeline/PR Review)
+#   (4) / AC-2       : reviews 01-plan.md, recommends AC in GWT/VERIFY format
+#   (5) / AC-2       : folds via bold label **Security design-review (security):**
+#   (6) / AC-2       : forbid-list in security design-review slice
+#   (7) / AC-3       : Return Protocol carries mode: design-review + security_design_verdict
+#   anchor-ref       : AC-4  -- ref-direct-modes.md panel anchor present
+#   (8) / AC-4       : ordered dispatch qa -> security -> plan-reviewer documented
+#   (9) / AC-4       : security gated via state->heuristic->operator-override
+#   (10) / AC-4      : cites existing path auto-escalation list as authority
+#   (11) / AC-5      : zero parallel correction-files + one ## Plan Review
+#   (12) / AC-5      : three sub-verdicts as bold inline labels (NOT ### headings)
+#   (13) / AC-5      : combined verdict surfaced (Output Discipline)
+#   anchor-orch      : AC-6  -- orchestrator.md centralization contract anchor present
+#   (14) / AC-6(a)   : fold in-place into 01-plan.md
+#   (15) / AC-6(b)   : zero parallel correction-files
+#   (16) / AC-6(c)   : plan-reviewer sole writer of header + **Combined verdict:**
+#   (17) / AC-6(d)   : idempotent / overwrite-in-place declared
+#   (18) / AC-6(d)   : sub-verdicts as bold labels, NOT ### headings
+#   (19) / AC-6(e)   : cross-link to [CONSTRAINT-DISCOVERED] fold-back (Phase 2.5)
+#   (20) / AC-7      : Step 6 disambiguation reflects three-way panel
+#   anchor-pr        : AC-8  -- plan-reviewer.md consolidated section anchor present
+#   (21) / AC-8      : owns ## Plan Review header + ## Summary table + Combined verdict
+#   (22) / AC-8      : does NOT overwrite Substance (qa) / Security design-review sub-verdicts
+#   (23) / AC-8      : sub-verdicts as bold labels (not ### headings) for sliceability
+#   anchor-qa        : AC-9  -- qa.md ratify-plan reuse anchor present
+#   (24) / AC-9      : ratify-plan reused as substance reviewer of the panel
+#   (25) / AC-9      : writes **Substance (qa):** inside ## Plan Review (not ### heading)
+#   (26) / AC-9      : no-parallel-files forbid-list reinforced
+#   (27) / AC-10     : CLAUDE.md §5 contains **Plan-review panel centralization** bullet
+#   (28) / AC-10     : CLAUDE.md §11 explicitly names Suite 34
+#   (29) / AC-11     : Suite 34 present in test_agent_structure.py (self-referential guard)
+#   (30) / drift     : skills/design/SKILL.md line ~49 references 01-plan.md not 01-architecture.md
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 34: Plan-review enriched three-reviewer panel + centralization contract ===")
+
+_s34_sec = read(AGENTS_DIR / "security.md")
+_s34_ref = read(AGENTS_DIR / "ref-direct-modes.md")
+_s34_orch = read(AGENTS_DIR / "orchestrator.md")
+_s34_pr = read(AGENTS_DIR / "plan-reviewer.md")
+_s34_qa = read(AGENTS_DIR / "qa.md")
+_s34_claude = read(REPO_ROOT / "CLAUDE.md")
+_s34_design_skill_path = SKILLS_DIR / "design" / "SKILL.md"
+_s34_design_skill = read(_s34_design_skill_path) if _s34_design_skill_path.exists() else ""
+
+
+# ---------------------------------------------------------------------------
+# Anchor A: agents/security.md "### Design Review Mode (`design-review`)"
+# (Covers AC-1, AC-2, AC-3)
+# ---------------------------------------------------------------------------
+_SEC_ANCHOR = "### Design Review Mode (`design-review`)"
+_sec_dr = _slice_section(_s34_sec, _SEC_ANCHOR)
+
+check(
+    "plan-review(anchor-sec): agents/security.md contains"
+    " '### Design Review Mode (`design-review`)' section",
+    bool(_sec_dr),
+    f"anchor '{_SEC_ANCHOR}' not found in security.md"
+    " -- plan-review checks (1)(2)(3)(4)(5)(6)(7) will all fail",
+)
+
+# Check (1) -- AC-1: design-review mode listed in "Operating Modes" of security.md.
+# Assert within the FULL security.md (Operating Modes is a separate section from the
+# anchor slice; the anchor slice itself is the mode body). We look for the mode
+# identifier appearing in an Operating Modes context.
+_c1_in_operating_modes = (
+    "Operating Mode" in _s34_sec
+    and "design-review" in _s34_sec
+    and (
+        _s34_sec.find("design-review")
+        < _s34_sec.find(_SEC_ANCHOR)
+        + len(_SEC_ANCHOR) + 5000  # sanity bound; both should be in the same doc
+    )
+)
+check(
+    "plan-review(1/ac-1): agents/security.md lists 'design-review'"
+    " in the Operating Modes section",
+    _c1_in_operating_modes,
+    "security.md does not list 'design-review' in an 'Operating Mode' context"
+    " -- mode must appear in the Operating Modes listing",
+)
+
+# Check (2) -- AC-1: no-code clause present in the design-review mode slice.
+_c2_no_code = bool(_sec_dr) and (
+    "no code" in _sec_dr.lower()
+    or "do not audit code" in _sec_dr.lower()
+    or "do NOT audit code" in _sec_dr
+    or "no code yet" in _sec_dr.lower()
+    or "no source code" in _sec_dr.lower()
+)
+check(
+    "plan-review(2/ac-1): agents/security.md design-review slice"
+    " contains explicit no-code clause ('no code' / 'do NOT audit code')",
+    _c2_no_code,
+    f"anchor '{_SEC_ANCHOR}' slice missing no-code clause"
+    " -- mode must forbid auditing code (distinct from Audit/Focused/Pipeline modes)",
+)
+
+# Check (3) -- AC-1: design-review is DISTINCT from all 4 existing modes.
+# The 4 existing modes are: Audit Mode, Focused Mode, Pipeline Mode, PR Review Security Mode.
+# Each must be present in security.md (confirming they still exist) and the new anchor
+# must be a FIFTH, separate section.
+_c3_audit_exists = "Audit Mode" in _s34_sec or "Audit" in _s34_sec
+_c3_focused_exists = "Focused Mode" in _s34_sec or "Focused" in _s34_sec
+_c3_pipeline_exists = "Pipeline Mode" in _s34_sec or "Pipeline" in _s34_sec
+_c3_pr_review_exists = "PR Review" in _s34_sec
+_c3_new_anchor_distinct = bool(_sec_dr)  # slice is non-empty = anchor exists as its own section
+check(
+    "plan-review(3/ac-1): agents/security.md design-review mode is DISTINCT from"
+    " the 4 existing modes (Audit / Focused / Pipeline / PR Review Security)",
+    _c3_audit_exists and _c3_focused_exists and _c3_pipeline_exists
+    and _c3_pr_review_exists and _c3_new_anchor_distinct,
+    (
+        f"anchor '{_SEC_ANCHOR}' distinctness:"
+        f" audit={_c3_audit_exists},"
+        f" focused={_c3_focused_exists},"
+        f" pipeline={_c3_pipeline_exists},"
+        f" pr_review={_c3_pr_review_exists},"
+        f" new_anchor_distinct={_c3_new_anchor_distinct}"
+    ),
+)
+
+# Check (4) -- AC-2: slice states mode reviews 01-plan.md and recommends AC
+# in Given/When/Then or VERIFY format.
+_c4_reviews_plan = bool(_sec_dr) and "01-plan.md" in _sec_dr
+_c4_ac_format = bool(_sec_dr) and (
+    "Given" in _sec_dr or "VERIFY" in _sec_dr or "GWT" in _sec_dr
+)
+check(
+    "plan-review(4/ac-2): agents/security.md design-review slice"
+    " states mode reviews '01-plan.md' and recommends AC in GWT/VERIFY format",
+    _c4_reviews_plan and _c4_ac_format,
+    (
+        f"anchor '{_SEC_ANCHOR}' slice:"
+        f" reviews_01-plan.md={_c4_reviews_plan},"
+        f" ac_format_GWT_or_VERIFY={_c4_ac_format}"
+    ),
+)
+
+# Check (5) -- AC-2: design-review slice documents folding via the bold inline label
+# **Security design-review (security):** within ## Plan Review (not a ### heading).
+_c5_bold_label = bool(_sec_dr) and "**Security design-review (security):**" in _sec_dr
+_c5_within_plan_review = bool(_sec_dr) and (
+    "## Plan Review" in _sec_dr
+    or "Plan Review" in _sec_dr
+)
+_c5_not_as_heading = bool(_sec_dr) and (
+    "### Security design-review" not in _sec_dr
+)
+check(
+    "plan-review(5/ac-2): agents/security.md design-review slice"
+    " folds via bold inline label '**Security design-review (security):**'"
+    " within ## Plan Review (NOT as a ### heading)",
+    _c5_bold_label and _c5_within_plan_review and _c5_not_as_heading,
+    (
+        f"anchor '{_SEC_ANCHOR}' slice:"
+        f" bold_label='**Security design-review (security):**'={_c5_bold_label},"
+        f" within_Plan_Review={_c5_within_plan_review},"
+        f" not_a_heading={_c5_not_as_heading}"
+    ),
+)
+
+# Check (6) -- AC-2: forbid-list present in design-review slice
+# (no *-review.md files, no security-reports/ directory in this mode).
+_c6_no_review_files = bool(_sec_dr) and (
+    "*-review.md" in _sec_dr
+    or "review.md" in _sec_dr.lower()
+    or "no parallel" in _sec_dr.lower()
+    or "forbid" in _sec_dr.lower()
+    or "MUST NOT" in _sec_dr
+    or "must not" in _sec_dr.lower()
+)
+_c6_no_security_reports = bool(_sec_dr) and (
+    "security-reports" in _sec_dr
+    or "04-security.md" in _sec_dr
+    or "zero" in _sec_dr.lower()
+    or "no side" in _sec_dr.lower()
+    or "no file" in _sec_dr.lower()
+)
+check(
+    "plan-review(6/ac-2): agents/security.md design-review slice"
+    " includes forbid-list (no *-review.md parallel files, no security-reports/)",
+    _c6_no_review_files and _c6_no_security_reports,
+    (
+        f"anchor '{_SEC_ANCHOR}' slice:"
+        f" no_review_files={_c6_no_review_files},"
+        f" no_security_reports={_c6_no_security_reports}"
+    ),
+)
+
+# Check (7) -- AC-3: Return Protocol in security.md carries
+# mode: design-review + security_design_verdict: clean | risks-found.
+_c7_mode_field = bool(_sec_dr) and "mode: design-review" in _sec_dr
+_c7_verdict_field = bool(_sec_dr) and (
+    "security_design_verdict" in _sec_dr
+    and ("clean" in _sec_dr or "risks-found" in _sec_dr)
+)
+check(
+    "plan-review(7/ac-3): agents/security.md design-review slice"
+    " Return Protocol carries 'mode: design-review'"
+    " and 'security_design_verdict: clean | risks-found'",
+    _c7_mode_field and _c7_verdict_field,
+    (
+        f"anchor '{_SEC_ANCHOR}' slice:"
+        f" mode_field={_c7_mode_field},"
+        f" verdict_field={_c7_verdict_field}"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Anchor B: agents/ref-direct-modes.md "### Review Panel (three reviewers, one plan)"
+# (Covers AC-4, AC-5)
+# ---------------------------------------------------------------------------
+_REF_ANCHOR = "### Review Panel (three reviewers, one plan)"
+_ref_panel = _slice_section(_s34_ref, _REF_ANCHOR)
+
+check(
+    "plan-review(anchor-ref): agents/ref-direct-modes.md contains"
+    " '### Review Panel (three reviewers, one plan)' section",
+    bool(_ref_panel),
+    f"anchor '{_REF_ANCHOR}' not found in ref-direct-modes.md"
+    " -- plan-review checks (8)(9)(10)(11)(12)(13) will all fail",
+)
+
+# Check (8) -- AC-4: ordered dispatch qa(ratify-plan) -> security(design-review, conditional)
+# -> plan-reviewer(shape, last) documented within the anchor slice.
+_c8_qa_first = bool(_ref_panel) and (
+    "ratify-plan" in _ref_panel
+    and ("qa" in _ref_panel.lower())
+)
+_c8_security_cond = bool(_ref_panel) and (
+    "design-review" in _ref_panel
+    and ("conditional" in _ref_panel.lower() or "security-sensitive" in _ref_panel.lower()
+         or "security_sensitive" in _ref_panel.lower())
+)
+_c8_pr_last = bool(_ref_panel) and (
+    "plan-reviewer" in _ref_panel
+    and ("last" in _ref_panel.lower() or "third" in _ref_panel.lower()
+         or "final" in _ref_panel.lower())
+)
+# Also verify ORDER: qa appears before security, security appears before plan-reviewer.
+_c8_order_ok = False
+if bool(_ref_panel) and _c8_qa_first and _c8_security_cond and _c8_pr_last:
+    _idx_qa = _ref_panel.find("ratify-plan")
+    _idx_sec = _ref_panel.find("design-review")
+    _idx_pr_last = _ref_panel.rfind("plan-reviewer")
+    _c8_order_ok = (
+        0 <= _idx_qa < _idx_sec < _idx_pr_last
+    )
+check(
+    "plan-review(8/ac-4): ref-direct-modes.md panel slice documents"
+    " ordered dispatch qa(ratify-plan) -> security(design-review, conditional)"
+    " -> plan-reviewer(last)",
+    _c8_qa_first and _c8_security_cond and _c8_pr_last and _c8_order_ok,
+    (
+        f"anchor '{_REF_ANCHOR}' slice:"
+        f" qa_ratify={_c8_qa_first},"
+        f" security_design_cond={_c8_security_cond},"
+        f" plan_reviewer_last={_c8_pr_last},"
+        f" order_ok={_c8_order_ok}"
+    ),
+)
+
+# Check (9) -- AC-4: security gated via state field -> path/keyword heuristic
+# -> operator override chain.
+_c9_state_field = bool(_ref_panel) and (
+    "00-state.md" in _ref_panel
+    or "state" in _ref_panel.lower()
+)
+_c9_heuristic = bool(_ref_panel) and (
+    "heuristic" in _ref_panel.lower()
+    or "path" in _ref_panel.lower()
+    or "keyword" in _ref_panel.lower()
+)
+_c9_operator_override = bool(_ref_panel) and (
+    "override" in _ref_panel.lower()
+    or "operator" in _ref_panel.lower()
+)
+check(
+    "plan-review(9/ac-4): ref-direct-modes.md panel slice documents"
+    " security gating chain: state field -> path/keyword heuristic -> operator override",
+    _c9_state_field and _c9_heuristic and _c9_operator_override,
+    (
+        f"anchor '{_REF_ANCHOR}' slice:"
+        f" state_field={_c9_state_field},"
+        f" path_keyword_heuristic={_c9_heuristic},"
+        f" operator_override={_c9_operator_override}"
+    ),
+)
+
+# Check (10) -- AC-4: slice cites the EXISTING pipeline path auto-escalation list
+# as the heuristic authority (reused, not a new divergent list).
+# The canonical paths: auth/**, middleware/**, api/**, db/**,
+# security/**, crypto/**, session/**
+_ESCALATION_PATHS = ("auth/**", "middleware/**", "api/**", "db/**",
+                     "security/**", "crypto/**", "session/**")
+_c10_paths_cited = bool(_ref_panel) and sum(
+    1 for p in _ESCALATION_PATHS if p in _ref_panel or p.rstrip("/**") in _ref_panel
+) >= 4  # at least 4 of 7 paths cited = the list is referenced
+check(
+    "plan-review(10/ac-4): ref-direct-modes.md panel slice cites the"
+    " existing pipeline path auto-escalation list"
+    " (auth/**, middleware/**, api/**, db/**, security/**, crypto/**, session/**)"
+    " as the heuristic authority (not a new divergent list)",
+    _c10_paths_cited,
+    (
+        f"anchor '{_REF_ANCHOR}' slice: found "
+        f"{sum(1 for p in _ESCALATION_PATHS if p in _ref_panel or p.rstrip('/**') in _ref_panel)}"
+        f"/{len(_ESCALATION_PATHS)} escalation paths"
+        " -- need >= 4 to confirm reuse of existing list"
+    ),
+)
+
+# Check (11) -- AC-5: zero parallel correction-files + one ## Plan Review section
+# documented within the panel slice.
+_c11_zero_side_files = bool(_ref_panel) and (
+    "zero" in _ref_panel.lower()
+    or "no parallel" in _ref_panel.lower()
+    or "no side" in _ref_panel.lower()
+    or "no new file" in _ref_panel.lower()
+    or "MUST NOT" in _ref_panel
+    or "must not create" in _ref_panel.lower()
+)
+_c11_one_plan_review = bool(_ref_panel) and (
+    "## Plan Review" in _ref_panel
+    or "Plan Review" in _ref_panel
+)
+check(
+    "plan-review(11/ac-5): ref-direct-modes.md panel slice states"
+    " zero parallel correction-files and a single consolidated ## Plan Review section",
+    _c11_zero_side_files and _c11_one_plan_review,
+    (
+        f"anchor '{_REF_ANCHOR}' slice:"
+        f" zero_side_files={_c11_zero_side_files},"
+        f" one_plan_review={_c11_one_plan_review}"
+    ),
+)
+
+# Check (12) -- AC-5: three sub-verdicts documented as bold inline labels
+# (NOT ### headings) within the panel slice.
+_c12_substance = bool(_ref_panel) and "**Substance (qa):**" in _ref_panel
+_c12_security_dr = bool(_ref_panel) and "**Security design-review (security):**" in _ref_panel
+_c12_combined = bool(_ref_panel) and "**Combined verdict:**" in _ref_panel
+_c12_not_as_headings = bool(_ref_panel) and (
+    "### Substance" not in _ref_panel
+    and "### Security design-review" not in _ref_panel
+    and "### Combined verdict" not in _ref_panel
+)
+check(
+    "plan-review(12/ac-5): ref-direct-modes.md panel slice documents"
+    " all three sub-verdict bold inline labels"
+    " ('**Substance (qa):**', '**Security design-review (security):**', '**Combined verdict:**')"
+    " and NOT as ### headings",
+    _c12_substance and _c12_security_dr and _c12_combined and _c12_not_as_headings,
+    (
+        f"anchor '{_REF_ANCHOR}' slice:"
+        f" Substance_qa={_c12_substance},"
+        f" Security_design_review={_c12_security_dr},"
+        f" Combined_verdict={_c12_combined},"
+        f" not_as_headings={_c12_not_as_headings}"
+    ),
+)
+
+# Check (13) -- AC-5: combined verdict surfaced (Output Discipline #186).
+_c13_output_discipline = bool(_ref_panel) and (
+    "Output Discipline" in _ref_panel
+    or "#186" in _ref_panel
+    or "combined verdict" in _ref_panel.lower()
+    or "**Combined verdict:**" in _ref_panel
+)
+check(
+    "plan-review(13/ac-5): ref-direct-modes.md panel slice Output block"
+    " surfaces the combined verdict (Output Discipline #186)",
+    _c13_output_discipline,
+    (
+        f"anchor '{_REF_ANCHOR}' slice:"
+        f" combined_verdict_surfaced={_c13_output_discipline}"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Anchor C: agents/orchestrator.md "### Plan-review panel centralization contract"
+# (Covers AC-6, AC-7)
+# ---------------------------------------------------------------------------
+_ORCH_PR_ANCHOR = "### Plan-review panel centralization contract"
+_orch_pr = _slice_section(_s34_orch, _ORCH_PR_ANCHOR)
+
+check(
+    "plan-review(anchor-orch): agents/orchestrator.md contains"
+    " '### Plan-review panel centralization contract' section",
+    bool(_orch_pr),
+    f"anchor '{_ORCH_PR_ANCHOR}' not found in orchestrator.md"
+    " -- plan-review checks (14)(15)(16)(17)(18)(19) will all fail",
+)
+
+# Check (14) -- AC-6(a): fold in-place into 01-plan.md.
+_c14_fold_inplace = bool(_orch_pr) and (
+    "01-plan.md" in _orch_pr
+    and (
+        "in-place" in _orch_pr.lower()
+        or "in place" in _orch_pr.lower()
+        or "fold" in _orch_pr.lower()
+        or "overwrite" in _orch_pr.lower()
+    )
+)
+check(
+    "plan-review(14/ac-6a): orchestrator.md centralization contract slice"
+    " states all plan reviewers fold in-place into 01-plan.md",
+    _c14_fold_inplace,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" fold_inplace_01-plan.md={_c14_fold_inplace}"
+    ),
+)
+
+# Check (15) -- AC-6(b): zero parallel correction-files.
+_c15_zero_files = bool(_orch_pr) and (
+    "zero" in _orch_pr.lower()
+    or "no parallel" in _orch_pr.lower()
+    or "no side" in _orch_pr.lower()
+    or "MUST NOT" in _orch_pr
+    or "must not" in _orch_pr.lower()
+    or "no correction" in _orch_pr.lower()
+)
+check(
+    "plan-review(15/ac-6b): orchestrator.md centralization contract slice"
+    " declares zero parallel correction-files",
+    _c15_zero_files,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" zero_parallel_files={_c15_zero_files}"
+    ),
+)
+
+# Check (16) -- AC-6(c): plan-reviewer sole writer of consolidated header
+# + **Combined verdict:** block.
+_c16_sole_writer = bool(_orch_pr) and (
+    "plan-reviewer" in _orch_pr
+    and (
+        "sole" in _orch_pr.lower()
+        or "only writer" in _orch_pr.lower()
+        or "only" in _orch_pr.lower()
+        or "writer" in _orch_pr.lower()
+    )
+)
+_c16_combined_verdict = bool(_orch_pr) and "**Combined verdict:**" in _orch_pr
+check(
+    "plan-review(16/ac-6c): orchestrator.md centralization contract slice"
+    " declares plan-reviewer as sole writer of consolidated header"
+    " + '**Combined verdict:**' block",
+    _c16_sole_writer and _c16_combined_verdict,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" sole_writer={_c16_sole_writer},"
+        f" combined_verdict_label={_c16_combined_verdict}"
+    ),
+)
+
+# Check (17) -- AC-6(d): idempotent overwrite-in-place declared.
+_c17_idempotent = bool(_orch_pr) and (
+    "idempotent" in _orch_pr.lower()
+    or "overwrite" in _orch_pr.lower()
+    or "overwrite-in-place" in _orch_pr.lower()
+    or "replace" in _orch_pr.lower()
+)
+check(
+    "plan-review(17/ac-6d): orchestrator.md centralization contract slice"
+    " declares idempotent overwrite-in-place",
+    _c17_idempotent,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" idempotent={_c17_idempotent}"
+    ),
+)
+
+# Check (18) -- AC-6(d): sub-verdicts as bold inline labels (not ### headings)
+# keeping ## Plan Review a single sliceable block.
+_c18_bold_labels = bool(_orch_pr) and (
+    "**Substance (qa):**" in _orch_pr
+    or "**Security design-review (security):**" in _orch_pr
+    or "bold" in _orch_pr.lower()
+    or "inline" in _orch_pr.lower()
+)
+_c18_not_headings = bool(_orch_pr) and (
+    "### Substance" not in _orch_pr
+    and "### Security design-review" not in _orch_pr
+    and "### Combined verdict" not in _orch_pr
+)
+_c18_sliceable = bool(_orch_pr) and (
+    "sliceable" in _orch_pr.lower()
+    or "single block" in _orch_pr.lower()
+    or "## Plan Review" in _orch_pr
+)
+check(
+    "plan-review(18/ac-6d): orchestrator.md centralization contract slice"
+    " states sub-verdicts are bold inline labels (not ### headings)"
+    " keeping ## Plan Review a single sliceable block",
+    _c18_bold_labels and _c18_not_headings and _c18_sliceable,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" bold_inline_labels={_c18_bold_labels},"
+        f" not_headings={_c18_not_headings},"
+        f" sliceable={_c18_sliceable}"
+    ),
+)
+
+# Check (19) -- AC-6(e): cross-link to [CONSTRAINT-DISCOVERED] fold-back
+# (Phase 2.5 / qa reconcile).
+_c19_constraint_discovered = bool(_orch_pr) and (
+    "[CONSTRAINT-DISCOVERED]" in _orch_pr
+    or "CONSTRAINT-DISCOVERED" in _orch_pr
+)
+_c19_phase25 = bool(_orch_pr) and (
+    "2.5" in _orch_pr
+    or "Phase 2.5" in _orch_pr
+    or "reconcile" in _orch_pr.lower()
+)
+check(
+    "plan-review(19/ac-6e): orchestrator.md centralization contract slice"
+    " cross-links to [CONSTRAINT-DISCOVERED] fold-back (Phase 2.5 / qa reconcile)",
+    _c19_constraint_discovered and _c19_phase25,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" CONSTRAINT_DISCOVERED={_c19_constraint_discovered},"
+        f" phase_2.5={_c19_phase25}"
+    ),
+)
+
+# Check (20) -- AC-7: orchestrator.md Step 6 disambiguation reflects three-way panel
+# while preserving distinction from `validate` and substance-refinement.
+# Anchor-scoped: the plan-review routing row is in a routing table; we extract a
+# window of text around the EXISTING 'revisar/auditar plan' | 'plan-review' row and
+# assert that window contains the three-way panel language ADDED by the implementer.
+# Using a 2000-char window around the first occurrence of 'revisar' (the existing
+# Spanish routing keyword) is specific enough to avoid false-greens from unrelated
+# 'three' / 'panel' occurrences elsewhere in orchestrator.md (there is currently
+# one 'panel' at char ~211389 in "Pipeline Summary panel" which is unrelated).
+_c20_revisar_idx = _s34_orch.find("revisar")
+_c20_window = (
+    _s34_orch[max(0, _c20_revisar_idx - 200): _c20_revisar_idx + 1800]
+    if _c20_revisar_idx != -1 else ""
+)
+_c20_plan_review_in_window = "plan-review" in _c20_window
+_c20_validate_in_window = "validate" in _c20_window  # validate route still present in same table
+_c20_three_way_in_window = (
+    "three reviewer" in _c20_window.lower()
+    or "three-way" in _c20_window.lower()
+    or "three way" in _c20_window.lower()
+    or "three-reviewer" in _c20_window.lower()
+    or "panel" in _c20_window.lower()
+)
+check(
+    "plan-review(20/ac-7): orchestrator.md Step 6 disambiguation"
+    " (window around 'revisar/auditar plan' routing row)"
+    " reflects the three-way panel for plan-review"
+    " while preserving distinct route for 'validate'",
+    _c20_plan_review_in_window and _c20_validate_in_window and _c20_three_way_in_window,
+    (
+        f"orchestrator.md Step-6 window (revisar+/-200..+1800):"
+        f" plan_review={_c20_plan_review_in_window},"
+        f" validate_distinct={_c20_validate_in_window},"
+        f" three_way_or_panel={_c20_three_way_in_window}"
+        " -- implementer must update Step 6 disambiguation to mention the three-way panel"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Anchor D: agents/plan-reviewer.md
+#           "### Consolidated Plan Review section (three-reviewer panel)"
+# (Covers AC-8)
+# ---------------------------------------------------------------------------
+_PR_ANCHOR = "### Consolidated Plan Review section (three-reviewer panel)"
+_pr_consol = _slice_section(_s34_pr, _PR_ANCHOR)
+
+check(
+    "plan-review(anchor-pr): agents/plan-reviewer.md contains"
+    " '### Consolidated Plan Review section (three-reviewer panel)' section",
+    bool(_pr_consol),
+    f"anchor '{_PR_ANCHOR}' not found in plan-reviewer.md"
+    " -- plan-review checks (21)(22)(23) will all fail",
+)
+
+# Check (21) -- AC-8: plan-reviewer owns ## Plan Review header + rules Summary table
+# + Combined verdict block.
+_c21_header_ownership = bool(_pr_consol) and (
+    "## Plan Review" in _pr_consol
+    or "header" in _pr_consol.lower()
+    or "owner" in _pr_consol.lower()
+    or "owns" in _pr_consol.lower()
+)
+_c21_combined_verdict = bool(_pr_consol) and "**Combined verdict:**" in _pr_consol
+check(
+    "plan-review(21/ac-8): plan-reviewer.md consolidated section slice"
+    " declares plan-reviewer owns ## Plan Review header + ## Summary table"
+    " + '**Combined verdict:**' block",
+    _c21_header_ownership and _c21_combined_verdict,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" header_ownership={_c21_header_ownership},"
+        f" combined_verdict={_c21_combined_verdict}"
+    ),
+)
+
+# Check (22) -- AC-8: plan-reviewer does NOT overwrite **Substance (qa):** or
+# **Security design-review (security):** sub-verdicts (reads but not overwrites).
+_c22_no_overwrite_substance = bool(_pr_consol) and (
+    "**Substance (qa):**" in _pr_consol
+    and (
+        "not overwrite" in _pr_consol.lower()
+        or "does not overwrite" in _pr_consol.lower()
+        or "reads" in _pr_consol.lower()
+        or "do not overwrite" in _pr_consol.lower()
+        or "MUST NOT overwrite" in _pr_consol
+        or "not touch" in _pr_consol.lower()
+        or "only reads" in _pr_consol.lower()
+    )
+)
+_c22_no_overwrite_security = bool(_pr_consol) and (
+    "**Security design-review (security):**" in _pr_consol
+)
+check(
+    "plan-review(22/ac-8): plan-reviewer.md consolidated section slice"
+    " declares plan-reviewer does NOT overwrite"
+    " '**Substance (qa):**' or '**Security design-review (security):**'"
+    " sub-verdicts (reads them to produce combined verdict)",
+    _c22_no_overwrite_substance and _c22_no_overwrite_security,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" no_overwrite_substance={_c22_no_overwrite_substance},"
+        f" security_label_present={_c22_no_overwrite_security}"
+    ),
+)
+
+# Check (23) -- AC-8: sub-verdicts documented as bold inline labels (not ### headings)
+# so ## Plan Review remains a single sliceable block.
+_c23_not_headings = bool(_pr_consol) and (
+    "### Substance" not in _pr_consol
+    and "### Security design-review" not in _pr_consol
+    and "### Combined verdict" not in _pr_consol
+)
+_c23_bold_labels_mentioned = bool(_pr_consol) and (
+    "bold" in _pr_consol.lower()
+    or "inline" in _pr_consol.lower()
+    or "**Substance (qa):**" in _pr_consol
+)
+check(
+    "plan-review(23/ac-8): plan-reviewer.md consolidated section slice"
+    " confirms sub-verdicts are bold inline labels (not ### headings)"
+    " so ## Plan Review stays a single sliceable block",
+    _c23_not_headings and _c23_bold_labels_mentioned,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" not_headings={_c23_not_headings},"
+        f" bold_inline_labels={_c23_bold_labels_mentioned}"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Anchor E: agents/qa.md "### Plan-review panel (ratify-plan reuse)"
+# (Covers AC-9)
+# ---------------------------------------------------------------------------
+_QA_ANCHOR = "### Plan-review panel (ratify-plan reuse)"
+_qa_panel = _slice_section(_s34_qa, _QA_ANCHOR)
+
+check(
+    "plan-review(anchor-qa): agents/qa.md contains"
+    " '### Plan-review panel (ratify-plan reuse)' section",
+    bool(_qa_panel),
+    f"anchor '{_QA_ANCHOR}' not found in qa.md"
+    " -- plan-review checks (24)(25)(26) will all fail",
+)
+
+# Check (24) -- AC-9: ratify-plan reused as substance reviewer of the panel.
+_c24_ratify_plan_reuse = bool(_qa_panel) and (
+    "ratify-plan" in _qa_panel
+    and (
+        "reuse" in _qa_panel.lower()
+        or "reused" in _qa_panel.lower()
+        or "substance" in _qa_panel.lower()
+        or "reviewer" in _qa_panel.lower()
+    )
+)
+check(
+    "plan-review(24/ac-9): qa.md panel slice declares"
+    " ratify-plan is reused as the substance reviewer of the plan-review panel",
+    _c24_ratify_plan_reuse,
+    (
+        f"anchor '{_QA_ANCHOR}' slice:"
+        f" ratify_plan_reuse={_c24_ratify_plan_reuse}"
+    ),
+)
+
+# Check (25) -- AC-9: qa writes **Substance (qa):** inside ## Plan Review
+# (not as a ### heading) without touching the combined verdict.
+_c25_substance_label = bool(_qa_panel) and "**Substance (qa):**" in _qa_panel
+_c25_inside_plan_review = bool(_qa_panel) and (
+    "## Plan Review" in _qa_panel
+    or "Plan Review" in _qa_panel
+)
+_c25_not_heading = bool(_qa_panel) and "### Substance" not in _qa_panel
+_c25_not_combined = bool(_qa_panel) and (
+    "not touch" in _qa_panel.lower()
+    or "not overwrite" in _qa_panel.lower()
+    or "do not" in _qa_panel.lower()
+    or "MUST NOT" in _qa_panel
+    or "without touching" in _qa_panel.lower()
+    or "only" in _qa_panel.lower()
+)
+check(
+    "plan-review(25/ac-9): qa.md panel slice states qa writes"
+    " '**Substance (qa):**' inside ## Plan Review"
+    " (not as a ### heading) without touching the combined verdict",
+    _c25_substance_label and _c25_inside_plan_review and _c25_not_heading,
+    (
+        f"anchor '{_QA_ANCHOR}' slice:"
+        f" substance_label={_c25_substance_label},"
+        f" inside_plan_review={_c25_inside_plan_review},"
+        f" not_heading={_c25_not_heading}"
+    ),
+)
+
+# Check (26) -- AC-9: forbid-list (no parallel side-files) reinforced in qa panel slice.
+_c26_forbid_list = bool(_qa_panel) and (
+    "forbid" in _qa_panel.lower()
+    or "MUST NOT" in _qa_panel
+    or "must not" in _qa_panel.lower()
+    or "no parallel" in _qa_panel.lower()
+    or "no side" in _qa_panel.lower()
+    or "no new file" in _qa_panel.lower()
+    or "zero" in _qa_panel.lower()
+)
+check(
+    "plan-review(26/ac-9): qa.md panel slice reinforces"
+    " the no-parallel-files forbid-list",
+    _c26_forbid_list,
+    (
+        f"anchor '{_QA_ANCHOR}' slice:"
+        f" forbid_list={_c26_forbid_list}"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Anchor F: CLAUDE.md §5 "**Plan-review panel centralization**"
+# (Covers AC-10)
+# ---------------------------------------------------------------------------
+_CLAUDE_ANCHOR = "**Plan-review panel centralization**"
+# Use _slice_bullet_section for a CLAUDE.md §5 bold-bullet anchor
+# (same idiom as Suite 32 for the §5 whitelist bullet).
+_claude_pr = _slice_bullet_section(_s34_claude, _CLAUDE_ANCHOR)
+
+check(
+    "plan-review(27/ac-10): CLAUDE.md §5 contains"
+    " '**Plan-review panel centralization**' bullet anchor",
+    bool(_claude_pr),
+    f"anchor '{_CLAUDE_ANCHOR}' not found in CLAUDE.md §5"
+    " -- plan-review check (27) fails",
+)
+
+# Check (28) -- AC-10: CLAUDE.md §11 explicitly names Suite 34.
+_c28_suite34_in_s11 = "Suite 34" in _s34_claude
+check(
+    "plan-review(28/ac-10): CLAUDE.md §11 inventory explicitly names 'Suite 34'",
+    _c28_suite34_in_s11,
+    "literal 'Suite 34' not found in CLAUDE.md"
+    " -- §11 Testing Conventions must be updated to reference Suite 34",
+)
+
+
+# ---------------------------------------------------------------------------
+# Self-referential guard: Suite 34 present in test_agent_structure.py (AC-11).
+# This check is GREEN immediately (we just added the suite). It is a guard:
+# once green it must stay green -- nobody may delete Suite 34 from the test.
+# ---------------------------------------------------------------------------
+_s34_self = read(Path(__file__).resolve())
+_c29_suite34_present = "Suite 34" in _s34_self and "plan-review panel" in _s34_self.lower()
+check(
+    "plan-review(29/ac-11): tests/test_agent_structure.py contains Suite 34"
+    " (self-referential guard -- must stay green)",
+    _c29_suite34_present,
+    "Suite 34 or 'plan-review panel' literal not found in this test file"
+    " -- suite was deleted or renamed",
+)
+
+
+# ---------------------------------------------------------------------------
+# Drift fix check: skills/design/SKILL.md line ~49 references 01-plan.md
+# not 01-architecture.md (AC-11, Work Plan Step 11).
+# ---------------------------------------------------------------------------
+_c30_no_legacy_arch = "01-architecture.md" not in _s34_design_skill
+_c30_has_plan = "01-plan.md" in _s34_design_skill
+check(
+    "plan-review(30/drift): skills/design/SKILL.md output references"
+    " '01-plan.md' (not legacy '01-architecture.md')",
+    _c30_no_legacy_arch and _c30_has_plan,
+    (
+        f"skills/design/SKILL.md:"
+        f" legacy_01-architecture.md_present={not _c30_no_legacy_arch},"
+        f" 01-plan.md_present={_c30_has_plan}"
+        " -- line ~49 must reference 01-plan.md; remove 01-architecture.md reference"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

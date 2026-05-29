@@ -205,6 +205,21 @@ This mode is read-only and short — typical run is 2-3 minutes of agent time, ~
 
 ---
 
+### Plan-review panel (ratify-plan reuse)
+
+In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **substance reviewer** of the plan-review panel. The same ratify-plan procedure applies (AC ↔ Work Plan coverage mapping), but in panel context `qa` additionally writes its sub-verdict into the `## Plan Review` section of `01-plan.md` as a bold inline label:
+
+**In panel context, `qa` writes:** `**Substance (qa):**` followed by `pass` or `fail` and a one-line summary, inside `## Plan Review`. This label MUST be written as a bold inline label (NOT as a markdown heading with `###` prefix — a heading would split the `## Plan Review` slice and break the consolidated block).
+
+**What `qa` MUST NOT touch in panel context:**
+- The `**Combined verdict:**` label — that is written solely by `plan-reviewer` (the last reviewer in the panel).
+- The `**Security design-review (security):**` label — written solely by `security`.
+- The `## Plan Review` header itself — owned by `plan-reviewer`.
+
+**No side-files.** In panel context the same forbid-list applies: qa MUST NOT create `01-coverage-review.md`, `*-review.md`, `qa-reports/`, or any parallel file. Zero side-files. All output goes in-place into `01-plan.md` only.
+
+---
+
 ### PR Review QA Mode (`pr-review-qa`)
 
 Used by `/th:review-pr` to validate a PR's changes against workspaces AC (if the PR came from a team-harness pipeline). Runs in parallel with the reviewer and security agents at Tier 2+ when AC are available.

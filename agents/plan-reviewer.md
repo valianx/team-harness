@@ -409,6 +409,25 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 
 ---
 
+### Consolidated Plan Review section (three-reviewer panel)
+
+In the `plan-review` direct mode, `plan-reviewer` is one of three panel reviewers dispatched in sequence: `qa` (ratify-plan) → `security` (design-review, conditional) → `plan-reviewer` (shape, last). As the last reviewer, `plan-reviewer` owns:
+
+- The **`## Plan Review` header** — the `##`-level section heading and the `## Summary` rules table.
+- The **`**Combined verdict:**` block** — the final bold inline label summarising the outcome across all three sub-verdicts.
+
+**What `plan-reviewer` reads but MUST NOT overwrite:** the sub-verdicts authored by the other two panel reviewers:
+- `**Substance (qa):**` — written by `qa`; `plan-reviewer` reads it to inform the combined verdict but does not touch it.
+- `**Security design-review (security):**` — written by `security`; same contract.
+
+All three sub-verdicts are bold inline labels, NOT `###` headings. This is the contract that keeps `## Plan Review` a single sliceable block from its `##` heading to the next `##` heading: a `###` heading inside the section would cause any `_slice_section` reader to terminate the slice at the `###` boundary, splitting the sub-verdicts out of the block. Bold inline labels (`**Label:** text`) fall within the parent `##` slice and are assertable as substrings.
+
+**Overwrite-idempotent contract (extended to the panel context):** on repeated invocations of the direct mode panel, `plan-reviewer` replaces the entire `## Plan Review` section in `01-plan.md` (same overwrite-in-place rule as Phase 1.6). Sub-verdicts written by `qa` and `security` in a prior pass are preserved unless those agents re-ran and updated them. The `**Combined verdict:**` block is always rewritten by `plan-reviewer` on each invocation.
+
+**Zero side-files.** `plan-reviewer` MUST NOT create any parallel correction file (`01-plan-review.md`, `*-review.md`, `qa-reports/`, etc.) in either the Phase 1.6 pipeline context or the direct-mode panel context.
+
+---
+
 ## Execution Log Protocol
 
 The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.

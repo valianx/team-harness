@@ -17,30 +17,43 @@ This file is read on-demand by the orchestrator when executing a direct mode. It
 
 **Routing:** the user invokes `/th:plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
 
+### Review Panel (three reviewers, one plan)
+
+The `plan-review` direct mode runs a panel of up to three reviewers that fold their findings into a single `01-plan.md`. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
+
+1. **`qa` (mode: `ratify-plan`)** — substance reviewer. Validates AC coverage vs Work Plan. Writes `## Plan Ratification` (existing contract) AND writes its sub-verdict as the bold inline label `**Substance (qa):**` followed by a one-line verdict inside `## Plan Review`. Does NOT use a `###` heading for this label.
+2. **`security` (mode: `design-review`)** — design-security reviewer. **Conditional:** runs only when the task is security-sensitive. When run, writes its sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` inside `## Plan Review`. Does NOT use a `###` heading.
+3. **`plan-reviewer` (shape audit, runs last)** — sole writer of the `## Plan Review` header and the `**Combined verdict:**` block. Reads the sub-verdicts written by (1) and (2) to produce the combined verdict. Runs LAST so it can read the other sub-verdicts.
+
+**Centralization contract:** the panel MUST NOT create any parallel side-file. Zero parallel correction-files. All findings fold in-place into `01-plan.md`. The consolidated `## Plan Review` section carries the three sub-verdicts as bold inline labels (`**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) — never as `###` headings — so `## Plan Review` stays a single sliceable block from start to finish.
+
+**Gating of security reviewer (step 2):** determine security-sensitivity in this order:
+1. Read `00-state.md` (if it exists) and check for `security-sensitive: true` or `security_sensitive: true`.
+2. If absent, derive from path/keyword heuristic: scan `### Services Touched` and the AC blocks in `01-plan.md` for the existing pipeline path auto-escalation list — `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**` — which is the same list used by the bug-fix pipeline (reused, not a new divergent list). If any of those paths or keywords are present, treat as security-sensitive.
+3. Operator override: if the operator passed `--security` flag or explicitly said "include security" / "incluí seguridad", treat as security-sensitive regardless of the above.
+
 **Process:**
 
 1. Glob `workspaces/{feature-name}/`. If the folder does not exist, return a friendly message asking the user to first run `/th:design` or to confirm the feature name.
 2. Confirm `01-plan.md` exists. If it is absent but `01-architecture.md` is present, prompt the user: "no `01-plan.md` — this looks like a legacy plan (pipeline_version 1) or an incomplete design. Run `/th:design {feature}` to produce the merged plan, or invoke `/th:plan-review` after the architect has emitted `01-plan.md`."
-3. Invoke `plan-reviewer` via Task tool with the standard input contract (feature name + pointer to `01-plan.md`).
-4. Wait for the agent's status block. Read `verdict` and `findings` counts.
-5. Print the verdict and findings inline to the user. Direct mode does NOT emit a STAGE-GATE-1 STOP block — there is no pipeline to gate. The user is invoking interactively for information.
-6. If `verdict: pass` → confirm "plan-shape OK". If `verdict: concerns` or `fail` → enumerate the findings file:line, one per line, and point the user to `01-plan.md § Plan Review` for the full report.
+3. Invoke `qa` (mode: `ratify-plan`) via Task tool. Wait for status block.
+4. Determine security-sensitivity (per gating above). If security-sensitive, invoke `security` (mode: `design-review`) via Task tool. Wait for status block.
+5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
+6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.
 
 **Behaviour:**
-- Read-only. Direct mode never modifies `01-plan.md` except for the `plan-reviewer` agent's own append of the `## Plan Review` section.
-- The agent appends (or replaces) its `## Plan Review` section in `01-plan.md` so subsequent direct-mode invocations always reflect the latest plan state.
+- Zero side-files. All panel output folds in-place into `01-plan.md`. No agent creates a parallel review file.
+- The consolidated `## Plan Review` section in `01-plan.md` is idempotent (overwrite-in-place on subsequent invocations).
 - Does not append `stage.gate` events to JSONL — there is no pipeline.
+- Inline fallback (nested-dispatch): if the Task tool is unavailable (nested context), run the panel reviewers sequentially inline using each agent's system-prompt file as the procedure spec — same order, same centralization contract.
 
 **Output:**
 ```
 Plan Review (direct mode): {feature-name}
-Verdict: {pass | concerns | fail}
-Findings:
-  Rule 1 (PR-count): {N}
-  Rule 2 (per-PR ACs): {N}
-  Rule 3 (consolidated docs): {N}
-  Rule 4 (cross-references): {N}
-  Rule 5 (service identity): {N}
+**Combined verdict:** {pass | concerns | fail}
+Substance (qa): {pass | fail}
+Security design-review: {clean | risks-found | skipped (not security-sensitive)}
+Shape (plan-reviewer): {pass | concerns | fail}
 
 {if any findings:}
 Top issues:

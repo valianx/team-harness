@@ -46,4 +46,4 @@ name: design
 - **You read issues. The orchestrator does NOT** — it receives the data from you.
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly
 - The orchestrator will run Intake + Specify + Design, then stop
-- Output: `workspaces/{feature-name}/01-architecture.md`
+- Output: `workspaces/{feature-name}/01-plan.md`

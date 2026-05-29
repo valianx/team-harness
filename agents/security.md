@@ -38,7 +38,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ## Operating Modes
 
-Detect the mode from the orchestrator's instructions or the user's request.
+Detect the mode from the orchestrator's instructions or the user's request. Modes: `audit` (default), `focused`, `pipeline`, `design-review`, `pr-review-security`.
 
 ### Audit Mode (default)
 
@@ -64,6 +64,41 @@ Invoked as part of the main pipeline after implementation, to verify no security
 - **Output:** `workspaces/{feature-name}/04-security.md`
 - **Flow:** Phase 0 → Phase 1 (only changed files) → Phase 2 (only changed files) → Phase 4 (report)
 - **Scope rule:** In pipeline mode, ONLY analyze files listed as created/modified by the implementer. Do NOT scan global config, dependencies, or other files unless they were explicitly changed. This keeps the audit fast and focused on regressions introduced by the current feature.
+
+### Design Review Mode (`design-review`)
+
+Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is a fifth, distinct operating mode — it is DISTINCT from Audit Mode, Focused Mode, Pipeline Mode, and PR Review Security Mode, all of which assume source code exists.
+
+**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `04-security.md` or any `*-review.md` file in this mode.
+
+- **Trigger:** orchestrator invokes with `mode: design-review`, only when the task or plan is security-sensitive.
+- **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).
+- **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
+- **What to produce:** recommend security AC to add to the plan, in `Given/When/Then` or `VERIFY:` format, so the architect or operator can fold them into `01-plan.md`. Do not implement; recommend only.
+
+**Centralization contract (MUST NOT violate):**
+- Fold findings into the body of `01-plan.md` (refine `### Security Assessment` in-place when applicable).
+- Write the sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` and a one-line summary, WITHIN `## Plan Review` — NEVER as a markdown heading with `###` prefix (a `###` heading would split the `## Plan Review` slice).
+- MUST NOT create `04-security.md`, `*-review.md`, `security-reports/`, or any parallel side-file. Zero side-files.
+- No parallel correction files. All output goes in-place into `01-plan.md`.
+
+**Return Protocol (status block):**
+```
+agent: security
+status: success | failed | blocked
+mode: design-review
+security_design_verdict: clean | risks-found
+output: workspaces/{feature-name}/01-plan.md (Security Assessment section + ## Plan Review sub-verdict)
+summary: {N design risks identified; M security AC recommended, or "no design-level risks found"}
+context7_consult: hit:0 miss:0 skipped:1
+memory_consult: search_nodes:0 open_nodes:0
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+issues: {list of critical design risks, or "none"}
+```
+
+Note: `kg_save_candidates` is not emitted in design-review mode — this mode reviews a plan (no code vulnerabilities), so there are no security findings to persist to the KG. Only Pipeline Mode and Audit Mode produce KG write candidates (Critical/High findings with node_type `error` or `pattern`).
+
+---
 
 ### PR Review Security Mode (`pr-review-security`)
 
