@@ -73,10 +73,11 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache and prints `… updated from <X> to <Y>. Restart to apply changes.` Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
 
 6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure MCP servers and workspace mode; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
-   - **Source of truth.** The two managed blocks are defined verbatim in the plugin's `skills/setup/SKILL.md`. Read it from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate. Path: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/SKILL.md`.
-   - **Extract** both blocks, each including its delimiter comments:
+   - **Source of truth.** The three managed blocks are defined verbatim in the plugin's `skills/setup/SKILL.md`. Read it from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate. Path: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/SKILL.md`.
+   - **Extract** all three blocks, each including its delimiter comments:
      - `<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`
      - `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->`
+     - `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`
    - **Back up** `~/.claude/CLAUDE.md` to `~/.claude/CLAUDE.md.bak-YYYYMMDD-HHMMSS` (UTC) before the first write. If the file does not exist, create it (blocks-only) and skip the backup.
    - **Write each block idempotently:** if both its markers are present in `~/.claude/CLAUDE.md`, replace everything from `:start` to `:end` inclusive with the canonical block; otherwise append the block at the end of the file. Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
    - **Never touch anything outside the marker-delimited blocks.** All other content in `~/.claude/CLAUDE.md` is the operator's and is preserved byte-for-byte.
@@ -91,7 +92,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
      catalog refresh     done
      installed version   <X>
      downloaded version  <Y>
-     managed blocks      <per-block outcome, e.g. "synced (orchestrator-dispatch-rule updated)" or "in sync (2/2)">
+     managed blocks      <per-block outcome, e.g. "synced (orchestrator-dispatch-rule updated)" or "in sync (3/3)">
    ```
    Closing line: `Next: /reload-plugins (or restart Claude Code) to activate <Y>.`
 
@@ -102,7 +103,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
      catalog refresh     done
      installed version   <X>
      latest version      <X>
-     managed blocks      <e.g. "in sync (2/2)" or "synced (nested-dispatch-takeover updated)">
+     managed blocks      <e.g. "in sync (3/3)" or "synced (nested-dispatch-takeover updated)">
    ```
    Closing line: `No action required.`
 

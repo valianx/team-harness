@@ -1122,6 +1122,81 @@ check(
 
 update_skill_md = read(SKILLS_DIR / "update" / "SKILL.md")
 
+# --- voice-rule block (v2.36.8) — neutral register, no regional idioms ------
+# Third managed block written by /th:setup (and synced by /th:update) to
+# ~/.claude/CLAUDE.md so the neutral-register rule (no country-specific idioms)
+# applies in any repo, not just team-harness work.
+VOICE_RULE_START = "<!-- voice-rule:start -->"
+VOICE_RULE_END = "<!-- voice-rule:end -->"
+
+check(
+    "skills/setup/SKILL.md contains voice-rule start marker",
+    VOICE_RULE_START in setup_skill_md,
+    "setup SKILL.md must declare the voice-rule managed block start marker",
+)
+check(
+    "skills/setup/SKILL.md contains voice-rule end marker",
+    VOICE_RULE_END in setup_skill_md,
+    "setup SKILL.md must declare the voice-rule managed block end marker",
+)
+# Slice the block so the substance assert cannot false-green on ambient text.
+_vr_a = setup_skill_md.find(VOICE_RULE_START)
+_vr_b = setup_skill_md.find(VOICE_RULE_END)
+_voice_block = setup_skill_md[_vr_a:_vr_b] if (_vr_a != -1 and _vr_b != -1 and _vr_b > _vr_a) else ""
+check(
+    "skills/setup/SKILL.md voice-rule block states the no-regional-idioms intent",
+    ("idiom" in _voice_block.lower() or "regional" in _voice_block.lower())
+    and "neutral" in _voice_block.lower(),
+    "the voice-rule block must mandate neutral register and forbid country-specific idioms/regionalisms",
+)
+check(
+    "skills/update/SKILL.md syncs the voice-rule block (names its markers)",
+    VOICE_RULE_START in update_skill_md and VOICE_RULE_END in update_skill_md,
+    "update/SKILL.md step 6 must name the voice-rule markers so /th:update syncs the third managed block",
+)
+
+# --- --fast operator-declared lightweight path (v2.36.8) --------------------
+# The orchestrator recognizes a literal --fast flag (operator-declared only) and
+# runs a lightweight path that skips plan review + qa + security, while keeping
+# Specify, tester, the push gate, Delivery, and the security override on
+# sensitive paths. Surfaced in the dispatch managed block for discoverability.
+_ref_flows_md = read(AGENTS_DIR / "ref-special-flows.md")
+_global_claude_go = read(REPO_ROOT / "cmd" / "install" / "global_claude_md.go")
+
+check(
+    "orchestrator.md recognizes --fast as operator-declared fast mode",
+    "--fast" in orchestrator_md and "fast_mode" in orchestrator_md,
+    "orchestrator.md must document the --fast flag and the fast_mode classification field",
+)
+check(
+    "orchestrator.md fast_mode keeps the security override on sensitive paths",
+    "fast_mode" in orchestrator_md
+    and "cannot bypass security" in orchestrator_md.lower(),
+    "orchestrator.md must state that --fast cannot bypass security on security-sensitive paths",
+)
+check(
+    "orchestrator.md Current State template declares the fast_mode field",
+    "fast_mode:" in orchestrator_md,
+    "the 00-state.md § Current State template must include a fast_mode field",
+)
+check(
+    "ref-special-flows.md documents the Fast Mode (--fast) flow",
+    "Fast Mode" in _ref_flows_md
+    and "--fast" in _ref_flows_md
+    and "operator-declared" in _ref_flows_md.lower(),
+    "ref-special-flows.md must define the Fast Mode (--fast) flow as operator-declared only",
+)
+check(
+    "skills/setup/SKILL.md dispatch block advertises the --fast fast path",
+    "--fast" in setup_skill_md,
+    "the orchestrator-dispatch-rule block must surface the operator-declared --fast path for discoverability",
+)
+check(
+    "cmd/install/global_claude_md.go dispatch block mirrors the --fast advisory (parity)",
+    "--fast" in _global_claude_go,
+    "the Go installer's orchestrator-dispatch-rule block must mirror the --fast advisory for parity with setup/SKILL.md",
+)
+
 # -- (a) Manifest exists and appears BEFORE the first numbered step ----------
 # Position check: index of the manifest header must be lower than the index
 # of the first numbered step ("1. Do NOT ask") within _subagent_orch_md.

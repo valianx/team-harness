@@ -872,6 +872,20 @@ When the user explicitly says "simple", "just implement", "skip design", "no tes
 
 ---
 
+## Fast Mode (`--fast`)
+
+**Operator-declared ONLY.** The orchestrator NEVER sets `fast_mode` on its own — only a literal `--fast` in the operator's request triggers it. It is the developer's discretionary lightweight path for very small changes: a version bump, a one-line edit, a trivial copy tweak. It complements User-Initiated Simple Mode — Simple Mode is granular keyword skipping ("skip design", "skip tests"); `--fast` is a single named profile with a fixed skip-set. Applies to any `type`.
+
+**Skips:** Phase 1 Design (no `architect`; the orchestrator emits a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5); plan review (Phase 1.6); STAGE-GATE-1; the `qa` and `security` agents at Phase 3; Acceptance Check (Phase 3.6); Internal Review (Phase 4.5).
+
+**Keeps — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the `tester` agent at Phase 3 (run-all / suite no-regression only); Build Verification (Phase 3.75); STAGE-GATE-3 (the human push/PR gate); Delivery (Phase 4 — branch, commit, PR).
+
+**Security override (hard, non-negotiable):** a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, or any path containing `auth`/`permission`) or `[security: required]` forces the `security` agent to run at Phase 3 regardless of `--fast`. For `type: fix | hotfix`, the tier-driven security floor (Tier 3+) is also preserved. `--fast` never bypasses security on sensitive code; the orchestrator announces the override when it fires.
+
+**Acknowledge** the choice to the operator: "Fast mode — skipping plan review, qa, and security (non-sensitive scope). tester, the push gate, and delivery still run." Record `fast_mode: true` in `00-state.md § Current State` and log it under Hot Context.
+
+---
+
 ## Artifact Verification in Special Flows
 
 Every special flow that skips phases must explicitly document which artifact verifications are skipped and why. The Artifact Verification Protocol (see `orchestrator.md` § Artifact Verification Protocol) runs for every agent that IS dispatched — it is only exempt for phases that are skipped entirely.
@@ -908,3 +922,10 @@ Every special flow that skips phases must explicitly document which artifact ver
 - **Artifact verification skipped for:** agents in phases the user explicitly skipped.
 - **Phase 3.6 and 4.5:** run normally if verify and delivery phases are not skipped. If the user says "just implement" (skip Design + Verify), Phase 3.6 and 4.5 are not applicable.
 - **Phase 3.75 (Build Verification):** runs if Phase 3 (verify) runs; skipped if the user skipped verify.
+
+### Fast Mode (--fast, operator-declared)
+
+- **Phases skipped:** 1 (Design — no `architect`), 1.5, 1.6, STAGE-GATE-1; Phase 3 `qa` + `security` (unless a sensitive path / `[security: required]` forces security); 3.6; 4.5.
+- **Artifact verification runs for:** `implementer` → `02-implementation.md`; `tester` → `03-testing.md`; `delivery` (Phase 4). The orchestrator verifies each exists after the agent returns.
+- **Artifact verification skipped for:** `architect` (not dispatched — one-sentence prose plan in `01-plan.md` instead), `qa` (not dispatched), `security` (not dispatched, unless the sensitive-path override fires).
+- **Phase 3.75 (Build Verification):** runs — the change must still build and the suite must pass.

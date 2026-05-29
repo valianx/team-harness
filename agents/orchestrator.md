@@ -469,6 +469,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - operator_language: {en|es|pt|fr|de|...} # ISO 639-1 code; detected at Phase 0a Step 1d; default en
 - total_tokens: {N}                       # running sum of tokens across all phases; updated at every phase.end
 - clickup_workspace_id: {id | null}       # resolved ClickUp workspace id (precedence override > persistent); null when no ClickUp workspace is configured
+- fast_mode: {true|false}                  # operator-declared via --fast; lightweight path — skips Design+plan-review+STAGE-GATE-1, qa, security (unless sensitive path), 3.6, 4.5. Never auto-set
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -870,6 +871,12 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      **Output:** record `bug_tier: 0 | 1 | 2 | 3 | 4` in `00-state.md` `## Current State` (for Tier 1+; Tier 0 skips workspaces entirely). Surface the tier to the operator in the classification announcement (Step 12): `Tier {N} — {name}. {brief rationale: path X matched signal Y; keyword Z escalated}`. Operator-declared tiers are flagged in the announcement: `Tier {N} — operator-declared via [TIER: N]`.
 
+   - **Fast mode (`--fast`, operator-declared ONLY):** `fast_mode: false` by default. Set `fast_mode: true` ONLY when the operator's request contains the literal flag `--fast`. The orchestrator NEVER sets it on its own — only the operator can request a lighter pipeline (same principle as User-Initiated Simple Mode). `--fast` is a discretionary lightweight path the developer chooses for very small changes: a version bump, a one-line edit, a trivial copy tweak. It applies to any `type`. When `fast_mode: true`:
+     - **Skipped:** Phase 1 Design (the `architect` is NOT dispatched; the orchestrator writes a one-sentence prose plan into `01-plan.md`, same surface as `type: hotfix`); plan ratification (Phase 1.5) and plan review (Phase 1.6); STAGE-GATE-1; the `qa` and `security` agents at Phase 3; the Acceptance Check (Phase 3.6) and Internal Review (Phase 4.5).
+     - **Kept — floors that `--fast` can NEVER skip:** Specify (Phase 0b); Implement (Phase 2); the `tester` agent at Phase 3 (run-all / suite no-regression only); Build Verification (Phase 3.75); STAGE-GATE-3 (the human push/PR gate); Delivery (Phase 4 — branch, commit, PR).
+     - **Security override (hard, non-negotiable):** if the change touches a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, or any path containing `auth`/`permission`) OR the request carries `[security: required]`, the `security` agent runs at Phase 3 regardless of `--fast`. `--fast` cannot bypass security on sensitive code; the orchestrator announces the override when it fires. Likewise, `type: fix | hotfix` keeps its own tier-driven security rules — `--fast` does not relax the Bug-fix Flow's security floor for Tier 3+.
+     - Record `fast_mode: true` in `00-state.md § Current State`. Surface it in the Step 12 announcement: `Fast mode — operator-declared via --fast; skipping plan review, qa, and security (non-sensitive scope).` Full flow: `ref-special-flows.md § Fast Mode (--fast)`.
+
 8. **Bootstrap check** (development tasks only — skip for `research`, `plan`, and `spike`):
    - Verify these prerequisites exist: `CLAUDE.md`, `CHANGELOG.md`, `.gitignore` with `/workspaces` entry
    - If ANY is missing → invoke `init` agent via Task tool before continuing
@@ -903,7 +910,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
     - When in doubt (ambiguous scope) → ask the user: "Do you want to test a specific feature or the entire service?"
 12. **Announce** to the user: task classified, proceeding to SPECIFY.
 
-13. **Update `00-state.md` with classification results.** The file was created at Step 1c with `status: classifying`. Now update it with the full classification: `type`, `complexity`, `security-sensitive`, `frontend-scope`, `bug_tier`, `bug_tier_source`. Rewrite TL;DR: `Now`: "Phase 0b spec investigation starting." `Last`: "Pipeline started — task classified as {type}/{complexity}." `Next`: "Phase 0b SPECIFY, then Phase 1 design." `Open issues`: "none".
+13. **Update `00-state.md` with classification results.** The file was created at Step 1c with `status: classifying`. Now update it with the full classification: `type`, `complexity`, `security-sensitive`, `frontend-scope`, `bug_tier`, `bug_tier_source`, `fast_mode`. Rewrite TL;DR: `Now`: "Phase 0b spec investigation starting." `Last`: "Pipeline started — task classified as {type}/{complexity}." `Next`: "Phase 0b SPECIFY, then Phase 1 design." `Open issues`: "none".
 
 ---
 

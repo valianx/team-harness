@@ -71,6 +71,8 @@ Read `~/.claude/CLAUDE.md`. If it does not contain the orchestrator dispatch rul
 
 **Full pipeline is the default.** Every development task runs the complete pipeline unless the operator explicitly requests a direct mode (research, design, validate, deliver, review). Do not skip stages or substitute yourself for a subagent — the pipeline runs in full or stops with a real error.
 
+**Operator-declared fast path.** The operator — and only the operator — may request a lighter pipeline; the orchestrator never shrinks it on its own. Declarations: `--fast` for a very small change (a version bump, a one-line edit) skips the plan review, qa, and security stages; `[TIER: 0]` / `[TIER: 1]` for trivial or docs-only fixes; or Simple Mode keywords (`simple`, `just implement`, `skip tests`). In every case Specify and Delivery still run — every change is spec'd, branched, committed, and shipped as a PR — and security still runs on security-sensitive paths (`auth`, `api`, `db`, `crypto`, `session`) regardless of the declaration.
+
 **Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), and subfolder (`logs-subfolder`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
 
 **Language propagation.** When dispatching the orchestrator, detect the operator's chat language and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` This ensures the orchestrator and all downstream agents write in the operator's language.
@@ -105,6 +107,22 @@ If the block already exists (markers found), replace the content between the mar
 
 **Path & name resolution:** all `docs/…` and `agents/…` paths referenced above (`docs/subagent-orchestration.md`, `agents/ref-special-flows.md`, `agents/orchestrator.md`) are repo-relative for contributors with a `team-harness` clone. For plugin installs (no repo clone), the same files live under `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/` — resolve `<highest-version>` to the highest semver directory present (multiple versions may be cached after updates; the newest is canonical). The `dispatch_handoff` JSON stores `next_dispatch.agent` in **prefixed** form (`th:architect`) — use it verbatim for `Task(subagent_type=…)`, but **strip the `th:` prefix** to derive the agent's file path (`th:architect` → `agents/architect.md`); team-harness agents are flat, so a prefix-strip suffices.
 <!-- nested-dispatch-takeover:end -->
+```
+
+### 4c. Write voice-rule block
+
+Read `~/.claude/CLAUDE.md`. If the file does not contain the voice-rule block (look for `<!-- voice-rule:start -->`), append the block below at the end of the file. If the block already exists (markers found), replace the content between the markers with the canonical version below. This is the idempotence contract: insert if missing, replace between markers if present.
+
+```markdown
+<!-- voice-rule:start -->
+## Voice — neutral register, no regional idioms
+
+Use neutral, standard language that reads the same to a reader from any country. Do NOT use country-specific idioms, regionalisms, or local slang of any particular nation. This applies to every response, in any language — there is no informal-chat-mode exception.
+
+- Prefer the standard, neutral form of a word over its regional or colloquial variant.
+- No localisms, no dialect slang, no colloquial anglicisms (`shippeo`, `bakeado`, `wrappear`) — use the formal equivalent (`publicar`, `incorporado`, `encapsular`).
+- Keep the tone declarative and professional; the reader's country should not be inferable from word choice.
+<!-- voice-rule:end -->
 ```
 
 ### 5. Write manifest
