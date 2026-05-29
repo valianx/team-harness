@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Output discipline: agents and skills now operate silently during execution and emit a single structured report only on completion or error (Silently On Success, Report Once On Error). Internal tool calls (config reads, file existence checks, verification steps) are no longer narrated to the operator. Observability is preserved via `operation.*` nested events in `00-execution-events.jsonl/md` (`operation.start` / `operation.end` / `operation.error`). Rolled out across `orchestrator`, `architect`, `implementer`, `tester`, `qa`, `security`, `delivery`, `init`, and skills `lint`, `memory`, `setup`, `status`, `trace`. `agents/_shared/output-template.md` provides the canonical output contract; `docs/observability.md` documents the `operation.*` schema. A `/th:lint` guardrail (Suite 31) enforces the contract on every new agent/skill commit.
+
 ### Fixed
 
 - Takeover-protocol references in the managed `nested-dispatch-takeover` block are now plugin-cache-resolvable and prefix-correct. (A) A "Path & name resolution" note resolves the `docs/…` and `agents/…` repo-relative paths via `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/`, covering plugin-only installs without a repo clone. (B) The `dispatch_handoff` JSON field `next_dispatch.agent` is now canonically **prefixed** (`th:architect`) — use verbatim for `Task(subagent_type=…)` and strip the `th:` prefix only to derive the agent file path (`th:architect` → `agents/architect.md`). Four dispatch-templates aligned; 8 Suite 18 regression assertions added (989/989 green).

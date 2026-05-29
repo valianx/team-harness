@@ -1016,3 +1016,9 @@ issues: {list of blockers, or "none"}
 The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md` (see orchestrator's "Pipeline Summary Protocol" section).
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. Codebase exploration (Glob, Grep, Read during discovery) is silent on success. Context7 doc queries are silent on success; misses surface as one-line note in the `## Documentation Consulted` section of the plan, not as chat output.

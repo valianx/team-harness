@@ -376,3 +376,9 @@ The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — e
 - `follow_ups_spotted: {N}` — count of `[FOLLOW-UP]` annotations you added to `02-implementation.md` § `## Follow-ups Spotted` (other issues you spotted but did NOT fix per the scope-discipline contract). Zero is a valid value.
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. File reads during codebase discovery are silent on success. Build/lint errors surface as one-line summary + next-step in the status block.

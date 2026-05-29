@@ -338,3 +338,7 @@ Round R2 (1 PR, started 14:21:49, closed 14:31:02):
 - Works even if no `.gitignore` or CLAUDE.md exists
 - If `00-state.md` is missing but workspaces folder exists, report the folder as "no state file (legacy?)"
 - If tmux is not available, skip process detection gracefully — show `?` instead of LIVE/DEAD
+
+## Narration Exemption
+
+This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:status` specifically to see pipeline internals — surfacing phase numbers, stage names, and pipeline mechanics is the explicit purpose of this skill. The narration lint (`tests/test_agent_structure.py` Suite 31) does not scan this file.

@@ -3156,3 +3156,9 @@ When context is compacted (auto or manual), recovery is simple because state liv
 **`operator_language` recovery.** When recovering from `00-state.md`, read `operator_language` from `## Current State`. If the field does not exist (legacy pipeline), default to `en`. Apply the recovered value to all subsequent agent dispatch prompts.
 
 **`events_file` recovery.** When recovering from `00-state.md`, read `events_file` from `## Current State`. If the field does not exist (legacy pipeline), re-derive it from `logs_mode`: `obsidian` → `00-execution-events.md`; `local` → `00-execution-events.jsonl`.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. The boot sequence (`## Mandatory boot sequence`) is already silent per its own header; this section extends that pattern to config-load and MCP-verify steps throughout the pipeline. Phase-transition status blocks and STOP blocks remain operator-facing.

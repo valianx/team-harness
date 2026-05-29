@@ -278,3 +278,9 @@ Use these status icons in the output:
 - FAIL → `[FAIL]`
 
 Count only PASS as "passed" in the final summary. WARN and FAIL do not count as passed.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. Each check runs silently; only the final consolidated report is presented to the operator. Individual tool calls (Bash, Grep, Glob, Read) produce no intermediate chat output.

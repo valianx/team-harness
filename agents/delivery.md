@@ -883,3 +883,9 @@ issues: none
 The orchestrator pauses and waits for the operator to reply `pr opened #N`. On continue, the pipeline re-probes the PR number with a Tier A read and records it in `00-state.md`.
 
 Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. File I/O during delivery (reading workspaces, writing CHANGELOG, pushing to git) is silent on success. Errors in git operations surface as one-line summary + suggestion, never raw git output.

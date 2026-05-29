@@ -244,3 +244,9 @@ When `consolidate` writes new observations or `create_entities` is invoked, appl
 - `[project]` entities must be named after the bare repo (e.g. `zippy-backoffice`), never with an embedded path.
 
 If a candidate observation violates the policy, drop the violating part. Do not auto-rewrite the user's source data — when consolidating, prefer dropping noisy observations over inventing replacements. Full policy: `docs/kg-content-policy.md`.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. MCP search and graph-read calls are silent on success. A failed MCP call surfaces as one-line error + suggestion before the action result is reported.

@@ -500,3 +500,9 @@ issues: {list of TBD items, or "none"}
 ```
 
 Do NOT repeat the full CLAUDE.md content in your final message — it's already written to the file. The orchestrator uses this status block to report results.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. Config-load and file-system probes during initialization are silent on success.

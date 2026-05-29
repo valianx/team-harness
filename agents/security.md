@@ -777,3 +777,9 @@ When you finish pipeline mode and `04-security.md` reports any **Critical** or *
 ```
 
 Medium / Low / Info findings do NOT go in the brief — those are warnings included in the delivery report, not iteration triggers. Keep the brief tight: 5-10 lines per iteration.
+
+---
+
+## Output Discipline
+
+See `agents/_shared/output-template.md` § "Output Discipline" for the full contract. Codebase scanning during security analysis is silent on success. Security findings are always operator-facing (they are results, not internal chatter) — surface all Critical/High findings regardless of success/failure classification.

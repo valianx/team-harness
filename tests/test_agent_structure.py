@@ -4000,6 +4000,358 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 31 — Output Discipline lint (AC-2, AC-2b, AC-7, AC-8)
+# ---------------------------------------------------------------------------
+# This suite is the lint-is-the-test for the output-discipline feature.
+# It verifies:
+#   1. Foundation artifacts exist with the correct content.
+#   2. CLAUDE.md stays under 40 KB and has no duplicate §7b header.
+#   3. Rollout: every target agent/skill references output-template.md.
+#   4. /status and /trace document the exemption (not silenced).
+#   5. The narration detector fires on positive canary (per rule) and
+#      does NOT fire on instructional text (negative canary).
+#   6. The real agent/skill scan produces 0 narration matches.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 31: Output Discipline lint ===")
+
+# --- Compile the 3 narration detection rules once ---
+# Rule 1: first-person process narration
+_NARR_RULE1 = re.compile(
+    r"^\s*(I'?m|I am|I'?ll|I will|Let me|Now I'?ll?)"
+    r"\s+(read|reading|check|checking|verify|verifying|run|running"
+    r"|load|loading|fetch|fetching|look|looking)\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+# Rule 2: progress-gerund at line start
+_NARR_RULE2 = re.compile(
+    r"^\s*(Reading|Checking|Verifying|Running|Loading|Fetching|Initializing)"
+    r"\s+(the\s+|config|MCP|file|server|connection)\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+# Rule 3: step-counter pattern
+_NARR_RULE3 = re.compile(
+    r"\bStep \d+ of \d+\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+# Skills whose entire content is exempt from the narration scan
+# (they surface internals by design — the operator explicitly requested it).
+_EXEMPT_SKILL_NAMES = {"status", "trace"}
+
+# Path fragments that disqualify a SKILL.md from the scan
+# (vendored/installed files that are not prompt content).
+_EXCLUDED_PATH_FRAGMENTS = {"references", ".venv", "node_modules", ".git"}
+
+
+def _strip_output_discipline(text: str) -> str:
+    """Strip the '## Output Discipline' section (new, lists prohibited
+    narration phrases as negative examples — scanning it would be a false
+    positive).  Strips from the section header up to (but not including)
+    the next level-2 header."""
+    start = text.find("## Output Discipline")
+    if start < 0:
+        return text
+    end = text.find("\n## ", start + len("## Output Discipline"))
+    if end < 0:
+        return text[:start]
+    return text[:start] + text[end:]
+
+
+# Paths used repeatedly in this suite
+_OUTPUT_TEMPLATE = AGENTS_DIR / "_shared" / "output-template.md"
+_OBSERVABILITY_MD = REPO_ROOT / "docs" / "observability.md"
+_CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
+
+# --- (setup) Foundation: output-template.md ---
+
+check(
+    "voice: agents/_shared/output-template.md exists",
+    _OUTPUT_TEMPLATE.exists(),
+    "output-template.md is missing — implementer must create it",
+)
+if _OUTPUT_TEMPLATE.exists():
+    _ot = read(_OUTPUT_TEMPLATE)
+    check(
+        "voice: output-template.md declares the core silence-on-success rule",
+        "silent on success" in _ot.lower() or ("silent" in _ot.lower() and "success" in _ot.lower()),
+        "output-template.md must contain 'silent on success' (or equivalent)",
+    )
+    check(
+        "voice: output-template.md declares the report-once-on-error rule",
+        "report once on error" in _ot.lower() or ("report once" in _ot.lower() and "error" in _ot.lower()),
+        "output-template.md must contain 'report once on error' (or equivalent)",
+    )
+    check(
+        "voice: output-template.md lists carve-outs (STOP blocks / analysis / results)",
+        "stop" in _ot.lower() and ("analysis" in _ot.lower() or "results" in _ot.lower()),
+        "output-template.md must list carve-outs (STOP blocks and analysis/results)",
+    )
+    check(
+        "voice: output-template.md documents /status and /trace exemption",
+        "status" in _ot.lower() and "trace" in _ot.lower() and "exempt" in _ot.lower(),
+        "output-template.md must document the /status and /trace exemption",
+    )
+    check(
+        "voice: output-template.md has 'How to reference this file' section",
+        "## How to reference this file" in _ot,
+        "output-template.md must have a '## How to reference this file' section (gh-fallback pattern)",
+    )
+else:
+    # Can't check contents when file is missing; register placeholder failures
+    for _lbl in [
+        "voice: output-template.md declares the core silence-on-success rule",
+        "voice: output-template.md declares the report-once-on-error rule",
+        "voice: output-template.md lists carve-outs (STOP blocks / analysis / results)",
+        "voice: output-template.md documents /status and /trace exemption",
+        "voice: output-template.md has 'How to reference this file' section",
+    ]:
+        check(_lbl, False, "skipped — output-template.md does not exist")
+
+# --- (CLAUDE.md) IN/OUT chatter table and size/dedup constraints ---
+
+_claude_full = read(_CLAUDE_MD)
+
+check(
+    "voice: CLAUDE.md §7.1 contains IN/OUT chatter table — Config load category",
+    "Config load" in _claude_full,
+    "CLAUDE.md §7.1 must contain the IN/OUT chatter table with 'Config load' row",
+)
+check(
+    "voice: CLAUDE.md §7.1 contains IN/OUT chatter table — MCP verify category",
+    "MCP verify" in _claude_full,
+    "CLAUDE.md §7.1 must contain 'MCP verify' row in the IN/OUT table",
+)
+check(
+    "voice: CLAUDE.md §7.1 contains IN/OUT chatter table — Initialization category",
+    "Initialization" in _claude_full,
+    "CLAUDE.md §7.1 must contain 'Initialization' row in the IN/OUT table",
+)
+check(
+    "voice: CLAUDE.md §7.1 contains IN/OUT chatter table — SILENT and PERMITTED tokens",
+    "SILENT" in _claude_full and "PERMITTED" in _claude_full,
+    "CLAUDE.md §7.1 must contain 'SILENT' and 'PERMITTED' tokens in the IN/OUT table",
+)
+check(
+    "voice: CLAUDE.md §7.1 defines internal-chatter vs operator-facing boundary",
+    "Internal chatter" in _claude_full and "operator-facing" in _claude_full,
+    "CLAUDE.md §7.1 must contain the boundary definition with 'Internal chatter' and 'operator-facing'",
+)
+
+_claude_size = os.path.getsize(_CLAUDE_MD)
+check(
+    "voice: CLAUDE.md stays under 40 KB (AC-2)",
+    _claude_size < 40 * 1024,
+    f"CLAUDE.md is {_claude_size} bytes — must be under {40 * 1024} bytes after edits",
+)
+
+check(
+    "voice: CLAUDE.md '## 7b. Document Hygiene' header appears exactly once (AC-2b)",
+    _claude_full.count("## 7b. Document Hygiene") == 1,
+    f"'## 7b. Document Hygiene' appears {_claude_full.count('## 7b. Document Hygiene')} times — must be exactly 1 (duplicate must be removed)",
+)
+
+# --- (observability) docs/observability.md ---
+
+check(
+    "voice: docs/observability.md exists",
+    _OBSERVABILITY_MD.exists(),
+    "docs/observability.md is missing — implementer must create it",
+)
+if _OBSERVABILITY_MD.exists():
+    _obs = read(_OBSERVABILITY_MD)
+    check(
+        "voice: observability.md defines operation.* event schema fields",
+        "operation.started" in _obs and "operation.success" in _obs and "operation.failed" in _obs
+        and "operation" in _obs and "status" in _obs and "error" in _obs and "suggestion" in _obs,
+        "observability.md must define operation.started/success/failed and fields: operation, status, error, suggestion",
+    )
+    check(
+        "voice: observability.md declares operation.* is nested in 00-execution-events (not a separate file)",
+        "00-execution-events" in _obs and ("nested" in _obs.lower() or "not a separate file" in _obs.lower()),
+        "observability.md must state that operation.* is nested in 00-execution-events, not a separate file",
+    )
+    check(
+        "voice: observability.md declares operation.* is optional and additive",
+        ("optional" in _obs.lower() or "additive" in _obs.lower()),
+        "observability.md must declare operation.* is optional/additive",
+    )
+else:
+    for _lbl in [
+        "voice: observability.md defines operation.* event schema fields",
+        "voice: observability.md declares operation.* is nested in 00-execution-events (not a separate file)",
+        "voice: observability.md declares operation.* is optional and additive",
+    ]:
+        check(_lbl, False, "skipped — docs/observability.md does not exist")
+
+# --- (rollout) Target agents reference output-template.md ---
+
+_TARGET_AGENTS = [
+    "orchestrator", "delivery", "init", "architect",
+    "implementer", "tester", "qa", "security",
+]
+for _agent_name in _TARGET_AGENTS:
+    _agent_path = AGENTS_DIR / f"{_agent_name}.md"
+    if _agent_path.exists():
+        _agent_content = read(_agent_path)
+        check(
+            f"voice: agents/{_agent_name}.md references output-template.md",
+            "agents/_shared/output-template.md" in _agent_content,
+            f"agents/{_agent_name}.md must reference agents/_shared/output-template.md in its Output Discipline section",
+        )
+    else:
+        check(
+            f"voice: agents/{_agent_name}.md references output-template.md",
+            False,
+            f"agents/{_agent_name}.md does not exist",
+        )
+
+# --- (rollout) Target skills have Output Discipline section ---
+
+_TARGET_SKILLS = ["setup", "lint", "memory"]
+for _skill_name in _TARGET_SKILLS:
+    _skill_p = skill_path(_skill_name)
+    if _skill_p.exists():
+        _skill_content = read(_skill_p)
+        check(
+            f"voice: skills/{_skill_name} has Output Discipline section",
+            "## Output Discipline" in _skill_content
+            or "Output Discipline" in _skill_content,
+            f"skills/{_skill_name}/SKILL.md must contain an 'Output Discipline' section",
+        )
+        check(
+            f"voice: skills/{_skill_name} references output-template.md",
+            "agents/_shared/output-template.md" in _skill_content
+            or "output-template.md" in _skill_content,
+            f"skills/{_skill_name}/SKILL.md must reference output-template.md",
+        )
+    else:
+        for _lbl in [
+            f"voice: skills/{_skill_name} has Output Discipline section",
+            f"voice: skills/{_skill_name} references output-template.md",
+        ]:
+            check(_lbl, False, f"skills/{_skill_name}/SKILL.md does not exist at {_skill_p}")
+
+# --- (exemption) /status and /trace document the exemption ---
+
+for _exempt_skill in ["status", "trace"]:
+    _esp = skill_path(_exempt_skill)
+    if _esp.exists():
+        _esc = read(_esp)
+        check(
+            f"voice: skills/{_exempt_skill} documents narration exemption",
+            "exempt" in _esc.lower() or "EXEMPT" in _esc,
+            f"skills/{_exempt_skill}/SKILL.md must document the narration exemption (operator requested internals)",
+        )
+    else:
+        check(
+            f"voice: skills/{_exempt_skill} documents narration exemption",
+            False,
+            f"skills/{_exempt_skill}/SKILL.md does not exist at {_esp}",
+        )
+
+# --- (CANARY positive, per-rule) Each narration rule fires independently ---
+# One synthetic line per rule — asserted rule-by-rule (not aggregated).
+# These PASS now (they test the detector, not the repo content).
+
+_canary_line1 = "I'm reading the config now"
+_canary_line2 = "Checking MCP connectivity..."
+_canary_line3 = "Step 3 of 7"
+
+check(
+    "voice: narration rule 1 (first-person) fires on synthetic line",
+    bool(_NARR_RULE1.search(_canary_line1)),
+    f"rule 1 did not match '{_canary_line1}' — detector broken",
+)
+check(
+    "voice: narration rule 2 (progress gerund) fires on synthetic line",
+    bool(_NARR_RULE2.search(_canary_line2)),
+    f"rule 2 did not match '{_canary_line2}' — detector broken",
+)
+check(
+    "voice: narration rule 3 (step counter) fires on synthetic line",
+    bool(_NARR_RULE3.search(_canary_line3)),
+    f"rule 3 did not match '{_canary_line3}' — detector broken",
+)
+
+# --- (CANARY negative) Detector does NOT fire on instructional text ---
+# Real-world instructional phrases confirmed as false-positive candidates.
+# These PASS now (they validate precision of the detector).
+
+_canary_negative = "\n".join([
+    "Read the file at path X.",
+    "Downstream agents will read this file directly.",
+    "The test will verify it.",
+    "which test(s) will verify it",
+    "Match by checking if the task name appears in the list.",
+])
+
+check(
+    "voice: narration detector does not fire on instructional text (no false positives)",
+    not _NARR_RULE1.search(_canary_negative)
+    and not _NARR_RULE2.search(_canary_negative)
+    and not _NARR_RULE3.search(_canary_negative),
+    "one or more narration rules fired on legitimate instructional text — denylist too broad",
+)
+
+# --- (glob-correctness) Scan reaches subdirectory skills ---
+# Assert that **/SKILL.md glob includes at least one subdirectory path.
+
+_all_skill_mds = list(SKILLS_DIR.glob("**/SKILL.md"))
+_has_subdir_skill = any(
+    "setup" in str(p) or "/" in str(p.relative_to(SKILLS_DIR))
+    for p in _all_skill_mds
+)
+check(
+    "voice: Suite 31 glob '**/SKILL.md' reaches subdirectory skills",
+    _has_subdir_skill and len(_all_skill_mds) > 0,
+    "glob('**/SKILL.md') found no subdirectory skills — skills not reachable",
+)
+
+# --- (lint-real) No operator-facing narration in agents/*.md and skills/**/SKILL.md ---
+# Scan order per AC-8:
+#   Step 1 — exclude vendored/non-prompt paths (references/, .venv/, node_modules/, .git/)
+#   Step 2 — exclude exempt skills by name (status, trace)
+#   Step 3 — strip ## Voice contract + ## Output Discipline before applying rules
+
+_narr_matches: list[str] = []
+
+# Scan agents
+for _ap in sorted(AGENTS_DIR.glob("*.md")):
+    _ac = read(_ap)
+    _ac = _strip_voice_contract(_ac)
+    _ac = _strip_output_discipline(_ac)
+    for _rule, _rname in [(_NARR_RULE1, "rule1"), (_NARR_RULE2, "rule2"), (_NARR_RULE3, "rule3")]:
+        _m = _rule.search(_ac)
+        if _m:
+            _narr_matches.append(f"agents/{_ap.name} [{_rname}]: {_m.group()!r}")
+
+# Scan skills — AC-8 order: path exclusion BEFORE skill exemption
+for _sp in sorted(SKILLS_DIR.glob("**/SKILL.md")):
+    # Step 1: path exclusion (vendored/installed files under references/, .venv/, etc.)
+    _sp_str = str(_sp)
+    if any(_excl in _sp_str for _excl in _EXCLUDED_PATH_FRAGMENTS):
+        continue
+    # Step 2: skill exemption by name
+    _sname = _sp.parent.name
+    if _sname in _EXEMPT_SKILL_NAMES:
+        continue
+    # Step 3: strip sections that legitimately list banned phrases, then scan
+    _sc = read(_sp)
+    _sc = _strip_voice_contract(_sc)
+    _sc = _strip_output_discipline(_sc)
+    for _rule, _rname in [(_NARR_RULE1, "rule1"), (_NARR_RULE2, "rule2"), (_NARR_RULE3, "rule3")]:
+        _m = _rule.search(_sc)
+        if _m:
+            _narr_matches.append(f"skills/{_sname}/SKILL.md [{_rname}]: {_m.group()!r}")
+
+check(
+    "voice: no operator-facing narration in agents/*.md and skills/**/SKILL.md",
+    len(_narr_matches) == 0,
+    f"narration found in {len(_narr_matches)} location(s): {_narr_matches}",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
