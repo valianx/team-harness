@@ -1281,6 +1281,101 @@ check(
     "and are NOT checked here)",
 )
 
+# -- (g) Plugin cache-path resolvable (AC-5 / AC-8: fix/takeover-doc-plugin-cache-path) --
+# The managed block must name the explicit marketplace+plugin cache-path segment
+# ("team-harness-marketplace/th/") and the highest-semver resolution wording
+# ("<highest-version>") so plugin-only installs (no repo clone) can resolve the
+# docs/ and agents/ references during a takeover.
+#
+# DO NOT assert merely "plugins/cache" — line ~1088 already covers that substring
+# via the Red herring note and is green today.  These assertions target literals
+# that are ABSENT today and will become present only after the implementer's fix.
+# They fail pre-fix and pass post-fix (regression test contract, Phase 2.0).
+#
+# Resolution: scoped to _managed_block_content (extracted above in section (d2))
+# so ambient occurrences elsewhere in setup/SKILL.md do not produce false greens.
+check(
+    "skills/setup/SKILL.md managed block contains plugin cache-path segment 'team-harness-marketplace/th/'",
+    "team-harness-marketplace/th/" in _managed_block_content,
+    "the nested-dispatch-takeover block must include the explicit marketplace+plugin "
+    "cache-path segment so plugin-only installs can resolve docs/ and agents/ references; "
+    "the current Red herring uses an ellipsis ('.../th/') which is insufficiently specific",
+)
+check(
+    "skills/setup/SKILL.md managed block contains highest-version resolution wording '<highest-version>'",
+    "<highest-version>" in _managed_block_content,
+    "the block must instruct operators to resolve to the highest semver directory "
+    "('<highest-version>') rather than a fixed version or the ambiguous '<version>' "
+    "placeholder already present in the Red herring; multiple versions may be cached "
+    "after updates and the newest is canonical",
+)
+
+# -- (h) Strip-rule co-occurrence (AC-9 / AC-8: fix/takeover-doc-plugin-cache-path additive pass) --
+# The managed block must document the prefix-strip rule using the EXACT example
+# literals `th:architect` AND `agents/architect.md`, co-occurring in the same block.
+# This captures defect B: the placeholder `{next_dispatch.agent}` is stored in
+# PREFIXED form (`th:architect`) for Task dispatch, but the file-read step (step 3)
+# must STRIP the `th:` prefix to derive the agent's on-disk path.
+#
+# These two literals are ABSENT today from _managed_block_content → assertion FAILS
+# pre-fix and PASSES post-fix (regression test contract, Phase 2.0 additive pass).
+#
+# Resolution: scoped to _managed_block_content so ambient occurrences elsewhere
+# in setup/SKILL.md do not produce false greens.
+check(
+    "skills/setup/SKILL.md managed block contains strip-rule co-occurrence: 'th:architect' AND 'agents/architect.md'",
+    "th:architect" in _managed_block_content and "agents/architect.md" in _managed_block_content,
+    "the nested-dispatch-takeover block must document the prefix-strip rule with the "
+    "literal example 'th:architect' -> 'agents/architect.md'; both literals must "
+    "co-occur in the managed block so the transformation is unambiguous; "
+    "absent today (defect B — placeholder form undocumented in the block)",
+)
+
+# Also assert the same strip-rule co-occurrence in docs/subagent-orchestration.md
+# (step-3 region), verifying defect B is corrected in the protocol doc as well.
+# Resolution: _subagent_orch_md (full doc; the strip rule is expected in step 3 prose).
+check(
+    "docs/subagent-orchestration.md contains strip-rule co-occurrence: 'th:architect' AND 'agents/architect.md'",
+    "th:architect" in _subagent_orch_md and "agents/architect.md" in _subagent_orch_md,
+    "the Takeover Protocol (docs/subagent-orchestration.md) step 3 must document "
+    "the prefix-strip rule with the literal example 'th:architect' -> 'agents/architect.md'; "
+    "absent today (defect B — strip-rule not described in the protocol)",
+)
+
+# -- (i) Double-prefix negative guard (AC-10: regression guard, PASSES today) --
+# Assert that `th:th:` is NOT present in _managed_block_content or in the
+# four dispatch-template files. This is a GUARD assertion: it passes today
+# (no double-prefix exists) and remains a regression guard post-fix so that
+# any template that auto-adds `th:` to an already-prefixed value (producing
+# `th:th:architect`) is caught immediately.
+#
+# NOTE: this assertion is GREEN today and is expected to REMAIN green post-fix.
+# It is NOT a pre-fix-red assertion — it is a regression guard.
+_orchestrator_for_guard = orchestrator_md  # reuse from Suite 18 (already read)
+_skills_readme_for_guard = skills_readme_md  # reuse from Suite 18 (already read)
+check(
+    "double-prefix guard: 'th:th:' absent from managed block (AC-10 regression guard)",
+    "th:th:" not in _managed_block_content,
+    "a template that auto-adds the 'th:' prefix to an already-prefixed value "
+    "would produce 'th:th:architect'; absent today and must remain absent post-fix",
+)
+check(
+    "double-prefix guard: 'th:th:' absent from docs/subagent-orchestration.md (AC-10 regression guard)",
+    "th:th:" not in _subagent_orch_md,
+    "dispatch-template in the protocol doc must not produce a double-prefix",
+)
+check(
+    "double-prefix guard: 'th:th:' absent from agents/orchestrator.md (AC-10 regression guard)",
+    "th:th:" not in _orchestrator_for_guard,
+    "dispatch-template in orchestrator.md must not produce a double-prefix",
+)
+check(
+    "double-prefix guard: 'th:th:' absent from skills/README.md (AC-10 regression guard)",
+    "th:th:" not in _skills_readme_for_guard,
+    "dispatch-template in skills/README.md must not produce a double-prefix",
+)
+
+
 # ---------------------------------------------------------------------------
 # Suite 19 — Agent identity & cross-reference consistency
 # ---------------------------------------------------------------------------

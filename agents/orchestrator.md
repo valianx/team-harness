@@ -63,7 +63,7 @@ Triggered only when the boot probe returns a genuine "tool unavailable" error. D
    > **Phase:** {N} ({phase-name})
    > **State ref:** {state_ref or "no session-doc yet"}
    >
-   > Top-level Claude: dispatch `{next-agent}` via `Task(subagent_type={next-agent}, ...)`. Follow `CLAUDE.md §14` universal rule. Do NOT re-invoke `@th:orchestrator` — that re-creates the nested condition.
+   > Top-level Claude: dispatch `{next-agent}` via `Task(subagent_type={next-agent}, ...)`. The `next_dispatch.agent` JSON field is in **prefixed** form (e.g. `th:architect`) — use verbatim for dispatch; strip `th:` only to derive the agent file path. Follow `CLAUDE.md §14` universal rule. Do NOT re-invoke `@th:orchestrator` — that re-creates the nested condition.
 
    Then stop. Do not retry the probe. Do not write code inline.
 

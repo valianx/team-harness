@@ -45,8 +45,8 @@ When a skill dispatches `Task(subagent_type=orchestrator, ...)`, the orchestrato
 **Top-level Claude MUST honour the handoff automatically.** This is not a user-decision point; the user already authorised the pipeline when they typed the skill or mention. The protocol is:
 
 1. Read `00-state.md` (`## Current State` + `## Handoff`) if it exists, or use the handoff fields embedded in the orchestrator's response.
-2. Read `agents/orchestrator.md` for the per-phase contract and `agents/{next-agent}.md` for the agent contract.
-3. Dispatch `{next-agent}` directly via `Task(subagent_type={next-agent}, ...)` from the top-level session.
+2. Read `agents/orchestrator.md` for the per-phase contract and the agent contract file — derive the file path by stripping the `th:` prefix from `next_dispatch.agent` (e.g. `th:architect` → `agents/architect.md`).
+3. Dispatch `{next-agent}` directly via `Task(subagent_type={next-agent}, ...)` from the top-level session — `{next-agent}` is the prefixed value from `next_dispatch.agent` (e.g. `th:architect`), used verbatim.
 4. Continue through the remaining phases, dispatching each agent in sequence (or in parallel where the contract specifies, e.g. `tester` + `qa` + `security` in Phase 3). Update `00-state.md` after every transition.
 5. Respect gates: STAGE-GATE-2 between PRs is silent iff `autonomous: true`; STAGE-GATE-3 always asks the user before push.
 6. **Do NOT** ask the user "should I take over?", **do NOT** re-invoke `@th:orchestrator` (it recreates the nested context), and **do NOT** write the agents' workspaces inline — top-level Claude still inherits the orchestrator's "you NEVER write code/tests/docs" contract during the takeover.
