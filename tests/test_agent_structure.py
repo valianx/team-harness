@@ -6405,6 +6405,260 @@ check(
 )
 
 
+
+# ---------------------------------------------------------------------------
+# Suite 36 -- KG write-integrity beacon (write-integrity-beacon, AC-1..AC-8)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks for the kg_write event contract across 5 files.
+# Every check slices to a uniquely-named section heading and asserts
+# sub-tokens WITHIN that slice — never a loose `token in whole_file`.
+# Exception: the self-referential guard (check 11) is file-wide by design,
+# following the precedent of Suite 35 check 6 and Suite 34 checks 28-29.
+#
+# Principle: if the anchor is absent the slice is "" and the check FAILS
+# with a clear detail — no false-green is possible (the anti-false-green
+# dispatch: _slice_section returns "" for a missing anchor, and "x" in ""
+# is always False).
+#
+# Check index -> AC mapping:
+#   (1)  / AC-1 : observability.md § kg_write event — schema tokens present
+#   (2)  / AC-1 : same slice — all 4 reason codes present
+#   (3)  / AC-2 : orchestrator.md § Emitting kg_write events — 3 site values
+#   (4)  / AC-2 : same slice — all 4 reason codes
+#   (5)  / AC-3 : orchestrator.md — kg_write registered as valid event
+#   (6)  / AC-2 : delivery.md § delivery-passive-capture — mapeo declarado
+#   (7)  / AC-4 : trace SKILL.md § KG write-integrity rollup — rollup tokens
+#   (8)  / AC-4 : same slice — format-agnostic evidence (jsonl + md extraction)
+#   (9)  / AC-6 : orchestrator.md + delivery.md slices — resiliencia preservada
+#   (10) / AC-5 : orchestrator.md — anti-parallel-family rule names kg_write
+#   (11) / AC-7 : CLAUDE.md §11 + self-referential guard (write-integrity beacon)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 36: KG write-integrity beacon ===")
+
+# ---- file reads (suite-local variables) ------------------------------------
+_s36_obs_text   = read(REPO_ROOT / "docs" / "observability.md")
+_s36_orch_text  = read(AGENTS_DIR / "orchestrator.md")
+_s36_deliv_text = read(AGENTS_DIR / "delivery.md")
+_s36_trace_text = read(skill_path("trace"))
+_s36_claude_text = read(REPO_ROOT / "CLAUDE.md")
+_s36_self_text  = read(Path(__file__).resolve())
+
+# ---- anchors ---------------------------------------------------------------
+_S36_OBS_ANCHOR      = "## kg_write event"
+_S36_ORCH_EMIT_ANCHOR = "### Emitting kg_write events"
+_S36_DELIV_ANCHOR    = "kg_write site:delivery-passive-capture"
+_S36_TRACE_ANCHOR    = "### KG write-integrity rollup"
+
+# 4 reason codes that must be documented everywhere they are relevant
+_S36_REASON_CODES = (
+    "ok",
+    "skipped:mcp-down",
+    "skipped:malformed-call",
+    "skipped:policy-filtered",
+)
+
+# ---- slice the sections we need -------------------------------------------
+_s36_obs_slice   = _slice_section(_s36_obs_text,   _S36_OBS_ANCHOR)
+_s36_orch_emit   = _slice_section(_s36_orch_text,  _S36_ORCH_EMIT_ANCHOR)
+_s36_deliv_slice = _slice_section(_s36_deliv_text, _S36_DELIV_ANCHOR)
+_s36_trace_slice = _slice_section(_s36_trace_text, _S36_TRACE_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 -- observability.md § kg_write event: schema tokens present
+# Asserts the section documents the event shape: event, "kg_write", attempted,
+# succeeded, reason.  A missing anchor gives "" and fails immediately.
+# ---------------------------------------------------------------------------
+_s36_schema_tokens = ("event", '"kg_write"', "attempted", "succeeded", "reason")
+check(
+    "kg-beacon(1/ac-1): docs/observability.md § 'kg_write event'"
+    " documents schema tokens (event, attempted, succeeded, reason)",
+    bool(_s36_obs_slice)
+    and all(t in _s36_obs_slice for t in _s36_schema_tokens),
+    f"anchor '{_S36_OBS_ANCHOR}' missing or tokens absent: {_s36_schema_tokens}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-1 -- same slice: all 4 reason codes documented
+# ---------------------------------------------------------------------------
+check(
+    "kg-beacon(2/ac-1): docs/observability.md § 'kg_write event'"
+    " documents all 4 reason codes",
+    bool(_s36_obs_slice)
+    and all(code in _s36_obs_slice for code in _S36_REASON_CODES),
+    f"anchor '{_S36_OBS_ANCHOR}' missing or reason codes absent: {_S36_REASON_CODES}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-2 -- orchestrator.md § Emitting kg_write events:
+# all 3 site values declared
+# ---------------------------------------------------------------------------
+_S36_SITES = (
+    "phase6-knowledge-save",
+    "security-finding",
+    "delivery-passive-capture",
+)
+check(
+    "kg-beacon(3/ac-2): agents/orchestrator.md § 'Emitting kg_write events'"
+    " declares all 3 site values",
+    bool(_s36_orch_emit)
+    and all(site in _s36_orch_emit for site in _S36_SITES),
+    f"anchor '{_S36_ORCH_EMIT_ANCHOR}' missing or site values absent: {_S36_SITES}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-2 -- same slice: all 4 reason codes present
+# (orchestrator must know the vocabulary at the point of emission)
+# ---------------------------------------------------------------------------
+check(
+    "kg-beacon(4/ac-2): agents/orchestrator.md § 'Emitting kg_write events'"
+    " contains all 4 reason codes",
+    bool(_s36_orch_emit)
+    and all(code in _s36_orch_emit for code in _S36_REASON_CODES),
+    f"anchor '{_S36_ORCH_EMIT_ANCHOR}' missing or reason codes absent: {_S36_REASON_CODES}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-3 -- kg_write registered as valid event in orchestrator.md
+# The plan specifies that kg_write is added to the "One of:" list or the
+# "When to write each event" table.  We search the whole orchestrator text
+# for the event being named in an enumeration context.
+# We use a scoped slice of the event-schema section rather than a whole-file
+# grep to keep the assertion anchored.
+# Anchor: "One of:" (the plan's L2523 list phrasing) OR
+#         "When to write each event" table header.
+# We try both; accept if kg_write appears in either slice.
+# ---------------------------------------------------------------------------
+_s36_one_of_slice   = _slice_section(_s36_orch_text, "One of:")
+_s36_when_to_write  = _slice_section(_s36_orch_text, "When to write each event")
+check(
+    "kg-beacon(5/ac-3): agents/orchestrator.md registers 'kg_write'"
+    " as a valid event (in 'One of:' list or 'When to write each event' table)",
+    ("kg_write" in _s36_one_of_slice)
+    or ("kg_write" in _s36_when_to_write),
+    "kg_write not found in 'One of:' slice or 'When to write each event' slice"
+    " -- anchor sections may be missing or token absent",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-2 -- delivery.md § delivery-passive-capture slice:
+# declares kg_passive_capture as source + names at least ok + skipped:mcp-down
+# (the two codes delivery can produce for a real write vs. MCP-down scenario)
+# ---------------------------------------------------------------------------
+check(
+    "kg-beacon(6/ac-2): agents/delivery.md § 'kg_write site:delivery-passive-capture'"
+    " declares kg_passive_capture as event source and names ok + skipped:mcp-down",
+    bool(_s36_deliv_slice)
+    and "kg_passive_capture" in _s36_deliv_slice
+    and "ok" in _s36_deliv_slice
+    and "skipped:mcp-down" in _s36_deliv_slice,
+    f"anchor '{_S36_DELIV_ANCHOR}' missing or tokens (kg_passive_capture, ok,"
+    " skipped:mcp-down) absent in slice",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-4 -- trace SKILL.md § KG write-integrity rollup:
+# rollup tokens KG writes:, attempted, succeeded all present
+# ---------------------------------------------------------------------------
+check(
+    "kg-beacon(7/ac-4): skills/trace/SKILL.md § 'KG write-integrity rollup'"
+    " documents rollup tokens (KG writes:, attempted, succeeded)",
+    bool(_s36_trace_slice)
+    and "KG writes:" in _s36_trace_slice
+    and "attempted" in _s36_trace_slice
+    and "succeeded" in _s36_trace_slice,
+    f"anchor '{_S36_TRACE_ANCHOR}' missing or rollup tokens absent",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-4 -- same slice: format-agnostic declared
+# The plan requires both jsonl and .md extraction to be mentioned in the
+# rollup section.  Evidence tokens: "jsonl" + one of ("sed -n", "fence", ".md")
+# ---------------------------------------------------------------------------
+check(
+    "kg-beacon(8/ac-4): skills/trace/SKILL.md § 'KG write-integrity rollup'"
+    " is format-agnostic (jsonl + .md fence extraction documented)",
+    bool(_s36_trace_slice)
+    and "jsonl" in _s36_trace_slice
+    and any(
+        tok in _s36_trace_slice
+        for tok in ("sed -n", "fence", ".md")
+    ),
+    f"anchor '{_S36_TRACE_ANCHOR}' missing or format-agnostic tokens absent"
+    " (need 'jsonl' + one of: 'sed -n', 'fence', '.md')",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-6 -- resilience clauses preserved at both write sites
+# orchestrator.md: its emit slice must contain a resilience phrase
+# delivery.md:     its site slice must contain a resilience phrase
+# ---------------------------------------------------------------------------
+_S36_ORCH_RESILIENCE = ("best-effort", "silently", "log")
+_S36_DELIV_RESILIENCE = ("never fail", "best-effort")
+_s36_orch_has_resilience = any(
+    tok in _s36_orch_emit for tok in _S36_ORCH_RESILIENCE
+)
+_s36_deliv_has_resilience = any(
+    tok in _s36_deliv_slice for tok in _S36_DELIV_RESILIENCE
+)
+check(
+    "kg-beacon(9/ac-6): resilience clauses preserved"
+    " (orchestrator § Emitting kg_write events + delivery § site slice"
+    " both contain best-effort / never-fail language)",
+    bool(_s36_orch_emit) and _s36_orch_has_resilience
+    and bool(_s36_deliv_slice) and _s36_deliv_has_resilience,
+    "resilience clause missing -- "
+    + (
+        "orchestrator emit slice has no resilience token"
+        f" (checked: {_S36_ORCH_RESILIENCE}); "
+        if not (bool(_s36_orch_emit) and _s36_orch_has_resilience)
+        else ""
+    )
+    + (
+        "delivery site slice has no resilience token"
+        f" (checked: {_S36_DELIV_RESILIENCE})"
+        if not (bool(_s36_deliv_slice) and _s36_deliv_has_resilience)
+        else ""
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-5 -- anti-parallel-family rule names kg_write as exception
+# The plan: orchestrator.md L2577-area rule "parallel family" must mention
+# kg_write so any future reader knows the event is a deliberate singular
+# exception, not a new KG-namespaced family.
+# Anchor: slice on "parallel family" (the plan's phrasing for the rule).
+# ---------------------------------------------------------------------------
+_s36_parallel_family_slice = _slice_section(_s36_orch_text, "parallel family")
+check(
+    "kg-beacon(10/ac-5): agents/orchestrator.md anti-parallel-family rule"
+    " (slice of 'parallel family') names 'kg_write' as recognized exception",
+    "kg_write" in _s36_parallel_family_slice,
+    "anchor 'parallel family' missing in orchestrator.md"
+    " or 'kg_write' not present within that slice"
+    " -- implementer must update the L2577 rule to cite the exception",
+)
+
+# ---------------------------------------------------------------------------
+# Check (11) / AC-7 -- self-referential guard
+# CLAUDE.md §11 must register Suite 36.
+# This file must contain the literal "Suite 36" and the marker
+# "write-integrity beacon" so the guard survives future edits.
+# (Whole-file check is acceptable here — identical to Suite 35 check 6.)
+# ---------------------------------------------------------------------------
+check(
+    "kg-beacon(11/ac-7):"
+    " CLAUDE.md §11 names 'Suite 36' and this file defines it"
+    " (self-referential guard -- must stay green post-implementation)",
+    "Suite 36" in _s36_claude_text
+    and "Suite 36" in _s36_self_text
+    and "write-integrity beacon" in _s36_self_text,
+    "Suite 36 not registered in CLAUDE.md §11"
+    " or marker literal 'write-integrity beacon' missing in this file"
+    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

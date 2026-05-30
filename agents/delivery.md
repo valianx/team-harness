@@ -781,6 +781,24 @@ The operator replays by reading the file and invoking the appropriate MCP tool f
 
 The orchestrator propagates this into the `kg_passive_capture` sub-field of the `tools` object on the `phase.end` event in `00-execution-events.jsonl`. The `/th:trace <feature> --tools` view surfaces it under "Tool Effectiveness".
 
+#### kg_write site:delivery-passive-capture — event source declaration
+
+The orchestrator emits a `kg_write` event with `site: delivery-passive-capture` during `phase.end` processing for Phase 4, using the `kg_passive_capture` line from this status block as the authoritative source. This is a **best-effort observability event** — the delivery pipeline never fails because of it.
+
+The orchestrator maps delivery's `kg_passive_capture` string to the 4-code reason vocabulary as follows:
+
+| `kg_passive_capture` value | `kg_write` `reason` code | `succeeded` |
+|---------------------------|--------------------------|-------------|
+| `written` / `written-with-relation-note` / `merged-into` | `ok` | 1 |
+| `skipped: mcp-unreachable` / `mcp-unhealthy` / `mcp-not-wired` | `skipped:mcp-down` | 0 |
+| `skipped: policy/<code>` | `skipped:policy-filtered` | 0 |
+| `skipped: low-specificity` / `type-mismatch` / `no-extraction` | `ok` (content-gate) | 0 |
+| `skipped: no-reusable-learning` | `attempted:0, writes:[]` | 0 |
+| `gate1-error` / `gate2-error` | `skipped:malformed-call` | 0 |
+| `failed: <error>` | `skipped:mcp-down` | 0 |
+
+The delivery agent's resilience contract is unchanged: **never fail the delivery on KG errors**. The `kg_write` event records what already happened; it has no effect on the delivery outcome.
+
 ---
 
 ## Session Documentation

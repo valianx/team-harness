@@ -2520,7 +2520,7 @@ Every line is a JSON object with these fields:
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 timestamp with timezone (e.g. `2026-05-01T14:00:00-03:00`). |
-| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `pipeline.complete`, `pipeline.incomplete`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`. |
+| `event` | yes | One of: `pipeline.start`, `pipeline.end`, `pipeline.complete`, `pipeline.incomplete`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `kg_write`. |
 | `feature` | yes | Feature name (kebab-case, matches the workspaces folder). |
 | `phase` | conditional | Phase identifier (e.g. `0a-intake`, `1-design`, `1-root-cause`, `2-implement`, `2.0-regression-test`, `3-verify`, `1.5-ratify-plan`, `1.6-plan-review`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
 | `stage` | conditional | Stage number (`1` / `2` / `3`). Required for `stage.gate*` events. |
@@ -2574,7 +2574,53 @@ Every line is a JSON object with these fields:
 | `pipeline.complete` | Immediately after the Final Pipeline Sanity Check passes (all expected artifacts present and non-empty). Emitted before Phase 5. |
 | `pipeline.incomplete` | Immediately after the Final Pipeline Sanity Check fails (one or more expected artifacts missing or empty). Sets `status: blocked-incomplete`; Phase 5 and Phase 6 do NOT execute. |
 | `pipeline.end` | Phase 6 final, regardless of outcome (`success` / `failed` / `blocked`). |
-| `operation.started` / `operation.success` / `operation.failed` | Silent-on-success operations: config load, MCP connectivity probes, mid-pipeline KG reads on error, and security-finding writes. Use `operation.*` with a `detail` discriminator — do NOT introduce a parallel family of KG-namespaced events (use `operation.*` with `detail` instead). KG-specific `detail` values: `kg-read-on-acceptance-fail` (Phase 3.6 fail read), `kg-read-on-build-fail` (Phase 3.75 fail read), `kg-write-security-finding` (Phase 3 security write). `operation.started` / `operation.success` are silent to the operator (events file only). `operation.failed` surfaces as a one-line summary in the operator report. |
+| `kg_write` | After each KG write batch resolves (success or skip) — once per write site per pipeline run. Emitted for: Phase 6 Knowledge Save (`site: phase6-knowledge-save`), Phase 3 security-finding write (`site: security-finding`), and delivery Step 11.5 passive capture (`site: delivery-passive-capture`). See the "Emitting kg_write events" subsection below for derivation rules. |
+| `operation.started` / `operation.success` / `operation.failed` | Silent-on-success operations: config load, MCP connectivity probes, mid-pipeline KG reads on error, and security-finding writes. Use `operation.*` with a `detail` discriminator — do NOT introduce a parallel family of KG-namespaced events (kg.started / kg.success / kg.failed). Exception: `kg_write` is a deliberate singular event (not a family with state suffixes) for batch-level KG write accounting — the batch-with-counts case that `operation.*` cannot express without contaminating its single-operation schema. KG-specific `detail` values: `kg-read-on-acceptance-fail` (Phase 3.6 fail read), `kg-read-on-build-fail` (Phase 3.75 fail read), `kg-write-security-finding` (Phase 3 security write, retained alongside `kg_write`). `operation.started` / `operation.success` are silent to the operator (events file only). `operation.failed` surfaces as a one-line summary in the operator report. |
+
+### Emitting kg_write events
+
+After each KG write batch completes (success or skip), emit one `kg_write` event. **Best-effort only — the event records what already happened; it never changes control flow and never causes a hard-fail.** The pipeline's existing resilience clauses ("best-effort", "skip silently", "log and continue") are preserved verbatim at every site. The event is emitted AFTER the write decision is already final, reading its result.
+
+**Reason-code derivation — closed vocabulary of 4 values:**
+
+| Situation | `reason` code | Increments `succeeded`? |
+|-----------|--------------|------------------------|
+| `create_nodes` / `add_observations` returned without error | `ok` | yes |
+| Content-quality gate decided not to write (`low-specificity`, `type-mismatch`, `no-reusable-learning`, dedup-merge that added nothing new) | `ok` (with `detail: "content-gate: <reason>"`) | no |
+| MCP unreachable / doctor degraded / tool not wired / mcp-unhealthy | `skipped:mcp-down` | no |
+| Tool name not found or arguments malformed (non-infrastructure failure) | `skipped:malformed-call` | no |
+| Content-policy filter or MCP `policy/<code>` response discarded the write | `skipped:policy-filtered` | no |
+
+**Three write sites and how to derive the event:**
+
+**Site 1 — `phase6-knowledge-save` (Phase 6)**
+Emit once at the end of Phase 6, before `session_end`. The orchestrator executes the batch directly, so it counts each write result: each `create_nodes` / `add_observations` that returns without error → `reason: ok`, `succeeded++`; each candidate dropped by the content filter → `reason: skipped:policy-filtered`; if `doctor` / MCP fails → `reason: skipped:mcp-down` for the remaining candidates; tool-not-found / args invalid → `reason: skipped:malformed-call`. `attempted == writes.length`.
+
+**Site 2 — `security-finding` (Phase 3)**
+Emit once after the final Phase 3 verify pass, at the security-finding write site. The orchestrator executes this write directly. Derive reason codes the same way as Site 1. The existing `operation.failed` log (`detail: kg-write-security-finding`) is retained alongside the new `kg_write` event — both coexist.
+
+**Site 3 — `delivery-passive-capture` (Phase 4)**
+Delivery executes this write and reports the result in its status block as `kg_passive_capture: <result>`. The orchestrator emits the `kg_write` event during `phase.end` processing, mapping delivery's status-block string to the 4-code vocabulary:
+
+| delivery `kg_passive_capture` value | `kg_write` mapping |
+|-------------------------------------|--------------------|
+| `written` | `attempted:1, succeeded:1, writes:[{reason:"ok"}]` |
+| `written-with-relation-note: …` | `attempted:1, succeeded:1, writes:[{reason:"ok", detail:"…"}]` |
+| `merged-into: …` | `attempted:1, succeeded:1, writes:[{reason:"ok", detail:"merged-into: …"}]` |
+| `skipped: mcp-unreachable` / `mcp-unhealthy` / `mcp-not-wired` | `attempted:1, succeeded:0, writes:[{reason:"skipped:mcp-down"}]` |
+| `skipped: policy/<code>` | `attempted:1, succeeded:0, writes:[{reason:"skipped:policy-filtered"}]` |
+| `skipped: low-specificity` / `type-mismatch` / `no-reusable-learning` / `no-extraction` | `attempted:1, succeeded:0, writes:[{reason:"ok", detail:"content-gate: <reason>"}]` |
+| `skipped: no-reusable-learning` (nothing to write) | `attempted:0, succeeded:0, writes:[]` |
+| `gate1-error: …` / `gate2-error: …` | `attempted:1, succeeded:0, writes:[{reason:"skipped:malformed-call", detail:"…"}]` |
+| `failed: <error>` | `attempted:1, succeeded:0, writes:[{reason:"skipped:mcp-down", detail:"<error>"}]` |
+
+**Format (all three sites):**
+
+```jsonl
+{"ts":"<ISO-8601>","event":"kg_write","feature":"<feature>","phase":"6-knowledge-save","site":"phase6-knowledge-save","attempted":2,"succeeded":1,"writes":[{"reason":"ok","detail":"create_nodes: prisma-sqlite-enum"},{"reason":"skipped:policy-filtered","detail":"content-policy: user-path"}]}
+```
+
+**Resilience invariant:** if constructing or appending the `kg_write` event itself fails (e.g., a Bash write error), log the failure and continue — the pipeline never hard-fails on an observability emit error.
 
 ### Implementation note
 

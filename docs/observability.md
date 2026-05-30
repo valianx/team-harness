@@ -78,6 +78,58 @@ and events file exist. When no workspace exists (one-shot invocation), these
 skills apply the same output discipline — silence on success, one-line error +
 suggestion on failure — without event persistence.
 
+## kg_write event
+
+`kg_write` is a **sibling event** (peer of `phase.*` / `gate.*` / `operation.*`) emitted by the orchestrator after each Knowledge Graph write batch. Unlike `operation.*`, which models a single discrete operation, a KG write site may attempt multiple writes in one batch; `kg_write` carries per-batch counters (`attempted`, `succeeded`) and a per-write `writes[]` array so `/th:trace` can aggregate across all three write sites.
+
+**Shape:**
+
+```json
+{
+  "ts":        "<ISO-8601 with timezone>",
+  "event":     "kg_write",
+  "feature":   "<kebab-case, matches workspaces folder>",
+  "phase":     "6-knowledge-save | 3-verify | 4-delivery",
+  "site":      "phase6-knowledge-save | security-finding | delivery-passive-capture",
+  "attempted": "<int — writes attempted in this batch>",
+  "succeeded": "<int — writes that completed with create_nodes/add_observations>",
+  "writes": [
+    { "reason": "ok",                      "detail": "<optional — e.g. 'create_nodes: prisma-sqlite-enum'>" },
+    { "reason": "skipped:mcp-down",        "detail": "<optional — verbatim from doctor or error, NO secrets>" },
+    { "reason": "skipped:malformed-call",  "detail": "<optional — tool name or arg error>" },
+    { "reason": "skipped:policy-filtered", "detail": "<optional — e.g. 'content-policy: user-path'>" }
+  ]
+}
+```
+
+**Field rules:**
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `ts` | always | ISO-8601 with timezone (same convention as every trace event) |
+| `event` | always | Literal `"kg_write"`. One type, no state suffixes. |
+| `feature` | always | Kebab-case, matches the workspaces folder |
+| `phase` | always | Pipeline phase where the write occurs |
+| `site` | always | Discriminator for the write site. Closed vocabulary: `phase6-knowledge-save`, `security-finding`, `delivery-passive-capture` |
+| `attempted` | always | Count of writes attempted. `0` when the site decided nothing to write (e.g., no reusable learning) |
+| `succeeded` | always | Count of effective writes (`create_nodes` / `add_observations` returned without error). Always `≤ attempted` |
+| `writes` | always | Array, one entry per attempted write. `length == attempted`. Empty array `[]` when `attempted == 0` |
+| `writes[].reason` | always | One of the 4 reason codes below |
+| `writes[].detail` | optional | Mechanical context only — **same secret prohibition as `operation.*`**: no tokens, no bearer credentials, no private URLs, no user-path identifiers |
+
+**Consistency invariant:** `succeeded == count of writes[] entries where reason == "ok"` and `attempted == writes.length`. `/th:trace` validates and aggregates using this invariant.
+
+**Reason vocabulary (4 codes):**
+
+| `reason` | Meaning | Derives from |
+|----------|---------|--------------|
+| `ok` | Write was effective (`create_nodes` / `add_observations` returned without error) — OR a content-quality gate legitimately decided not to write (the seam worked; the gate found nothing to persist). Distinguish with `succeeded`: a quality-gate skip is `ok` with `detail: "content-gate: <reason>"` and does NOT increment `succeeded`. | Successful MCP return, or content-quality gate decision (`low-specificity`, `type-mismatch`, `no-reusable-learning`, dedup→merge) |
+| `skipped:mcp-down` | The MCP seam is unreachable, degraded, or not wired — the write could not be attempted due to infrastructure. This is the code that would have fired for the `create_entities` naming bug (PR1). | `doctor` degraded/error, MCP unreachable, tool not wired |
+| `skipped:malformed-call` | The tool call failed due to a non-existent tool name or malformed arguments (not infrastructure). This is the exact code for the renamed-tool class of bug. | tool-not-found, invalid args, schema rejection by the MCP not caused by connectivity or policy |
+| `skipped:policy-filtered` | The content-policy filter or an MCP `policy/*` return discarded the write. | Content-policy drop, MCP `policy/<code>` response |
+
+**Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A Phase 6 batch may write up to 5 nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes. See the orchestrator's "Emitting kg_write events" subsection for the full rationale and the explicit exception.
+
 ## Relationship to the Output Discipline contract
 
 The `operation.*` schema is the log target for the silent-on-success rule:
