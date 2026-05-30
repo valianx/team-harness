@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.3] - 2026-05-29
+
+### Added
+
+- `INTEGRATION.md`: a canonical end-to-end guide for the team-harness ↔ context-harness-mcp integration — the canonical `mcpServers` `memory` block (local/hosted/authenticated variants), the 16-tool server contract, end-to-end setup, KG content-policy pointer, and a troubleshooting section keyed to the `kg_write` reason codes from the write-integrity beacon.
+
 ## [2.39.2] - 2026-05-29
 
 ### Fixed
