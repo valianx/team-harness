@@ -61,9 +61,20 @@ Read each file using the Read tool. All files are in `.claude/` in the current w
 
 ## Verdict rule
 
-**Strict any-CHANGES_REQUESTED wins:**
-- If ANY focused reviewer's event is `REQUEST_CHANGES` → overall event is `REQUEST_CHANGES`.
-- Only if ALL focused reviewers emit `APPROVE` → overall event is `APPROVE`.
+**Attribution guard (runs before any-CHANGES_REQUESTED logic):**
+
+Before applying the any-CHANGES_REQUESTED rule, inspect every CRITICAL finding across all focused reviewer drafts. For each CRITICAL:
+- Determine whether the PR **introduced or materially affected** the target (file:line). The PR diff is the authoritative source.
+- If the CRITICAL's target is pre-existing code the PR did not touch and the change did not cause to break or regress, the finding is **out-of-scope**:
+  - Discard it from `inline_findings` (it must not become an inline comment on the final review).
+  - Downgrade it to an informational entry in `## Fuera de alcance` in the consolidated `review_body` — not under `### Problemas Criticos`.
+  - Do NOT count it when applying the any-CHANGES_REQUESTED rule below.
+  - Add an attribution note in parentheses: `(hallazgo fuera de alcance — problema pre-existente, no causado por este PR; ver § Fuera de alcance)`.
+- If the CRITICAL's target was introduced or affected by the PR, it is in-scope: carry it forward unchanged.
+
+**Strict any-CHANGES_REQUESTED wins (applied after attribution guard):**
+- If ANY in-scope focused reviewer finding is `REQUEST_CHANGES` → overall event is `REQUEST_CHANGES`.
+- Only if ALL focused reviewers emit `APPROVE` (and no in-scope CRITICALs remain after the attribution guard) → overall event is `APPROVE`.
 - The operator can override the event at the publish prompt (Step 13 of `skills/review-pr.md`).
 
 ## Zero-findings case
