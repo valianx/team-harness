@@ -179,6 +179,96 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
 
 4. If `jq` is not available, fall back to printing only the `## Tool Effectiveness` section of the summary.
 
+### KG write-integrity rollup
+
+After the Tool Effectiveness table, append a KG write-integrity rollup that aggregates all `kg_write` events in the trace. This rollup covers all three write sites (`phase6-knowledge-save`, `security-finding`, `delivery-passive-capture`) and is format-agnostic: for `.md` traces, extract the JSONL fence before aggregating; for `.jsonl` traces, read directly.
+
+**Output format:**
+
+When the trace contains `kg_write` events:
+```
+KG writes: N attempted, M succeeded
+```
+
+If any writes were skipped (`N > M`), append a per-reason-code breakdown:
+```
+KG writes: 7 attempted, 5 succeeded
+  skipped: 1 mcp-down, 1 policy-filtered
+```
+
+When no `kg_write` events are in the trace (e.g., pre-beacon pipeline or `--fast` run that did not reach Phase 6):
+```
+KG writes: none recorded
+```
+
+**Aggregation with `jq` (canonical):**
+
+```bash
+# .md variant — extract fence first, then aggregate
+sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' {events_file} | jq -s '
+  map(select(.event == "kg_write")) as $w |
+  {
+    attempted: ($w | map(.attempted) | add // 0),
+    succeeded: ($w | map(.succeeded) | add // 0),
+    by_reason: ($w | map(.writes[]) | group_by(.reason)
+                | map({reason: .[0].reason, n: length})
+                | map(select(.reason != "ok")))
+  }
+'
+
+# .jsonl variant — read directly
+jq -s '
+  map(select(.event == "kg_write")) as $w |
+  {
+    attempted: ($w | map(.attempted) | add // 0),
+    succeeded: ($w | map(.succeeded) | add // 0),
+    by_reason: ($w | map(.writes[]) | group_by(.reason)
+                | map({reason: .[0].reason, n: length})
+                | map(select(.reason != "ok")))
+  }
+' {events_file}
+```
+
+**Fallback without `jq`** — use `python3` to sum `attempted` / `succeeded` and group `writes[].reason` across all `kg_write` lines:
+
+```bash
+# Works for both .jsonl (read direct) and .md (extract fence first with sed -n)
+python3 -c "
+import json, sys, collections
+attempted = 0; succeeded = 0; reasons = collections.Counter()
+for line in sys.stdin:
+    try:
+        e = json.loads(line)
+    except Exception:
+        continue
+    if e.get('event') != 'kg_write':
+        continue
+    attempted += e.get('attempted', 0)
+    succeeded += e.get('succeeded', 0)
+    for w in e.get('writes', []):
+        r = w.get('reason', '')
+        if r != 'ok':
+            reasons[r] += 1
+if attempted == 0:
+    print('KG writes: none recorded')
+else:
+    print(f'KG writes: {attempted} attempted, {succeeded} succeeded')
+    if reasons:
+        parts = ', '.join(f'{n} {r.replace(\"skipped:\",\"\")}' for r, n in sorted(reasons.items()))
+        print(f'  skipped: {parts}')
+"
+```
+
+If neither `jq` nor `python3` is available, print:
+```
+KG writes: trace present, install jq or python3 for the rollup
+```
+
+**Integration in `--tools` Totals block:** append the rollup line after `KG passive capture (delivery):` in the Totals section:
+```
+KG writes (all sites): N attempted, M succeeded{breakdown}
+```
+
 ---
 
 ## `--fails` mode — failures, dispatch issues, iterations

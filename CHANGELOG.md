@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.0] - 2026-05-29
+
+### Added
+
+- Write-Integrity Beacon: every KG write now emits a reason-coded `kg_write` event (`attempted`/`succeeded` counters + closed vocabulary `ok | skipped:mcp-down | skipped:malformed-call | skipped:policy-filtered`) at all three write sites (orchestrator Phase 6 + security-finding; delivery passive capture). `/trace` aggregates them into a one-line "KG writes: N attempted, M succeeded" rollup, so a silently-skipped KG write (the exact failure mode behind the 2.38.2 fix) can never again be invisible. Resilience is preserved — the beacon only records, never hard-fails. Suite 36 (11 anchor-scoped checks) locks the contract.
+
 ## [2.38.2] - 2026-05-29
 
 ### Fixed
