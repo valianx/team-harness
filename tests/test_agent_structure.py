@@ -1897,7 +1897,12 @@ for label, condition in no_default_url_checks:
 for label, condition in delivery_kg_checks:
     check(f"delivery.md KG hygiene: {label}", condition)
 
-# --- skills/memory.md: mark_superseded + hard-delete sub-command ---
+# --- skills/memory.md: mark_superseded + hard-delete operator-only contract ---
+# Hard-delete is NOT a skill sub-command (decision b per 01-plan.md): the
+# context-harness-mcp server exposes no delete tool.  The checks below assert
+# the new contract: soft-delete via mark_superseded is the only destructive
+# operation the skill performs; hard-delete is documented as operator-only
+# (Supabase Studio / direct SQL).
 
 memory_skill = read(skill_path("memory"))
 
@@ -1906,19 +1911,22 @@ memory_skill_checks = [
      "mark_superseded" in memory_skill and "soft-delete" in memory_skill),
     ("/memory consolidate uses mark_superseded",
      memory_skill.count("mark_superseded") >= 2),
-    ("/memory hard-delete sub-command exists",
-     "### `hard-delete" in memory_skill),
-    ("hard-delete requires double confirmation",
-     "Final confirmation" in memory_skill or "Second confirmation" in memory_skill),
-    ("hard-delete asks user to type entity name exactly",
-     "Type the entity name exactly" in memory_skill),
-    ("hard-delete asks for DELETE <name> confirmation",
-     'Type "DELETE' in memory_skill or "Type 'DELETE" in memory_skill),
-    ("/memory usage help lists hard-delete",
-     "hard-delete <entity-name>" in memory_skill),
-    ("Important section reflects soft-delete-by-default",
-     "Soft-delete via `mark_superseded` is reversible" in memory_skill or
-     "Soft-delete via mark_superseded" in memory_skill),
+    ("/memory hard-delete sub-command is NOT present (operator-only per decision b)",
+     "### `hard-delete" not in memory_skill),
+    ("hard-delete documented as operator-only (Supabase Studio / direct SQL)",
+     "operator-only" in memory_skill and
+     ("Supabase Studio" in memory_skill or "direct SQL" in memory_skill)),
+    ("skill does NOT reference delete_entities / delete_observations / delete_relations",
+     "delete_entities" not in memory_skill and
+     "delete_observations" not in memory_skill and
+     "delete_relations" not in memory_skill),
+    ("Important section: only mark_superseded is destructive (no phantom delete tool)",
+     "mark_superseded" in memory_skill and "delete_entities" not in memory_skill),
+    ("usage help does NOT list hard-delete as a skill action",
+     "hard-delete <entity-name>   Permanent deletion" not in memory_skill),
+    ("Important section reflects soft-delete-only contract",
+     "Soft-delete via `mark_superseded` is the only destructive operation" in memory_skill or
+     "mark_superseded" in memory_skill),
 ]
 for label, condition in memory_skill_checks:
     check(f"skills/memory.md: {label}", condition)
@@ -6198,33 +6206,38 @@ check(
 # ---------------------------------------------------------------------------
 # Suite 35 -- KG MCP tool-name contract (kg-seam-toolname, AC-1..AC-6)
 # ---------------------------------------------------------------------------
-# Two-clause contract over agents/*.md (and the _shared/ snippets, which
-# are also scanned because they can carry tool references):
+# Two-clause contract over agents/*.md AND skills/**/*.md (recursive rglob
+# because skills are directory-format: skills/<name>/SKILL.md):
 #
 #   Clause (a) -- prefixed subset:
-#     Every mcp__memory__<tool> reference found anywhere in agents/*.md must
-#     be an element of CANONICAL_KG_TOOLS — the exact set the
-#     context-harness-mcp server registers / exposes.  No delete_* tool
-#     exists on the server; no create_entities (renamed to create_nodes).
+#     Every mcp__memory__<tool> reference found anywhere in agents/*.md or
+#     skills/**/*.md must be an element of CANONICAL_KG_TOOLS — the exact
+#     set the context-harness-mcp server registers / exposes.  No delete_*
+#     tool exists on the server; no create_entities (renamed to create_nodes).
 #
 #   Clause (b) -- bare deprecated tokens == 0:
 #     The bare tokens create_entities, delete_entities, delete_observations,
-#     delete_relations appear ZERO times in agents/*.md, matched with a
-#     WORD-BOUNDARY regex so that create_nodes and create_relations are NOT
-#     false positives.  This clause is what catches the bare Phase-6
-#     instructions in orchestrator.md (L2040-L2115) that clause (a) alone
-#     would miss — those instructions carry no mcp__memory__ prefix.
+#     delete_relations appear ZERO times in agents/*.md or skills/**/*.md,
+#     matched with a WORD-BOUNDARY regex so that create_nodes and
+#     create_relations are NOT false positives.  This clause is what catches
+#     bare token references that carry no mcp__memory__ prefix.
 #
-# This test is RED on main (create_entities + delete_* still present).
-# It goes GREEN after the implementer's rename + grant-removal fix.
-# The test CANNOT go green while a single bare or prefixed deprecated name
-# remains in any agents/*.md file.
+# NOTE: the scan iterates over *.md files only (agents/ and skills/).
+# The test file itself (tests/test_agent_structure.py) is a .py file and
+# is NEVER scanned, so the DEPRECATED_BARE_TOKENS list defined here does
+# not cause a self-flag.
 #
-# CANONICAL_KG_TOOLS = exactly what context-harness-mcp registers/exposes:
-#   Core CRUD (no delete):  create_nodes, add_observations, create_relations,
-#                           search_nodes, open_nodes, read_graph
-#   Utility / session:      doctor, suggest_node_type, session_start,
-#                           session_end
+# This test is RED on the current branch (create_entities + delete_* still
+# present in skills/memory/SKILL.md).
+# It goes GREEN after the implementer's rename + hard-delete removal fix.
+#
+# CANONICAL_KG_TOOLS = exactly what context-harness-mcp registers/exposes
+# (full 16-tool set, verified against instrumentTool() registrations):
+#   Core CRUD (no delete):  create_nodes, add_observations, update_observations,
+#                           create_relations, search_nodes, open_nodes, read_graph
+#   Lifecycle / admin:      stats, timeline, find_conflicts, mark_superseded,
+#                           suggest_node_type, doctor
+#   Session:                session_start, session_end, session_summary
 #
 # Check index -> AC mapping:
 #   (1) / AC-1  clause-a : every mcp__memory__ ref in canonical set
@@ -6242,15 +6255,22 @@ CANONICAL_KG_TOOLS = frozenset({
     # No delete_* tool is registered; soft-delete is operator-SQL-only.
     "create_nodes",
     "add_observations",
+    "update_observations",
     "create_relations",
     "search_nodes",
     "open_nodes",
     "read_graph",
-    # Utility / session — exposed by the MCP session layer.
-    "doctor",
+    # Lifecycle / admin tools.
+    "stats",
+    "timeline",
+    "find_conflicts",
+    "mark_superseded",
     "suggest_node_type",
+    "doctor",
+    # Session tools — exposed by the MCP session layer.
     "session_start",
     "session_end",
+    "session_summary",
 })
 
 # Bare tokens that the server no longer (or never did) register.
@@ -6268,26 +6288,38 @@ DEPRECATED_BARE_TOKENS = (
 # Regex for prefixed references: captures the tool name after mcp__memory__.
 _s35_prefixed_rx = re.compile(r"mcp__memory__([A-Za-z_]+)")
 
-# Collect every prefixed tool name referenced across agents/*.md.
-# Map: tool_name -> set of filenames that reference it.
+# Sorted list of all .md files to scan: agents/*.md + skills/**/*.md.
+# rglob is mandatory for skills because they are directory-format
+# (skills/<name>/SKILL.md); a non-recursive glob("*.md") would miss them.
+# tests/*.py is excluded by construction — only .md files are listed here,
+# so DEPRECATED_BARE_TOKENS defined in this .py file is never self-scanned.
+_s35_scan_files: list[Path] = sorted(AGENTS_DIR.glob("*.md")) + sorted(
+    SKILLS_DIR.rglob("*.md")
+)
+
+# Collect every prefixed tool name referenced across agents/*.md and
+# skills/**/*.md.  Map: tool_name -> set of relative paths that reference it.
 _s35_referenced: dict[str, set[str]] = {}
-for _s35_md in sorted(AGENTS_DIR.glob("*.md")):
+for _s35_md in _s35_scan_files:
     _s35_text = read(_s35_md)
+    _s35_rel = str(_s35_md.relative_to(REPO_ROOT))
     for _s35_tool in _s35_prefixed_rx.findall(_s35_text):
-        _s35_referenced.setdefault(_s35_tool, set()).add(_s35_md.name)
+        _s35_referenced.setdefault(_s35_tool, set()).add(_s35_rel)
 
 _s35_all_prefixed = set(_s35_referenced)
 _s35_phantom = sorted(_s35_all_prefixed - CANONICAL_KG_TOOLS)
 
 # ---------------------------------------------------------------------------
 # Check (1) / AC-1 -- clause (a): prefixed subset
-# Every mcp__memory__<tool> name found in agents/*.md must be in the
-# canonical set.  Failure message lists every phantom name + the files
-# that reference it, so the implementer knows exactly what to fix.
+# Every mcp__memory__<tool> name found in agents/*.md or skills/**/*.md
+# must be in the canonical set.  Failure message lists every phantom name
+# + the files that reference it, so the implementer knows exactly what to
+# fix.
 # ---------------------------------------------------------------------------
 check(
     "kg-contract(1/ac-1) clause-a:"
-    " every mcp__memory__ ref is in the canonical CH set",
+    " every mcp__memory__ ref is in the canonical CH set"
+    " (agents/*.md + skills/**/*.md)",
     _s35_all_prefixed <= CANONICAL_KG_TOOLS,
     "phantom prefixed names: "
     + (
@@ -6303,22 +6335,25 @@ check(
 # ---------------------------------------------------------------------------
 # Check (2) / AC-1 -- clause (b): bare deprecated tokens == 0
 # Word-boundary match guarantees create_nodes / create_relations are not
-# flagged.  Failure message lists each token with its files and hit count.
-# This is the clause that catches L2040-L2115 in orchestrator.md.
+# flagged.  Failure message lists each token with its relative path and
+# hit count.  Scans agents/*.md + skills/**/*.md (same _s35_scan_files
+# list used by clause-a).  The test .py file is excluded by construction.
 # ---------------------------------------------------------------------------
-_s35_bare_hits: dict[str, list[str]] = {}   # token -> ["filename:count", ...]
+_s35_bare_hits: dict[str, list[str]] = {}   # token -> ["rel-path:count", ...]
 for _s35_tok in DEPRECATED_BARE_TOKENS:
     _s35_bare_rx = re.compile(r"\b" + re.escape(_s35_tok) + r"\b")
-    for _s35_md in sorted(AGENTS_DIR.glob("*.md")):
+    for _s35_md in _s35_scan_files:
         _s35_n = len(_s35_bare_rx.findall(read(_s35_md)))
         if _s35_n:
+            _s35_rel = str(_s35_md.relative_to(REPO_ROOT))
             _s35_bare_hits.setdefault(_s35_tok, []).append(
-                f"{_s35_md.name}:{_s35_n}"
+                f"{_s35_rel}:{_s35_n}"
             )
 
 check(
     "kg-contract(2/ac-1) clause-b:"
-    " bare deprecated tokens appear ZERO times in agents/*.md",
+    " bare deprecated tokens appear ZERO times"
+    " in agents/*.md + skills/**/*.md",
     not _s35_bare_hits,
     "bare deprecated tokens still present: "
     + (
@@ -6336,11 +6371,13 @@ check(
 # The server exposes no delete tool.  Any delete_* in the prefixed set is
 # a phantom.  This check reinforces clause (a) with a targeted assertion
 # that also produces a clear "delete tools referenced" message.
+# Scans agents/*.md + skills/**/*.md via the shared _s35_referenced map.
 # ---------------------------------------------------------------------------
 _s35_deletes = sorted(t for t in _s35_all_prefixed if t.startswith("delete_"))
 check(
     "kg-contract(3/ac-3):"
-    " no mcp__memory__delete_* reference (server exposes no delete tool)",
+    " no mcp__memory__delete_* reference in agents/*.md or skills/**/*.md"
+    " (server exposes no delete tool)",
     not _s35_deletes,
     "prefixed delete tools still referenced: " + ", ".join(_s35_deletes)
     if _s35_deletes

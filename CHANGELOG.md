@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.2] - 2026-05-29
+
+### Fixed
+
+- Aligned the `/th:memory` skill to the real context-harness-mcp tool surface: renamed `create_entities`→`create_nodes` and removed a documented hard-delete-with-double-confirmation feature that called MCP delete tools the server never exposes (it deliberately exposes no delete on its unauthenticated public endpoint). Hard-delete is now documented as operator-only (Supabase Studio / direct SQL); reversible soft-delete via `mark_superseded` remains the skill's destructive default with confirmation. Suite 35 now scans `skills/**/*.md` (not just `agents/`) against the full 16-tool canonical set, catching this class repo-wide.
+
 ## [2.39.1] - 2026-05-29
 
 ### Changed

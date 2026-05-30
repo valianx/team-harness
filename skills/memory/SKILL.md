@@ -105,7 +105,7 @@ name: memory
 
 ### `prune` — Find stale entities and soft-delete via `mark_superseded`
 
-**Default action is soft-delete (reversible), not hard-delete.** `prune` runs `mark_superseded(old=<stale>, new=<self-or-placeholder>, archive_old_observations=true)` to hide the stale node's observations without destroying them. Hard-delete lives in `/th:memory hard-delete` (separate sub-command, double confirmation required).
+**Default action is soft-delete (reversible).** `prune` runs `mark_superseded(old=<stale>, new=<self-or-placeholder>, archive_old_observations=true)` to hide the stale node's observations without destroying them. Hard-delete is operator-only (Supabase Studio / direct SQL) — out of this skill's reach.
 
 1. Use Knowledge Graph MCP `read_graph` to get everything
 2. Analyze each entity for staleness:
@@ -129,7 +129,7 @@ name: memory
 
    Action: mark_superseded archives observations but the node + relations stay
    queryable as supersedes-relation targets. Reversible by removing the relation
-   and clearing deleted_at. Hard-delete requires `/th:memory hard-delete <name>`.
+   and clearing deleted_at. Hard-delete is operator-only (out of this skill's reach).
    ```
 4. Ask user: "Soft-delete (archive observations) any of these? List entity names separated by commas, or 'none'."
 5. If user confirms → for each entity, call Knowledge Graph MCP `mark_superseded(old=<name>, new=<name>, archive_old_observations=true, reason="prune: stale per /th:memory prune <date>")`. The self-supersedes pattern (`old == new`) marks the node archived without inventing a replacement — confirm the MCP backend accepts this; otherwise fall back to creating a placeholder entity `archived-<name>` of type `process-insight` with a single observation `"Archived: superseded entry for <name>, no replacement"` and use that as `new`.
@@ -159,36 +159,16 @@ name: memory
    - Use `mark_superseded(old=<b>, new=<a>, archive_old_observations=true, reason="consolidate via /th:memory")` — preserves {entity-b} as a queryable but archived node with a `supersedes` relation pointing to {entity-a}
    - Update relations if needed (relations from {entity-b} should be re-pointed to {entity-a} via `create_relations`; relations into {entity-b} can stay — the supersedes edge makes the redirection discoverable)
 
-### `hard-delete <entity-name>` — Permanent deletion (double confirmation)
+### Hard-delete — operator-only, out of this skill's reach
 
-**Use sparingly.** Most "remove this" cases are better served by `prune` (soft-delete via `mark_superseded`). Hard-delete is only for entries that violate the content policy or contain secrets/PII that must not remain queryable even via supersedes chains.
+True hard-delete (permanent removal of a node, its observations, and all relations) is not performed by this skill. The `context-harness-mcp` server does not expose any delete tool — by design, to protect the KG from accidental or unauthorized destruction on a public endpoint.
 
-1. Use Knowledge Graph MCP `open_nodes` to show the full entity (name, type, observations, relations)
-2. **First confirmation:** print:
-   ```
-   ⚠  Hard-delete request: {entity-name}
-   This permanently removes the node, all its observations, and all incoming/outgoing relations.
-   This is NOT reversible. The supersedes-archive trail is also destroyed.
+To hard-delete an entity, use one of these operator-level paths:
 
-   Reasons hard-delete is appropriate:
-     • Content-policy violation (PII / secrets / forbidden volatile reference) that must not persist.
-     • Test / accident entry that should not exist.
+- **Supabase Studio** — navigate to the `entities` / `observations` / `relations` tables and delete the rows directly.
+- **Direct SQL** — `DELETE FROM entities WHERE name = '<entity-name>'` (cascades to observations and relations if foreign keys are set with `ON DELETE CASCADE`).
 
-   Reasons hard-delete is WRONG (use `prune` instead):
-     • Outdated knowledge — soft-delete preserves history.
-     • Duplicate — use `consolidate` to merge into the canonical entry.
-
-   Confirm? Type the entity name exactly to proceed, or "abort".
-   ```
-3. If the user's input does not equal the entity name exactly → print `Aborted.` and exit.
-4. **Second confirmation:** print:
-   ```
-   Final confirmation. This action cannot be undone.
-   Type "DELETE {entity-name}" to proceed.
-   ```
-5. If the user's input does not equal `DELETE {entity-name}` exactly → print `Aborted.` and exit.
-6. Use Knowledge Graph MCP `delete_entities` for the entity.
-7. Print confirmation with the deletion timestamp and the recorded reason (if any).
+For most "remove this" cases, `prune` (soft-delete via `mark_superseded`) is the correct tool: it archives the node's observations and makes it non-discoverable in normal queries, while preserving the history trail. Use hard-delete only when the entry must not persist at all (content-policy violation, accidental PII write, secrets committed in error).
 
 ### No args — Show usage help
 
@@ -196,13 +176,15 @@ name: memory
 Usage: /th:memory <action> [args]
 
 Actions:
-  search <query>              Search entities by text
-  list [type]                 List all entities (filter: pattern/error/constraint/decision/tool-gotcha/project/service/stack-profile)
-  show <entity-name>          Show full entity details
-  stats                       Knowledge Graph statistics
-  prune                       Soft-delete stale entities via mark_superseded (reversible)
-  consolidate                 Merge similar entities; old → mark_superseded by new (preserves history)
-  hard-delete <entity-name>   Permanent deletion — double confirmation, irreversible
+  search <query>     Search entities by text
+  list [type]        List all entities (filter: pattern/error/constraint/decision/tool-gotcha/project/service/stack-profile)
+  show <entity-name> Show full entity details
+  stats              Knowledge Graph statistics
+  prune              Soft-delete stale entities via mark_superseded (reversible)
+  consolidate        Merge similar entities; old → mark_superseded by new (preserves history)
+
+Note: hard-delete (permanent node removal) is operator-only — Supabase Studio or
+direct SQL. This skill does not call any delete tool; the MCP server does not expose one.
 
 Examples:
   /th:memory search "Next.js auth"
@@ -212,7 +194,6 @@ Examples:
   /th:memory stats
   /th:memory prune
   /th:memory consolidate
-  /th:memory hard-delete leaked-customer-name-entity
 ```
 
 ---
@@ -222,7 +203,7 @@ name: memory
 
 - If Knowledge Graph MCP is not available → "Knowledge Graph MCP server is not running. Check your Claude Code MCP configuration."
 - If `read_graph` returns empty → "Knowledge Graph is empty. Entities are created automatically by the orchestrator after successful pipelines."
-- If `delete_entities` fails → report the error, do not retry
+- If `mark_superseded` fails → report the error, do not retry
 
 ---
 name: memory
@@ -230,13 +211,14 @@ name: memory
 ## Important
 
 - This skill does NOT route through the orchestrator
-- Uses Knowledge Graph MCP tools directly: `search_nodes`, `read_graph`, `open_nodes`, `create_entities`, `add_observations`, `mark_superseded`, `find_conflicts`, `delete_entities` (hard-delete only), `delete_observations`, `create_relations`, `delete_relations`
-- **Destructive actions require user confirmation.** Soft-delete via `mark_superseded` is reversible and is the default for `prune` and `consolidate`. Hard-delete via `delete_entities` requires double confirmation (the user types the entity name twice).
+- Uses Knowledge Graph MCP tools directly: `search_nodes`, `read_graph`, `open_nodes`, `create_nodes`, `add_observations`, `update_observations`, `mark_superseded`, `find_conflicts`, `create_relations`
+- **Soft-delete via `mark_superseded` is the only destructive operation this skill performs** — it is reversible and requires user confirmation before executing. Hard-delete (permanent node removal) is operator-only via Supabase Studio or direct SQL; this skill does not call any delete tool.
+- Note: if a future server release exposes a hard-delete MCP tool, re-introduce double confirmation (entity name typed twice) before calling it.
 - Never auto-prune or auto-consolidate without asking
 
 ## Content policy (mandatory before any write)
 
-When `consolidate` writes new observations or `create_entities` is invoked, apply the same redaction the orchestrator applies in Phase 6:
+When `consolidate` writes new observations or `create_nodes` is invoked, apply the same redaction the orchestrator applies in Phase 6:
 
 - No absolute paths that include a user identifier (`C:/Users/<name>/...`, `/home/<name>/...`, `/mnt/c/Users/<name>/...`). Strip them or use the bare repo name.
 - No personal names, no client / stakeholder data, no tokens or keys.
