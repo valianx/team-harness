@@ -1647,8 +1647,7 @@ After the last Phase 3 verify pass that succeeds (immediately before STAGE-GATE-
 For each candidate in `security`'s `kg_save_candidates` (may be bare string legacy OR `{name, node_type, remediation_text}` object):
 
 1. **Content-filter pass.** Apply the write-time filter from `docs/kg-content-policy.md`. Discard or rewrite any candidate that contains: exploit details, CVE-version specifics, secrets or PII, absolute paths with user identifiers, or other forbidden content. Only proceed if the candidate passes the filter. When the forbidden content is STRUCTURAL (an exploit detail, a CVE-version identifier, a secret or PII value, a user-path — not merely a phrasing nuance), PREFER discard over rewrite: a silent rewrite risks distorting the security lesson or leaving forbidden residue in the observation.
-2. **Gate 1 — Specificity (`suggest_node_type`).** Call `mcp__memory__suggest_node_type(text=<remediation_text or name>)`. If top-1 confidence < 0.5, skip this candidate (too vague). If top-1 type does not match `error` or `pattern` by a margin ≥ 0.2, skip (type mismatch). This reuses the same gate pattern as delivery Step 11.5.
-3. **Gate 2 — Dedup (`search_nodes`).** Call `mcp__memory__search_nodes(query=<name or first observation>)`. Filter results to `node_type ∈ {error, pattern}` only — do not cross-merge against a `process-insight` node. If a clear match exists among `error`/`pattern` nodes, use `add_observations`; otherwise use `create_nodes` with the candidate's `node_type` (`error` or `pattern`).
+2. **Gate 1 — Specificity (`suggest_node_type`) + Gate 2 — Dedup (`search_nodes`):** see `agents/_shared/kg-write-policy.md` § "Dedup gate" for the full mechanics. For security-finding writes, the intended type is `error` or `pattern`; filter Gate 2 `search_nodes` results to `node_type ∈ {error, pattern}` only — do not cross-merge against a `process-insight` node.
 4. Call `mcp__memory__create_nodes` or `mcp__memory__add_observations` as determined in Gate 2.
 
 **Note on KG deletions:** Deletes are operator-SQL-only; the orchestrator never attempts an MCP delete. The context-harness-mcp server exposes no delete tool — node removal is performed directly against the database by the operator when needed.
@@ -2034,6 +2033,8 @@ Using the Knowledge Graph MCP tools (if available), save the most reusable insig
 - **Services:** deployable-level entities for new or substantially modified services (e.g., `service` for `zippy-commission-api` when this pipeline introduced or rewired it)
 - **Stacks:** reusable stack profiles for new project archetypes (e.g., `stack-profile` for `nextjs-prisma-trpc-b2b-saas` when this pipeline established or codified a new template)
 
+**Content policy + dedup gate + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", § "Dedup gate", and § "Session attribution". Apply before every `create_nodes` / `add_observations` call in this phase.
+
 **How to save:**
 1. Extract 1-3 reusable insights from the pipeline run (not everything — only what applies beyond this feature)
 2. **Dedup check (MANDATORY)** — before creating any entity, search for it first:
@@ -2114,24 +2115,9 @@ mcp__memory__session_end(
 - If nothing reusable was learned, save nothing — that's fine
 - Always dedup before creating — duplicates waste context window during Phase 0a searches
 - **Language: English** — all entity names, observations, and relation types must be in English
-- **Content policy (MANDATORY):** the KG is technical memory meant to be shareable across developers. Before every `create_nodes` / `add_observations` call, redact the payload against the rules below. If any observation hits one of these, **drop that observation** (or the whole entity if unsalvageable). When in doubt, omit — it is cheap to re-add later and expensive to extract once distributed. Full policy: `docs/kg-content-policy.md`.
+- **Content policy (MANDATORY):** the KG is technical memory meant to be shareable across developers. Before every `create_nodes` / `add_observations` call, apply the full redaction rules and pre-write checklist. Full policy: `docs/kg-content-policy.md`.
 
-  **Forbidden in observations:**
-  - Personal names (users, colleagues, stakeholders) or user-specific preferences / feedback.
-  - Credentials, tokens, API keys, private URLs/IPs.
-  - Absolute filesystem paths that include a user identifier. Examples seen in past violations: `C:/Users/<name>/...`, `C:\Users\<name>\...`, `/mnt/c/Users/<name>/...`, `/home/<name>/...`. Use repo-relative paths (e.g. `src/services/payment.ts`) or just the bare repo name.
-  - Client, account, contract, or commercial information.
-  - Volatile identifiers: PR numbers (`PR #317`), issue numbers (`#42`), commit SHAs longer than the conventional 7 chars, branch names that include personal prefixes (`feat/<name>`).
-
-  **Required for `[project]` entities:** identify the project by its **bare repo name only** (e.g. `zippy-backoffice`, `transactions-service`). Never embed a path. The name should be the same string a teammate would type to clone it.
-
-  **Required for any entity that summarizes a change:** describe the change by date + capability, not by PR/issue number. "2026-04 currency-per-country migration in backoffice" is good; "PR #323" is volatile and meaningless once the PR is gone.
-
-  **Pre-write checklist (run mentally for every observation):**
-  1. Does this string contain a slash followed by `Users/`, `home/`, or `mnt/c/Users/`? → strip path or drop observation.
-  2. Does this string contain a `#` followed by digits? → check whether it's a PR/issue ref; if yes, rewrite without the number.
-  3. Does this string contain a developer name? → drop or anonymize.
-  4. Could this observation be sent to another developer's machine and still be useful? → if no, drop.
+  **Content policy + pre-write checklist + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", and § "Session attribution".
 
 **No mid-pipeline investigation writes** — only the two KG-read touchpoints (Phase 3.6 fail Cases A/B/D and Phase 3.75 fail, described in `### KG read on error` above) and the security-finding writes (Phase 3, described in `### KG write on security findings` above) are added mid-pipeline. No investigation writes are added at any other mid-pipeline point. `session_end` remains in Phase 6 (unchanged); the mid-pipeline touchpoints use read/create operations within the already-open session without closing it early.
 

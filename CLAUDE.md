@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.39.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.39.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -335,14 +335,16 @@ The delivery agent creates overflow files on first offload. Agents read `docs/kn
 
 ## 11. Testing Conventions
 
-The repo has a verification suite at `tests/` that covers what is testable without a live LLM:
+The repo has a free verification suite at `tests/` (no live LLM): `test_policy_block.sh`
+(hooks/policy-block.sh functional cases), `test_agent_structure.py` (structural assertions
+across `agents/`/`skills/`/`hooks/`), `test_agent_frontmatter.py` (YAML frontmatter validity),
+run together by `run-all.sh`. Golden commands in §4.
 
-- **`tests/test_policy_block.sh`** — functional tests for `hooks/policy-block.sh`. Each case feeds a tool-call JSON payload and asserts the output (deny → JSON with `permissionDecision: "deny"`; allow → empty stdout). ~48 cases: `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), git destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL DROP/TRUNCATE, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
-- **`tests/test_agent_structure.py`** — structural tests across `agents/`, `skills/`, `hooks/`. 1050 assertions in 34 suites: tool allowlists, 5-column Roster matrix, pipeline phases (1.5 / 1.6 / 2.5 / 3.5 / 3.6 / 4.5), per-agent contract sections, workspaces hygiene guardrails, inviolable Phase 1.6 gate + inline fallback, task-list Status + AC checkbox mirror, `PreToolUse` wiring, README cross-references, observability stack (Suite 20), KG hygiene (Suite 21), stage-end notifications + SEC guards (Suite 22), plan-review panel centralization contract (Suite 34).
-- **`tests/test_agent_frontmatter.py`** — YAML frontmatter validity for every `agents/*.md`. Uses PyYAML via `uv run --with PyYAML python` to catch the silent-agent-drop class of bug (an unquoted `": "` inside a description breaks YAML parsing; Claude Code then silently drops the agent from the registered `subagent_type` list with no error surfaced). 19 agents currently parse cleanly.
-- **`tests/run-all.sh`** — wrapper that runs all three suites and exits 0 if all pass.
-
-See `docs/testing.md` for the full reference (when to add a test, what the tests do NOT cover). Suite 34 (34 checks) asserts the plan-review panel centralization contract structurally. Suite 35 (6 checks) asserts the KG MCP tool-name contract: every `mcp__memory__<tool>` reference in `agents/*.md` is a subset of the canonical context-harness-mcp tool set, and bare deprecated tokens (`create_entities`, `delete_*`) appear zero times. Suite 36 (11 checks) asserts the write-integrity beacon contract: `kg_write` event schema in `docs/observability.md`, emission rules in `agents/orchestrator.md` and `agents/delivery.md`, rollup in `skills/trace/SKILL.md`, and CLAUDE.md §11 registration — all anchor-scoped per the anti-false-green dispatch.
+Structural suites registered by literal (self-referential guards assert these names live here):
+**Suite 34** — plan-review panel centralization. **Suite 35** — KG MCP tool-name contract.
+**Suite 36** — KG write-integrity beacon. **Suite 37** — KG write-policy `_shared` snippet
+consolidation. Full reference (per-suite scope, when to add a test, what is NOT covered):
+`docs/testing.md`.
 
 ---
 

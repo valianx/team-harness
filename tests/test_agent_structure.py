@@ -6660,6 +6660,202 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 37 -- KG write-policy _shared snippet consolidation
+#             (kg-shared-snippet, AC-1..AC-7)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks that verify the existence and structure of the
+# canonical snippet `agents/_shared/kg-write-policy.md`, the two KG writer
+# agents' references to it (orchestrator Phase 6 + delivery Step 11.5), the
+# non-reference by read-only agents, and the CLAUDE.md §11 self-referential
+# guard.
+#
+# Anti-false-green dispatch: _slice_section returns "" for a missing anchor,
+# so "x" in "" is always False.  Every anchor-scoped check fails clearly
+# when the anchor is absent rather than silently passing.
+# Exception: check (6) (read-only non-reference) and check (7) (self-
+# referential guard) are intentionally file-wide — the same precedent as
+# Suite 35 check 6 and Suite 36 check 11.
+#
+# Check index -> AC mapping:
+#   (1) / AC-1 : agents/_shared/kg-write-policy.md exists
+#   (2) / AC-1 : snippet header HTML names Consumed by: orchestrator+delivery
+#   (3) / AC-1 : snippet contains all 4 required section anchors
+#   (4) / AC-2 : orchestrator.md Phase 6 slice references the snippet
+#   (5) / AC-2 : delivery.md Step 11.5 slice references the snippet
+#   (6) / AC-2 : read-only agents (qa, tester, security, architect) do NOT
+#                reference kg-write-policy.md (no false-positive pollution)
+#   (7) / AC-7 : CLAUDE.md §11 names 'Suite 37' + self-referential guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 37: KG write-policy _shared snippet consolidation ===")
+
+# ---- constants ---------------------------------------------------------------
+_S37_SNIPPET_PATH = AGENTS_DIR / "_shared" / "kg-write-policy.md"
+
+# Required section anchors that the snippet must expose for writer agents
+# to reference by section name.
+_S37_REQUIRED_SECTIONS = (
+    "## Content policy",
+    "## Pre-write checklist",
+    "## Dedup gate",
+    "## Session attribution",
+)
+
+# The two KG-writing agents; every other agent in agents/*.md is read-only
+# with respect to KG writes and must NOT reference the write-policy snippet.
+_S37_WRITER_AGENTS = {"orchestrator.md", "delivery.md"}
+
+# Read-only agents that must NOT reference kg-write-policy.md.
+# These agents already carry the read-only puntero ("writes stay centralized
+# in orchestrator Phase 6") and must never be linked to the write-policy
+# snippet — adding a reference there would signal an unintended scope creep.
+_S37_READONLY_AGENTS = {"qa.md", "tester.md", "security.md", "architect.md"}
+
+# Anchors used to scope the checks into the exact sections that matter.
+# Using slice anchors guards against the snippet path appearing as a stray
+# cross-reference elsewhere in the agent file.
+_S37_ORCH_ANCHOR  = "Phase 6 — Knowledge Save (MANDATORY)"
+_S37_DELIV_ANCHOR = "### Step 11.5 — Persist a process-insight"
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 -- snippet file exists
+# The implementer creates agents/_shared/kg-write-policy.md in Step 1 of
+# the work plan.  Until then this check is RED by construction.
+# ---------------------------------------------------------------------------
+_s37_snippet_exists = _S37_SNIPPET_PATH.exists()
+check(
+    "kg-snippet(1/ac-1): agents/_shared/kg-write-policy.md exists",
+    _s37_snippet_exists,
+    "file not found — implementer must create agents/_shared/kg-write-policy.md",
+)
+
+# Read snippet content (empty string when absent — guards downstream checks)
+_s37_snippet_text = _S37_SNIPPET_PATH.read_text(encoding="utf-8") if _s37_snippet_exists else ""
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-1 -- snippet header HTML names Consumed by: orchestrator+delivery
+# The canonical _shared/ pattern requires an HTML comment block at the top
+# with "Consumed by: agents/orchestrator.md" and "agents/delivery.md"
+# (or equivalent phrasing) so future editors know exactly which files depend
+# on this snippet.  Read-only agents must NOT appear in this list.
+# ---------------------------------------------------------------------------
+check(
+    "kg-snippet(2/ac-1): snippet header HTML 'Consumed by:' names"
+    " orchestrator.md and delivery.md",
+    "Consumed by:" in _s37_snippet_text
+    and "orchestrator" in _s37_snippet_text
+    and "delivery" in _s37_snippet_text,
+    "snippet header HTML missing 'Consumed by:' block or omits orchestrator/delivery"
+    " -- see agents/_shared/gh-fallback.md for the canonical header pattern",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-1 -- snippet exposes all 4 required section anchors
+# Writer agents reference the snippet by section name (e.g.
+# `§ "Pre-write checklist"`).  Every required section must exist as a
+# markdown heading so _slice_section can resolve it.
+# ---------------------------------------------------------------------------
+_s37_missing_sections = [
+    sec for sec in _S37_REQUIRED_SECTIONS
+    if sec not in _s37_snippet_text
+]
+check(
+    "kg-snippet(3/ac-1): snippet contains all 4 required section anchors"
+    " (Content policy, Pre-write checklist, Dedup gate, Session attribution)",
+    not _s37_missing_sections,
+    "missing sections: " + ", ".join(_s37_missing_sections)
+    if _s37_missing_sections
+    else "",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-2 -- orchestrator.md Phase 6 slice references the snippet
+# After the implementer replaces the inline Forbidden + Pre-write blocks with
+# a pointer line, the Phase 6 body must contain a reference to
+# "kg-write-policy.md".  Scoped to the Phase 6 KG Save section so that any
+# stray occurrence elsewhere in orchestrator.md does not create a false-green.
+# ---------------------------------------------------------------------------
+_s37_orch_text  = read(AGENTS_DIR / "orchestrator.md")
+_s37_orch_slice = _slice_section(_s37_orch_text, _S37_ORCH_ANCHOR)
+check(
+    "kg-snippet(4/ac-2): agents/orchestrator.md § 'Phase 6 — Knowledge Save'"
+    " references agents/_shared/kg-write-policy.md (pointer replaces inline blocks)",
+    bool(_s37_orch_slice) and "kg-write-policy.md" in _s37_orch_slice,
+    f"anchor '{_S37_ORCH_ANCHOR}' missing in orchestrator.md"
+    " or 'kg-write-policy.md' not referenced within that slice"
+    " -- implementer must replace the inline Forbidden/Pre-write blocks with a"
+    " pointer to agents/_shared/kg-write-policy.md",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-2 -- delivery.md Step 11.5 slice references the snippet
+# After the implementer replaces the inline Hard-guardrails + Gate mechanics
+# with a pointer, the Step 11.5 section must contain a reference to
+# "kg-write-policy.md".  Scoped to Step 11.5 so only the relevant section
+# is asserted.
+# ---------------------------------------------------------------------------
+_s37_deliv_text  = read(AGENTS_DIR / "delivery.md")
+_s37_deliv_slice = _slice_section(_s37_deliv_text, _S37_DELIV_ANCHOR)
+check(
+    "kg-snippet(5/ac-2): agents/delivery.md § 'Step 11.5 — Persist a process-insight'"
+    " references agents/_shared/kg-write-policy.md (pointer replaces inline blocks)",
+    bool(_s37_deliv_slice) and "kg-write-policy.md" in _s37_deliv_slice,
+    f"anchor '{_S37_DELIV_ANCHOR}' missing in delivery.md"
+    " or 'kg-write-policy.md' not referenced within that slice"
+    " -- implementer must replace Hard-guardrails + Gate mechanics with a pointer",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-2 -- read-only agents do NOT reference kg-write-policy.md
+# The plan is explicit: qa, tester, security, and architect are read-only KG
+# agents and must never reference the write-policy snippet.  A reference there
+# would indicate unintended scope creep (the agent is being granted write
+# responsibility it does not have).
+# Whole-file check is appropriate here — there is no section in these files
+# that should reference the snippet under any interpretation.
+# ---------------------------------------------------------------------------
+_s37_readonly_violations = []
+for _s37_ro_name in sorted(_S37_READONLY_AGENTS):
+    _s37_ro_path = AGENTS_DIR / _s37_ro_name
+    if _s37_ro_path.exists():
+        _s37_ro_text = read(_s37_ro_path)
+        if "kg-write-policy.md" in _s37_ro_text:
+            _s37_readonly_violations.append(_s37_ro_name)
+
+check(
+    "kg-snippet(6/ac-2): read-only agents (qa, tester, security, architect)"
+    " do NOT reference kg-write-policy.md (no scope-creep)",
+    not _s37_readonly_violations,
+    "read-only agents unexpectedly reference kg-write-policy.md: "
+    + ", ".join(_s37_readonly_violations)
+    if _s37_readonly_violations
+    else "",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-7 -- self-referential guard
+# CLAUDE.md §11 must register Suite 37.
+# This file must contain the literal "Suite 37" and the marker
+# "KG write-policy _shared snippet" so the guard stays coherent after edits.
+# (Whole-file check — identical precedent to Suite 35 check 6 and Suite 36
+# check 11.)
+# ---------------------------------------------------------------------------
+_s37_claude_text = read(REPO_ROOT / "CLAUDE.md")
+_s37_self_text   = read(Path(__file__).resolve())
+check(
+    "kg-snippet(7/ac-7):"
+    " CLAUDE.md §11 names 'Suite 37' and this file defines it"
+    " (self-referential guard -- must stay green post-implementation)",
+    "Suite 37" in _s37_claude_text
+    and "Suite 37" in _s37_self_text
+    and "KG write-policy _shared snippet" in _s37_self_text,
+    "Suite 37 not registered in CLAUDE.md §11"
+    " or marker literal 'KG write-policy _shared snippet' missing in this file"
+    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

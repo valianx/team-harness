@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.1] - 2026-05-29
+
+### Changed
+
+- Consolidated the write-time KG content-policy and dedup-gate contract (previously duplicated across agent prompts) into a single `agents/_shared/kg-write-policy.md` snippet referenced by the two KG-writing agents (orchestrator, delivery); documented best-effort session_id propagation; offloaded the §11 testing-conventions prose to `docs/testing.md` to restore CLAUDE.md headroom under the 40 KB cap. Suite 37 locks the snippet contract. No behavior change.
+
 ## [2.39.0] - 2026-05-29
 
 ### Added

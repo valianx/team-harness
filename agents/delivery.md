@@ -669,6 +669,8 @@ Report the existing PR URL in the status block — do NOT fail.
 
 **Best-effort** — if the Memory MCP server is unavailable, log the skip and continue. Never fail the delivery on KG errors.
 
+**Content policy + dedup gate + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", § "Dedup gate", and § "Session attribution". Apply before every `create_nodes` / `add_observations` call in this step. The intended node type is `process-insight`; dedup operates on `process-insight` nodes only (do not cross-merge with `error`/`pattern` nodes).
+
 ### Pre-flight MCP health check (mandatory first action)
 
 Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to verify the server is reachable from your subagent context. The MCP client may have been initialised with stale config (e.g., the parent session started before `~/.claude.json` was updated, or the subagent inherits a different MCP wiring than the parent expects).
@@ -713,42 +715,13 @@ Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to v
 
 The KG passive-capture is the largest single source of potential noise in the graph. Two gates run before any write to keep noise out — both are cheap (one MCP call each) and read-only.
 
-**Gate 1 — Specificity gate (`suggest_node_type`).**
+**Gate 1 — Specificity gate (`suggest_node_type`).** Concatenate the proposed observations into a single text blob and call `mcp__memory__suggest_node_type(text=blob)`. If Top-1 confidence < 0.5, skip (too vague). If top-1 type ≠ `process-insight` by a margin ≥ 0.2, skip (type mismatch). Full gate mechanics: see `agents/_shared/kg-write-policy.md` § "Dedup gate".
 
-Concatenate the proposed observations into a single text blob. Call `mcp__memory__suggest_node_type(text=blob)`. Inspect the top-3 result:
+**Gate 2 — Dedup gate (`search_nodes` pre-flight).** Call `mcp__memory__search_nodes(query=<first observation>)`. **No cross-merge with security node types** — this gate operates on `process-insight` nodes only. Do not merge a `process-insight` passive-capture against a security finding node of type `error` or `pattern`. Those are distinct node types by design. Lean toward `add_observations` when in doubt. Full gate mechanics: see `agents/_shared/kg-write-policy.md` § "Dedup gate".
 
-| Condition | Action |
-|---|---|
-| Top-1 confidence < 0.5 | **Skip the write.** The text is too vague — the type classifier can't place it confidently, which means the insight is generic. Log `kg_passive_capture: skipped: low-specificity (top-1: <type> <score>)`. Exit Step 11.5. |
-| Top-1 type ≠ `process-insight` AND its confidence exceeds the `process-insight` confidence by ≥ 0.2 | **Skip the write.** The classifier thinks your text is something else (a `pattern`, `decision`, etc.). The agent shouldn't be passive-capturing into `process-insight` when the content belongs to a curated type. Log `kg_passive_capture: skipped: type-mismatch (suggested: <top-1>, proposed: process-insight)`. Exit. |
-| Otherwise | Proceed to Gate 2. |
+Log outcomes as `kg_passive_capture: skipped: low-specificity (top-1: <type> <score>)`, `kg_passive_capture: skipped: type-mismatch (suggested: <top-1>, proposed: process-insight)`, `kg_passive_capture: merged-into: <existing-name>`, `kg_passive_capture: written-with-relation-note (related to <existing-name>)`, or `kg_passive_capture: written`.
 
-**Gate 2 — Dedup gate (`search_nodes` pre-flight).**
-
-**No cross-merge with security node types** — this Gate 2 dedup operates on `process-insight` nodes only. Do not merge a `process-insight` passive-capture against a security finding node of type `error` or `pattern`. Those are distinct node types by design: `error`/`pattern` nodes are written by the orchestrator at Phase 3 for security findings (Critical/High); `process-insight` nodes are written here for task-level learnings. The dedup search may return `error`/`pattern` nodes — treat them as non-matching for the purpose of this gate (they are not the same insight type and must not be merged across types).
-
-Call `mcp__memory__search_nodes(query=<first observation, which is the synthesized summary>)`. Inspect the top-3 results:
-
-| Condition | Action |
-|---|---|
-| Top result clearly covers the same insight (same library + same pattern + same fix) | **Redirect to `add_observations`** on the matched node instead of `create_nodes`. Reuse only the observations that add new content; drop ones that restate what's already there. Log `kg_passive_capture: merged-into: <existing-name>`. |
-| Top result is topically related but distinct (e.g., same library, different problem) | **Proceed with `create_nodes`** but make the new node's first observation explicitly mention the relationship: `"Related to <existing-name>; this one focuses on X (vs Y)."` Log `kg_passive_capture: written-with-relation-note (related to <existing-name>)`. |
-| No semantically close match | **Proceed with `create_nodes` clean.** Log `kg_passive_capture: written`. |
-
-The judgment between "same insight" vs "topically related but distinct" is the agent's call. Lean toward `add_observations` when in doubt — adding observations is cheap; creating a duplicate is expensive (it pollutes future `search_nodes` Phase 0a queries).
-
-**Failure modes for the gates** (never block the pipeline):
-- `suggest_node_type` returns an error or empty → log `kg_passive_capture: gate1-error: <reason>` and proceed to Gate 2 anyway (don't block on the optional gate).
-- `search_nodes` returns an error → log `kg_passive_capture: gate2-error: <reason>` and proceed with `create_nodes` (conservative: prefer a possible duplicate over losing the insight).
-- Gates pass but `create_nodes` / `add_observations` fails → follow existing failure handling below.
-
-**Hard guardrails on content:**
-- **Technical only.** No stakeholder names, no Slack handles, no personal data, no tokens, no internal URLs. (See `docs/kg-content-policy.md` if present in this repo.)
-- **No PR / branch / commit metadata.** Those rot. Write the insight as a stable claim about the codebase or workflow.
-- **No restatement of the CHANGELOG.** The CHANGELOG describes what changed; the KG entry describes what was learned that future tasks can reuse. If you cannot articulate a learning beyond the changelog, write `null` and skip the call (see "When to skip").
-- **Each observation ≤ 280 chars.** Forces concision. Multi-sentence observations are fine; multi-paragraph are not.
-
-**Optional session attribution.** If `workspaces/{feature-name}/session.json` exists and contains a valid `session_id` (the orchestrator may have called `session_start` at the top of the pipeline — this is **not yet enforced** as of this writing), pass `"session_id": "<uuid>"` alongside `"nodes"` so the node is attached to the session. If the file is absent OR the `session_id` is the empty string OR `session_end` has already been called on that session, **omit the field** — `create_nodes` rejects ended sessions with `policy/session-already-ended`.
+**Content policy + pre-write checklist + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", and § "Session attribution". Pass `session_id` from `workspaces/{feature-name}/session.json` when valid (non-empty and session not yet ended); omit otherwise.
 
 **When to skip (log the reason and continue):**
 - The Memory MCP server is unreachable / errors out — log `kg_passive_capture: skipped: mcp-unreachable` and write the pending payload (see "Pending payload fallback" below). Do NOT include a URL in the log line — see the pre-flight section above for why.
