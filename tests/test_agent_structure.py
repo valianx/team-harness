@@ -7248,7 +7248,11 @@ _S39_SETUP_NDT_ANCHOR   = "<!-- nested-dispatch-takeover:start -->"
 _s39_orch_exit_slice    = _slice_section(_s39_orch_text,    _S39_ORCH_EXIT_ANCHOR)
 _s39_takeover_slice     = _slice_section(_s39_suborch_text, _S39_TAKEOVER_ANCHOR)
 _s39_schema_slice       = _slice_section(_s39_suborch_text, _S39_SCHEMA_ANCHOR)
-_s39_setup_ndt_slice    = _slice_section(_s39_setup_text,   _S39_SETUP_NDT_ANCHOR)
+# Re-pointed (pr-th-update-fix Step 5): read canonical file directly; the block
+# starts on line 1 so _slice_section would stop at the first ## heading inside
+# the block — use the whole file instead, which IS the block.
+_s39_ndt_canonical_text = read(SKILLS_DIR / "setup" / "managed-blocks" / "nested-dispatch-takeover.md")
+_s39_setup_ndt_slice    = _s39_ndt_canonical_text
 
 # 8 field names that the consumer reads (AC-3)
 _S39_SCHEMA_FIELDS = (
@@ -8867,6 +8871,375 @@ check(
     f" this file has Suite 43: {'Suite 43' in _s43_self};"
     f" CLAUDE.md has Suite 43 (must be False): {'Suite 43' in _s43_claude_md}"
     " — implementer must complete docs/testing.md; tester must not add Suite 43 to CLAUDE.md",
+)
+
+
+# ---------------------------------------------------------------------------
+# Suite 44 -- pr-th-update-fix (AC-2, AC-4, AC-5, AC-8)
+# ---------------------------------------------------------------------------
+# Regression assertions that FAIL against the current source state (before the
+# implementer moves the three managed blocks out of setup/SKILL.md).
+#
+# The root cause: each <!-- X:start --> marker appears TWICE in
+# skills/setup/SKILL.md — once in the instructional prose ("look for
+# <!-- X:start -->") and once in the real block.  Any between-markers
+# extraction that starts at the FIRST occurrence captures prose instead of the
+# block, producing the ""), append this block:" corruption.
+#
+# Fix model: move each block verbatim to a canonical file under
+# skills/setup/managed-blocks/, rewrite setup/SKILL.md to read-from-file,
+# and rewrite update/SKILL.md to read the canonical files + provide exact
+# per-OS command blocks (PowerShell + bash).
+#
+# Anti-false-green guarantee (mirror of Suite 43 idiom):
+#   - _slice_section returns "" when its anchor is absent
+#     => token-in-slice assertions always fail when the section is missing.
+#   - Existence assertions use Path.exists(), which is False until the
+#     canonical file is created.
+#   - count() assertions assert == 1, which is False today (count == 2).
+#
+# AC coverage:
+#   AC-2  : marker count == 1 after fix (currently == 2 → FAILS pre-fix)
+#   AC-4  : setup reads canonical files, no inline copy
+#   AC-5  : update reads canonical files + per-OS PowerShell + bash blocks
+#   AC-8  : Suite 44 in docs/testing.md; NOT in CLAUDE.md §11
+#
+# Existing suites to leave alone (implementer re-points them in Step 5):
+#   Suite 18 lines 1143-1145 (_voice_block), 1271-1277 (_managed_block_content)
+#   Suite 18 lines 1073/1078/1134/1139 (marker presence in setup_skill_md)
+#   Suite 18 lines 1083/1088/1191 (content literals in setup_skill_md)
+#   Suite 39 line 7251 (_s39_setup_ndt_slice)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 44: pr-th-update-fix — canonical managed-block files + per-OS update ===")
+
+MB_DIR = SKILLS_DIR / "setup" / "managed-blocks"
+
+_s44_setup_text    = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s44_update_text   = read(SKILLS_DIR / "update" / "SKILL.md")
+_s44_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s44_claude_md     = read(REPO_ROOT / "CLAUDE.md")
+_s44_self          = Path(__file__).read_text(encoding="utf-8")
+
+# Canonical block-file paths.
+_MB_ODR  = MB_DIR / "orchestrator-dispatch-rule.md"
+_MB_NDT  = MB_DIR / "nested-dispatch-takeover.md"
+_MB_VR   = MB_DIR / "voice-rule.md"
+
+# Marker strings (used both for existence checks and count checks).
+_ODR_START = "<!-- orchestrator-dispatch-rule:start -->"
+_ODR_END   = "<!-- orchestrator-dispatch-rule:end -->"
+_NDT_START = "<!-- nested-dispatch-takeover:start -->"
+_NDT_END   = "<!-- nested-dispatch-takeover:end -->"
+_VR_START  = "<!-- voice-rule:start -->"
+_VR_END    = "<!-- voice-rule:end -->"
+
+# ---------------------------------------------------------------------------
+# (1) Canonical file existence — each file must exist with BOTH its markers.
+# ---------------------------------------------------------------------------
+check(
+    "canonical-blocks(1a): skills/setup/managed-blocks/orchestrator-dispatch-rule.md exists",
+    _MB_ODR.exists(),
+    "canonical file not yet created — implementer must copy the block from setup/SKILL.md",
+)
+check(
+    "canonical-blocks(1b): orchestrator-dispatch-rule.md contains start marker",
+    _MB_ODR.exists() and _ODR_START in read(_MB_ODR),
+    f"canonical file missing or does not contain '{_ODR_START}'",
+)
+check(
+    "canonical-blocks(1c): orchestrator-dispatch-rule.md contains end marker",
+    _MB_ODR.exists() and _ODR_END in read(_MB_ODR),
+    f"canonical file missing or does not contain '{_ODR_END}'",
+)
+
+check(
+    "canonical-blocks(2a): skills/setup/managed-blocks/nested-dispatch-takeover.md exists",
+    _MB_NDT.exists(),
+    "canonical file not yet created — implementer must copy the block from setup/SKILL.md",
+)
+check(
+    "canonical-blocks(2b): nested-dispatch-takeover.md contains start marker",
+    _MB_NDT.exists() and _NDT_START in read(_MB_NDT),
+    f"canonical file missing or does not contain '{_NDT_START}'",
+)
+check(
+    "canonical-blocks(2c): nested-dispatch-takeover.md contains end marker",
+    _MB_NDT.exists() and _NDT_END in read(_MB_NDT),
+    f"canonical file missing or does not contain '{_NDT_END}'",
+)
+
+check(
+    "canonical-blocks(3a): skills/setup/managed-blocks/voice-rule.md exists",
+    _MB_VR.exists(),
+    "canonical file not yet created — implementer must copy the block from setup/SKILL.md",
+)
+check(
+    "canonical-blocks(3b): voice-rule.md contains start marker",
+    _MB_VR.exists() and _VR_START in read(_MB_VR),
+    f"canonical file missing or does not contain '{_VR_START}'",
+)
+check(
+    "canonical-blocks(3c): voice-rule.md contains end marker",
+    _MB_VR.exists() and _VR_END in read(_MB_VR),
+    f"canonical file missing or does not contain '{_VR_END}'",
+)
+
+# ---------------------------------------------------------------------------
+# (2) Byte-faithfulness — canonical file block content must match what was
+# inline in setup/SKILL.md (snapshot captured below from the current source).
+# AC-1 / PR-1 byte-faithful requirement.
+#
+# Strategy: extract the inline block from _s44_setup_text (between markers)
+# and compare it with the full content of the canonical file.  Post-fix, the
+# canonical file IS the block, so canonical_content == inline_block_content.
+# Pre-fix, the canonical file does not exist → the existence check above
+# already fails, so these assertions reaching _MB_ODR.exists() == False will
+# also fail cleanly via the guard.
+#
+# The snapshot anchors are the REAL block occurrences (second occurrence of
+# each :start marker in the current file, at lines 65, 93, 119).  We locate
+# them by finding _ODR_START a second time after the first prose occurrence.
+# ---------------------------------------------------------------------------
+
+def _extract_inline_block(text: str, start_marker: str, end_marker: str) -> str:
+    """Return the block from the LAST occurrence of start_marker to (and
+    including) the end_marker.  This targets the real block, not the prose
+    occurrence.  Returns '' when either marker is absent."""
+    last_start = text.rfind(start_marker)
+    end_idx = text.rfind(end_marker)
+    if last_start == -1 or end_idx == -1 or end_idx < last_start:
+        return ""
+    return text[last_start: end_idx + len(end_marker)]
+
+
+_inline_odr = _extract_inline_block(_s44_setup_text, _ODR_START, _ODR_END)
+_inline_ndt = _extract_inline_block(_s44_setup_text, _NDT_START, _NDT_END)
+_inline_vr  = _extract_inline_block(_s44_setup_text, _VR_START,  _VR_END)
+
+# For the byte-faithfulness check: after the fix, the canonical file content
+# (stripped of leading/trailing whitespace) must equal the inline block
+# (stripped).  Pre-fix: _MB_ODR.exists() is False → guard short-circuits.
+_odr_canonical_text = read(_MB_ODR).strip() if _MB_ODR.exists() else None
+_ndt_canonical_text = read(_MB_NDT).strip() if _MB_NDT.exists() else None
+_vr_canonical_text  = read(_MB_VR).strip()  if _MB_VR.exists()  else None
+
+check(
+    "canonical-blocks(4a): orchestrator-dispatch-rule.md is byte-faithful to inline block in setup/SKILL.md",
+    _MB_ODR.exists() and bool(_inline_odr) and _odr_canonical_text == _inline_odr.strip(),
+    "canonical file content does not match the inline block snapshot from setup/SKILL.md "
+    f"(inline block present: {bool(_inline_odr)}; "
+    f"canonical exists: {_MB_ODR.exists()})",
+)
+check(
+    "canonical-blocks(4b): nested-dispatch-takeover.md is byte-faithful to inline block in setup/SKILL.md",
+    _MB_NDT.exists() and bool(_inline_ndt) and _ndt_canonical_text == _inline_ndt.strip(),
+    "canonical file content does not match the inline block snapshot from setup/SKILL.md "
+    f"(inline block present: {bool(_inline_ndt)}; "
+    f"canonical exists: {_MB_NDT.exists()})",
+)
+check(
+    "canonical-blocks(4c): voice-rule.md is byte-faithful to inline block in setup/SKILL.md",
+    _MB_VR.exists() and bool(_inline_vr) and _vr_canonical_text == _inline_vr.strip(),
+    "canonical file content does not match the inline block snapshot from setup/SKILL.md "
+    f"(inline block present: {bool(_inline_vr)}; "
+    f"canonical exists: {_MB_VR.exists()})",
+)
+
+# Key-content assertions (alternative faithfulness check scoped to distinctive
+# lines within each block — catches an empty or wrong canonical file even if
+# the byte comparison above is skipped for some reason).
+# orchestrator block: "## orchestrator dispatch" heading + "--fast" fast-path mention
+_odr_canonical_for_content = read(_MB_ODR) if _MB_ODR.exists() else ""
+check(
+    "canonical-blocks(4d): orchestrator-dispatch-rule.md contains '## orchestrator dispatch' heading",
+    "## orchestrator dispatch" in _odr_canonical_for_content,
+    "canonical orchestrator-dispatch-rule.md must contain the '## orchestrator dispatch' heading "
+    "(key-content faithfulness check)",
+)
+check(
+    "canonical-blocks(4e): orchestrator-dispatch-rule.md contains '--fast' fast-path mention",
+    "--fast" in _odr_canonical_for_content,
+    "canonical orchestrator-dispatch-rule.md must contain the '--fast' fast-path mention "
+    "(key-content faithfulness check — indicates full block content was copied)",
+)
+# nested block: "## nested-dispatch-takeover" heading + "blocked-no-dispatch" status
+_ndt_canonical_for_content = read(_MB_NDT) if _MB_NDT.exists() else ""
+check(
+    "canonical-blocks(4f): nested-dispatch-takeover.md contains '## nested-dispatch-takeover' heading",
+    "## nested-dispatch-takeover" in _ndt_canonical_for_content,
+    "canonical nested-dispatch-takeover.md must contain the '## nested-dispatch-takeover' heading "
+    "(key-content faithfulness check)",
+)
+check(
+    "canonical-blocks(4g): nested-dispatch-takeover.md contains 'blocked-no-dispatch' status literal",
+    "blocked-no-dispatch" in _ndt_canonical_for_content,
+    "canonical nested-dispatch-takeover.md must contain 'blocked-no-dispatch' "
+    "(key-content faithfulness check — indicates full block content was copied)",
+)
+# voice block: "## Voice" heading + "regional" idioms reference
+_vr_canonical_for_content = read(_MB_VR) if _MB_VR.exists() else ""
+check(
+    "canonical-blocks(4h): voice-rule.md contains '## Voice' heading",
+    "## Voice" in _vr_canonical_for_content,
+    "canonical voice-rule.md must contain the '## Voice' heading "
+    "(key-content faithfulness check)",
+)
+check(
+    "canonical-blocks(4i): voice-rule.md contains 'regional' idioms reference",
+    "regional" in _vr_canonical_for_content,
+    "canonical voice-rule.md must contain 'regional' (key-content faithfulness check — "
+    "indicates the no-regional-idioms text was copied)",
+)
+
+# ---------------------------------------------------------------------------
+# (3) Double-marker removal in setup/SKILL.md — AC-2 (regression anchor).
+# After the fix: each marker appears EXACTLY ONCE in setup/SKILL.md (the
+# read-from-file reference).  Pre-fix: each marker appears TWICE (prose +
+# real block).
+# ---------------------------------------------------------------------------
+check(
+    "canonical-blocks(5a): <!-- orchestrator-dispatch-rule:start --> appears exactly once in setup/SKILL.md (AC-2)",
+    _s44_setup_text.count(_ODR_START) == 1,
+    f"marker '{_ODR_START}' appears {_s44_setup_text.count(_ODR_START)} times in setup/SKILL.md "
+    "(expected 1 after fix; currently 2 — prose occurrence + real block); "
+    "the double-occurrence is the root cause of the CLAUDE.md corruption",
+)
+check(
+    "canonical-blocks(5b): <!-- nested-dispatch-takeover:start --> appears exactly once in setup/SKILL.md (AC-2)",
+    _s44_setup_text.count(_NDT_START) == 1,
+    f"marker '{_NDT_START}' appears {_s44_setup_text.count(_NDT_START)} times in setup/SKILL.md "
+    "(expected 1 after fix; currently 2)",
+)
+check(
+    "canonical-blocks(5c): <!-- voice-rule:start --> appears exactly once in setup/SKILL.md (AC-2)",
+    _s44_setup_text.count(_VR_START) == 1,
+    f"marker '{_VR_START}' appears {_s44_setup_text.count(_VR_START)} times in setup/SKILL.md "
+    "(expected 1 after fix; currently 2)",
+)
+
+# Corruption-prose absence: the specific instructional phrase that causes the
+# corruption ("append this block:") must NOT appear in setup/SKILL.md after
+# the fix (it is inside the fenced inline copies that get removed).
+# Note: pre-fix this phrase appears 3 times; post-fix it is gone.
+check(
+    "canonical-blocks(5d): setup/SKILL.md no longer contains the corruption-causing prose 'append this block:'",
+    "append this block:" not in _s44_setup_text,
+    "setup/SKILL.md still contains 'append this block:' — the instructional prose that caused "
+    "CLAUDE.md corruption when extracted as a block; this must be removed as part of the fix",
+)
+
+# ---------------------------------------------------------------------------
+# (4) setup/SKILL.md read-from-file reference — AC-4.
+# After the fix: setup/SKILL.md Steps 4a/4b/4c reference the canonical files
+# by path (e.g. "managed-blocks/orchestrator-dispatch-rule.md").
+# ---------------------------------------------------------------------------
+check(
+    "canonical-blocks(6a): setup/SKILL.md references managed-blocks/orchestrator-dispatch-rule.md (AC-4)",
+    "managed-blocks/orchestrator-dispatch-rule.md" in _s44_setup_text,
+    "setup/SKILL.md must reference the canonical file path 'managed-blocks/orchestrator-dispatch-rule.md' "
+    "in Steps 4a (read-from-file design); currently not present",
+)
+check(
+    "canonical-blocks(6b): setup/SKILL.md references managed-blocks/nested-dispatch-takeover.md (AC-4)",
+    "managed-blocks/nested-dispatch-takeover.md" in _s44_setup_text,
+    "setup/SKILL.md must reference the canonical file path 'managed-blocks/nested-dispatch-takeover.md' "
+    "in Step 4b (read-from-file design); currently not present",
+)
+check(
+    "canonical-blocks(6c): setup/SKILL.md references managed-blocks/voice-rule.md (AC-4)",
+    "managed-blocks/voice-rule.md" in _s44_setup_text,
+    "setup/SKILL.md must reference the canonical file path 'managed-blocks/voice-rule.md' "
+    "in Step 4c (read-from-file design); currently not present",
+)
+
+# ---------------------------------------------------------------------------
+# (5) update/SKILL.md canonical-file references + per-OS command blocks — AC-5.
+# After the fix: update/SKILL.md step 6 reads the canonical files (not
+# "extract from setup/SKILL.md between markers") AND contains exact
+# PowerShell + bash command blocks.
+# ---------------------------------------------------------------------------
+check(
+    "canonical-blocks(7a): update/SKILL.md references managed-blocks/orchestrator-dispatch-rule.md (AC-5)",
+    "managed-blocks/orchestrator-dispatch-rule.md" in _s44_update_text,
+    "update/SKILL.md step 6 must reference the canonical file 'managed-blocks/orchestrator-dispatch-rule.md'; "
+    "currently the skill reads setup/SKILL.md inline and extracts between markers",
+)
+check(
+    "canonical-blocks(7b): update/SKILL.md references managed-blocks/nested-dispatch-takeover.md (AC-5)",
+    "managed-blocks/nested-dispatch-takeover.md" in _s44_update_text,
+    "update/SKILL.md step 6 must reference the canonical file 'managed-blocks/nested-dispatch-takeover.md'; "
+    "currently the skill reads setup/SKILL.md inline and extracts between markers",
+)
+check(
+    "canonical-blocks(7c): update/SKILL.md references managed-blocks/voice-rule.md (AC-5)",
+    "managed-blocks/voice-rule.md" in _s44_update_text,
+    "update/SKILL.md step 6 must reference the canonical file 'managed-blocks/voice-rule.md'; "
+    "currently the skill reads setup/SKILL.md inline and extracts between markers",
+)
+
+# Per-OS PowerShell command block — must contain PowerShell-style syntax.
+# Acceptable anchors: "PowerShell", "pwsh", or "Get-Content" (distinctive PS
+# cmdlet for reading canonical files on Windows).
+_HAS_PS_BLOCK = (
+    "PowerShell" in _s44_update_text
+    or "pwsh" in _s44_update_text
+    or "Get-Content" in _s44_update_text
+)
+check(
+    "canonical-blocks(7d): update/SKILL.md contains a PowerShell command block (AC-5)",
+    _HAS_PS_BLOCK,
+    "update/SKILL.md must contain an exact PowerShell/pwsh/Get-Content command block "
+    "for Windows operators; currently the skill improvises shell without per-OS blocks",
+)
+
+# Per-OS bash command block — must contain bash-style syntax.
+# Acceptable anchors: "bash" code fence, "cat " (reading canonical file via cat),
+# or "sed " (the replace-between-markers idiom in bash).
+_HAS_BASH_BLOCK = (
+    "```bash" in _s44_update_text
+    or "cat " in _s44_update_text
+    or "sed " in _s44_update_text
+)
+check(
+    "canonical-blocks(7e): update/SKILL.md contains a bash command block (AC-5)",
+    _HAS_BASH_BLOCK,
+    "update/SKILL.md must contain an exact bash command block (```bash / cat / sed) "
+    "for Unix/macOS operators; currently the skill improvises shell without per-OS blocks",
+)
+
+# Destructive-replace declaration — must explicitly state DESTRUCTIVE replace.
+check(
+    "canonical-blocks(7f): update/SKILL.md declares DESTRUCTIVE replace (AC-5)",
+    "DESTRUCTIVE" in _s44_update_text or "destructive" in _s44_update_text,
+    "update/SKILL.md must explicitly declare that the block-sync is a DESTRUCTIVE replace "
+    "(no comparison beyond marker-presence); currently this is implicit and undocumented",
+)
+
+# ---------------------------------------------------------------------------
+# (6) Self-referential guard — AC-8.
+# Suite 44 must be registered in docs/testing.md (NOT CLAUDE.md §11).
+# This file must contain the literal "Suite 44" and "pr-th-update-fix".
+# CLAUDE.md §11 must NOT contain "Suite 44".
+# ---------------------------------------------------------------------------
+check(
+    "canonical-blocks(8/ac-8): docs/testing.md canonical registry names 'Suite 44'"
+    " and 'pr-th-update-fix'; this file contains 'Suite 44'; CLAUDE.md §11 does NOT"
+    " contain 'Suite 44' (hygiene contract)",
+    "Suite 44" in _s44_testing_md
+    and "pr-th-update-fix" in _s44_testing_md
+    and "Suite 44" in _s44_self
+    and "_slice_section" in _s44_self
+    and "Suite 44" not in _s44_claude_md,
+    "Suite 44 not registered in docs/testing.md canonical registry"
+    " or 'pr-th-update-fix' missing from docs/testing.md"
+    " or literal 'Suite 44' missing in this file"
+    f" or 'Suite 44' found in CLAUDE.md (hygiene violation);"
+    f" docs/testing.md has Suite 44: {'Suite 44' in _s44_testing_md};"
+    f" docs/testing.md has pr-th-update-fix: {'pr-th-update-fix' in _s44_testing_md};"
+    f" this file has Suite 44: {'Suite 44' in _s44_self};"
+    f" CLAUDE.md has Suite 44 (must be False): {'Suite 44' in _s44_claude_md}"
+    " — implementer must complete docs/testing.md; tester must not add Suite 44 to CLAUDE.md",
 )
 
 
