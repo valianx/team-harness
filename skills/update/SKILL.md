@@ -73,15 +73,77 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache and prints `… updated from <X> to <Y>. Restart to apply changes.` Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
 
 6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure MCP servers and workspace mode; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
-   - **Source of truth.** The three managed blocks are defined verbatim in the plugin's `skills/setup/SKILL.md`. Read it from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate. Path: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/SKILL.md`.
-   - **Extract** all three blocks, each including its delimiter comments:
-     - `<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`
-     - `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->`
-     - `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`
+   - **Source of truth.** The three managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
+     - `managed-blocks/orchestrator-dispatch-rule.md` (markers: `<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`)
+     - `managed-blocks/nested-dispatch-takeover.md` (markers: `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->`)
+     - `managed-blocks/voice-rule.md` (markers: `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`)
+     Full paths under the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/managed-blocks/{orchestrator-dispatch-rule,nested-dispatch-takeover,voice-rule}.md`
    - **Back up** `~/.claude/CLAUDE.md` to `~/.claude/CLAUDE.md.bak-YYYYMMDD-HHMMSS` (UTC) before the first write. If the file does not exist, create it (blocks-only) and skip the backup.
-   - **Write each block idempotently:** if both its markers are present in `~/.claude/CLAUDE.md`, replace everything from `:start` to `:end` inclusive with the canonical block; otherwise append the block at the end of the file. Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
+   - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the three canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
+   - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
    - **Never touch anything outside the marker-delimited blocks.** All other content in `~/.claude/CLAUDE.md` is the operator's and is preserved byte-for-byte.
    - **Record** each block's outcome (`updated` / `inserted` / `already current`) for the `managed blocks` row of the final report (step 7). Do not print it inline — the report is the only operator-facing message.
+
+   **Windows (PowerShell) — run this block verbatim on Windows:**
+   ```powershell
+   # Resolve the highest-version plugin directory
+   $pluginBase = "$env:USERPROFILE\.claude\plugins\cache\team-harness-marketplace\th"
+   $latestDir = Get-ChildItem -Path $pluginBase -Directory |
+       Sort-Object { [Version]($_.Name -replace '[^0-9.]','') } |
+       Select-Object -Last 1
+   $mbDir = "$($latestDir.FullName)\skills\setup\managed-blocks"
+   $claudeMd = "$env:USERPROFILE\.claude\CLAUDE.md"
+
+   # Backup
+   $ts = (Get-Date -Format "yyyyMMdd-HHmmss")
+   Copy-Item $claudeMd "$claudeMd.bak-$ts"
+
+   # Sync each managed block (DESTRUCTIVE replace between markers, or append)
+   foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule")) {
+       $canonicalPath = "$mbDir\$block.md"
+       $canonical = Get-Content $canonicalPath -Raw
+       $startMarker = "<!-- $block`:start -->"
+       $endMarker   = "<!-- $block`:end -->"
+       $content = Get-Content $claudeMd -Raw
+       if ($content -match [regex]::Escape($startMarker) -and $content -match [regex]::Escape($endMarker)) {
+           # DESTRUCTIVE replace between markers (inclusive)
+           $pattern = [regex]::Escape($startMarker) + "[\s\S]*?" + [regex]::Escape($endMarker)
+           $content = [regex]::Replace($content, $pattern, $canonical.TrimEnd())
+           Set-Content $claudeMd $content -NoNewline
+       } else {
+           # Append
+           Add-Content $claudeMd "`n$canonical"
+       }
+   }
+   ```
+
+   **Unix/macOS (bash) — run this block verbatim on Linux/macOS:**
+   ```bash
+   # Resolve the highest-version plugin directory
+   PLUGIN_BASE="$HOME/.claude/plugins/cache/team-harness-marketplace/th"
+   LATEST_DIR=$(ls -1 "$PLUGIN_BASE" | sort -V | tail -1)
+   MB_DIR="$PLUGIN_BASE/$LATEST_DIR/skills/setup/managed-blocks"
+   CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+
+   # Backup
+   TS=$(date -u +"%Y%m%d-%H%M%S")
+   cp "$CLAUDE_MD" "$CLAUDE_MD.bak-$TS"
+
+   # Sync each managed block (DESTRUCTIVE replace between markers, or append)
+   for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule; do
+       CANONICAL=$(cat "$MB_DIR/$BLOCK.md")
+       START_MARKER="<!-- ${BLOCK}:start -->"
+       END_MARKER="<!-- ${BLOCK}:end -->"
+       if grep -qF "$START_MARKER" "$CLAUDE_MD" && grep -qF "$END_MARKER" "$CLAUDE_MD"; then
+           # DESTRUCTIVE replace between markers (inclusive) using sed
+           sed -i.tmp "/${START_MARKER//\//\\/}/,/${END_MARKER//\//\\/}/d" "$CLAUDE_MD"
+           # Append canonical block at position of removed block
+           printf '\n%s\n' "$CANONICAL" >> "$CLAUDE_MD"
+       else
+           printf '\n%s\n' "$CANONICAL" >> "$CLAUDE_MD"
+       fi
+   done
+   ```
 
 7. **Emit the final report** — the single operator-facing message. Use the matching template below verbatim in structure (a fenced status block), filling the values from the run. Align the values into one column. Keep the labels lowercase as shown. Render the closing line outside the fence.
 
