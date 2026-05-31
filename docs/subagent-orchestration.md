@@ -15,6 +15,57 @@ When `orchestrator` is invoked from a context where another agent is already act
 
 **What to expect when the limitation triggers:** the orchestrator emits a "Dispatch handoff" response with a human-readable summary followed by a JSON block. Top-level Claude reads the summary, dispatches the named agent directly, and continues the pipeline — no user action needed.
 
+## dispatch_handoff Schema
+
+The `dispatch_handoff` JSON block is the canonical machine-readable payload the orchestrator writes when the boot probe fails (nested context). The orchestrator produces it; top-level Claude consumes it. This section is the single source of truth for all 8 fields — the producer references this schema by name and does not enumerate fields inline.
+
+```json
+{
+  "schema_version": "1",
+  "next_dispatch": {
+    "agent": "th:architect"
+  },
+  "type": null,
+  "phase": "0a-intake",
+  "autonomy": {
+    "granted": false
+  },
+  "round": null,
+  "state_ref": null,
+  "probe_error": "<literal harness error message>"
+}
+```
+
+| Field | Type | Boot (no `00-state.md`) | Mid-pipeline |
+|-------|------|------------------------|--------------|
+| `schema_version` | string | required | required |
+| `next_dispatch.agent` | string (prefixed, e.g. `th:architect`) | required — value is `th:architect`; NEVER `th:orchestrator` | required — the phase agent read from `00-state.md`; NEVER `th:orchestrator` |
+| `type` | string\|null | `null` (task type not yet classified at boot) — **`type: null` does NOT mean security is skipped**: when resuming from a boot handoff with unknown type, top-level Claude MUST re-classify (Phase 0a Step 7) before applying the type-gated manifest; security defaults to RUN when type is unknown. Full boot re-classification is hardened in PR B. | `feature` \| `fix` \| `hotfix` \| `refactor` \| `enhancement` \| `docs` |
+| `phase` | string | required — `0a-intake` or `1-design` | required — id of the current phase (e.g. `2-implement`) |
+| `autonomy.granted` | boolean | required | required |
+| `round` | string\|null | `null` | `R1` \| `R2` \| … when applicable |
+| `state_ref` | string\|null | `null` (no workspace yet) | path to `00-state.md` |
+| `probe_error` | string | required — the literal harness error message from the failed `Task` call | required |
+
+**Worked example — mid-pipeline handoff (Phase 2, `type: fix`):**
+
+```json
+{
+  "schema_version": "1",
+  "next_dispatch": {
+    "agent": "th:implementer"
+  },
+  "type": "fix",
+  "phase": "2-implement",
+  "autonomy": {
+    "granted": true
+  },
+  "round": "R1",
+  "state_ref": "workspaces/my-feature/00-state.md",
+  "probe_error": "Tool 'Task' is not available in this context."
+}
+```
+
 ## Auto-Takeover on `blocked-no-dispatch`
 
 **Universal rule (applies regardless of how the orchestrator was invoked):**
@@ -25,9 +76,9 @@ When the `orchestrator` subagent returns a response containing **"Dispatch hando
 
 ## Takeover Protocol (static, identical for every handoff)
 
-**Takeover Pipeline Manifest — read this first.** You MUST complete every item below, in order. Read each stage's detailed contract (the agent `.md` and the matching `agents/orchestrator.md` / `agents/ref-special-flows.md` phase section) as you reach it — do NOT read them all up front. Skipping any stage or gate is a defect, not a shortcut; reading the manifest is the means, completing every item is the obligation. The takeover is not a lighter path: the same full-stage compliance that the `orchestrator-dispatch-rule` block requires for normal dispatch ("Full pipeline is the default… Do not skip stages") applies equally here.
+**Takeover Pipeline Manifest (gate manifest) — read this first.** This manifest enumerates the inviolable gates that a takeover MUST NOT skip. It is a **gate manifest**, not the ordered phase sequence — the complete, ordered list of phases lives in the **Phase Dispatch table** in `agents/orchestrator.md`; read that table as the authoritative phase sequence. Read each gate's detailed contract (the agent `.md` and the matching `agents/orchestrator.md` / `agents/ref-special-flows.md` phase section) as you reach it — do NOT read them all up front. skipping any gate is a defect, not a shortcut; completing every item is the obligation. The takeover is not a lighter path: the same full-stage compliance that the `orchestrator-dispatch-rule` block requires for normal dispatch ("Full pipeline is the default… Do not skip stages") applies equally here.
 
-Ordered stages and gates (annotate `dispatch_handoff.type` to determine which items apply):
+Inviolable gates (annotate `dispatch_handoff.type` to determine which items apply):
 
 - **STAGE-GATE-1** — mandatory human approval before implementation begins. `[all types]`
 - **Phase 1.6 plan-review** — inviolable plan review (`01-plan.md § Plan Review` with `## Verdict`). `[all types]`
@@ -41,7 +92,9 @@ Ordered stages and gates (annotate `dispatch_handoff.type` to determine which it
 1. Do NOT ask the user "should I take over?" The directive in the orchestrator's response is itself the authorisation.
 2. Do NOT re-invoke `@th:orchestrator` or any skill that routes via `Task(subagent_type=orchestrator, ...)` — that recreates the nested context and the boot probe will fail again.
 3. Parse `dispatch_handoff.next_dispatch.agent` from the JSON — the value is in **prefixed** form (e.g. `th:architect`). If `state_ref` is set, read that state file (`## Current State` + `## Agent Results` + `## Handoff`). To read the agent's contract file, **strip the `th:` prefix** to derive the on-disk path (`th:architect` → `agents/architect.md`); team-harness agents are flat so a prefix-strip suffices (a plugin subagent in a subfolder would map `:`→`/`). For plugin installs (no repo clone), `agents/…` and `docs/…` paths resolve under `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/` — resolve `<highest-version>` to the highest semver directory present. Consult the Takeover Pipeline Manifest above for the ordered set of stages to complete; read each stage's detailed contract as you reach it (lazy-load).
-4. Dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session — use the value verbatim (it is already prefixed, e.g. `th:architect`; do NOT add `th:` again). Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the orchestrator's checkpointing protocol. Iterate per the orchestrator contract (max 3 iterations on `failed`/`blocked`).
+4. **Consume-side guard (check before dispatch):** If `next_dispatch.agent == th:orchestrator`, the handoff is malformed — dispatching `th:orchestrator` recreates the nested context that caused the Task strip. Do NOT dispatch `th:orchestrator`. Instead, dispatch the phase agent from `00-state.md` (read `## Current State` to determine the current phase and its owning agent), or `th:architect` if no workspace exists (boot case). Log this correction as a `dispatch.blocked` event with `reason: malformed-handoff-agent` before continuing.
+
+   Once the guard passes, dispatch the named agent directly via `Task(subagent_type={next_dispatch.agent}, ...)` from the top-level session — use the value verbatim (it is already prefixed, e.g. `th:architect`; do NOT add `th:` again). Parse the returned status block. Update `state_ref` (TL;DR + Current State + Agent Results) per the orchestrator's checkpointing protocol. Iterate per the orchestrator contract (max 3 iterations on `failed`/`blocked`).
 5. Continue through the remaining phases of the pipeline (Phase 3 verifies in parallel: `tester` + `qa` + `security` when sensitive; Phase 3.5 acceptance-gate; Phase 3.6 `acceptance-checker`; Phase 4 `delivery`). Respect gate semantics:
    - **STAGE-GATE-2** (between PRs in Stage 2): if `dispatch_handoff.autonomy.granted` is `true`, skip silently; otherwise stop and ask the user.
    - **STAGE-GATE-3** (before push in Stage 3): always stop and ask the user — autonomy never covers this gate.
