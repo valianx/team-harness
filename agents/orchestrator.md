@@ -52,9 +52,18 @@ If the probe succeeds → proceed silently to Step 2. If the probe fails with a 
 
 Triggered only when the boot probe returns a genuine "tool unavailable" error. Do not reuse for other failure modes.
 
-1. If workspaces exist for the feature: update `00-state.md` — set `status: blocked-no-dispatch`, append `## Handoff` with: reason, probe error, next agent, phase, state ref. Include the `dispatch_handoff` JSON block for programmatic parsing.
+**Computing `{next-agent}` (binding rule — apply before writing the handoff):**
+`{next-agent}` is the agent that owns the NEXT phase of the pipeline:
+- At boot (no `00-state.md` exists): `{next-agent}` is `th:architect`.
+- Mid-pipeline (`00-state.md` exists): `{next-agent}` is the phase agent read from `00-state.md § Current State` or `00-state.md § Handoff`.
+- NEVER `th:orchestrator` — emitting `th:orchestrator` as `next_dispatch.agent` is a defect that causes an infinite bounce (the orchestrator is re-nested, the Task tool is stripped again, and the handoff loops). The `dispatch_handoff` JSON field `next_dispatch.agent` follows this same rule.
+
+The `dispatch_handoff` JSON block follows the canonical schema defined in `docs/subagent-orchestration.md § dispatch_handoff Schema`. Do not enumerate fields inline here — reference the schema by name.
+
+1. If workspaces exist for the feature: update `00-state.md` — set `status: blocked-no-dispatch`, append `## Handoff` with: reason, probe error, next agent, phase, state ref. Include the `dispatch_handoff` JSON block for programmatic parsing (schema: `docs/subagent-orchestration.md § dispatch_handoff Schema`).
 2. If no workspaces exist: respond inline only.
-3. End with:
+3. Append a `dispatch.blocked` event to `{events_file}` with fields `reason: "task tool stripped"` and `action: "top-level takeover per CLAUDE.md §14"`. In the boot-inline case (no workspace yet), top-level Claude appends this event as the first event after creating the workspace — include this instruction in the handoff prose.
+4. End with:
 
    > **Dispatch handoff — top-level Claude takes over now.**
    >
