@@ -106,9 +106,9 @@ You will use this to:
 
 If no GitHub issue section exists, proceed without — this is not an error.
 
-### Step 2b — Detect remote availability
+### Step 2b — Active gh account capture
 
-Run the standard detection probe from `agents/_shared/gh-fallback.md` § "Detection probe" to set `has_gh`, then check for a remote:
+Run the standard detection probe from `agents/_shared/gh-fallback.md` § "Detection probe" to set `has_gh`, check for a remote, and capture the active `gh` account:
 
 ```bash
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
@@ -119,6 +119,16 @@ fi
 origin_url="$(git remote get-url origin 2>/dev/null)"
 if [ -n "$origin_url" ]; then has_remote=true; else has_remote=false; fi
 ```
+
+**When `has_gh=true`**, capture the currently active account:
+
+```bash
+gh_active_account="$(gh api user -q .login 2>/dev/null || echo "unknown")"
+```
+
+Report the active account in the status block as `gh_account: <login>`. Step 11 reports the PR author, providing a second signal of the account used for remote writes.
+
+**Known limitation (operator-owned, by design):** the active `gh` account can drift between subagent runs (EMU vs personal). Correctness of the active account is the operator's responsibility per the global `gh` account-mapping rule in `~/.claude/CLAUDE.md`. This step makes the account visible; it does NOT auto-flip the account (an automatic switch without context could break the opposite operation). If the wrong account is active, the operator must run `gh auth switch -u <account>` before the pipeline proceeds to Step 10 (push).
 
 Set internal flags:
 - `has_remote: true/false` — controls push behavior (Step 10)
@@ -361,6 +371,25 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 **If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP.** Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version file.
 
+### Step 9.0 — Version sites (explicit enumeration)
+
+For repos that maintain version literals in multiple synchronized files, edit **each** of the following sites explicitly — do NOT rely on Glob-first-match, which structurally finds only one site and leaves the rest out of sync.
+
+**This repo's canonical version sites (all five must be updated together):**
+
+| Site | File | Field / location |
+|------|------|-----------------|
+| Plugin manifest | `.claude-plugin/plugin.json` | `"version"` field |
+| Marketplace entry | `.claude-plugin/marketplace.json` | `plugins[0].version` — the per-plugin version inside the `plugins` array |
+| Go installer | `cmd/install/main.go` | `var version = "X.Y.Z"` literal |
+| CLAUDE.md §3 | `CLAUDE.md` | `**Current version:** \`X.Y.Z\`` line |
+| CHANGELOG.md | `CHANGELOG.md` | Release heading `## [X.Y.Z] - YYYY-MM-DD` (cut in Step 9e) |
+
+**FENCED OFF — do NOT touch:**
+The top-level `"version"` field in `.claude-plugin/marketplace.json` (value `"1.1.0"`) is the schema/format version of the marketplace document, not the plugin version. It is a different field from `plugins[0].version`. Never modify the schema version.
+
+For other project types (Node, Python, Rust, etc.) that do not maintain multiple synchronized version sites, proceed directly to Step 9.1 (Glob-first-match is appropriate when there is only one version file).
+
 **Step 9.1 — Find the version file.** Use Glob to search the project root for these files in order:
 
 ```
@@ -413,20 +442,47 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
 
 **Step 9.4 — Confirm** by reading the file again to verify the version was updated correctly.
 
+### Step 9e — CHANGELOG release cut
+
+**Gated on Step 9 having produced a version bump.** If Step 9 was skipped (`skip-version: true`) or produced no version change, skip this step entirely.
+
+When a version bump was performed in Step 9, move the accumulated `[Unreleased]` entries into a new versioned release heading and recreate an empty `[Unreleased]` section above it. The new versioned heading format is `## [<version>] - <date>` (using the bumped version from Step 9 and today's date in `YYYY-MM-DD` format). The empty `[Unreleased]` section is recreated above the new heading as the placeholder for the next release cycle.
+
+**Procedure:**
+
+1. Read `CHANGELOG.md`.
+2. Collect all content under `## [Unreleased]` (between the `[Unreleased]` heading and the next `## [` heading).
+3. If `[Unreleased]` is empty (no entries since the last release), skip the cut — there is nothing to promote.
+4. Insert the new versioned release section between the empty `[Unreleased]` and the previous release:
+   - Keep `## [Unreleased]` at the top (now empty — placeholder for the next cycle).
+   - Add a blank line, then `## [<version>] - <date>` where `<version>` is the bumped version and `<date>` is today in `YYYY-MM-DD` format.
+   - Move the accumulated entries under the new versioned heading.
+5. Write the updated CHANGELOG.md.
+
+**Format rules:**
+- Do NOT touch any existing `## [X.Y.Z]` headings below the cut point.
+- Do NOT reformat the moved entries.
+
 ### Step 9b — Definition of Done (DoD) checklist
 
-Before staging, run the project's quality gates. Discover the commands from CLAUDE.md (golden commands table) or from the project's manifest (`package.json` scripts, `Makefile`, `pyproject.toml`, `Cargo.toml`). Common ones:
+Before staging, run the project's quality gates. Discover DoD commands from two sources, in this order of priority:
+
+**Source 1 — CLAUDE.md §4 Golden Commands table (primary for this repo):** Read `CLAUDE.md` and locate the `## 4. Golden Commands` section (or equivalent `§4`). Parse the table and treat every command listed there as a DoD gate for this repo. Commands in the Golden Commands table are authoritative because they represent the maintainer's own definition of what must pass before merging.
+
+**Source 2 — Project manifest (secondary, for other project types):** Read the project's manifest files (`package.json` scripts, `Makefile`, `pyproject.toml`, `Cargo.toml`) for additional gates not already covered by Source 1.
 
 | Check | Where to find the command | Action if it fails |
 |---|---|---|
 | Lint | `package.json` `scripts.lint`, `make lint`, `cargo clippy`, `ruff check` | Abort, report which files fail |
 | Type check | `package.json` `scripts.typecheck`, `tsc --noEmit`, `mypy`, `pyright` | Abort, report errors |
-| Tests | `package.json` `scripts.test`, `make test`, `pytest`, `cargo test` | Abort, report failing tests |
+| Tests | `package.json` `scripts.test`, `make test`, `pytest`, `cargo test`, `bash tests/run-all.sh` | Abort, report failing tests |
 | Build (when a build step exists) | `package.json` `scripts.build`, `make build` | Abort, report build error |
 
-Run each check. If ANY fails, return `status: failed` with the command output captured in `00-state.md § Delivery` under "DoD Failures". Do NOT proceed to commit.
+Run each discovered check. If ANY fails, return `status: failed` with the command output captured in `00-state.md § Delivery` under "DoD Failures". Do NOT proceed to commit.
 
 If a check command does not exist in the project (e.g. no `lint` script), skip that row and note it in the delivery summary — do NOT invent a command.
+
+**Visibility rule:** when ALL discovered DoD rows are skipped (no commands found in either source), emit a status-block line `dod: no gates discovered` — this state must be visible, not silent. A silent all-skip is the failure mode this step is designed to prevent.
 
 ### Step 9c — Acceptance Matrix
 
@@ -664,6 +720,7 @@ Report the existing PR URL in the status block — do NOT fail.
 - Title follows conventional commits format
 - If PR creation/update fails (e.g., no remote, no gh), report to the user
 - **Never fail just because a PR already exists** — always detect and handle gracefully
+- **When `has_gh=true` and push succeeded but `gh pr create` fails:** report `status: blocked-pr-pending` (see `agents/_shared/gh-fallback.md` § `status: blocked-pr-pending`). The remote branch already exists; do not re-push. Emit the compare URL and body file and wait for operator reply (`pr opened #N`). Step 3's OPEN/no-PR detection handles the pushed-but-PR-less state on re-run.
 
 ### Step 11.5 — Persist a process-insight to the knowledge graph (passive capture)
 
@@ -850,9 +907,11 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 
 ```
 agent: delivery
-status: success | failed | blocked | blocked-manual-push
+status: success | failed | blocked | blocked-manual-push | blocked-pr-pending
 output: workspaces/{feature-name}/00-state.md § Delivery
 summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections updated}
+gh_account: <login> | unknown | n/a (has_gh=false)
+dod: {pass | no gates discovered | failed: <command>}
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}
@@ -868,9 +927,26 @@ manual_action_required: true
 manual_action_file: workspaces/{feature-name}/inputs/pr-body.md
 manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1
 summary: PR not created automatically (gh unavailable). Operator paste required.
+gh_account: n/a (has_gh=false)
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: none
+```
+
+**`status: blocked-pr-pending`** — emitted when `has_gh=true`, push succeeded, but `gh pr create` failed (see `agents/_shared/gh-fallback.md` § `status: blocked-pr-pending`). The remote branch already exists. Add these fields when reporting this status:
+
+```
+agent: delivery
+status: blocked-pr-pending
+output: workspaces/{feature-name}/00-state.md § Delivery
+manual_action_required: true
+manual_action_file: workspaces/{feature-name}/inputs/pr-body.md
+manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1
+summary: Push succeeded but gh pr create failed. Branch is live on remote. Operator PR creation required.
+gh_account: <login>
+context7_consult: hit:N miss:N skipped:N
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+issues: gh pr create failed: {error message}
 ```
 
 The orchestrator pauses and waits for the operator to reply `pr opened #N`. On continue, the pipeline re-probes the PR number with a Tier A read and records it in `00-state.md`.
