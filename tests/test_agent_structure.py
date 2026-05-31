@@ -9409,6 +9409,501 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 46 -- pr-f-observability (AC-1..AC-8)
+# ---------------------------------------------------------------------------
+# Regression assertions written FAILING-FIRST (Phase 2.0 mandate) against the
+# current source state.  They become GREEN after the implementer lands the 6
+# fixes.  Each check is ANCHOR-SCOPED via _slice_section so that:
+#   - a missing anchor returns "" → token-in-"" is False → the check fails
+#     clearly (not silently) even if the token happens to exist elsewhere.
+#   - renaming or removing the anchored section fails the check, not the
+#     ambient-presence guard.
+#
+# CANONICAL ANCHORS (implementer MUST use these verbatim):
+#   agents/orchestrator.md  : "### Final Pipeline Sanity Check"   (exists today)
+#   agents/orchestrator.md  : "## Phase 3.5 — Acceptance Gate"    (exists today)
+#   agents/orchestrator.md  : "Phase 2-close scope check"         (NEW section / subsection)
+#   agents/orchestrator.md  : Phase 3 security-finding write site
+#                             → pointer line contains "### Emitting kg_write events"
+#                             (new pointer, sliced via existing "## Phase 3 — Verify" anchor)
+#   agents/orchestrator.md  : Phase 6 save procedure
+#                             → pointer line contains "### Emitting kg_write events"
+#                             (new pointer, sliced via "Phase 6 — Knowledge Save" anchor)
+#   agents/ref-special-flows.md : "## Documentation Flow"          (exists today)
+#   agents/ref-special-flows.md + CLAUDE.md §5 : Tier 0 carve-out
+#                             → CLAUDE.md contains "Tier 0" + "explicitly" + "observability"
+#                             (new sub-clause, whole-§5-paragraph check)
+#
+# Check index → AC mapping:
+#   (1)   AC-1  Final Sanity Check verifies {events_file} + 00-pipeline-summary.md
+#   (2)   AC-1  Final Sanity Check asserts ≥1 phase.end per [x] phase
+#   (3)   AC-1  Mismatch → blocked-incomplete (not pipeline.complete)
+#   (4)   AC-2  Phase 3.5 fix/hotfix Tier 2-4 regression-still-passing condition
+#   (5)   AC-3  Phase 2-close scope check diff-vs-Scope-of-Fix present
+#   (6)   AC-3  Phase 2-close note: coordination with PR B (not duplication)
+#   (7)   AC-4  kg_write pointer after Phase 3 security-finding write site
+#   (8)   AC-4  kg_write pointer after Phase 6 save procedure
+#   (9)   AC-5  Documentation Flow lists 00-execution-events
+#   (10)  AC-5  Documentation Flow specifies phase.start/phase.end per phase
+#   (11)  AC-5  Documentation Flow has DOC-GATE gate event
+#   (12)  AC-5  Documentation Flow declares KG capture stance (no KG capture)
+#   (13)  AC-6  CLAUDE.md §5 carve-out explicitly exempts Tier 0 from observability
+#   (14)  AC-6  ref-special-flows.md Tier 0 rows reference the carve-out
+#   (15)  AC-8  Suite 46 in docs/testing.md (canonical registry)
+#   (16)  AC-8  Suite 46 NOT in CLAUDE.md §11 (hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 46: pr-f-observability — observability gates hardening ===")
+
+# ---- file reads (suite-local) ----------------------------------------------
+_s46_orch      = read(AGENTS_DIR / "orchestrator.md")
+_s46_rsf       = read(AGENTS_DIR / "ref-special-flows.md")
+_s46_claude    = read(REPO_ROOT / "CLAUDE.md")
+_s46_testing   = read(REPO_ROOT / "docs" / "testing.md")
+_s46_self      = Path(__file__).read_text(encoding="utf-8")
+
+# ---- canonical anchors & slices --------------------------------------------
+_S46_SANITY_ANCHOR   = "### Final Pipeline Sanity Check"
+_S46_PHASE35_ANCHOR  = "## Phase 3.5 — Acceptance Gate"
+_S46_PH2CLOSE_ANCHOR = "Phase 2-close scope check"
+_S46_PHASE3_ANCHOR   = "## Phase 3 — Verify"
+_S46_PHASE6_ANCHOR   = "Phase 6 — Knowledge Save (MANDATORY)"
+_S46_DOCFLOW_ANCHOR  = "## Documentation Flow"
+
+_s46_sanity_slice   = _slice_section(_s46_orch, _S46_SANITY_ANCHOR)
+_s46_phase35_slice  = _slice_section(_s46_orch, _S46_PHASE35_ANCHOR)
+_s46_ph2close_slice = _slice_section(_s46_orch, _S46_PH2CLOSE_ANCHOR)
+_s46_phase3_slice   = _slice_section(_s46_orch, _S46_PHASE3_ANCHOR)
+_s46_phase6_slice   = _slice_section(_s46_orch, _S46_PHASE6_ANCHOR)
+_s46_docflow_slice  = _slice_section(_s46_rsf, _S46_DOCFLOW_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 — Final Sanity Check asserts both observability artifacts
+# exist and are non-empty.  The check anchors on the existing
+# "### Final Pipeline Sanity Check" section.  Today that section enumerates
+# only per-agent workspace docs; the 2 observability files are absent.
+# Tokens required in slice:
+#   "00-pipeline-summary.md"  — the pipeline summary artifact
+#   one of "{events_file}" / "00-execution-events"  — the events file
+#   "non-empty"               — both must be asserted non-empty
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(1/ac-1): orchestrator.md § Final Pipeline Sanity Check asserts"
+    " 00-pipeline-summary.md AND the events file exist + non-empty",
+    bool(_s46_sanity_slice)
+    and "00-pipeline-summary.md" in _s46_sanity_slice
+    and (
+        "{events_file}" in _s46_sanity_slice
+        or "00-execution-events" in _s46_sanity_slice
+    )
+    and "non-empty" in _s46_sanity_slice,
+    f"anchor '{_S46_SANITY_ANCHOR}' missing or observability-artifact tokens absent;"
+    f" anchor present: {bool(_s46_sanity_slice)};"
+    f" 00-pipeline-summary.md: {'00-pipeline-summary.md' in _s46_sanity_slice};"
+    f" events_file: {('{events_file}' in _s46_sanity_slice or '00-execution-events' in _s46_sanity_slice)};"
+    f" non-empty: {'non-empty' in _s46_sanity_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-1 — Final Sanity Check asserts ≥1 phase.end per [x] phase
+# in the Phase Checklist.  Today there is no such assertion.
+# Tokens required in slice:
+#   "phase.end"       — the event type being counted
+#   one of "[x]" / "Phase Checklist" / "phase.end per"  — what it reads
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(2/ac-1): orchestrator.md § Final Pipeline Sanity Check asserts"
+    " ≥1 phase.end per [x] phase in Phase Checklist",
+    bool(_s46_sanity_slice)
+    and "phase.end" in _s46_sanity_slice
+    and (
+        "[x]" in _s46_sanity_slice
+        or "Phase Checklist" in _s46_sanity_slice
+        or "phase.end per" in _s46_sanity_slice
+    ),
+    f"anchor '{_S46_SANITY_ANCHOR}' missing or phase.end-per-phase assertion absent;"
+    f" anchor present: {bool(_s46_sanity_slice)};"
+    f" 'phase.end' in slice: {'phase.end' in _s46_sanity_slice};"
+    f" '[x]' or 'Phase Checklist' in slice:"
+    f" {('[x]' in _s46_sanity_slice or 'Phase Checklist' in _s46_sanity_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-1 — Mismatch → blocked-incomplete, not pipeline.complete.
+# Today the check does not exist so the mismatch path is never reached.
+# Tokens required in slice:
+#   "blocked-incomplete"   — the status set on mismatch
+#   one of "missing_artifacts" / "NOT" / "no pipeline.complete"
+#                          — confirmation that pipeline.complete is suppressed
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(3/ac-1): orchestrator.md § Final Pipeline Sanity Check routes"
+    " observability mismatch to blocked-incomplete (not pipeline.complete)",
+    bool(_s46_sanity_slice)
+    and "blocked-incomplete" in _s46_sanity_slice
+    and (
+        "missing_artifacts" in _s46_sanity_slice
+        or "NOT" in _s46_sanity_slice
+        or "not pipeline.complete" in _s46_sanity_slice.lower()
+    ),
+    f"anchor '{_S46_SANITY_ANCHOR}' missing or blocked-incomplete path absent;"
+    f" anchor present: {bool(_s46_sanity_slice)};"
+    f" 'blocked-incomplete': {'blocked-incomplete' in _s46_sanity_slice};"
+    f" 'missing_artifacts' or NOT: "
+    f" {'missing_artifacts' in _s46_sanity_slice or 'NOT' in _s46_sanity_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-2 — Phase 3.5 Acceptance Gate adds a regression-still-passing
+# condition for type:fix|hotfix Tier 2-4.  Today Phase 3.5 has only the
+# count-ratchet; the specific-regression-test check is absent.
+# Tokens required in slice:
+#   one of "regression_test_path" / "02-regression-test.md"
+#                              — the regression test artifact
+#   one of "skip" / "xfail" / "not skipped"
+#                              — the skip/xfail/comment check
+#   one of "Tier 2" / "Tier 2-4" / "fix|hotfix"
+#                              — the condition scope
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(4/ac-2): orchestrator.md § Phase 3.5 adds regression-still-passing"
+    " condition for type:fix/hotfix Tier 2-4 (regression_test_path PASS + not skipped)",
+    bool(_s46_phase35_slice)
+    and (
+        "regression_test_path" in _s46_phase35_slice
+        or "02-regression-test.md" in _s46_phase35_slice
+    )
+    and (
+        "skip" in _s46_phase35_slice
+        or "xfail" in _s46_phase35_slice
+    )
+    and (
+        "Tier 2" in _s46_phase35_slice
+        or "Tier 2-4" in _s46_phase35_slice
+        or ("fix" in _s46_phase35_slice and "hotfix" in _s46_phase35_slice)
+    ),
+    f"anchor '{_S46_PHASE35_ANCHOR}' missing or regression-still-passing condition absent;"
+    f" anchor present: {bool(_s46_phase35_slice)};"
+    f" regression_test_path or 02-regression-test.md:"
+    f" {'regression_test_path' in _s46_phase35_slice or '02-regression-test.md' in _s46_phase35_slice};"
+    f" skip/xfail: {'skip' in _s46_phase35_slice or 'xfail' in _s46_phase35_slice};"
+    f" Tier scope: {'Tier 2' in _s46_phase35_slice or 'Tier 2-4' in _s46_phase35_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-3 — Phase 2-close scope check: diff-vs-Scope-of-Fix present.
+# Today there is no Phase 2-close scope check.  After the fix, a new step
+# runs `git diff --name-only` and checks each non-test changed file against
+# `01-root-cause.md § Scope of Fix`.
+# Tokens required in slice:
+#   "git diff --name-only"     — the command
+#   one of "Scope of Fix" / "01-root-cause.md"  — the authority list
+#   one of "[SCOPE-DRIFT]" / "SCOPE-DRIFT"       — the annotation
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(5/ac-3): orchestrator.md Phase 2-close scope check runs"
+    " 'git diff --name-only' vs 01-root-cause.md § Scope of Fix"
+    " and recognises [SCOPE-DRIFT] annotation",
+    bool(_s46_ph2close_slice)
+    and "git diff --name-only" in _s46_ph2close_slice
+    and (
+        "Scope of Fix" in _s46_ph2close_slice
+        or "01-root-cause.md" in _s46_ph2close_slice
+    )
+    and "SCOPE-DRIFT" in _s46_ph2close_slice,
+    f"anchor '{_S46_PH2CLOSE_ANCHOR}' missing or scope-check tokens absent;"
+    f" anchor present: {bool(_s46_ph2close_slice)};"
+    f" git diff: {'git diff --name-only' in _s46_ph2close_slice};"
+    f" Scope of Fix or 01-root-cause.md:"
+    f" {'Scope of Fix' in _s46_ph2close_slice or '01-root-cause.md' in _s46_ph2close_slice};"
+    f" SCOPE-DRIFT: {'SCOPE-DRIFT' in _s46_ph2close_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-3 — Phase 2-close note: coordination with PR B gate
+# (diff-vs-sensitive-paths) — distinct and complementary, not a duplicate.
+# Today there is no such coordination note.
+# Tokens required in slice:
+#   one of "PR B" / "sensitive-paths" / "tier_promote"  — PR B gate identity
+#   one of "complementary" / "distinct" / "coordination"
+#                              — the co-existence framing
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(6/ac-3): Phase 2-close scope check documents coordination with"
+    " PR B gate (diff-vs-sensitive-paths) as distinct and complementary",
+    bool(_s46_ph2close_slice)
+    and (
+        "PR B" in _s46_ph2close_slice
+        or "sensitive-paths" in _s46_ph2close_slice
+        or "tier_promote" in _s46_ph2close_slice
+    )
+    and (
+        "complementary" in _s46_ph2close_slice
+        or "distinct" in _s46_ph2close_slice
+        or "coordination" in _s46_ph2close_slice
+    ),
+    f"anchor '{_S46_PH2CLOSE_ANCHOR}' missing or PR-B coordination note absent;"
+    f" anchor present: {bool(_s46_ph2close_slice)};"
+    f" PR B / sensitive-paths / tier_promote:"
+    f" {'PR B' in _s46_ph2close_slice or 'sensitive-paths' in _s46_ph2close_slice or 'tier_promote' in _s46_ph2close_slice};"
+    f" complementary / distinct / coordination:"
+    f" {'complementary' in _s46_ph2close_slice or 'distinct' in _s46_ph2close_slice or 'coordination' in _s46_ph2close_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-4 — kg_write pointer co-located after Phase 3 security-finding
+# write site.  Today the Phase 3 section has no such inline pointer.
+# Strategy: slice the "## Phase 3 — Verify" section and assert the pointer
+# references the emit section via the `§ "Emitting kg_write events"` form
+# (the § convention is used so the literal "### Emitting kg_write events"
+# heading token is NOT reproduced inline — an inline `### …` copy would be
+# matched first by _slice_section's text.find() and would hijack the slices
+# that Suites 35/36 anchor on the real heading).
+# ---------------------------------------------------------------------------
+_S46_EMIT_PTR = '§ "Emitting kg_write events"'
+check(
+    "obs-gates(7/ac-4): orchestrator.md § Phase 3 — Verify contains an inline"
+    " pointer (§ \"Emitting kg_write events\") after the security-finding write site",
+    bool(_s46_phase3_slice)
+    and _S46_EMIT_PTR in _s46_phase3_slice,
+    f"anchor '{_S46_PHASE3_ANCHOR}' missing or kg_write pointer absent in Phase 3 slice;"
+    f" anchor present: {bool(_s46_phase3_slice)};"
+    f" '{_S46_EMIT_PTR}' in slice:"
+    f" {_S46_EMIT_PTR in _s46_phase3_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-4 — kg_write pointer co-located after Phase 6 save procedure.
+# Today the Phase 6 section has no such inline pointer.
+# Strategy: slice the "Phase 6 — Knowledge Save (MANDATORY)" section and
+# assert the pointer references the emit section via the `§ "Emitting
+# kg_write events"` form (same anti-collision rationale as check (7)).
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(8/ac-4): orchestrator.md § Phase 6 — Knowledge Save contains an"
+    " inline pointer (§ \"Emitting kg_write events\") after the save procedure",
+    bool(_s46_phase6_slice)
+    and _S46_EMIT_PTR in _s46_phase6_slice,
+    f"anchor '{_S46_PHASE6_ANCHOR}' missing or kg_write pointer absent in Phase 6 slice;"
+    f" anchor present: {bool(_s46_phase6_slice)};"
+    f" '{_S46_EMIT_PTR}' in slice:"
+    f" {_S46_EMIT_PTR in _s46_phase6_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-5 — Documentation Flow lists 00-execution-events in its
+# workspace listing.  Today the Documentation Flow workspace listing does not
+# include 00-execution-events.
+# Tokens required in slice:
+#   "00-execution-events"  — the artifact name (either .md or .jsonl suffix)
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(9/ac-5): ref-special-flows.md § Documentation Flow lists"
+    " 00-execution-events in its workspace artifact listing",
+    bool(_s46_docflow_slice)
+    and "00-execution-events" in _s46_docflow_slice,
+    f"anchor '{_S46_DOCFLOW_ANCHOR}' missing or 00-execution-events absent in slice;"
+    f" anchor present: {bool(_s46_docflow_slice)};"
+    f" 00-execution-events: {'00-execution-events' in _s46_docflow_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-5 — Documentation Flow specifies phase.start/phase.end
+# events for its phases (1, 2a, 2b, 3).  Today no phase events are documented
+# for the docs-flow.
+# Tokens required in slice (both):
+#   "phase.start"   — event type
+#   "phase.end"     — event type
+# Plus evidence of at least one docs-flow phase reference:
+#   one of "2a" / "2b" / "Research" / "Write"
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(10/ac-5): ref-special-flows.md § Documentation Flow specifies"
+    " phase.start and phase.end events for its phases (1, 2a, 2b, 3)",
+    bool(_s46_docflow_slice)
+    and "phase.start" in _s46_docflow_slice
+    and "phase.end" in _s46_docflow_slice
+    and (
+        "2a" in _s46_docflow_slice
+        or "2b" in _s46_docflow_slice
+        or "Research" in _s46_docflow_slice
+        or "Write" in _s46_docflow_slice
+    ),
+    f"anchor '{_S46_DOCFLOW_ANCHOR}' missing or phase event tokens absent;"
+    f" anchor present: {bool(_s46_docflow_slice)};"
+    f" phase.start: {'phase.start' in _s46_docflow_slice};"
+    f" phase.end: {'phase.end' in _s46_docflow_slice};"
+    f" phase ref (2a/2b/Research/Write):"
+    f" {'2a' in _s46_docflow_slice or '2b' in _s46_docflow_slice or 'Research' in _s46_docflow_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (11) / AC-5 — Documentation Flow has a DOC-GATE gate event.  Today
+# no DOC-GATE gate event is specified.
+# Tokens required in slice:
+#   "DOC-GATE"   — the gate name (used in the plan spec)
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(11/ac-5): ref-special-flows.md § Documentation Flow specifies"
+    " a DOC-GATE gate event",
+    bool(_s46_docflow_slice)
+    and "DOC-GATE" in _s46_docflow_slice,
+    f"anchor '{_S46_DOCFLOW_ANCHOR}' missing or DOC-GATE absent in slice;"
+    f" anchor present: {bool(_s46_docflow_slice)};"
+    f" DOC-GATE: {'DOC-GATE' in _s46_docflow_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (12) / AC-5 — Documentation Flow explicitly declares its KG-capture
+# stance (no KG capture — the docs-flow has no Phase 6).  Today this is
+# undocumented.
+# Tokens required in slice:
+#   one of "KG" / "KG capture" / "knowledge"  — the KG concept
+#   one of "no" / "not" / "NO" / "does not"   — the negation
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(12/ac-5): ref-special-flows.md § Documentation Flow explicitly"
+    " declares its KG-capture stance (no KG capture / no Phase 6)",
+    bool(_s46_docflow_slice)
+    and (
+        "KG" in _s46_docflow_slice
+        or "KG capture" in _s46_docflow_slice
+        or "knowledge" in _s46_docflow_slice.lower()
+    )
+    and (
+        "no KG" in _s46_docflow_slice
+        or "no Phase 6" in _s46_docflow_slice
+        or "does not" in _s46_docflow_slice
+        or "NO KG" in _s46_docflow_slice
+        or "not perform" in _s46_docflow_slice
+    ),
+    f"anchor '{_S46_DOCFLOW_ANCHOR}' missing or KG-capture stance absent;"
+    f" anchor present: {bool(_s46_docflow_slice)};"
+    f" KG token: {'KG' in _s46_docflow_slice or 'knowledge' in _s46_docflow_slice.lower()};"
+    f" negation: {'no KG' in _s46_docflow_slice or 'does not' in _s46_docflow_slice or 'no Phase 6' in _s46_docflow_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (13) / AC-6 — CLAUDE.md §5 carve-out explicitly exempts Tier 0 from
+# the observability-mandatory invariant.  Today §5 mandates observability
+# without any exception for Tier 0.
+#
+# Strategy: slice §5 from CLAUDE.md (between "## 5." and "## 6.") and assert:
+#   "Tier 0"        — the tier name
+#   "observability" — or "observable" — the invariant domain
+#   one of "exception" / "exempt" / "carve-out" / "explicitly"
+#                   — the carve-out framing
+# ---------------------------------------------------------------------------
+_S46_CLAUDE_S5_START = "## 5."
+_S46_CLAUDE_S6_START = "## 6."
+_s46_s5_idx = _s46_claude.find(_S46_CLAUDE_S5_START)
+_s46_s6_idx = _s46_claude.find(_S46_CLAUDE_S6_START, _s46_s5_idx) if _s46_s5_idx != -1 else -1
+_s46_claude_s5 = (
+    _s46_claude[_s46_s5_idx:_s46_s6_idx]
+    if _s46_s5_idx != -1 and _s46_s6_idx != -1
+    else (_s46_claude[_s46_s5_idx:] if _s46_s5_idx != -1 else "")
+)
+
+check(
+    "obs-gates(13/ac-6): CLAUDE.md §5 explicitly carves Tier 0 out of the"
+    " observability-mandatory invariant (Tier 0 + observability + exception/exempt)",
+    bool(_s46_claude_s5)
+    and "Tier 0" in _s46_claude_s5
+    and (
+        "observability" in _s46_claude_s5
+        or "observable" in _s46_claude_s5.lower()
+    )
+    and (
+        "exception" in _s46_claude_s5
+        or "exempt" in _s46_claude_s5
+        or "carve-out" in _s46_claude_s5
+        or "explicitly" in _s46_claude_s5
+    ),
+    f"CLAUDE.md §5 slice (## 5. → ## 6.) missing or Tier 0 carve-out absent;"
+    f" §5 slice found: {bool(_s46_claude_s5)};"
+    f" Tier 0: {'Tier 0' in _s46_claude_s5};"
+    f" observability: {'observability' in _s46_claude_s5};"
+    f" exception/exempt/carve-out/explicitly:"
+    f" {'exception' in _s46_claude_s5 or 'exempt' in _s46_claude_s5 or 'carve-out' in _s46_claude_s5 or 'explicitly' in _s46_claude_s5}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (14) / AC-6 — ref-special-flows.md Tier 0 rows reference the carve-out.
+# Today the Tier 0 rows in ref-special-flows.md do not mention the §5 carve-out.
+# Strategy: whole-file check on ref-special-flows.md for both:
+#   "Tier 0"              — tier name
+#   one of "carve-out" / "§5" / "CLAUDE.md" / "exempt"
+#                         — the carve-out reference
+# (We use whole-file because the Tier 0 table is in a different section than
+# Documentation Flow and we already have the whole file loaded.)
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(14/ac-6): ref-special-flows.md Tier 0 rows reference the §5"
+    " carve-out (CLAUDE.md §5 or 'carve-out' or 'exempt' in the Tier 0 context)",
+    "Tier 0" in _s46_rsf
+    and (
+        "carve-out" in _s46_rsf
+        or "§5" in _s46_rsf
+        or ("CLAUDE.md" in _s46_rsf and "Tier 0" in _s46_rsf and "observability" in _s46_rsf)
+        or ("exempt" in _s46_rsf and "Tier 0" in _s46_rsf)
+    ),
+    f"ref-special-flows.md missing Tier 0 carve-out reference;"
+    f" 'Tier 0' present: {'Tier 0' in _s46_rsf};"
+    f" carve-out reference (carve-out/§5/exempt):"
+    f" {'carve-out' in _s46_rsf or '§5' in _s46_rsf or 'exempt' in _s46_rsf}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (15) / AC-8 — Suite 46 registered in docs/testing.md (canonical
+# registry, NOT in CLAUDE.md §11).
+# ---------------------------------------------------------------------------
+check(
+    "obs-gates(15/ac-8): docs/testing.md canonical registry names 'Suite 46'"
+    " and 'pr-f-observability'; this file contains 'Suite 46' and '_slice_section';"
+    " CLAUDE.md §11 does NOT contain 'Suite 46' (hygiene contract)",
+    "Suite 46" in _s46_testing
+    and "pr-f-observability" in _s46_testing
+    and "Suite 46" in _s46_self
+    and "_slice_section" in _s46_self
+    and "Suite 46" not in _s46_claude_s5,
+    f"Suite 46 not registered in docs/testing.md"
+    f" or 'pr-f-observability' absent from docs/testing.md"
+    f" or 'Suite 46' missing in this file"
+    f" or '_slice_section' idiom absent"
+    f" or 'Suite 46' found in CLAUDE.md §11 (hygiene violation);"
+    f" docs/testing.md Suite 46: {'Suite 46' in _s46_testing};"
+    f" docs/testing.md pr-f-observability: {'pr-f-observability' in _s46_testing};"
+    f" this file Suite 46: {'Suite 46' in _s46_self};"
+    f" CLAUDE.md §5 Suite 46 (must be False): {'Suite 46' in _s46_claude_s5}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (16) / AC-8 — Suite 46 NOT in CLAUDE.md §11 (hygiene contract —
+# same precedent as Suites 43/44/45).
+# Strategy: slice CLAUDE.md §11 (between "## 11." and "## 12.") and assert
+# "Suite 46" does NOT appear there.
+# ---------------------------------------------------------------------------
+_S46_CLAUDE_S11_START = "## 11."
+_S46_CLAUDE_S12_START = "## 12."
+_s46_s11_idx = _s46_claude.find(_S46_CLAUDE_S11_START)
+_s46_s12_idx = _s46_claude.find(_S46_CLAUDE_S12_START, _s46_s11_idx) if _s46_s11_idx != -1 else -1
+_s46_claude_s11 = (
+    _s46_claude[_s46_s11_idx:_s46_s12_idx]
+    if _s46_s11_idx != -1 and _s46_s12_idx != -1
+    else (_s46_claude[_s46_s11_idx:] if _s46_s11_idx != -1 else "")
+)
+
+check(
+    "obs-gates(16/ac-8): CLAUDE.md §11 does NOT contain 'Suite 46'"
+    " (hygiene contract — per-suite inventory belongs in docs/testing.md, not §11)",
+    "Suite 46" not in _s46_claude_s11,
+    f"CLAUDE.md §11 contains literal 'Suite 46' — hygiene violation;"
+    f" Suite 46 must be registered only in docs/testing.md, not in CLAUDE.md §11;"
+    f" §11 slice found: {bool(_s46_claude_s11)}",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

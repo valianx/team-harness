@@ -421,6 +421,14 @@ After `delivery` returns `status: success` at Phase 4, and before any reporting 
 - Escalate to the operator with a STOP block that lists every missing file and the recovery action.
 - **Do NOT emit any "pipeline complete" signal.** Phase 5 (GitHub Update) and Phase 6 (KG Save) do NOT execute in this state. Note: Phase 4 delivery already created the PR on the remote — it remains in a valid state on remote. The operator can resolve the missing artifacts and resume Phases 5–6 via `/th:recover`.
 
+**Observability artifact verification (mandatory extension):** After the per-agent artifact check (steps 1–5 above), perform a dedicated check for the two observability files that are orchestrator-owned and never appear in `§ Agent Results`:
+
+6. Verify `{docs_root}/00-pipeline-summary.md` exists and is non-empty.
+7. Verify `{docs_root}/{events_file}` exists and is non-empty.
+8. Read `{docs_root}/00-state.md § Phase Checklist` and count the number of phases marked `[x]` (completed). Read `{docs_root}/{events_file}` and count `phase.end` events. Assert: the events file contains ≥1 `phase.end` per `[x]` phase in the Phase Checklist.
+
+If any of steps 6–8 fail (file missing, file empty, or insufficient `phase.end` count), add the failing items to `missing_artifacts`, set `status: blocked-incomplete`, and do NOT emit `pipeline.complete`. Use the same failure path defined above — escalate with the STOP block listing the missing or incomplete observability files.
+
 **Pipeline-type awareness:** the expected-artifact list is derived dynamically from `00-state.md § Agent Results`, not from a hardcoded static list. This means:
 
 - A `docs` pipeline that never dispatched `security` does NOT expect `04-security.md`.
@@ -1586,6 +1594,21 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 ---
 
+### Phase 2-close scope check (type: fix / hotfix — mandatory before Phase 3)
+
+**When to run:** For `type: fix` or `type: hotfix`, after the implementer returns `status: success` and before launching Phase 3. Skip for all other types.
+
+**Mechanic:**
+
+1. Run `git diff --name-only` against the branch to enumerate every file changed since branching from base.
+2. Read `01-root-cause.md § Scope of Fix` to obtain the declared list of files the implementer was authorised to touch.
+3. For each changed non-test file (exclude `tests/`, `*.test.*`, `*.spec.*`): verify it appears in `§ Scope of Fix` OR has a `[SCOPE-DRIFT]` annotation in `02-implementation.md`.
+4. If any non-test file is outside `§ Scope of Fix` and has no `[SCOPE-DRIFT]` annotation → **route back to implementer** (or architect if the scope genuinely needs expanding): "Scope-discipline violation: `{file}` is not in `01-root-cause.md § Scope of Fix` and has no `[SCOPE-DRIFT]` annotation. Revert the change or add `[SCOPE-DRIFT: file X required for AC-N]` with a one-line justification." This counts toward the max-3 iteration budget.
+
+**Coordination note — distinct from PR B gate:** This check is diff-vs-`Scope of Fix` (implementer scope-discipline for bug-fix mode). The Phase 2-close re-tier gate from PR B (`§ Tier System`) is diff-vs-sensitive-paths and forces `tier_promote: 3` when a security-sensitive path is touched. The two gates are distinct and complementary — both run at Phase 2 close for fix/hotfix; neither duplicates the other's authority list or consequence.
+
+---
+
 ## Phase 3 — Verify (Test + Validate + Security in parallel)
 
 **Agents:** `tester` + `qa` (validate mode) + `security` (conditional) — **launched in parallel**
@@ -1603,6 +1626,8 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 | `4` | default verify | validate mode (default bug-fix contract) | pipeline mode + **extended analysis** (cross-references prior-art from `01-root-cause.md ## Prior Art`; analyses adjacent-code attack surface beyond the diff) | ~9 agent runs. |
 
 **Feature flow (`type: feature` / `refactor` / `enhancement`):** unchanged from existing behaviour — tester + qa always; security only when `security-sensitive: true` per Phase 0a Step 7 classification.
+
+→ When `security` reports Critical/High findings and a KG write is performed (see § "KG write on security findings" below), emit a `kg_write` event per § "Emitting kg_write events".
 
 Launch agents simultaneously using Task tool calls in the same message:
 - **tester**: feature name, list of files created/modified (from implementer's status block summary), **acceptance criteria from `01-plan.md` § Task List (per-PR AC block)** (the tester must map each AC to at least one test), reference to `00-knowledge-context.md` if it exists. For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
@@ -1704,6 +1729,8 @@ This sub-procedure is invoked BEFORE re-dispatching the correcting agent in Phas
 
 After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceability directly from workspaces. This is the second line of defense against shipping unfinished work — Phase 3 already passed all status blocks, but we re-check the artifacts to confirm.
 
+**Additional gate for `type: fix` / `type: hotfix` Tier 2-4 — regression-still-passing:** Confirm `regression_test_path` (from `00-state.md`) shows PASS in `03-testing.md`, AND the named test from `02-regression-test.md` still exists in the suite without `skip`, `xfail`, or a comment removing it. If the regression test is absent or not passing → fail the gate and route back to tester (counts against the max-3 budget).
+
 1. **Read `workspaces/{feature-name}/01-plan.md`** (§ Task List, the AC block for this PR) and count the total AC.
 2. **Read `workspaces/{feature-name}/04-validation.md`** (qa) and count `PASS` vs `FAIL` per AC.
 3. **Read `workspaces/{feature-name}/03-testing.md`** AC Coverage table and verify every AC has at least one test marked PASS.
@@ -1719,15 +1746,20 @@ After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceab
    - `high`, `medium`, and `suggestion` findings do **not** block delivery — include them in the acceptance gate summary as recommendations only.
    - If `04-ux-validation.md` is absent (ux-reviewer failed or was skipped) → log a warning and proceed (non-blocking when the file is absent; the gate only blocks on present critical findings).
 
-6. **Test-ratchet check.** Compare the tester's `tests_count` from this iteration's status block against `last_tests_count` recorded in `00-state.md` Hot Context (from the previous iteration; absent on the first iteration of this pipeline). On the first iteration, capture `tests_count` as the baseline and skip the comparison. On subsequent iterations:
+6. **Regression-still-passing check (type: fix / hotfix, Tier 2-4 only).** When `type` is `fix` or `hotfix` and `bug_tier` is 2, 3, or 4:
+   - Read `workspaces/{feature-name}/03-testing.md` and confirm `regression_test_path` (from `00-state.md`) is listed with status PASS.
+   - Read `workspaces/{feature-name}/02-regression-test.md` to obtain the named regression test. Verify that test name still appears in the test suite (in `03-testing.md` or the test file itself) without `skip`, `xfail`, or a comment that removes it from execution.
+   - If the regression test is absent, marked `skip` or `xfail`, or does not show PASS in `03-testing.md` → **fail the gate**: route back to tester with: "Regression-still-passing check failed: the named regression test from `02-regression-test.md` is absent, skipped, or not passing. Restore and fix the test." This counts toward the max-3 iteration budget.
+
+7. **Test-ratchet check.** Compare the tester's `tests_count` from this iteration's status block against `last_tests_count` recorded in `00-state.md` Hot Context (from the previous iteration; absent on the first iteration of this pipeline). On the first iteration, capture `tests_count` as the baseline and skip the comparison. On subsequent iterations:
    - **`tests_count >= last_tests_count`** → ratchet passes. Update `last_tests_count` in Hot Context.
    - **`tests_count < last_tests_count` AND `tests_deleted == 0`** → impossible, the tester miscounted. Log a warning and proceed; treat as ratchet pass.
    - **`tests_deleted > 0` AND `tests_deleted_reason` is present and meaningful** → ratchet passes (legitimate deletion). Update `last_tests_count`. Note the reason in Hot Context: `tests_deleted: {N} — {reason}`.
    - **`tests_deleted > 0` AND `tests_deleted_reason` is empty, missing, or matches a forbidden pattern** (`broken`, `flaky`, `couldn't make them pass`, `removing failing tests`) → **ratchet FAILS.** Route back to `tester` with: "Test-ratchet violation: {N} tests deleted without valid justification. Restore the deleted tests and fix the underlying issue instead." This counts toward the max-3 iteration budget.
 
 **Decision matrix:**
-- All AC `PASS` in qa AND every AC has a passing test AND no Critical/High security AND no critical UX findings (when `frontend_scope: true`) AND test-ratchet passes → **proceed to Phase 4**.
-- Any AC failed in qa, missing a test, any unresolved Critical/High security, any critical UX finding (WCAG A, when `frontend_scope: true`), or test-ratchet fails → **route back to implementer or tester** (depending on which check failed — UX critical findings route to implementer as Case A) with a focused fix brief. Increment iteration counter (still subject to the max-3 limit from Phase 3).
+- All AC `PASS` in qa AND every AC has a passing test AND no Critical/High security AND no critical UX findings (when `frontend_scope: true`) AND regression-still-passing check passes (type: fix/hotfix Tier 2-4) AND test-ratchet passes → **proceed to Phase 4**.
+- Any AC failed in qa, missing a test, any unresolved Critical/High security, any critical UX finding (WCAG A, when `frontend_scope: true`), regression-still-passing failure (type: fix/hotfix Tier 2-4), or test-ratchet fails → **route back to implementer or tester** (depending on which check failed — UX critical findings route to implementer as Case A) with a focused fix brief. Increment iteration counter (still subject to the max-3 limit from Phase 3).
 - AC count in qa report ≠ AC count in `01-plan.md` § Task List → **abort with `status: blocked`** and report the discrepancy to the user; this means the plan drifted silently and needs reconciliation.
 
 Update `00-state.md` with the Phase 3.5 result. If gate passes, write a single line in Hot Context: `Acceptance gate: {N}/{N} AC verified, {test count} tests, security {clean|N findings}`. Also persist `last_tests_count: {N}` in Hot Context for the test-ratchet baseline used by the next iteration (if any).
@@ -1762,6 +1794,8 @@ For each candidate in `security`'s `kg_save_candidates` (may be bare string lega
 1. **Content-filter pass.** Apply the write-time filter from `docs/kg-content-policy.md`. Discard or rewrite any candidate that contains: exploit details, CVE-version specifics, secrets or PII, absolute paths with user identifiers, or other forbidden content. Only proceed if the candidate passes the filter. When the forbidden content is STRUCTURAL (an exploit detail, a CVE-version identifier, a secret or PII value, a user-path — not merely a phrasing nuance), PREFER discard over rewrite: a silent rewrite risks distorting the security lesson or leaving forbidden residue in the observation.
 2. **Gate 1 — Specificity (`suggest_node_type`) + Gate 2 — Dedup (`search_nodes`):** see `agents/_shared/kg-write-policy.md` § "Dedup gate" for the full mechanics. For security-finding writes, the intended type is `error` or `pattern`; filter Gate 2 `search_nodes` results to `node_type ∈ {error, pattern}` only — do not cross-merge against a `process-insight` node.
 4. Call `mcp__memory__create_nodes` or `mcp__memory__add_observations` as determined in Gate 2.
+
+→ After each KG write call above, emit a `kg_write` event per § "Emitting kg_write events" below.
 
 **Note on KG deletions:** Deletes are operator-SQL-only; the orchestrator never attempts an MCP delete. The context-harness-mcp server exposes no delete tool — node removal is performed directly against the database by the operator when needed.
 
@@ -2164,6 +2198,8 @@ Using the Knowledge Graph MCP tools (if available), save the most reusable insig
    - `uses-stack` (project → stack-profile): create when a project formally adopts or follows a stack profile.
    - `depends-on` (service → service): create only when the build or deploy ordering is real (e.g., shared library, schema dependency), distinct from runtime calls.
    - Legacy: `relates_to` remains valid as the generic edge for non-topology pairs (e.g., `prisma-sqlite-enum-workaround` → `prisma`).
+
+→ After each `create_nodes` / `add_observations` call in the save procedure above, emit a `kg_write` event per § "Emitting kg_write events".
 
 ### Save triggers (per entity type)
 

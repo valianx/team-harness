@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.9] - 2026-05-31
+
+### Fixed
+
+- Hardened pipeline observability gates (PR F — pipeline-flows-hardening): Final Pipeline Sanity Check now verifies `00-pipeline-summary.md` and the events file exist + non-empty and contain ≥1 `phase.end` per completed phase (mismatch → `blocked-incomplete`, no `pipeline.complete`); Phase 3.5 Acceptance Gate adds a regression-still-passing check for `type: fix/hotfix` Tier 2-4; Phase 2-close scope check asserts every non-test changed file is in `01-root-cause.md § Scope of Fix` or has `[SCOPE-DRIFT]`; inline `### Emitting kg_write events` pointers added after Phase 3 security-finding write site and Phase 6 save procedure; Documentation Flow observability contract added (`00-execution-events` + `phase.start`/`phase.end` per phase + DOC-GATE gate event + no-KG-capture declaration); Tier 0 explicitly carved out of the CLAUDE.md §5 observability invariant (`workspaces: NONE` by design). Suite 46 (16 anchor-scoped checks, anti-false-green) added to `tests/test_agent_structure.py`.
+
 ## [2.40.8] - 2026-05-31
 
 ### Fixed

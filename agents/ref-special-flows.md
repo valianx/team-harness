@@ -130,7 +130,7 @@ The Tier System modulates the Bug-fix Pipeline depth so trivial fixes skip cerem
 
 | Tier | Name | Phase 1 (root-cause) | Phase 2.0 (pre-fix regression test) | Phase 3 agents | workspaces | Estimated agent runs |
 |---|---|---|---|---|---|---|
-| **0** | Trivial/Cosmetic | **Skip** | **Skip** | tester only (suite no-regress; no full audit) | **NONE** — no workspaces created | ~1 |
+| **0** | Trivial/Cosmetic | **Skip** | **Skip** | tester only (suite no-regress; no full audit) | **NONE** — no workspaces created (Tier 0 is exempt from the `CLAUDE.md §5` observability invariant; see §5 carve-out) | ~1 |
 | **1** | Docs/Trivial | **Skip** — no `01-root-cause.md`. orchestrator emits one-sentence prose plan at STAGE-GATE-1 (same surface as `type: hotfix`). | **Conditional skip** — only when there is no behavior change (see condition below). | tester (suite no-regress) only | Yes — `00-state.md`, `01-plan.md` | ~3 |
 | **2** | Light fix | Inline `01-root-cause.md` — 1 paragraph for `## Mechanism` + 1 paragraph for `## Scope of Fix`, no extended sections. Architect dispatched with `mode: light-root-cause`. | Mandatory | tester + qa | Yes — full | ~5 |
 | **3** | Standard fix | Full `01-root-cause.md` (current PR #50 default). Architect dispatched with `mode: full-root-cause`. `## Prior Art` section optional. | Mandatory | tester + qa + security | Yes — full | ~7 |
@@ -714,6 +714,8 @@ workspaces/
 
 When the user asks to document a service, database, API, library, infrastructure, or product — typically via `/th:docs` or conversational requests like "documenta en obsidian el servicio X", "document the auth service", "genera documentación del API de pagos".
 
+**Observability:** this flow is non-standard (no dev pipeline). The orchestrator appends `phase.start` and `phase.end` events to `00-execution-events` for each phase: Phase 0 (intake), Phase 1 (research), Phase 2a (write), Phase 2b (diagrams), Phase 3 (review). The DOC-GATE human checkpoint emits a `gate` event with `gate: "DOC-GATE"`. The workspace listing includes `00-execution-events` (see `### workspaces for documentation pipeline`). **KG capture:** the documentation flow does NOT perform KG capture — it has no Phase 6; no `process-insight` node is written to the Knowledge Graph.
+
 ### Phase 0 — Intake
 
 1. **Read vault config** — read `~/.claude/config/obsidian-vaults.json`. If missing, stop and ask the operator for the vault path. If a `--vault` flag was passed, use that vault entry; otherwise use the `default` vault.
@@ -832,11 +834,27 @@ Each topic gets its own workspaces subfolder pattern: `workspaces/docs-{topic-na
 ```
 workspaces/{feature-name}/
   00-state.md              # Pipeline state (type: docs)
+  00-execution-events.md   # Observability event trace (or .jsonl in local mode) — append-only, one JSON per line
   01-plan.md               # Topics, vault, folder, language, subject classification (§ Review Summary) + task breakdown (§ Task List)
   00-research.md           # Architect research findings
   02-documentation.md      # Documenter manifest (pages, diagrams, dispatch requests)
   04-validation.md         # QA validation report
 ```
+
+### Observability events for documentation pipeline
+
+The orchestrator appends observability events to `00-execution-events` at each phase transition. Required events per phase:
+
+| Phase | Event | When |
+|-------|-------|------|
+| Phase 0 — Intake | `phase.start` (phase: "0-intake") / `phase.end` (phase: "0-intake") | On enter / on complete |
+| Phase 1 — Research | `phase.start` (phase: "1-research") / `phase.end` (phase: "1-research") | On enter / on architect return |
+| Phase 2a — Write | `phase.start` (phase: "2a-write") / `phase.end` (phase: "2a-write") | On enter / on documenter return |
+| Phase 2b — Diagrams | `phase.start` (phase: "2b-diagrams") / `phase.end` (phase: "2b-diagrams") | On enter / on diagram dispatch complete (or skipped with status: "skipped") |
+| Phase 3 — Review | `phase.start` (phase: "3-review") / `phase.end` (phase: "3-review") | On enter / on qa return |
+| DOC-GATE | `gate` (gate: "DOC-GATE", decision: "approve\|revise") | On operator decision |
+
+**KG capture stance:** The documentation flow does NOT perform KG capture. It has no Phase 6. The operator-facing pages are the primary output; no `process-insight` node is written to the Knowledge Graph. If a reusable pattern is discovered during research, the operator may write it manually via `/th:memory`.
 
 ### Direct mode (for other agents)
 
