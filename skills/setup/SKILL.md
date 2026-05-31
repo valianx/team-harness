@@ -59,9 +59,14 @@ If obsidian mode:
 
 ### 4a. Write orchestrator dispatch rule
 
-Read `~/.claude/CLAUDE.md`. If it does not contain the orchestrator dispatch rule (look for `<!-- orchestrator-dispatch-rule:start -->`), append this block:
+Read the canonical block from `managed-blocks/orchestrator-dispatch-rule.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/orchestrator-dispatch-rule.md`).
 
-```markdown
+Read `~/.claude/CLAUDE.md`. Apply idempotently: if both the start and end markers of the orchestrator-dispatch-rule block are present, replace the content between those markers (inclusive) with the canonical block. Otherwise append the block at the end of the file.
+
+Also check for legacy markers (`<!-- th-orchestrator-inline-rule:start -->` or `<!-- th-orchestrator-dispatch-rule:start -->`) and replace them with the current version.
+
+The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-rule.md`):
+
 <!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
@@ -77,19 +82,17 @@ Read `~/.claude/CLAUDE.md`. If it does not contain the orchestrator dispatch rul
 
 **Language propagation.** When dispatching the orchestrator, detect the operator's chat language and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` This ensures the orchestrator and all downstream agents write in the operator's language.
 <!-- orchestrator-dispatch-rule:end -->
-```
-
-If the rule already exists (markers found), replace the block between markers with the version above. This ensures the subagent_type matches the plugin namespace.
-
-Also check for legacy markers (`<!-- th-orchestrator-inline-rule:start -->` or `<!-- th-orchestrator-dispatch-rule:start -->`) and replace them with the current version.
 
 ### 4b. Write nested-dispatch-takeover rule
 
-Read `~/.claude/CLAUDE.md`. If the file does not contain the nested-dispatch-takeover block (look for `<!-- nested-dispatch-takeover:start -->`), append the block below at the end of the file.
+Read the canonical block from `managed-blocks/nested-dispatch-takeover.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/nested-dispatch-takeover.md`).
 
-If the block already exists (markers found), replace the content between the markers with the canonical version below. This is the idempotence contract: insert if missing, replace between markers if present. Do NOT add migration logic for legacy markers — this block is new in v2.33.1 and has no prior marker variants. The canonical block includes a guard: if `next_dispatch.agent == th:orchestrator`, the handoff is malformed — the consumer must dispatch the phase agent from `00-state.md` (or `th:architect` at boot), never `th:orchestrator` itself.
+Read `~/.claude/CLAUDE.md`. Apply idempotently: if both the start and end markers of the nested-dispatch-takeover block are present, replace the content between those markers (inclusive) with the canonical block. Otherwise append the block at the end of the file.
 
-```markdown
+Do NOT add migration logic for legacy markers — this block is new in v2.33.1 and has no prior marker variants. The canonical block includes a guard: if `next_dispatch.agent == th:orchestrator`, the handoff is malformed — the consumer must dispatch the phase agent from `00-state.md` (or `th:architect` at boot), never `th:orchestrator` itself.
+
+The canonical block (source of truth in `managed-blocks/nested-dispatch-takeover.md`):
+
 <!-- nested-dispatch-takeover:start -->
 ## nested-dispatch-takeover
 
@@ -109,13 +112,15 @@ If the block already exists (markers found), replace the content between the mar
 
 **Guard:** if `next_dispatch.agent == th:orchestrator`, the handoff is malformed — dispatch the phase agent from `00-state.md` (or `th:architect` at boot), never `th:orchestrator` itself. See `docs/subagent-orchestration.md § dispatch_handoff Schema` for the canonical schema and `§ Takeover Protocol` step 4 for the full consume-side guard.
 <!-- nested-dispatch-takeover:end -->
-```
 
 ### 4c. Write voice-rule block
 
-Read `~/.claude/CLAUDE.md`. If the file does not contain the voice-rule block (look for `<!-- voice-rule:start -->`), append the block below at the end of the file. If the block already exists (markers found), replace the content between the markers with the canonical version below. This is the idempotence contract: insert if missing, replace between markers if present.
+Read the canonical block from `managed-blocks/voice-rule.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/voice-rule.md`).
 
-```markdown
+Read `~/.claude/CLAUDE.md`. Apply idempotently: if both the start and end markers of the voice-rule block are present, replace the content between those markers (inclusive) with the canonical block. Otherwise append the block at the end of the file.
+
+The canonical block (source of truth in `managed-blocks/voice-rule.md`):
+
 <!-- voice-rule:start -->
 ## Voice — neutral register, no regional idioms
 
@@ -125,7 +130,6 @@ Use neutral, standard language that reads the same to a reader from any country.
 - No localisms, no dialect slang, no colloquial anglicisms (`shippeo`, `bakeado`, `wrappear`) — use the formal equivalent (`publicar`, `incorporado`, `encapsular`).
 - Keep the tone declarative and professional; the reader's country should not be inferable from word choice.
 <!-- voice-rule:end -->
-```
 
 ### 5. Write manifest
 
