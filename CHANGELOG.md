@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.1] - 2026-05-30
+
+### Fixed
+
+- Repaired the nested-dispatch takeover / handoff contract: bound `{next-agent}` to an explicit rule (`th:architect` at boot, phase agent from `00-state.md` mid-pipeline, NEVER `th:orchestrator`); added consume-side guard in `docs/subagent-orchestration.md § Takeover Protocol` step 4 that rejects a malformed `th:orchestrator` agent value; defined the canonical `dispatch_handoff` JSON schema (8-field table + worked example) in a new `## dispatch_handoff Schema` section; wired `dispatch.blocked` event emission (reason + action) in the Dispatch-blocked exit; relabeled the Takeover Pipeline Manifest as a gate manifest with a pointer to the Phase Dispatch table as the authoritative ordered phase sequence; corrected stale `§ 13 "Subagent Orchestration"` cross-reference in `skills/README.md` to `§ 14`; added never-th:orchestrator guard reinforcement line in `skills/setup/SKILL.md` managed block; added Suite 39 structural tests (13 assertions anchored via `_slice_section`). Fixes CWE-691 (infinite bounce), CWE-778 (missing security-relevant event), CWE-636 (type:null fail-open entrenchment note).
+
 ## [2.40.0] - 2026-05-30
 
 ### Added
