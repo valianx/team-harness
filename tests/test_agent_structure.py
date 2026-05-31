@@ -7447,6 +7447,387 @@ check(
 )
 
 
+# Suite 40 -- pr-b-security-failopen (AC-1..AC-9 + SEC-D1 + SEC-D2)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks for the four fail-open security vectors closed by PR B
+# of the pipeline-flows-hardening programme:
+#   Vector #1 — hotfix not pinned to Tier 3 → security skipped for low-tier hotfix
+#   Vector #2 — Signal 2 "re-evaluate" is discretionary, not a deterministic GATE
+#   Vector #3 — boot type=null: no classify-first before applying type-gated manifest
+#   Vector #4 — plan-review direct mode: glob-only path scan misses semantic keywords
+#
+# Every check slices to a named anchor and asserts sub-tokens WITHIN the slice —
+# never a loose `token in whole_file` — following the Suite 36/37/38/39 idiom.
+# Anti-false-green guarantee:
+#   _slice_section returns "" when the anchor is absent
+#   => `"token" in ""` is always False
+#   => a missing section always fails the check, never silently passes it.
+#
+# Exception: the self-referential guard (check 12) is file-wide by design,
+# following the precedent of Suite 35-39 self-ref guards.
+#
+# Check index -> AC mapping:
+#   (1)  / AC-1 + SEC-D1 : orchestrator.md § Bug tier — hotfix→Tier-3 hard floor
+#                           + override-clamp (override cannot lower hotfix below Tier 3)
+#   (2)  / AC-2           : ref-special-flows.md § Hotfix sub-flow — security-always
+#                           justified by Tier-3 pin (both tokens near security text)
+#   (3)  / AC-3           : orchestrator.md Signal 2 slice — GATE tokens present
+#                           (Phase 2 + git-diff/touched-paths + MUST/FUERZA/forces)
+#                           and NOT purely "re-evaluate"
+#   (4)  / AC-4           : subagent-orchestration.md § Takeover Protocol step 4 —
+#                           classify-first clause for type=null + security defaults RUN
+#   (5)  / AC-5           : subagent-orchestration.md § dispatch_handoff Schema —
+#                           placeholder "hardened in PR B" replaced by step-4 reference;
+#                           manifest Phase 3 line carries type-null rule
+#   (6)  / AC-6           : ref-direct-modes.md § Plan Review Mode gating slice —
+#                           `keyword` token + ≥6 semantic security terms
+#   (7)  / AC-7           : ref-direct-modes.md plan-review output block —
+#                           visible-skip text (SKIPPED + re-run|--security)
+#   (8)  / AC-9 + SEC-D2  : consistency check — BOTH orchestrator.md AND
+#                           ref-special-flows.md affirm the hotfix Tier-3 pin;
+#                           dispatch table Tier-3 and Tier-4 rows stay "pipeline mode"
+#   (9)  / AC-8           : this file must contain Suite 40 + anti-false-green idiom
+#   (10) / AC-5 schema    : schema row placeholder replaced (no "hardened in PR B")
+#   (11) / AC-3 gate-only : Signal 2 slice must NOT rely solely on "re-evaluate"
+#   (12)                  : self-referential guard — CLAUDE.md §11 names "Suite 40"
+#                           + this file contains "Suite 40"
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 40: pr-b-security-failopen ===")
+
+# ---- file reads (suite-local) ----------------------------------------------
+_s40_orch        = read(AGENTS_DIR / "orchestrator.md")
+_s40_ref_special = read(AGENTS_DIR / "ref-special-flows.md")
+_s40_suborch     = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s40_ref_direct  = read(AGENTS_DIR / "ref-direct-modes.md")
+_s40_claude      = read(REPO_ROOT / "CLAUDE.md")
+_s40_self        = read(Path(__file__).resolve())
+
+# ---- anchors ---------------------------------------------------------------
+# AC-1: the Bug-tier classification block in Phase 0a Step 7
+_S40_BUG_TIER_ANCHOR = "Bug tier (only when"
+# AC-2: Hotfix sub-flow in ref-special-flows.md
+_S40_HOTFIX_ANCHOR   = "## Hotfix sub-flow"
+# AC-3: Signal 2 in orchestrator.md
+_S40_SIGNAL2_ANCHOR  = "Signal 2 — File-path patterns"
+# AC-4 / AC-5: Takeover Protocol step 4 + schema section
+_S40_TAKEOVER_ANCHOR = "## Takeover Protocol"
+_S40_SCHEMA_ANCHOR   = "## dispatch_handoff Schema"
+# AC-6 / AC-7: Plan Review Mode gating in ref-direct-modes.md
+_S40_PLAN_REVIEW_ANCHOR = "## Plan Review Mode"
+# AC-9 / SEC-D2: dispatch table in orchestrator.md
+_S40_DISPATCH_TABLE_ANCHOR = "Tier-gated dispatch table"
+
+# ---- slices ----------------------------------------------------------------
+_s40_bug_tier_slice    = _slice_section(_s40_orch,        _S40_BUG_TIER_ANCHOR)
+_s40_hotfix_slice      = _slice_section(_s40_ref_special, _S40_HOTFIX_ANCHOR)
+_s40_signal2_slice     = _slice_section(_s40_orch,        _S40_SIGNAL2_ANCHOR)
+_s40_takeover_slice    = _slice_section(_s40_suborch,     _S40_TAKEOVER_ANCHOR)
+_s40_schema_slice      = _slice_section(_s40_suborch,     _S40_SCHEMA_ANCHOR)
+_s40_plan_review_slice = _slice_section(_s40_ref_direct,  _S40_PLAN_REVIEW_ANCHOR)
+_s40_dispatch_slice    = _slice_section(_s40_orch,        _S40_DISPATCH_TABLE_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 + SEC-D1 — orchestrator.md § Bug tier:
+# The hotfix→Tier-3 hard floor rule must be present in the Bug tier section.
+# Requires: `hotfix` + `Tier 3` + one of (minimum|never below|never-below|hard floor).
+# SEC-D1 override-clamp: `override` + one of (cannot lower|only raise|clamp)
+# near `hotfix` — the operator `[TIER: 0/1/2]` override cannot lower a hotfix
+# below Tier 3.
+# ---------------------------------------------------------------------------
+_S40_AC1_BASE_TOKENS = ("hotfix", "Tier 3")
+_S40_AC1_FLOOR_ALTS  = ("minimum", "never below", "never-below", "hard floor", "nunca baja")
+_S40_AC1_CLAMP_ALTS  = ("cannot lower", "only raise", "clamp", "solo sube")
+
+def _tokens_within(text, tok_a, tok_b, window=200):
+    """Return True if tok_a and tok_b appear within `window` chars of each other."""
+    import re as _re
+    for ma in _re.finditer(re.escape(tok_a), text):
+        for mb in _re.finditer(re.escape(tok_b), text):
+            if abs(ma.start() - mb.start()) <= window:
+                return True
+    return False
+
+# Check 1a: `type: hotfix` (precise form) must appear within 200 chars of
+# a floor phrase in the Bug tier section. The existing text has generic mentions
+# of `hotfix` and `Tier 3` separately; after Fix #1, a dedicated rule
+# "type: hotfix → Tier 3 minimum" will co-locate them.
+_s40_floor_found = any(
+    _tokens_within(_s40_bug_tier_slice, "type: hotfix", a, window=200)
+    or _tokens_within(_s40_bug_tier_slice, "hotfix", a, window=80)
+    for a in _S40_AC1_FLOOR_ALTS
+)
+
+check(
+    "failopen(1a/ac-1): orchestrator.md § 'Bug tier' contains hotfix→Tier-3 hard floor"
+    " ('type: hotfix' or 'hotfix' within 80-200 chars of a floor phrase:"
+    f" {_S40_AC1_FLOOR_ALTS})",
+    bool(_s40_bug_tier_slice)
+    and "hotfix" in _s40_bug_tier_slice
+    and "Tier 3" in _s40_bug_tier_slice
+    and _s40_floor_found,
+    f"anchor '{_S40_BUG_TIER_ANCHOR}' missing or hotfix Tier-3 floor absent;"
+    f" need 'hotfix' + 'Tier 3' + one of {_S40_AC1_FLOOR_ALTS} within 200 chars",
+)
+
+check(
+    "failopen(1b/ac-1/sec-d1): orchestrator.md § 'Bug tier' contains override-clamp"
+    " for hotfix (override cannot lower hotfix below Tier 3)",
+    bool(_s40_bug_tier_slice)
+    and "override" in _s40_bug_tier_slice
+    and "hotfix" in _s40_bug_tier_slice
+    and any(a in _s40_bug_tier_slice for a in _S40_AC1_CLAMP_ALTS),
+    f"anchor '{_S40_BUG_TIER_ANCHOR}' missing or SEC-D1 override-clamp absent;"
+    f" need 'override' + 'hotfix' + one of {_S40_AC1_CLAMP_ALTS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-2 — ref-special-flows.md § Hotfix sub-flow:
+# The "security always" text must be justified by the Tier-3 pin.
+# Both `hotfix` and `Tier 3` must appear in the Hotfix sub-flow slice.
+# ---------------------------------------------------------------------------
+check(
+    "failopen(2/ac-2): agents/ref-special-flows.md § 'Hotfix sub-flow'"
+    " contains security-always text justified by Tier-3 pin"
+    " (tokens: hotfix + Tier 3 near security-always passage)",
+    bool(_s40_hotfix_slice)
+    and "hotfix" in _s40_hotfix_slice
+    and "Tier 3" in _s40_hotfix_slice
+    and "security" in _s40_hotfix_slice.lower(),
+    f"anchor '{_S40_HOTFIX_ANCHOR}' missing or Tier-3 pin justification absent;"
+    " need 'hotfix' + 'Tier 3' + 'security' in slice",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-3 — orchestrator.md Signal 2 slice:
+# The GATE must be deterministic — Signal 2 must explicitly say `git diff`
+# (the actual command that runs at Phase 2 close) AND one of
+# (MUST | FUERZA | forces) that is NOT part of an unrelated STAGE-GATE string.
+# Using `git diff` (not just "touched paths") because that is the specific
+# tool the contract requires at Phase 2-close; "touched paths" alone could
+# be present in the existing Signal 2 path-description text.
+# Anti-false-green: "GATE" is intentionally excluded from _S40_AC3_GATE_ALTS_MUST
+# because "STAGE-GATE" already appears in the tier table captured by the slice.
+# ---------------------------------------------------------------------------
+_S40_AC3_GATE_ALTS_PATH   = ("git diff", "touched paths", "touched-paths", "scope known")
+_S40_AC3_GATE_ALTS_MUST   = ("MUST", "FUERZA", "forces")
+
+check(
+    "failopen(3/ac-3): orchestrator.md Signal 2 slice contains deterministic re-tier GATE"
+    " (git diff + MUST/FUERZA/forces — confirming the new deterministic gate text,"
+    " not historical STAGE-GATE mentions already in the slice)",
+    bool(_s40_signal2_slice)
+    and "git diff" in _s40_signal2_slice
+    and any(a in _s40_signal2_slice for a in _S40_AC3_GATE_ALTS_MUST),
+    f"anchor '{_S40_SIGNAL2_ANCHOR}' missing or GATE tokens absent;"
+    f" need 'git diff' + one of {_S40_AC3_GATE_ALTS_MUST}"
+    " (GATE excluded to avoid false-green from STAGE-GATE text already in slice)",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-4 — docs/subagent-orchestration.md § Takeover Protocol step 4:
+# classify-first clause for type=null + "security defaults to RUN".
+# ---------------------------------------------------------------------------
+_S40_AC4_TOKENS = ("null", "classify", "security")
+_S40_AC4_RUN_ALTS = ("defaults to RUN", "default RUN", "RUN by default", "security RUN",
+                     "defaults to run", "RUN when type")
+
+check(
+    "failopen(4/ac-4): docs/subagent-orchestration.md § 'Takeover Protocol'"
+    " step 4 contains classify-first for type=null + security defaults to RUN",
+    bool(_s40_takeover_slice)
+    and all(t in _s40_takeover_slice for t in _S40_AC4_TOKENS)
+    and any(a in _s40_takeover_slice for a in _S40_AC4_RUN_ALTS),
+    f"anchor '{_S40_TAKEOVER_ANCHOR}' missing or classify-first/security-RUN absent;"
+    f" need {_S40_AC4_TOKENS} + one of {_S40_AC4_RUN_ALTS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-5 — docs/subagent-orchestration.md § dispatch_handoff Schema:
+# placeholder "hardened in PR B" must NOT appear (it was replaced by the
+# implementer); and the type-null rule should reference step 4.
+# ---------------------------------------------------------------------------
+_S40_PLACEHOLDER = "hardened in PR B"
+
+check(
+    "failopen(5a/ac-5): docs/subagent-orchestration.md § 'dispatch_handoff Schema'"
+    " no longer contains placeholder 'hardened in PR B' (was replaced by step-4 ref)",
+    bool(_s40_schema_slice)
+    and _S40_PLACEHOLDER not in _s40_schema_slice,
+    f"Placeholder '{_S40_PLACEHOLDER}' still present in the dispatch_handoff Schema section"
+    " — implementer must replace it with a reference to Takeover Protocol step 4",
+)
+
+check(
+    "failopen(5b/ac-5): docs/subagent-orchestration.md manifest Phase 3 line"
+    " carries type-null rule (type + null + security or classify in manifest section)",
+    # The manifest lives inside § Takeover Protocol, so use the takeover slice.
+    # Look for the Phase-3 manifest entry + type-null annotation.
+    bool(_s40_takeover_slice)
+    and "null" in _s40_takeover_slice
+    and (
+        "classify" in _s40_takeover_slice.lower()
+        or "security" in _s40_takeover_slice.lower()
+    ),
+    f"Takeover Protocol section missing or Phase-3 manifest type-null annotation absent",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-6 — agents/ref-direct-modes.md § Plan Review Mode:
+# Gating section must contain `keyword` token + ≥6 semantic security terms.
+# ---------------------------------------------------------------------------
+_S40_SECURITY_TERMS = (
+    "auth",
+    "token",
+    "jwt",
+    "secret",
+    "credential",
+    "PII",
+    "encrypt",
+    "session",
+    "permission",
+    "password",
+    "oauth",
+    "signature",
+    "csrf",
+    "xss",
+    "injection",
+)
+
+_s40_sec_terms_found = [t for t in _S40_SECURITY_TERMS if t in _s40_plan_review_slice]
+
+check(
+    "failopen(6/ac-6): agents/ref-direct-modes.md § 'Plan Review Mode' gating"
+    " contains 'keyword' token + ≥6 semantic security terms"
+    f" (need ≥6 of: {_S40_SECURITY_TERMS[:8]}...)",
+    bool(_s40_plan_review_slice)
+    and "keyword" in _s40_plan_review_slice
+    and len(_s40_sec_terms_found) >= 6,
+    f"anchor '{_S40_PLAN_REVIEW_ANCHOR}' missing or keyword-match contract absent;"
+    f" 'keyword' present: {'keyword' in _s40_plan_review_slice};"
+    f" security terms found ({len(_s40_sec_terms_found)}/6 minimum): {_s40_sec_terms_found}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-7 — agents/ref-direct-modes.md plan-review output block:
+# visible-skip text must be present (SKIPPED + re-run|--security).
+# ---------------------------------------------------------------------------
+_S40_AC7_SKIP_ALTS = ("re-run", "--security", "re-run with --security")
+
+check(
+    "failopen(7/ac-7): agents/ref-direct-modes.md § 'Plan Review Mode' output block"
+    " contains visible-skip text (SKIPPED + re-run|--security)",
+    bool(_s40_plan_review_slice)
+    and "SKIPPED" in _s40_plan_review_slice
+    and any(a in _s40_plan_review_slice for a in _S40_AC7_SKIP_ALTS),
+    f"anchor '{_S40_PLAN_REVIEW_ANCHOR}' missing or visible-skip text absent;"
+    f" need 'SKIPPED' + one of {_S40_AC7_SKIP_ALTS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8a) / AC-9 consistency — BOTH orchestrator.md AND ref-special-flows.md
+# affirm the hotfix Tier-3 pin.
+# ---------------------------------------------------------------------------
+check(
+    "failopen(8a/ac-9): BOTH orchestrator.md § 'Bug tier' AND"
+    " ref-special-flows.md § 'Hotfix sub-flow' affirm the hotfix→Tier-3 pin"
+    " (hotfix + Tier 3 in both slices)",
+    bool(_s40_bug_tier_slice)
+    and bool(_s40_hotfix_slice)
+    and "hotfix" in _s40_bug_tier_slice
+    and "Tier 3" in _s40_bug_tier_slice
+    and "hotfix" in _s40_hotfix_slice
+    and "Tier 3" in _s40_hotfix_slice,
+    "Consistency check failed: one or both files do not affirm hotfix→Tier-3 pin;"
+    f" orchestrator has ('hotfix': {'hotfix' in _s40_bug_tier_slice},"
+    f" 'Tier 3': {'Tier 3' in _s40_bug_tier_slice});"
+    f" ref-special-flows has ('hotfix': {'hotfix' in _s40_hotfix_slice},"
+    f" 'Tier 3': {'Tier 3' in _s40_hotfix_slice})",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8b) / AC-9 + SEC-D2 — dispatch table Tier-3 and Tier-4 rows still
+# say "pipeline mode" (security runs). Fail-closed in BOTH classification AND
+# dispatch (the two points of truth).
+# ---------------------------------------------------------------------------
+_S40_PIPELINE_MODE = "pipeline mode"
+
+check(
+    "failopen(8b/ac-9/sec-d2): orchestrator.md 'Tier-gated dispatch table'"
+    " Tier-3 and Tier-4 rows still show 'pipeline mode' (security runs)",
+    bool(_s40_dispatch_slice)
+    and _s40_dispatch_slice.count(_S40_PIPELINE_MODE) >= 2,
+    f"anchor '{_S40_DISPATCH_TABLE_ANCHOR}' missing or 'pipeline mode' appears"
+    f" fewer than 2 times in slice (need Tier-3 row + Tier-4 row);"
+    f" occurrences: {_s40_dispatch_slice.count(_S40_PIPELINE_MODE)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-8 — this file contains Suite 40 and uses _slice_section idiom
+# (anti-false-green: the suite file itself carries the idiom marker).
+# ---------------------------------------------------------------------------
+check(
+    "failopen(9/ac-8): this test file contains Suite 40 marker"
+    " and the _slice_section anti-false-green idiom",
+    "Suite 40" in _s40_self
+    and "_slice_section" in _s40_self
+    and "pr-b-security-failopen" in _s40_self,
+    "This file is missing Suite 40 marker, _slice_section usage, or"
+    " pr-b-security-failopen identifier — self-consistency check failed",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-3 gate-only guard — Signal 2 slice must contain the specific
+# "tier_promote: 3" value (the concrete promotion the GATE emits when it fires
+# at Phase 2-close). This is a unique token: the existing Signal 2 text has
+# `tier_promote: <new_tier>` (with angle-bracket placeholder for the architect
+# re-tier case) but NOT `tier_promote: 3` (the hardcoded value that the Phase
+# 2-close GATE forces for any sensitive-path match). After Fix #2 adds the
+# deterministic GATE, `tier_promote: 3` will appear in the Signal 2 section.
+# ---------------------------------------------------------------------------
+check(
+    "failopen(10/ac-3-gate): orchestrator.md Signal 2 — GATE hardcodes tier_promote: 3"
+    " (literal 'tier_promote: 3' present in Signal 2 slice, confirming the gate"
+    " forces the specific value 3, not just the generic re-tier mechanism)",
+    bool(_s40_signal2_slice)
+    and "tier_promote: 3" in _s40_signal2_slice,
+    f"Signal 2 slice missing or 'tier_promote: 3' absent;"
+    " deterministic gate must hardcode promotion to Tier 3 for sensitive-path matches"
+    " (existing text has 'tier_promote: <new_tier>' but not 'tier_promote: 3')",
+)
+
+# ---------------------------------------------------------------------------
+# Check (11) / AC-5 schema placeholder — full-file check that the placeholder
+# "hardened in PR B" is absent from the ENTIRE subagent-orchestration.md,
+# not just the schema section (belt-and-suspenders vs check 5a).
+# ---------------------------------------------------------------------------
+check(
+    "failopen(11/ac-5-file): docs/subagent-orchestration.md no longer contains"
+    " placeholder 'hardened in PR B' anywhere in the file",
+    _S40_PLACEHOLDER not in _s40_suborch,
+    f"Placeholder '{_S40_PLACEHOLDER}' still present in docs/subagent-orchestration.md"
+    " — implementer must replace it",
+)
+
+# ---------------------------------------------------------------------------
+# Check (12) / self-referential guard:
+# CLAUDE.md §11 must register "Suite 40" + marker "pr-b-security-failopen".
+# This file must contain the literal "Suite 40".
+# (Whole-file check — identical precedent to Suite 35-39 self-ref guards.)
+# ---------------------------------------------------------------------------
+check(
+    "failopen(12/self-ref):"
+    " CLAUDE.md §11 names 'Suite 40' and this file defines it"
+    " (self-referential guard -- pr-b-security-failopen)",
+    "Suite 40" in _s40_claude
+    and "Suite 40" in _s40_self
+    and "pr-b-security-failopen" in _s40_self,
+    "Suite 40 not registered in CLAUDE.md §11"
+    " or marker literal 'pr-b-security-failopen' missing in this file"
+    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
