@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.3] - 2026-05-30
+
+### Fixed
+
+- Corrected three hotfix-flow correctness defects (PR C — pipeline-flows-hardening): (1) Removed the contradictory claim that Phase 1.6 "should have skipped entirely for hotfix" from `agents/plan-reviewer.md:70` and its twin in `agents/orchestrator.md` (renderer section); both files now affirm that Phase 1.6 runs normally for hotfix — Rule 7 no-op, Rule 8 active against `01-plan.md § Task List` — consistent with the canonical `agents/ref-special-flows.md:349`. (2) Split the `bug-not-reproducible` gate-table row in `orchestrator.md § Phase 2.0` by type: `type: fix` keeps the existing "route back to architect" path; `type: hotfix` now auto-promotes to `type: fix` (Tier 3 preserved per PR B clamp), dispatches the architect for a real root-cause, and re-runs Phase 2.0 (operator may override to `status: blocked`). (3) Added an explicit orchestrator-self-authored step for `01-plan.md § Review Summary` and `§ Task List` before STAGE-GATE-1 for hotfix (extending the Tier-1-fix pattern), reflected in `orchestrator.md § STAGE-GATE-1` and `ref-special-flows.md § Modified phases`; amended the STAGE-GATE-1 missing-Review-Summary guard to be type-aware: hotfix and Tier-1-fix route to the self-authored step, never to the architect (which is not dispatched in those flows). Suite 41 (10 anchor-scoped checks, anti-false-green idiom) added to `tests/test_agent_structure.py`.
+
 ## [2.40.2] - 2026-05-30
 
 ### Fixed
