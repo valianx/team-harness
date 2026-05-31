@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.10] - 2026-05-31
+
+### Fixed
+
+- Hardened Documentation Flow fidelity gates (PR G — pipeline-flows-hardening): docs-mode `qa` now spot-verifies a sample of concrete technical claims (endpoints, env vars, config keys, CLI flags, params) against real source files — not just `00-research.md` — and a documented fact with no source backing is a fidelity finding that FAILS the DOC-GATE; `documenter` now requires file:line provenance for every concrete technical claim and returns `blocked` instead of inventing facts when `00-research.md` lacks backing (fail-closed); docs-flow artifacts (`00-research.md`, `02-documentation.md`, `04-validation.md`) registered in the canonical Artifact Verification Protocol table in `orchestrator.md`; DOC-GATE in `ref-special-flows.md` adds a pages-on-disk == `pages_created` existence assertion (mismatch → blocked, fail-closed). Suite 47 (12 anchor-scoped checks) added to `tests/test_agent_structure.py`.
+
 ## [2.40.9] - 2026-05-31
 
 ### Fixed

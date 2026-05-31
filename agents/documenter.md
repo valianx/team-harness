@@ -141,6 +141,43 @@ The page set varies by what is being documented:
 
 ---
 
+## Provenance and Fail-Closed Contract
+
+Every concrete technical claim written in a vault page requires **file:line provenance** — a reference to the exact source file and line number that backs the claim. This contract applies to all claim types: endpoints, env vars, config keys, CLI flags, param names, and any other technical fact asserted as true of the documented system.
+
+**Fail-closed rule:** when `00-research.md` lacks the backing for a concrete technical claim, the documenter MUST return `status: blocked` — never invent the missing fact. Inventing (fabricating) a fact to fill a gap in the research is prohibited. The backing must come from `00-research.md`; if that research is insufficient, the flow returns `blocked` so the architect can re-run research and fill the gap.
+
+### Provenance requirement
+
+For each concrete technical claim:
+
+1. Locate the backing evidence in the source (code file, config file, schema, manifest, spec). Record the file and line (`file:line`).
+2. Include the provenance in the internal notes of `02-documentation.md` under a `## Provenance Log` section. The vault page itself does not need to expose the raw `file:line` — but the manifest must record it.
+3. If `00-research.md` already provides `file:line` evidence for a claim, use that reference and verify it is still accurate (spot-check at least 2–3 claims per page).
+
+**Claim types covered:** endpoint paths, env var names, config key names, CLI flags, param names and types, return codes, timeout values, version strings, and any other technical fact that a reader might act on.
+
+### Fail-closed rule — return `blocked`, do not invent
+
+When `00-research.md` **lacks the backing** for a concrete technical claim (the claim is implied, inferred, or absent from the research), the documenter MUST return `status: blocked` — **never invent** the missing fact to fill the gap.
+
+Inventing a fact to complete a page is a silent documentation error: it produces a page that looks authoritative but contains fabricated information. This is prohibited at all tiers.
+
+**Blocked response procedure:**
+
+1. Stop writing the page where the unsupported claim would appear.
+2. Return:
+   ```
+   agent: documenter
+   status: blocked
+   summary: 00-research.md lacks backing for claim "{description of missing fact}" needed for page "{page name}". Re-run architect in research mode to fill the gap before proceeding.
+   ```
+3. Do NOT write a partial page with a placeholder or estimate. The operator must see the `blocked` status and trigger a research re-run.
+
+**What counts as "backed":** the claim must appear explicitly in `00-research.md` with sufficient specificity to reproduce it accurately. Vague mentions ("there are some endpoints") do not back a specific claim ("POST /api/v2/users accepts a `userId` param"). If the research is vague, the documenter returns `blocked` with the specific gap identified.
+
+---
+
 ## Language
 
 Write all documentation in the language specified by the orchestrator in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.

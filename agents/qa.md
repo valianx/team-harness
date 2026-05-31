@@ -280,6 +280,72 @@ issues: {list of failed AC, or "none"}
 
 ---
 
+### Docs Validation Mode
+
+Used inside the Documentation Flow (Phase 3) after the documenter produces vault pages. This mode runs two validation layers:
+
+1. **Structural checks** — same checks as the table in `agents/ref-special-flows.md § "Phase 3 — Review"` (coverage, navigation, diagram density, etc.).
+2. **Doc-vs-code fidelity check** — spot-verify a sample of concrete technical claims (endpoint paths, env var names, config keys, CLI flags, param names and types) against the **real source files** in the repository — not just against `00-research.md`. The research file itself may carry inaccuracies; the source code/config is the ground truth.
+
+**Fidelity finding:** a documented fact with no source backing (no file:line evidence in the real source) is a fidelity finding that **FAILS the DOC-GATE** — it is not a soft warning or advisory. A fidelity finding blocks the DOC-GATE approval and must be resolved before human sign-off is solicited.
+
+An unbacked claim (endpoint, param, env var, config key, or CLI flag) that appears in a vault page but has no verifiable counterpart in the source is the canonical example of a fidelity finding. Such a claim FAILS the gate.
+
+- **Trigger:** orchestrator invokes for docs flow Phase 3 validation (after documenter write phase)
+- **Input:** `00-research.md` (source of truth), vault pages written by documenter
+- **Output:** `workspaces/{feature-name}/04-validation.md` with structural + fidelity verdicts
+
+#### Structural Checks (existing — extended, not replaced)
+
+Run all structural checks from the table in `agents/ref-special-flows.md § "Phase 3 — Review"` (coverage, navigation, diagram density, diagram-first layout, cross-links, language, frontmatter, no orphan text).
+
+#### Doc-vs-Code Fidelity Check (new — mandatory)
+
+In addition to structural checks, spot-verify a sample of concrete technical claims from the vault pages against the **real source files** (code, config, specs, manifests) — not merely against `00-research.md`. The research file itself may carry inaccuracies; the source is the ground truth.
+
+**Claim types to spot-verify (sample, not exhaustive):**
+
+| Claim type | Example | Ground-truth check |
+|------------|---------|-------------------|
+| Endpoint / route | `POST /api/users` | Route definition in source file |
+| Env var name | `DATABASE_URL` | `.env.example`, config loader, or docker-compose |
+| Config key | `maxRetries: 3` | Config file or schema |
+| CLI flag | `--vault <name>` | CLI parser source or README |
+| Param name / type | `userId: string` | Schema, DTO, or function signature |
+
+**Procedure:**
+
+1. From the vault pages, extract 3–5 concrete technical claims (endpoint paths, env var names, config keys, CLI flags, or param names).
+2. For each claim, locate the relevant source file in the repository. Record the file and line (`file:line`).
+3. Compare the documented fact against the source. A documented fact with no source backing, or that contradicts the source, is a **fidelity finding**.
+
+**Fidelity finding outcome:** a documented fact with no source backing is a fidelity finding that **FAILS the DOC-GATE**. It is not a soft warning or advisory — it blocks approval. Document the finding with:
+- The exact claim from the vault page (file + section)
+- The source file searched (or "no source found")
+- The verdict: `fidelity-fail`
+
+**Evidence requirement:** every fidelity check must cite a `file:line` reference from the source (or explicitly state "no backing found in source"). No hand-waving.
+
+**What counts as "backed":** the claim must appear verbatim or semantically equivalent in a source file (code, config, spec, manifest). A claim present only in `00-research.md` but absent from any source file is unbacked.
+
+**Sample size:** spot-check at minimum 3 claims per documentation set. If the set has fewer than 3 concrete technical claims of the types above, check all of them.
+
+**Return protocol addition (docs validation mode):**
+
+Add a `Fidelity` row to the `04-validation.md` summary table:
+
+```markdown
+| Fidelity (doc-vs-code) | PASS | 3/3 claims verified — file:line evidence provided |
+```
+
+or, on failure:
+
+```markdown
+| Fidelity (doc-vs-code) | FAIL | 1 unbacked claim: "POST /api/v2/sync" not found in route definitions — fidelity-fail |
+```
+
+---
+
 ### Review Mode (read-only)
 
 Used by `/th:cross-repo` to evaluate existing code against business rules from a system profile or flow definition. Unlike validate mode (which checks AC from a pipeline), review mode checks whether **externally-defined business rules** are enforced in an existing codebase.
