@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.8] - 2026-05-31
+
+### Fixed
+
+- Fixed `/th:update` step 6 accumulating `CLAUDE.md.bak-*` backups indefinitely by adding a bounded rolling-last-3 prune in both per-OS command blocks (PowerShell: `Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime | Select-Object -SkipLast 3 | Remove-Item -Force`; bash: `ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f`). Prune runs immediately after each backup creation; delete is anchored exclusively on the resolved path variable glob (`$claudeMd.bak-*` / `"$CLAUDE_MD".bak-*`) — no bare wildcard. Suite 45 (11 anchor-scoped checks, anti-false-green idiom) added to `tests/test_agent_structure.py`.
+
 ## [2.40.7] - 2026-05-31
 
 ### Fixed
