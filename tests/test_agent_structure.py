@@ -9903,6 +9903,417 @@ check(
 )
 
 
+
+# ---------------------------------------------------------------------------
+# Suite 47 -- pr-g-docs-fidelity (AC-1..AC-8)
+# ---------------------------------------------------------------------------
+# Regression assertions written FAILING-FIRST (Phase 2.0 mandate) against the
+# current source state.  They become GREEN after the implementer lands the 4
+# fixes.  Each content check is ANCHOR-SCOPED via _slice_section so that:
+#   - a missing anchor returns "" → token-in-"" is False → the check fails
+#     clearly (not silently) even if the token happens to exist elsewhere.
+#   - renaming or removing the anchored section fails the check, not the
+#     ambient-presence guard.
+#
+# CANONICAL ANCHORS (implementer MUST use these verbatim):
+#   agents/qa.md              : "### Docs Validation Mode"       (NEW section)
+#   agents/documenter.md      : "## Provenance and Fail-Closed Contract"  (NEW section)
+#   agents/orchestrator.md    : "### Artifact Verification Protocol"  (EXISTS today)
+#   agents/ref-special-flows.md: "### DOC-GATE — Human Checkpoint"  (EXISTS today)
+#
+# ANTI-COLLISION NOTE (lesson from PR F):
+#   The anchor strings above are Python string literals assigned to variables.
+#   They are NOT reproduced as inline markdown headings anywhere in this .py
+#   file.  The _slice_section helper resolves by text.find() on the .md sources;
+#   as long as no other suite defines the same anchor on the same file via a
+#   _slice_section call, there is no hijack risk.  Verified: no existing suite
+#   calls _slice_section on qa.md, documenter.md with these substrings, nor on
+#   ref-special-flows.md with "### DOC-GATE — Human Checkpoint", nor on
+#   orchestrator.md with "### Artifact Verification Protocol" via _slice_section
+#   (Suite 29 uses a whole-file `in` check, not _slice_section — no collision).
+#
+# Cross-refs in check names use the § "Section Name" form (never ### literal).
+#
+# Check index → AC mapping:
+#   (1)   AC-1  qa.md § Docs Validation Mode declares doc-vs-code spot-verify
+#   (2)   AC-2  qa.md § Docs Validation Mode: unbacked fact FAILS the DOC-GATE
+#   (3)   AC-3  documenter.md § Provenance and Fail-Closed Contract: file:line provenance
+#   (4)   AC-4  documenter.md § Provenance and Fail-Closed Contract: return blocked not invent
+#   (5)   AC-5  orchestrator.md § Artifact Verification Protocol table has docs-flow rows
+#   (6)   AC-5  orchestrator.md § Artifact Verification Protocol: 00-research.md row present
+#   (7)   AC-5  orchestrator.md § Artifact Verification Protocol: 02-documentation.md row present
+#   (8)   AC-5  orchestrator.md § Artifact Verification Protocol: 04-validation.md row present
+#   (9)   AC-6  ref-special-flows.md § DOC-GATE: pages-on-disk == pages_created assertion
+#   (10)  AC-6  ref-special-flows.md § DOC-GATE: mismatch → blocked (fail-closed)
+#   (11)  AC-7  Suite 47 in docs/testing.md (canonical registry)
+#   (12)  AC-7  Suite 47 NOT in CLAUDE.md §11 (hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 47: pr-g-docs-fidelity — docs-flow fidelity hardening ===")
+
+# ---- file reads (suite-local) ----------------------------------------------
+_s47_qa          = read(AGENTS_DIR / "qa.md")
+_s47_doc         = read(AGENTS_DIR / "documenter.md")
+_s47_orch        = read(AGENTS_DIR / "orchestrator.md")
+_s47_rsf         = read(AGENTS_DIR / "ref-special-flows.md")
+_s47_claude      = read(REPO_ROOT / "CLAUDE.md")
+_s47_testing     = read(REPO_ROOT / "docs" / "testing.md")
+_s47_self        = Path(__file__).read_text(encoding="utf-8")
+
+# ---- canonical anchors -----------------------------------------------------
+_S47_QA_DOCS_ANCHOR      = "### Docs Validation Mode"
+_S47_DOC_PROV_ANCHOR     = "## Provenance and Fail-Closed Contract"
+_S47_ORCH_AV_ANCHOR      = "### Artifact Verification Protocol"
+_S47_RSF_DOCGATE_ANCHOR  = "### DOC-GATE — Human Checkpoint"
+
+# ---- slices ----------------------------------------------------------------
+_s47_qa_docs_slice    = _slice_section(_s47_qa,   _S47_QA_DOCS_ANCHOR)
+_s47_doc_prov_slice   = _slice_section(_s47_doc,  _S47_DOC_PROV_ANCHOR)
+_s47_orch_av_slice    = _slice_section(_s47_orch, _S47_ORCH_AV_ANCHOR)
+_s47_rsf_docgate_slice = _slice_section(_s47_rsf, _S47_RSF_DOCGATE_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 — qa.md § Docs Validation Mode declares spot-verify of
+# concrete technical claims (endpoints, params, env vars, config keys, CLI
+# flags) against the REAL source file — not merely against 00-research.md.
+# Today qa.md has no docs-mode section; the slice will be empty → check fails.
+# Tokens required in slice:
+#   one of "doc-vs-code" / "source file" / "real source"
+#               — the ground-truth target (source, not research)
+#   one of "endpoint" / "env var" / "config key" / "CLI flag" / "param"
+#               — the claim types being spot-verified
+#   one of "spot-verif" / "fidelity" / "sample"
+#               — the verification method
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(1/ac-1): qa.md § Docs Validation Mode declares doc-vs-code"
+    " spot-verify of concrete claims (endpoints/params/env-vars/config-keys/CLI-flags)"
+    " against the real source file",
+    bool(_s47_qa_docs_slice)
+    and (
+        "doc-vs-code" in _s47_qa_docs_slice
+        or "source file" in _s47_qa_docs_slice
+        or "real source" in _s47_qa_docs_slice
+    )
+    and (
+        "endpoint" in _s47_qa_docs_slice
+        or "env var" in _s47_qa_docs_slice
+        or "config key" in _s47_qa_docs_slice
+        or "CLI flag" in _s47_qa_docs_slice
+        or "param" in _s47_qa_docs_slice
+    )
+    and (
+        "spot-verif" in _s47_qa_docs_slice
+        or "fidelity" in _s47_qa_docs_slice
+        or "sample" in _s47_qa_docs_slice
+    ),
+    f"anchor '{_S47_QA_DOCS_ANCHOR}' missing in qa.md or doc-vs-code/claim-type/spot-verif tokens absent;"
+    f" anchor present: {bool(_s47_qa_docs_slice)};"
+    f" doc-vs-code/source file/real source: {('doc-vs-code' in _s47_qa_docs_slice or 'source file' in _s47_qa_docs_slice or 'real source' in _s47_qa_docs_slice)};"
+    f" claim type token: {('endpoint' in _s47_qa_docs_slice or 'env var' in _s47_qa_docs_slice or 'config key' in _s47_qa_docs_slice)};"
+    f" spot-verif/fidelity/sample: {('spot-verif' in _s47_qa_docs_slice or 'fidelity' in _s47_qa_docs_slice or 'sample' in _s47_qa_docs_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-2 — qa.md § Docs Validation Mode declares that an unbacked
+# documented fact is a fidelity finding that FAILS the DOC-GATE (not a soft
+# warning).  Today no such declaration exists → slice empty → check fails.
+# Tokens required in slice:
+#   one of "fidelity finding" / "fidelity check" / "unbacked"
+#               — the finding classification
+#   one of "FAIL" / "fails" / "FALLA" (Spanish form permitted)
+#               — the gate outcome
+#   "DOC-GATE"  — the gate name
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(2/ac-2): qa.md § Docs Validation Mode declares an unbacked"
+    " documented fact is a fidelity finding that FAILS the DOC-GATE (not a soft warning)",
+    bool(_s47_qa_docs_slice)
+    and (
+        "fidelity finding" in _s47_qa_docs_slice
+        or "fidelity check" in _s47_qa_docs_slice
+        or "unbacked" in _s47_qa_docs_slice
+    )
+    and (
+        "FAIL" in _s47_qa_docs_slice
+        or "fails" in _s47_qa_docs_slice
+        or "FALLA" in _s47_qa_docs_slice
+    )
+    and "DOC-GATE" in _s47_qa_docs_slice,
+    f"anchor '{_S47_QA_DOCS_ANCHOR}' missing or fidelity-finding/FAIL/DOC-GATE tokens absent;"
+    f" anchor present: {bool(_s47_qa_docs_slice)};"
+    f" fidelity finding/check/unbacked: {('fidelity finding' in _s47_qa_docs_slice or 'fidelity check' in _s47_qa_docs_slice or 'unbacked' in _s47_qa_docs_slice)};"
+    f" FAIL/fails/FALLA: {('FAIL' in _s47_qa_docs_slice or 'fails' in _s47_qa_docs_slice or 'FALLA' in _s47_qa_docs_slice)};"
+    f" DOC-GATE: {'DOC-GATE' in _s47_qa_docs_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-3 — documenter.md § Provenance and Fail-Closed Contract
+# requires file:line provenance for every concrete technical claim.
+# Today documenter.md has no provenance section → slice empty → check fails.
+# Tokens required in slice:
+#   one of "file:line" / "provenance"
+#               — the provenance citation form
+#   one of "endpoint" / "env var" / "config key" / "CLI flag" / "param"
+#   OR one of "concrete" / "technical claim"
+#               — the claim scope
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(3/ac-3): documenter.md § Provenance and Fail-Closed Contract"
+    " requires file:line provenance for concrete technical claims",
+    bool(_s47_doc_prov_slice)
+    and (
+        "file:line" in _s47_doc_prov_slice
+        or "provenance" in _s47_doc_prov_slice
+    )
+    and (
+        "endpoint" in _s47_doc_prov_slice
+        or "env var" in _s47_doc_prov_slice
+        or "config key" in _s47_doc_prov_slice
+        or "CLI flag" in _s47_doc_prov_slice
+        or "param" in _s47_doc_prov_slice
+        or "concrete" in _s47_doc_prov_slice
+        or "technical claim" in _s47_doc_prov_slice
+    ),
+    f"anchor '{_S47_DOC_PROV_ANCHOR}' missing in documenter.md or provenance/file:line tokens absent;"
+    f" anchor present: {bool(_s47_doc_prov_slice)};"
+    f" file:line/provenance: {('file:line' in _s47_doc_prov_slice or 'provenance' in _s47_doc_prov_slice)};"
+    f" claim scope token: {('endpoint' in _s47_doc_prov_slice or 'env var' in _s47_doc_prov_slice or 'concrete' in _s47_doc_prov_slice or 'technical claim' in _s47_doc_prov_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-4 — documenter.md § Provenance and Fail-Closed Contract
+# declares return `blocked` (NOT invent) when 00-research.md lacks backing
+# — fail-closed.
+# Today no such declaration exists → slice empty → check fails.
+# Tokens required in slice:
+#   "blocked"         — the return status when backing is absent
+#   one of "invent" / "fabricat" / "not invent" / "never invent"
+#               — the prohibition on fabrication
+#   one of "00-research.md" / "research" / "backing" / "lacks"
+#               — the condition (backing absent)
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(4/ac-4): documenter.md § Provenance and Fail-Closed Contract"
+    " declares return blocked (not invent) when 00-research.md lacks backing — fail-closed",
+    bool(_s47_doc_prov_slice)
+    and "blocked" in _s47_doc_prov_slice
+    and (
+        "invent" in _s47_doc_prov_slice
+        or "fabricat" in _s47_doc_prov_slice
+    )
+    and (
+        "00-research.md" in _s47_doc_prov_slice
+        or "research" in _s47_doc_prov_slice
+        or "backing" in _s47_doc_prov_slice
+        or "lacks" in _s47_doc_prov_slice
+    ),
+    f"anchor '{_S47_DOC_PROV_ANCHOR}' missing or blocked/invent/research-condition tokens absent;"
+    f" anchor present: {bool(_s47_doc_prov_slice)};"
+    f" blocked: {'blocked' in _s47_doc_prov_slice};"
+    f" invent/fabricat: {('invent' in _s47_doc_prov_slice or 'fabricat' in _s47_doc_prov_slice)};"
+    f" 00-research.md/research/backing/lacks: {('00-research.md' in _s47_doc_prov_slice or 'research' in _s47_doc_prov_slice or 'backing' in _s47_doc_prov_slice or 'lacks' in _s47_doc_prov_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-5 — orchestrator.md § Artifact Verification Protocol table
+# contains at least one docs-flow agent row.
+# Today the table lists 11 rows (architect, implementer, tester x2, qa x2,
+# security, delivery, reviewer, acceptance-checker, plan-reviewer) but has NO
+# docs-flow rows → the check on doc-flow artifact tokens fails.
+# Strategy: slice from "### Artifact Verification Protocol" and verify at
+# least one of the docs-flow artifact names is present.
+# Token: one of "00-research.md" / "02-documentation.md" / "04-validation.md"
+#         AND one of "docs" / "documentation" / "documenter" / "Phase 2a"
+#               — to distinguish docs-flow from regular validate rows
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(5/ac-5): orchestrator.md § Artifact Verification Protocol"
+    " table contains at least one docs-flow row (00-research.md, 02-documentation.md,"
+    " or 04-validation.md) with docs-flow context",
+    bool(_s47_orch_av_slice)
+    and (
+        "00-research.md" in _s47_orch_av_slice
+        or "02-documentation.md" in _s47_orch_av_slice
+        or "04-validation.md" in _s47_orch_av_slice
+    )
+    and (
+        "docs" in _s47_orch_av_slice
+        or "documentation" in _s47_orch_av_slice
+        or "documenter" in _s47_orch_av_slice
+        or "Phase 2a" in _s47_orch_av_slice
+    ),
+    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing in orchestrator.md or docs-flow artifact tokens absent;"
+    f" anchor present: {bool(_s47_orch_av_slice)};"
+    f" 00-research/02-documentation/04-validation: {('00-research.md' in _s47_orch_av_slice or '02-documentation.md' in _s47_orch_av_slice or '04-validation.md' in _s47_orch_av_slice)};"
+    f" docs/documentation/documenter/Phase 2a: {('docs' in _s47_orch_av_slice or 'documentation' in _s47_orch_av_slice or 'documenter' in _s47_orch_av_slice or 'Phase 2a' in _s47_orch_av_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-5 — orchestrator.md § Artifact Verification Protocol:
+# the architect research → 00-research.md row is present.
+# Today absent → check fails.
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(6/ac-5): orchestrator.md § Artifact Verification Protocol"
+    " has architect research → 00-research.md row",
+    bool(_s47_orch_av_slice)
+    and "00-research.md" in _s47_orch_av_slice,
+    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or '00-research.md' absent in slice;"
+    f" anchor present: {bool(_s47_orch_av_slice)};"
+    f" 00-research.md: {'00-research.md' in _s47_orch_av_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-5 — orchestrator.md § Artifact Verification Protocol:
+# the documenter Phase 2a → 02-documentation.md row is present.
+# Today absent → check fails.
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(7/ac-5): orchestrator.md § Artifact Verification Protocol"
+    " has documenter Phase 2a → 02-documentation.md row",
+    bool(_s47_orch_av_slice)
+    and "02-documentation.md" in _s47_orch_av_slice,
+    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or '02-documentation.md' absent in slice;"
+    f" anchor present: {bool(_s47_orch_av_slice)};"
+    f" 02-documentation.md: {'02-documentation.md' in _s47_orch_av_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-5 — orchestrator.md § Artifact Verification Protocol:
+# the qa Phase 3 docs → 04-validation.md row for the docs-flow is present.
+# Note: 04-validation.md already exists in the table for standard validate mode
+# (Phase 3).  The docs-flow row must add a docs-context qualifier so Suite 47
+# can assert its presence distinctly.  Strategy: assert BOTH "04-validation.md"
+# AND one of "Phase 3 docs" / "docs validation" / "documentation flow"
+# appear within the slice.  This pair is absent today → check fails.
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(8/ac-5): orchestrator.md § Artifact Verification Protocol"
+    " has qa Phase 3 docs → 04-validation.md row with docs-flow qualifier",
+    bool(_s47_orch_av_slice)
+    and "04-validation.md" in _s47_orch_av_slice
+    and (
+        "Phase 3 docs" in _s47_orch_av_slice
+        or "docs validation" in _s47_orch_av_slice
+        or "documentation flow" in _s47_orch_av_slice
+        or "docs flow" in _s47_orch_av_slice
+        or "docs-flow" in _s47_orch_av_slice
+    ),
+    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or '04-validation.md' + docs-flow qualifier absent;"
+    f" anchor present: {bool(_s47_orch_av_slice)};"
+    f" 04-validation.md: {'04-validation.md' in _s47_orch_av_slice};"
+    f" docs-flow qualifier: {('Phase 3 docs' in _s47_orch_av_slice or 'docs validation' in _s47_orch_av_slice or 'documentation flow' in _s47_orch_av_slice or 'docs-flow' in _s47_orch_av_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-6 — ref-special-flows.md § DOC-GATE — Human Checkpoint
+# declares the pages-on-disk == pages_created existence assertion.
+# Today the DOC-GATE section reports Pages: {count} from the manifest's
+# pages_created field without verifying disk → the existence assertion is
+# absent → check fails.
+# Tokens required in slice:
+#   "pages_created"  — the manifest field name
+#   one of "disk" / "on disk" / "exist" / "pages on disk"
+#               — the disk-verification concept
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(9/ac-6): ref-special-flows.md § DOC-GATE — Human Checkpoint"
+    " declares the pages-on-disk == pages_created existence assertion",
+    bool(_s47_rsf_docgate_slice)
+    and "pages_created" in _s47_rsf_docgate_slice
+    and (
+        "disk" in _s47_rsf_docgate_slice
+        or "on disk" in _s47_rsf_docgate_slice
+        or "exist" in _s47_rsf_docgate_slice
+    ),
+    f"anchor '{_S47_RSF_DOCGATE_ANCHOR}' missing or pages_created/disk tokens absent;"
+    f" anchor present: {bool(_s47_rsf_docgate_slice)};"
+    f" pages_created: {'pages_created' in _s47_rsf_docgate_slice};"
+    f" disk/on disk/exist: {('disk' in _s47_rsf_docgate_slice or 'on disk' in _s47_rsf_docgate_slice or 'exist' in _s47_rsf_docgate_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-6 — ref-special-flows.md § DOC-GATE: mismatch (pages on
+# disk != pages_created) routes to `blocked` (fail-closed).
+# Today the DOC-GATE has no mismatch → blocked path → check fails.
+# Tokens required in slice:
+#   "blocked"          — the fail-closed status
+#   one of "mismatch" / "!=" / "count" / "never written"
+#               — the mismatch condition
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(10/ac-6): ref-special-flows.md § DOC-GATE declares mismatch"
+    " (pages-on-disk != pages_created) → blocked (fail-closed)",
+    bool(_s47_rsf_docgate_slice)
+    and "blocked" in _s47_rsf_docgate_slice
+    and (
+        "mismatch" in _s47_rsf_docgate_slice
+        or "!=" in _s47_rsf_docgate_slice
+        or "never written" in _s47_rsf_docgate_slice
+        or (
+            "count" in _s47_rsf_docgate_slice
+            and "pages_created" in _s47_rsf_docgate_slice
+        )
+    ),
+    f"anchor '{_S47_RSF_DOCGATE_ANCHOR}' missing or blocked/mismatch tokens absent;"
+    f" anchor present: {bool(_s47_rsf_docgate_slice)};"
+    f" blocked: {'blocked' in _s47_rsf_docgate_slice};"
+    f" mismatch/!=/never written/count+pages_created: {('mismatch' in _s47_rsf_docgate_slice or '!=' in _s47_rsf_docgate_slice or 'never written' in _s47_rsf_docgate_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (11) / AC-7 — Suite 47 registered in docs/testing.md (canonical
+# registry) AND this file contains 'Suite 47' and '_slice_section'.
+# The self-ref guard for docs/testing.md may already pass on authoring (the
+# tester registers Suite 47 there as part of Phase 2.0).  The presence of
+# 'Suite 47' and '_slice_section' in the test file itself is always true
+# once the suite is authored — these are the content-present guards.
+# ---------------------------------------------------------------------------
+check(
+    "docs-fidelity(11/ac-7): docs/testing.md canonical registry names 'Suite 47'"
+    " and 'pr-g-docs-fidelity'; this file contains 'Suite 47' and '_slice_section'",
+    "Suite 47" in _s47_testing
+    and "pr-g-docs-fidelity" in _s47_testing
+    and "Suite 47" in _s47_self
+    and "_slice_section" in _s47_self,
+    f"Suite 47 not in docs/testing.md"
+    f" or 'pr-g-docs-fidelity' absent from docs/testing.md"
+    f" or 'Suite 47' missing in this file"
+    f" or '_slice_section' idiom absent;"
+    f" docs/testing.md Suite 47: {'Suite 47' in _s47_testing};"
+    f" docs/testing.md pr-g-docs-fidelity: {'pr-g-docs-fidelity' in _s47_testing};"
+    f" this file Suite 47: {'Suite 47' in _s47_self};"
+    f" _slice_section in this file: {'_slice_section' in _s47_self}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (12) / AC-7 — Suite 47 NOT in CLAUDE.md §11 (hygiene contract —
+# same precedent as Suites 43/44/45/46).  Per the v2.40.5 rule: per-suite
+# inventory belongs in docs/testing.md only; CLAUDE.md §11 is a pointer.
+# Strategy: slice CLAUDE.md §11 (between "## 11." and "## 12.") and assert
+# 'Suite 47' does NOT appear there.
+# ---------------------------------------------------------------------------
+_S47_CLAUDE_S11_START = "## 11."
+_S47_CLAUDE_S12_START = "## 12."
+_s47_s11_idx = _s47_claude.find(_S47_CLAUDE_S11_START)
+_s47_s12_idx = _s47_claude.find(_S47_CLAUDE_S12_START, _s47_s11_idx) if _s47_s11_idx != -1 else -1
+_s47_claude_s11 = (
+    _s47_claude[_s47_s11_idx:_s47_s12_idx]
+    if _s47_s11_idx != -1 and _s47_s12_idx != -1
+    else (_s47_claude[_s47_s11_idx:] if _s47_s11_idx != -1 else "")
+)
+
+check(
+    "docs-fidelity(12/ac-7): CLAUDE.md §11 does NOT contain 'Suite 47'"
+    " (hygiene contract — per-suite inventory belongs in docs/testing.md, not §11)",
+    "Suite 47" not in _s47_claude_s11,
+    f"CLAUDE.md §11 contains literal 'Suite 47' — hygiene violation;"
+    f" Suite 47 must be registered only in docs/testing.md, not in CLAUDE.md §11;"
+    f" §11 slice found: {bool(_s47_claude_s11)}",
+)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

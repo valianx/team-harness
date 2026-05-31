@@ -796,21 +796,30 @@ Output: `04-validation.md` with per-check verdict + overall PASS/FAIL.
 
 ### DOC-GATE — Human Checkpoint
 
-Present to the operator:
+**Pre-gate assertions (automated — run before presenting to operator):**
+
+1. **Pages-on-disk existence check.** Count the vault pages actually present on disk in the target folder. Compare against `pages_created` in `02-documentation.md`:
+   - `count(pages on disk) == pages_created` → existence check passes.
+   - `count(pages on disk) != pages_created` → **mismatch**: the manifest claims a page that was never written (or a page was written without being registered). Return `status: blocked` with `summary: pages-on-disk mismatch — manifest declares {pages_created} pages but {actual_count} found on disk; re-run documenter to reconcile`. Do NOT present the DOC-GATE to the operator until this is resolved. This is fail-closed: a manifest that claims an unwritten page is a silent documentation gap.
+
+2. **Fidelity outcome check.** Read `04-validation.md` from Phase 3. If the qa doc-vs-code fidelity check produced any fidelity finding (unbacked documented fact), the DOC-GATE is **blocked** — the fidelity finding must be resolved before human approval is solicited. Refer the qa finding back to the documenter with instructions to correct the specific claim and re-run Phase 3.
+
+Only when both pre-gate assertions pass, present to the operator:
 
 ```
 Documentation complete: {topic(s)}
 Vault: {path}
 Folder: {folder name}
-Pages: {count} | Diagrams: {inline + external count}
+Pages: {count} (verified on disk) | Diagrams: {inline + external count}
 QA: {PASS or FAIL with details}
+Fidelity: {PASS — N claims verified | FAIL — see fidelity findings in 04-validation.md}
 
 Options:
 1. Approve — documentation is complete
 2. Revise — {specific feedback} → documenter iterates on flagged pages
 ```
 
-If **revise**: feed the operator's feedback + QA findings back to the documenter for targeted page updates. Max 3 iteration rounds. After each iteration, re-run QA (Phase 3) on the updated pages only.
+If **revise**: feed the operator's feedback + QA findings back to the documenter for targeted page updates. Max 3 iteration rounds. After each iteration, re-run Phase 3 QA (structural + fidelity) on the updated pages only, then re-run the pre-gate assertions before re-presenting.
 
 If **approve**: write `00-state.md` with `status: complete`.
 

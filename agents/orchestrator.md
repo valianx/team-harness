@@ -367,16 +367,21 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 |-------|-------|-------------------|
 | `architect` | 1 (design mode) | `01-plan.md` |
 | `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
+| `architect` | 1 (docs-flow research mode) | `00-research.md` |
 | `implementer` | 2 | `02-implementation.md` |
 | `tester` | 3 | `03-testing.md` |
 | `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
 | `qa` | 3 (validate mode) | `04-validation.md` |
+| `qa` | 3 (docs validation — docs-flow Phase 3) | `04-validation.md` |
 | `qa` | 1.5 (ratify-plan mode) | (no file — verdict is in status block only) |
+| `documenter` | 2 (docs-flow write — `02-documentation.md`) | `02-documentation.md` |
 | `security` | 3 | `04-security.md` |
 | `delivery` | 4 | `00-state.md` update (delivery section) |
 | `reviewer` | 4.5 (internal mode) | `04-internal-review.md` |
 | `acceptance-checker` | 3.6 | `04-validation.md` (§ Drift Analysis appended) |
 | `plan-reviewer` | 1.6 | `01-plan.md` (§ Plan Review appended) |
+
+**Documentation flow note:** vault pages written by the `documenter` (docs-flow write phase) live in the Obsidian vault, outside `{docs_root}`. Their existence is verified by the DOC-GATE (not by this per-phase table) using a pages-on-disk count check against `pages_created` in `02-documentation.md`.
 
 **Verification mechanic:**
 
