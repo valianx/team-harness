@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.40.2` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.40.3` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -349,7 +349,9 @@ worktree behavioral verification, agent-level publish invariant). **Suite 39** �
 dispatch.blocked emit, manifest gate-label, §14 cross-ref). **Suite 40** — pr-b-security-failopen
 (fail-closed security gating: hotfix Tier-3 hard floor + override-clamp, deterministic re-tier GATE
 at Phase 2-close, boot type=null classify-first + security-defaults-RUN, plan-review keyword
-trigger + visible-skip). Full reference (per-suite scope, when to add a test, what is NOT covered): `docs/testing.md`.
+trigger + visible-skip). **Suite 41** — pr-c-hotfix-correctness (hotfix flow correctness: Phase 1.6
+runs for hotfix, non-reproducible hotfix auto-promote, orchestrator authors Review Summary before
+STAGE-GATE-1, type-aware STAGE-GATE-1 guard). Full reference (per-suite scope, when to add a test, what is NOT covered): `docs/testing.md`.
 
 ---
 

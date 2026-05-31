@@ -1267,6 +1267,11 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 
 **What the orchestrator does:** emit the STAGE-GATE-1 STOP block (template below) and pause execution. Wait for an explicit user reply. Do NOT proceed without it.
 
+**For `type: hotfix` (and `type: fix` Tier 1 — no architect): orchestrator authors `01-plan.md` before this gate fires.** Because the architect is skipped for hotfix and Tier-1 fix, there is no architect-produced `## Review Summary`. The orchestrator writes `01-plan.md` directly with:
+- `## Review Summary` — constructed from the Phase 0b bug-report payload (Reported behaviour, Expected behaviour, Reproduction steps, Environment). The orchestrator authors this section; it is NOT the architect's output.
+- `## Task List` — the minimum 4-line task list (reproduce, regression test, fix, verify) with a `§ Task List` section.
+This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above, Tier 1 row). For hotfix, the same orchestrator-self-authored approach applies. The resulting `01-plan.md` is what Phase 1.6 (plan-reviewer) audits and what the STOP block displays verbatim below.
+
 **STOP block emitted to the user.** The orchestrator copies the `## Review Summary` section from `01-plan.md` verbatim into the block, plus the `### Summary` table from `01-plan.md` (§ Task List). This is the only place where the orchestrator does a small Read from workspaces on the happy path — the rest of the gating uses status blocks. The intent: the human reviews from the gate, not by opening the file. The plan-reviewer (Phase 1.6, Rule 6) enforces that all required sections exist before this gate fires.
 
 ```
@@ -1300,7 +1305,9 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 
 **Rendering rules:**
 - Preserve markdown bullets and table syntax as-is — terminal users see them rendered by Claude Code, file-output users get faithful markdown.
-- If `## Review Summary` is missing in `01-plan.md`, do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
+- If `## Review Summary` is missing in `01-plan.md`: this guard is **type-aware**.
+  - For `type: feature`, `type: refactor`, `type: enhancement`, or `type: fix` (Tier 2-4): do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
+  - For `type: hotfix` or `type: fix` Tier 1 (orchestrator-self-authored, no architect): do NOT route to architect (the architect is not dispatched in this flow — routing there would create a loop). Instead, route to the orchestrator-self-authored step above: the orchestrator writes `01-plan.md § Review Summary` from the Phase 0b bug-report payload and re-emits the gate. This is the **self-authored** path; it never routes to the architect.
 - If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, render only the first 10 plus a `… +{N-10} more, see 01-plan.md` line — protect the gate from giant batch features.
 
 **Handling the user reply:**
@@ -1364,7 +1371,8 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 |---|---|---|
 | `success` | equal AND `suite_still_passing: true` | Proceed to Phase 2. Mutate `<TBD-Phase-2.0>` placeholder in `01-plan.md` (§ Task List) to `regression_test_path`. Update `00-state.md` `regression_test_path` and `regression_test_status: failing`. |
 | `success` | unequal OR `suite_still_passing: false` | Route back to tester. Treat as iteration of Phase 2.0 (counts toward max-3). |
-| `failed` with reason `bug-not-reproducible` | n/a | Route back to architect — root-cause is wrong or incomplete. Re-run Phase 1, then Phase 2.0. Counts toward Phase 1.6 iteration budget. |
+| `failed` with reason `bug-not-reproducible` (type: fix) | n/a | Route back to architect — root-cause is wrong or incomplete. Re-run Phase 1, then Phase 2.0. Counts toward Phase 1.6 iteration budget. |
+| `failed` with reason `bug-not-reproducible` (type: hotfix) | n/a | **hotfix auto-promote**: auto-promote `type: hotfix` to `type: fix` (Tier 3 preserved — the hotfix Tier 3 floor clamp from PR B prevents descent below Tier 3). Record in `00-state.md` Hot Context: `type_transition: hotfix → fix`, `bug_tier: 3`, `reason: hotfix bug not reproducible — promoted to fix for real root-cause`. Dispatch the architect (mode: `full-root-cause`) to produce `01-root-cause.md`, then re-run Phase 1.5 → 1.6 → STAGE-GATE-1 → Phase 2.0 (the promoted `type: fix` Tier 3 must pass through Phase 1.6 security design-review before implementation). Operator override: set `status: blocked` and surface the non-reproducibility to the operator instead of auto-promoting. |
 | `blocked` | n/a | Cannot author a test. Pipeline blocks with `status: blocked`. Surface to operator. **No fallback** — operator override mandates regression test always. |
 
 **JSONL trace:** append `phase.start` and `phase.end` events with `phase: "2.0-regression-test"` and the tester's tools fields. The `00-pipeline-summary.md` renderer aggregates these into the Phase Timeline.
@@ -2771,7 +2779,7 @@ The Phase Timeline renderer adapts to the `type` field in `00-state.md`:
 - For `type: hotfix`: Phase 1 row is rendered as `Phase 1 — skipped (hotfix)` (single-line entry).
 - For both: a new `Phase 2.0 — Regression Test` row slots between STAGE-GATE-1 and Phase 2.
 - Phase 1.5 row is skipped when ratify-plan was skipped (existing behaviour — bug fixes usually have ≤3 AC).
-- Phase 1.6 row is skipped for `type: hotfix`.
+- Phase 1.6 row **is rendered for `type: hotfix`** — the plan-reviewer runs against the orchestrator-authored `01-plan.md` (one-sentence prose plan + task list). Rule 7 is no-op (no `01-root-cause.md`); **Rule 8 is active** (regression-test AC must be present in § Task List).
 - Phase 3 row shows `tester + qa + security` for `type: fix` / `type: hotfix` (security runs always).
 - Phase 3.6 and Phase 4.5 rows respect existing skip gates.
 

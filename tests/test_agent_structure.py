@@ -7829,6 +7829,361 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 41 — pr-c-hotfix-correctness
+#   Phase-1.6-for-hotfix contradiction fix: 3-way consistency check
+#   + non-reproducible routing fix + Review-Summary owner fix.
+#
+#   All checks use anchored _slice_section (anti-false-green idiom from
+#   Suite 36-40): anchor absent → _slice_section returns "" → token in ""
+#   is False → sección ausente siempre falla.
+#
+#   CANONICAL ANCHORS (implementer MUST use verbatim):
+#     agents/plan-reviewer.md  : "## Session Context Protocol"
+#     agents/orchestrator.md   : "### Bug-fix flow row mappings (type: fix | hotfix)"
+#     agents/orchestrator.md   : "## Phase 2.0 — Regression Test Authoring"
+#     agents/orchestrator.md   : "## STAGE-GATE-1 — End of Stage 1 (mandatory human review)"
+#     agents/ref-special-flows.md : "## Hotfix sub-flow (type: hotfix)"
+#
+#   Check index → AC mapping:
+#     (1) / AC-1 : plan-reviewer.md SCP slice — defect phrase ABSENT
+#     (2) / AC-1 : plan-reviewer.md SCP slice — affirmative tokens PRESENT
+#     (3) / AC-2 : orchestrator.md renderer slice — "Phase 1.6 row is skipped" ABSENT
+#     (4) / AC-2 : orchestrator.md renderer slice — affirmative tokens PRESENT
+#     (5) / AC-3 : ref-special-flows.md hotfix slice — "still run" PRESENT (canonical preserved)
+#     (6) / AC-3 : ref-special-flows.md hotfix slice — orchestrator Review Summary owner PRESENT
+#     (7) / AC-4 : orchestrator.md Phase 2.0 slice — hotfix auto-promote tokens PRESENT
+#     (8) / AC-5 : orchestrator.md STAGE-GATE-1 slice — orchestrator authors Review Summary PRESENT
+#     (9) / AC-6 : orchestrator.md STAGE-GATE-1 slice — type-aware guard (hotfix path ≠ architect) PRESENT
+#    (10) / AC-9 : self-referential guard — CLAUDE.md §11 names "Suite 41"; this file contains "Suite 41"
+#    (11) / SEC-001 : orchestrator.md Phase 2.0 slice — hotfix auto-promote re-entry includes
+#                     "Phase 1.6" + "STAGE-GATE-1" (not only "Phase 2.0"); proximity guard
+#
+#   AC-7 (version bump to 2.40.3) and AC-8 (Suite 41 in the suite, failing-first)
+#   are covered by the self-ref guard (10) and the explicit authoring in Phase 2.0.
+#   The version-bump assertions (AC-7) are intentionally deferred to the implementer
+#   (version bump is Step 8, after the source fixes); asserting the new version here
+#   would make this a pre-fix-red AND post-fix-red assertion, which violates the
+#   failing-test contract. Version bumps are guarded in Suite 3 (existing).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 41: pr-c-hotfix-correctness — hotfix flow correctness ===")
+
+_s41_pr = read(AGENTS_DIR / "plan-reviewer.md")
+_s41_orch = read(AGENTS_DIR / "orchestrator.md")
+_s41_rsf = read(AGENTS_DIR / "ref-special-flows.md")
+_s41_claude = read(REPO_ROOT / "CLAUDE.md")
+_s41_self = Path(__file__).read_text(encoding="utf-8")
+
+# Slice anchors
+_S41_PR_ANCHOR = "## Session Context Protocol"
+_S41_RENDERER_ANCHOR = "### Bug-fix flow row mappings (type: fix | hotfix)"
+_S41_PHASE20_ANCHOR = "## Phase 2.0 — Regression Test Authoring"
+_S41_GATE1_ANCHOR = "## STAGE-GATE-1 — End of Stage 1 (mandatory human review)"
+_S41_HOTFIX_ANCHOR = "## Hotfix sub-flow (type: hotfix)"
+
+_S41_MODIFIED_PHASES_ANCHOR = "### Modified phases"
+
+_s41_pr_scp_slice = _slice_section(_s41_pr, _S41_PR_ANCHOR)
+_s41_renderer_slice = _slice_section(_s41_orch, _S41_RENDERER_ANCHOR)
+_s41_phase20_slice = _slice_section(_s41_orch, _S41_PHASE20_ANCHOR)
+_s41_gate1_slice = _slice_section(_s41_orch, _S41_GATE1_ANCHOR)
+_s41_hotfix_slice = _slice_section(_s41_rsf, _S41_HOTFIX_ANCHOR)
+# The "Phase 1.5 and 1.6 — still run" canonical line and the orchestrator Review Summary
+# ownership step live in ### Modified phases (sub-section of ## Hotfix sub-flow).
+# _slice_section cuts at the first heading inside ## Hotfix sub-flow, so we must
+# anchor at the sub-section level. "### Modified phases" is unique in the file.
+_s41_hotfix_modified_slice = _slice_section(_s41_rsf, _S41_MODIFIED_PHASES_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 — Defect phrase ABSENT from plan-reviewer.md SCP slice.
+# Today: "should have skipped Phase 1.6 entirely for hotfix" is present → FAILS.
+# Post-fix: phrase removed → PASSES.
+# ---------------------------------------------------------------------------
+_S41_DEFECT_PHRASE = "should have skipped Phase 1.6 entirely for hotfix"
+
+check(
+    "hotfix-flow(1/ac-1): plan-reviewer.md § Session Context Protocol does NOT"
+    " contain defect phrase 'should have skipped Phase 1.6 entirely for hotfix'",
+    bool(_s41_pr_scp_slice)
+    and _S41_DEFECT_PHRASE not in _s41_pr_scp_slice,
+    f"Defect phrase '{_S41_DEFECT_PHRASE}' still present in plan-reviewer.md"
+    f" § Session Context Protocol — defect 1a not fixed;"
+    f" anchor present: {bool(_s41_pr_scp_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-1 — Affirmative tokens PRESENT in plan-reviewer.md SCP slice.
+# Today: affirmative text absent → FAILS.
+# Post-fix: replacement text present → PASSES.
+# Require: "Phase 1.6" AND one of ("runs normally", "still run", "runs for hotfix")
+# in the hotfix bullet of the SCP slice.
+# ---------------------------------------------------------------------------
+_S41_AFFIRM_ALTS = ("runs normally", "still run", "runs for hotfix")
+
+check(
+    "hotfix-flow(2/ac-1): plan-reviewer.md § Session Context Protocol affirms"
+    " Phase 1.6 runs for hotfix (Phase 1.6 + one of: runs normally / still run"
+    " / runs for hotfix)",
+    bool(_s41_pr_scp_slice)
+    and "Phase 1.6" in _s41_pr_scp_slice
+    and any(alt in _s41_pr_scp_slice for alt in _S41_AFFIRM_ALTS),
+    f"Affirmative tokens missing in plan-reviewer.md § Session Context Protocol;"
+    f" 'Phase 1.6' present: {'Phase 1.6' in _s41_pr_scp_slice};"
+    f" alternatives checked: {_S41_AFFIRM_ALTS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-2 — Gemelo renderer phrase ABSENT from orchestrator.md renderer slice.
+# Today: "Phase 1.6 row is skipped for `type: hotfix`" is present → FAILS.
+# Post-fix: phrase removed → PASSES.
+# ---------------------------------------------------------------------------
+_S41_RENDERER_DEFECT = "Phase 1.6 row is skipped for `type: hotfix`"
+
+check(
+    "hotfix-flow(3/ac-2): orchestrator.md § 'Bug-fix flow row mappings' does NOT"
+    " contain renderer defect 'Phase 1.6 row is skipped for `type: hotfix`'",
+    bool(_s41_renderer_slice)
+    and _S41_RENDERER_DEFECT not in _s41_renderer_slice,
+    f"Renderer defect phrase '{_S41_RENDERER_DEFECT}' still present in orchestrator.md"
+    f" § Bug-fix flow row mappings — defect 1b (gemelo) not fixed;"
+    f" anchor present: {bool(_s41_renderer_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-2 — Affirmative renderer tokens PRESENT in orchestrator.md renderer slice.
+# Today: affirmative text absent → FAILS.
+# Post-fix: replacement text present → PASSES.
+# Strategy: require tokens that ONLY appear after the defect line is replaced.
+# The current defect line "Phase 1.6 row is skipped for `type: hotfix`" contains
+# "runs" elsewhere in the slice (e.g., "security runs always") — those create a
+# false green. Instead require "Rule 7 no-op" or "Rule 8 active" which the
+# implementer must add per the Work Plan (defect-1b fix language from 01-plan.md).
+# ---------------------------------------------------------------------------
+_S41_RENDERER_AFFIRM_ALTS = ("Rule 7 no-op", "Rule 8 active", "Rule 7", "Rule 8")
+
+check(
+    "hotfix-flow(4/ac-2): orchestrator.md § 'Bug-fix flow row mappings' affirms"
+    " Phase 1.6 renders for hotfix with Rule 7/8 annotation"
+    " (Rule 7 no-op / Rule 8 active / Rule 7 / Rule 8 in renderer slice)",
+    bool(_s41_renderer_slice)
+    and any(alt in _s41_renderer_slice for alt in _S41_RENDERER_AFFIRM_ALTS),
+    f"Affirmative renderer tokens missing in orchestrator.md § Bug-fix flow row mappings;"
+    f" alternatives checked: {_S41_RENDERER_AFFIRM_ALTS};"
+    f" anchor present: {bool(_s41_renderer_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-3 — Canonical "still run" preserved in ref-special-flows.md.
+# Anchored at "### Modified phases" (unique sub-section of ## Hotfix sub-flow;
+# _slice_section on ## Hotfix sub-flow cuts at the first sub-heading, so the
+# "Phase 1.5 and 1.6 — still run" line lives in the ### Modified phases slice).
+# Today: the canonical line is present in ### Modified phases → PASSES today.
+# This is a no-regress guard — must remain green pre-fix AND post-fix.
+# ---------------------------------------------------------------------------
+check(
+    "hotfix-flow(5/ac-3): ref-special-flows.md § '### Modified phases' (inside"
+    " Hotfix sub-flow) preserves canonical '1.6' + 'still run' (no-regress guard)",
+    bool(_s41_hotfix_modified_slice)
+    and "still run" in _s41_hotfix_modified_slice
+    and "1.6" in _s41_hotfix_modified_slice,
+    f"Canonical 'still run' / '1.6' absent from ref-special-flows.md"
+    f" § Modified phases — canonical source must be preserved;"
+    f" anchor present: {bool(_s41_hotfix_modified_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-3 — Orchestrator authors Review Summary, reflected in
+# ref-special-flows.md § Modified phases (inside Hotfix sub-flow).
+# Today: "Review Summary" absent from the slice → FAILS.
+# Post-fix: "orchestrator" + "Review Summary" added to the modified-phases block → PASSES.
+# ---------------------------------------------------------------------------
+_S41_RSF_REVIEW_TOKENS = ("orchestrator", "Review Summary")
+
+check(
+    "hotfix-flow(6/ac-3): ref-special-flows.md § '### Modified phases' (inside"
+    " Hotfix sub-flow) documents that the orchestrator authors § Review Summary"
+    " before STAGE-GATE-1 (tokens: orchestrator + Review Summary)",
+    bool(_s41_hotfix_modified_slice)
+    and all(tok in _s41_hotfix_modified_slice for tok in _S41_RSF_REVIEW_TOKENS),
+    f"Tokens {_S41_RSF_REVIEW_TOKENS} not all present in ref-special-flows.md"
+    f" § Modified phases — defect 3 (Review Summary owner) not reflected here;"
+    f" anchor present: {bool(_s41_hotfix_modified_slice)};"
+    + " ".join(
+        f"'{t}' present: {t in _s41_hotfix_modified_slice};"
+        for t in _S41_RSF_REVIEW_TOKENS
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-4 — Auto-promote tokens PRESENT in orchestrator.md Phase 2.0 slice.
+# Today: the bug-not-reproducible row does NOT distinguish type; "hotfix" and
+# "auto-promote" do co-occur in the slice but in unrelated contexts (Tier-1
+# auto-promote to Tier-2), so the naive check produces a false green.
+# Strategy: require the specific co-occurrence of "bug-not-reproducible" +
+# "hotfix" + "type: fix" in the same Phase 2.0 slice, indicating the row has
+# been split by type. Today the bug-not-reproducible row says "Route back to
+# architect" for ALL types without "type: fix" in that row context.
+# Require: "bug-not-reproducible" + "hotfix" + "type: fix" all co-present in
+# the Phase 2.0 slice (post-fix the table splits the row by type, so "type: fix"
+# appears in the hotfix → auto-promote → type: fix routing text).
+# ---------------------------------------------------------------------------
+check(
+    "hotfix-flow(7/ac-4): orchestrator.md § 'Phase 2.0 Regression Test Authoring'"
+    " documents hotfix-specific auto-promote on bug-not-reproducible"
+    " ('bug-not-reproducible' + 'hotfix' + 'auto-promote' all co-present in slice;"
+    " today the auto-promote in this slice is Tier-1→Tier-2 only; post-fix a"
+    " hotfix→type:fix auto-promote row is added so all three tokens co-appear"
+    " in a hotfix context — verified via 'hotfix' + 'auto-promote' co-occurrence"
+    " separated by ≤300 chars, confirming they appear in the same gate-table row).",
+    bool(_s41_phase20_slice)
+    and "bug-not-reproducible" in _s41_phase20_slice
+    and "hotfix" in _s41_phase20_slice
+    and "auto-promote" in _s41_phase20_slice
+    # Proximity guard: post-fix, "hotfix" and "auto-promote" will appear within
+    # the same table row (~300 chars). Today they do NOT — "auto-promote" appears
+    # in the Tier-1 section, "hotfix" appears in the gate-table section, and
+    # they are separated by over 1000 characters.
+    and any(
+        abs(_s41_phase20_slice.find("hotfix", i) - i) <= 300
+        for i in (
+            j for j in range(len(_s41_phase20_slice))
+            if _s41_phase20_slice[j:j + len("auto-promote")] == "auto-promote"
+        )
+    ),
+    f"Hotfix auto-promote proximity check failed in Phase 2.0 slice;"
+    f" 'bug-not-reproducible' present: {'bug-not-reproducible' in _s41_phase20_slice};"
+    f" 'hotfix' present: {'hotfix' in _s41_phase20_slice};"
+    f" 'auto-promote' present: {'auto-promote' in _s41_phase20_slice};"
+    f" anchor present: {bool(_s41_phase20_slice)}"
+    " — post-fix 'auto-promote' and 'hotfix' must appear within 300 chars of each other"
+    " (same table row); today they are in different sections (>1000 chars apart)",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-5 — Orchestrator Review Summary authoring step PRESENT in
+# orchestrator.md STAGE-GATE-1 slice (defect 3a).
+# Today: "emits" exists in the slice but for "STAGE-GATE-1 emits" (gate action),
+# not for "orchestrator authors Review Summary for hotfix". The authoring step
+# using "authors" or "writes" is absent.
+# Post-fix: an explicit step is added with language like "orchestrator authors
+# 01-plan.md § Review Summary" for hotfix, so "authors" or "writes" will appear
+# in proximity to "hotfix" + "Review Summary".
+# Strategy: require "hotfix" + "Review Summary" + one of ("authors", "writes")
+# within 400 chars of each other in the GATE-1 slice.
+# ---------------------------------------------------------------------------
+_S41_GATE1_AUTHOR_ALTS = ("authors", "writes")
+
+check(
+    "hotfix-flow(8/ac-5): orchestrator.md § STAGE-GATE-1 documents explicit step"
+    " where orchestrator authors § Review Summary for hotfix"
+    " ('hotfix' + 'Review Summary' + 'authors'/'writes' within 400 chars)",
+    bool(_s41_gate1_slice)
+    and "hotfix" in _s41_gate1_slice
+    and "Review Summary" in _s41_gate1_slice
+    and any(
+        any(
+            abs(_s41_gate1_slice.find("hotfix", max(0, i - 200)) - i) <= 400
+            for i in (
+                j for j in range(len(_s41_gate1_slice))
+                if _s41_gate1_slice[j:j + len("Review Summary")] == "Review Summary"
+            )
+        )
+        and alt in _s41_gate1_slice
+        for alt in _S41_GATE1_AUTHOR_ALTS
+    ),
+    f"Authoring step tokens missing in orchestrator.md § STAGE-GATE-1 slice;"
+    f" 'hotfix' present: {'hotfix' in _s41_gate1_slice};"
+    f" 'Review Summary' present: {'Review Summary' in _s41_gate1_slice};"
+    f" author-alts checked: {_S41_GATE1_AUTHOR_ALTS} (not found near hotfix+Review Summary);"
+    f" anchor present: {bool(_s41_gate1_slice)}"
+    " — post-fix an explicit orchestrator-authors-Review-Summary step must appear"
+    " for hotfix in the STAGE-GATE-1 section",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-6 — Type-aware guard PRESENT in orchestrator.md STAGE-GATE-1 slice (defect 3b).
+# Today: guard "route back to architect" is NOT type-aware — no hotfix-specific branch → FAILS.
+# Post-fix: type-aware guard added (hotfix path does NOT route to architect) → PASSES.
+# Strategy: require "hotfix" + ("type-aware" or "orchestrator" near "Review Summary missing")
+# AND require that "hotfix" co-occurs with NOT routing to architect in the guard context.
+# Concrete: require "hotfix" in gate1_slice AND one of the affirmative type-aware signals.
+# Affirmative signals: "type-aware", "orchestrator-self", "never route" with hotfix context.
+# Conservative: require "hotfix" + one of ("type-aware", "self-authored", "orchestrator author")
+# to appear in the gate1 slice (the implementer must add these to the guard language).
+# ---------------------------------------------------------------------------
+_S41_TYPEAWARE_ALTS = ("type-aware", "self-authored", "orchestrator author", "self-author")
+
+check(
+    "hotfix-flow(9/ac-6): orchestrator.md § STAGE-GATE-1 guard is type-aware"
+    " — hotfix path does NOT route to architect"
+    " (hotfix + type-aware/self-authored/orchestrator author in slice)",
+    bool(_s41_gate1_slice)
+    and "hotfix" in _s41_gate1_slice
+    and any(alt in _s41_gate1_slice for alt in _S41_TYPEAWARE_ALTS),
+    f"Type-aware guard tokens missing in orchestrator.md § STAGE-GATE-1 slice;"
+    f" 'hotfix' present: {'hotfix' in _s41_gate1_slice};"
+    f" alternatives checked: {_S41_TYPEAWARE_ALTS};"
+    f" anchor present: {bool(_s41_gate1_slice)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-9 — Self-referential guard.
+# CLAUDE.md §11 must name "Suite 41".
+# This file must contain literal "Suite 41" and "_slice_section".
+# ---------------------------------------------------------------------------
+check(
+    "hotfix-flow(10/ac-9): CLAUDE.md §11 names 'Suite 41' and this file defines it"
+    " (self-referential guard — pr-c-hotfix-correctness)",
+    "Suite 41" in _s41_claude
+    and "Suite 41" in _s41_self
+    and "_slice_section" in _s41_self
+    and "pr-c-hotfix-correctness" in _s41_self,
+    "Suite 41 not registered in CLAUDE.md §11"
+    " or literal 'pr-c-hotfix-correctness' missing in this file"
+    " or '_slice_section' idiom absent"
+    " — implementer must update CLAUDE.md §11; tester must not remove the markers",
+)
+
+
+# ---------------------------------------------------------------------------
+# Check (11) / SEC-001 — hotfix auto-promote re-entry includes Phase 1.6 and
+# STAGE-GATE-1, NOT only Phase 2.0.
+# Anchored at "## Phase 2.0 — Regression Test Authoring" (_s41_phase20_slice).
+# Pre-fix (SEC-001 open): the bug-not-reproducible (type: hotfix) row says
+#   "re-run Phase 2.0" — skips Phase 1.6 and STAGE-GATE-1 → FAILS.
+# Post-fix: row updated to "re-run Phase 1.5 → 1.6 → STAGE-GATE-1 → Phase 2.0"
+#   so "Phase 1.6" and "STAGE-GATE-1" appear in the hotfix auto-promote row → PASSES.
+# Strategy: require "Phase 1.6" AND "STAGE-GATE-1" in the Phase 2.0 slice,
+# both in proximity to "auto-promote" and "hotfix" (within 500 chars).
+# ---------------------------------------------------------------------------
+_S41_REENTRY_TOKENS = ("Phase 1.6", "STAGE-GATE-1")
+
+check(
+    "hotfix-flow(11/sec-001): orchestrator.md § 'Phase 2.0 Regression Test Authoring'"
+    " auto-promote re-entry includes Phase 1.6 and STAGE-GATE-1, not only Phase 2.0"
+    " ('Phase 1.6' + 'STAGE-GATE-1' both present in Phase 2.0 slice, in proximity"
+    " to 'auto-promote' + 'hotfix' — confirms the promoted fix goes through"
+    " Phase 1.6 security design-review before implementation)",
+    bool(_s41_phase20_slice)
+    and all(tok in _s41_phase20_slice for tok in _S41_REENTRY_TOKENS)
+    and any(
+        abs(_s41_phase20_slice.find("auto-promote", i) - i) <= 500
+        for i in (
+            j for j in range(len(_s41_phase20_slice))
+            if _s41_phase20_slice[j:j + len("Phase 1.6")] == "Phase 1.6"
+        )
+    ),
+    f"SEC-001 not closed: auto-promote re-entry tokens missing in Phase 2.0 slice;"
+    f" 'Phase 1.6' present: {'Phase 1.6' in _s41_phase20_slice};"
+    f" 'STAGE-GATE-1' present: {'STAGE-GATE-1' in _s41_phase20_slice};"
+    f" anchor present: {bool(_s41_phase20_slice)}"
+    " — post-fix the hotfix auto-promote row must specify"
+    " 'Phase 1.5 → 1.6 → STAGE-GATE-1 → Phase 2.0' so the promoted type:fix"
+    " passes through Phase 1.6 security design-review",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

@@ -345,9 +345,9 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 
 ### Modified phases
 
-- Phase 0b — bug-report intake same as `type: fix`, but the AC list is tighter (typically only AC-1 reproduction-no-longer-bug and AC-2 regression-test-exists).
+- Phase 0b — bug-report intake same as `type: fix`, but the AC list is tighter (typically only AC-1 reproduction-no-longer-bug and AC-2 regression-test-exists). **Before STAGE-GATE-1, the orchestrator authors `01-plan.md § Review Summary`** (constructed from the Phase 0b bug-report payload: Reported behaviour, Expected behaviour, Reproduction steps, Environment) and `§ Task List` (minimum 4-line list: reproduce, regression test, fix, verify). This is the orchestrator-self-authored path — the architect is not dispatched in the hotfix flow. See `orchestrator.md § STAGE-GATE-1` for the full self-authored step contract.
 - Phase 1.5 and 1.6 — still run. Plan ratification + plan review operate against the regression test + task list + 1-sentence prose plan emitted by the orchestrator inline at STAGE-GATE-1. plan-reviewer Rules 7 + 8 still apply.
-- STAGE-GATE-1 — uses a tighter STOP block with a one-sentence prose plan from the orchestrator.
+- STAGE-GATE-1 — uses a tighter STOP block with a one-sentence prose plan from the orchestrator; `## Review Summary` is self-authored by the orchestrator (see Phase 0b bullet above).
 
 ### Unchanged from `type: fix`
 
