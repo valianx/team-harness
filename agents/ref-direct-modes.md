@@ -207,6 +207,8 @@ When invoked with `Direct Mode Task: review`:
 
 The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The orchestrator and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
 
+**No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The orchestrator writes the draft to a file and returns control to the skill. The skill handles user approval and all GitHub API calls (POST, PUT, reply) exclusively after the operator confirms in the Phase 4 decision menu.
+
 ### Submode routing
 
 Check the `Submode` / `Mode` field in the task payload:

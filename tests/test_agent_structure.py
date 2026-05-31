@@ -6892,6 +6892,257 @@ check(
 )
 
 
+
+# ---------------------------------------------------------------------------
+# Suite 38 -- review-pipeline-guardrails (review-pipeline-guardrails, AC-3..AC-17)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks for the four guardrails added to reviewer.md,
+# reviewer-consolidator.md, skills/review-pr/SKILL.md, and agents/ref-direct-modes.md.
+# Every check slices to a named section anchor and asserts sub-tokens WITHIN that
+# slice -- never a loose `token in whole_file` -- following the Suite 36/37 idiom.
+# Exception: the self-referential guard (check 9) is file-wide by design, following
+# the precedent of Suite 35 check 6, Suite 36 check 11, and Suite 37 check 7.
+#
+# Anti-false-green dispatch: _slice_section returns "" for a missing anchor,
+# so `"token" in ""` is always False -- a missing section always fails the check.
+#
+# Check index -> AC mapping:
+#   (1)  / AC-3  : reviewer.md § Scope Discipline -- section present + key tokens
+#   (2)  / AC-3  : reviewer.md § Scope Discipline -- Patterns & Consistency cross-ref
+#   (3)  / AC-3  : reviewer.md § Scope Discipline -- Tests cross-ref
+#   (4)  / AC-3  : reviewer.md § Phase 3 template -- Fuera de alcance section present
+#   (5)  / AC-4  : reviewer.md § AI-Authored PR Review Lens -- three checks present
+#   (6)  / AC-5  : reviewer.md frontmatter -- context7 tools granted
+#   (7)  / AC-7/8: reviewer.md § No-Publish Invariant -- invariant declared
+#   (8)  / AC-13 : reviewer.md -- no `gh-fallback.md § Policy` pointer; gh-fallback.md clean
+#   (9)  / AC-9  : reviewer-consolidator.md -- attribution guard before any-CHANGES wins
+#   (10) / AC-12 : skills/review-pr/SKILL.md -- behavioral step best-effort
+#   (11) / AC-17 : skills/review-pr/SKILL.md -- isCrossRepository fork-exclusion gate
+#   (12) / AC-14 : agents/ref-direct-modes.md -- no-publish invariant sentence present
+#   (13) / AC-15 : self-referential guard (Suite 38 in CLAUDE.md §11 + this file)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 38: review-pipeline-guardrails ===")
+
+# ---- file reads (suite-local variables) ------------------------------------
+_s38_reviewer_text    = read(AGENTS_DIR / "reviewer.md")
+_s38_consolidator_text = read(AGENTS_DIR / "reviewer-consolidator.md")
+_s38_skill_text       = read(skill_path("review-pr"))
+_s38_ref_direct_text  = read(AGENTS_DIR / "ref-direct-modes.md")
+_s38_gh_fallback_text = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
+_s38_claude_text      = read(REPO_ROOT / "CLAUDE.md")
+_s38_self_text        = read(Path(__file__).resolve())
+
+# ---- anchors ---------------------------------------------------------------
+_S38_SCOPE_ANCHOR     = "## Scope Discipline"
+_S38_AI_LENS_ANCHOR   = "### AI-Authored PR Review Lens"
+_S38_NOPUB_ANCHOR     = "## No-Publish Invariant"
+_S38_BEHAV_ANCHOR     = "### Step 1.6 — Behavioral Verification"
+_S38_VERDICT_ANCHOR   = "## Verdict rule"
+_S38_REVIEW_MODE_ANCHOR = "## Review Mode"
+
+# ---- slices ----------------------------------------------------------------
+_s38_scope_slice    = _slice_section(_s38_reviewer_text,     _S38_SCOPE_ANCHOR)
+_s38_ai_lens_slice  = _slice_section(_s38_reviewer_text,     _S38_AI_LENS_ANCHOR)
+_s38_nopub_slice    = _slice_section(_s38_reviewer_text,     _S38_NOPUB_ANCHOR)
+_s38_behav_slice    = _slice_section(_s38_skill_text,        _S38_BEHAV_ANCHOR)
+_s38_verdict_slice  = _slice_section(_s38_consolidator_text, _S38_VERDICT_ANCHOR)
+_s38_ref_mode_slice = _slice_section(_s38_ref_direct_text,   _S38_REVIEW_MODE_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-3 -- reviewer.md § Scope Discipline: section present + key tokens
+# ---------------------------------------------------------------------------
+_S38_SCOPE_TOKENS = (
+    "In scope",
+    "Out of scope",
+    "attribution",
+    "Fuera de alcance",
+)
+check(
+    "review-guardrails(1/ac-3): agents/reviewer.md § 'Scope Discipline'"
+    " present and contains In scope / Out of scope / attribution / Fuera de alcance",
+    bool(_s38_scope_slice)
+    and all(t in _s38_scope_slice for t in _S38_SCOPE_TOKENS),
+    f"anchor '{_S38_SCOPE_ANCHOR}' missing or tokens absent: {_S38_SCOPE_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-3 -- Patterns & Consistency cross-ref to Scope Discipline
+# ---------------------------------------------------------------------------
+_s38_patterns_slice = _slice_section(_s38_reviewer_text, "### Patterns & Consistency")
+check(
+    "review-guardrails(2/ac-3): reviewer.md § 'Patterns & Consistency'"
+    " cross-references Scope Discipline",
+    bool(_s38_patterns_slice)
+    and ("Scope Discipline" in _s38_patterns_slice or "scope" in _s38_patterns_slice.lower()),
+    "Patterns & Consistency section missing or no Scope Discipline cross-reference",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-3 -- Tests cross-ref to Scope Discipline
+# ---------------------------------------------------------------------------
+_s38_tests_slice = _slice_section(_s38_reviewer_text, "### Tests\n")
+check(
+    "review-guardrails(3/ac-3): reviewer.md § 'Tests'"
+    " cross-references Scope Discipline",
+    bool(_s38_tests_slice)
+    and ("Scope Discipline" in _s38_tests_slice or "scope" in _s38_tests_slice.lower()),
+    "Tests section missing or no Scope Discipline cross-reference",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-3 -- Phase 3 template has Fuera de alcance section
+# ---------------------------------------------------------------------------
+check(
+    "review-guardrails(4/ac-3): agents/reviewer.md review_body template"
+    " includes '### Fuera de alcance' section",
+    "### Fuera de alcance" in _s38_reviewer_text,
+    "'### Fuera de alcance' section missing from reviewer.md review_body template",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-4 -- reviewer.md § AI-Authored PR Review Lens: three checks present
+# ---------------------------------------------------------------------------
+_S38_AI_LENS_TOKENS = (
+    "Existence check",
+    "Plausible-but-wrong",
+    "Vacuous-test",
+    "CRITICAL",
+    "context7",
+)
+check(
+    "review-guardrails(5/ac-4): agents/reviewer.md § 'AI-Authored PR Review Lens'"
+    " contains all three check categories + CRITICAL classification + context7",
+    bool(_s38_ai_lens_slice)
+    and all(t in _s38_ai_lens_slice for t in _S38_AI_LENS_TOKENS),
+    f"anchor '{_S38_AI_LENS_ANCHOR}' missing or tokens absent: {_S38_AI_LENS_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-5 -- reviewer.md frontmatter has context7 tools
+# ---------------------------------------------------------------------------
+_s38_reviewer_fm = parse_frontmatter(_s38_reviewer_text)
+_s38_reviewer_tools = [t.strip() for t in _s38_reviewer_fm.get("tools", "").split(",")]
+check(
+    "review-guardrails(6/ac-5): agents/reviewer.md frontmatter grants"
+    " mcp__context7__resolve-library-id and mcp__context7__get-library-docs",
+    "mcp__context7__resolve-library-id" in _s38_reviewer_tools
+    and "mcp__context7__get-library-docs" in _s38_reviewer_tools,
+    "reviewer.md frontmatter missing one or both context7 tools",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-7+AC-8 -- reviewer.md § No-Publish Invariant declared
+# ---------------------------------------------------------------------------
+_S38_NOPUB_TOKENS = (
+    "NEVER",
+    "publishes",
+    "draft",
+    "operator",
+)
+check(
+    "review-guardrails(7/ac-7+ac-8): agents/reviewer.md § 'No-Publish Invariant'"
+    " present and declares NEVER / publishes / draft / operator",
+    bool(_s38_nopub_slice)
+    and all(t in _s38_nopub_slice for t in _S38_NOPUB_TOKENS),
+    f"anchor '{_S38_NOPUB_ANCHOR}' missing or tokens absent: {_S38_NOPUB_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-13 -- reviewer.md no longer points to gh-fallback.md § Policy;
+#             gh-fallback.md has NOT gained a § Policy section
+# ---------------------------------------------------------------------------
+check(
+    "review-guardrails(8/ac-13): agents/reviewer.md does NOT reference"
+    " 'gh-fallback.md § Policy' (broken pointer removed)",
+    "gh-fallback.md § Policy" not in _s38_reviewer_text,
+    "reviewer.md still contains the dead pointer 'gh-fallback.md § Policy'",
+)
+check(
+    "review-guardrails(8b/ac-13): agents/_shared/gh-fallback.md does NOT"
+    " contain a '§ Policy' or '## Policy' section (must stay clean)",
+    "§ Policy" not in _s38_gh_fallback_text
+    and "## Policy" not in _s38_gh_fallback_text,
+    "gh-fallback.md gained a § Policy or ## Policy section — must stay clean",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-9 -- reviewer-consolidator.md attribution guard before verdict rule
+# ---------------------------------------------------------------------------
+_S38_GUARD_TOKENS = (
+    "Attribution guard",
+    "out-of-scope",
+    "Fuera de alcance",
+    "any-CHANGES_REQUESTED",
+)
+check(
+    "review-guardrails(9/ac-9): agents/reviewer-consolidator.md § 'Verdict rule'"
+    " contains Attribution guard before any-CHANGES_REQUESTED rule",
+    bool(_s38_verdict_slice)
+    and all(t in _s38_verdict_slice for t in _S38_GUARD_TOKENS),
+    f"anchor '{_S38_VERDICT_ANCHOR}' missing or guard tokens absent: {_S38_GUARD_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-12 -- skills/review-pr/SKILL.md behavioral step documented
+# ---------------------------------------------------------------------------
+_S38_BEHAV_TOKENS = (
+    "best-effort",
+    "isCrossRepository",
+    "no-command",
+    "timeout",
+)
+check(
+    "review-guardrails(10/ac-12): skills/review-pr/SKILL.md § 'Step 1.6'"
+    " documents behavioral verification step with best-effort + declared-suite constraints",
+    bool(_s38_behav_slice)
+    and all(t in _s38_behav_slice for t in _S38_BEHAV_TOKENS),
+    f"anchor '{_S38_BEHAV_ANCHOR}' missing or behavioral tokens absent: {_S38_BEHAV_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (11) / AC-17 -- isCrossRepository fork-exclusion gate
+# ---------------------------------------------------------------------------
+check(
+    "review-guardrails(11/ac-17): skills/review-pr/SKILL.md § 'Step 1.6'"
+    " has isCrossRepository trust-tier gate that excludes forks from auto-run",
+    bool(_s38_behav_slice)
+    and "isCrossRepository" in _s38_behav_slice
+    and ("fork" in _s38_behav_slice or "Fork" in _s38_behav_slice)
+    and "skipped:fork" in _s38_behav_slice,
+    f"anchor '{_S38_BEHAV_ANCHOR}' missing or fork-exclusion gate tokens absent"
+    " (need isCrossRepository + fork + skipped:fork)",
+)
+
+# ---------------------------------------------------------------------------
+# Check (12) / AC-14 -- agents/ref-direct-modes.md no-publish invariant
+# ---------------------------------------------------------------------------
+check(
+    "review-guardrails(12/ac-14): agents/ref-direct-modes.md § 'Review Mode'"
+    " declares the no-publish invariant (reviewer NEVER calls GitHub API write endpoints)",
+    bool(_s38_ref_mode_slice)
+    and "No-publish invariant" in _s38_ref_mode_slice
+    and "NEVER" in _s38_ref_mode_slice,
+    f"anchor '{_S38_REVIEW_MODE_ANCHOR}' missing or invariant tokens absent"
+    " (need 'No-publish invariant' + 'NEVER')",
+)
+
+# ---------------------------------------------------------------------------
+# Check (13) / AC-15 -- self-referential guard: Suite 38 in CLAUDE.md §11 + this file
+# ---------------------------------------------------------------------------
+check(
+    "review-guardrails(13/ac-15):"
+    " CLAUDE.md §11 names 'Suite 38' and this file defines it"
+    " (self-referential guard -- review-pipeline-guardrails)",
+    "Suite 38" in _s38_claude_text
+    and "Suite 38" in _s38_self_text
+    and "review-pipeline-guardrails" in _s38_self_text,
+    "Suite 38 not registered in CLAUDE.md §11"
+    " or marker literal 'review-pipeline-guardrails' missing in this file"
+    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

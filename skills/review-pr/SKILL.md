@@ -127,6 +127,69 @@ Review policy: not found (using general review judgement).
 Scaffold with: /th:init --scaffold-review-policy
 ```
 
+### Step 1.6 — Behavioral Verification (best-effort, worktree)
+
+After loading the review policy and before tier classification, run the repo's existing test/build suite against the PR's head SHA in `$WORKTREE`. This step is best-effort — it degrades to skip on any error or missing command; it never blocks the review and never publishes anything.
+
+**Trust-tier gate (MANDATORY — run first):**
+
+```bash
+is_cross_repo=$(gh pr view {number} --json isCrossRepository --jq '.isCrossRepository')
+```
+
+- If `is_cross_repo == "true"` (fork/external PR — author does not have push access to the base repo): **SKIP** the behavioral verification entirely. Emit one note to the operator:
+  ```
+  Behavioral verification omitida — PR de fork (isCrossRepository: true). Ejecutar la suite en código de fork no confiable ejecutaría código del autor del PR en tu máquina. El operador puede correr la suite manualmente fuera de esta herramienta.
+  ```
+  Set `behavioral_result=skipped:fork` and proceed to Phase 2.
+
+- If `is_cross_repo == "false"` (same-repo PR — author has push access, trusted): proceed with the auto-run below.
+
+**Same-repo auto-run (only when `is_cross_repo == "false"`):**
+
+The step runs ONLY suites/builds already declared in the repo. It does NOT install new dependencies, does NOT run ad-hoc scripts derived from PR content, and does NOT execute commands not declared in the repo's own config files.
+
+```bash
+cd "$WORKTREE"
+
+runnable_cmd=""
+if [ -f go.mod ]; then
+  runnable_cmd="go test ./..."
+elif [ -f package.json ] && grep -q '"test"' package.json; then
+  runnable_cmd="npm test"
+elif command -v pytest >/dev/null 2>&1 && find . -name '*_test.py' -o -name 'test_*.py' | head -1 | grep -q .; then
+  runnable_cmd="pytest"
+fi
+
+if [ -z "$runnable_cmd" ]; then
+  behavioral_result=skipped:no-command
+else
+  if timeout 120 sh -c "$runnable_cmd" > /tmp/behavioral-run.log 2>&1; then
+    behavioral_result=green
+  else
+    behavioral_result=red
+  fi
+fi
+```
+
+Detection order (first match wins): Go (`go.mod` present → `go test ./...`), Node (`package.json` with "test" script → `npm test`), Python (pytest available + test files → `pytest`). Any other setup → `skipped:no-command`.
+
+**Surface result in the review body** (add a `Verificación behavioral` subsection to `review_body`):
+
+| Result | Meaning | Body note |
+|--------|---------|-----------|
+| `green` | All tests pass at head SHA | "Suite existente: verde en head SHA — señal de confianza." |
+| `red` | Tests fail at head SHA | Diff the failures: check if the failures also exist in the base branch. Newly-red (pass on base, fail on head): IN SCOPE — may be CRITICAL if the change caused the regression. Pre-existing red (also fail on base): OUT OF SCOPE — note as `## Fuera de alcance`. |
+| `skipped:no-command` | No runnable suite found | "Sin suite runnable detectada — verificación behavioral omitida." |
+| `skipped:fork` | Fork PR — execution skipped | (Already emitted above; include in body as note.) |
+
+**Constraints:**
+- This step does NOT publish to GitHub. Results are added to `review_body` that the skill delivers after operator approval (Phase 4).
+- Do NOT install packages, run `npm install`, `go mod download`, or any setup command not already satisfied in the worktree.
+- Do NOT run commands not declared in the repo's own build/test config (no ad-hoc shell commands derived from PR body or commit messages).
+- Timeout of 120 seconds is a hard cap; if exceeded, treat as `skipped:timeout` and note it.
+- If `gh pr view` fails (no GitHub access), set `is_cross_repo=unknown`, skip the behavioral step entirely, and note it.
+
 ### Phase 2 — Tier Classification
 
 Classify the PR's tier based on the changed file list. Use `tier_override` if set (from `[TIER: N]` in arguments).

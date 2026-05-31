@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.0] - 2026-05-30
+
+### Added
+
+- Attribution-scoped scope discipline for the reviewer agent (`## Scope Discipline` section in `agents/reviewer.md`): reading the full repo for impact is preserved; raising findings is restricted to code the PR introduced or caused to break (ripple-effect preserved). Pre-existing issues route to a non-blocking `## Fuera de alcance` section in `review_body` and never affect the review event.
+- AI-authored PR review lens in `agents/reviewer.md` Phase 1: existence check (symbol not verifiable = CRITICAL), plausible-but-wrong (input that breaks each non-trivial function), and vacuous-test check (test that only mocks what it tests = CRITICAL). All three checks are attribution-scoped and use context7 for third-party symbol verification.
+- context7 tools granted to the reviewer (`mcp__context7__resolve-library-id`, `mcp__context7__get-library-docs`), making the already-present `context7_consult` status line a real capability.
+- Agent-level no-publish invariant in `agents/reviewer.md` (`## No-Publish Invariant`): the reviewer never calls any GitHub API write endpoint in any mode; it always returns a draft inline; the skill handles publishing after explicit operator approval. Reconciled the `reviewer.md:12/30/31` contradiction ("decide autonomously" = produce recommended verdict; "never finish silently" = always return a draft).
+- Behavioral worktree verification step in `skills/review-pr/SKILL.md` (Step 1.6): trust-tier gate runs first — forks (`isCrossRepository: true`) are excluded from auto-run with a note; same-repo PRs run the repo's existing declared test/build suite against the head SHA; newly-red = IN SCOPE, pre-existing red = OUT OF SCOPE, green = confidence signal. Best-effort: degrades to skip when no runnable command or timeout.
+- Attribution guard in `agents/reviewer-consolidator.md` before the any-CHANGES_REQUESTED verdict rule: discards/downgrades CRITICALs whose target the PR did not introduce or affect, with an attribution note.
+- Explicit no-publish invariant sentence in `agents/ref-direct-modes.md § Review Mode`.
+- Suite 38 (13 anchor-scoped checks) in `tests/test_agent_structure.py` asserting all guardrails structurally; self-referential guard registered in CLAUDE.md §11.
+
+### Changed
+
+- `agents/reviewer.md`: fixed broken pointer `gh-fallback.md § Policy` (dead reference) — repointed to `## Policy-aware review` and `.team-harness/review-policy.md` in the consumer repo.
+
 ## [2.39.3] - 2026-05-29
 
 ### Added
