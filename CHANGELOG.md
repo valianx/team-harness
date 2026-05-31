@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.2] - 2026-05-30
+
+### Fixed
+
+- Closed four fail-open security vectors in the Bug-fix Pipeline (PR B — pipeline-flows-hardening): (1) `type: hotfix` is now pinned to Tier 3 minimum as a hard floor — the auto-classifier and operator overrides `[TIER: 0/1/2]` cannot lower a hotfix below Tier 3 (SEC-D1 override-clamp); `ref-special-flows.md § Hotfix sub-flow` updated to justify the security-always rule by the Tier-3 pin. (2) Signal 2 "re-evaluate after Phase 1" replaced by a deterministic two-point GATE: Phase 0b (if paths known) and Phase 2-close (`git diff --name-only` vs sensitive-path list → any match forces `tier_promote: 3` + Phase 2.0 re-entry + Phase 3 security). (3) Boot type=null fail-open closed: Takeover Protocol step 4 now mandates classify-first (Phase 0a Step 7) before applying the type-gated manifest when `dispatch_handoff.type` is null; security defaults to RUN while type is unknown; schema-row placeholder "hardened in PR B" replaced by a reference to the hardened step 4. (4) Plan-review direct mode security trigger extended with semantic keyword match (auth, token, jwt, secret, credential, PII, encrypt, session, permission, etc.) in addition to the 7 path globs; security skip now surfaces as an affirmative visible notice (`SKIPPED — no security-sensitive path or keyword detected ... re-run with --security`) instead of a passive line. Suite 40 (14 anchor-scoped checks, anti-false-green idiom) added to `tests/test_agent_structure.py`.
+
 ## [2.40.1] - 2026-05-30
 
 ### Fixed
