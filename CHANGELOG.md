@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.7] - 2026-05-31
+
+### Fixed
+
+- Fixed `/th:update` corrupting `~/.claude/CLAUDE.md` by moving the three managed blocks (orchestrator-dispatch-rule, nested-dispatch-takeover, voice-rule) from inline fenced copies in `skills/setup/SKILL.md` to canonical source-of-truth files under `skills/setup/managed-blocks/`. Root cause: each `<!-- X:start -->` marker appeared twice in `setup/SKILL.md` (prose occurrence + real block), causing the between-markers extraction to capture instructional prose (`"), append this block:"`) instead of the actual block content. Updated `setup/SKILL.md` Steps 4a/4b/4c to read from the canonical files (read-from-file design, idempotent apply). Updated `update/SKILL.md` step 6 to read the canonical files directly and added exact per-OS command blocks (PowerShell + bash) for catalog refresh, download, and block-sync, declaring the replace as DESTRUCTIVE (marker-presence only, no content comparison). Suite 44 (32 anchor-scoped checks) added to `tests/test_agent_structure.py`.
+
 ## [2.40.6] - 2026-05-31
 
 ### Fixed
