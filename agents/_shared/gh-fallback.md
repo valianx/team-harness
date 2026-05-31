@@ -320,6 +320,35 @@ else
 fi
 ```
 
+## status: blocked-pr-pending
+
+When `has_gh=true` and the push to the remote branch succeeded but `gh pr create`
+failed (rate-limit, transient network error, label rejection, or any other
+recoverable failure), consumers report this status value:
+
+```
+agent: delivery
+status: blocked-pr-pending
+output: workspaces/{feature}/00-state.md § Delivery
+manual_action_required: true
+manual_action_file: workspaces/{feature}/inputs/pr-body.md
+manual_action_url: https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1
+summary: Push succeeded but gh pr create failed. Branch is live on remote. Operator PR creation required.
+```
+
+**What distinguishes this from `blocked-manual-push`:** the remote branch already
+exists (the push succeeded). Step 3's OPEN/no-PR detection handles the
+pushed-but-PR-less recoverable state — if delivery is re-run, Step 3.2 will
+detect no PR on the existing branch and proceed to Step 11 to create one.
+
+**Resume protocol** (identical to `blocked-manual-push`):
+1. Emit a one-paragraph STOP block with the compare URL and body file path.
+2. Wait for operator reply (`pr opened #N` → continue; `abort` → mark pipeline blocked).
+3. On continue: re-probe with a Tier A read of the new PR number; record in `00-state.md`.
+
+The compare URL format:
+`https://github.com/{owner}/{repo}/compare/main...{branch}?expand=1`
+
 ## `status: blocked-manual-push`
 
 When a Tier B write cannot be completed automatically (no `gh`, no token, or
