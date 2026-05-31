@@ -4147,6 +4147,7 @@ def _strip_output_discipline(text: str) -> str:
 _OUTPUT_TEMPLATE = AGENTS_DIR / "_shared" / "output-template.md"
 _OBSERVABILITY_MD = REPO_ROOT / "docs" / "observability.md"
 _CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
+_TESTING_MD = REPO_ROOT / "docs" / "testing.md"
 
 # --- (setup) Foundation: output-template.md ---
 
@@ -4228,6 +4229,43 @@ check(
     "voice: CLAUDE.md stays under 40 KB (AC-2)",
     _claude_size < 40 * 1024,
     f"CLAUDE.md is {_claude_size} bytes — must be under {40 * 1024} bytes after edits",
+)
+
+# ---------------------------------------------------------------------------
+# Leg (b): Durable headroom guard — CLAUDE.md must stay under 36 KB.
+# This is ADDITIONAL to the 40 KB cap above (both must pass post-fix).
+# Fails now (39960 bytes >= 36000); passes after the §5/§14 offload.
+# ---------------------------------------------------------------------------
+check(
+    "voice: CLAUDE.md stays under 36 KB (durable headroom guard)",
+    _claude_size < 36000,
+    f"CLAUDE.md is {_claude_size} bytes — must be under 36000 (durable headroom for PRs E-I;"
+    " offload §1/§3/§5/§14 detail to docs/ to bring it below threshold)",
+)
+
+# ---------------------------------------------------------------------------
+# Leg (c): §11 pure-pointer guard — CLAUDE.md §11 must NOT contain per-suite
+# inventory literals (Suite 34..42). After Step 5 of the implementer's work,
+# §11 is a 1–2 line pointer to docs/testing.md; the inventory belongs there.
+# Fails now (§11 lists all 9 suites in-line); passes after §11 is trimmed.
+# The check covers ALL 9 suites (not only 39-42) per the qa recommendation.
+# ---------------------------------------------------------------------------
+_s11_anchor = "## 11."
+_s11_next   = "## 12."
+_s11_start  = _claude_full.find(_s11_anchor)
+_s11_end    = _claude_full.find(_s11_next, _s11_start) if _s11_start != -1 else -1
+_s11_slice  = _claude_full[_s11_start:_s11_end] if _s11_start != -1 and _s11_end != -1 else (
+    _claude_full[_s11_start:] if _s11_start != -1 else ""
+)
+_s11_has_pointer    = "docs/testing.md" in _s11_slice
+_s11_suite_literals = [f"Suite {n}" for n in range(34, 43) if f"Suite {n}" in _s11_slice]
+check(
+    "voice: CLAUDE.md §11 is a pure pointer to docs/testing.md"
+    " — per-suite inventory literals (Suite 34..42) must NOT appear in §11",
+    _s11_has_pointer and not _s11_suite_literals,
+    f"CLAUDE.md §11 still contains per-suite inventory: {_s11_suite_literals}"
+    " — implementer must reduce §11 to a pointer to docs/testing.md"
+    " (per-suite one-liners belong in the canonical registry, not in CLAUDE.md §11)",
 )
 
 check(
@@ -6160,13 +6198,17 @@ check(
     " -- plan-review check (27) fails",
 )
 
-# Check (28) -- AC-10: CLAUDE.md §11 explicitly names Suite 34.
-_c28_suite34_in_s11 = "Suite 34" in _s34_claude
+# Check (28) -- AC-10: docs/testing.md (canonical registry) explicitly names Suite 34.
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
+# Fails now if docs/testing.md does not list "Suite 34"; passes after Step 1 completes
+# the canonical registry. Does NOT read CLAUDE.md — no fallback or 'or' permitted.
+_s34_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_c28_suite34_in_registry = "Suite 34" in _s34_testing_md
 check(
-    "plan-review(28/ac-10): CLAUDE.md §11 inventory explicitly names 'Suite 34'",
-    _c28_suite34_in_s11,
-    "literal 'Suite 34' not found in CLAUDE.md"
-    " -- §11 Testing Conventions must be updated to reference Suite 34",
+    "plan-review(28/ac-10): docs/testing.md canonical registry names 'Suite 34'",
+    _c28_suite34_in_registry,
+    "literal 'Suite 34' not found in docs/testing.md"
+    " -- docs/testing.md must be the canonical suite registry; Suite 34 must be listed there",
 )
 
 
@@ -6424,23 +6466,25 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (6) / AC-6 -- self-referential guard (mirrors Suite 34 checks 28+29)
-# CLAUDE.md §11 must name Suite 35 (the implementer's job — the tester does
-# NOT edit CLAUDE.md; this check enforces that the implementer does).
+# docs/testing.md (canonical registry) must name Suite 35.
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
 # This test file must contain the literal "Suite 35" and the marker
 # "KG MCP tool-name contract" so the guard stays coherent after edits.
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
 _s35_claude_text = read(REPO_ROOT / "CLAUDE.md")
 _s35_self_text = read(Path(__file__).resolve())
+_s35_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
     "kg-contract(6/ac-6):"
-    " CLAUDE.md §11 names 'Suite 35' and this file defines it"
+    " docs/testing.md canonical registry names 'Suite 35' and this file defines it"
     " (self-referential guard -- must stay green post-fix)",
-    "Suite 35" in _s35_claude_text
+    "Suite 35" in _s35_testing_md
     and "Suite 35" in _s35_self_text
     and "KG MCP tool-name contract" in _s35_self_text,
-    "Suite 35 not registered in CLAUDE.md §11"
+    "Suite 35 not registered in docs/testing.md canonical registry"
     " or marker literal 'KG MCP tool-name contract' missing in this file"
-    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+    " -- implementer must complete docs/testing.md; tester must not remove the marker",
 )
 
 
@@ -6680,21 +6724,23 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (11) / AC-7 -- self-referential guard
-# CLAUDE.md §11 must register Suite 36.
+# docs/testing.md (canonical registry) must register Suite 36.
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
 # This file must contain the literal "Suite 36" and the marker
 # "write-integrity beacon" so the guard survives future edits.
-# (Whole-file check is acceptable here — identical to Suite 35 check 6.)
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
+_s36_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
     "kg-beacon(11/ac-7):"
-    " CLAUDE.md §11 names 'Suite 36' and this file defines it"
+    " docs/testing.md canonical registry names 'Suite 36' and this file defines it"
     " (self-referential guard -- must stay green post-implementation)",
-    "Suite 36" in _s36_claude_text
+    "Suite 36" in _s36_testing_md
     and "Suite 36" in _s36_self_text
     and "write-integrity beacon" in _s36_self_text,
-    "Suite 36 not registered in CLAUDE.md §11"
+    "Suite 36 not registered in docs/testing.md canonical registry"
     " or marker literal 'write-integrity beacon' missing in this file"
-    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+    " -- implementer must complete docs/testing.md; tester must not remove the marker",
 )
 
 
@@ -6873,24 +6919,25 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (7) / AC-7 -- self-referential guard
-# CLAUDE.md §11 must register Suite 37.
+# docs/testing.md (canonical registry) must register Suite 37.
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
 # This file must contain the literal "Suite 37" and the marker
 # "KG write-policy _shared snippet" so the guard stays coherent after edits.
-# (Whole-file check — identical precedent to Suite 35 check 6 and Suite 36
-# check 11.)
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
 _s37_claude_text = read(REPO_ROOT / "CLAUDE.md")
 _s37_self_text   = read(Path(__file__).resolve())
+_s37_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
 check(
     "kg-snippet(7/ac-7):"
-    " CLAUDE.md §11 names 'Suite 37' and this file defines it"
+    " docs/testing.md canonical registry names 'Suite 37' and this file defines it"
     " (self-referential guard -- must stay green post-implementation)",
-    "Suite 37" in _s37_claude_text
+    "Suite 37" in _s37_testing_md
     and "Suite 37" in _s37_self_text
     and "KG write-policy _shared snippet" in _s37_self_text,
-    "Suite 37 not registered in CLAUDE.md §11"
+    "Suite 37 not registered in docs/testing.md canonical registry"
     " or marker literal 'KG write-policy _shared snippet' missing in this file"
-    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+    " -- implementer must complete docs/testing.md; tester must not remove the marker",
 )
 
 
@@ -7130,18 +7177,21 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (13) / AC-15 -- self-referential guard: Suite 38 in CLAUDE.md §11 + this file
+# Check (13) / AC-15 -- self-referential guard: Suite 38 in docs/testing.md + this file
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
+_s38_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
     "review-guardrails(13/ac-15):"
-    " CLAUDE.md §11 names 'Suite 38' and this file defines it"
+    " docs/testing.md canonical registry names 'Suite 38' and this file defines it"
     " (self-referential guard -- review-pipeline-guardrails)",
-    "Suite 38" in _s38_claude_text
+    "Suite 38" in _s38_testing_md
     and "Suite 38" in _s38_self_text
     and "review-pipeline-guardrails" in _s38_self_text,
-    "Suite 38 not registered in CLAUDE.md §11"
+    "Suite 38 not registered in docs/testing.md canonical registry"
     " or marker literal 'review-pipeline-guardrails' missing in this file"
-    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+    " -- implementer must complete docs/testing.md; tester must not remove the marker",
 )
 
 
@@ -7432,20 +7482,22 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (11) -- self-referential guard:
-# CLAUDE.md §11 must register "Suite 39" + marker "pr-a-takeover-contract".
-# This file must contain the literal "Suite 39".
-# (Whole-file check -- identical precedent to Suite 35-38 self-ref guards.)
+# docs/testing.md (canonical registry) must register "Suite 39" + marker
+# "pr-a-takeover-contract". This file must contain the literal "Suite 39".
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
+_s39_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
     "takeover-contract(11/self-ref):"
-    " CLAUDE.md §11 names 'Suite 39' and this file defines it"
+    " docs/testing.md canonical registry names 'Suite 39' and this file defines it"
     " (self-referential guard -- pr-a-takeover-contract)",
-    "Suite 39" in _s39_claude_text
+    "Suite 39" in _s39_testing_md
     and "Suite 39" in _s39_self_text
     and "pr-a-takeover-contract" in _s39_self_text,
-    "Suite 39 not registered in CLAUDE.md §11"
+    "Suite 39 not registered in docs/testing.md canonical registry"
     " or marker literal 'pr-a-takeover-contract' missing in this file"
-    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+    " -- implementer must complete docs/testing.md; tester must not remove the marker",
 )
 
 
@@ -7813,20 +7865,22 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (12) / self-referential guard:
-# CLAUDE.md §11 must register "Suite 40" + marker "pr-b-security-failopen".
-# This file must contain the literal "Suite 40".
-# (Whole-file check — identical precedent to Suite 35-39 self-ref guards.)
+# docs/testing.md (canonical registry) must register "Suite 40" + marker
+# "pr-b-security-failopen". This file must contain the literal "Suite 40".
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
+_s40_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
     "failopen(12/self-ref):"
-    " CLAUDE.md §11 names 'Suite 40' and this file defines it"
+    " docs/testing.md canonical registry names 'Suite 40' and this file defines it"
     " (self-referential guard -- pr-b-security-failopen)",
-    "Suite 40" in _s40_claude
+    "Suite 40" in _s40_testing_md
     and "Suite 40" in _s40_self
     and "pr-b-security-failopen" in _s40_self,
-    "Suite 40 not registered in CLAUDE.md §11"
+    "Suite 40 not registered in docs/testing.md canonical registry"
     " or marker literal 'pr-b-security-failopen' missing in this file"
-    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+    " -- implementer must complete docs/testing.md; tester must not remove the marker",
 )
 
 
@@ -8130,20 +8184,23 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (10) / AC-9 — Self-referential guard.
-# CLAUDE.md §11 must name "Suite 41".
+# docs/testing.md (canonical registry) must name "Suite 41".
 # This file must contain literal "Suite 41" and "_slice_section".
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
+_s41_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
-    "hotfix-flow(10/ac-9): CLAUDE.md §11 names 'Suite 41' and this file defines it"
-    " (self-referential guard — pr-c-hotfix-correctness)",
-    "Suite 41" in _s41_claude
+    "hotfix-flow(10/ac-9): docs/testing.md canonical registry names 'Suite 41'"
+    " and this file defines it (self-referential guard — pr-c-hotfix-correctness)",
+    "Suite 41" in _s41_testing_md
     and "Suite 41" in _s41_self
     and "_slice_section" in _s41_self
     and "pr-c-hotfix-correctness" in _s41_self,
-    "Suite 41 not registered in CLAUDE.md §11"
+    "Suite 41 not registered in docs/testing.md canonical registry"
     " or literal 'pr-c-hotfix-correctness' missing in this file"
     " or '_slice_section' idiom absent"
-    " — implementer must update CLAUDE.md §11; tester must not remove the markers",
+    " — implementer must complete docs/testing.md; tester must not remove the markers",
 )
 
 
@@ -8484,20 +8541,22 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (9) / AC-8 + AC-9 — CLAUDE.md §11 self-referential guard:
-# CLAUDE.md §11 must register "Suite 42" and "pr-d-frontend-wiring".
-# This file must contain the literal "Suite 42".
-# (Whole-file check — identical precedent to Suite 35-41 self-ref guards.)
+# Check (9) / AC-8 + AC-9 — docs/testing.md self-referential guard:
+# docs/testing.md (canonical registry) must register "Suite 42" and
+# "pr-d-frontend-wiring". This file must contain the literal "Suite 42".
+# Re-pointed from CLAUDE.md to docs/testing.md (pr-claude-md-hygiene).
+# Does NOT read CLAUDE.md for the Suite literal — no fallback or 'or' permitted.
 # ---------------------------------------------------------------------------
+_s42_testing_md = read(REPO_ROOT / "docs" / "testing.md")
 check(
-    "frontend-wiring(9/self-ref): CLAUDE.md §11 names 'Suite 42' and this file"
-    " defines it (self-referential guard — pr-d-frontend-wiring)",
-    "Suite 42" in _s42_claude
+    "frontend-wiring(9/self-ref): docs/testing.md canonical registry names 'Suite 42'"
+    " and this file defines it (self-referential guard — pr-d-frontend-wiring)",
+    "Suite 42" in _s42_testing_md
     and "Suite 42" in _s42_self
     and "pr-d-frontend-wiring" in _s42_self,
-    "Suite 42 not registered in CLAUDE.md §11"
+    "Suite 42 not registered in docs/testing.md canonical registry"
     " or literal 'pr-d-frontend-wiring' missing in this file"
-    " — implementer must update CLAUDE.md §11; tester must not remove the markers",
+    " — implementer must complete docs/testing.md; tester must not remove the markers",
 )
 
 # ---------------------------------------------------------------------------
