@@ -1553,10 +1553,12 @@ for ref in sorted(plausible_agent_refs):
 # 5. Phase numbers mentioned in orchestrator.md are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "2.0", "2", "2.5", "3", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
+    # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
+    # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
 }
 # Extract `Phase X` mentions, case-insensitive.
 phase_mentions = set(re.findall(r"Phase\s+([0-9]+(?:\.[0-9]+)?[a-z]?)", orchestrator_md_v19))
@@ -8180,6 +8182,345 @@ check(
     " — post-fix the hotfix auto-promote row must specify"
     " 'Phase 1.5 → 1.6 → STAGE-GATE-1 → Phase 2.0' so the promoted type:fix"
     " passes through Phase 1.6 security design-review",
+)
+
+
+# ---------------------------------------------------------------------------
+# Suite 42 -- pr-d-frontend-wiring (AC-1..AC-9)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks for the frontend-scope (ux-reviewer) wiring closed by
+# PR D of the pipeline-flows-hardening programme.
+#
+# Dead-letter bug (theme #2): the ux-reviewer is declared in classification
+# tables but no phase body dispatches it and no gate reads 04-ux-validation.md,
+# so the "WCAG A blocks delivery" contract is vacuous.
+#
+# PR D fix:
+#   (1) Phase 1 body gains a "When frontend_scope: true" sub-block that
+#       dispatches ux-reviewer enrich (sub-phase 1.7) after the architect.
+#   (2) Phase 3 parallel-dispatch block gains ux-reviewer validate (sub-phase
+#       3.4) when frontend_scope: true.
+#   (3) Phase 3.5 reads 04-ux-validation.md; a critical (WCAG A) finding fails
+#       the gate and routes back to implementer (Case A).
+#   (4) Phase 3.6 input pointers include 04-ux-validation.md.
+#   (5) Sub-phase identities 1.7-ux-enrich / 3.4-ux-validate carry
+#       phase.start/phase.end observability events and Phase-Checklist lines
+#       gated by frontend_scope ([~skipped: frontend_scope:false] when off).
+#   (6) A fallback inline/nested path exists for the ux-reviewer (mirrors the
+#       plan-reviewer fallback tree); status-block gate reads findings.critical.
+#   (7) agents/ux-reviewer.md enrich-mode pins AC into 01-plan.md § Task List
+#       (not only 01-ux-review.md), resolving the AC-sink contradiction.
+#
+# Every check slices to a named anchor and asserts sub-tokens WITHIN the slice.
+# Anti-false-green guarantee:
+#   _slice_section returns "" when the anchor is absent
+#   => `"token" in ""` is always False
+#   => a missing section always fails the check, never silently passes it.
+#
+# Exceptions:
+#   - Check (9)  self-referential guard: file-wide by design (Suite 35-41 precedent).
+#   - Check (10) CLAUDE.md §11 self-ref guard: file-wide by design.
+#
+# CANONICAL ANCHORS (implementer MUST add these verbatim to the target files):
+#   agents/orchestrator.md  : "### When frontend_scope: true — ux-reviewer enrich (Phase 1.7)"
+#   agents/orchestrator.md  : "### When frontend_scope: true — ux-reviewer validate (Phase 3.4)"
+#   agents/orchestrator.md  : "### UX gate — frontend_scope: true"
+#   agents/orchestrator.md  : "### Phase Checklist — frontend_scope additions"
+#   agents/orchestrator.md  : "### ux-reviewer fallback"
+#   agents/ux-reviewer.md   : "### AC sink — 01-plan.md § Task List"
+#
+# Check index -> AC mapping:
+#   (1)  / AC-1  : orchestrator.md Phase 1 enrich anchor —
+#                  "When frontend_scope: true" sub-block dispatches ux-reviewer
+#                  enrich (1.7-ux-enrich) after architect, before Phase 1.5;
+#                  input 01-plan.md + output 01-ux-review.md.
+#   (2)  / AC-2  : orchestrator.md Phase 3 validate anchor —
+#                  ux-reviewer validate (3.4-ux-validate) in the parallel block
+#                  when frontend_scope: true; input 02-implementation.md +
+#                  01-ux-review.md; output 04-ux-validation.md.
+#   (3)  / AC-3  : orchestrator.md Phase 3.5 UX gate anchor —
+#                  reads 04-ux-validation.md; critical (WCAG A) fails gate and
+#                  routes to implementer (Case A); high/medium do NOT block.
+#   (4)  / AC-4  : orchestrator.md Phase 3.6 input pointers —
+#                  04-ux-validation.md listed as a pointer (pointer line in
+#                  the existing Phase 3.6 "Invoke via Task tool" block).
+#   (5)  / AC-5  : orchestrator.md Phase Checklist anchor —
+#                  sub-phase lines 1.7-ux-enrich / 3.4-ux-validate present;
+#                  phase.start/phase.end observability events named;
+#                  [~skipped: frontend_scope:false] gating marker present.
+#   (6)  / AC-6  : orchestrator.md ux-reviewer fallback anchor —
+#                  inline/nested fallback documented; verdict derived from
+#                  findings.critical (status-block gate).
+#   (7)  / AC-7  : agents/ux-reviewer.md AC-sink anchor —
+#                  enrich-mode pins AC into 01-plan.md § Task List;
+#                  resolves the 01-ux-review.md vs "append to PR AC list"
+#                  contradiction (lines :46/:66/:115-138).
+#   (8)  / AC-8  : this file contains "Suite 42" + "_slice_section" idiom
+#                  + "pr-d-frontend-wiring" (anti-false-green self-check).
+#   (9)  / AC-8  : CLAUDE.md §11 registers "Suite 42" + "pr-d-frontend-wiring".
+#   (10) / AC-1+2: consistency check — BOTH Phase 1 enrich slice AND Phase 3
+#                  validate slice reference "04-ux-validation.md" and
+#                  "ux-reviewer" (end-to-end wiring in both directions).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 42: pr-d-frontend-wiring — frontend-scope ux-reviewer wiring ===")
+
+# ---- file reads (suite-local) ----------------------------------------------
+_s42_orch    = read(AGENTS_DIR / "orchestrator.md")
+_s42_uxrev   = read(AGENTS_DIR / "ux-reviewer.md")
+_s42_claude  = read(REPO_ROOT / "CLAUDE.md")
+_s42_self    = Path(__file__).read_text(encoding="utf-8")
+
+# ---- canonical anchors -----------------------------------------------------
+_S42_ENRICH_ANCHOR    = "### When frontend_scope: true — ux-reviewer enrich (Phase 1.7)"
+_S42_VALIDATE_ANCHOR  = "### When frontend_scope: true — ux-reviewer validate (Phase 3.4)"
+_S42_GATE35_ANCHOR    = "### UX gate — frontend_scope: true"
+_S42_CHECKLIST_ANCHOR = "### Phase Checklist — frontend_scope additions"
+_S42_FALLBACK_ANCHOR  = "### ux-reviewer fallback"
+_S42_ACSINK_ANCHOR    = "### AC sink — 01-plan.md § Task List"
+
+# ---- slices ----------------------------------------------------------------
+_s42_enrich_slice    = _slice_section(_s42_orch,  _S42_ENRICH_ANCHOR)
+_s42_validate_slice  = _slice_section(_s42_orch,  _S42_VALIDATE_ANCHOR)
+_s42_gate35_slice    = _slice_section(_s42_orch,  _S42_GATE35_ANCHOR)
+_s42_checklist_slice = _slice_section(_s42_orch,  _S42_CHECKLIST_ANCHOR)
+_s42_fallback_slice  = _slice_section(_s42_orch,  _S42_FALLBACK_ANCHOR)
+_s42_acsink_slice    = _slice_section(_s42_uxrev, _S42_ACSINK_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 — orchestrator.md § Phase 1 enrich block:
+# When frontend_scope: true, ux-reviewer enrich dispatched after architect,
+# before Phase 1.5. Tokens: "1.7-ux-enrich" + "ux-reviewer" +
+# "01-ux-review.md" + "01-plan.md" (input) + "1.5" (ordering reference).
+# ---------------------------------------------------------------------------
+_S42_ENRICH_TOKENS = ("1.7-ux-enrich", "ux-reviewer", "01-ux-review.md", "01-plan.md", "1.5")
+
+check(
+    "frontend-wiring(1/ac-1): orchestrator.md contains Phase 1 enrich anchor"
+    " and dispatches ux-reviewer enrich (1.7-ux-enrich) before Phase 1.5,"
+    " with input 01-plan.md and output 01-ux-review.md",
+    bool(_s42_enrich_slice)
+    and all(t in _s42_enrich_slice for t in _S42_ENRICH_TOKENS),
+    f"anchor '{_S42_ENRICH_ANCHOR}' missing or required tokens absent;"
+    f" anchor present: {bool(_s42_enrich_slice)};"
+    + " ".join(
+        f" '{t}' present: {t in _s42_enrich_slice};"
+        for t in _S42_ENRICH_TOKENS
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-2 — orchestrator.md § Phase 3 validate block:
+# ux-reviewer validate (3.4-ux-validate) in the parallel Task block when
+# frontend_scope: true. Tokens: "3.4-ux-validate" + "ux-reviewer" +
+# "04-ux-validation.md" + "02-implementation.md" + "01-ux-review.md".
+# ---------------------------------------------------------------------------
+_S42_VALIDATE_TOKENS = (
+    "3.4-ux-validate", "ux-reviewer", "04-ux-validation.md",
+    "02-implementation.md", "01-ux-review.md",
+)
+
+check(
+    "frontend-wiring(2/ac-2): orchestrator.md contains Phase 3 validate anchor"
+    " and adds ux-reviewer validate (3.4-ux-validate) to the parallel Task block"
+    " with input 02-implementation.md+01-ux-review.md and output 04-ux-validation.md",
+    bool(_s42_validate_slice)
+    and all(t in _s42_validate_slice for t in _S42_VALIDATE_TOKENS),
+    f"anchor '{_S42_VALIDATE_ANCHOR}' missing or required tokens absent;"
+    f" anchor present: {bool(_s42_validate_slice)};"
+    + " ".join(
+        f" '{t}' present: {t in _s42_validate_slice};"
+        for t in _S42_VALIDATE_TOKENS
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-3 — orchestrator.md § Phase 3.5 UX gate:
+# reads 04-ux-validation.md; critical (WCAG A) finding fails gate and routes
+# to implementer (Case A); the gate explicitly does NOT block on high/medium.
+# Tokens required: "04-ux-validation.md" + "critical" + "Case A" +
+# one of ("implementer", "routes to implementer", "route to implementer").
+# Negative token: "high" MUST also be present (to confirm the "only critical
+# blocks" language is there, not just a bare "critical" mention).
+# ---------------------------------------------------------------------------
+_S42_GATE35_BASE_TOKENS = ("04-ux-validation.md", "critical", "Case A")
+_S42_GATE35_ROUTE_ALTS  = ("implementer", "route to implementer", "routes to implementer")
+_S42_GATE35_WCAG_ALTS   = ("WCAG A", "WCAG-A", "wcag-a", "wcag a")
+
+check(
+    "frontend-wiring(3/ac-3): orchestrator.md § Phase 3.5 UX gate reads"
+    " 04-ux-validation.md; critical (WCAG A) finding fails gate and routes to"
+    " implementer (Case A); 'high' token confirms only-critical-blocks language",
+    bool(_s42_gate35_slice)
+    and all(t in _s42_gate35_slice for t in _S42_GATE35_BASE_TOKENS)
+    and any(a in _s42_gate35_slice for a in _S42_GATE35_ROUTE_ALTS)
+    and any(a in _s42_gate35_slice for a in _S42_GATE35_WCAG_ALTS)
+    and "high" in _s42_gate35_slice,
+    f"anchor '{_S42_GATE35_ANCHOR}' missing or gate tokens absent;"
+    f" anchor present: {bool(_s42_gate35_slice)};"
+    + " ".join(f" '{t}' present: {t in _s42_gate35_slice};" for t in _S42_GATE35_BASE_TOKENS)
+    + f" route-alt found: {any(a in _s42_gate35_slice for a in _S42_GATE35_ROUTE_ALTS)};"
+    f" WCAG-A alt found: {any(a in _s42_gate35_slice for a in _S42_GATE35_WCAG_ALTS)};"
+    f" 'high' present: {'high' in _s42_gate35_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-4 — orchestrator.md Phase 3.6 input pointers:
+# 04-ux-validation.md must appear in the existing "Invoke via Task tool"
+# pointer block of Phase 3.6 (acceptance checker inputs).
+# Strategy: search the whole orchestrator text for the 3.6 pointer block
+# and verify 04-ux-validation.md is listed alongside the existing pointers.
+# The existing line (orchestrator.md:1750) lists:
+#   "02-implementation.md, 03-testing.md, 04-validation.md, and 04-security.md"
+# After the fix it must also include "04-ux-validation.md".
+# Anchor: "## Phase 3.6" (the acceptance-checker phase heading).
+# ---------------------------------------------------------------------------
+_S42_PHASE36_ANCHOR = "## Phase 3.6"
+_s42_phase36_slice  = _slice_section(_s42_orch, _S42_PHASE36_ANCHOR)
+
+check(
+    "frontend-wiring(4/ac-4): orchestrator.md Phase 3.6 input pointer block"
+    " includes '04-ux-validation.md' (alongside existing 02-implementation.md,"
+    " 03-testing.md, 04-validation.md pointers)",
+    bool(_s42_phase36_slice)
+    and "04-ux-validation.md" in _s42_phase36_slice,
+    f"anchor '{_S42_PHASE36_ANCHOR}' missing or '04-ux-validation.md' absent"
+    f" from Phase 3.6 input pointer block;"
+    f" anchor present: {bool(_s42_phase36_slice)};"
+    f" '04-ux-validation.md' present: {'04-ux-validation.md' in _s42_phase36_slice}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-5 — orchestrator.md Phase Checklist frontend_scope additions:
+# Sub-phase lines 1.7-ux-enrich and 3.4-ux-validate must be present.
+# The [~skipped: frontend_scope:false] gating marker must appear.
+# phase.start and phase.end observability event labels must be named.
+# The ordering note (number marks identity, not execution order) must appear.
+# ---------------------------------------------------------------------------
+_S42_CHECKLIST_TOKENS = (
+    "1.7-ux-enrich",
+    "3.4-ux-validate",
+    "frontend_scope:false",
+    "phase.start",
+    "phase.end",
+)
+_S42_ORDER_ALTS = ("identity", "observability", "execution order", "not order")
+
+check(
+    "frontend-wiring(5/ac-5): orchestrator.md Phase Checklist anchor contains"
+    " sub-phase lines 1.7-ux-enrich + 3.4-ux-validate + [~skipped: frontend_scope:false]"
+    " + phase.start/phase.end + ordering-note (identity/observability/not order)",
+    bool(_s42_checklist_slice)
+    and all(t in _s42_checklist_slice for t in _S42_CHECKLIST_TOKENS)
+    and any(a in _s42_checklist_slice for a in _S42_ORDER_ALTS),
+    f"anchor '{_S42_CHECKLIST_ANCHOR}' missing or required tokens absent;"
+    f" anchor present: {bool(_s42_checklist_slice)};"
+    + " ".join(f" '{t}' present: {t in _s42_checklist_slice};" for t in _S42_CHECKLIST_TOKENS)
+    + f" order-alt found: {any(a in _s42_checklist_slice for a in _S42_ORDER_ALTS)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-6 — orchestrator.md ux-reviewer fallback block:
+# Inline/nested fallback documented, mirroring the plan-reviewer fallback tree.
+# Status-block gate reads verdict from findings.critical.
+# Tokens: "findings.critical" + "inline" + one of ("nested", "fallback") +
+# one of ("ux-reviewer.md", "agents/ux-reviewer.md") as the spec reference.
+# ---------------------------------------------------------------------------
+_S42_FALLBACK_BASE = ("findings.critical", "inline")
+_S42_FALLBACK_ALTS = ("nested", "fallback")
+_S42_FALLBACK_SPEC = ("ux-reviewer.md", "agents/ux-reviewer.md")
+
+check(
+    "frontend-wiring(6/ac-6): orchestrator.md ux-reviewer fallback anchor"
+    " documents inline/nested fallback path; verdict derived from findings.critical;"
+    " ux-reviewer.md referenced as spec",
+    bool(_s42_fallback_slice)
+    and all(t in _s42_fallback_slice for t in _S42_FALLBACK_BASE)
+    and any(a in _s42_fallback_slice for a in _S42_FALLBACK_ALTS)
+    and any(a in _s42_fallback_slice for a in _S42_FALLBACK_SPEC),
+    f"anchor '{_S42_FALLBACK_ANCHOR}' missing or fallback tokens absent;"
+    f" anchor present: {bool(_s42_fallback_slice)};"
+    + " ".join(f" '{t}' present: {t in _s42_fallback_slice};" for t in _S42_FALLBACK_BASE)
+    + f" fallback-alt found: {any(a in _s42_fallback_slice for a in _S42_FALLBACK_ALTS)};"
+    f" spec-alt found: {any(a in _s42_fallback_slice for a in _S42_FALLBACK_SPEC)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-7 — agents/ux-reviewer.md AC-sink:
+# Enrich-mode must pin AC into 01-plan.md § Task List (the gate source-of-truth),
+# not only 01-ux-review.md. The contradiction between :46 (output=01-ux-review.md),
+# :66 ("append to existing PR's AC list"), and :115-138 (AC Additions written to
+# 01-ux-review.md) must be resolved. Tokens required:
+# "01-plan.md" + "Task List" + one of ("pin", "append to", "fix", "primary").
+# ---------------------------------------------------------------------------
+_S42_ACSINK_TOKENS = ("01-plan.md", "Task List")
+_S42_ACSINK_ALTS   = ("pin", "append to", "fix", "primary", "source of truth", "source-of-truth")
+
+check(
+    "frontend-wiring(7/ac-7): agents/ux-reviewer.md AC-sink anchor documents"
+    " that enrich-mode pins AC into 01-plan.md § Task List (gate source-of-truth);"
+    " tokens: '01-plan.md' + 'Task List' + pin/append/primary/source-of-truth",
+    bool(_s42_acsink_slice)
+    and all(t in _s42_acsink_slice for t in _S42_ACSINK_TOKENS)
+    and any(a in _s42_acsink_slice for a in _S42_ACSINK_ALTS),
+    f"anchor '{_S42_ACSINK_ANCHOR}' missing or AC-sink tokens absent;"
+    f" anchor present: {bool(_s42_acsink_slice)};"
+    + " ".join(f" '{t}' present: {t in _s42_acsink_slice};" for t in _S42_ACSINK_TOKENS)
+    + f" pin-alt found: {any(a in _s42_acsink_slice for a in _S42_ACSINK_ALTS)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-8 — this file contains "Suite 42" + "_slice_section" idiom
+# + "pr-d-frontend-wiring" (anti-false-green self-check, Suite 36-41 precedent).
+# ---------------------------------------------------------------------------
+check(
+    "frontend-wiring(8/ac-8): this test file contains 'Suite 42' marker,"
+    " '_slice_section' anti-false-green idiom, and 'pr-d-frontend-wiring' identifier",
+    "Suite 42" in _s42_self
+    and "_slice_section" in _s42_self
+    and "pr-d-frontend-wiring" in _s42_self,
+    "This file is missing 'Suite 42' marker, '_slice_section' usage,"
+    " or 'pr-d-frontend-wiring' identifier — self-consistency check failed",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-8 + AC-9 — CLAUDE.md §11 self-referential guard:
+# CLAUDE.md §11 must register "Suite 42" and "pr-d-frontend-wiring".
+# This file must contain the literal "Suite 42".
+# (Whole-file check — identical precedent to Suite 35-41 self-ref guards.)
+# ---------------------------------------------------------------------------
+check(
+    "frontend-wiring(9/self-ref): CLAUDE.md §11 names 'Suite 42' and this file"
+    " defines it (self-referential guard — pr-d-frontend-wiring)",
+    "Suite 42" in _s42_claude
+    and "Suite 42" in _s42_self
+    and "pr-d-frontend-wiring" in _s42_self,
+    "Suite 42 not registered in CLAUDE.md §11"
+    " or literal 'pr-d-frontend-wiring' missing in this file"
+    " — implementer must update CLAUDE.md §11; tester must not remove the markers",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-1 + AC-2 consistency — end-to-end wiring:
+# BOTH the Phase 1 enrich slice AND the Phase 3 validate slice must reference
+# "ux-reviewer" and the artefact chain is coherent:
+#   enrich output (01-ux-review.md) appears as validate input.
+# ---------------------------------------------------------------------------
+check(
+    "frontend-wiring(10/ac-1+ac-2 consistency): Phase 1 enrich slice AND Phase 3"
+    " validate slice both reference 'ux-reviewer'; enrich output '01-ux-review.md'"
+    " appears in validate slice as input (end-to-end artefact chain coherent)",
+    bool(_s42_enrich_slice)
+    and bool(_s42_validate_slice)
+    and "ux-reviewer" in _s42_enrich_slice
+    and "ux-reviewer" in _s42_validate_slice
+    and "01-ux-review.md" in _s42_validate_slice,
+    f"End-to-end artefact chain broken:"
+    f" enrich slice present: {bool(_s42_enrich_slice)};"
+    f" validate slice present: {bool(_s42_validate_slice)};"
+    f" 'ux-reviewer' in enrich: {'ux-reviewer' in _s42_enrich_slice};"
+    f" 'ux-reviewer' in validate: {'ux-reviewer' in _s42_validate_slice};"
+    f" '01-ux-review.md' in validate: {'01-ux-review.md' in _s42_validate_slice}",
 )
 
 
