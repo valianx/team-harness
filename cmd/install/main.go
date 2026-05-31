@@ -29,7 +29,7 @@ import (
 // Note: the value is the BARE semver (no leading "v"). The "v" is added by
 // the printf in main(). The release workflow strips the leading "v" from
 // the git tag (e.g. v2.0.1 → 2.0.1) before injecting — see release.yml.
-var version = "2.40.5"
+var version = "2.40.6"
 
 // forceFlag is preserved as a no-op for backward compatibility. The installer
 // always overwrites embedded files; this flag once disabled the conflict gate,

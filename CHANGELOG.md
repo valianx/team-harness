@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.6] - 2026-05-31
+
+### Fixed
+
+- Hardened `delivery` agent flow (PR E — pipeline-flows-hardening): replaced Glob-first-match version discovery with an explicit 5-site enumeration (`.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` `plugins[0].version`, `cmd/install/main.go`, `CLAUDE.md §3`, `CHANGELOG.md`) and fenced off the schema top-level; added Step 9e to own the CHANGELOG release cut (gated on Step 9 version bump); updated Step 9b to read `CLAUDE.md §4 Golden Commands` as DoD source and emit `dod: no gates discovered` when all rows are skipped; added Step 2b active `gh` account capture (`gh api user -q .login`) reported as `gh_account:` in the status block; added `blocked-pr-pending` status to `agents/_shared/gh-fallback.md` for the `has_gh=true` push-ok/PR-failed partial-success case. Suite 43 (7 anchor-scoped checks, anti-false-green idiom) added to `tests/test_agent_structure.py`.
+
 ## [2.40.5] - 2026-05-31
 
 ### Changed
