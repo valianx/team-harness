@@ -17,6 +17,8 @@ This file is read on-demand by the orchestrator when executing a direct mode. It
 
 **Routing:** the user invokes `/th:plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
 
+**Security-sensitivity detection (summary):** security reviewer runs when `00-state.md` declares `security-sensitive: true`, OR when a path glob match finds `auth/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`, OR when a **semantic keyword match** detects security-relevant terms in prose (auth, token, jwt, password, secret, credential, PII, encrypt, decrypt, session, cookie, permission, privilege, signature, csrf, xss, injection — case-insensitive; ≥1 match is sufficient), OR when the operator passes `--security`. When security is SKIPPED (none of the above triggered), the output shows an affirmative visible notice: `SKIPPED — no security-sensitive path or keyword detected ... re-run with --security`. Fail-closed principle: a false-positive (security runs when not needed) costs one extra agent run; a false-negative (security skipped when needed) is the risk this mode exists to prevent. See gating detail in `### Review Panel` below. (Note: keyword-list dedup with `orchestrator.md` Signal 1 belongs to PR I.)
+
 ### Review Panel (three reviewers, one plan)
 
 The `plan-review` direct mode runs a panel of up to three reviewers that fold their findings into a single `01-plan.md`. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
@@ -29,7 +31,10 @@ The `plan-review` direct mode runs a panel of up to three reviewers that fold th
 
 **Gating of security reviewer (step 2):** determine security-sensitivity in this order:
 1. Read `00-state.md` (if it exists) and check for `security-sensitive: true` or `security_sensitive: true`.
-2. If absent, derive from path/keyword heuristic: scan `### Services Touched` and the AC blocks in `01-plan.md` for the existing pipeline path auto-escalation list — `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**` — which is the same list used by the bug-fix pipeline (reused, not a new divergent list). If any of those paths or keywords are present, treat as security-sensitive.
+2. If absent, derive from path/keyword heuristic: scan `### Services Touched`, `## Review Summary`, and the AC blocks in `01-plan.md` using TWO complementary checks — both are sufficient independently to trigger security:
+   - **Path glob match:** scan for the existing pipeline path auto-escalation list — `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**` — which is the same list used by the bug-fix pipeline (reused, not a new divergent list).
+   - **Semantic keyword match (case-insensitive):** scan for security-relevant terms in prose — `auth`, `authentication`, `authorization`, `token`, `jwt`, `oauth`, `password`, `secret`, `credential`, `credentials`, `PII`, `encrypt`, `decrypt`, `encryption`, `session`, `cookie`, `permission`, `privilege`, `signature`, `csrf`, `xss`, `injection`. If ≥1 keyword is matched, treat as security-sensitive. (Note: this keyword list is intentionally consistent with the high-tier Signal 1 list in `orchestrator.md`; dedup of these lists into a single source belongs to PR I.)
+   If either path glob match OR semantic keyword match finds a result, treat as security-sensitive.
 3. Operator override: if the operator passed `--security` flag or explicitly said "include security" / "incluí seguridad", treat as security-sensitive regardless of the above.
 
 **Process:**
@@ -52,7 +57,7 @@ The `plan-review` direct mode runs a panel of up to three reviewers that fold th
 Plan Review (direct mode): {feature-name}
 **Combined verdict:** {pass | concerns | fail}
 Substance (qa): {pass | fail}
-Security design-review: {clean | risks-found | skipped (not security-sensitive)}
+Security design-review: {clean | risks-found | SKIPPED — no security-sensitive path or keyword detected in the plan. If this plan touches auth/crypto/session/PII, re-run with --security}
 Shape (plan-reviewer): {pass | concerns | fail}
 
 {if any findings:}
