@@ -7143,6 +7143,310 @@ check(
 )
 
 
+# Suite 39 -- pr-a-takeover-contract (AC-1..AC-12)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks for the five defects repaired by PR A of the
+# nested-dispatch takeover contract hardening programme.
+#
+# Every check slices to a named section anchor and asserts sub-tokens WITHIN
+# that slice -- never a loose `token in whole_file` -- following the Suite
+# 36/37/38 idiom.  The anti-false-green guarantee:
+#   _slice_section returns "" when the anchor is absent
+#   => `"x" in ""` is always False
+#   => a missing section always fails the check, never silently passes it.
+#
+# Exception: check (10) uses a whole-file grep (AC-7 -- absence of §13 across
+# all .md files), and the self-referential guard (check 11) is file-wide by
+# design, following the precedent of Suite 35 check 6, Suite 36 check 11,
+# Suite 37 check 7, and Suite 38 check 13.
+#
+# Check index -> AC mapping:
+#   (1)  / AC-1  : orchestrator.md § Dispatch-blocked exit -- never-th:orchestrator binding
+#   (2)  / AC-2  : subagent-orchestration.md § Takeover Protocol -- consume-side guard
+#   (3a) / AC-3  : subagent-orchestration.md -- ## dispatch_handoff Schema section exists
+#   (3b) / AC-3  : same section -- ```json fenced block present
+#   (3c) / AC-3  : same section -- all 8 required field names present
+#   (4)  / AC-4  : orchestrator.md § Dispatch-blocked exit -- dispatch.blocked emit instruction
+#   (5)  / AC-5  : orchestrator.md § Dispatch-blocked exit -- references schema by canonical name
+#   (6)  / AC-6  : subagent-orchestration.md § Takeover Protocol -- gate-manifest pointer phrase
+#   (7)  / AC-7  : skills/README.md -- §14 (not §13) cross-reference present
+#   (8)  / AC-7  : repo-wide grep -- §13 "Subagent Orchestration" absent from all .md files
+#   (9)  / AC-8  : skills/setup/SKILL.md nested-dispatch-takeover block -- never-th:orchestrator line
+#   (10) / AC-12 : subagent-orchestration.md § dispatch_handoff Schema -- type:null security note
+#   (11)         : self-referential guard -- Suite 39 in CLAUDE.md §11 + this file
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 39: pr-a-takeover-contract ===")
+
+# ---- file reads (suite-local variables) ------------------------------------
+_s39_orch_text     = read(AGENTS_DIR / "orchestrator.md")
+_s39_suborch_text  = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s39_setup_text    = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s39_skills_rm_text = read(SKILLS_DIR / "README.md")
+_s39_claude_text   = read(REPO_ROOT / "CLAUDE.md")
+_s39_self_text     = read(Path(__file__).resolve())
+
+# ---- anchors ---------------------------------------------------------------
+_S39_ORCH_EXIT_ANCHOR   = "### Dispatch-blocked exit"
+_S39_TAKEOVER_ANCHOR    = "## Takeover Protocol"
+_S39_SCHEMA_ANCHOR      = "## dispatch_handoff Schema"
+_S39_SETUP_NDT_ANCHOR   = "<!-- nested-dispatch-takeover:start -->"
+
+# ---- slices ----------------------------------------------------------------
+_s39_orch_exit_slice    = _slice_section(_s39_orch_text,    _S39_ORCH_EXIT_ANCHOR)
+_s39_takeover_slice     = _slice_section(_s39_suborch_text, _S39_TAKEOVER_ANCHOR)
+_s39_schema_slice       = _slice_section(_s39_suborch_text, _S39_SCHEMA_ANCHOR)
+_s39_setup_ndt_slice    = _slice_section(_s39_setup_text,   _S39_SETUP_NDT_ANCHOR)
+
+# 8 field names that the consumer reads (AC-3)
+_S39_SCHEMA_FIELDS = (
+    "schema_version",
+    "next_dispatch.agent",
+    "type",
+    "phase",
+    "autonomy.granted",
+    "round",
+    "state_ref",
+    "probe_error",
+)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 -- orchestrator.md § Dispatch-blocked exit:
+# The binding of {next-agent} must explicitly name the never-th:orchestrator rule.
+# Asserts: "th:architect" (boot case), "00-state.md" (mid-pipeline source),
+# and "NEVER" + "th:orchestrator" (the prohibited value).
+# ---------------------------------------------------------------------------
+_S39_AC1_TOKENS = (
+    "th:architect",
+    "00-state.md",
+    "NEVER",
+)
+check(
+    "takeover-contract(1/ac-1): orchestrator.md § 'Dispatch-blocked exit'"
+    " binds {next-agent} with th:architect (boot), 00-state.md (mid-pipeline),"
+    " and NEVER th:orchestrator rule",
+    bool(_s39_orch_exit_slice)
+    and all(t in _s39_orch_exit_slice for t in _S39_AC1_TOKENS)
+    and "th:orchestrator" in _s39_orch_exit_slice,
+    f"anchor '{_S39_ORCH_EXIT_ANCHOR}' missing or binding tokens absent:"
+    f" need {_S39_AC1_TOKENS} + 'th:orchestrator' (the prohibited value)",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-2 -- subagent-orchestration.md § Takeover Protocol:
+# Consume-side guard must state that th:orchestrator == malformed handoff
+# and instruct dispatching the phase agent / th:architect instead.
+# ---------------------------------------------------------------------------
+_S39_AC2_TOKENS = (
+    "th:orchestrator",
+    "malformed",
+    "th:architect",
+)
+check(
+    "takeover-contract(2/ac-2): docs/subagent-orchestration.md § 'Takeover Protocol'"
+    " contains consume-side guard: if next_dispatch.agent == th:orchestrator"
+    " => malformed => dispatch phase agent / th:architect",
+    bool(_s39_takeover_slice)
+    and all(t in _s39_takeover_slice for t in _S39_AC2_TOKENS)
+    and "malformed" in _s39_takeover_slice,
+    f"anchor '{_S39_TAKEOVER_ANCHOR}' missing or guard tokens absent: {_S39_AC2_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3a) / AC-3 -- subagent-orchestration.md: ## dispatch_handoff Schema section exists
+# ---------------------------------------------------------------------------
+check(
+    "takeover-contract(3a/ac-3): docs/subagent-orchestration.md has"
+    " a '## dispatch_handoff Schema' section",
+    bool(_s39_schema_slice),
+    f"anchor '{_S39_SCHEMA_ANCHOR}' not found in docs/subagent-orchestration.md",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3b) / AC-3 -- same section: ```json fenced block present
+# ---------------------------------------------------------------------------
+check(
+    "takeover-contract(3b/ac-3): docs/subagent-orchestration.md"
+    " § 'dispatch_handoff Schema' contains a ```json fenced block",
+    "```json" in _s39_schema_slice,
+    "No ```json fenced block found in the dispatch_handoff Schema section",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3c) / AC-3 -- same section: all 8 field names enumerated
+# ---------------------------------------------------------------------------
+check(
+    "takeover-contract(3c/ac-3): docs/subagent-orchestration.md"
+    " § 'dispatch_handoff Schema' enumerates all 8 required field names"
+    f" {_S39_SCHEMA_FIELDS}",
+    bool(_s39_schema_slice)
+    and all(f in _s39_schema_slice for f in _S39_SCHEMA_FIELDS),
+    f"One or more field names missing from the dispatch_handoff Schema section:"
+    f" need {_S39_SCHEMA_FIELDS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-4 -- orchestrator.md § Dispatch-blocked exit:
+# Must instruct appending a dispatch.blocked event with reason + action,
+# covering the boot-inline case.
+# ---------------------------------------------------------------------------
+_S39_AC4_TOKENS = (
+    "dispatch.blocked",
+    "reason",
+    "action",
+)
+check(
+    "takeover-contract(4/ac-4): orchestrator.md § 'Dispatch-blocked exit'"
+    " instructs appending a dispatch.blocked event with reason + action"
+    " (including boot-inline case)",
+    bool(_s39_orch_exit_slice)
+    and all(t in _s39_orch_exit_slice for t in _S39_AC4_TOKENS),
+    f"anchor '{_S39_ORCH_EXIT_ANCHOR}' missing or dispatch.blocked emit tokens absent:"
+    f" {_S39_AC4_TOKENS}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-5 -- orchestrator.md § Dispatch-blocked exit:
+# Must reference the schema by canonical name (not enumerate fields inline).
+# ---------------------------------------------------------------------------
+check(
+    "takeover-contract(5/ac-5): orchestrator.md § 'Dispatch-blocked exit'"
+    " references the canonical schema by name"
+    " ('dispatch_handoff Schema')",
+    bool(_s39_orch_exit_slice)
+    and "dispatch_handoff Schema" in _s39_orch_exit_slice,
+    f"anchor '{_S39_ORCH_EXIT_ANCHOR}' missing or canonical schema name"
+    " 'dispatch_handoff Schema' not referenced in the exit section",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-6 -- subagent-orchestration.md § Takeover Protocol:
+# The manifest must be relabeled as gate-manifest + carry a pointer to the
+# Phase Dispatch table in orchestrator.md.
+# Asserts one of: "gate manifest", "gate-manifest", "gates" near "Phase Dispatch".
+# ---------------------------------------------------------------------------
+check(
+    "takeover-contract(6/ac-6): docs/subagent-orchestration.md § 'Takeover Protocol'"
+    " relabels the manifest as gate-manifest and includes a pointer to the"
+    " Phase Dispatch table in agents/orchestrator.md",
+    bool(_s39_takeover_slice)
+    and (
+        "gate manifest" in _s39_takeover_slice.lower()
+        or "gate-manifest" in _s39_takeover_slice.lower()
+    )
+    and "Phase Dispatch" in _s39_takeover_slice,
+    f"anchor '{_S39_TAKEOVER_ANCHOR}' missing or gate-manifest relabel / Phase Dispatch"
+    " pointer absent from the Takeover Protocol section",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-7 -- skills/README.md: cross-reference must say §14, not §13
+# ---------------------------------------------------------------------------
+_s39_skills_rm_slice = _slice_section(_s39_skills_rm_text, "nested-dispatch-takeover")
+check(
+    "takeover-contract(7/ac-7): skills/README.md references"
+    " '§ 14 \"Subagent Orchestration\"' (not § 13)",
+    '§ 14' in _s39_skills_rm_text
+    and '§ 13 "Subagent Orchestration"' not in _s39_skills_rm_text,
+    "skills/README.md still references '§ 13 \"Subagent Orchestration\"'"
+    " or '§ 14' is absent",
+)
+
+# ---------------------------------------------------------------------------
+# Check (8) / AC-7 -- repo-wide grep: §13 "Subagent Orchestration" absent from
+# every .md file in the repo (excluding CHANGELOG.md).
+# ---------------------------------------------------------------------------
+_S39_FORBIDDEN_XREF = '§ 13 "Subagent Orchestration"'
+
+def _find_stale_xrefs(repo_root: Path, needle: str) -> list[str]:
+    """Return list of relative .md file paths that contain `needle`,
+    excluding CHANGELOG.md."""
+    hits = []
+    for md in repo_root.rglob("*.md"):
+        if md.name == "CHANGELOG.md":
+            continue
+        try:
+            if needle in md.read_text(encoding="utf-8", errors="replace"):
+                hits.append(str(md.relative_to(repo_root)))
+        except OSError:
+            pass
+    return hits
+
+_s39_stale_xref_hits = _find_stale_xrefs(REPO_ROOT, _S39_FORBIDDEN_XREF)
+check(
+    "takeover-contract(8/ac-7): repo-wide grep -- no .md file (excl. CHANGELOG.md)"
+    f" contains '{_S39_FORBIDDEN_XREF}'",
+    len(_s39_stale_xref_hits) == 0,
+    f"Stale §13 cross-reference found in: {_s39_stale_xref_hits}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (9) / AC-8 -- skills/setup/SKILL.md nested-dispatch-takeover managed block:
+# Must contain a reinforcement line for the never-th:orchestrator guard.
+# Slices from the <!-- nested-dispatch-takeover:start --> marker to the next
+# heading, so a missing marker returns "" => always fails (anti-false-green).
+# ---------------------------------------------------------------------------
+_S39_AC8_TOKENS = (
+    "th:orchestrator",
+    "malformed",
+)
+check(
+    "takeover-contract(9/ac-8): skills/setup/SKILL.md nested-dispatch-takeover"
+    " managed block contains never-th:orchestrator reinforcement line"
+    " (th:orchestrator => malformed)",
+    bool(_s39_setup_ndt_slice)
+    and all(t in _s39_setup_ndt_slice for t in _S39_AC8_TOKENS)
+    and "malformed" in _s39_setup_ndt_slice,
+    f"anchor '{_S39_SETUP_NDT_ANCHOR}' missing or tokens absent: {_S39_AC8_TOKENS}"
+    " -- never-th:orchestrator reinforcement line not found in the managed block",
+)
+
+# ---------------------------------------------------------------------------
+# Check (10) / AC-12 -- subagent-orchestration.md § dispatch_handoff Schema:
+# The `type` field row must carry a neutralizing note that type:null (boot)
+# does NOT mean security is skipped.
+# ---------------------------------------------------------------------------
+_S39_AC12_TOKENS = (
+    "null",
+    "security",
+)
+check(
+    "takeover-contract(10/ac-12): docs/subagent-orchestration.md"
+    " § 'dispatch_handoff Schema' type row carries note that"
+    " type: null (boot) does NOT mean security skipped",
+    bool(_s39_schema_slice)
+    and all(t in _s39_schema_slice for t in _S39_AC12_TOKENS)
+    and (
+        "security" in _s39_schema_slice.lower()
+        and "null" in _s39_schema_slice
+        and (
+            "not" in _s39_schema_slice.lower()
+            or "NO" in _s39_schema_slice
+        )
+    ),
+    f"dispatch_handoff Schema section missing or type:null security-note absent:"
+    f" need {_S39_AC12_TOKENS} + negation phrase ('not' / 'NO')",
+)
+
+# ---------------------------------------------------------------------------
+# Check (11) -- self-referential guard:
+# CLAUDE.md §11 must register "Suite 39" + marker "pr-a-takeover-contract".
+# This file must contain the literal "Suite 39".
+# (Whole-file check -- identical precedent to Suite 35-38 self-ref guards.)
+# ---------------------------------------------------------------------------
+check(
+    "takeover-contract(11/self-ref):"
+    " CLAUDE.md §11 names 'Suite 39' and this file defines it"
+    " (self-referential guard -- pr-a-takeover-contract)",
+    "Suite 39" in _s39_claude_text
+    and "Suite 39" in _s39_self_text
+    and "pr-a-takeover-contract" in _s39_self_text,
+    "Suite 39 not registered in CLAUDE.md §11"
+    " or marker literal 'pr-a-takeover-contract' missing in this file"
+    " -- implementer must update CLAUDE.md §11; tester must not remove the marker",
+)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
