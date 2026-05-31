@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.40.4` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.40.5` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -335,23 +335,7 @@ The delivery agent creates overflow files on first offload. Agents read `docs/kn
 
 ## 11. Testing Conventions
 
-> Full reference (test files, per-suite scope, when to add a test, what is NOT covered): `docs/testing.md`.
-
-Structural suites registered by literal (self-referential guards assert these names live here):
-**Suite 34** — plan-review panel centralization. **Suite 35** — KG MCP tool-name contract.
-**Suite 36** — KG write-integrity beacon. **Suite 37** — KG write-policy `_shared` snippet
-consolidation. **Suite 38** — review-pipeline-guardrails (scope discipline, AI-authored lens,
-worktree behavioral verification, agent-level publish invariant). **Suite 39** — pr-a-takeover-contract
-(nested-dispatch takeover contract: next-agent binding, consume-side guard, dispatch_handoff schema,
-dispatch.blocked emit, manifest gate-label, §14 cross-ref). **Suite 40** — pr-b-security-failopen
-(fail-closed security gating: hotfix Tier-3 hard floor + override-clamp, deterministic re-tier GATE
-at Phase 2-close, boot type=null classify-first + security-defaults-RUN, plan-review keyword
-trigger + visible-skip). **Suite 41** — pr-c-hotfix-correctness (hotfix flow correctness: Phase 1.6
-runs for hotfix, non-reproducible hotfix auto-promote, orchestrator authors Review Summary before
-STAGE-GATE-1, type-aware STAGE-GATE-1 guard). **Suite 42** — pr-d-frontend-wiring (frontend-scope
-ux-reviewer wiring: Phase 1 enrich dispatch 1.7-ux-enrich, Phase 3 validate dispatch 3.4-ux-validate,
-Phase 3.5 UX gate critical-blocks-only, Phase 3.6 04-ux-validation.md pointer, checklist+observability,
-inline/nested fallback, ux-reviewer AC-sink → 01-plan.md § Task List).
+Per-suite scope, golden commands, and what the tests do NOT cover: see `docs/testing.md` (canonical suite registry — Suites 34–42 and beyond are registered there, not here).
 
 ---
 
@@ -374,30 +358,9 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 ## 14. Subagent Orchestration
 
-**The `orchestrator` agent is the canonical entry point for every development workflow.** Operators drive the pipeline by talking to it conversationally (e.g., `@th:orchestrator give me the work plan for this task: X`, `@th:orchestrator implement it`, `@th:orchestrator open the PR`) and the orchestrator's Step 6 intent-detection classifies the request and dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route into the same orchestrator under the hood — they give a deterministic entry without the intent-detection step plus a few extras (e.g., `/design #N` fetches a GitHub issue automatically), but the orchestrator-conversational path covers every workflow. Treat the orchestrator as the single front door; do not surface slash commands as "the better way" to operators who prefer chat. **All repo artefacts (code, configs, agents, skills, docs, commits, PR bodies, CHANGELOG) are written in English. Operators may chat in any language; the orchestrator's intent-detection patterns accept Spanish and English. The English-only rule applies to what is committed to the repository, not to live chat.**
+**The `orchestrator` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the orchestrator's Step 6 intent-detection dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts into the same orchestrator. All repo artefacts are written in English; live chat accepts Spanish and English.
 
-Routing table for this repo:
-
-| Intent | Subagent | Output |
-|---|---|---|
-| Add/modify an agent, add/modify a skill, refactor the pipeline | `architect` + `agent-builder` | Design doc + updated `.md` files |
-| Installer changes, hooks refactor, cross-platform fixes | `architect` → `implementer` | Architecture note + code changes |
-| Tests (if/when introduced) | `tester` | Test plan + tests with factory mocks |
-| Acceptance criteria + validation against AC | `qa` | AC list / validation report |
-| Docs, CHANGELOG, version bump, branch, commit, PR | `delivery` | Docs + CHANGELOG + commit + PR |
-| PR review | `reviewer` | Inline review, approve/request-changes |
-| Security review of hooks, installer, or MCP (elevated privileges on user's machine) | `security` | OWASP/CWE-aligned report |
-| Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |
-| Documentation (`type: docs`) | orchestrator → `architect` (research mode) → `documenter` → `diagrammer` (conditional) → `qa` | `00-research.md` + Obsidian vault pages + `02-documentation.md` manifest + `04-validation.md` |
-| Frontend-scope tasks (`frontend-scope: true`) | Standard pipeline + `ux-reviewer` (enrich after architect in Stage 1, validate in parallel in Stage 3) | `01-ux-review.md` + `04-ux-validation.md` |
-| Bug fix (`type: fix`) | orchestrator → `architect` (root-cause mode) → `tester` (Phase 2.0 regression test) → `implementer` (scope-discipline) → `tester` + `qa` + `security` (always, parallel) → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
-| Hotfix (`type: hotfix`) | same as bug fix, Phase 1 skipped (no `01-root-cause.md`); orchestrator emits 1-sentence prose plan at STAGE-GATE-1 | full feature backbone minus `01-root-cause.md`; PR title appends `(hotfix)` suffix |
-
-**Escalation rules.**
-- Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
-- Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
-- Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the orchestrator pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
 > **Limitation — nested-context dispatch.** When `orchestrator` runs nested (not top-level), the `Task` tool is stripped. The orchestrator emits a `dispatch_handoff` directive; top-level Claude takes over automatically. Full protocol in `docs/subagent-orchestration.md`.
 
