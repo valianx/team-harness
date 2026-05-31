@@ -87,7 +87,7 @@ Also check for legacy markers (`<!-- th-orchestrator-inline-rule:start -->` or `
 
 Read `~/.claude/CLAUDE.md`. If the file does not contain the nested-dispatch-takeover block (look for `<!-- nested-dispatch-takeover:start -->`), append the block below at the end of the file.
 
-If the block already exists (markers found), replace the content between the markers with the canonical version below. This is the idempotence contract: insert if missing, replace between markers if present. Do NOT add migration logic for legacy markers — this block is new in v2.33.1 and has no prior marker variants.
+If the block already exists (markers found), replace the content between the markers with the canonical version below. This is the idempotence contract: insert if missing, replace between markers if present. Do NOT add migration logic for legacy markers — this block is new in v2.33.1 and has no prior marker variants. The canonical block includes a guard: if `next_dispatch.agent == th:orchestrator`, the handoff is malformed — the consumer must dispatch the phase agent from `00-state.md` (or `th:architect` at boot), never `th:orchestrator` itself.
 
 ```markdown
 <!-- nested-dispatch-takeover:start -->
@@ -106,6 +106,8 @@ If the block already exists (markers found), replace the content between the mar
 **Red herring:** if `~/.claude/agents/` does not exist, this is NOT a failure. Plugin-installed agents live under `~/.claude/plugins/cache/.../th/<version>/agents/`. The `subagent_type` strings are namespaced (`th:architect`, `th:implementer`, etc.) and the harness resolves them from the plugin path.
 
 **Path & name resolution:** all `docs/…` and `agents/…` paths referenced above (`docs/subagent-orchestration.md`, `agents/ref-special-flows.md`, `agents/orchestrator.md`) are repo-relative for contributors with a `team-harness` clone. For plugin installs (no repo clone), the same files live under `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/` — resolve `<highest-version>` to the highest semver directory present (multiple versions may be cached after updates; the newest is canonical). The `dispatch_handoff` JSON stores `next_dispatch.agent` in **prefixed** form (`th:architect`) — use it verbatim for `Task(subagent_type=…)`, but **strip the `th:` prefix** to derive the agent's file path (`th:architect` → `agents/architect.md`); team-harness agents are flat, so a prefix-strip suffices.
+
+**Guard:** if `next_dispatch.agent == th:orchestrator`, the handoff is malformed — dispatch the phase agent from `00-state.md` (or `th:architect` at boot), never `th:orchestrator` itself. See `docs/subagent-orchestration.md § dispatch_handoff Schema` for the canonical schema and `§ Takeover Protocol` step 4 for the full consume-side guard.
 <!-- nested-dispatch-takeover:end -->
 ```
 

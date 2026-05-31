@@ -51,7 +51,7 @@ When a skill dispatches `Task(subagent_type=orchestrator, ...)`, the orchestrato
 5. Respect gates: STAGE-GATE-2 between PRs is silent iff `autonomous: true`; STAGE-GATE-3 always asks the user before push.
 6. **Do NOT** ask the user "should I take over?", **do NOT** re-invoke `@th:orchestrator` (it recreates the nested context), and **do NOT** write the agents' workspaces inline — top-level Claude still inherits the orchestrator's "you NEVER write code/tests/docs" contract during the takeover.
 
-This contract is universal across every routing skill. The full directive lives in `agents/orchestrator.md` § "Dispatch-blocked exit" and in `CLAUDE.md` § 13 "Subagent Orchestration" — both are authoritative.
+This contract is universal across every routing skill. The full directive lives in `agents/orchestrator.md` § "Dispatch-blocked exit" and in `CLAUDE.md` § 14 "Subagent Orchestration" — both are authoritative.
 
 ## Notes
 
