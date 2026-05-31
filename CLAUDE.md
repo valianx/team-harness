@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.40.3` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.40.4` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -335,10 +335,7 @@ The delivery agent creates overflow files on first offload. Agents read `docs/kn
 
 ## 11. Testing Conventions
 
-The repo has a free verification suite at `tests/` (no live LLM): `test_policy_block.sh`
-(hooks/policy-block.sh functional cases), `test_agent_structure.py` (structural assertions
-across `agents/`/`skills/`/`hooks/`), `test_agent_frontmatter.py` (YAML frontmatter validity),
-run together by `run-all.sh`. Golden commands in §4.
+> Full reference (test files, per-suite scope, when to add a test, what is NOT covered): `docs/testing.md`.
 
 Structural suites registered by literal (self-referential guards assert these names live here):
 **Suite 34** — plan-review panel centralization. **Suite 35** — KG MCP tool-name contract.
@@ -351,7 +348,10 @@ dispatch.blocked emit, manifest gate-label, §14 cross-ref). **Suite 40** — pr
 at Phase 2-close, boot type=null classify-first + security-defaults-RUN, plan-review keyword
 trigger + visible-skip). **Suite 41** — pr-c-hotfix-correctness (hotfix flow correctness: Phase 1.6
 runs for hotfix, non-reproducible hotfix auto-promote, orchestrator authors Review Summary before
-STAGE-GATE-1, type-aware STAGE-GATE-1 guard). Full reference (per-suite scope, when to add a test, what is NOT covered): `docs/testing.md`.
+STAGE-GATE-1, type-aware STAGE-GATE-1 guard). **Suite 42** — pr-d-frontend-wiring (frontend-scope
+ux-reviewer wiring: Phase 1 enrich dispatch 1.7-ux-enrich, Phase 3 validate dispatch 3.4-ux-validate,
+Phase 3.5 UX gate critical-blocks-only, Phase 3.6 04-ux-validation.md pointer, checklist+observability,
+inline/nested fallback, ux-reviewer AC-sink → 01-plan.md § Task List).
 
 ---
 
