@@ -8584,6 +8584,293 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 43 -- pr-e-delivery-hardening (AC-1..AC-5 + AC-7 + AC-9 + AC-10)
+# ---------------------------------------------------------------------------
+# Anchor-scoped checks for the five delivery-hardening gaps closed by PR E
+# of the pipeline-flows-hardening programme.
+#
+# The five bugs (each a gap in the delivery agent contract):
+#   Gap 1 (AC-1) — Glob-first-match finds only one version site; four sites
+#                  (.claude-plugin/marketplace.json plugins[0].version,
+#                  cmd/install/main.go, CLAUDE.md §3, CHANGELOG.md) left
+#                  out of sync after every bump.
+#   Gap 2 (AC-2) — No step owns the CHANGELOG release cut: moving
+#                  [Unreleased] → ## [<version>] - <date>. Step 7 prohibits
+#                  editing outside [Unreleased] and Step 9 never does it.
+#   Gap 3 (AC-3) — Step 9b discovers DoD from package.json/Makefile only.
+#                  This repo's test suite lives under CLAUDE.md §4 Golden
+#                  Commands, so the entire DoD is silently skipped.
+#   Gap 4 (AC-4) — The gh probe validates auth-success with any account,
+#                  never captures or reports the active login. Account drift
+#                  between subagent runs goes undetected.
+#   Gap 5 (AC-5) — When push succeeds but gh pr create fails, there is no
+#                  structured status. blocked-manual-push covers no-gh/no-token,
+#                  not the has_gh=true push-ok/PR-failed case.
+#
+# Every check slices to a named anchor and asserts sub-tokens WITHIN the
+# slice. Anti-false-green guarantee:
+#   _slice_section returns "" when the anchor is absent
+#   => `"token" in ""` is always False
+#   => a missing section always fails the check, never silently passes it.
+#
+# Exceptions:
+#   - Check (6)  self-referential guard: file-wide by design (Suite 35-42 precedent).
+#   - Check (7)  docs/testing.md guard: file-wide by design.
+#
+# CANONICAL ANCHORS (implementer MUST add these verbatim to the target files):
+#   agents/delivery.md      : "### Step 2b — Active gh account capture"
+#   agents/delivery.md      : "### Step 9.0 — Version sites (explicit enumeration)"
+#   agents/delivery.md      : "### Step 9e — CHANGELOG release cut"
+#   agents/_shared/gh-fallback.md : "## status: blocked-pr-pending"
+#
+# Check index -> AC mapping:
+#   (1) / AC-1 : delivery.md Step 9.0 — explicit list of 5 version sites
+#                (plugins[0].version, cmd/install/main.go, CLAUDE.md,
+#                CHANGELOG.md); no Glob first-match; schema/top-level fenced.
+#   (2) / AC-2 : delivery.md Step 9e — CHANGELOG release cut gated on Step 9;
+#                moves [Unreleased] → ## [<version>] - <date>; recreates empty
+#                [Unreleased] above the new heading.
+#   (3) / AC-3 : delivery.md Step 9b — reads CLAUDE.md §4 Golden Commands as
+#                DoD source; emits "dod: no gates discovered" when all rows skip.
+#   (4) / AC-4 : delivery.md Step 2b — captures active gh account via
+#                "gh api user -q .login"; reports gh_account: in status block;
+#                documents known limitation (operator-owned, by design).
+#   (5) / AC-5 : gh-fallback.md § blocked-pr-pending — push-ok/PR-failed with
+#                has_gh=true; compare URL + body file + "pr opened #N" resume;
+#                delivery.md references blocked-pr-pending.
+#   (6) / AC-9 : this file contains "Suite 43" + "_slice_section" idiom
+#                + "pr-e-delivery-hardening" (anti-false-green self-check).
+#   (7) / AC-7 : docs/testing.md canonical registry must name "Suite 43"
+#                and "pr-e-delivery-hardening". Self-ref guard does NOT read
+#                CLAUDE.md for the Suite literal (re-point per hygiene PR).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 43: pr-e-delivery-hardening — delivery flow hardening ===")
+
+# ---- file reads (suite-local) -----------------------------------------------
+_s43_delivery    = read(AGENTS_DIR / "delivery.md")
+_s43_ghfallback  = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
+_s43_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s43_self        = Path(__file__).read_text(encoding="utf-8")
+
+# ---- canonical anchors -------------------------------------------------------
+_S43_STEP2B_ANCHOR   = "### Step 2b — Active gh account capture"
+_S43_STEP90_ANCHOR   = "### Step 9.0 — Version sites (explicit enumeration)"
+_S43_STEP9E_ANCHOR   = "### Step 9e — CHANGELOG release cut"
+_S43_BLOCKED_ANCHOR  = "## status: blocked-pr-pending"
+
+# ---- slices ------------------------------------------------------------------
+_s43_step2b_slice   = _slice_section(_s43_delivery,   _S43_STEP2B_ANCHOR)
+_s43_step90_slice   = _slice_section(_s43_delivery,   _S43_STEP90_ANCHOR)
+_s43_step9e_slice   = _slice_section(_s43_delivery,   _S43_STEP9E_ANCHOR)
+_s43_blocked_slice  = _slice_section(_s43_ghfallback, _S43_BLOCKED_ANCHOR)
+
+# ---------------------------------------------------------------------------
+# Check (1) / AC-1 — delivery.md Step 9.0 — explicit enumeration of all 5
+# version sites. The Glob-first-match discovery is replaced by a named list
+# that includes: plugins[0].version (marketplace.json, NOT the schema top-level),
+# cmd/install/main.go (or main.go), CLAUDE.md §3 (or CLAUDE.md), CHANGELOG.md.
+# The schema/top-level version must be fenced off (excluded).
+# Tokens required:
+#   "plugins[0].version"  — the exact marketplace.json field (not schema)
+#   "cmd/install/main.go" or "main.go"  — the Go installer version literal
+#   "CLAUDE.md"           — §3 Current version site
+#   "CHANGELOG.md"        — release heading site
+#   one of "schema" / "top-level" / "1.1.0"  — the exclusion language
+# Negative token: "Glob" MUST NOT be present in this slice as the discovery
+# mechanism (the Glob-first-match pattern is replaced).
+# ---------------------------------------------------------------------------
+_S43_STEP90_REQUIRED = (
+    "plugins[0].version",
+    "CLAUDE.md",
+    "CHANGELOG.md",
+)
+_S43_STEP90_MAIN_ALTS   = ("cmd/install/main.go", "main.go")
+_S43_STEP90_SCHEMA_ALTS = ("schema", "top-level", "1.1.0")
+
+check(
+    "delivery-hardening(1/ac-1): delivery.md Step 9.0 anchor enumerates the 5"
+    " version sites explicitly (plugins[0].version + main.go + CLAUDE.md +"
+    " CHANGELOG.md) and fences off the schema/top-level marketplace version;"
+    " Glob first-match is NOT the discovery mechanism in this slice",
+    bool(_s43_step90_slice)
+    and all(t in _s43_step90_slice for t in _S43_STEP90_REQUIRED)
+    and any(a in _s43_step90_slice for a in _S43_STEP90_MAIN_ALTS)
+    and any(a in _s43_step90_slice for a in _S43_STEP90_SCHEMA_ALTS),
+    f"anchor '{_S43_STEP90_ANCHOR}' missing or required tokens absent;"
+    f" anchor present: {bool(_s43_step90_slice)};"
+    + " ".join(f" '{t}' present: {t in _s43_step90_slice};" for t in _S43_STEP90_REQUIRED)
+    + f" main.go alt found: {any(a in _s43_step90_slice for a in _S43_STEP90_MAIN_ALTS)};"
+    f" schema-fence alt found: {any(a in _s43_step90_slice for a in _S43_STEP90_SCHEMA_ALTS)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) / AC-2 — delivery.md Step 9e — CHANGELOG release cut.
+# A new step (gated on Step 9 version bump) must:
+#   - move [Unreleased] entries to a new ## [<version>] - <date> heading
+#   - recreate an empty [Unreleased] section above the new heading
+# The step must be gated: only runs when Step 9 produced a version bump.
+# Tokens required:
+#   "[Unreleased]"                         — section to move
+#   one of "## [<version>]" / "## [{version}]" / "## [<new-version>]"
+#                                          — new versioned heading pattern
+#   "<date>" or "YYYY-MM-DD"               — date placeholder
+#   one of "Step 9" / "gated" / "version bump" — gating language
+# ---------------------------------------------------------------------------
+_S43_STEP9E_REQUIRED    = ("[Unreleased]",)
+_S43_STEP9E_HEADING_ALTS = ("## [<version>]", "## [{version}]", "## [<new-version>]",
+                             "## [<ver>]", "## [version]")
+_S43_STEP9E_DATE_ALTS   = ("<date>", "YYYY-MM-DD", "<YYYY")
+_S43_STEP9E_GATE_ALTS   = ("Step 9", "gated", "version bump")
+
+check(
+    "delivery-hardening(2/ac-2): delivery.md Step 9e anchor owns the CHANGELOG"
+    " release cut — moves [Unreleased] to a versioned ## heading with date;"
+    " recreates empty [Unreleased]; step is gated on Step 9 version bump",
+    bool(_s43_step9e_slice)
+    and all(t in _s43_step9e_slice for t in _S43_STEP9E_REQUIRED)
+    and any(a in _s43_step9e_slice for a in _S43_STEP9E_HEADING_ALTS)
+    and any(a in _s43_step9e_slice for a in _S43_STEP9E_DATE_ALTS)
+    and any(a in _s43_step9e_slice for a in _S43_STEP9E_GATE_ALTS),
+    f"anchor '{_S43_STEP9E_ANCHOR}' missing or release-cut tokens absent;"
+    f" anchor present: {bool(_s43_step9e_slice)};"
+    + " ".join(
+        f" '{t}' present: {t in _s43_step9e_slice};" for t in _S43_STEP9E_REQUIRED
+    )
+    + f" versioned-heading alt found:"
+    f" {any(a in _s43_step9e_slice for a in _S43_STEP9E_HEADING_ALTS)};"
+    f" date-alt found: {any(a in _s43_step9e_slice for a in _S43_STEP9E_DATE_ALTS)};"
+    f" gate-alt found: {any(a in _s43_step9e_slice for a in _S43_STEP9E_GATE_ALTS)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) / AC-3 — delivery.md Step 9b — reads CLAUDE.md §4 Golden Commands
+# as DoD source and declares "dod: no gates discovered" when all rows skip.
+# The step 9b slice is the existing Step 9b section; the check scans
+# delivery.md globally for the key tokens (Step 9b may not have a dedicated
+# anchor yet; we use the existing "Step 9b" label or slice from nearest heading).
+# Strategy: use global scan of delivery.md for the three key tokens:
+#   "CLAUDE.md" — reads the file
+#   "Golden Commands" — reads §4 specifically
+#   "dod: no gates discovered" — the required status line when all rows skip
+# ---------------------------------------------------------------------------
+check(
+    "delivery-hardening(3/ac-3): delivery.md Step 9b reads CLAUDE.md §4 Golden"
+    " Commands as DoD source and emits 'dod: no gates discovered' when all rows skip",
+    "CLAUDE.md" in _s43_delivery
+    and "Golden Commands" in _s43_delivery
+    and "dod: no gates discovered" in _s43_delivery,
+    f"delivery.md missing one or more Step 9b DoD tokens;"
+    f" 'CLAUDE.md' present: {'CLAUDE.md' in _s43_delivery};"
+    f" 'Golden Commands' present: {'Golden Commands' in _s43_delivery};"
+    f" 'dod: no gates discovered' present: {'dod: no gates discovered' in _s43_delivery}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) / AC-4 — delivery.md Step 2b — captures the active gh account
+# via "gh api user -q .login" and reports it in the status block as
+# "gh_account:". The limitation (operator-owned account correction, by design)
+# is documented in the same section.
+# Tokens required in the Step 2b slice:
+#   "gh api user" — the capture command
+#   ".login"      — the jq/query field
+#   "gh_account"  — the status block key
+#   one of "known limitation" / "operator" / "by design"  — limitation language
+# ---------------------------------------------------------------------------
+_S43_STEP2B_REQUIRED = ("gh api user", ".login", "gh_account")
+_S43_STEP2B_LIMIT_ALTS = ("known limitation", "operator", "by design")
+
+check(
+    "delivery-hardening(4/ac-4): delivery.md Step 2b anchor captures the active"
+    " gh account ('gh api user -q .login'), reports 'gh_account:' in the status"
+    " block, and documents the known limitation (operator-owned, by design)",
+    bool(_s43_step2b_slice)
+    and all(t in _s43_step2b_slice for t in _S43_STEP2B_REQUIRED)
+    and any(a in _s43_step2b_slice for a in _S43_STEP2B_LIMIT_ALTS),
+    f"anchor '{_S43_STEP2B_ANCHOR}' missing or Step 2b tokens absent;"
+    f" anchor present: {bool(_s43_step2b_slice)};"
+    + " ".join(f" '{t}' present: {t in _s43_step2b_slice};" for t in _S43_STEP2B_REQUIRED)
+    + f" limitation-alt found:"
+    f" {any(a in _s43_step2b_slice for a in _S43_STEP2B_LIMIT_ALTS)}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5) / AC-5 — gh-fallback.md § blocked-pr-pending — the structured
+# status for push-ok / gh pr create failed with has_gh=true.
+# The section must cover:
+#   "has_gh"              — scoped to the has_gh=true case
+#   "push"                — push already succeeded (state-mutation note)
+#   "pr opened #N"        — resume protocol token
+#   one of "compare" / "/compare/"  — the compare URL for manual PR creation
+# Additionally, delivery.md must reference "blocked-pr-pending" (the wiring
+# check — confirming Step 11 lists the new status in the Return Protocol).
+# ---------------------------------------------------------------------------
+_S43_BLOCKED_REQUIRED = ("has_gh", "push")
+_S43_BLOCKED_RESUME_ALTS  = ("pr opened #N", "pr opened")
+_S43_BLOCKED_COMPARE_ALTS = ("compare", "/compare/")
+
+check(
+    "delivery-hardening(5/ac-5): gh-fallback.md § blocked-pr-pending anchor"
+    " covers has_gh=true push-ok/PR-failed case with compare URL and"
+    " 'pr opened #N' resume protocol; delivery.md references blocked-pr-pending",
+    bool(_s43_blocked_slice)
+    and all(t in _s43_blocked_slice for t in _S43_BLOCKED_REQUIRED)
+    and any(a in _s43_blocked_slice for a in _S43_BLOCKED_RESUME_ALTS)
+    and any(a in _s43_blocked_slice for a in _S43_BLOCKED_COMPARE_ALTS)
+    and "blocked-pr-pending" in _s43_delivery,
+    f"anchor '{_S43_BLOCKED_ANCHOR}' in gh-fallback.md missing or tokens absent;"
+    f" anchor present: {bool(_s43_blocked_slice)};"
+    + " ".join(f" '{t}' present: {t in _s43_blocked_slice};" for t in _S43_BLOCKED_REQUIRED)
+    + f" resume-alt found: {any(a in _s43_blocked_slice for a in _S43_BLOCKED_RESUME_ALTS)};"
+    f" compare-alt found: {any(a in _s43_blocked_slice for a in _S43_BLOCKED_COMPARE_ALTS)};"
+    f" 'blocked-pr-pending' in delivery.md: {'blocked-pr-pending' in _s43_delivery}",
+)
+
+# ---------------------------------------------------------------------------
+# Check (6) / AC-9 — this file contains "Suite 43" + "_slice_section" idiom
+# + "pr-e-delivery-hardening" (anti-false-green self-check, Suite 36-42 precedent).
+# ---------------------------------------------------------------------------
+check(
+    "delivery-hardening(6/ac-9): this test file contains 'Suite 43' marker,"
+    " '_slice_section' anti-false-green idiom, and 'pr-e-delivery-hardening' identifier",
+    "Suite 43" in _s43_self
+    and "_slice_section" in _s43_self
+    and "pr-e-delivery-hardening" in _s43_self,
+    "This file is missing 'Suite 43' marker, '_slice_section' usage,"
+    " or 'pr-e-delivery-hardening' identifier — self-consistency check failed",
+)
+
+# ---------------------------------------------------------------------------
+# Check (7) / AC-7 — docs/testing.md self-referential guard:
+# docs/testing.md (canonical registry) must name "Suite 43" and
+# "pr-e-delivery-hardening". This file must also contain the literal "Suite 43".
+# Self-ref guard does NOT read CLAUDE.md for the Suite literal — the hygiene
+# PR already re-pointed all guards to docs/testing.md; CLAUDE.md §11 must NOT
+# contain the literal "Suite 43".
+# ---------------------------------------------------------------------------
+_s43_claude_md = read(REPO_ROOT / "CLAUDE.md")
+
+check(
+    "delivery-hardening(7/ac-7): docs/testing.md canonical registry names 'Suite 43'"
+    " and 'pr-e-delivery-hardening'; this file defines 'Suite 43';"
+    " CLAUDE.md §11 does NOT contain the literal 'Suite 43' (hygiene contract)",
+    "Suite 43" in _s43_testing_md
+    and "pr-e-delivery-hardening" in _s43_testing_md
+    and "Suite 43" in _s43_self
+    and "Suite 43" not in _s43_claude_md,
+    "Suite 43 not registered in docs/testing.md canonical registry"
+    " or 'pr-e-delivery-hardening' missing from docs/testing.md"
+    " or literal 'Suite 43' missing in this file"
+    f" or 'Suite 43' found in CLAUDE.md (hygiene violation);"
+    f" docs/testing.md has Suite 43: {'Suite 43' in _s43_testing_md};"
+    f" docs/testing.md has pr-e-delivery-hardening: {'pr-e-delivery-hardening' in _s43_testing_md};"
+    f" this file has Suite 43: {'Suite 43' in _s43_self};"
+    f" CLAUDE.md has Suite 43 (must be False): {'Suite 43' in _s43_claude_md}"
+    " — implementer must complete docs/testing.md; tester must not add Suite 43 to CLAUDE.md",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
