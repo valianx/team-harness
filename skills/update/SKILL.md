@@ -78,7 +78,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
      - `managed-blocks/nested-dispatch-takeover.md` (markers: `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->`)
      - `managed-blocks/voice-rule.md` (markers: `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`)
      Full paths under the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/managed-blocks/{orchestrator-dispatch-rule,nested-dispatch-takeover,voice-rule}.md`
-   - **Back up** `~/.claude/CLAUDE.md` to `~/.claude/CLAUDE.md.bak-YYYYMMDD-HHMMSS` (UTC) before the first write. If the file does not exist, create it (blocks-only) and skip the backup.
+   - **Back up** `~/.claude/CLAUDE.md` to `~/.claude/CLAUDE.md.bak-YYYYMMDD-HHMMSS` (UTC) before the first write. If the file does not exist, create it (blocks-only) and skip the backup. Retention: only the last 3 `CLAUDE.md.bak-*` backups are kept; older ones are pruned after each sync.
    - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the three canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
    - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
    - **Never touch anything outside the marker-delimited blocks.** All other content in `~/.claude/CLAUDE.md` is the operator's and is preserved byte-for-byte.
@@ -97,6 +97,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup
    $ts = (Get-Date -Format "yyyyMMdd-HHmmss")
    Copy-Item $claudeMd "$claudeMd.bak-$ts"
+   Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime | Select-Object -SkipLast 3 | Remove-Item -Force
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
    foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule")) {
@@ -128,6 +129,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup
    TS=$(date -u +"%Y%m%d-%H%M%S")
    cp "$CLAUDE_MD" "$CLAUDE_MD.bak-$TS"
+   ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
    for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule; do
