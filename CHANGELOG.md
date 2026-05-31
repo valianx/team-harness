@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.5] - 2026-05-31
+
+### Changed
+
+- Re-pointed 9 self-referential test guards (Suites 34–42) from `CLAUDE.md` to `docs/testing.md` as the canonical suite registry, stopping the monotonic §11 growth that was pushing `CLAUDE.md` toward the 40 KB cap with each new suite PR.
+- Reduced `CLAUDE.md §11` to a pure 2-line pointer to `docs/testing.md`; all per-suite inventory (Suites 34–42 one-liners) now lives exclusively in `docs/testing.md`.
+- Completed `docs/testing.md` canonical registry: added Suites 39, 40, 41, 42 entries (previously listed only in `CLAUDE.md §11`).
+- Offloaded §14 routing table and escalation rules to `docs/subagent-orchestration.md § Routing Table and Escalation Rules`; `CLAUDE.md §14` now carries a pointer and the essential universal-rule text only.
+- Added structural size-cap `CLAUDE.md < 36000 bytes` guard to `tests/test_agent_structure.py` (durable headroom for PRs E–I); existing `< 40 KB` guard preserved.
+- `CLAUDE.md` reduced from 39960 bytes to ~35366 bytes (comfortably under 35 KB).
+
 ## [2.40.4] - 2026-05-31
 
 ### Fixed
