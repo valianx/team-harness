@@ -9244,6 +9244,171 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 45 -- pr-th-update-backup-prune (AC-1, AC-2, AC-3, AC-4, AC-5)
+# ---------------------------------------------------------------------------
+# Regression assertions that FAIL against the current source state (before the
+# implementer inserts the bounded backup-prune into both per-OS blocks of
+# skills/update/SKILL.md step 6).
+#
+# Root cause: step 6 creates a backup (CLAUDE.md.bak-<ts>) on every run but
+# never prunes older backups, so they accumulate monotonically.
+#
+# Fix model: insert a bounded prune immediately after the backup creation in
+# EACH per-OS block, keeping the most recent 3 backups:
+#   PowerShell: Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime
+#               | Select-Object -SkipLast 3 | Remove-Item -Force
+#   bash:       ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f
+# Also add one line of prose documenting the rolling retention of 3.
+#
+# Anti-false-green guarantee (mirrors Suite 43/44 idiom):
+#   - _slice_section returns "" when its anchor is absent
+#     => token-in-slice assertions fail when the anchor section is missing.
+#   - All key tokens are absent from the current SKILL.md (no prune exists today)
+#     => every content assertion is False against current main.
+#
+# AC coverage:
+#   AC-1 : PowerShell block contains SkipLast 3 + .bak-* glob + Remove-Item
+#   AC-2 : bash block contains tail -n +4 + .bak-* glob + rm
+#   AC-3 : prose of step 6 documents retention (keep last 3 / rolling / keep)
+#   AC-4 : Suite 45 in docs/testing.md; this file contains Suite 45
+#   AC-5 : NEITHER block deletes a broad path (no bare Remove-Item * / rm -rf $HOME);
+#          both prune lines reference the .bak- bounded glob
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 45: pr-th-update-backup-prune — bounded last-3 backup prune ===")
+
+# ---- file reads (suite-local) ----------------------------------------------
+_s45_update_text = read(SKILLS_DIR / "update" / "SKILL.md")
+_s45_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s45_claude_md   = read(REPO_ROOT / "CLAUDE.md")
+_s45_self        = Path(__file__).read_text(encoding="utf-8")
+
+# ---- section anchors -------------------------------------------------------
+# The two per-OS command blocks are identified by their header comments as
+# written in SKILL.md today.  _slice_section returns "" when absent, so every
+# token assertion inside an empty slice is False => no false-greens possible.
+_S45_PS_ANCHOR   = "Windows (PowerShell) — run this block verbatim on Windows:"
+_S45_BASH_ANCHOR = "Unix/macOS (bash) — run this block verbatim on Linux/macOS:"
+
+_s45_ps_slice   = _slice_section(_s45_update_text, _S45_PS_ANCHOR)
+_s45_bash_slice = _slice_section(_s45_update_text, _S45_BASH_ANCHOR)
+
+# ---- (1) PowerShell block — AC-1 ------------------------------------------
+# Assert the bounded prune is present: SkipLast 3 + bak-* glob + Remove-Item.
+check(
+    "backup-prune(1a/ac-1): PowerShell block contains 'SkipLast 3' (keep-last-3 retention)",
+    "SkipLast 3" in _s45_ps_slice,
+    f"PowerShell block (anchor: '{_S45_PS_ANCHOR}') does not contain 'SkipLast 3'; "
+    "implementer must add: Select-Object -SkipLast 3 | Remove-Item -Force after Copy-Item backup line",
+)
+check(
+    "backup-prune(1b/ac-1): PowerShell block operates on 'bak-' bounded glob",
+    ".bak-" in _s45_ps_slice and "bak-*" in _s45_ps_slice,
+    f"PowerShell block does not reference the bounded glob '.bak-*'; "
+    "the prune must anchor on '$claudeMd.bak-*' — never a bare wildcard",
+)
+check(
+    "backup-prune(1c/ac-1): PowerShell block contains 'Remove-Item' (delete cmdlet)",
+    "Remove-Item" in _s45_ps_slice,
+    f"PowerShell block does not contain 'Remove-Item'; "
+    "the prune pipeline must end with '| Remove-Item -Force'",
+)
+
+# ---- (2) bash block — AC-2 -------------------------------------------------
+# Assert the bounded prune is present: tail -n +4 + bak-* glob + rm.
+check(
+    "backup-prune(2a/ac-2): bash block contains 'tail -n +4' (keep-last-3 retention)",
+    "tail -n +4" in _s45_bash_slice,
+    f"bash block (anchor: '{_S45_BASH_ANCHOR}') does not contain 'tail -n +4'; "
+    "implementer must add: ls -1t \"$CLAUDE_MD\".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f",
+)
+check(
+    "backup-prune(2b/ac-2): bash block operates on 'bak-' bounded glob",
+    ".bak-" in _s45_bash_slice and "bak-*" in _s45_bash_slice,
+    f"bash block does not reference the bounded glob '.bak-*'; "
+    "the prune must anchor on '\"$CLAUDE_MD\".bak-*' — never a bare wildcard",
+)
+check(
+    "backup-prune(2c/ac-2): bash block contains 'rm' (delete command)",
+    " rm " in _s45_bash_slice or "xargs -r rm" in _s45_bash_slice or "rm -f" in _s45_bash_slice,
+    f"bash block does not contain an 'rm' invocation; "
+    "the prune pipeline must end with '| xargs -r rm -f'",
+)
+
+# ---- (3) Prose documentation — AC-3 ----------------------------------------
+# The prose of step 6 must mention the rolling retention of 3 backups.
+# Acceptable tokens: 'last 3', 'rolling', or 'keep' near the backup bullet.
+# We check the whole SKILL.md text because the prose sits outside the code
+# fences (and _slice_section would stop at the next heading before the fences).
+_S45_RETENTION_DOCUMENTED = (
+    "last 3" in _s45_update_text
+    or "rolling" in _s45_update_text
+    or ("keep" in _s45_update_text and "bak" in _s45_update_text)
+)
+check(
+    "backup-prune(3/ac-3): SKILL.md prose documents rolling retention"
+    " ('last 3' or 'rolling' or 'keep'+'bak' present)",
+    _S45_RETENTION_DOCUMENTED,
+    "skills/update/SKILL.md step 6 prose does not document the rolling retention of 3 backups; "
+    "implementer must add a one-line note: e.g. 'pruned to the last 3 rolling backups'",
+)
+
+# ---- (4) Bounded-delete safety — AC-5 -------------------------------------
+# Negative assertions: NEITHER per-OS block must use an unbounded delete path.
+# PowerShell: "Remove-Item *" (bare wildcard) must not appear in the PS slice.
+# bash: "rm -rf $HOME" must not appear in the bash slice.
+# Positive: the prune lines in each slice reference ".bak-" (bounded glob marker).
+check(
+    "backup-prune(4a/ac-5): PowerShell block does NOT contain bare 'Remove-Item *' (unbounded delete guard)",
+    "Remove-Item *" not in _s45_ps_slice,
+    "PowerShell block contains 'Remove-Item *' — this is an unbounded delete and violates AC-5; "
+    "the prune must be scoped to '$claudeMd.bak-*' exclusively",
+)
+check(
+    "backup-prune(4b/ac-5): bash block does NOT contain 'rm -rf $HOME' (unbounded delete guard)",
+    "rm -rf $HOME" not in _s45_bash_slice,
+    "bash block contains 'rm -rf $HOME' — this is an unbounded destructive delete and violates AC-5",
+)
+check(
+    "backup-prune(4c/ac-5): PowerShell prune line references '.bak-' bounded glob (scope guard)",
+    ".bak-" in _s45_ps_slice,
+    "PowerShell prune line does not reference '.bak-' — the delete is not bounded to the backup glob; "
+    "the prune must operate exclusively on '$claudeMd.bak-*'",
+)
+check(
+    "backup-prune(4d/ac-5): bash prune line references '.bak-' bounded glob (scope guard)",
+    ".bak-" in _s45_bash_slice,
+    "bash prune line does not reference '.bak-' — the delete is not bounded to the backup glob; "
+    "the prune must operate exclusively on '\"$CLAUDE_MD\".bak-*'",
+)
+
+# ---- (5) Self-referential guard — AC-4 ------------------------------------
+# Suite 45 must be registered in docs/testing.md (NOT CLAUDE.md §11).
+# This file must contain the literal "Suite 45" and "pr-th-update-backup-prune".
+# CLAUDE.md §11 must NOT contain "Suite 45" (hygiene contract, same as Suites 43/44).
+check(
+    "backup-prune(5/ac-4): docs/testing.md canonical registry names 'Suite 45'"
+    " and 'pr-th-update-backup-prune'; this file contains 'Suite 45' and '_slice_section';"
+    " CLAUDE.md does NOT contain 'Suite 45' (hygiene contract)",
+    "Suite 45" in _s45_testing_md
+    and "pr-th-update-backup-prune" in _s45_testing_md
+    and "Suite 45" in _s45_self
+    and "_slice_section" in _s45_self
+    and "Suite 45" not in _s45_claude_md,
+    "Suite 45 not registered in docs/testing.md canonical registry"
+    " or 'pr-th-update-backup-prune' missing from docs/testing.md"
+    " or literal 'Suite 45' missing in this file"
+    " or '_slice_section' idiom absent"
+    f" or 'Suite 45' found in CLAUDE.md (hygiene violation);"
+    f" docs/testing.md has Suite 45: {'Suite 45' in _s45_testing_md};"
+    f" docs/testing.md has pr-th-update-backup-prune: {'pr-th-update-backup-prune' in _s45_testing_md};"
+    f" this file has Suite 45: {'Suite 45' in _s45_self};"
+    f" CLAUDE.md has Suite 45 (must be False): {'Suite 45' in _s45_claude_md}"
+    " — implementer must register in docs/testing.md; tester must not add Suite 45 to CLAUDE.md",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
