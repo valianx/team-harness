@@ -818,11 +818,18 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    - **Bug tier (only when `type: fix` or `type: hotfix`):** `0` | `1` | `2` | `3` | `4`. The tier determines how much of the Bug-fix Pipeline runs against a given fix — trivial bugs skip ceremony, critical bugs add prior-art research and extended security analysis. Combine three signals; high-tier signals win, default to Tier 3 when ambiguous, operator declarations override auto-classification.
 
+     **`type: hotfix` — Tier 3 hard floor (fail-closed):** A hotfix is pinned to Tier 3 minimum. The auto-classifier MUST NOT assign a hotfix a tier below 3 — a hotfix is never Tier 0, 1, or 2. The auto-classifier can raise a hotfix to Tier 4 when Signal 1 high-tier keywords are present, but Tier 3 is the minimum regardless of all other signals. **Override-clamp (SEC-D1):** the operator override `[TIER: N]` can only raise a hotfix above Tier 3 (e.g., `[TIER: 4]`); a `[TIER: 0]`, `[TIER: 1]`, or `[TIER: 2]` declaration on a hotfix is silently clamped to Tier 3 — the override cannot lower a hotfix below Tier 3. This hard floor survives the override channel. `type: hotfix` implies `security: required` semantically: security runs at Phase 3 for every hotfix because every hotfix is Tier 3 minimum.
+
      **Signal 1 — Keywords in the bug report** (operator's plain-text request plus any linked issue body):
      - **High-tier triggers (escalate to Tier 4, case-insensitive whole-word match):** `auth`, `injection`, `xss`, `csrf`, `secret`, `token`, `permission`, `bypass`, `vulnerability`, `cve`, `leak`, `exposed`, `unauthorized`.
      - **Low-tier hints (Tier 1 candidate):** `typo`, `trivial`, `fix rápido`, `quick fix`, `cosmetic`, `documentation`, `comment fix`, `whitespace`.
 
-     **Signal 2 — File-path patterns** (use Phase 0b Step 1 codebase investigation results if the operator mentioned files; otherwise re-evaluate after Phase 1 once the architect identifies the scope):
+     **Signal 2 — File-path patterns** — deterministic re-tier GATE (two evaluation points):
+
+     Use Phase 0b Step 1 codebase investigation results if the operator mentioned files. If paths are not yet known, evaluate at Phase 0b (when investigation reveals scope) and MUST evaluate again at Phase 2 close.
+
+     **Phase 2-close re-tier GATE (mandatory for Tier 0/1 candidates):** At the close of Phase 2, run `git diff --name-only` against the sensitive-path list below. If any touched path matches a security-sensitive path, the orchestrator MUST force `tier_promote: 3`, re-enter Phase 2.0 (regression test), and dispatch Phase 3 with `security`. This GATE is deterministic — "re-evaluate" is NOT sufficient; the check MUST run and MUST force promotion on any match. Note (SEC-D3): for Tier 0/1 candidates promoted at Phase 2-close, the Phase 2.0 re-entry is test-after by construction (the fix code already exists); the regression test MUST still be written such that it fails if the fix is reverted. This trade-off is accepted and documented — the gate closes the security fail-open; the order degradation for that path is explicit, not hidden.
+
      - **Tier 1 paths:** `*.md`, `LICENSE`, `CHANGELOG*`, `docs/**/*`, code-comments-only changes.
      - **Tier 2 paths:** `.github/**`, `scripts/**`, `*.config.*`, `*.toml`, root-level `package.json` when changes are non-dep, `tests/**`, `__tests__/**`, `*.test.*`, `*.spec.*`, `mocks/**`, `fixtures/**`.
      - **Tier 3 paths (default for production code):** `src/**`, `lib/**`, `app/**`, `cmd/**` (when no security signals are present).
@@ -830,7 +837,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - **Tier 4 paths:** same as Tier 3 sensitive paths COMBINED with a Signal 1 high-tier keyword match.
 
      **Signal 3 — Operator override** (literal markers in the operator's request):
-     - `[TIER: 1|2|3|4]` — forces the declared tier, overrides auto-classification.
+     - `[TIER: 1|2|3|4]` — forces the declared tier, overrides auto-classification. Exception: for `type: hotfix`, the override cannot lower below Tier 3 (clamp applies — see hotfix hard floor above).
      - `[regression-test: required]` — forces Tier 2 minimum on a Tier 1 candidate (the regression-test skip conditional in Phase 2.0 no longer applies).
      - `[security: required]` — forces Tier 3 minimum (the security agent runs at Phase 3 regardless of path signals).
 

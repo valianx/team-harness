@@ -337,6 +337,8 @@ Routes through existing `plan-and-execute` flow. Each bug is one sub-task in `01
 
 The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scoped defects with urgency markers. **Phase 1 (Root-Cause Analysis) is skipped entirely** — no architect dispatch, no `01-root-cause.md`. Everything else from the Bug-fix Flow is preserved, including Phase 2.0 (mandatory regression test), Phase 4 delivery routing (`### Fixed` CHANGELOG, `fix(area): ... (hotfix)` PR title), and Phase 6 (KG save). The Phase 4 PR title appends `(hotfix)` to signal urgency to the reviewer.
 
+**Tier 3 hard floor for hotfix:** a hotfix is pinned to Tier 3 minimum at Phase 0a Step 7 classification (see `orchestrator.md § Bug tier` for the full hotfix floor rule). Because every hotfix is Tier 3+, the security agent runs for every hotfix — "security always runs for hotfix" is a direct consequence of this pin. The hotfix Tier 3 floor and the security-always contract are the same rule stated from two angles; they are consistent by construction. Note: dedup of the Tier table between `orchestrator.md` and this file belongs to PR I.
+
 ### Skipped phases (relative to type: fix)
 
 - Phase 1 — no architect dispatch, no `01-root-cause.md`.
@@ -351,7 +353,7 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 
 - Phase 2.0 (Regression Test) — **still mandatory**. The operator override "regression test is mandatory always" applies to hotfixes too.
 - Phase 2 (Implementation) — scope-discipline contract still applies.
-- Phase 3 (Verify) — `security` agent still runs always (defense-in-depth override).
+- Phase 3 (Verify) — `security` agent still runs always for hotfix. This is a direct consequence of the Tier 3 hard floor: `type: hotfix` is pinned to Tier 3 minimum at Phase 0a Step 7 in `orchestrator.md` (the hotfix Tier 3 floor rule), so the Tier-gated dispatch table always routes every hotfix to the Phase 3 `security` agent (Tier 3 row). "security runs always for hotfix" and "security runs for every Tier 3+ fix" are the same statement — the hotfix pin makes them equivalent. Note: dedup of the Tier table between `orchestrator.md` and this file belongs to PR I.
 - Phase 3.5 (Acceptance Gate) — same.
 - Phase 3.75 (Build Verification) — runs normally (hotfix code must still compile).
 - Phase 3.6 (Acceptance Check) — **SKIPPED** for hotfix + single-file fix (the only exception to mandatory Phase 3.6; speed override). For multi-file hotfixes, Phase 3.6 runs.
