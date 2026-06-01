@@ -1259,8 +1259,8 @@ The orchestrator can run as a nested subagent (e.g., when invoked via the `/th:r
 
 1. Read `agents/plan-reviewer.md` to load the rules and the report schema as the procedure spec. Treat its prompt as your own checklist.
 2. Read `01-plan.md` exactly as the subagent would (and `01-root-cause.md` when `type: fix`).
-3. Apply the rules deterministically:
-   - **Rule 1** — one PR per service (split allowed only with a closed-list reason: coexistence window, OAS bump independence, breaking-change isolation).
+3. Apply ALL rules from `agents/plan-reviewer.md` deterministically (Rules 1-8; the canonical rule set and its closed lists are owned by `agents/plan-reviewer.md` — enforce every rule there, not only the five summarized below):
+   - **Rule 1** — one PR per service (split allowed only with a closed-list reason; the canonical closed list lives in `agents/plan-reviewer.md` § "Valid Split reason values": `coexistence window`, `production signal`, `cross-repo deploy gate`. `oas bump`, `breaking-change isolation`, and reviewability/size reasons are explicitly INVALID per that section).
    - **Rule 2** — every PR in `01-plan.md` (§ Task List) has at least one Given/When/Then acceptance criterion (the count must match the `### Summary` table).
    - **Rule 3** — `01-plan.md` is consolidated (no version markers like `v6`, no "previously decided", no strikethrough, no inline changelog sections).
    - **Rule 4** — every file mentioned in `01-plan.md` (§ Architecture → `### Work Plan`) appears in the `Files:` field of some PR in `01-plan.md` (§ Task List).

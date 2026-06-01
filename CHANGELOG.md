@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.13] - 2026-05-31
+
+### Fixed
+
+- Closing cross-pipeline consistency review (post pipeline-flows-hardening): reconciled the orchestrator inline-fallback plan-review procedure (`agents/orchestrator.md`) with the canonical `agents/plan-reviewer.md` closed lists — Rule 1's `Split reason:` list was stale and self-contradictory (listed `OAS bump independence` / `breaking-change isolation`, both INVALID per `plan-reviewer.md`); it now references the canonical closed list (`coexistence window` / `production signal` / `cross-repo deploy gate`) and enforces all 8 rules (was implicitly 1-5), closing a fail-open in the least-supervised takeover path (C-01). Removed two stray `name: deliver` fragments from the `skills/deliver/SKILL.md` body (I-02). Added two anchored guards to `tests/test_agent_structure.py` so the inline-fallback split-reason list cannot re-drift.
+
 ## [2.40.12] - 2026-05-31
 
 ### Fixed

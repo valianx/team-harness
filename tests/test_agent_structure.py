@@ -778,6 +778,20 @@ check("orchestrator.md defines inline fallback for plan-review subagent failures
 check("orchestrator.md inline fallback procedure references plan-reviewer.md as spec",
       "Read `agents/plan-reviewer.md`" in orchestrator_md,
       "orchestrator.md inline fallback does not point to plan-reviewer.md as procedure spec")
+# Closing-consistency guard (C-01): the inline-fallback Rule 1 split-reason list
+# MUST match the canonical closed list in plan-reviewer.md (single source of truth)
+# and MUST NOT carry the stale/invalid reasons that drifted here once.
+check("orchestrator.md inline fallback Rule 1 uses the canonical split-reason closed list",
+      "coexistence window" in orchestrator_md
+      and "production signal" in orchestrator_md
+      and "cross-repo deploy gate" in orchestrator_md,
+      "orchestrator.md inline fallback Rule 1 does not reference the canonical"
+      " split-reason closed list (coexistence window / production signal / cross-repo deploy gate)")
+check("orchestrator.md inline fallback Rule 1 does NOT list oas-bump / breaking-change-isolation as valid split reasons",
+      "OAS bump independence" not in orchestrator_md
+      and "breaking-change isolation)" not in orchestrator_md,
+      "orchestrator.md inline fallback Rule 1 still lists an invalid split reason"
+      " (OAS bump independence / breaking-change isolation) — contradicts plan-reviewer.md canonical closed list")
 check("orchestrator.md emits mode: subagent | inline for telemetry",
       "mode: subagent | inline" in orchestrator_md or "mode: subagent" in orchestrator_md,
       "orchestrator.md status block does not distinguish subagent vs inline execution")
