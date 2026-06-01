@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.42.0] - 2026-06-01
+
+### Added
+
+- `/th:report-issue` — standalone skill to file a structured GitHub issue against valianx/team-harness, with a confirmation gate, duplicate check, Type→label mapping, and gh→curl→paste fallback. Does not route through the orchestrator.
+
 ## [2.41.0] - 2026-06-01
 
 ### Changed
