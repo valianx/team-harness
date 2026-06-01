@@ -218,14 +218,20 @@ if [ "$has_gh" = "true" ]; then
 else
   token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
   if [ -n "$token" ]; then
+    # /search/issues supports keyword search; response is {"items":[...]}
+    q="repo:valianx/team-harness is:issue is:open ${keywords}"
     curl -sf \
       -H "Authorization: Bearer $token" \
       -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/valianx/team-harness/issues?state=open&per_page=5&q=${keywords// /+}"
+      -G "https://api.github.com/search/issues" \
+      --data-urlencode "q=$q" \
+      --data "per_page=5"
   fi
   # If no gh and no token: skip the dedup check and proceed to Step 6.
 fi
 ```
+
+Note on response shapes: the `gh issue list` path returns a top-level JSON array with `number`, `title`, and `url` fields. The `curl /search/issues` path returns `{"items":[...]}` — read candidates from `.items[]`, using `number`, `title`, and `html_url` fields.
 
 **If likely duplicates are found (1 or more open issues with similar title):**
 
