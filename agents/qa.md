@@ -209,7 +209,7 @@ This mode is read-only and short — typical run is 2-3 minutes of agent time, ~
 
 In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **substance reviewer** of the plan-review panel. The same ratify-plan procedure applies (AC ↔ Work Plan coverage mapping), but in panel context `qa` additionally writes its sub-verdict into the `## Plan Review` section of `01-plan.md` as a bold inline label:
 
-**In panel context, `qa` writes:** `**Substance (qa):**` followed by `pass` or `fail` and a one-line summary, inside `## Plan Review`. This label MUST be written as a bold inline label (NOT as a markdown heading with `###` prefix — a heading would split the `## Plan Review` slice and break the consolidated block).
+**In panel context, `qa` writes:** `**Substance (qa):**` followed by `pass` or `fail` and a one-line summary, inside `## Plan Review`. This label MUST be written as a bold inline label (NOT as a markdown heading with `###` prefix — a heading would split the `## Plan Review` slice and break the consolidated block). `qa` writes `**Substance (qa):**` unconditionally on every invocation — regardless of the verdict (`pass` or `fail`) — so that `plan-reviewer`'s vacuous-success guard can always assert its presence. A panel where this label is missing is incomplete.
 
 **What `qa` MUST NOT touch in panel context:**
 - The `**Combined verdict:**` label — that is written solely by `plan-reviewer` (the last reviewer in the panel).

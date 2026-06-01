@@ -6248,6 +6248,341 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 34 PR-H extension -- plan-review-integrity (AC-1..AC-5)
+# Three new fix groups: preserve-in-place (fix #1), worst-of roll-up +
+# STAGE-GATE-1 reads combined (fix #2), vacuous-success guard + direct-mode
+# read-backs (fix #3).
+#
+# Anti-false-green: every check is ANCHOR-SCOPED via _slice_section. The
+# existing slices _pr_consol, _orch_pr, _ref_panel, _qa_panel are reused.
+# New slices are introduced where a new anchor is needed (STAGE-GATE-1 section
+# for fix #2 check 36).
+#
+# PR-F lesson (collision guard): the sub-verdict subsection headings
+# ### QA Ratification / ### Security Design Review / ### Plan Reviewer
+# are legitimate workspace headings in 01-plan.md templates; they are NOT
+# used as anchors here. All new anchors are distinct from existing Suite 34
+# anchors and do not duplicate any heading already keyed by Suites 35/36/46/47.
+#
+# marker: pr-h-plan-review-integrity
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Fix #1 -- Preserve-in-place (AC-1)
+# Checks (31)(32)(33): plan-reviewer.md _pr_consol slice declares
+# preserve-in-place of upstream sub-verdicts AND the "overwrite entire section"
+# contradiction is removed/reconciled.
+# These FAIL now because:
+#   - plan-reviewer.md:45 says "ALWAYS overwrite the ## Plan Review section"
+#   - plan-reviewer.md:425 says "replaces the entire ## Plan Review section"
+#   - neither has an explicit preserve-in-place clause for the upstream labels
+# ---------------------------------------------------------------------------
+
+# Check (31) -- AC-1: _pr_consol slice declares preserve-in-place of upstream
+# sub-verdicts (Substance (qa) and Security design-review (security)).
+_c31_preserve_in_place = bool(_pr_consol) and (
+    "preserve" in _pr_consol.lower()
+    and (
+        "**Substance (qa):**" in _pr_consol
+        or "**Security design-review (security):**" in _pr_consol
+    )
+    and (
+        "preserve-in-place" in _pr_consol.lower()
+        or "preserve in place" in _pr_consol.lower()
+        or "preserves" in _pr_consol.lower()
+    )
+)
+check(
+    "plan-review(31/pr-h-ac1): plan-reviewer.md consolidated section slice"
+    " declares preserve-in-place of upstream sub-verdicts"
+    " ('**Substance (qa):**' and '**Security design-review (security):**')",
+    _c31_preserve_in_place,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" preserve_in_place={_c31_preserve_in_place}"
+        " -- plan-reviewer.md must declare preserve-in-place of upstream sub-verdicts;"
+        " the 'overwrite entire section' contradiction must be reconciled (fix #1)"
+    ),
+)
+
+# Check (32) -- AC-1: the overwrite-contradiction tokens are ABSENT from
+# the _pr_consol slice. Today plan-reviewer.md:425 says "replaces the entire
+# ## Plan Review section" -- this must be removed or reconciled.
+_c32_no_overwrite_entire = bool(_pr_consol) and (
+    "replaces the entire" not in _pr_consol
+    and "replace the entire" not in _pr_consol
+)
+check(
+    "plan-review(32/pr-h-ac1): plan-reviewer.md consolidated section slice"
+    " does NOT contain 'replaces the entire' (overwrite-contradiction absent)",
+    _c32_no_overwrite_entire,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" overwrite_contradiction_absent={_c32_no_overwrite_entire}"
+        " -- plan-reviewer.md:425 'replaces the entire ## Plan Review section'"
+        " contradicts the preserve-in-place contract; implementer must remove/reconcile it"
+    ),
+)
+
+# Check (33) -- AC-1: the Critical Rule section of plan-reviewer.md
+# (the ALWAYS-overwrite instruction at line 45) no longer contradicts
+# preserve-in-place. We slice to the Critical Rules section (anchor: "## Critical Rules")
+# and assert the bold "**ALWAYS** overwrite" instruction is absent from that slice.
+# Today plan-reviewer.md line 45 contains:
+#   "- **ALWAYS** overwrite the `## Plan Review` section in `01-plan.md` on every invocation."
+# After fix: this bullet is replaced/reconciled with preserve-in-place.
+# This is a file-section check (not _pr_consol) because line 45 is outside
+# the _pr_consol anchor but still in the same file.
+_PR_CRITICAL_ANCHOR = "## Critical Rules"
+_pr_critical = _slice_section(_s34_pr, _PR_CRITICAL_ANCHOR)
+_c33_no_always_overwrite = bool(_pr_critical) and (
+    "**ALWAYS** overwrite the `## Plan Review`" not in _pr_critical
+)
+check(
+    "plan-review(33/pr-h-ac1): plan-reviewer.md Critical Rules section"
+    " does NOT contain '**ALWAYS** overwrite the `## Plan Review`' instruction"
+    " (overwrite-contradiction removed from Critical Rules)",
+    _c33_no_always_overwrite,
+    (
+        f"anchor '{_PR_CRITICAL_ANCHOR}' slice present={bool(_pr_critical)},"
+        f" always_overwrite_absent={_c33_no_always_overwrite}"
+        " -- plan-reviewer.md:45 '**ALWAYS** overwrite the `## Plan Review` section'"
+        " contradicts preserve-in-place; implementer must remove/reconcile it (fix #1)"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Fix #2 -- Deterministic worst-of roll-up + STAGE-GATE-1 reads combined (AC-2, AC-3)
+# Checks (34)(35)(36):
+#   (34) _pr_consol slice declares worst-of (fail > concerns > pass) + clean/risks mapping
+#   (35) _orch_pr slice declares worst-of + security verdict mapping
+#   (36) STAGE-GATE-1 section reads **Combined verdict:** (not just plan-reviewer verdict)
+# These FAIL now because:
+#   - grep "worst-of" over agents/ returns nothing
+#   - STAGE-GATE-1 STOP block says "Plan-reviewer verdict: {pass | concerns}"
+#     (not "Combined verdict:")
+# ---------------------------------------------------------------------------
+
+# Check (34) -- AC-2: _pr_consol slice declares worst-of roll-up function with
+# severity order fail > concerns > pass AND the security verdict mapping
+# (clean -> pass, risks-found -> fail).
+_c34_worst_of = bool(_pr_consol) and (
+    "worst-of" in _pr_consol.lower()
+    or "worst of" in _pr_consol.lower()
+)
+_c34_severity_order = bool(_pr_consol) and (
+    ("fail" in _pr_consol and "concerns" in _pr_consol and "pass" in _pr_consol)
+    and (
+        "fail > concerns" in _pr_consol
+        or "fail>concerns" in _pr_consol
+        or "fail > concerns > pass" in _pr_consol
+    )
+)
+_c34_security_mapping = bool(_pr_consol) and (
+    ("clean" in _pr_consol and "pass" in _pr_consol)
+    or ("risks-found" in _pr_consol and "fail" in _pr_consol)
+    or ("clean" in _pr_consol and "risks-found" in _pr_consol)
+)
+check(
+    "plan-review(34/pr-h-ac2): plan-reviewer.md consolidated section slice"
+    " declares worst-of roll-up (fail > concerns > pass)"
+    " and security verdict mapping (clean -> pass, risks-found -> fail)",
+    _c34_worst_of and _c34_severity_order and _c34_security_mapping,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" worst_of={_c34_worst_of},"
+        f" severity_order_fail_gt_concerns={_c34_severity_order},"
+        f" security_mapping={_c34_security_mapping}"
+        " -- no worst-of rule exists today in plan-reviewer.md; implementer must add it (fix #2)"
+    ),
+)
+
+# Check (35) -- AC-2: _orch_pr slice (orchestrator.md centralization contract)
+# also declares worst-of + security verdict mapping (the three files must be
+# consistent per AC-2).
+_c35_orch_worst_of = bool(_orch_pr) and (
+    "worst-of" in _orch_pr.lower()
+    or "worst of" in _orch_pr.lower()
+)
+_c35_orch_severity = bool(_orch_pr) and (
+    "fail > concerns" in _orch_pr
+    or "fail>concerns" in _orch_pr
+    or "fail > concerns > pass" in _orch_pr
+)
+check(
+    "plan-review(35/pr-h-ac2): orchestrator.md centralization contract slice"
+    " declares worst-of roll-up (fail > concerns > pass)",
+    _c35_orch_worst_of and _c35_orch_severity,
+    (
+        f"anchor '{_ORCH_PR_ANCHOR}' slice:"
+        f" worst_of={_c35_orch_worst_of},"
+        f" severity_order={_c35_orch_severity}"
+        " -- orchestrator.md must declare worst-of consistent with plan-reviewer.md (fix #2)"
+    ),
+)
+
+# Check (36) -- AC-3: STAGE-GATE-1 section in orchestrator.md reads
+# **Combined verdict:** (the roll-up), NOT only "Plan-reviewer verdict".
+# The anchor is the existing "## STAGE-GATE-1" heading.
+_GATE1_ANCHOR = "## STAGE-GATE-1"
+_orch_gate1 = _slice_section(_s34_orch, _GATE1_ANCHOR)
+_c36_gate_reads_combined = bool(_orch_gate1) and (
+    "**Combined verdict:**" in _orch_gate1
+    or "Combined verdict" in _orch_gate1
+)
+_c36_not_only_pr_verdict = bool(_orch_gate1) and (
+    # The fix must state that STAGE-GATE-1 reads the combined verdict (the roll-up).
+    # Today the STOP block only says "Plan-reviewer verdict: {pass | concerns}".
+    # After fix: it reads "Combined verdict: {pass | concerns | fail}".
+    "Combined verdict" in _orch_gate1
+)
+check(
+    "plan-review(36/pr-h-ac3): orchestrator.md STAGE-GATE-1 section"
+    " reads '**Combined verdict:**' (the roll-up), not only 'Plan-reviewer verdict'",
+    _c36_gate_reads_combined and _c36_not_only_pr_verdict,
+    (
+        f"anchor '{_GATE1_ANCHOR}' slice present={bool(_orch_gate1)},"
+        f" reads_combined_verdict={_c36_gate_reads_combined}"
+        " -- STAGE-GATE-1 STOP block today says 'Plan-reviewer verdict:' (ambiguous);"
+        " implementer must update it to read '**Combined verdict:**' (fix #2 / AC-3)"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Fix #3 -- Vacuous-success guard + direct-mode read-backs (AC-4, AC-5)
+# Checks (37)(38)(39):
+#   (37) _pr_consol slice has the vacuous guard (assert qa-label always +
+#        security-label when security ran; missing -> blocked/panel-incomplete)
+#   (38) _qa_panel slice reflects the guard requirement (qa declares it writes
+#        the label that the guard requires)
+#   (39) _ref_panel slice has direct-mode read-backs for research/design/diagram
+# These FAIL now because:
+#   - plan-reviewer.md has no guard that checks label presence before verdict
+#   - ref-direct-modes.md panel section has no read-back guard for direct modes
+# ---------------------------------------------------------------------------
+
+# Check (37) -- AC-4: _pr_consol slice declares the vacuous-success guard:
+# assert qa label present (always) and security label present when security ran;
+# a missing-but-expected label => panel incomplete / blocked (not auto-pass).
+_c37_qa_label_required = bool(_pr_consol) and (
+    (
+        "**Substance (qa):**" in _pr_consol
+        and (
+            "always" in _pr_consol.lower()
+            or "required" in _pr_consol.lower()
+            or "must be present" in _pr_consol.lower()
+            or "must exist" in _pr_consol.lower()
+            or "assert" in _pr_consol.lower()
+            or "verify" in _pr_consol.lower()
+            or "check" in _pr_consol.lower()
+        )
+    )
+)
+_c37_security_label_when_ran = bool(_pr_consol) and (
+    "**Security design-review (security):**" in _pr_consol
+    and (
+        "when security" in _pr_consol.lower()
+        or "security ran" in _pr_consol.lower()
+        or "security_sensitive" in _pr_consol.lower()
+        or "when ran" in _pr_consol.lower()
+        or "if security" in _pr_consol.lower()
+        or "security ran" in _pr_consol.lower()
+    )
+)
+_c37_blocked_if_absent = bool(_pr_consol) and (
+    "panel incomplete" in _pr_consol.lower()
+    or "blocked" in _pr_consol.lower()
+    or "incomplete" in _pr_consol.lower()
+    or "cannot be pass" in _pr_consol.lower()
+    or "no auto-pass" in _pr_consol.lower()
+    or "not auto-pass" in _pr_consol.lower()
+)
+check(
+    "plan-review(37/pr-h-ac4): plan-reviewer.md consolidated section slice"
+    " declares vacuous-success guard:"
+    " qa label required always + security label when security ran;"
+    " missing-but-expected label => panel incomplete (blocked / no auto-pass)",
+    _c37_qa_label_required and _c37_security_label_when_ran and _c37_blocked_if_absent,
+    (
+        f"anchor '{_PR_ANCHOR}' slice:"
+        f" qa_label_required={_c37_qa_label_required},"
+        f" security_label_when_ran={_c37_security_label_when_ran},"
+        f" blocked_if_absent={_c37_blocked_if_absent}"
+        " -- no vacuous-success guard exists today in plan-reviewer.md; implementer must add it (fix #3)"
+    ),
+)
+
+# Check (38) -- AC-4: _qa_panel slice (qa.md ratify-plan section) reflects
+# the vacuous-success guard requirement by explicitly stating that qa ALWAYS
+# writes **Substance (qa):** (unconditional / regardless of verdict) so that
+# plan-reviewer's guard can assert its presence.
+# Today the qa panel says qa MUST write the label (in format context) but does
+# NOT have an explicit "always" / "unconditional" / "regardless of verdict"
+# statement tied to the guard. After fix #3 that unconditional clause is added.
+_c38_qa_always_unconditional = bool(_qa_panel) and (
+    "**Substance (qa):**" in _qa_panel
+    and (
+        "always" in _qa_panel.lower()
+        or "unconditional" in _qa_panel.lower()
+        or "regardless" in _qa_panel.lower()
+        or "vacuous" in _qa_panel.lower()
+        or "panel incomplete" in _qa_panel.lower()
+    )
+)
+check(
+    "plan-review(38/pr-h-ac4): qa.md panel slice declares it always writes"
+    " '**Substance (qa):**' unconditionally / regardless of verdict"
+    " (enabling the vacuous-success guard to assert its presence)",
+    _c38_qa_always_unconditional,
+    (
+        f"anchor '{_QA_ANCHOR}' slice:"
+        f" qa_always_unconditional={_c38_qa_always_unconditional}"
+        " -- qa.md must state it always writes **Substance (qa):** unconditionally"
+        " so plan-reviewer can assert label presence (fix #3 / AC-4)"
+    ),
+)
+
+# Check (39) -- AC-5: _ref_panel slice (ref-direct-modes.md Review Panel section)
+# includes explicit read-backs / vacuous-success guard for the direct modes
+# (research, design, diagram) where the centralization of CLAUDE.md §5 applies.
+# Today the panel section does NOT have guard language tied to direct modes:
+# "research" is absent from the slice; "diagram" is absent from the slice.
+# "design" appears only because "design-review" is the mode name.
+# After fix #3: the guard for direct modes is documented, adding either
+# the direct-mode names (research / diagram) in a guard context,
+# or explicit "panel incomplete" / "blocked" language for those modes.
+_c39_has_non_design_mode = bool(_ref_panel) and (
+    "research" in _ref_panel.lower()
+    or "diagram" in _ref_panel.lower()
+)
+_c39_has_guard_language = bool(_ref_panel) and (
+    "guard" in _ref_panel.lower()
+    or "read-back" in _ref_panel.lower()
+    or "readback" in _ref_panel.lower()
+    or "incomplete" in _ref_panel.lower()
+    or "blocked" in _ref_panel.lower()
+    or "panel incomplete" in _ref_panel.lower()
+    or "vacuous" in _ref_panel.lower()
+)
+_c39_direct_mode_readbacks = _c39_has_non_design_mode and _c39_has_guard_language
+check(
+    "plan-review(39/pr-h-ac5): ref-direct-modes.md panel slice"
+    " includes explicit vacuous-success guard / read-backs"
+    " for direct modes (research and/or diagram present + guard/incomplete language)",
+    _c39_direct_mode_readbacks,
+    (
+        f"anchor '{_REF_ANCHOR}' slice:"
+        f" non_design_direct_mode_names={_c39_has_non_design_mode},"
+        f" guard_language={_c39_has_guard_language},"
+        f" readbacks_present={_c39_direct_mode_readbacks}"
+        " -- ref-direct-modes.md must add read-backs for research/diagram direct modes (fix #3 / AC-5)"
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
 # Suite 35 -- KG MCP tool-name contract (kg-seam-toolname, AC-1..AC-6)
 # ---------------------------------------------------------------------------
 # Two-clause contract over agents/*.md AND skills/**/*.md (recursive rglob

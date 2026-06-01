@@ -46,9 +46,14 @@ The `plan-review` direct mode runs a panel of up to three reviewers that fold th
 5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
 6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.
 
+**Vacuous-success guard (applies to this direct mode and to the research/diagram direct modes where the CLAUDE.md §5 centralization applies):** before surfacing the combined verdict, verify that the expected sub-verdict labels are present in `## Plan Review`:
+- `**Substance (qa):**` — always required (qa always runs in the panel, regardless of mode: design, research, or diagram).
+- `**Security design-review (security):**` — required only when security ran (i.e., the task was determined security-sensitive). When security was skipped, absence of this label is expected and does not trigger the guard.
+If a required label is absent, the panel is incomplete — do NOT surface a pass combined verdict. Report `blocked` / panel incomplete to the operator and prompt for a re-run.
+
 **Behaviour:**
 - Zero side-files. All panel output folds in-place into `01-plan.md`. No agent creates a parallel review file.
-- The consolidated `## Plan Review` section in `01-plan.md` is idempotent (overwrite-in-place on subsequent invocations).
+- The consolidated `## Plan Review` section in `01-plan.md` is idempotent (preserve-in-place on subsequent invocations — upstream sub-verdicts are never overwritten by `plan-reviewer`).
 - Does not append `stage.gate` events to JSONL — there is no pipeline.
 - Inline fallback (nested-dispatch): if the Task tool is unavailable (nested context), run the panel reviewers sequentially inline using each agent's system-prompt file as the procedure spec — same order, same centralization contract.
 

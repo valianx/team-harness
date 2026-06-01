@@ -1328,7 +1328,8 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
   - `**Security design-review (security):**` — written by `security` (design-review, conditional)
   - `**Combined verdict:**` — written by `plan-reviewer` (sole writer of the combined verdict)
 - **`plan-reviewer` is the sole writer of the `## Plan Review` header and the `**Combined verdict:**` block.** It runs last (after qa and security) and reads their sub-verdicts to produce the combined verdict. `qa` and `security` each append only their own labelled sub-verdict and MUST NOT touch the combined verdict.
-- **Idempotent overwrite-in-place.** On repeated invocations, `plan-reviewer` replaces the `## Plan Review` section in `01-plan.md` (overwrite, never append a second copy). `qa` and `security` replace their own labelled sub-verdict lines within the section.
+- **Preserve-in-place.** `plan-reviewer` preserves the upstream sub-verdicts (`**Substance (qa):**` and `**Security design-review (security):**`) written by the earlier panel reviewers. It MUST NOT overwrite or remove them. On repeated invocations, `plan-reviewer` rewrites only the header, the `## Summary` rules table, and the `**Combined verdict:**` block; `qa` and `security` replace their own labelled sub-verdict lines within the section.
+- **Deterministic worst-of roll-up.** The `**Combined verdict:**` is the worst-of the three sub-verdicts with severity order `fail > concerns > pass`. Security sub-verdict mapping: `clean → pass`, `risks-found → fail`. A missing-but-expected sub-verdict label means the panel is incomplete — the combined verdict MUST NOT be `pass` in that case.
 - **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of this same centralization principle: every correction folds to `01-plan.md`, nothing accretes in side-files. The plan-review panel applies the same rule at Stage 1.
 
 ---
@@ -1361,8 +1362,8 @@ This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above
  ── PR Summary ─────────────────────────
  {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
 
- Plan-reviewer verdict: {pass | concerns}
- {if concerns:}
+ **Combined verdict:** {pass | concerns | fail}
+ {if concerns or fail:}
  Concerns to review:
    - {one-line per concern, citing file:line}
 
@@ -1397,9 +1398,9 @@ This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above
 
 **Schema update in `00-state.md`:** under `## Current State`, add fields `autonomous: true|false` and `autonomous_granted_at: STAGE-GATE-1 | STAGE-GATE-2-after-PR-{N} | null`. `compaction` recovery and `/th:recover` must preserve these.
 
-**Rewrite TL;DR when STAGE-GATE-1 emits** (row 6 of §5.2): `Now`: "STAGE-GATE-1 emitted at {HH:MM}, waiting for human." `Last`: "Phase 1.6 plan-reviewer verdict: {pass|concerns}." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: concerns listed (or "none" on pass).
+**Rewrite TL;DR when STAGE-GATE-1 emits** (row 6 of §5.2): `Now`: "STAGE-GATE-1 emitted at {HH:MM}, waiting for human." `Last`: "Phase 1.6 combined verdict: {pass|concerns|fail}." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: concerns listed (or "none" on pass).
 
-**Rewrite TL;DR when STAGE-GATE-1 is released** (row 7 of §5.2): On `approve`: `Now`: "Phase 2 starting for PR-1 in Round 1." `Last`: "STAGE-GATE-1 released with approve (interactive)." `Next`: "Phase 2 implementer, then Phase 3 verify." On `approve autonomous`: `Last`: "STAGE-GATE-1 released with approve autonomous — STAGE-GATE-2 will be skipped." On `reject`/`edit`: update `Now` and `Next` to reflect the routing back to architect.
+**Rewrite TL;DR when STAGE-GATE-1 is released** (row 7 of §5.2): On `approve`: `Now`: "Phase 2 starting for PR-1 in Round 1." `Last`: "STAGE-GATE-1 released with approve (interactive) — Combined verdict was {pass|concerns}." `Next`: "Phase 2 implementer, then Phase 3 verify." On `approve autonomous`: `Last`: "STAGE-GATE-1 released with approve autonomous — STAGE-GATE-2 will be skipped." On `reject`/`edit`: update `Now` and `Next` to reflect the routing back to architect.
 
 **For `type: fix` and `type: hotfix`:** the next phase after STAGE-GATE-1 release is **Phase 2.0 — Regression Test Authoring** (see below), not Phase 2 directly. The implementer is dispatched only after the failing regression test exists.
 

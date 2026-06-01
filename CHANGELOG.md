@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.11] - 2026-05-31
+
+### Fixed
+
+- Hardened plan-review panel integrity (PR H — pipeline-flows-hardening): reconciled the `plan-reviewer` overwrite/preserve contradiction by redefining the write-mode to preserve-in-place (`**Substance (qa):**` and `**Security design-review (security):**` are never overwritten by `plan-reviewer`); defined a deterministic worst-of combined verdict roll-up (`fail > concerns > pass`, security mapping `clean→pass`/`risks-found→fail`, owner=`plan-reviewer`) so STAGE-GATE-1 reads the `**Combined verdict:**` (not the last sub-verdict); added a vacuous-success guard that blocks the combined verdict from resolving as pass when an expected sub-verdict label is absent (missing-but-expected label → panel incomplete); added direct-mode read-backs for research/diagram modes in `ref-direct-modes.md`. Suite 34 extended by 9 checks (checks 31–39, marker: `pr-h-plan-review-integrity`).
+
 ## [2.40.10] - 2026-05-31
 
 ### Fixed
