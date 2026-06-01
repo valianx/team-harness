@@ -151,7 +151,7 @@ Every concrete technical claim written in a vault page requires **file:line prov
 
 For each concrete technical claim:
 
-1. Locate the backing evidence in the source (code file, config file, schema, manifest, spec). Record the file and line (`file:line`).
+1. Locate the backing evidence in `00-research.md` (the architect-captured research that records the source `file:line`). The architect captures the source reference during research; the documenter reads it from `00-research.md`, never from the source file directly (consistent with `§ "Input contract"` — the documenter never reads code).
 2. Include the provenance in the internal notes of `02-documentation.md` under a `## Provenance Log` section. The vault page itself does not need to expose the raw `file:line` — but the manifest must record it.
 3. If `00-research.md` already provides `file:line` evidence for a claim, use that reference and verify it is still accurate (spot-check at least 2–3 claims per page).
 

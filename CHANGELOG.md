@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.14] - 2026-05-31
+
+### Fixed
+
+- Propagated preserve-in-place semantics to the two orchestrator plan-review execution sites (`agents/orchestrator.md`): the dispatch instruction (~:1238) and the inline-fallback step 4 (~:1268) now instruct the plan-reviewer to preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` and rewrite only its own header, Summary table, and `**Combined verdict:**` block — consistent with the canonical contract at :1338 (PR H). Previously both sites ordered "replace section if it exists", which would destroy qa+security sub-verdicts in the takeover/inline path (the least-supervised path).
+- Rewritten `agents/documenter.md` provenance step 1 (:154) to locate backing evidence in `00-research.md` (which records the architect-captured source `file:line`) rather than reading the source file directly — consistent with the documenter input contract (:12 NEVER reads code, :148 backing from `00-research.md`, :156 use existing reference). Eliminates the contradiction that left the documenter either violating its sandbox or paralysed.
+
+### Security
+
+- SEC-DR-3 closed: expanded the semantic keyword list (design-review trigger, `agents/ref-direct-modes.md § "Review Panel"`) with five additional high-risk vulnerability classes: `xxe` (CWE-611), `ssti` (CWE-94/1336), `traversal` (CWE-22), `redirect` (open redirect, CWE-601), `cors` (CWE-942 / A05:2025). Plans whose only security indicator is one of these classes now correctly trigger the security design-review via the semantic keyword gate (fail-closed). The summary list (:20) is aligned. `eval`/`exec` remain excluded (false-positive-prone in pipeline prose per `docs/knowledge.md:60`).
+
 ## [2.40.13] - 2026-05-31
 
 ### Fixed

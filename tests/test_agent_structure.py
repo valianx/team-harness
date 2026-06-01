@@ -11183,6 +11183,230 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Checks (14) / AC-1 + AC-2 + AC-3 (SEC-DR-3 extension) — 5 new security
+# keywords that complete the design-review trigger list.
+#
+# Context (failing-first, 2026-05-31):
+#   agents/ref-direct-modes.md § "Review Panel" today ends its Semantic
+#   keyword list with "sanitize".  Five classes — xxe, ssti, traversal,
+#   redirect, cors — are absent (recorded as deferred in docs/knowledge.md:60
+#   as SEC-DR-3 follow-up).  Each is a fail-closed trigger; their absence
+#   means plans whose only security indicator is, e.g., "SSTI in template
+#   engine" bypass the semantic keyword gate → fail-open.
+#
+# Anti-false-green: reuses _s48_rdm_panel_slice (already anchor-scoped in
+# check 11).  An absent anchor returns "" → token-in-"" is False → clear fail.
+# Each keyword is checked INDIVIDUALLY so a failure pinpoints the exact term.
+#
+# EXCLUDE eval/exec: these are NOT added (false-positive-prone in pipeline
+# prose per docs/knowledge.md:60).  We do NOT assert their absence here
+# (positive assertion only; absence-of-eval/exec is an AC-3 prose guarantee,
+# verified by plan-reviewer; a negative structural assertion would be fragile
+# since those strings appear legitimately elsewhere in the file).
+#
+# NOTE: _S48_RDM_PANEL_ANCHOR and _s48_rdm_panel_slice are already defined
+# above in check (11) — no redefinition needed.
+# ---------------------------------------------------------------------------
+_S48_NEW_KEYWORDS_SEC_DR3 = (
+    "xxe",
+    "ssti",
+    "traversal",
+    "redirect",
+    "cors",
+)
+
+for _kw in _S48_NEW_KEYWORDS_SEC_DR3:
+    check(
+        f"recover-dedup(14/ac-1+ac-2+ac-3/sec-dr-3): ref-direct-modes.md"
+        f" § Review Panel contains new security keyword '{_kw}'"
+        f" (design-review trigger list — SEC-DR-3 completion; fail-closed)",
+        bool(_s48_rdm_panel_slice)
+        and _kw in _s48_rdm_panel_slice,
+        f"anchor '{_S48_RDM_PANEL_ANCHOR}' missing from ref-direct-modes.md"
+        f" or keyword '{_kw}' absent from the canonical design-review trigger list;"
+        f" anchor present: {bool(_s48_rdm_panel_slice)};"
+        f" '{_kw}' in slice: {_kw in _s48_rdm_panel_slice}"
+        f" — implementer must add '{_kw}' to the semantic keyword list in"
+        f" § Review Panel (SEC-DR-3 completion; fail-closed)",
+    )
+
+# ---------------------------------------------------------------------------
+# Checks (15) / AC-4 + AC-5 + AC-6 — preserve-in-place propagation.
+#
+# Context (failing-first, 2026-05-31):
+#   PR H (v2.40.11) defined the preserve-in-place contract at :1338 —
+#   plan-reviewer preserves upstream sub-verdicts and rewrites ONLY its own
+#   header + Summary table + **Combined verdict:**.  But two sibling spots
+#   still carry the OLD destructive semantics:
+#     :1238 (dispatch instruction) says:
+#       "replace section if it exists, never append a second copy"
+#     :1268 (inline-fallback step 4) says:
+#       "Replace the section if it already exists, never append a second copy"
+#   In a takeover / inline plan-review (the least-supervised path) this
+#   DESTROYS the qa + security sub-verdicts → re-opens the bug PR H fixed.
+#
+# Strategy (two sub-checks):
+#   (15a) Slice § "Phase 1.6 — Plan Review (Stage 1 closing gate)" (covers
+#         :1238): assert the destructive phrase is ABSENT and preserve-in-place
+#         language is PRESENT.
+#   (15b) Slice § "Inline fallback when Task subagent invocation is not
+#         available" (covers :1268): same assertion.
+#
+# Preserve-in-place tokens (at least one required):
+#   "preserve" / "Substance (qa)" / "Security design-review (security)"
+#   Any of these confirm the fix propagated the preserve-in-place contract.
+#
+# Destructive phrases (must be ABSENT after fix):
+#   "replace section if it exists"      → :1238 today
+#   "Replace the section if it already" → :1268 today
+#
+# Bold-inline form guard: we also assert the BOLD INLINE labels
+#   **Substance (qa):** and **Security design-review (security):**
+# are named as the preservation target — NOT ### subsections (which would
+# break _slice_section).  The plan calls for the positive presence of at
+# least one label token in the reconciled instruction.
+#
+# Anti-false-green: both anchors are unique in orchestrator.md.
+#   - If the anchor moves/renames, slice returns "" → preserve-token
+#     check fails → clear fail.
+#   - The destructive text is asserted ABSENT; if source is unchanged,
+#     the absent-destructive-text assertion passes (source still has it)
+#     and the preserve-token assertion fails (fix not applied) → clear fail.
+#   Combined: both halves must pass → check is fail-safe.
+#
+# Collision check: neither anchor string is used by any existing Suite
+# (34-48 check 13) on orchestrator.md via _slice_section.  Verified.
+# ---------------------------------------------------------------------------
+
+# -- Group E: new slices for item 2 (preserve-in-place) --
+_S48_ORCH_P16_DISPATCH_ANCHOR  = "## Phase 1.6 — Plan Review (Stage 1 closing gate)"
+_S48_ORCH_INLINE_FALLBACK_ANCHOR = "### Inline fallback when Task subagent invocation is not available"
+
+_s48_orch_p16_dispatch_slice   = _slice_section(_s48_orch, _S48_ORCH_P16_DISPATCH_ANCHOR)
+_s48_orch_inline_fallback_slice = _slice_section(_s48_orch, _S48_ORCH_INLINE_FALLBACK_ANCHOR)
+
+# Preserve-in-place tokens (positive assertion — at least one required)
+_S48_PRESERVE_ALTS = (
+    "preserve",
+    "Substance (qa)",
+    "Security design-review (security)",
+)
+
+# Destructive phrase at :1238 (must be ABSENT after fix)
+_S48_DESTRUCTIVE_DISPATCH = "replace section if it exists"
+# Destructive phrase at :1268 (must be ABSENT after fix)
+_S48_DESTRUCTIVE_INLINE   = "Replace the section if it already"
+
+check(
+    "recover-dedup(15a/ac-4+ac-6): orchestrator.md"
+    " § Phase 1.6 — Plan Review (Stage 1 closing gate)"
+    " dispatch instruction uses preserve-in-place semantics"
+    " (sub-verdicts **Substance (qa):** / **Security design-review (security):**"
+    " preserved; destructive 'replace section if it exists' absent)",
+    bool(_s48_orch_p16_dispatch_slice)
+    and any(t in _s48_orch_p16_dispatch_slice for t in _S48_PRESERVE_ALTS)
+    and _S48_DESTRUCTIVE_DISPATCH not in _s48_orch_p16_dispatch_slice,
+    f"anchor '{_S48_ORCH_P16_DISPATCH_ANCHOR}' missing from orchestrator.md"
+    f" or preserve-in-place fix not applied to dispatch instruction;"
+    f" anchor present: {bool(_s48_orch_p16_dispatch_slice)};"
+    f" preserve-token found: {any(t in _s48_orch_p16_dispatch_slice for t in _S48_PRESERVE_ALTS)};"
+    f" destructive phrase still present: {_S48_DESTRUCTIVE_DISPATCH in _s48_orch_p16_dispatch_slice}"
+    f" — implementer must reconcile :1238 to preserve-in-place semantics (PR H § Plan-review panel"
+    f" centralization contract at :1338); preserve **Substance (qa):** /"
+    f" **Security design-review (security):**; remove 'replace section if it exists'",
+)
+
+check(
+    "recover-dedup(15b/ac-5+ac-6): orchestrator.md"
+    " § Inline fallback when Task subagent invocation is not available"
+    " step 4 uses preserve-in-place semantics"
+    " (sub-verdicts **Substance (qa):** / **Security design-review (security):**"
+    " preserved; destructive 'Replace the section if it already' absent)",
+    bool(_s48_orch_inline_fallback_slice)
+    and any(t in _s48_orch_inline_fallback_slice for t in _S48_PRESERVE_ALTS)
+    and _S48_DESTRUCTIVE_INLINE not in _s48_orch_inline_fallback_slice,
+    f"anchor '{_S48_ORCH_INLINE_FALLBACK_ANCHOR}' missing from orchestrator.md"
+    f" or preserve-in-place fix not applied to inline-fallback step 4;"
+    f" anchor present: {bool(_s48_orch_inline_fallback_slice)};"
+    f" preserve-token found: {any(t in _s48_orch_inline_fallback_slice for t in _S48_PRESERVE_ALTS)};"
+    f" destructive phrase still present: {_S48_DESTRUCTIVE_INLINE in _s48_orch_inline_fallback_slice}"
+    f" — implementer must reconcile :1268 (inline-fallback step 4) to preserve-in-place"
+    f" semantics (PR H § Plan-review panel centralization contract at :1338);"
+    f" preserve **Substance (qa):** / **Security design-review (security):**;"
+    f" remove 'Replace the section if it already exists'",
+)
+
+# ---------------------------------------------------------------------------
+# Check (16) / AC-8 — documenter provenance step references 00-research.md.
+#
+# Context (failing-first, 2026-05-31):
+#   agents/documenter.md § "Provenance and Fail-Closed Contract"
+#   → "### Provenance requirement" step 1 (:154) TODAY says:
+#     "Locate the backing evidence in the source (code file, config file,
+#     schema, manifest, spec). Record the file and line (file:line)."
+#   This contradicts:
+#     :12   (NEVER reads code directly)
+#     :148  (backing MUST come from 00-research.md; else blocked)
+#     :156  (if 00-research.md already provides file:line, use that)
+#   The documenter following :154 literally either reads source (sandbox
+#   violation) or is paralysed by the contradiction.
+#
+# Strategy:
+#   Slice § "Provenance and Fail-Closed Contract" (anchor already used by
+#   Suite 47 on the same file — no new anchor; reuse the same string).
+#   Assert:
+#     (a) "00-research.md" appears in the slice (provenance located there)
+#     (b) "source (code file" is ABSENT (destructive instruction removed)
+#
+# Anti-false-green: if the anchor disappears, slice returns "" →
+#   "00-research.md" in "" is False → check fails clearly.
+#   The absence assertion passes trivially on an empty slice — so we gate
+#   it on bool(slice): both parts require the slice to be non-empty.
+#
+# Note: Suite 47 (checks 3+4) already asserts the broader provenance/
+#   fail-closed contract (file:line + blocked).  Check 16 is orthogonal:
+#   it asserts specifically that step 1 of the requirement no longer points
+#   to the source file but to 00-research.md.  No duplication of assertions.
+# ---------------------------------------------------------------------------
+
+# -- Group F: new slice for item 3 (documenter provenance) --
+# Anchor: "### Provenance requirement" — the sub-section that contains :154.
+# Using "## Provenance and Fail-Closed Contract" would NOT work: _slice_section
+# stops at the first ### sub-heading (### Provenance requirement at :150),
+# meaning :154 would be outside the slice → false-green on the absence check.
+# "### Provenance requirement" is the correct anchor to scope the slice to the
+# exact sub-section where the bug text lives.
+# Collision check: no existing suite (34-48 check 13) calls _slice_section on
+# documenter.md with "### Provenance requirement" — verified above.
+_s48_doc = read(AGENTS_DIR / "documenter.md")
+_S48_DOC_PROV_ANCHOR = "### Provenance requirement"
+_s48_doc_prov_slice  = _slice_section(_s48_doc, _S48_DOC_PROV_ANCHOR)
+
+# Positive token: 00-research.md must appear in step 1 as provenance source
+_S48_DOC_PROV_TOKEN = "00-research.md"
+# Destructive token: the old step-1 "source (code file" phrase must be gone
+_S48_DOC_DESTRUCTIVE = "source (code file"
+
+check(
+    "recover-dedup(16/ac-8): documenter.md"
+    " § Provenance requirement (sub-section of Provenance and Fail-Closed Contract)"
+    " step 1 references '00-research.md' as the source of backing evidence"
+    " and does NOT instruct reading source code directly"
+    " ('source (code file' absent; consistent with :12/:148/:156)",
+    bool(_s48_doc_prov_slice)
+    and _S48_DOC_PROV_TOKEN in _s48_doc_prov_slice
+    and _S48_DOC_DESTRUCTIVE not in _s48_doc_prov_slice,
+    f"anchor '{_S48_DOC_PROV_ANCHOR}' missing from documenter.md"
+    f" or provenance-fix not applied to step 1;"
+    f" anchor present: {bool(_s48_doc_prov_slice)};"
+    f" '00-research.md' in slice: {_S48_DOC_PROV_TOKEN in _s48_doc_prov_slice};"
+    f" 'source (code file' still present (must be False): {_S48_DOC_DESTRUCTIVE in _s48_doc_prov_slice}"
+    f" — implementer must rewrite :154 so step 1 locates backing in '00-research.md'"
+    f" (never reading the source file directly); consistent with :12/:148/:156",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

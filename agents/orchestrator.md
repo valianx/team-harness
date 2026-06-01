@@ -1235,7 +1235,7 @@ Routing to architect to revise Work Plan
 - Pointers to `01-plan.md` (and also `01-root-cause.md` for `type: fix`).
 - `type` field from `00-state.md` (so the plan-reviewer can gate Rules 7 + 8 on `type: fix | hotfix`).
 - Mode: default (the plan-reviewer has one mode).
-- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other workspaces. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Append your report as `## Plan Review` section to `01-plan.md` (replace section if it exists, never append a second copy). Return verdict pass/concerns/fail in the status block."
+- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other workspaces. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report into `## Plan Review` in `01-plan.md` using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, and the `**Combined verdict:**` block. Never append a second `## Plan Review` section. Return verdict pass/concerns/fail in the status block."
 
 ### Phase 1.6 is inviolable
 
@@ -1265,7 +1265,7 @@ The orchestrator can run as a nested subagent (e.g., when invoked via the `/th:r
    - **Rule 3** — `01-plan.md` is consolidated (no version markers like `v6`, no "previously decided", no strikethrough, no inline changelog sections).
    - **Rule 4** — every file mentioned in `01-plan.md` (§ Architecture → `### Work Plan`) appears in the `Files:` field of some PR in `01-plan.md` (§ Task List).
    - **Rule 5** — `### Services Touched` in `01-plan.md` (§ Architecture) matches the set of repos that have at least one PR in `01-plan.md` (§ Task List).
-4. Append a `## Plan Review` section to `01-plan.md` with the same schema as the subagent would (`**Verdict:**` line, per-rule findings tables, recommendations). Replace the section if it already exists, never append a second copy. The schema is documented in `agents/plan-reviewer.md`.
+4. Write your report into `## Plan Review` in `01-plan.md` with the same schema as the subagent would (`**Verdict:**` line, per-rule findings tables, recommendations) using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, and the `**Combined verdict:**` block. Never append a second `## Plan Review` section. The schema is documented in `agents/plan-reviewer.md`.
 5. Return your own status block with `mode: inline` so the run is traceable.
 
 **Quality bar.** The inline audit must produce the same artifact a subagent would produce — same schema, same level of rigor, same overwrite semantics. The `mode: subagent | inline` field is for telemetry only; it never changes the gate logic.
