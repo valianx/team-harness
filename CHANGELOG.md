@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.41.0] - 2026-06-01
+
+### Changed
+
+- Renamed three skills to eliminate collision with Claude Code built-in slash commands: the plugin registers a bare alias (e.g. `/status`) that shadows the native built-in in the menu (confirmed on CC v2.1.159); renaming the folder is the complete canonical fix because the command derives from the folder name, not the `name:` frontmatter. Migration table: `/th:status` → `/th:pipelines`, `/th:memory` → `/th:kg`, `/th:init` → `/th:bootstrap`. The `init` agent (`agents/init.md`) is unchanged; `/th:bootstrap` continues routing to it.
+
 ## [2.40.14] - 2026-05-31
 
 ### Fixed
