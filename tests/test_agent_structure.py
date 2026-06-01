@@ -526,33 +526,33 @@ for phase_label in ("Phase 0a", "Phase 1.6", "STAGE-GATE-1", "Phase 2 ", "Phase 
           f"TL;DR rewrite instruction not found near {phase_label}")
 # (this check expands to 8 phase-label assertions; counted as one logical check group)
 
-# skills/status.md changes
-status_md = read(skill_path("status"))
-check("skills/status.md no-args table has Stage column",
+# skills/pipelines.md changes
+status_md = read(skill_path("pipelines"))
+check("skills/pipelines.md no-args table has Stage column",
       "Stage" in status_md and "| Stage |" in status_md,
-      "Stage column not added to /status no-args table")
+      "Stage column not added to /th:pipelines no-args table")
 
-check("skills/status.md documents the 7 refined Status values",
+check("skills/pipelines.md documents the 7 refined Status values",
       all(v in status_md for v in ["waiting_gate_1", "waiting_gate_2", "waiting_gate_3",
                                     "autonomous", "iterating", "complete", "paused"]),
-      "one or more refined Status values missing from /status")
+      "one or more refined Status values missing from /th:pipelines")
 
-check("skills/status.md <feature-name> mode reads execution events (dual-format: .md or .jsonl)",
+check("skills/pipelines.md <feature-name> mode reads execution events (dual-format: .md or .jsonl)",
       "<feature-name>" in status_md and "00-execution-events.md" in status_md and "00-execution-events.jsonl" in status_md,
-      "/status <feature> does not reference both execution events formats")
+      "/th:pipelines <feature> does not reference both execution events formats")
 
-check("skills/status.md timeline declares the event types it renders",
+check("skills/pipelines.md timeline declares the event types it renders",
       all(e in status_md for e in ["stage.gate", "stage.gate.release", "stage.gate.skipped",
                                     "gate.pass", "gate.fail", "iteration.start", "phase.end"]),
-      "Timeline event-type list incomplete in /status")
+      "Timeline event-type list incomplete in /th:pipelines")
 
-check("skills/status.md handles missing JSONL gracefully (no crash)",
+check("skills/pipelines.md handles missing JSONL gracefully (no crash)",
       "no events recorded" in status_md or "JSONL" in status_md and "missing" in status_md.lower(),
-      "Graceful degradation for missing JSONL not documented in /status")
+      "Graceful degradation for missing JSONL not documented in /th:pipelines")
 
-check("skills/status.md renderer never modifies state",
+check("skills/pipelines.md renderer never modifies state",
       "never modifies" in status_md or "Read-only" in status_md or "read-only" in status_md,
-      "/status read-only contract not stated explicitly")
+      "/th:pipelines read-only contract not stated explicitly")
 
 # CHANGELOG.md entry
 changelog = read(REPO_ROOT / "CHANGELOG.md")
@@ -642,12 +642,12 @@ check("init.md still creates docs/knowledge.md placeholder (option a)",
       "docs/knowledge.md" in init_md and "Create docs/knowledge.md" in init_md,
       "init.md no longer documents creating docs/knowledge.md — option (a) violated")
 
-# 10. memory skill documents new types
-mem_skill = read(skill_path("memory"))
+# 10. kg skill documents new types
+mem_skill = read(skill_path("kg"))
 for new_type in ("project", "service", "stack-profile"):
-    check(f"skills/memory.md documents '{new_type}' as a type filter",
+    check(f"skills/kg.md documents '{new_type}' as a type filter",
           new_type in mem_skill,
-          f"new type '{new_type}' not documented in /memory list filter")
+          f"new type '{new_type}' not documented in /th:kg list filter")
 
 # 11. CHANGELOG entry
 check("CHANGELOG.md [Unreleased] mentions KG vocabulary expansion",
@@ -1756,16 +1756,16 @@ if trace_path.exists():
             f"marker '{marker}' not found",
         )
 
-# --- skills/status.md reads 00-pipeline-summary.md ---
+# --- skills/pipelines.md reads 00-pipeline-summary.md ---
 
-status_md = read(skill_path("status"))
+status_md = read(skill_path("pipelines"))
 check(
-    "skills/status.md <feature-name> mode reads 00-pipeline-summary.md",
+    "skills/pipelines.md <feature-name> mode reads 00-pipeline-summary.md",
     "00-pipeline-summary.md" in status_md,
     "narrative renderer does not read the pipeline summary",
 )
 check(
-    "skills/status.md points to /trace for deeper observability",
+    "skills/pipelines.md points to /trace for deeper observability",
     "/th:trace" in status_md,
     "narrative renderer does not advertise /th:trace",
 )
@@ -1913,21 +1913,21 @@ for label, condition in no_default_url_checks:
 for label, condition in delivery_kg_checks:
     check(f"delivery.md KG hygiene: {label}", condition)
 
-# --- skills/memory.md: mark_superseded + hard-delete operator-only contract ---
+# --- skills/kg.md: mark_superseded + hard-delete operator-only contract ---
 # Hard-delete is NOT a skill sub-command (decision b per 01-plan.md): the
 # context-harness-mcp server exposes no delete tool.  The checks below assert
 # the new contract: soft-delete via mark_superseded is the only destructive
 # operation the skill performs; hard-delete is documented as operator-only
 # (Supabase Studio / direct SQL).
 
-memory_skill = read(skill_path("memory"))
+memory_skill = read(skill_path("kg"))
 
 memory_skill_checks = [
-    ("/memory prune uses mark_superseded as default (soft-delete)",
+    ("/th:kg prune uses mark_superseded as default (soft-delete)",
      "mark_superseded" in memory_skill and "soft-delete" in memory_skill),
-    ("/memory consolidate uses mark_superseded",
+    ("/th:kg consolidate uses mark_superseded",
      memory_skill.count("mark_superseded") >= 2),
-    ("/memory hard-delete sub-command is NOT present (operator-only per decision b)",
+    ("/th:kg hard-delete sub-command is NOT present (operator-only per decision b)",
      "### `hard-delete" not in memory_skill),
     ("hard-delete documented as operator-only (Supabase Studio / direct SQL)",
      "operator-only" in memory_skill and
@@ -1945,7 +1945,7 @@ memory_skill_checks = [
      "mark_superseded" in memory_skill),
 ]
 for label, condition in memory_skill_checks:
-    check(f"skills/memory.md: {label}", condition)
+    check(f"skills/kg.md: {label}", condition)
 
 # --- docs/kg-content-policy.md: Volatility avoidance + Multi-tenant additions ---
 
@@ -3554,12 +3554,12 @@ check(
     "init.md does not document the --scaffold-rereview-workflow flag",
 )
 
-# (18) skills/init.md passes --scaffold-rereview-workflow flag through.
-_init_skill = read(skill_path("init"))
+# (18) skills/bootstrap.md passes --scaffold-rereview-workflow flag through.
+_init_skill = read(skill_path("bootstrap"))
 check(
-    "skills/init.md passes --scaffold-rereview-workflow flag to init agent",
+    "skills/bootstrap.md passes --scaffold-rereview-workflow flag to init agent",
     "--scaffold-rereview-workflow" in _init_skill,
-    "skills/init.md does not propagate the --scaffold-rereview-workflow flag",
+    "skills/bootstrap.md does not propagate the --scaffold-rereview-workflow flag",
 )
 
 # (19) agents/reviewer-consolidator.md exists (added in PR-11).
@@ -4136,7 +4136,7 @@ _NARR_RULE3 = re.compile(
 
 # Skills whose entire content is exempt from the narration scan
 # (they surface internals by design — the operator explicitly requested it).
-_EXEMPT_SKILL_NAMES = {"status", "trace"}
+_EXEMPT_SKILL_NAMES = {"pipelines", "trace"}
 
 # Path fragments that disqualify a SKILL.md from the scan
 # (vendored/installed files that are not prompt content).
@@ -4188,9 +4188,9 @@ if _OUTPUT_TEMPLATE.exists():
         "output-template.md must list carve-outs (STOP blocks and analysis/results)",
     )
     check(
-        "voice: output-template.md documents /status and /trace exemption",
-        "status" in _ot.lower() and "trace" in _ot.lower() and "exempt" in _ot.lower(),
-        "output-template.md must document the /status and /trace exemption",
+        "voice: output-template.md documents /th:pipelines and /trace exemption",
+        "pipelines" in _ot.lower() and "trace" in _ot.lower() and "exempt" in _ot.lower(),
+        "output-template.md must document the /th:pipelines and /trace exemption",
     )
     check(
         "voice: output-template.md has 'How to reference this file' section",
@@ -4345,7 +4345,7 @@ for _agent_name in _TARGET_AGENTS:
 
 # --- (rollout) Target skills have Output Discipline section ---
 
-_TARGET_SKILLS = ["setup", "lint", "memory"]
+_TARGET_SKILLS = ["setup", "lint", "kg"]
 for _skill_name in _TARGET_SKILLS:
     _skill_p = skill_path(_skill_name)
     if _skill_p.exists():
@@ -4371,7 +4371,7 @@ for _skill_name in _TARGET_SKILLS:
 
 # --- (exemption) /status and /trace document the exemption ---
 
-for _exempt_skill in ["status", "trace"]:
+for _exempt_skill in ["pipelines", "trace"]:
     _esp = skill_path(_exempt_skill)
     if _esp.exists():
         _esc = read(_esp)

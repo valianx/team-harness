@@ -72,7 +72,7 @@ The orchestrator is the exclusive writer of `00-execution-events.*` during
 pipeline runs. In that context, agents return operation metadata in their status
 blocks; the orchestrator propagates it.
 
-Standalone skills (`/th:setup`, `/th:lint`, `/th:memory`) that execute outside
+Standalone skills (`/th:setup`, `/th:lint`, `/th:kg`) that execute outside
 a pipeline context write their own `operation.*` events only when a workspace
 and events file exist. When no workspace exists (one-shot invocation), these
 skills apply the same output discipline — silence on success, one-line error +

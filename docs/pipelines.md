@@ -30,7 +30,7 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 
 ### Pipelines NOT in this list
 
-`docs/pipelines.md` covers multi-phase pipelines that dispatch multiple agents through staged gates. Standalone utility skills (`/lint`, `/status`, `/memory`, `/tmux`, `/th-update`, `/trace`, `/background`, `/eval`, `/cross-repo`) and direct modes (`/audit`, `/diagram`, `/translate`, `/security`, `/define-ac`, `/validate`, `/recover`, `/deliver`, `/gcp-costs`, `/init`) are operator-facing surfaces but do not run a multi-phase pipeline. Their contracts live in the respective `skills/*.md` and `agents/*.md` files. The orchestrator routes them directly (see `agents/orchestrator.md` Step 6 routing table).
+`docs/pipelines.md` covers multi-phase pipelines that dispatch multiple agents through staged gates. Standalone utility skills (`/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, `/trace`, `/background`, `/eval`, `/cross-repo`) and direct modes (`/audit`, `/diagram`, `/translate`, `/security`, `/define-ac`, `/validate`, `/recover`, `/deliver`, `/gcp-costs`, `/th:bootstrap`) are operator-facing surfaces but do not run a multi-phase pipeline. Their contracts live in the respective `skills/*.md` and `agents/*.md` files. The orchestrator routes them directly (see `agents/orchestrator.md` Step 6 routing table).
 
 ---
 
@@ -210,9 +210,9 @@ See also: [`docs/decisions/gh-fallback-pattern.md`](./decisions/gh-fallback-patt
 
 The `reviewer` agent runs 2–3 focused review passes (one per focus: `general`, `security`, `architecture`, `style`). The `reviewer-consolidator` agent then merges the drafts into a single unified PR review, de-duplicates findings, surfaces contradictions, and derives the final verdict. Only the consolidated review is posted to GitHub.
 
-Review policy: if `.team-harness/review-policy.md` exists in the consumer repo, the reviewer reads it and enforces its declared rules. Scaffold via `/init --scaffold-review-policy`.
+Review policy: if `.team-harness/review-policy.md` exists in the consumer repo, the reviewer reads it and enforces its declared rules. Scaffold via `/th:bootstrap --scaffold-review-policy`.
 
-Re-review automation: optionally scaffold `.github/workflows/team-harness-rereview.yml` via `/init --scaffold-rereview-workflow`. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review.
+Re-review automation: optionally scaffold `.github/workflows/team-harness-rereview.yml` via `/th:bootstrap --scaffold-rereview-workflow`. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review.
 
 ---
 

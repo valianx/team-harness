@@ -1,8 +1,8 @@
 ---
-name: memory
+name: kg
 description: Search, inspect, and manage the Knowledge Graph.
 ---
-name: memory
+name: kg
 
 Manage the Knowledge Graph (cross-project memory). Search, inspect, prune, and consolidate entities. This is a standalone utility — does NOT route through the orchestrator.
 
@@ -34,7 +34,7 @@ The operator can chat in any language; you reply in the operator's chat language
 Analyze the input: $ARGUMENTS
 
 ---
-name: memory
+name: kg
 
 ## Actions
 
@@ -132,7 +132,7 @@ name: memory
    and clearing deleted_at. Hard-delete is operator-only (out of this skill's reach).
    ```
 4. Ask user: "Soft-delete (archive observations) any of these? List entity names separated by commas, or 'none'."
-5. If user confirms → for each entity, call Knowledge Graph MCP `mark_superseded(old=<name>, new=<name>, archive_old_observations=true, reason="prune: stale per /th:memory prune <date>")`. The self-supersedes pattern (`old == new`) marks the node archived without inventing a replacement — confirm the MCP backend accepts this; otherwise fall back to creating a placeholder entity `archived-<name>` of type `process-insight` with a single observation `"Archived: superseded entry for <name>, no replacement"` and use that as `new`.
+5. If user confirms → for each entity, call Knowledge Graph MCP `mark_superseded(old=<name>, new=<name>, archive_old_observations=true, reason="prune: stale per /th:kg prune <date>")`. The self-supersedes pattern (`old == new`) marks the node archived without inventing a replacement — confirm the MCP backend accepts this; otherwise fall back to creating a placeholder entity `archived-<name>` of type `process-insight` with a single observation `"Archived: superseded entry for <name>, no replacement"` and use that as `new`.
 
 ### `consolidate` — Merge similar entities via `mark_superseded`
 
@@ -156,7 +156,7 @@ name: memory
    ```
 4. If approved:
    - Use `add_observations` to add missing observations to the kept entity
-   - Use `mark_superseded(old=<b>, new=<a>, archive_old_observations=true, reason="consolidate via /th:memory")` — preserves {entity-b} as a queryable but archived node with a `supersedes` relation pointing to {entity-a}
+   - Use `mark_superseded(old=<b>, new=<a>, archive_old_observations=true, reason="consolidate via /th:kg")` — preserves {entity-b} as a queryable but archived node with a `supersedes` relation pointing to {entity-a}
    - Update relations if needed (relations from {entity-b} should be re-pointed to {entity-a} via `create_relations`; relations into {entity-b} can stay — the supersedes edge makes the redirection discoverable)
 
 ### Hard-delete — operator-only, out of this skill's reach
@@ -173,7 +173,7 @@ For most "remove this" cases, `prune` (soft-delete via `mark_superseded`) is the
 ### No args — Show usage help
 
 ```
-Usage: /th:memory <action> [args]
+Usage: /th:kg <action> [args]
 
 Actions:
   search <query>     Search entities by text
@@ -187,17 +187,17 @@ Note: hard-delete (permanent node removal) is operator-only — Supabase Studio 
 direct SQL. This skill does not call any delete tool; the MCP server does not expose one.
 
 Examples:
-  /th:memory search "Next.js auth"
-  /th:memory list pattern
-  /th:memory list service
-  /th:memory show prisma-sqlite-workaround
-  /th:memory stats
-  /th:memory prune
-  /th:memory consolidate
+  /th:kg search "Next.js auth"
+  /th:kg list pattern
+  /th:kg list service
+  /th:kg show prisma-sqlite-workaround
+  /th:kg stats
+  /th:kg prune
+  /th:kg consolidate
 ```
 
 ---
-name: memory
+name: kg
 
 ## Error Handling
 
@@ -206,7 +206,7 @@ name: memory
 - If `mark_superseded` fails → report the error, do not retry
 
 ---
-name: memory
+name: kg
 
 ## Important
 

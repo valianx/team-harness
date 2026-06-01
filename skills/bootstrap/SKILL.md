@@ -1,5 +1,5 @@
 ---
-name: init
+name: bootstrap
 description: Initialize CLAUDE.md and project conventions for a repository.
 ---
 
@@ -12,7 +12,7 @@ Before routing, check for optional flags in `$ARGUMENTS`:
 Remove parsed flags from the description before routing.
 
 ---
-name: init
+name: bootstrap
 
 Pass to the `orchestrator` agent:
 ```
@@ -23,7 +23,7 @@ Direct Mode Task:
 ```
 
 ---
-name: init
+name: bootstrap
 
 ## Important
 

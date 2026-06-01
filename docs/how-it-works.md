@@ -17,7 +17,7 @@ Team-harness turns Claude Code into a Spec-Driven Development pipeline. Every fe
 
 The orchestrator's intent-detection step (Step 6 of its contract in `agents/orchestrator.md`) classifies the natural-language request and dispatches to the right phase or direct mode — design, implementation, verify, delivery, plan-review, validate, deliver, research, and others. Verbs such as `design`, `give me the plan`, `implement`, `open the PR`, `validate`, `review the plan`, `research`, and `recover` map to specific phases. The intent-detection patterns are bilingual; the operator can use either English or Spanish at the chat layer, but repo artefacts (this doc included) are written in English.
 
-**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/status` exist and work, but they all route into the same orchestrator agent under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@th:orchestrator` path covers everything.
+**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/th:pipelines` exist and work, but they all route into the same orchestrator agent under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@th:orchestrator` path covers everything.
 
 Pick whichever feels more natural. The rest of this doc uses the orchestrator-conversational form.
 
@@ -118,7 +118,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 ## What ships
 
 - **Agents.** `orchestrator`, `architect`, `implementer`, `tester`, `qa`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `reviewer-consolidator`, `security`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `translator`, `gcp-cost-analyzer`, `init`, `agent-builder`. Full roster + model + effort matrix in [`agents/README.md`](../agents/README.md).
-- **Skills** (slash commands). Most route into the orchestrator; standalone utilities include `/lint`, `/status`, `/memory`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through the orchestrator.
+- **Skills** (slash commands). Most route into the orchestrator; standalone utilities include `/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through the orchestrator.
 - **Hooks.** `hooks/policy-block.sh` is the `PreToolUse` policy gate — it intercepts every `Bash`, `Write`, `Edit`, and `NotebookEdit` tool call and denies destructive operations before they execute (48 tested cases: `rm -rf`, force-push, secret-file writes, SQL DROP/TRUNCATE, sensitive-path writes). Notification scripts per OS are optional opt-in. See [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
 

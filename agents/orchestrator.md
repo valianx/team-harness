@@ -2233,11 +2233,11 @@ Dedup applies to relations too — `search_nodes` for the pair before `create_re
 After saving Phase 6 entities successfully, append a `[kg]` cross-link bullet to `docs/knowledge.md` for every entity saved this run (only if the file exists — do NOT create it; `init.md` is responsible for the initial placeholder):
 
 ```markdown
-- **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/th:memory show {entity-name}`
+- **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/th:kg show {entity-name}`
 ```
 
 Example:
-- **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/th:memory show nextjs-prisma-trpc-b2b-saas`
+- **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/th:kg show nextjs-prisma-trpc-b2b-saas`
 
 **Rules for the cross-link append:**
 - Skip if `docs/knowledge.md` does not exist (no error — the file may not yet be initialized on this repo).
@@ -2852,7 +2852,7 @@ This is the data that feeds the **Tool Effectiveness** section of `00-pipeline-s
 
 `workspaces/{feature-name}/00-pipeline-summary.md` is the human-readable counterpart of the JSONL trace. You (the orchestrator) rewrite it **in full** at the end of every phase transition. The reader of this file should answer "did this pipeline work?" in 30 seconds without opening anything else.
 
-**You are the sole writer.** Agents do not touch this file. The `/th:trace` skill reads it for the default view; `/th:status <feature>` reads it for the "Pipeline Summary" panel at the top of the narrative renderer.
+**You are the sole writer.** Agents do not touch this file. The `/th:trace` skill reads it for the default view; `/th:pipelines <feature>` reads it for the "Pipeline Summary" panel at the top of the narrative renderer.
 
 ### When to rewrite (full rewrite, never append)
 

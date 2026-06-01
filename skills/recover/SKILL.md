@@ -31,7 +31,7 @@ The events file is `00-execution-events.md` (obsidian mode) or `00-execution-eve
 ## Mode 1 — Feature name provided (`/th:recover my-feature`)
 
 1. Check that `{resolved-path}/{feature}/00-state.md` exists
-2. If not found, tell the user: "No pipeline state found for '{feature}'. Use `/th:status` to see active pipelines."
+2. If not found, tell the user: "No pipeline state found for '{feature}'. Use `/th:pipelines` to see active pipelines."
 3. Read `workspaces/{feature}/00-state.md` in full
 4. Read `workspaces/{feature}/00-execution-events.{md,jsonl}` if it exists (for timing context — resolve filename from `logs_mode` in `00-state.md § Current State`)
 5. Validate the state:

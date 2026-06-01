@@ -124,7 +124,7 @@ fi
 When `has_policy=false`, emit one line to the operator:
 ```
 Review policy: not found (using general review judgement).
-Scaffold with: /th:init --scaffold-review-policy
+Scaffold with: /th:bootstrap --scaffold-review-policy
 ```
 
 ### Step 1.6 — Behavioral Verification (best-effort, worktree)

@@ -118,18 +118,18 @@ Q-1 through Q-6 cover Part 1 (gh-fallback core). Q-7 through Q-10 cover §9.5 (R
 
 ---
 
-## Q-9 — `/init` scaffold UX for review-policy
+## Q-9 — `/th:bootstrap` scaffold UX for review-policy
 
-**Question:** How should `/init` expose the review-policy scaffold — as a separate `--scaffold-review-policy` flag, as an interactive prompt during normal `/init`, or implicitly when `.team-harness/` is missing?
+**Question:** How should `/th:bootstrap` expose the review-policy scaffold — as a separate `--scaffold-review-policy` flag, as an interactive prompt during normal `/th:bootstrap`, or implicitly when `.team-harness/` is missing?
 
 **Options considered:**
 - (a) Separate `--scaffold-review-policy` flag — explicit, discoverable. Companion to `--scaffold-rereview-workflow`. [DEFAULT]
-- (b) Interactive prompt during normal `/init` — surfaces to all users but adds ceremony.
+- (b) Interactive prompt during normal `/th:bootstrap` — surfaces to all users but adds ceremony.
 - (c) Implicit when `.team-harness/` is missing — automatic but surprising on first run.
 
 **Decision:** (a) was selected — separate `--scaffold-review-policy` flag.
 
-**Rationale:** Matches the pattern established by `--scaffold-rereview-workflow`. Operators who want the scaffold ask for it explicitly; those who do not need it are unaffected. Discovery is via `/init --help` and `docs/`.
+**Rationale:** Matches the pattern established by `--scaffold-rereview-workflow`. Operators who want the scaffold ask for it explicitly; those who do not need it are unaffected. Discovery is via `/th:bootstrap --help` and `docs/`.
 
 ---
 
@@ -191,7 +191,7 @@ Q-1 through Q-6 cover Part 1 (gh-fallback core). Q-7 through Q-10 cover §9.5 (R
 
 ## Q-14 — Private-repo Actions billing surfaced at scaffold time
 
-**Question:** Should `/init --scaffold-rereview-workflow` warn about Actions-minute consumption on private repos?
+**Question:** Should `/th:bootstrap --scaffold-rereview-workflow` warn about Actions-minute consumption on private repos?
 
 **Options considered:**
 - (a) Yes — mention the billing note in the scaffold prompt (typically <1 minute per sync). [DEFAULT]

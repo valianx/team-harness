@@ -267,11 +267,11 @@ Append knowledge to `docs/knowledge.md`. One file, flat bullets, no rigid struct
 **Cross-link to KG.** If the orchestrator's Phase 6 saved KG entities for this feature (the orchestrator passes the list of saved entity names in its handoff), append a `[kg]` bullet for each entity so a reader of `docs/knowledge.md` knows where the deeper context lives:
 
 ```markdown
-- **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/th:memory show {entity-name}`
+- **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/th:kg show {entity-name}`
 ```
 
 Example:
-- **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/th:memory show nextjs-prisma-trpc-b2b-saas`
+- **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/th:kg show nextjs-prisma-trpc-b2b-saas`
 
 **Rules for the `[kg]` bullets:**
 - Only add bullets for entities the orchestrator confirms were saved this run (from its Phase 6 entity list) — do NOT guess.

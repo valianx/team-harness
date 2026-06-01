@@ -24,8 +24,8 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 
 ## Routing
 
-- **Routes to orchestrator** (default for pipeline work): `/th:issue`, `/th:plan`, `/th:design`, `/th:research`, `/th:spike`, `/th:test`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:init`, `/th:recover`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`.
-- **Standalone** (no orchestrator involvement): `/th:lint`, `/th:status`, `/th:memory`, `/th:tmux`, `/th:background`, `/th:update`.
+- **Routes to orchestrator** (default for pipeline work): `/th:issue`, `/th:plan`, `/th:design`, `/th:research`, `/th:spike`, `/th:test`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:recover`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`.
+- **Standalone** (no orchestrator involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`.
 - **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
 
 ## Adding a skill

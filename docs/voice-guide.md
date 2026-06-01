@@ -56,7 +56,7 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] No enthusiasm markers, no emoji decoration of routine status messages.
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
-- [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, workspace doc templates). Exception: `/status` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
+- [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, workspace doc templates). Exception: `/th:pipelines` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
 - [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `04-security.md` / `04-internal-review.md` / `05-internal-review.md` outputs; `agents/orchestrator.md` Step 6 routing table.
 - [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 

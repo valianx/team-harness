@@ -827,7 +827,7 @@ The orchestrator appends observability events to `00-execution-events` at each p
 | Phase 3 — Review | `phase.start` (phase: "3-review") / `phase.end` (phase: "3-review") | On enter / on qa return |
 | DOC-GATE | `gate` (gate: "DOC-GATE", decision: "approve\|revise") | On operator decision |
 
-**KG capture stance:** The documentation flow does NOT perform KG capture. It has no Phase 6. The operator-facing pages are the primary output; no `process-insight` node is written to the Knowledge Graph. If a reusable pattern is discovered during research, the operator may write it manually via `/th:memory`.
+**KG capture stance:** The documentation flow does NOT perform KG capture. It has no Phase 6. The operator-facing pages are the primary output; no `process-insight` node is written to the Knowledge Graph. If a reusable pattern is discovered during research, the operator may write it manually via `/th:kg`.
 
 ### Direct mode (for other agents)
 

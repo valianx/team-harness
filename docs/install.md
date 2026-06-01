@@ -95,10 +95,10 @@ go run ./cmd/install
 
 ## Optional scaffolds (post-install)
 
-After installing, two optional scaffolds are available via `/init`:
+After installing, two optional scaffolds are available via `/th:bootstrap`:
 
-- `/init --scaffold-rereview-workflow` — adds `.github/workflows/team-harness-rereview.yml` to the consumer repo. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review, nudging the operator to re-run `/review-pr`. On private repos, each run consumes ~1 GitHub Actions minute.
-- `/init --scaffold-review-policy` — adds `.team-harness/review-policy.md` with a starter review policy template. The `reviewer` agent reads this file when present and enforces the declared rules.
+- `/th:bootstrap --scaffold-rereview-workflow` — adds `.github/workflows/team-harness-rereview.yml` to the consumer repo. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review, nudging the operator to re-run `/review-pr`. On private repos, each run consumes ~1 GitHub Actions minute.
+- `/th:bootstrap --scaffold-review-policy` — adds `.team-harness/review-policy.md` with a starter review policy template. The `reviewer` agent reads this file when present and enforces the declared rules.
 
 ## Invoking the bug-fix and feature pipelines
 
@@ -118,7 +118,7 @@ The canonical entry point after install is the `orchestrator` agent. Type `@th:o
 | `/design <feature>` | Routes to design direct mode |
 | `/deliver` | Routes to delivery direct mode |
 | `/recover <feature>` | Resumes an interrupted pipeline |
-| `/status` | Shows current pipeline state |
+| `/th:pipelines` | Shows current pipeline state |
 
 **Anti-pattern — do NOT invoke `@th:orchestrator` from inside another agent's active context.** When another agent is already running, the Claude Code harness strips the `Task` tool as an anti-recursion safety. The orchestrator cannot dispatch specialist agents from that context.
 

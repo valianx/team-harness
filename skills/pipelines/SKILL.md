@@ -1,5 +1,5 @@
 ---
-name: status
+name: pipelines
 description: Show current state of all pipelines in workspaces.
 ---
 
@@ -105,7 +105,7 @@ Highlight:
 
 The `Status` column in the no-args table uses a 7-value enum derived by cross-referencing `phase`, `status`, and `autonomous` fields from `00-state.md`. This lets users distinguish "waiting at a human gate" from "actively iterating" from "autonomous-running" at a glance.
 
-| `/th:status` shows | Derived from `00-state.md` |
+| `/th:pipelines` shows | Derived from `00-state.md` |
 |---|---|
 | `waiting_gate_1` | `status: waiting` AND `phase: 1.6` (STAGE-GATE-1 emitted, no release yet) |
 | `waiting_gate_2` | `status: waiting` AND `phase: 3.6` AND `autonomous: false` (STAGE-GATE-2 between rounds) |
@@ -341,4 +341,4 @@ Round R2 (1 PR, started 14:21:49, closed 14:31:02):
 
 ## Narration Exemption
 
-This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:status` specifically to see pipeline internals — surfacing phase numbers, stage names, and pipeline mechanics is the explicit purpose of this skill. The narration lint (`tests/test_agent_structure.py` Suite 31) does not scan this file.
+This skill is **exempt** from the output-discipline silence rules. The operator invoked `/th:pipelines` specifically to see pipeline internals — surfacing phase numbers, stage names, and pipeline mechanics is the explicit purpose of this skill. The narration lint (`tests/test_agent_structure.py` Suite 31) does not scan this file.
