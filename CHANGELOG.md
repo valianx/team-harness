@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.45.0] - 2026-06-02
+
+### Added
+
+- `docs/patch-mode.md`: full patch-mode contract (blast-radius classification, BOUNDED-PATCH producer contract, selective verifier re-run matrix, mandatory coherence gate, stateless-dispatch honesty limit, post-compaction recoverability, Phase C precedent).
+- Suite 50 (`patch-mode-iteration-contract`, 8 structural checks) in `tests/test_agent_structure.py`: asserts Blast radius in the 3 verifier templates, qa-plan.md exclusion, mandatory coherence gate, and `structural → Never narrow` invariant. Uses `_window_around` anti-false-green helper.
+
+### Changed
+
+- Patch mode + selective verifier re-run (Phase D): verifiers declare `**Blast radius:** localized {IDs} | structural` in `failure-brief.md`; orchestrator applies BOUNDED-PATCH to producers and re-runs only the affected verifier domain; mandatory coherence gate after every localized patch; `extra.blast_radius` added to `iteration.start` JSONL schema; full contract in `docs/patch-mode.md`.
+
 ## [2.44.0] - 2026-06-02
 
 ### Added
