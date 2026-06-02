@@ -503,6 +503,9 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - survey_iteration_autonomy: {true | false | null}    # true = autonomous; false = manual pause after each verify round
 - survey_scope_hint: {<free text> | null}             # captured in E1; consumed by architect in E2; never written to KG
 - survey_source: {asked | confirmed | inferred | null}  # asked = full form; confirmed = 1-screen; inferred = derived from literal marker
+- spec_seed_present: {true|false}                      # true when 00-spec-seed.md was written during Discover; false = no seed provided
+- spec_seed_dissents: {true|false}                     # true when architect declared spec_seed_dissent:true in Phase 1 status block; false otherwise
+- approach_checkpoint: {auto-confirmed|confirmed|adjusted|null}  # null before Phase 1; auto-confirmed=approach_freedom:low; confirmed/adjusted=operator participated
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -523,6 +526,16 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - [ ] STAGE-GATE-3 — Human approves push (mandatory stop)
 - [ ] 5 — GitHub Update
 - [ ] 6 — KG Save
+
+### Phase Checklist — approach checkpoint (always present in Design Mode)
+
+The `1.0-approach-check` item is added to every Phase Checklist when `mode: design` (i.e., `type: feature | refactor | enhancement`). It is **non-blocking** — it is always resolved before Phase 1.5 begins, either auto-confirmed or confirmed by operator.
+
+**Sub-phase identity note:** `1.0` marks identity for observability — it is NOT a distinct execution slot between Phase 0b and Phase 1. The approach checkpoint runs INSIDE Phase 1 Design (after the architect's initial codebase read, before writing the Work Plan). The orchestrator appends this line to the Phase Checklist when architect status block is received.
+
+**Observability:** emits `phase.start` / `phase.end` events with `phase: "1.0-approach-check"` and `status: "auto-confirmed" | "confirmed" | "adjusted"`.
+
+- [ ] 1.0-approach-check — approach checkpoint (inside Phase 1; auto-confirmed when approach_freedom:low; one STOP when high) [~auto-confirmed: approach_freedom:low]
 
 ### Phase Checklist — frontend_scope additions
 
@@ -553,6 +566,7 @@ If reading this after context compaction:
 2. Read `{events_file}` for timing (or use `/th:trace {feature}`)
 3. {exactly what to do next}
 4. **Discover / survey fields:** `discover_state` and `advance_signal` indicate whether Discover is still open and what signal (if any) closed it. The `survey_*` fields hold the operator's meta-decisions — use them to skip re-asking on resume. `survey_source: inferred` means a field was derived from an operator literal marker, not asked anew. If `discover_state: open`, Discover is still in progress — do not dispatch the architect until an advance signal is received.
+5. **Spec seed / approach checkpoint fields:** `spec_seed_present` indicates whether `00-spec-seed.md` exists at `docs_root`; `spec_seed_dissents` indicates whether the architect dissented. `approach_checkpoint: null` means Phase 1 has not yet reached the approach gate; `auto-confirmed` means no STOP was needed; `confirmed`/`adjusted` means the operator participated.
 
 **Recover safety contract (mandatory — applies on every resume, including via `/th:recover`):**
 - **Re-emit any un-cleared STAGE-GATE.** Before resuming any pipeline work, determine whether the current or next step is a STAGE-GATE. A STAGE-GATE is cleared ONLY when a `stage.gate.release` event appears in `{events_file}` AND the corresponding flag is set in `00-state.md § Current State`. Do not infer gate-cleared status from prose — never infer approval from `next_action`, Hot Context, or any other prose field. The structural signal (00-state.md + events trace) is the only valid source. If the structural signal does not confirm the gate was released, re-emit the STOP block and halt. STAGE-GATE-3 (the human push/PR gate) must never be bypassed on recovery.
@@ -798,6 +812,18 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      Record answers in `00-state.md § Current State` fields `survey_pipeline_shape`, `survey_effort`, `survey_iteration_autonomy`, `survey_scope_hint`, `survey_source`. Full field definitions: `docs/discover-phase.md §7`.
 
      **INVARIANT — the survey NEVER writes `security_sensitive`.** That field is written ONLY by step 7 path-pattern auto-escalation (below, `:868`). The path-pattern auto-escalation is input-independent of all survey answers — its result depends solely on file paths, never on `survey_pipeline_shape` or `survey_effort`. Proceed to step 7 immediately after survey capture.
+
+     **Step 6f — Spec seed offer (immediately after survey capture, before step 7).**
+
+     Offer the operator a chance to seed the spec. This is optional — a developer with no view on the approach leaves all fields blank and the architect fills them in. Use the operator's language (`operator_language` from `00-state.md`); see the bilingual offer template and full format spec in `docs/spec-coauthoring.md §2.1`.
+
+     The offer presents 4 optional prompts: Intent (why), Approach (how, if known), Decomposition (into what parts), Gotchas (what bites). Operator may answer any subset or say "skip" to bypass.
+
+     - **Operator provides any content:** write `{docs_root}/00-spec-seed.md` (format: `docs/spec-coauthoring.md §2.2`). Set `spec_seed_present: true`, `spec_seed_dissents: false` in `00-state.md`.
+     - **Operator says "skip" or equivalent:** do NOT create the file. Set `spec_seed_present: false`, `spec_seed_dissents: false` in `00-state.md`.
+     - **Skip condition:** if the operator already provided a complete spec with AC in the original message, skip the offer and set `spec_seed_present: false`.
+
+     **INVARIANT — spec seed NEVER writes `security_sensitive`, never marks a Phase Checklist item skipped.** Full E2 invariants: `docs/spec-coauthoring.md §2.4`.
 
    - **Unclear** → **ask a clarifying question.** Do NOT guess. Example: "Is the goal to translate the app (translate mode) or to implement a translation feature (full pipeline)?"
 
@@ -1078,6 +1104,8 @@ Collect the following as an in-memory payload to pass verbatim in the architect'
 - **Codebase context:** files, patterns, dependencies discovered in Step 1
 - **Clarifications resolved:** questions and answers from Step 3 (if any)
 - **Bug report (type: fix / hotfix only):** Reported behaviour / Expected behaviour / Reproduction steps / Environment
+- **Spec seed:** `"00-spec-seed.md present — read it as your primary prior before codebase exploration"` (when `spec_seed_present: true`); `"no spec seed — standard mode"` (when `spec_seed_present: false`)
+- **Scope hint:** the `survey_scope_hint` value from `00-state.md` (or `null`; replaces broad file-scope exploration when non-null)
 
 The architect uses this payload to write `01-plan.md` § Review Summary (the formalized spec) AND § Architecture AND § Task List — making `01-plan.md` the single source of truth from Stage 1 onward.
 
@@ -1135,6 +1163,8 @@ If any check fails (except ambiguities), fix it in-place in the payload. This is
 - **`bug_tier: {N}`** — passed verbatim from `00-state.md` so the architect knows the depth contract
 - **For `bug_tier: 4`:** "Mandatory `## Prior Art` section in `01-root-cause.md`. Invoke `mcp__memory__search_nodes` with 1-3 semantic queries derived from the bug's failure mode (e.g., `"auth bypass middleware"`, `"token leak logger"`). List relevant prior `process-insight` nodes with one-line summaries. If no relevant prior art is found, write `## Prior Art\nNo prior art found in the knowledge graph for this failure mode.` — the empty section is still mandatory because its presence signals the agent looked. Skip rule: never. Tier 4 always queries memory."
 - **Spec feedback instruction:** "If you discover a technical constraint that invalidates or modifies an AC, annotate `01-plan.md` § Review Summary with `[CONSTRAINT-DISCOVERED: description]` next to the affected AC. Continue working — the orchestrator will reconcile before verification."
+- **Spec seed consumption (when `spec_seed_present: true`):** "Read `00-spec-seed.md` FIRST, before codebase exploration. Consume it as a **strong prior** — start from the developer's intent/approach/decomposition/gotchas rather than exploring from scratch. The `scope_hint` replaces broad file-scope discovery. After completing the design, append an `architect-rigorization` section to `00-spec-seed.md` documenting what you expanded, corrected, or overrode. The seed is a **prior, not a mandate** — evaluate alternatives the seed did not consider, and dissent explicitly when the seeded approach is deficient (see Spec Feedback Protocol in `agents/architect.md`)."
+- **Approach checkpoint (always, `mode: design`):** "At the start of your design pass (before writing the Work Plan), emit `### Proposed Approach` (≤1 paragraph describing the chosen approach and any material alternatives). Declare in your status block: `approach_freedom: high` when there are multiple materially different approaches the operator should choose between; `approach_freedom: low` when there is one clear approach (no meaningful alternatives). When `high`, also declare `approach_alternatives: [alt1, alt2]` in the status block."
 - **For `type: fix`:** "If you determine the reported bug is actually a missing feature (the system never promised the behaviour the user expected), set `type_reclassify: true` in your status block with a one-line rationale. Do NOT auto-route; the orchestrator surfaces the recommendation to the operator for the decision."
 - **For `type: fix` (any tier 2-4):** "If during root-cause analysis you discover the scope is wider than the initial tier classification suggests (e.g., the bug touches a security-sensitive path or a Tier 4 keyword surfaces in the failure mechanism), set `tier_promote: <new_tier>` and `tier_promote_rationale: <1-line>` in your status block. Do NOT auto-route; the orchestrator surfaces the recommendation to the operator for the decision before continuing."
 
@@ -1145,7 +1175,17 @@ If any check fails (except ambiguities), fix it in-place in the payload. This is
 4. Waits for the operator's decision. Records the decision and the source (`bug_tier_source: architect-promote` on accept) in `00-state.md` Hot Context.
 5. Same operator-in-loop protocol as `type_reclassify`. Does NOT auto-route.
 
-**Gate (status-block):** The architect returns a compact status block. If `status: success` → update `00-state.md`, add architect result to Agent Results table, extract any hot context insights from summary, proceed to Phase 1.5. If `status: failed` or `status: blocked` → read `01-plan.md` (or `01-root-cause.md` for `type: fix`) to understand the issue and decide how to proceed.
+**Gate (status-block):** The architect returns a compact status block. Read `approach_freedom` and `spec_seed_dissent` first, then proceed:
+
+1. **Approach checkpoint (Variant B — always runs for `mode: design`):**
+   - Append to Phase Checklist: `- [ ] 1.0-approach-check — approach checkpoint`
+   - Emit `phase.start` with `phase: "1.0-approach-check"`.
+   - **If `approach_freedom: low`:** mark `[~auto-confirmed: approach_freedom:low]`; emit `phase.end` with `status: "auto-confirmed"`; set `approach_checkpoint: auto-confirmed` in `00-state.md`. Continue to Phase 1.5.
+   - **If `approach_freedom: high`:** emit a lightweight STOP showing the architect's `### Proposed Approach` from `01-plan.md` and list `approach_alternatives`. Ask the operator to confirm or choose a direction. On confirm → mark `[~confirmed]`; set `approach_checkpoint: confirmed`; emit `phase.end`; continue to Phase 1.5. On direction-change → mark `[~adjusted]`; set `approach_checkpoint: adjusted`; re-dispatch architect with the operator's direction (counts against Phase 1 max-3 budget); after re-dispatch returns success, re-read `approach_freedom` and repeat this gate.
+
+2. **Spec seed dissent:** If the architect's status block contains `spec_seed_dissent: true`, set `spec_seed_dissents: true` in `00-state.md`. If `spec_seed_dissent: false` or the field is absent, set `spec_seed_dissents: false`.
+
+3. **Continue/fail:** If `status: success` (and approach checkpoint resolved) → update `00-state.md`, add architect result to Agent Results table, extract hot context insights from summary, proceed to Phase 1.5. If `status: failed` or `status: blocked` → read `01-plan.md` (or `01-root-cause.md` for `type: fix`) to understand the issue and decide how to proceed.
 
 **Type-reclassify handling (`type: fix` only).** If the architect's status block contains `type_reclassify: true` (the bug is actually a feature gap), the orchestrator:
 1. Halts the bug-fix pipeline (no Phase 1.5, no Phase 1.6, no STAGE-GATE-1).
