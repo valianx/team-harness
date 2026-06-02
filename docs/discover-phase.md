@@ -175,3 +175,40 @@ The delivery agent includes a conditional `Intake survey:` line in the PR body (
 This line appears in the `## Main change` section, immediately below the one-sentence main-change description. It is conditional: omit entirely when `survey_source: null` (Discover was bypassed before the survey ran).
 
 **Prohibition:** the `Intake survey:` line MUST NOT include `security_sensitive`, any gate status flag, or any field not in the enumeration above. No line in the PR may be read as attributing a security decision to the operator.
+
+---
+
+## 10. Spec co-authoring — `00-spec-seed.md` (Phase E2)
+
+After the intake survey and before dispatching the architect, the orchestrator offers the operator an opportunity to seed the spec. Full contract: `docs/spec-coauthoring.md`.
+
+### 10.1 Seeding offer
+
+After recording survey answers in `00-state.md`, the orchestrator asks:
+
+```
+Antes de arrancar el diseño, ¿querés sembrar el spec? (opcional)
+Respondé cualquiera de estas preguntas — lo que tengas; dejá en blanco lo que no:
+
+1. Intención: ¿Por qué lo estás pidiendo?
+2. Enfoque: ¿Cómo lo harías? (si tenés una idea)
+3. Descomposición: ¿En qué partes lo dividirías?
+4. Gotchas: ¿Qué sabés que muerde?
+
+O decí "skip" para arrancar directo.
+```
+
+### 10.2 Artefact: `00-spec-seed.md`
+
+When the operator provides any response (other than "skip"), the orchestrator writes `{docs_root}/00-spec-seed.md` with the four sections above marked `**Source:** dev-seed`. Sets `spec_seed_present: true` in `00-state.md`.
+
+When the operator skips: no file is created; `spec_seed_present: false`. The architect runs in standard mode.
+
+The `survey_scope_hint` captured in §5 above is passed to the architect regardless — it is the fifth, lightest seed (file-scope hint, already in `00-state.md`; no re-ask needed).
+
+### 10.3 Hard invariants
+
+- **HI-E2-1 — Prior, not order.** The seed is a strong prior for the architect, not a mandate. The architect evaluates alternatives the seed did not consider and dissents when the seeded approach is deficient.
+- **HI-E2-2 — No security fields from seed.** `security_sensitive` and all gate-status fields remain input-independent of seed content. HI-2 (§6) applies unchanged.
+- **HI-E2-3 — No gate skipped.** `spec_seed_present: true` never marks any Phase Checklist item as skipped. Specify (Phase 0b), Design (Phase 1), ratify-plan (1.5), and plan-review (1.6) all run in full.
+- **HI-E2-4 — Recoverable.** `spec_seed_present` and `spec_seed_dissents` are plain-text key:value fields in `00-state.md § Current State`; `00-spec-seed.md` is human-readable prose. Both survive context compaction without re-interrogating the manifest.
