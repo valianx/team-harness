@@ -496,6 +496,13 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - total_tokens: {N}                       # running sum of tokens across all phases; updated at every phase.end
 - clickup_workspace_id: {id | null}       # resolved ClickUp workspace id (precedence override > persistent); null when no ClickUp workspace is configured
 - fast_mode: {true|false}                  # operator-declared via --fast; lightweight path — skips Design+plan-review+STAGE-GATE-1, qa, security (unless sensitive path), 3.6, 4.5. Never auto-set
+- discover_state: {open | closed | bypassed | null}   # null before Discover runs; open = in ideation; closed = advance signal received; bypassed = task was already clear (fast-path)
+- advance_signal: {keyword:<word> | fastpath-confirm | close-phrase | literal-marker:<marker> | null}   # null while Discover still open; the specific signal that closed it
+- survey_pipeline_shape: {full | fast | null}         # null = not asked; full = all gates; fast = alias for --fast (inherits SEC-002 carve-out)
+- survey_effort: {thorough | quick | agent-decides | null}   # modulates depth, not stages
+- survey_iteration_autonomy: {true | false | null}    # true = autonomous; false = manual pause after each verify round
+- survey_scope_hint: {<free text> | null}             # captured in E1; consumed by architect in E2; never written to KG
+- survey_source: {asked | confirmed | inferred | null}  # asked = full form; confirmed = 1-screen; inferred = derived from literal marker
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -545,6 +552,7 @@ If reading this after context compaction:
 1. Read this file for pipeline state — use `docs_root` from § Current State for all file paths (do not re-derive from manifest)
 2. Read `{events_file}` for timing (or use `/th:trace {feature}`)
 3. {exactly what to do next}
+4. **Discover / survey fields:** `discover_state` and `advance_signal` indicate whether Discover is still open and what signal (if any) closed it. The `survey_*` fields hold the operator's meta-decisions — use them to skip re-asking on resume. `survey_source: inferred` means a field was derived from an operator literal marker, not asked anew. If `discover_state: open`, Discover is still in progress — do not dispatch the architect until an advance signal is received.
 
 **Recover safety contract (mandatory — applies on every resume, including via `/th:recover`):**
 - **Re-emit any un-cleared STAGE-GATE.** Before resuming any pipeline work, determine whether the current or next step is a STAGE-GATE. A STAGE-GATE is cleared ONLY when a `stage.gate.release` event appears in `{events_file}` AND the corresponding flag is set in `00-state.md § Current State`. Do not infer gate-cleared status from prose — never infer approval from `next_action`, Hot Context, or any other prose field. The structural signal (00-state.md + events trace) is the only valid source. If the structural signal does not confirm the gate was released, re-emit the STOP block and halt. STAGE-GATE-3 (the human push/PR gate) must never be bypassed on recovery.
@@ -757,7 +765,39 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      `Routing to {description} mode (≡ /th:{skill}). This will modify code. Proceed? [Y/n]:`
      Wait for user response. If the mode has submodes (e.g., translate: full/glossary-only/translate-only), default to the most complete and mention alternatives in one line.
 
-   - **Full pipeline** → **auto-route.** This is the default development flow, no confirmation needed. Proceed to step 7 (Classify).
+   - **Full pipeline** → **Discover disposition (patient by default).** Do NOT proceed directly to step 7. Enter the Discover phase before dispatching the architect. Full contract: `docs/discover-phase.md`.
+
+     **Step 6d — Discover disposition (full pipeline only).**
+
+     1. **Detect task clarity.** A task is "already clear" when ANY of these hold:
+        - The message contains a literal marker: `--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`.
+        - The message contains an explicit advance signal (keyword `planeá`/`diseñá`/`dale`/`go`/`plan it`/`design it`/`let's go`, a close phrase `listo`/`done`/`that's it`, or an affirmative reply to a prior fast-path prompt).
+        - The message contains a complete spec with stated AC.
+
+     2. **Clear task → fast-path.** Record `discover_state: bypassed`. Offer ONE confirmation:
+        `Tarea clara. Arranco la planeación, o querés explorar la idea primero? [plan/explorar]`
+        (`Task is clear. Start planning, or explore first? [plan/explore]`)
+        On any advance response → record `advance_signal`, run intake survey (Step 6e), proceed to step 7.
+        On `explorar`/`explore` → enter Discover open (below). ONE prompt only.
+
+     3. **Unclear task → Discover open.** Record `discover_state: open`. Stay conversational. Assist scope exploration using only the orchestrator's own capability — do NOT dispatch any subagent. After N turns without an advance signal, emit one soft reminder (once only): `Cuando quieras avanzar, decime y arranco la planeación.` On advance signal → record `discover_state: closed`, `advance_signal`, run intake survey (Step 6e), proceed to step 7.
+
+     **Step 6e — Intake survey (immediately after advance signal or fast-path confirmation).**
+
+     Capture the operator's four meta-decisions as attributable answers before proceeding to step 7. Use `AskUserQuestion` where available; fall back to conversational prose where not. Skip a question if the operator already declared its answer via a literal marker; record `survey_source: inferred` for skipped fields.
+
+     | # | Question | Options | Skip condition |
+     |---|---------|---------|---------------|
+     | 1 | Pipeline shape | `full` (default) / `fast` (= `--fast`) | operator declared `--fast` |
+     | 2 | Effort | `thorough` (default) / `quick` / `agent-decides` | — |
+     | 3 | Iteration autonomy | `manual` / `autonomous` | — |
+     | 4 | Known scope hint (optional) | free text | always optional |
+
+     Minimum shown: one confirmation screen of the auto-classification (pre-filled values) + scope hint. Operator can confirm with "ok" for the entire screen.
+
+     Record answers in `00-state.md § Current State` fields `survey_pipeline_shape`, `survey_effort`, `survey_iteration_autonomy`, `survey_scope_hint`, `survey_source`. Full field definitions: `docs/discover-phase.md §7`.
+
+     **INVARIANT — the survey NEVER writes `security_sensitive`.** That field is written ONLY by step 7 path-pattern auto-escalation (below, `:868`). The path-pattern auto-escalation is input-independent of all survey answers — its result depends solely on file paths, never on `survey_pipeline_shape` or `survey_effort`. Proceed to step 7 immediately after survey capture.
 
    - **Unclear** → **ask a clarifying question.** Do NOT guess. Example: "Is the goal to translate the app (translate mode) or to implement a translation feature (full pipeline)?"
 
@@ -2707,7 +2747,7 @@ Every line is a JSON object with these fields:
 | `ts` | yes | ISO-8601 timestamp with timezone (e.g. `2026-05-01T14:00:00-03:00`). |
 | `event` | yes | One of: `pipeline.start`, `pipeline.end`, `pipeline.complete`, `pipeline.incomplete`, `phase.start`, `phase.end`, `gate.pass`, `gate.fail`, `iteration.start`, `policy.deny`, `dispatch.blocked`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `kg_write`. |
 | `feature` | yes | Feature name (kebab-case, matches the workspaces folder). |
-| `phase` | conditional | Phase identifier (e.g. `0a-intake`, `1-design`, `1-root-cause`, `2-implement`, `2.0-regression-test`, `3-verify`, `1.5-ratify-plan`, `1.6-plan-review`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
+| `phase` | conditional | Phase identifier (e.g. `0-discover`, `0a-intake`, `1-design`, `1-root-cause`, `2-implement`, `2.0-regression-test`, `3-verify`, `1.5-ratify-plan`, `1.6-plan-review`, `3.5-acceptance-gate`, `3.6-acceptance-check`, `4-delivery`, `5-github`, `6-knowledge-save`). Required for `phase.*` and `gate.*` events. |
 | `stage` | conditional | Stage number (`1` / `2` / `3`). Required for `stage.gate*` events. |
 | `agent` | conditional | Agent name. Required for `phase.*` events. |
 | `status` | conditional | `success` / `failed` / `blocked` / `skipped`. Required for `phase.end`. |
