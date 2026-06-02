@@ -617,6 +617,15 @@ When requirements are ambiguous, make the best architectural decision based on t
 
 ## Phase 2 — Architecture Design
 
+**Approach-first contract (Design Mode only).** Before writing the Work Plan details:
+
+1. Write `### Proposed Approach` in `## Review Summary` of `01-plan.md` (≤1 paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives — one sentence each).
+2. Declare in your status block:
+   - `approach_freedom: low` — there is one clear approach with no material alternatives worth surfacing (the common case). The orchestrator auto-confirms and continues.
+   - `approach_freedom: high` — there are multiple materially different approaches and the operator should choose. Also declare `approach_alternatives: [alt1, alt2]`. The orchestrator emits a lightweight STOP.
+3. **Collapse rule:** When a task has no meaningful architectural choices (e.g., a documentation update, a trivial config change), declare `approach_freedom: low`. The checkpoint is recorded but no STOP is emitted.
+4. **After the approach checkpoint resolves** (orchestrator continues or operator confirms), write the full Work Plan, services-touched, security/performance assessments, and task list.
+
 Adapt your analysis to the project type. For every decision, systematically evaluate:
 
 ### Design Lenses (apply all relevant)
@@ -837,6 +846,10 @@ Identify patterns that span multiple repos:
 
 ## Spec Feedback Protocol
 
+This protocol is **bidirectional**: you communicate discovered constraints BACK to the spec (architect→spec via `[CONSTRAINT-DISCOVERED]`), and you communicate dissent ABOUT the developer's seed FORWARD to the plan (architect→dissent on seed).
+
+### Channel 1 — Technical constraint discovered (architect → spec)
+
 When you discover a technical constraint during design that invalidates or modifies an acceptance criterion:
 
 1. **Annotate the spec** — open `01-plan.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC in the `## Review Summary` section using the Edit tool
@@ -848,6 +861,35 @@ When you discover a technical constraint during design that invalidates or modif
 - AC says "support offset pagination" but data source only supports cursors → annotate: `[CONSTRAINT-DISCOVERED: Data source only supports cursor-based pagination]`
 
 **When NOT to annotate:** If the constraint is minor and you can satisfy the AC with a reasonable interpretation, just implement it and note the decision in your output. Only annotate when the AC is genuinely unachievable or needs meaningful revision.
+
+### Channel 2 — Dissent on developer seed (architect → plan)
+
+**The seed is a strong prior, NOT a mandate.** When `00-spec-seed.md` is present (declared in the dispatch payload as `spec_seed: present`):
+
+1. **Read `00-spec-seed.md` first**, before codebase exploration. Use the developer's intent/approach/decomposition/gotchas as your starting point.
+2. **Evaluate alternatives** the seed did not consider. The prior is strong but not exclusive — your role is rigorous analysis, not execution of the seed.
+3. **Accept or override** independently: the developer seeds from domain knowledge; you add codebase, architectural, and pattern-level rigour. Both directions are legitimate.
+4. **Rigorize the seed** — after completing the design, append an `architect-rigorization` section to `00-spec-seed.md` (format: `docs/spec-coauthoring.md §2.2`) documenting what you expanded, corrected, or overrode.
+
+**When to dissent:** When the seeded approach is deficient — wrong architectural pattern, incorrect decomposition for the codebase constraints, likely to cause a known class of problem (N+1, coupling, security hole). Disagreement on style or minor trade-offs does NOT warrant a dissent.
+
+**How to dissent:**
+
+1. Write `### Architect Dissent on Seed` inside `## Review Summary` of `01-plan.md`:
+
+   ```markdown
+   ### Architect Dissent on Seed
+
+   > {1-2 sentences: what the seed proposed and why it is deficient.}
+   > {The approach actually taken, with rationale.}
+   > {Any open question for the operator if the fork is genuinely ambiguous.}
+   ```
+
+2. Declare `spec_seed_dissent: true` in your status block.
+
+**When NOT to dissent:** If the seeded approach is sound and you are building on it, do NOT write the section. Declare `spec_seed_dissent: false` (or omit the field) in your status block.
+
+**Rationale for placement in `## Review Summary`:** STAGE-GATE-1 copies `## Review Summary` verbatim into the STOP block. The dissent must be where the operator reviews — inline markers in the plan body would be missed at the gate.
 
 ---
 
@@ -900,6 +942,15 @@ If you find yourself with 0 bullets to list, write a single bullet `- No human-j
 - **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
 - ...
 (or "- No human-judgement decisions required — all trade-offs follow established project patterns. → decided")
+
+### Architect Dissent on Seed
+<!-- Mandatory when spec_seed_dissent: true; OMIT entirely when no seed or no dissent -->
+> {1-2 sentences: what the seed proposed and why it is deficient.}
+> {The approach actually taken, with rationale.}
+> {Any open question for the operator if the fork is genuinely ambiguous.}
+
+### Proposed Approach
+{1 paragraph: the chosen approach and, when approach_freedom:high, the material alternatives (one sentence each).}
 
 ### Risks
 | Risk | Severity | Mitigation |
@@ -1013,6 +1064,9 @@ sub_mode: light-root-cause | full-root-cause | null   # set only when mode: root
 status: success | failed | blocked
 output: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
+approach_freedom: high | low   # design mode only: high = material alternatives exist; low = one clear approach; orchestrator gates on this
+approach_alternatives: [alt1, alt2]   # design mode, approach_freedom:high only; omit when low
+spec_seed_dissent: true | false   # design mode only: true when seeded approach was deficient and ### Architect Dissent on Seed was written; false or omit otherwise
 type_reclassify: false | true   # set to true only in root-cause mode when the bug is actually a feature gap; omit the line otherwise
 tier_promote: 2 | 3 | 4 | null   # set only in root-cause mode when the scope is wider than the initial classification; null/omit otherwise
 tier_promote_rationale: {1-line}  # mandatory when tier_promote is non-null; omit otherwise

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.0] - 2026-06-02
+
+### Added
+
+- `docs/spec-coauthoring.md`: full Phase E2 contract — spec co-authoring (`00-spec-seed.md`, 4 optional prompts + `survey_scope_hint`, marks `dev-seed`/`architect-rigorization`), bidirectional dissent (`### Architect Dissent on Seed` in `01-plan.md § Review Summary`), and approach checkpoint (Variant B: architect emits `approach_freedom: high|low` in status block; orchestrator auto-confirms on `low`, emits one lightweight STOP on `high`).
+- Spec co-authoring in `orchestrator.md`: Step 6f (spec-seed offer after intake survey), Phase 0b Step 5 payload now includes `spec_seed` pointer + `scope_hint`, Phase 1 dispatch includes seed-consumption and approach-first instructions, Phase 1 gate reads `approach_freedom` + `spec_seed_dissent` from architect status block.
+- Approach checkpoint (Variant B) in `orchestrator.md`: Phase Checklist `1.0-approach-check` non-blocking item; orchestrator auto-confirms on `approach_freedom: low`; emits lightweight STOP on `high`; `approach_checkpoint: {auto-confirmed|confirmed|adjusted}` field in `00-state.md`.
+- Spec co-authoring §10 in `docs/discover-phase.md`: seeding offer after intake survey, `00-spec-seed.md` artefact format, 4 E2 hard invariants (HI-E2-1..4).
+- Bidirectional Spec Feedback Protocol in `agents/architect.md`: Channel 1 (constraint→spec via `[CONSTRAINT-DISCOVERED]`) + Channel 2 (dissent on seed via `### Architect Dissent on Seed`); `approach_freedom` + `spec_seed_dissent` status-block fields; approach-first contract in Phase 2.
+- Dissent check in `agents/plan-reviewer.md` Rule 6: when `spec_seed_dissents: true`, verifies `### Architect Dissent on Seed` is present; no-op when no seed or no dissent (no false positive).
+- `Spec-seed:` conditional line in `agents/delivery.md` PR body template, below `Intake survey:`; same prohibition as `Intake survey:`.
+- 3 new `00-state.md` fields: `spec_seed_present`, `spec_seed_dissents`, `approach_checkpoint`.
+- `CLAUDE.md §5` pointer folded into the existing Discover bullet (E1+E2 together, `docs/spec-coauthoring.md` pointer, Discover bullet header updated); CLAUDE.md stays at 35,999 bytes (strictly under the 36,000 cap).
+
+### Changed
+
+- `agents/architect.md` `01-plan.md` schema: `### Architect Dissent on Seed` (optional, mandatory when dissenting) and `### Proposed Approach` added to `## Review Summary` template.
+- `agents/orchestrator.md` `00-state.md` template: 3 new fields (`spec_seed_present`, `spec_seed_dissents`, `approach_checkpoint`) and updated Recovery Instructions.
+
 ## [2.46.0] - 2026-06-02
 
 ### Added
