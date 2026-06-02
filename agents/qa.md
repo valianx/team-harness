@@ -471,6 +471,7 @@ kg_save_candidates: [entity-name-1, entity-name-2]
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 regression_test_referenced: true | false | null  # validate mode for type: fix | hotfix only; null when bug_tier: 1 (Phase 2.0 skipped); omit otherwise
 reproduction_steps_validated: true | false      # validate mode for type: fix | hotfix only; omit otherwise
+blast_radius: localized {IDs} | structural       # when status: failed (validate mode only); omit on success
 issues: {list of failed criteria, or "none"}
 ```
 
@@ -493,6 +494,7 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 ```markdown
 ## Iteration {N} — qa — {YYYY-MM-DD HH:MM}
 **Root cause type:** A (implementation) | C (criteria)
+**Blast radius:** localized {AC-3} | structural
 
 ### Failing AC
 - AC-3: Given admin role, When DELETE /users/{id} is called, Then user is soft-deleted — `src/users/users.controller.ts:54` returns 200 but does NOT mark deletedAt
@@ -504,6 +506,8 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 - AC-7: ask user whether window is 1 min or 1 hour
 - ...
 ```
+
+**Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC IDs and a targeted edit resolves it. Declare `structural` when the failure implicates multiple AC, overall design assumptions, or you cannot name the affected elements precisely. Default to `structural` when uncertain.
 
 Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing.
 

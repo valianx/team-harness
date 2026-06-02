@@ -39,6 +39,18 @@ Hard rule: the following patterns **must not appear** in any analysis doc you wr
 
 When the orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-plan.md`) — you do NOT create a sibling file (`01-plan-v2.md`, `01-plan-refined.md`) and you do NOT append a "Round N" suffix.
 
+### BOUNDED-PATCH contract (localized blast radius)
+
+When the orchestrator dispatches you with a `failure-brief.md` that declares `**Blast radius:** localized {IDs}`:
+
+- **Edit only the elements named in `{IDs}`** (specific AC identifiers, Work Plan Step IDs, or named sections). Leave all other content in `01-plan.md` unchanged.
+- **Emit a diff summary** in your status block describing exactly what changed and why.
+- **Do NOT re-derive the architecture.** The design is sound except for the named elements; do not refactor unrelated sections, rename components, or reorder the Work Plan.
+
+When the brief declares `**Blast radius:** structural`, apply the standard full re-design contract (re-derive the affected sections, overwrite in place as normal).
+
+**Honesty invariant:** the bounded patch constrains your OUTPUT reasoning (you do not re-derive the architecture). It does NOT eliminate input re-reads — you still read `01-plan.md` and `failure-brief.md` because dispatch is stateless. The savings are in generation tokens and downstream verifier re-runs, not in zero-read.
+
 If the file you are about to overwrite is already very large (>30 KB or >800 lines), surface this in your status block (`size_warning: 32_456 bytes — consider extracting reference material to 00-research.md`). The size cap is not enforced, but a 200 KB architecture doc is a smell that the analysis is mixing decisions with reference material.
 
 ---

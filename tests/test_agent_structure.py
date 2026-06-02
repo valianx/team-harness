@@ -11631,6 +11631,217 @@ check(
 
 
 # ---------------------------------------------------------------------------
+# Suite 50 — patch-mode-iteration-contract
+#
+# Asserts the Phase D patch-mode contract is locked against regression:
+# (a1-a3) the 3 iteration verifiers have **Blast radius:** in their Failure
+#         Brief template, below **Root cause type:**
+# (b)     agents/qa-plan.md does NOT contain **Blast radius:** (not a verifier)
+# (c1)    orchestrator.md § "If any agent fails" declares coherence gate
+# (c2)    same section declares structural → full re-dispatch fallback
+# (5a)    docs/testing.md registry + this file contain the required markers
+# (5b)    CLAUDE.md §11 does NOT contain "Suite 50" (hygiene contract)
+#
+# All content checks are anchor-scoped via _slice_section (anti-false-green:
+# missing anchor → _slice_section returns "" → token-in-"" is False → FAIL).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 50: patch-mode-iteration-contract ===")
+
+# Anchors for the Failure Brief sections.
+# NOTE: the brief template is wrapped in a ```markdown code fence, and
+# _slice_section stops at the first heading-like line (## Iteration {N} inside
+# the fence).  To get a slice that includes both the template AND the guidance
+# prose that follows, we anchor on the guidance text that sits AFTER the fence
+# — it is unique per file and is outside any code block.
+_S50_TESTER_ANCHOR  = "**Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC or Step IDs"
+_S50_QA_ANCHOR      = "**Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC IDs"
+_S50_SEC_ANCHOR     = "**Blast radius guidance:** declare `localized {IDs}` when the finding is confined"
+# For the verifier template check we need a wider window that includes the code
+# fence content.  We look backwards from the guidance anchor to grab the
+# preceding ```markdown block.  The simplest approach: search for the anchor in
+# the raw file text and scan backwards for **Blast radius:** in the 800 chars
+# before the anchor.
+_S50_ORCH_ANCHOR    = "### If any agent fails → ITERATE"
+
+_s50_tester   = read(AGENTS_DIR / "tester.md")
+_s50_qa       = read(AGENTS_DIR / "qa.md")
+_s50_sec      = read(AGENTS_DIR / "security.md")
+_s50_qa_plan  = read(AGENTS_DIR / "qa-plan.md")
+_s50_orch     = read(AGENTS_DIR / "orchestrator.md")
+_s50_testing  = read(REPO_ROOT / "docs" / "testing.md")
+_s50_self     = read(Path(__file__))
+_s50_claude   = read(REPO_ROOT / "CLAUDE.md")
+
+
+def _window_around(text: str, anchor: str, before: int = 800, after: int = 200) -> str:
+    """Return text[idx-before : idx+after] where idx is the start of anchor.
+    Returns "" when anchor is absent. Used to check content near a known landmark
+    when _slice_section cannot be used (heading inside a code fence stops it early)."""
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    start = max(0, idx - before)
+    end = min(len(text), idx + after)
+    return text[start:end]
+
+
+# For verifier template checks: look in a 800-char window BEFORE the guidance
+# anchor to confirm **Blast radius:** is present in the template block.
+_s50_tester_window = _window_around(_s50_tester, _S50_TESTER_ANCHOR)
+_s50_qa_window     = _window_around(_s50_qa,     _S50_QA_ANCHOR)
+_s50_sec_window    = _window_around(_s50_sec,    _S50_SEC_ANCHOR)
+
+# For orchestrator checks: the iteration section's ```markdown block also has
+# headings inside it, so _slice_section stops too early.  Use _window_around
+# on a unique phrase that appears AFTER the code fence.
+# "Step 2c" anchors the coherence gate sub-section; "Step 2b" anchors the
+# routing matrix.  A window of 1600 chars forward from "Step 2b" covers both
+# the matrix (structural → full re-dispatch) and the coherence gate text.
+_S50_ORCH_MATRIX_ANCHOR  = "**Step 2b — Classify blast radius"
+_S50_ORCH_GATE_ANCHOR    = "**Step 2c — Coherence gate (mandatory"
+_s50_orch_matrix_window  = _window_around(_s50_orch, _S50_ORCH_MATRIX_ANCHOR, before=0, after=1600)
+_s50_orch_gate_window    = _window_around(_s50_orch, _S50_ORCH_GATE_ANCHOR,   before=0, after=800)
+
+# ---- CLAUDE.md §11 slice (hygiene contract) --------------------------------
+_S50_S11_START = "## 11."
+_S50_S12_START = "## 12."
+_s50_s11_idx = _s50_claude.find(_S50_S11_START)
+_s50_s12_idx = (
+    _s50_claude.find(_S50_S12_START, _s50_s11_idx)
+    if _s50_s11_idx != -1
+    else -1
+)
+_s50_claude_s11 = (
+    _s50_claude[_s50_s11_idx:_s50_s12_idx]
+    if _s50_s11_idx != -1 and _s50_s12_idx != -1
+    else (_s50_claude[_s50_s11_idx:] if _s50_s11_idx != -1 else "")
+)
+
+# (a1) tester.md Failure Brief template contains **Blast radius:**
+# Anti-false-green: _window_around returns "" when the guidance anchor is absent
+# (anchor absent → window "" → "**Blast radius:**" in "" is False → FAIL).
+check(
+    "patch-mode(a1): agents/tester.md § Failure Brief template contains"
+    " '**Blast radius:**' (in the ```markdown template block, below '**Root cause type:**')",
+    bool(_s50_tester_window)
+    and "**Blast radius:**" in _s50_tester_window
+    and "**Root cause type:**" in _s50_tester_window,
+    f"guidance anchor missing or '**Blast radius:**' absent from tester.md Failure Brief template window;"
+    f" window present: {bool(_s50_tester_window)};"
+    f" '**Blast radius:**' in window: {'**Blast radius:**' in _s50_tester_window};"
+    f" '**Root cause type:**' in window: {'**Root cause type:**' in _s50_tester_window}"
+    " — add '**Blast radius:** localized {IDs} | structural' below '**Root cause type:**'"
+    " in the ```markdown template block in agents/tester.md § Failure Brief",
+)
+
+# (a2) qa.md Failure Brief template contains **Blast radius:**
+check(
+    "patch-mode(a2): agents/qa.md § Failure Brief template contains"
+    " '**Blast radius:**' (in the ```markdown template block, below '**Root cause type:**')",
+    bool(_s50_qa_window)
+    and "**Blast radius:**" in _s50_qa_window
+    and "**Root cause type:**" in _s50_qa_window,
+    f"guidance anchor missing or '**Blast radius:**' absent from qa.md Failure Brief template window;"
+    f" window present: {bool(_s50_qa_window)};"
+    f" '**Blast radius:**' in window: {'**Blast radius:**' in _s50_qa_window};"
+    f" '**Root cause type:**' in window: {'**Root cause type:**' in _s50_qa_window}"
+    " — add '**Blast radius:** localized {IDs} | structural' below '**Root cause type:**'"
+    " in the ```markdown template block in agents/qa.md § Failure Brief",
+)
+
+# (a3) security.md Failure Brief template contains **Blast radius:**
+check(
+    "patch-mode(a3): agents/security.md § Failure Brief template contains"
+    " '**Blast radius:**' (in the ```markdown template block, below '**Root cause type:**')",
+    bool(_s50_sec_window)
+    and "**Blast radius:**" in _s50_sec_window
+    and "**Root cause type:**" in _s50_sec_window,
+    f"guidance anchor missing or '**Blast radius:**' absent from security.md Failure Brief template window;"
+    f" window present: {bool(_s50_sec_window)};"
+    f" '**Blast radius:**' in window: {'**Blast radius:**' in _s50_sec_window};"
+    f" '**Root cause type:**' in window: {'**Root cause type:**' in _s50_sec_window}"
+    " — add '**Blast radius:** localized {IDs} | structural' below '**Root cause type:**'"
+    " in the ```markdown template block in agents/security.md § Failure Brief",
+)
+
+# (b) qa-plan.md does NOT contain **Blast radius:** (not an iteration verifier)
+check(
+    "patch-mode(b): agents/qa-plan.md does NOT contain '**Blast radius:**'"
+    " (qa-plan is not an iteration verifier — Blast radius belongs only in"
+    " tester/qa/security Failure Brief templates)",
+    "**Blast radius:**" not in _s50_qa_plan,
+    f"'**Blast radius:**' found in qa-plan.md — remove it;"
+    f" qa-plan does plan-review (ratify-plan/define-ac/reconcile), not iteration failure-briefs"
+    " — Blast radius field must appear only in the 3 iteration-verifier brief templates",
+)
+
+# (c1) orchestrator.md § "If any agent fails" declares mandatory coherence gate.
+# Anti-false-green: _window_around returns "" when the anchor is absent
+# (anchor absent → window "" → "Coherence gate" in "" is False → FAIL).
+check(
+    "patch-mode(c1): agents/orchestrator.md § iteration section declares"
+    " mandatory coherence gate post-localized-patch (token: 'Coherence gate')",
+    bool(_s50_orch_gate_window)
+    and "Coherence gate" in _s50_orch_gate_window
+    and "mandatory" in _s50_orch_gate_window,
+    f"gate anchor '{_S50_ORCH_GATE_ANCHOR}' missing from orchestrator.md or required tokens absent;"
+    f" window present: {bool(_s50_orch_gate_window)};"
+    f" 'Coherence gate' in window: {'Coherence gate' in _s50_orch_gate_window};"
+    f" 'mandatory' in window: {'mandatory' in _s50_orch_gate_window}"
+    " — orchestrator.md must declare a mandatory coherence gate after every localized patch"
+    " (patch mode makes iteration cheaper, not gateless)",
+)
+
+# (c2) same section declares structural → full re-dispatch (no silent narrowing).
+# The contract language is: Default to `structural` ... Never narrow a structural
+# change to a localized patch.  Check for "structural" + "Never narrow".
+check(
+    "patch-mode(c2): agents/orchestrator.md § iteration section declares"
+    " 'structural' blast-radius always falls back (token: 'structural' + 'Never narrow')",
+    bool(_s50_orch_matrix_window)
+    and "structural" in _s50_orch_matrix_window
+    and "Never narrow" in _s50_orch_matrix_window,
+    f"matrix anchor '{_S50_ORCH_MATRIX_ANCHOR}' missing from orchestrator.md or tokens absent;"
+    f" window present: {bool(_s50_orch_matrix_window)};"
+    f" 'structural' in window: {'structural' in _s50_orch_matrix_window};"
+    f" 'Never narrow' in window: {'Never narrow' in _s50_orch_matrix_window}"
+    " — orchestrator.md must declare that 'structural' blast-radius always triggers full re-run"
+    " and that narrowing a structural change to localized is forbidden"
+    " (invariant: 'Never narrow a structural change to a localized patch')",
+)
+
+# (5a) docs/testing.md registry + this file contain required markers
+check(
+    "patch-mode(5a): docs/testing.md canonical registry names 'Suite 50'"
+    " and 'patch-mode-iteration-contract';"
+    " this test file contains 'Suite 50', '_slice_section', 'patch-mode-iteration-contract'",
+    "Suite 50" in _s50_testing
+    and "patch-mode-iteration-contract" in _s50_testing
+    and "Suite 50" in _s50_self
+    and "_slice_section" in _s50_self
+    and "patch-mode-iteration-contract" in _s50_self,
+    f"'Suite 50' in docs/testing.md: {'Suite 50' in _s50_testing};"
+    f" 'patch-mode-iteration-contract' in docs/testing.md: {'patch-mode-iteration-contract' in _s50_testing};"
+    f" 'Suite 50' in this file: {'Suite 50' in _s50_self};"
+    f" '_slice_section' in this file: {'_slice_section' in _s50_self};"
+    f" 'patch-mode-iteration-contract' in this file: {'patch-mode-iteration-contract' in _s50_self}"
+    " — register Suite 50 in docs/testing.md (not CLAUDE.md §11)",
+)
+
+# (5b) CLAUDE.md §11 does NOT contain "Suite 50" (hygiene contract)
+check(
+    "patch-mode(5b): CLAUDE.md §11 does NOT contain 'Suite 50'"
+    " (hygiene contract — per-suite inventory belongs in docs/testing.md, not §11)",
+    "Suite 50" not in _s50_claude_s11,
+    f"CLAUDE.md §11 contains literal 'Suite 50' — hygiene violation;"
+    f" Suite 50 must be registered only in docs/testing.md, not in CLAUDE.md §11;"
+    f" §11 slice found: {bool(_s50_claude_s11)}"
+    " — remove 'Suite 50' from CLAUDE.md §11 and register it in docs/testing.md",
+)
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
