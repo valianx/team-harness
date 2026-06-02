@@ -11406,6 +11406,224 @@ check(
 )
 
 
+# ===========================================================================
+# Suite 49 — pr-cost-rollup-surface — phase.end token-emission contract lock
+#
+# Purpose: assert that `agents/orchestrator.md` declares `tokens` REQUIRED
+# (not optional) in the `phase.end` event schema and contains the wording
+# that forbids `tokens:0`.  This test blinders the Phase A token-emission
+# contract (v2.42.1) against accidental regression — if someone softens the
+# language to "optional" or removes the zero-forbidden rule, this test fails.
+#
+# Two anchors are used (both already exist post-Phase-A, no new wording):
+#   A) `### Phase Transition Protocol (atomic` — the step-1 sub-rule that
+#      governs real-time event appending, which declares REQUIRED + FORBIDDEN.
+#   B) `## Execution Events JSONL (canonical` — the schema table row for
+#      `tokens` which also carries the REQUIRED annotation.
+#
+# Both anchors are unique in orchestrator.md.  _slice_section returns "" when
+# an anchor is absent → the token-in-"" check fails immediately (no false-green).
+#
+# Anti-false-green: literal anchor strings are distinct from any string used
+# by Suites 34-48.  Verified (grep of existing anchor variables).
+#
+# Self-ref guard: this test file contains `Suite 49` + `_slice_section` +
+# `pr-cost-rollup-surface`; `docs/testing.md` names `Suite 49`; `CLAUDE.md §11`
+# does NOT contain `Suite 49` (hygiene contract).
+#
+# Check index:
+#   (1) Phase Transition Protocol slice declares tokens REQUIRED for phase.end
+#   (2) Phase Transition Protocol slice declares tokens:0 FORBIDDEN
+#   (3) JSONL Schema table slice declares tokens REQUIRED for phase.end
+#   (4) JSONL Schema table slice declares tokens:0 / zero FORBIDDEN
+#   (5a) docs/testing.md canonical registry names 'Suite 49' and 'pr-cost-rollup-surface'
+#   (5b) CLAUDE.md §11 does NOT contain 'Suite 49' (hygiene contract)
+# ===========================================================================
+print()
+print("=== Suite 49: pr-cost-rollup-surface — phase.end token-emission contract lock ===")
+
+# ---- file reads (suite-local) -----------------------------------------------
+_s49_orch     = read(AGENTS_DIR / "orchestrator.md")
+_s49_testing  = read(REPO_ROOT / "docs" / "testing.md")
+_s49_claude   = read(REPO_ROOT / "CLAUDE.md")
+_s49_self     = Path(__file__).read_text(encoding="utf-8")
+
+# ---- anchors ----------------------------------------------------------------
+# Anchor A: Phase Transition Protocol section — contains the token rules at step 1.
+_S49_PTP_ANCHOR    = "### Phase Transition Protocol (atomic"
+
+# Anchor B: The JSONL schema table's tokens row — use the verbatim row text as
+# the anchor.  _slice_section finds the first occurrence and returns text to the
+# next heading; the tokens row is a single-line in the table and the "Required
+# for `phase.end`" annotation plus "Never omit or write 0" are on the same row.
+# Using the row text directly avoids the nesting problem (## → ### boundary).
+_S49_JSONL_ANCHOR  = "| `tokens` | conditional | Total tokens"
+
+_s49_ptp_slice   = _slice_section(_s49_orch, _S49_PTP_ANCHOR)
+# For the JSONL schema checks, extract a window around the tokens row instead
+# of a full section slice (the row itself contains all required tokens).
+_s49_jsonl_anchor_idx = _s49_orch.find(_S49_JSONL_ANCHOR)
+_s49_jsonl_slice = (
+    _s49_orch[_s49_jsonl_anchor_idx: _s49_jsonl_anchor_idx + 300]
+    if _s49_jsonl_anchor_idx != -1
+    else ""
+)
+
+# ---- CLAUDE.md §11 slice (hygiene contract) --------------------------------
+_S49_S11_START = "## 11."
+_S49_S12_START = "## 12."
+_s49_s11_idx = _s49_claude.find(_S49_S11_START)
+_s49_s12_idx = (
+    _s49_claude.find(_S49_S12_START, _s49_s11_idx)
+    if _s49_s11_idx != -1
+    else -1
+)
+_s49_claude_s11 = (
+    _s49_claude[_s49_s11_idx:_s49_s12_idx]
+    if _s49_s11_idx != -1 and _s49_s12_idx != -1
+    else (_s49_claude[_s49_s11_idx:] if _s49_s11_idx != -1 else "")
+)
+
+# ---------------------------------------------------------------------------
+# Check (1) — Phase Transition Protocol declares tokens REQUIRED for phase.end.
+#
+# Tokens required in slice:
+#   "REQUIRED"      — the capitalized required marker
+#   "phase.end"     — scopes the requirement to phase.end events
+#   "tokens"        — the field being declared required
+# ---------------------------------------------------------------------------
+check(
+    "cost-rollup(1): orchestrator.md § Phase Transition Protocol"
+    " declares 'tokens' REQUIRED for phase.end events"
+    " (not optional — contract lock against regression)",
+    bool(_s49_ptp_slice)
+    and "REQUIRED" in _s49_ptp_slice
+    and "phase.end" in _s49_ptp_slice
+    and "tokens" in _s49_ptp_slice,
+    f"anchor '{_S49_PTP_ANCHOR}' missing from orchestrator.md"
+    f" or required tokens absent;"
+    f" anchor present: {bool(_s49_ptp_slice)};"
+    f" 'REQUIRED' in slice: {'REQUIRED' in _s49_ptp_slice};"
+    f" 'phase.end' in slice: {'phase.end' in _s49_ptp_slice};"
+    f" 'tokens' in slice: {'tokens' in _s49_ptp_slice}"
+    " — orchestrator.md Phase Transition Protocol must declare tokens REQUIRED"
+    " on every phase.end; do NOT soften to 'optional' or 'recommended'",
+)
+
+# ---------------------------------------------------------------------------
+# Check (2) — Phase Transition Protocol declares tokens:0 / "tokens":0 FORBIDDEN.
+#
+# Tokens required in slice:
+#   one of "FORBIDDEN" / "forbidden"  — the prohibition marker
+#   one of '"tokens":0' / 'tokens:0'  — the specific zero value prohibited
+# ---------------------------------------------------------------------------
+_S49_FORBIDDEN_ALTS = ("FORBIDDEN", "forbidden")
+_S49_ZERO_ALTS      = ('"tokens":0', "tokens:0", "tokens: 0")
+
+check(
+    "cost-rollup(2): orchestrator.md § Phase Transition Protocol"
+    " declares tokens:0 FORBIDDEN (zero silently erases cost visibility)",
+    bool(_s49_ptp_slice)
+    and any(a in _s49_ptp_slice for a in _S49_FORBIDDEN_ALTS)
+    and any(a in _s49_ptp_slice for a in _S49_ZERO_ALTS),
+    f"anchor '{_S49_PTP_ANCHOR}' missing from orchestrator.md"
+    f" or zero-forbidden wording absent;"
+    f" anchor present: {bool(_s49_ptp_slice)};"
+    f" forbidden-alt found: {any(a in _s49_ptp_slice for a in _S49_FORBIDDEN_ALTS)};"
+    f" zero-alt found: {any(a in _s49_ptp_slice for a in _S49_ZERO_ALTS)}"
+    " — the Phase Transition Protocol must explicitly forbid tokens:0"
+    " to prevent silent cost-visibility erasure",
+)
+
+# ---------------------------------------------------------------------------
+# Check (3) — JSONL Schema table also declares tokens REQUIRED for phase.end.
+#
+# The schema table at § "Execution Events JSONL" carries a `tokens` row with
+# Required=conditional and "Required for `phase.end`" in the Description column.
+#
+# Tokens required in slice:
+#   "tokens"           — the field name in the table row
+#   "Required"         — the required marker in the row
+#   "phase.end"        — scoping the requirement
+# ---------------------------------------------------------------------------
+check(
+    "cost-rollup(3): orchestrator.md § Execution Events JSONL schema table"
+    " carries a 'tokens' row declaring Required for phase.end"
+    " (second enforcement site — dual-source contract)",
+    bool(_s49_jsonl_slice)
+    and "tokens" in _s49_jsonl_slice
+    and "Required" in _s49_jsonl_slice
+    and "phase.end" in _s49_jsonl_slice,
+    f"anchor '{_S49_JSONL_ANCHOR}' missing from orchestrator.md"
+    f" or schema table tokens-row absent;"
+    f" anchor present: {bool(_s49_jsonl_slice)};"
+    f" 'tokens' in slice: {'tokens' in _s49_jsonl_slice};"
+    f" 'Required' in slice: {'Required' in _s49_jsonl_slice};"
+    f" 'phase.end' in slice: {'phase.end' in _s49_jsonl_slice}"
+    " — the JSONL Schema table must carry a tokens row with Required annotation"
+    " for phase.end events",
+)
+
+# ---------------------------------------------------------------------------
+# Check (4) — JSONL Schema section also contains the zero-forbidden wording.
+#
+# Tokens required in slice:
+#   one of "FORBIDDEN" / "forbidden" / "Never omit or write 0" / "never omit"
+#   one of '"tokens":0' / 'tokens:0' / 'write 0'
+# ---------------------------------------------------------------------------
+_S49_SCHEMA_FORBIDDEN_ALTS = ("FORBIDDEN", "forbidden", "Never omit or write 0", "never omit")
+_S49_SCHEMA_ZERO_ALTS      = ('"tokens":0', "tokens:0", "write 0", "tokens: 0")
+
+check(
+    "cost-rollup(4): orchestrator.md § Execution Events JSONL schema"
+    " contains zero-forbidden wording for the tokens field",
+    bool(_s49_jsonl_slice)
+    and any(a in _s49_jsonl_slice for a in _S49_SCHEMA_FORBIDDEN_ALTS)
+    and any(a in _s49_jsonl_slice for a in _S49_SCHEMA_ZERO_ALTS),
+    f"anchor '{_S49_JSONL_ANCHOR}' missing from orchestrator.md"
+    f" or zero-forbidden wording absent from schema section;"
+    f" anchor present: {bool(_s49_jsonl_slice)};"
+    f" forbidden-alt found: {any(a in _s49_jsonl_slice for a in _S49_SCHEMA_FORBIDDEN_ALTS)};"
+    f" zero-alt found: {any(a in _s49_jsonl_slice for a in _S49_SCHEMA_ZERO_ALTS)}"
+    " — the JSONL schema section must forbid tokens:0 / 'never omit or write 0'",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5a) — docs/testing.md canonical registry names Suite 49 and
+# 'pr-cost-rollup-surface'; this file contains 'Suite 49', '_slice_section',
+# and 'pr-cost-rollup-surface'.
+# ---------------------------------------------------------------------------
+check(
+    "cost-rollup(5a): docs/testing.md canonical registry names 'Suite 49'"
+    " and 'pr-cost-rollup-surface';"
+    " this test file contains 'Suite 49', '_slice_section', 'pr-cost-rollup-surface'",
+    "Suite 49" in _s49_testing
+    and "pr-cost-rollup-surface" in _s49_testing
+    and "Suite 49" in _s49_self
+    and "_slice_section" in _s49_self
+    and "pr-cost-rollup-surface" in _s49_self,
+    f"'Suite 49' in docs/testing.md: {'Suite 49' in _s49_testing};"
+    f" 'pr-cost-rollup-surface' in docs/testing.md: {'pr-cost-rollup-surface' in _s49_testing};"
+    f" 'Suite 49' in this file: {'Suite 49' in _s49_self};"
+    f" '_slice_section' in this file: {'_slice_section' in _s49_self};"
+    f" 'pr-cost-rollup-surface' in this file: {'pr-cost-rollup-surface' in _s49_self}"
+    " — register Suite 49 in docs/testing.md (not CLAUDE.md §11)",
+)
+
+# ---------------------------------------------------------------------------
+# Check (5b) — CLAUDE.md §11 does NOT contain 'Suite 49' (hygiene contract).
+# ---------------------------------------------------------------------------
+check(
+    "cost-rollup(5b): CLAUDE.md §11 does NOT contain 'Suite 49'"
+    " (hygiene contract — per-suite inventory belongs in docs/testing.md, not §11)",
+    "Suite 49" not in _s49_claude_s11,
+    f"CLAUDE.md §11 contains literal 'Suite 49' — hygiene violation;"
+    f" Suite 49 must be registered only in docs/testing.md, not in CLAUDE.md §11;"
+    f" §11 slice found: {bool(_s49_claude_s11)}"
+    " — remove 'Suite 49' from CLAUDE.md §11 and register it in docs/testing.md",
+)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

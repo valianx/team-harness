@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.0] - 2026-06-02
+
+### Added
+
+- Cost rollup surface (Phase B of the pipeline-collaboration-cost-redesign program): `00-pipeline-summary.md` now includes a `## Cost` section (total tokens, total cost, per-agent and per-phase breakdown with `%`); the `## Phase Timeline` table adds a `Tokens` column; the TL;DR line includes `~${cost}` as a key number. Cost is derived from `phase.end` tokens × a versioned `pricing` table in `~/.claude/.team-harness.json`; `(~)` marks estimated values.
+- `/th:trace --cost` flag: prints a per-agent and per-phase cost table with `$` amounts from the `pricing` config key; dual-format `.md`/`.jsonl` detection with `jq` + `python3` fallback; fails soft to tokens-only with `price table not configured — showing tokens only` when the pricing key is absent or malformed.
+- Accumulated cost line in all three STAGE-GATE STOP-block templates (`Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)`), surfacing run cost at every human review point.
+- Versioned `pricing` table format: a namespaced `pricing` key in `~/.claude/.team-harness.json` with `opus.input`/`opus.output`/`sonnet.input`/`sonnet.output` per 1M tokens and an `updated` field. Full spec in `docs/observability.md § "Cost rollup"`.
+
+### Tests
+
+- Suite 49 (`cost-rollup-surface`, 6 structural checks) added to `tests/test_agent_structure.py`: asserts `tokens` is declared REQUIRED (not optional) for `phase.end` in the Phase Transition Protocol and JSONL schema table; asserts `"tokens":0` is FORBIDDEN; includes anti-false-green anchor verification and self-referential guards. Registered in `docs/testing.md`. Total assertions: 1264 (was 1249).
+
 ## [2.42.1] - 2026-06-02
 
 ### Fixed

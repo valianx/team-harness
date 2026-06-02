@@ -41,6 +41,7 @@ Analyze the input: $ARGUMENTS
 /th:trace <feature-name> --jsonl   Tail the last 30 events (auto-detects .md or .jsonl format)
 /th:trace <feature-name> --tools   Aggregate tool usage across the pipeline
 /th:trace <feature-name> --fails   Filter to failures, dispatch issues, iterations
+/th:trace <feature-name> --cost    Show cost breakdown by agent and phase
 ```
 
 Parse `$ARGUMENTS`:
@@ -86,6 +87,7 @@ These are written by the **orchestrator** during pipeline runs (see `agents/orch
    ---
    For raw events: /th:trace {feature-name} --jsonl
    For tool effectiveness: /th:trace {feature-name} --tools
+   For cost breakdown:     /th:trace {feature-name} --cost
    For failures only:      /th:trace {feature-name} --fails
    ```
 
@@ -338,6 +340,125 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 
 ---
 
+## `--cost` mode — cost breakdown by agent and phase
+
+1. Detect the events file: check for `00-execution-events.md` first (Glob), then
+   `00-execution-events.jsonl`. If neither exists, report and exit cleanly.
+
+2. Read the price table from `~/.claude/.team-harness.json` (key `pricing`). If
+   the key is absent, malformed, or any required sub-field is missing, set
+   `has_pricing = false` — the mode continues but shows tokens only with the line:
+   ```
+   price table not configured — showing tokens only
+   ```
+
+3. Aggregate `phase.end` events to produce per-agent and per-phase token sums.
+
+   **If `jq` is available:**
+
+   For the `.md` variant, extract JSONL content first:
+   ```bash
+   sed -n '/^```jsonl$/,/^```$/{/^```/d;p}' workspaces/{feature-name}/00-execution-events.md | \
+     jq -s '
+       map(select(.event == "phase.end")) |
+       group_by(.agent) |
+       map({
+         agent:     .[0].agent,
+         phases:    [.[] | .phase],
+         tokens:    [.[] | .tokens // 0] | add,
+         estimated: ([.[] | select(.tokens_estimated == true)] | length)
+       })
+     '
+   ```
+
+   For the `.jsonl` variant:
+   ```bash
+   jq -s '
+     map(select(.event == "phase.end")) |
+     group_by(.agent) |
+     map({
+       agent:     .[0].agent,
+       phases:    [.[] | .phase],
+       tokens:    [.[] | .tokens // 0] | add,
+       estimated: ([.[] | select(.tokens_estimated == true)] | length)
+     })
+   ' workspaces/{feature-name}/00-execution-events.jsonl
+   ```
+
+   **If `jq` is not available, fall back to `python3`:**
+
+   ```bash
+   # Works for both .jsonl (read direct) and .md (extract fence first with sed -n)
+   python3 -c "
+   import json, sys, collections
+   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'estimated': 0})
+   by_phase = []
+   for line in sys.stdin:
+       try:
+           e = json.loads(line)
+       except Exception:
+           continue
+       if e.get('event') != 'phase.end':
+           continue
+       agent = e.get('agent', 'unknown')
+       phase = e.get('phase', '?')
+       tokens = e.get('tokens') or 0
+       est = 1 if e.get('tokens_estimated') else 0
+       by_agent[agent]['tokens'] += tokens
+       by_agent[agent]['phases'].append(phase)
+       by_agent[agent]['estimated'] += est
+       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'estimated': est})
+   total = sum(v['tokens'] for v in by_agent.values())
+   est_phases = sum(v['estimated'] for v in by_agent.values())
+   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'estimated': v['estimated']} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'est_phases': est_phases}))
+   "
+   ```
+
+4. Compute cost if `has_pricing == true`. Model classification:
+   - `architect` agent → use `pricing.opus` rates.
+   - All other agents → use `pricing.sonnet` rates.
+   - When `tokens_in` / `tokens_out` are available in the event, use
+     `(tokens_in × input + tokens_out × output) / 1_000_000`.
+   - When only `tokens` total is available, use
+     `tokens × (input + output) / 2 / 1_000_000` and mark with `(~)`.
+
+5. Render output:
+
+   ```
+   Cost Breakdown — {feature-name}
+   ================================
+   Total tokens: {N}  (measured — {or: N phases estimated})
+   Total cost:   ~${X.XX}   (or: price table not configured — showing tokens only)
+   Architect runs: {N}x
+
+   By agent:
+   | Agent       | Phases        | Tokens | Cost    |  % |
+   |-------------|---------------|--------|---------|----|
+   | architect   | 1-design      | {N}    | ~${X}   | P% |
+   | implementer | 2-implement   | {N}    | ~${X}   | P% |
+   | ...         | ...           | ...    | ...     | .. |
+   | Total       |               | {N}    | ~${X}   |100%|
+
+   By phase:
+   | Phase         | Agent       | Tokens | Cost    |
+   |---------------|-------------|--------|---------|
+   | 1-design      | architect   | {N}    | ~${X}   |
+   | 2-implement   | implementer | {N}    | ~${X}   |
+   | ...           | ...         | ...    | ...     |
+   ```
+
+   - Mark estimated phases with `(~)` in the Tokens column.
+   - When `has_pricing == false`, omit the `Cost` columns and append the
+     degradation line after the totals row.
+   - If neither `jq` nor `python3` is available, print:
+     ```
+     Cost summary: install jq or python3 to compute the breakdown
+     ```
+     and fall back to printing the `## Cost` section of `00-pipeline-summary.md`
+     (if it exists).
+
+---
+
 ## Error handling
 
 - **Feature name not found / no workspaces folder:** report and suggest `/th:pipelines` to see available features. Exit cleanly.
@@ -364,6 +485,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 | "Detailed narrative state for one feature" | `/th:pipelines <feature>` — narrative renderer with TL;DR + Hot Context + Timeline from JSONL |
 | "Did this pipeline work? Quick summary." | `/th:trace <feature>` — the canonical 30-second answer |
 | "How effective were the tools in this pipeline?" | `/th:trace <feature> --tools` |
+| "What did this pipeline cost in tokens and dollars?" | `/th:trace <feature> --cost` |
 | "What failed and why?" | `/th:trace <feature> --fails` |
 | "Show me the raw event log." | `/th:trace <feature> --jsonl` |
 
