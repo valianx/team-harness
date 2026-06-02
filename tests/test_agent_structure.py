@@ -77,13 +77,13 @@ print("=== Suite 1: Tool allowlist per agent ===")
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
-    "qa", "gcp-cost-analyzer", "init", "implementer", "tester",
+    "qa", "qa-plan", "gcp-cost-analyzer", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery",
 ]
 
 # Read-only agents that MUST NOT have Bash in their allowlist
-READ_ONLY_AGENTS = {"architect", "security", "qa", "acceptance-checker", "plan-reviewer"}
+READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "acceptance-checker", "plan-reviewer"}
 
 for agent_name in EXPECTED_AGENTS:
     path = AGENTS_DIR / f"{agent_name}.md"
@@ -210,14 +210,14 @@ if len(ret_proto) > 1:
 # Suite 5 — qa.md has Reconcile Mode (Phase 2.5)
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 5: qa.md Reconcile Mode ===")
+print("=== Suite 5: qa-plan.md Reconcile Mode ===")
 
-qa = read(AGENTS_DIR / "qa.md")
-check("qa.md has Reconcile Mode header", "Reconcile Mode (Phase 2.5" in qa)
-check("qa.md Reconcile Mode mentions keep / amend / drop",
-      all(kw in qa for kw in ["keep", "amend", "drop"]))
-check("qa.md Reconcile Mode references Original Description",
-      "Original Description" in qa)
+qa_plan = read(AGENTS_DIR / "qa-plan.md")
+check("qa-plan.md has Reconcile Mode header", "Reconcile Mode (Phase 2.5" in qa_plan)
+check("qa-plan.md Reconcile Mode mentions keep / amend / drop",
+      all(kw in qa_plan for kw in ["keep", "amend", "drop"]))
+check("qa-plan.md Reconcile Mode references Original Description",
+      "Original Description" in qa_plan)
 
 # ---------------------------------------------------------------------------
 # Suite 6 — reviewer.md has Internal Review mode + Reviewability score
@@ -2278,8 +2278,14 @@ check(
     "workspaces.go does not reference INSTALL_MODE — env-var fallback not implemented",
 )
 
-# (i) cmd/install/modes.go declares lowCostMatrix with all 17 agents.
+# (i) cmd/install/modes.go declares lowCostMatrix with agents known at installer
+# decommission time (2026-06-02). Agents added after decommission (qa-plan, ux-reviewer)
+# are excluded from this check — modes.go is a frozen artifact; new agents go in
+# the README low-cost matrix (vestigial, for documentation only).
+MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer"}
 for agent_name in EXPECTED_AGENTS:
+    if agent_name in MODES_GO_EXCLUDED:
+        continue
     check(
         f"cmd/install/modes.go lowCostMatrix contains entry for '{agent_name}'",
         f'"{agent_name}"' in modes_go,
@@ -5489,7 +5495,7 @@ _s34_sec = read(AGENTS_DIR / "security.md")
 _s34_ref = read(AGENTS_DIR / "ref-direct-modes.md")
 _s34_orch = read(AGENTS_DIR / "orchestrator.md")
 _s34_pr = read(AGENTS_DIR / "plan-reviewer.md")
-_s34_qa = read(AGENTS_DIR / "qa.md")
+_s34_qa = read(AGENTS_DIR / "qa-plan.md")
 _s34_claude = read(REPO_ROOT / "CLAUDE.md")
 _s34_design_skill_path = SKILLS_DIR / "design" / "SKILL.md"
 _s34_design_skill = read(_s34_design_skill_path) if _s34_design_skill_path.exists() else ""
@@ -6121,7 +6127,7 @@ check(
     "plan-review(anchor-qa): agents/qa.md contains"
     " '### Plan-review panel (ratify-plan reuse)' section",
     bool(_qa_panel),
-    f"anchor '{_QA_ANCHOR}' not found in qa.md"
+    f"anchor '{_QA_ANCHOR}' not found in qa-plan.md"
     " -- plan-review checks (24)(25)(26) will all fail",
 )
 
