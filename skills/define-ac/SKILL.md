@@ -45,5 +45,5 @@ name: define-ac
 
 - **You read issues. The orchestrator does NOT** — it receives the data from you.
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator will route to the `qa` agent in define-ac mode
+- The orchestrator will route to the `qa-plan` agent in define-ac mode
 - Output: acceptance criteria in Given/When/Then format

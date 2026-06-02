@@ -161,15 +161,17 @@ Canonical matrix (must match exactly):
 | Agent | Model | Effort |
 |---|---|---|
 | `orchestrator` | opus | high |
-| `architect` | opus | max |
+| `architect` | opus | high |
 | `agent-builder` | opus | max |
 | `security` | opus | max |
 | `reviewer` | opus | max |
-| `qa` | opus | high |
+| `qa` | sonnet | high |
+| `qa-plan` | opus | high |
 | `gcp-cost-analyzer` | opus | high |
-| `init` | opus | medium |
+| `init` | sonnet | medium |
 | `implementer` | sonnet | high |
-| `tester` | sonnet | medium |
+| `tester` | sonnet | high |
+| `documenter` | sonnet | high |
 | `acceptance-checker` | sonnet | medium |
 | `diagrammer` | sonnet | medium |
 | `likec4-diagrammer` | sonnet | medium |

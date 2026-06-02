@@ -222,12 +222,12 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | 0b Specify | orchestrator | Spec context (bug-report format) passed inline to architect; architect incorporates into `01-plan.md` § Review Summary | Reported behaviour / Expected behaviour / Reproduction steps / Environment / AC (AC-1 reproduction-no-longer-bug, AC-2 regression-test-exists for Tier 2-4; Tier 1 uses implicit "cited issue is fixed") |
 | 0.5 Bootstrap | orchestrator | — | Same as feature flow |
 | 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
-| 1.5 Plan ratification | qa (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
+| 1.5 Plan ratification | qa-plan (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
 | 1.6 Plan review | plan-reviewer | `01-plan.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
 | STAGE-GATE-1 | orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + PR Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
 | **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
-| 2.5 Reconcile | orchestrator + qa (reconcile) | — | Same as feature flow |
+| 2.5 Reconcile | orchestrator + qa-plan (reconcile) | — | Same as feature flow |
 | 3 Verify | tester + qa + security (tier-gated) | `03-testing.md`, `04-validation.md`, `04-security.md` (Tier 3+) | Tier 1: tester (suite no-regress) + qa (simplified). Tier 2: tester + qa. Tier 3: tester + qa + security. Tier 4: tester + qa + security (extended analysis) |
 | 3.5 Acceptance gate | orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1) |
 | 3.6 Acceptance check | acceptance-checker | `04-validation.md § Drift Analysis` | Conditional per existing gates |

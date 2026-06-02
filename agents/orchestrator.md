@@ -190,7 +190,7 @@ workspaces/{feature-name}/
   00-init.md               ← init (bootstrap report)
   00-research.md           ← architect (research mode)
   00-audit.md              ← architect (audit mode)
-  00-acceptance-criteria.md ← qa (define-ac mode)
+  00-acceptance-criteria.md ← qa-plan (define-ac mode)
   01-plan.md               ← architect (spec + architecture + tasks + plan-review appended by plan-reviewer)
   01-planning.md           ← architect (planning mode — multi-task batch breakdown)
   02-implementation.md     ← implementer
@@ -377,7 +377,7 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 | `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
 | `qa` | 3 (validate mode) | `04-validation.md` |
 | `qa` | 3 (docs validation — docs-flow Phase 3) | `04-validation.md` |
-| `qa` | 1.5 (ratify-plan mode) | (no file — verdict is in status block only) |
+| `qa-plan` | 1.5 (ratify-plan mode) | (no file — verdict is in status block only) |
 | `documenter` | 2 (docs-flow write — `02-documentation.md`) | `02-documentation.md` |
 | `security` | 3 | `04-security.md` |
 | `delivery` | 4 | `00-state.md` update (delivery section) |
@@ -396,7 +396,7 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
    b. Re-dispatch the agent exactly once with an explicit instruction: "Your previous run returned status: success but the expected artifact `{expected_artifact}` was not found at `{docs_root}/{expected_artifact}`. Produce the artifact before returning."
    c. If the retry also returns without the artifact: append `{"ts":"<ISO>","event":"artifact.missing","feature":"<name>","phase":"<N>","agent":"<agent>","expected_file":"<path>","action":"escalate"}`, set `status: blocked` in `00-state.md`, and escalate to the operator with the missing file path.
 
-**Agents that do not produce files** (e.g., `qa` in `ratify-plan` mode returns a verdict in the status block only) are exempt from artifact verification. The mapping table above marks these with "(no file)".
+**Agents that do not produce files** (e.g., `qa-plan` in `ratify-plan` mode returns a verdict in the status block only) are exempt from artifact verification. The mapping table above marks these with "(no file)".
 
 **This protocol is mandatory.** Skipping artifact verification is a contract violation equivalent to skipping a phase. The protocol catches silent agent failures where the status block says `success` but the agent did not write its output — a class of bug that propagates downstream as missing context for the next agent.
 
@@ -410,7 +410,7 @@ After `delivery` returns `status: success` at Phase 4, and before any reporting 
 
 1. Read `{docs_root}/00-state.md § Agent Results` and enumerate all rows with `status: success`.
 2. For each `(agent, phase)` row with `status: success`, consult the canonical mapping table in `### Artifact Verification Protocol` to resolve the expected artifact. Do NOT duplicate the table here — the `### Artifact Verification Protocol` table is the single source of truth.
-3. Exclude rows whose expected artifact is marked `(no file)` in that table (e.g., `qa` in `ratify-plan` mode).
+3. Exclude rows whose expected artifact is marked `(no file)` in that table (e.g., `qa-plan` in `ratify-plan` mode).
 4. For each remaining expected artifact, use `Read` to verify:
    - The file exists at `{docs_root}/{expected_artifact}`.
    - The file is non-empty (file size > 0).
@@ -742,7 +742,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | ambiguous / mixed concerns | **unclear** | — |
 
    **Disambiguation — `validate` vs `plan-review` vs substance refinement.**
-   - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
+   - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
 
@@ -1184,7 +1184,7 @@ Append a `phase.end` event:
 
 ## Phase 1.5 — Plan Ratification (cheap loop guard)
 
-**Agent:** `qa` (mode: `ratify-plan`)
+**Agent:** `qa-plan` (mode: `ratify-plan`)
 
 **Why this phase exists:** the most expensive iteration is one where the implementer codes against a Work Plan that does not actually cover all AC, and the gap is only discovered in Phase 3 — costing a full implementer + tester + qa + security re-run. Ratifying the plan against the AC before any code is written turns that loop into a cheap read-only check (~3-5K tokens). This is the **sprint contract** pattern from Anthropic's harness-design article: generator and evaluator agree on "what done looks like" before generating.
 
@@ -1210,7 +1210,7 @@ Append a `phase.end` event:
 **Report to user:**
 ```
 Plan ratification — verdict: pass
-  qa (ratify-plan): every AC covered by Work Plan
+  qa-plan (ratify-plan): every AC covered by Work Plan
 Next: implementation
 ```
 
@@ -1335,13 +1335,13 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 
 - **All findings go to `01-plan.md`.** No reviewer creates `04-security.md`, `*-review.md`, `security-reports/`, or any other side-file in the context of a plan review. Every correction, risk identification, and sub-verdict is written directly into the `01-plan.md` body (in-place).
 - **One consolidated `## Plan Review` section.** The section is a single sliceable block from its `##` heading to the next `##` heading. It carries three sub-verdicts authored as **bold inline labels** (NOT as `###` headings — a `###` heading would terminate the `_slice_section` boundary and split the block):
-  - `**Substance (qa):**` — written by `qa` (ratify-plan)
+  - `**Substance (qa):**` — written by `qa-plan` (ratify-plan)
   - `**Security design-review (security):**` — written by `security` (design-review, conditional)
   - `**Combined verdict:**` — written by `plan-reviewer` (sole writer of the combined verdict)
 - **`plan-reviewer` is the sole writer of the `## Plan Review` header and the `**Combined verdict:**` block.** It runs last (after qa and security) and reads their sub-verdicts to produce the combined verdict. `qa` and `security` each append only their own labelled sub-verdict and MUST NOT touch the combined verdict.
 - **Preserve-in-place.** `plan-reviewer` preserves the upstream sub-verdicts (`**Substance (qa):**` and `**Security design-review (security):**`) written by the earlier panel reviewers. It MUST NOT overwrite or remove them. On repeated invocations, `plan-reviewer` rewrites only the header, the `## Summary` rules table, and the `**Combined verdict:**` block; `qa` and `security` replace their own labelled sub-verdict lines within the section.
 - **Deterministic worst-of roll-up.** The `**Combined verdict:**` is the worst-of the three sub-verdicts with severity order `fail > concerns > pass`. Security sub-verdict mapping: `clean → pass`, `risks-found → fail`. A missing-but-expected sub-verdict label means the panel is incomplete — the combined verdict MUST NOT be `pass` in that case.
-- **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of this same centralization principle: every correction folds to `01-plan.md`, nothing accretes in side-files. The plan-review panel applies the same rule at Stage 1.
+- **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa-plan reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of this same centralization principle: every correction folds to `01-plan.md`, nothing accretes in side-files. The plan-review panel applies the same rule at Stage 1.
 
 ---
 
@@ -1594,9 +1594,9 @@ Count the constraints and classify each as **trivial** or **non-trivial**:
 
 - **All constraints are trivial** → reconcile inline (the current behaviour). For each annotation: rewrite the affected AC, remove the tag, log the change in Hot Context, briefly inform the user: "AC-{N} updated: {what changed and why}". Proceed to Phase 3.
 
-- **Any non-trivial constraint** → invoke `qa` in new mode `reconcile`. Pass: feature name, pointer to `01-plan.md` (§ Review Summary, with annotations), pointer to `01-plan.md` § Task List and `02-implementation.md`. Instruction: "Review each [CONSTRAINT-DISCOVERED] annotation in `01-plan.md` § Review Summary against the Original Description block in that same section. For each, decide: (a) AC stays as-is — the constraint can be worked around; (b) AC is amended — propose the new wording; (c) AC is dropped — the original promise is no longer feasible and the user must be notified. Do NOT change any AC yourself; return your decisions in `04-validation.md` under a `## Reconciliation Decisions` section."
+- **Any non-trivial constraint** → invoke `qa-plan` in new mode `reconcile`. Pass: feature name, pointer to `01-plan.md` (§ Review Summary, with annotations), pointer to `01-plan.md` § Task List and `02-implementation.md`. Instruction: "Review each [CONSTRAINT-DISCOVERED] annotation in `01-plan.md` § Review Summary against the Original Description block in that same section. For each, decide: (a) AC stays as-is — the constraint can be worked around; (b) AC is amended — propose the new wording; (c) AC is dropped — the original promise is no longer feasible and the user must be notified. Do NOT change any AC yourself; return your decisions in `04-validation.md` under a `## Reconciliation Decisions` section."
 
-- After `qa` returns, the orchestrator applies the decisions:
+- After `qa-plan` returns, the orchestrator applies the decisions:
   - For each (a): remove the `[CONSTRAINT-DISCOVERED]` tag, AC unchanged.
   - For each (b): rewrite the AC per qa's proposed wording in `01-plan.md` § Review Summary.
   - For each (c): mark the AC as `[DROPPED — {reason}]` in `01-plan.md` § Review Summary, count it OUT of the verification gate, surface the drop to the user before proceeding.
@@ -1609,7 +1609,7 @@ Append a `phase.end` event to `{docs_root}/{events_file}` with `phase: "2.5-reco
 
 If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .non_trivial: 0` and proceed to Phase 3.
 
-**Rewrite TL;DR** (row 10 of §5.2): If no constraints: skip TL;DR rewrite (no semantic change). If qa reconcile ran: `Now`: "Phase 3 verify launching." `Last`: "Reconciliation: {N} trivial / {M} non-trivial / {K} dropped." `Open issues`: any dropped AC identifiers.
+**Rewrite TL;DR** (row 10 of §5.2): If no constraints: skip TL;DR rewrite (no semantic change). If qa-plan reconcile ran: `Now`: "Phase 3 verify launching." `Last`: "Reconciliation: {N} trivial / {M} non-trivial / {K} dropped." `Open issues`: any dropped AC identifiers.
 
 **Cost:** typically zero (no annotations) or one qa invocation (~2-4K tokens). **Saves:** an entire iteration cycle when a non-trivial constraint would otherwise be silently absorbed and surfaced as an acceptance-checker concern at Phase 3.6.
 
@@ -3424,7 +3424,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** |
 | validate | `qa` (validate mode) | `01-plan.md` § Task List + implementation | check AC exist. If missing → tell user to run `/th:define-ac` first. Do NOT invoke without AC. |
 | deliver | `delivery` | implementation + tests + validation | verify `02-implementation.md`, `03-testing.md`, AND `04-validation.md` exist. If any missing → tell user. After `delivery` completes its internal work (branch, commits, changelog), run Phase 4.5 (internal review) and then emit STAGE-GATE-3 BEFORE any `git push` or `gh pr create`. The safe default for direct deliver is to emit the gate — it does NOT ship immediately. This mirrors the Stage 3 close of the full pipeline. |
-| define-ac | `qa` (define-ac mode) | none | invoke → present `00-acceptance-criteria.md` |
+| define-ac | `qa-plan` (define-ac mode) | none | invoke → present `00-acceptance-criteria.md` |
 | security | `security` | none (audit) or feature context (pipeline) | create workspaces → invoke → present `04-security.md` |
 | diagram | `architect` (research) → `diagrammer` | none | see `ref-direct-modes.md` § Diagram Mode |
 | likec4-diagram | `architect` (research) → `likec4-diagrammer` | none | see `ref-direct-modes.md` § LikeC4 Diagram Mode |

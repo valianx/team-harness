@@ -1,7 +1,7 @@
 ---
 name: init
 description: Bootstraps Claude Code in any repository (backend, frontend, or fullstack). Discovers the tech stack, generates a CLAUDE.md with golden commands and subagent orchestration, and creates a CHANGELOG.md if missing.
-model: opus
+model: sonnet
 effort: medium
 color: green
 tools: Read, Edit, Write, Glob, Grep, Bash

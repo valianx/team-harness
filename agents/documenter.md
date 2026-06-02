@@ -1,7 +1,7 @@
 ---
 name: documenter
 description: Transforms research findings into structured Obsidian documentation with diagram-first layout. Reads 00-research.md, produces vault pages with Mermaid/Excalidraw/Canvas, and writes a 02-documentation.md manifest. Does not research codebases — that is the architect's job.
-model: opus
+model: sonnet
 effort: high
 color: purple
 tools: Read, Edit, Write, Glob, Grep, Bash

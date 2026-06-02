@@ -23,7 +23,7 @@ This file is read on-demand by the orchestrator when executing a direct mode. It
 
 The `plan-review` direct mode runs a panel of up to three reviewers that fold their findings into a single `01-plan.md`. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
 
-1. **`qa` (mode: `ratify-plan`)** — substance reviewer. Validates AC coverage vs Work Plan. Writes `## Plan Ratification` (existing contract) AND writes its sub-verdict as the bold inline label `**Substance (qa):**` followed by a one-line verdict inside `## Plan Review`. Does NOT use a `###` heading for this label.
+1. **`qa-plan` (mode: `ratify-plan`)** — substance reviewer. Validates AC coverage vs Work Plan. Writes `## Plan Ratification` (existing contract) AND writes its sub-verdict as the bold inline label `**Substance (qa):**` followed by a one-line verdict inside `## Plan Review`. Does NOT use a `###` heading for this label.
 2. **`security` (mode: `design-review`)** — design-security reviewer. **Conditional:** runs only when the task is security-sensitive. When run, writes its sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` inside `## Plan Review`. Does NOT use a `###` heading.
 3. **`plan-reviewer` (shape audit, runs last)** — sole writer of the `## Plan Review` header and the `**Combined verdict:**` block. Reads the sub-verdicts written by (1) and (2) to produce the combined verdict. Runs LAST so it can read the other sub-verdicts.
 
@@ -41,7 +41,7 @@ The `plan-review` direct mode runs a panel of up to three reviewers that fold th
 
 1. Glob `workspaces/{feature-name}/`. If the folder does not exist, return a friendly message asking the user to first run `/th:design` or to confirm the feature name.
 2. Confirm `01-plan.md` exists. If it is absent but `01-architecture.md` is present, prompt the user: "no `01-plan.md` — this looks like a legacy plan (pipeline_version 1) or an incomplete design. Run `/th:design {feature}` to produce the merged plan, or invoke `/th:plan-review` after the architect has emitted `01-plan.md`."
-3. Invoke `qa` (mode: `ratify-plan`) via Task tool. Wait for status block.
+3. Invoke `qa-plan` (mode: `ratify-plan`) via Task tool. Wait for status block.
 4. Determine security-sensitivity (per gating above). If security-sensitive, invoke `security` (mode: `design-review`) via Task tool. Wait for status block.
 5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
 6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.

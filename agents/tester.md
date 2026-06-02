@@ -2,7 +2,7 @@
 name: tester
 description: Designs and implements test suites for any project type (backend, frontend, or fullstack). Adapts to the project's test framework, ensures proper isolation, mocks external dependencies, and validates business logic, user interactions, and accessibility.
 model: sonnet
-effort: medium
+effort: high
 color: red
 tools: Read, Edit, Write, Bash, Glob, Grep, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
 ---

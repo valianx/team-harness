@@ -34,22 +34,23 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | Agent | Model | Effort | Tools (allowlist) | Role |
 |---|---|---|---|---|
 | `orchestrator` | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, all 8 `mcp__memory__*` (KG read + write) | Central hub. Coordinates the pipeline and routes to all other agents. |
-| `architect` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Architecture design, research, planning, audits. **No Bash** (read-only on system). KG read-only (Phase 6 writes stay in orchestrator). |
+| `architect` | opus | `high` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Architecture design, research, planning, audits. **No Bash** (read-only on system). KG read-only (Phase 6 writes stay in orchestrator). |
 | `agent-builder` | opus | `max` | Read, Edit, Write, Glob, Grep, Bash | Create / improve agents and skills. |
 | `security` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). KG read-only for prior-vuln lookup. |
 | `reviewer` | opus | `max` | Read, Glob, Grep, Edit, Write, Bash | GitHub PR review. Bash limited to `git`/`gh` for diff retrieval. |
-| `qa` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Acceptance criteria definition and validation. **No Bash** (read-only on system). KG read-only for AC-pattern lookup. |
+| `qa-plan` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Pre-code AC work: ratify-plan (Phase 1.5), define-ac (standalone), reconcile (Phase 2.5), plan-review panel substance-reviewer. **No Bash** (read-only on system). KG read-only. |
+| `qa` | sonnet | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Post-code validation: validate (Phase 3), pr-review-qa, docs-validation, cross-repo review. **No Bash** (read-only on system). KG read-only for AC-pattern lookup. |
 | `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own workspace doc). |
 | `gcp-cost-analyzer` | opus | `high` | Read, Bash, Glob, Grep, Write | GCP cost / resource inventory reports. Bash limited to `gcloud`/`bq` reads. |
-| `init` | opus | `medium` | Read, Edit, Write, Glob, Grep, Bash | Bootstrap `CLAUDE.md` in any repo. |
+| `init` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | Bootstrap `CLAUDE.md` in any repo. |
 | `implementer` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, NotebookEdit | Production code following the architect's Work Plan. |
-| `tester` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Test suites with factory mocks. KG read-only for test-pattern lookup. |
+| `tester` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Test suites with factory mocks. KG read-only for test-pattern lookup. |
 | `acceptance-checker` | sonnet | `medium` | Read, Glob, Grep, Write | External audit comparing original spec vs delivered artifacts (Phase 3.6, non-binding verdict). **No Bash, no Edit** (write-only on its own workspace doc). |
 | `diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash, WebFetch | Excalidraw diagrams (render-validate loop). |
 | `likec4-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | LikeC4 diagrams (architecture-as-code). |
 | `d2-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | D2 diagrams. |
 | `translator` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | i18n discovery, glossary, translation. |
-| `documenter` | opus | `high` | Read, Edit, Write, Glob, Grep, Bash | Diagram-first Obsidian documentation from architect research. |
+| `documenter` | sonnet | `high` | Read, Edit, Write, Glob, Grep, Bash | Diagram-first Obsidian documentation from architect research. |
 | `ux-reviewer` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__get-library-docs` | UI/UX review for frontend tasks — accessibility, responsiveness, component reuse. Dispatched when `frontend-scope: true`. |
 | `delivery` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep | Docs, changelog, version, branch, commit, PR. |
 | `reviewer-consolidator` | opus | `high` | Read, Edit, Write, Glob, Grep | Merges 2-3 focused review drafts (security/architecture/style) into a single unified review. De-duplicates findings, surfaces contradictions, determines verdict. Invoked by orchestrator after parallel focused reviewer passes in multi-reviewer mode. |
@@ -65,9 +66,9 @@ Plus two cross-cutting snippets in `_shared/` (not invocable agents), installed 
 
 Three principles drive the matrix above:
 
-1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa, gcp-cost-analyzer, agent-builder, init, orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers, translator) run on `sonnet` — the heavy thinking has already been done upstream.
-2. **Effort by depth of judgement required.** `max` for irreversible analysis (architecture, security audits, PR reviews, agent design). `high` for solid analytical work that doesn't need exhaustive exploration (orchestrator routing, qa validation, FinOps prioritisation, implementer following a Work Plan). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`.
-3. **Tools by capability boundary.** The `tools` field is the **agency boundary** — what the agent literally cannot do regardless of what its prompt instructs. Read-only auditors (`architect`, `security`, `qa`, `acceptance-checker`) lose `Bash` so they cannot mutate the host even by accident. Builders (`implementer`, `tester`, `delivery`, diagrammers, `translator`, `init`, `agent-builder`) keep `Bash` but the harness gates destructive commands at `PreToolUse` (see `hooks/config.json`). Permission surface = agency boundary; tighten one and the prompt becomes a softer guardrail backed by a hard one.
+1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa-plan, gcp-cost-analyzer, agent-builder, orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers, translator) or **high-volume post-code auditing** (qa, documenter, init) run on `sonnet` — the heavy thinking has already been done upstream.
+2. **Effort by depth of judgement required.** `max` for irreversible analysis (security audits, PR reviews, agent design). `high` for solid analytical work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan, tester authoring regression tests). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`.
+3. **Tools by capability boundary.** The `tools` field is the **agency boundary** — what the agent literally cannot do regardless of what its prompt instructs. Read-only auditors (`architect`, `security`, `qa`, `qa-plan`, `acceptance-checker`) lose `Bash` so they cannot mutate the host even by accident. Builders (`implementer`, `tester`, `delivery`, diagrammers, `translator`, `init`, `agent-builder`) keep `Bash` but the harness gates destructive commands at `PreToolUse` (see `hooks/config.json`). Permission surface = agency boundary; tighten one and the prompt becomes a softer guardrail backed by a hard one.
 
 ## Low-cost mode
 
@@ -77,22 +78,24 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 
 **Engineering-honest trade-off.** On low-cost mode: architecture proposals are 1-2 iterations rougher (less novel synthesis, weaker risk enumeration); security audits are coarser (obvious OWASP-Top-10 issues caught, subtle injection vectors more likely missed); reviewer verdicts are more lenient; test suites miss ~5-15% more negative-path cases; code-generation correctness is preserved at `sonnet` (the implementer's standard tier). Single pipeline run is roughly **15-30% cheaper** and **15-30% slower** (more Phase 3 iteration loops). Suitable for personal projects, prototypes, and side-org workloads where the human reviewer at each STAGE-GATE is the trusted backstop — not for production-grade work where the standard mode's quality contract is load-bearing.
 
-**Low-cost matrix** (canonical — source of truth is `cmd/install/modes.go::lowCostMatrix`):
+**Low-cost matrix** (vestigial — Go installer infra decommissioned 2026-06-02; `cmd/install/modes.go::lowCostMatrix` is no longer the source of truth. Table kept for historical reference only.):
 
 | Agent | Standard model | Standard effort | Low-cost model | Low-cost effort | Notes |
 |---|---|---|---|---|---|
 | `orchestrator` | opus | high | sonnet | high | Coordination + gate routing; effort stays high so STAGE-GATE logic executes correctly. |
-| `architect` | opus | max | sonnet | high | Design work; effort high preserves depth-of-search. Human reads at STAGE-GATE-1. |
+| `architect` | opus | high | sonnet | high | Design work; effort high preserves depth-of-search. Human reads at STAGE-GATE-1. |
 | `agent-builder` | opus | max | sonnet | high | Agent/skill authoring; effort high preserves design depth. Human reviews the diff at PR time. |
 | `security` | opus | max | sonnet | high | Security audit; effort high is the cap. Human reads `04-security.md` at STAGE-GATE-2/3. |
 | `reviewer` | opus | max | sonnet | high | PR review gate; effort high preserves severity calibration. Human approves at STAGE-GATE-3. |
 | `reviewer-consolidator` | opus | high | sonnet | high | Multi-reviewer merge step; effort high preserves de-dup and contradiction detection quality. |
-| `qa` | opus | high | sonnet | high | AC validation; effort high retained — drives merge decision at STAGE-GATE-2/3. |
+| `qa-plan` | opus | high | sonnet | high | Pre-code AC work (ratify-plan, define-ac, reconcile); effort high retained — gates architect output. |
+| `qa` | sonnet | high | sonnet | high | Post-code AC validation; effort high retained — drives merge decision at STAGE-GATE-2/3. |
 | `plan-reviewer` | sonnet | medium | sonnet | medium | No change — already at the floor; gate role is inviolable. |
 | `gcp-cost-analyzer` | opus | high | sonnet | medium | Non-blocking advisory report; human decides on all output. |
-| `init` | opus | medium | sonnet | medium | One-shot bootstrap; human edits output before first commit. |
+| `init` | sonnet | medium | sonnet | medium | One-shot bootstrap; human edits output before first commit. |
 | `implementer` | sonnet | high | sonnet | medium | Model stays sonnet; effort drops to medium (more iteration loops via tester+qa). |
-| `tester` | sonnet | medium | sonnet | medium | No change — mechanical work; coverage gaps surface in AC trace. |
+| `tester` | sonnet | high | sonnet | medium | Effort high in standard; drops to medium in low-cost. |
+| `documenter` | sonnet | high | sonnet | medium | Effort high in standard; drops to medium in low-cost. |
 | `acceptance-checker` | sonnet | medium | sonnet | medium | No change — structural diff is mechanical; verdict is non-binding (Phase 3.6). |
 | `diagrammer` | sonnet | medium | sonnet | medium | No change — render-validate loop is the gate, not the model. |
 | `likec4-diagrammer` | sonnet | medium | sonnet | medium | No change — DSL validation catches errors. |
@@ -100,7 +103,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `translator` | sonnet | medium | sonnet | medium | No change — glossary is the contextual anchor; human reviews diff at PR time. |
 | `delivery` | sonnet | medium | sonnet | medium | No change — mechanical; reviewer audits at Phase 4.5; human approves PR. |
 
-**Tally:** all 18 agents on `sonnet` in low-cost mode. Effort: 7 × `high` (gate-makers + design heavyweights + acceptance auditors + consolidator), 11 × `medium` (everything else). No `max`, no `low`, no `haiku`, no `opus`.
+**Tally (standard mode):** 6 agents on `opus` (orchestrator, architect, agent-builder, security, reviewer-consolidator, qa-plan), remainder on `sonnet`. In low-cost mode, all on `sonnet`. No `max`, no `low`, no `haiku`.
 
 ## Adding or modifying an agent
 
