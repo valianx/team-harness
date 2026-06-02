@@ -84,7 +84,15 @@ You MUST write a single `01-plan.md` file that contains both the architecture pr
 
 #### Default: one PR per service
 
-The default is **one PR per service touched** by the feature. A split (>1 PR for the same service) is allowed ONLY when a valid temporal-prod reason exists. The closed list:
+**Situation → correct PR shape:**
+
+| Situation | Correct PR shape |
+|---|---|
+| Single repo, work ships together (all cases without a valid temporal-prod split reason below) | **1 PR, one commit per concern.** Push incrementally to the feature branch; open a single PR when the work is complete. The reviewer reads commit-by-commit — commit granularity is the reviewability strategy. |
+| Multiple independent deploy cadences OR multiple repos (valid temporal-prod reason below) | **N serial PRs, each based on fresh `main`.** Open and merge PR-N+1 only after PR-N lands on `main`; branch PR-N+1 from the updated `main`. See `agents/delivery.md` for the serial-merge contract. |
+| **Stacked PRs (child branch off a parent PR's branch)** | **PROHIBITED.** When the parent PR merges, GitHub automatically re-targets child PRs to the parent's base. Under rapid serial merges this re-targeting is asynchronous and races the merge — PRs silently lose their commits. See: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches |
+
+A split (>1 PR for the same service) is allowed ONLY when an independent deploy cadence exists. The closed list of valid split reasons covers **independent deploy cadences**, not size or reviewability:
 
 | Reason | When it applies |
 |---|---|
@@ -171,14 +179,15 @@ Ordered implementation steps. The implementer follows this sequence.
 
 ### Summary
 
-| PR | Service | Files | AC count | Depends on | Split reason |
-|----|---------|-------|----------|------------|--------------|
-| PR-1 | transactions | 4 | 5 | none | — |
-| PR-2 | payment-gateway | 2 | 3 | PR-1 | — |
-| PR-3 | transactions | 2 | 2 | PR-1 | coexistence window |
+| PR | Service | Base | Files | AC count | Depends on | Split reason |
+|----|---------|------|-------|----------|------------|--------------|
+| PR-1 | transactions | main | 4 | 5 | none | — |
+| PR-2 | payment-gateway | main | 2 | 3 | PR-1 | — |
+| PR-3 | transactions | main | 2 | 2 | PR-1 | coexistence window |
 
 Notes:
 - Rows in DAG order (Round 1 first: PRs with `Depends on: none`).
+- `Base` is the branch the PR targets. Default is `main`. Stacked PRs (base = a sibling branch) are PROHIBITED.
 - `Files` is the count, not the list — the list lives in the per-PR section.
 - `Split reason` is `—` when the service has only one PR; a closed-list value when it has more.
 
@@ -188,6 +197,7 @@ Notes:
 - **Title:** `{conventional-commit-style PR title, e.g., feat(reports): add GET /reports/daily endpoint}`
 - **Status:** pending
 - **Branch (suggested):** `feat/{kebab-case-name}`
+- **Base:** main
 - **Files:**
   - `{path}` (new|modify)
   - `{path}` (new|modify)
