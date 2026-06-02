@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.3] - 2026-06-02
+
+### Changed
+
+- Reframed the philosophy doc into a vision document (`docs/vision.md`), covering the destination and the two-level team model (each developer's agent team, and the developers as a shared human team); removed `docs/philosophy.md`.
+
 ## [2.47.2] - 2026-06-02
 
 ### Added
