@@ -249,6 +249,17 @@ if decisions_section is not inside review_summary_section:
 
 **Override:** the architect may add a `Plan-reviewer override: Rule 6 — {one-line justification}` block inside the affected section to degrade `fail` to `concerns`. Overuse is itself a smell — the human sees it at the gate.
 
+**Dissent check (conditional — E2 spec co-authoring).** When `spec_seed_dissents: true` is set in `00-state.md` (the orchestrator passes it in the task payload), verify:
+
+```
+if task_payload.spec_seed_dissents == true:
+    dissent_section = find subsection "### Architect Dissent on Seed" in review_summary_section
+    if dissent_section is None or dissent_section.line_count == 0:
+        findings.append(("Rule 6: spec_seed_dissents:true but ### Architect Dissent on Seed is absent from ## Review Summary", FAIL))
+```
+
+When `spec_seed_dissents: false` or the field is absent from the task payload: no-op (do NOT add a finding). This check must never produce a false positive when there is no seed or no dissent.
+
 ### Rule 7 — Regression Test Approach declared (Bug-fix Flow only)
 
 **Gating:** Rule 7 fires **only** when the task payload declares `type: fix` or `type: hotfix` (the orchestrator passes the `type` field from `00-state.md` in the task payload). For `type: feature | refactor | enhancement | research | spike` this rule is a no-op.
