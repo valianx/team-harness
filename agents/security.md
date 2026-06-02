@@ -782,6 +782,7 @@ context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}
 ```
 
@@ -801,6 +802,7 @@ When you finish pipeline mode and `04-security.md` reports any **Critical** or *
 ```markdown
 ## Iteration {N} — security — {YYYY-MM-DD HH:MM}
 **Root cause type:** D (security-only)
+**Blast radius:** localized {STEP-2} | structural
 
 ### Critical / High findings
 - [Critical] CWE-89 SQL injection — `src/users/users.repository.ts:42` — query string concatenation of `req.params.id`
@@ -812,6 +814,8 @@ When you finish pipeline mode and `04-security.md` reports any **Critical** or *
 - `src/auth/login.controller.ts:18` — add `@UseGuards(CsrfGuard)` and verify token on POST
 - ...
 ```
+
+**Blast radius guidance:** declare `localized {IDs}` when the finding is confined to specific, named implementation steps or files and a targeted fix resolves it. Declare `structural` when the finding reflects a design-level vulnerability or implicates multiple interconnected components. Default to `structural` when uncertain — security fixes must err on the side of full re-dispatch.
 
 Medium / Low / Info findings do NOT go in the brief — those are warnings included in the delivery report, not iteration triggers. Keep the brief tight: 5-10 lines per iteration.
 

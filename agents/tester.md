@@ -679,6 +679,7 @@ tests_deleted_reason: {one-line justification if tests_deleted > 0; otherwise om
 pre_fix_test_status: authored | skipped | null   # pre-fix-regression mode only; 'authored' when Phase 2.0 ran, 'skipped' when bug_tier: 1 no-behavior-change; null/omit in other modes
 regression_test_path: {test-file-path}    # pre-fix-regression mode AND Phase 3 post-fix verify (type: fix | hotfix); omit in other modes; null when pre_fix_test_status: skipped
 regression_test_status: failing | passing | skipped  # pre-fix-regression: 'failing' or 'skipped'; Phase 3 verify (post-fix): 'passing' or 'skipped'; omit in other modes
+blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
@@ -712,6 +713,7 @@ When you finish with `status: failed`, **append** an iteration entry to `workspa
 ```markdown
 ## Iteration {N} — tester — {YYYY-MM-DD HH:MM}
 **Root cause type:** A (implementation) | B (design) | C (criteria)
+**Blast radius:** localized {AC-2, STEP-3} | structural
 
 ### Failing tests
 - `path/to/foo.spec.ts:42` — `should validate token` — {1-line: assertion expected X, got Y}
@@ -721,6 +723,8 @@ When you finish with `status: failed`, **append** an iteration entry to `workspa
 - `src/auth/token.ts:18` — null check missing for empty token
 - ...
 ```
+
+**Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC or Step IDs and a targeted edit resolves it. Declare `structural` when the failure implicates the overall design, multiple interconnected components, or you cannot name the affected elements precisely. Default to `structural` when uncertain — the orchestrator uses this to determine whether to apply a bounded patch or a full re-dispatch.
 
 Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing — no re-reads of the full test report.
 
