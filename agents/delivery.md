@@ -648,6 +648,9 @@ gh pr create --base main \
 ## Main change (mandatory)
 {1-2 sentences in the user's voice — what does this PR DO from the user's perspective? Not "implements JWT", but "users now stay logged in for 30 days with rotating refresh tokens".}
 
+**Intake survey (conditional — include when `survey_source` in `00-state.md` is not null; omit entirely otherwise):** forma={full|fast}, esfuerzo={thorough|quick|agent-decides}, autonomía={manual|autonomous}, scope-hint="{text or none}", fuente={asked|confirmed|inferred}
+<!-- Prohibition: this line MUST NOT include security_sensitive or any gate status field. Read values from 00-state.md § Current State survey_* fields. -->
+
 ## File map (mandatory)
 Group changed files by intent so the reviewer can navigate by purpose:
 - **Entry points / new public surface:** `{file}` ({1-line role})
