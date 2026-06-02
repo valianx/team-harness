@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.47.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.47.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -152,9 +152,9 @@ All commands run from the repo root.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux. Avoid Unix-only tools or shell-specific syntax in agent prompts.
 - **KG content is technical-only.** The knowledge graph must never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
 - **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per successfully-completed task (Step 11.5 of its workflow). The insight is synthesised from workspaces + the CHANGELOG entry and describes what was learned that future tasks can reuse — not what changed (that's the CHANGELOG). The call is best-effort: if the Memory MCP server is unreachable or the task has no reusable learning, the step logs and skips. This builds team knowledge automatically without operator curation.
-- **Pipeline observability is mandatory.** Every pipeline run produces two observability artifacts in `workspaces/{feature}/`: `00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode) — append-only event trace, machine-readable, queryable with `jq` — and `00-pipeline-summary.md` (human-readable rollup, rewritten in full at every phase transition). Both are written exclusively by the orchestrator (agents return tool-usage counts in their status blocks; the orchestrator propagates them into the `tools` field of `phase.end` events and aggregates them into the summary). Every `phase.end` MUST include `tokens` (integer); when Agent()/Task() metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true` — zero is forbidden. Every KG write emits a reason-coded `kg_write` event (`attempted`/`succeeded` counters + the closed vocabulary `ok | skipped:mcp-down | skipped:malformed-call | skipped:policy-filtered`), aggregated by `/trace` into a write-integrity rollup so a silently-skipped KG write is never invisible. The `/trace <feature>` skill is the canonical 30-second answer to "did this pipeline work and were the tools effective?" and detects both formats automatically. The legacy `pipeline-metrics.json` / `done.yml` artifacts are deprecated. Writing observability events is mandatory, not best-effort: skipping appends to save tokens deletes the only signal we have on pipeline health. **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file.
+- **Pipeline observability is mandatory.** Every pipeline run produces `00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode) and `00-pipeline-summary.md`. Writing events is mandatory, not best-effort. **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Every decision involving a third-party library's API or configuration syntax must be verified against context7 before code is generated. Training-snapshot knowledge is treated as potentially stale. Mandatory triggers per agent are documented in `docs/context7-usage.md` §2 (architect, implementer, tester, security, translator); `init` is a light reference. Every consulting agent emits `context7_consult: hit:N miss:N skipped:M` in its status block — even when all counts are zero, the line's presence signals the agent considered freshness. Absence of context7 ≠ excuse to ignore the check: fall back to training knowledge and document the fallback in the workspace doc's `## Documentation Consulted` section.
-- **Bug-fix flow forces security review and mandatory regression test.** For `type: fix` and `type: hotfix`, `security-sensitive: true` is forced at Phase 0a Step 7 — the `security` agent runs at Phase 3 in parallel with `tester` and `qa` regardless of any other criterion. Defense-in-depth rationale: many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information), and fixes can introduce new vulnerabilities. The Bug-fix Pipeline also adds **Phase 2.0 — Regression Test Authoring** between STAGE-GATE-1 and Phase 2: the tester authors a failing test BEFORE the implementer touches source code. The regression test is mandatory always; there is no fallback path. The implementer runs under a scope-discipline contract that forbids tangential refactors. Tier 1-4 classification governs architect participation, regression-test gating, and Phase 3 agent set; path-pattern auto-escalation forces security-sensitive paths to Tier 3+. Full flow definition: `agents/ref-special-flows.md` § Bug-fix Flow § Tier System.
+- **Bug-fix flow forces security review and mandatory regression test.** For `type: fix` and `type: hotfix`, `security-sensitive: true` is forced — security runs at Phase 3 always. **Phase 2.0 — Regression Test Authoring** runs between STAGE-GATE-1 and Phase 2; the regression test is mandatory always. Full flow definition: `agents/ref-special-flows.md` § Bug-fix Flow § Tier System.
 - **Patch mode + selective verifier re-run.** Localized verifier failure: producer edits named elements only; orchestrator re-runs only the affected domain; coherence gate follows. Default is structural (full re-dispatch). Full contract: `docs/patch-mode.md`.
 - **Plan-review panel centralization** — `plan-review` runs up to 3 reviewers into ONE `01-plan.md`; worst-of combined verdict; preserve-in-place sub-verdicts; vacuous-success guard. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
@@ -226,17 +226,7 @@ Operator-facing copy presents facts, options, and outcomes. It does not perform 
 - Direct action descriptions: `X was executed`, `Y was updated`, `Z requires manual action by the operator`.
 - Concise summaries: a status block, a table, or a 2-3 sentence outcome. No padding, no celebration.
 
-Example — agent reporting the close of a verification phase:
-
-```
-Bad:  ✓ Phase 3/7 — Verify — completed
-        Agent: tester ✅ | qa ✅ | security ✅
-        Perfecto, todo limpio. Lista para la siguiente fase.
-
-Good: Verify complete.
-        tester: pass | qa: pass | security: clean
-        Next: acceptance gate.
-```
+See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
 ### 7.1.1 Internal chatter — IN/OUT table
 
@@ -281,48 +271,9 @@ Every committed artefact is in English. workspaces prose follows the operator's 
 
 ## 7b. Document Hygiene
 
-CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`.
+CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`. The delivery agent checks file size after every update; if CLAUDE.md exceeds **35 KB**, it must offload the largest non-structural section to `docs/` before committing. Hard cap: **40 KB** (Claude Code warns above this threshold).
 
-### File size cap
-
-**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing. Structural sections (§1-§7) are exempt — they shrink by extracting detailed tables/protocols to docs/ files (as done with §7.4-7.6 → `docs/voice-guide.md` and §14 protocol → `docs/subagent-orchestration.md`).
-
-### Section size rules
-
-| Section | Max entries in CLAUDE.md | Overflow target |
-|---------|------------------------|-----------------|
-| Architecture Decisions (§8) | 10 | `docs/decisions.md` |
-| Patterns & Conventions (§9) | 10 | `docs/patterns.md` |
-| Known Constraints (§10) | 10 | `docs/constraints.md` |
-| Testing Conventions (§11) | 10 | `docs/testing.md` |
-
-When a section exceeds its limit, the delivery agent extracts older entries to the overflow file and replaces the section body with a pointer:
-
-```
-See `docs/decisions.md` for the full log. Recent entries kept inline below.
-```
-
-### What belongs in CLAUDE.md vs docs/
-
-| CLAUDE.md | docs/ |
-|-----------|-------|
-| Golden commands (copy-paste ready) | Extended decision rationale |
-| Tech stack summary (one table) | Migration guides, ADRs |
-| Current conventions (active rules) | Historical patterns, superseded decisions |
-| Architectural boundaries (one-liners) | Detailed constraint analysis |
-| Pointers to docs/ files | The detailed content itself |
-
-### docs/ structure
-
-| File | Content | Updated by |
-|------|---------|-----------|
-| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | delivery agent |
-| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | delivery agent (auto-offload) |
-| `docs/patterns.md` | Patterns overflow (pattern + example path) | delivery agent (auto-offload) |
-| `docs/constraints.md` | Constraints overflow (constraint + detail) | delivery agent (auto-offload) |
-| `docs/testing.md` | Testing conventions overflow (convention + description) | delivery agent (auto-offload) |
-
-The delivery agent creates overflow files on first offload. Agents read `docs/knowledge.md` before every task; overflow files are read on-demand when the CLAUDE.md pointer section is relevant.
+See `docs/document-hygiene.md` for the section-size rules, the overflow targets, and the what-belongs-where tables.
 
 ---
 

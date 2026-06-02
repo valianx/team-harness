@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.1] - 2026-06-02
+
+### Changed
+
+- docs(claude-md): offload §5 observability/bug-fix detail, §7b hygiene tables, and §7 Voice examples to docs/ — recovers ~4 KB of headroom under the 36 KB durable guard (pure relocation, zero behavior change).
+
 ## [2.47.0] - 2026-06-02
 
 ### Added

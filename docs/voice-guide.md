@@ -2,6 +2,38 @@
 
 > Extracted from CLAUDE.md §7 to keep the main file under 40 KB. The core rules (§7.1 forbidden/required, §7.2 dev-natural verbs, §7.3 language summary) remain inline in CLAUDE.md. This file contains the full language rules, boundary tables, exceptions, and contributor checklist.
 
+## Voice §7.1 — full examples and rationale
+
+The four guidelines in CLAUDE.md §7 evolved from observed friction with the pre-2026-05 voice (enthusiasm markers in status blocks, phase-number jargon leaking into operator copy, Spanish prose in skill files). The rules are deliberately tight — a tool that speaks like a professional instrument frees the operator to focus on the actual work, which is designing solutions and solving problems.
+
+**Why the OUT list matters.** The items in the CLAUDE.md §7.1 OUT list are not style preferences — each has a documented failure mode observed in production runs:
+
+- **Enthusiasm markers** (the markers listed in the CLAUDE.md §7.1 OUT section) — operators reported them as patronizing and they buried the actual status signal in visual noise.
+- **First-person personality** (`Creo que…`, `My recommendation…`) — conflated agent analysis with personal preference, making it harder to challenge the output as a technical decision vs a recommendation.
+- **Anthropomorphic framing** (`Yo voy a…`, `I'm going to…`) — implied agency and intent; correct framing is "The system performs X" or "Next: X".
+- **Marketing tone** — obscures capability boundaries; a feature described as "potente" but that fails silently is harder to debug than one described accurately.
+- **Affirmations** (`Buena pregunta`, `That makes sense`) — consumed tokens without adding information; operators found them condescending over repeated interactions.
+- **Filler closings** — same: consumed tokens, added no signal, implied the operator needed permission to continue.
+- **Colloquialisms** — untranslatable across the international audience; formal equivalents are always available.
+
+**Full Bad/Good contrast:**
+
+Example — agent reporting the close of a verification phase (the Bad variant uses a prohibited enthusiasm marker; the Good variant uses dev-natural verbs and status literals):
+
+```
+Bad:  Phase 3/7 — Verify — completed
+        Agent: tester [ok] | qa [ok] | security [ok]
+        [enthusiasm-marker], todo limpio. Lista para la siguiente fase.
+
+Good: Verify complete.
+        tester: pass | qa: pass | security: clean
+        Next: acceptance gate.
+```
+
+The Good variant: (a) uses dev-natural stage vocabulary (`Verify`), not phase numbers; (b) uses status literals (`pass`, `clean`) not emoji or enthusiasm markers; (c) ends with the next action, not a filler closing.
+
+---
+
 ## Language — English-only repo content (§7.3 full)
 
 Every committed artefact is in English: `README.md`, all files under `docs/`, `agents/*.md`, `skills/*.md`, `CLAUDE.md`, `cmd/install/*.go` strings, `bin/install.{sh,ps1,cmd}` echoes, `hooks/*.sh` echoes, `.github/workflows/*.yml`, `CHANGELOG.md`, commit messages, PR titles and bodies.
