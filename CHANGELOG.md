@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.2] - 2026-06-02
+
+### Added
+
+- Philosophy document (`docs/philosophy.md`) stating the collaborative developer + agent-team model; linked from README.
+
 ## [2.47.1] - 2026-06-02
 
 ### Changed
