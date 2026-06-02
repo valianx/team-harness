@@ -29,6 +29,7 @@ Concretely, the team's rules are:
 4. **Cross-reference integrity.** Every file in the Work Plan (§ Architecture `### Work Plan`) appears in some PR's `Files:` field in `## Task List`.
 5. **Service identity.** The set of services declared in `01-plan.md` (`### Services Touched` under `## Architecture`) matches the union of `Service:` fields across all PRs in `## Task List`.
 6. **Human-readability sections.** `01-plan.md` opens with `## Review Summary` containing `### Decisions for human review` (3-5 bullets, hard cap 7) and `## Task List` contains a `### Summary` table covering every PR. These are the human's entry points at STAGE-GATE-1 — without them the reviewer is forced to read the full document to decide.
+9. **No stacked PRs.** The base of every PR is `main`. Stacked PRs (child branch off a parent PR's branch) are unconditionally prohibited — GitHub's async auto-retargeting on merge silently loses commits.
 
 None of these can be audited by `qa` or `acceptance-checker` without folding plan-shape into agents that already have distinct concerns. A separate, narrow, read-only agent keeps responsibilities clean and the audit deterministic.
 
@@ -82,7 +83,7 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 ## Audit Process
 
-Run the five rules in order. Each rule produces 0..N findings. The total set of findings determines the verdict.
+Run the rules in order. Each rule produces 0..N findings. The total set of findings determines the verdict.
 
 ### Rule 1 — One PR per service unless temporal-prod reason
 
@@ -308,17 +309,48 @@ For each PR section in `01-plan.md` (§ Task List):
 
 **Override:** the architect may NOT override Rule 8 to skip the regression-test AC reference — the operator override mandates regression test always, and Rule 8 is the structural anchor.
 
+### Rule 9 — No stacked PRs / base must be `main`
+
+**What to check:**
+
+1. For each PR in `01-plan.md` (§ Task List) that declares an explicit `Base:` field: the value MUST be `main`. Any other value (a sibling branch name, a feature branch, anything that is not the word `main`) is a finding.
+2. For each service that has more than one PR in `01-plan.md` (§ Task List): every PR for that service MUST declare a `Split reason:` drawn from the closed list (same list as Rule 1). A service split without a closed-list `Split reason:` is a finding. (This is the stacking signal: the architect is splitting a single-repo service without a valid temporal-prod reason.)
+
+**Absence tolerance:** a PR with no `Base:` field at all is treated as `Base: main` implicitly — no finding. Only an explicit `Base:` value that is not `main` triggers this rule.
+
+**Detection algorithm:**
+
+```
+PRs = parse PRs from 01-plan.md § Task List
+for pr in PRs:
+    if pr.base is not None and pr.base.strip() != "main":
+        findings.append((pr.id, f"Rule 9: PR-{pr.id} declares Base: '{pr.base}' — base must be main; stacked PRs are PROHIBITED"))
+
+by_service = group(PRs, key=service)
+for service, group in by_service:
+    if len(group) > 1:
+        for pr in group:
+            if pr.split_reason is None or pr.split_reason.lower() not in VALID_REASONS:
+                findings.append((pr.id, f"Rule 9: service '{service}' split across {len(group)} PRs without a valid closed-list Split reason — consolidate or cite a valid reason"))
+```
+
+Note: Rule 9's split-check is complementary to Rule 1's split-check. Rule 1 fires when a service has >1 PR with a missing/invalid `Split reason:`. Rule 9 fires from the angle of stacking detection — the same structural signal. Both rules should produce consistent findings on the same input.
+
+**Severity:** `fail`. A PR whose base is not `main` will cause silent commit loss via GitHub's async auto-retargeting on merge. A service split without a valid reason is the structural pattern the prohibition is designed to prevent.
+
+**Override:** the architect may NOT override Rule 9. Stacked PRs are unconditionally prohibited.
+
 ---
 
 ## Verdict Calibration
 
 | Verdict | When |
 |---|---|
-| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 always; Rules 7-8 when `type: fix | hotfix`). |
+| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rules 7-8 when `type: fix | hotfix`). |
 | `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), or rule 7 size overflow (>120 lines in `01-root-cause.md`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
-| `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), rule 6 missing-section without an override, **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
+| `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
 
-**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, and 8 are; rules 3, 4, 5, 6-overflow/order, and 7-size-overflow are not.
+**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, and 9 are; rules 3, 4, 5, 6-overflow/order, and 7-size-overflow are not.
 
 **Rules 7 and 8 are no-ops for non-bug-fix types.** When the task payload declares `type: feature | refactor | enhancement | research | spike`, Rules 7 and 8 do not fire (zero findings, no severity assigned). The plan-reviewer determines applicability from the `type` field passed in the task payload (sourced from `00-state.md`).
 
@@ -349,6 +381,7 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 | 6 — Human-readability sections | {N} | mixed (missing=fail, overflow/order=concerns) |
 | 7 — Regression Test Approach (Bug-fix) | {N} | mixed (structural=fail, size=concerns); no-op for non-fix |
 | 8 — Regression test AC cross-ref (Bug-fix) | {N} | fail-blocking; no-op for non-fix |
+| 9 — No stacked PRs / base must be main | {N} | fail-blocking |
 | **Total** | **{N}** | — |
 
 ## Findings
@@ -396,6 +429,11 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 - 01-plan.md:{line} — PR-{id} AC declares regression test at `{path-A}` but `02-regression-test.md` declares `{path-B}` — mismatch (FAIL; only checked after Phase 2.0 has run).
 (or "Not applicable — `type` is `feature | refactor | ...`. Rule 8 is a no-op for non-bug-fix types.")
 (or "None — every PR's AC block references the regression test path (or `<TBD-Phase-2.0>` placeholder before Phase 2.0).")
+
+### Rule 9 — No stacked PRs / base must be main
+- 01-plan.md:{line} — PR-{id} declares Base: `{value}` — base must be `main`; stacked PRs are PROHIBITED (FAIL).
+- 01-plan.md:{line} — service `{service}` split across {N} PRs without a valid closed-list Split reason — cite coexistence window, production signal, or cross-repo deploy gate, or consolidate into one PR (FAIL).
+(or "None — all declared Base: fields are main (or absent, treated as main); all service splits cite a valid temporal-prod reason.")
 
 ### Overrides honoured
 - PR-{id}: `Plan-reviewer override: <one-line justification>` on Rule {N}. Finding kept; severity degraded from fail to concerns.
@@ -465,6 +503,7 @@ findings:
   - rule-6: {count}
   - rule-7: {count}    # Bug-fix Flow; reports 0 when type is not fix/hotfix
   - rule-8: {count}    # Bug-fix Flow; reports 0 when type is not fix/hotfix
+  - rule-9: {count}    # Always fires; stacked PRs / base ≠ main
 human_entry_points:
   tldr: {true|false}
   decisions_for_human_review: {true|false}
