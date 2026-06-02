@@ -347,7 +347,11 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
    - When a gate is reached: append `{"ts":"<ISO>","event":"gate","gate":"<gate-name>","action":"<stop|approved>"}`.
    - At pipeline end: append `{"ts":"<ISO>","event":"session.end","total_tokens":<sum of all phase tokens>,"total_duration_ms":<sum of all phase durations>}` and close the code fence (obsidian mode).
    - **This step comes FIRST** because events are append-only and must reflect real-time — backfilling after the fact loses timestamp accuracy.
-   - **Token tracking is mandatory.** Every `phase.end` event MUST include `tokens` and `duration_ms`. If the Agent() result does not expose usage metadata, estimate from the agent's status block or write `"tokens":0` — never omit the field.
+   - **Token tracking is mandatory.** Every `phase.end` event MUST include `tokens` (total integer) and `duration_ms`. The field rules are:
+     - `tokens` (total) — **REQUIRED** on every `phase.end`. Extract from the Agent()/Task() call result metadata when available. When metadata is not available (takeover dispatch via `Task()`, nested subagent without usage headers, or any context where `total_tokens` is not exposed), you MUST estimate using the heuristic: `tokens ≈ duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy phases. The escape `"tokens":0` is **FORBIDDEN** — a zero silently erases cost visibility.
+     - `tokens_in` / `tokens_out` (input/output split) — **OPTIONAL breakdown**. Include when the metadata exposes them (Agent() result on a standard orchestrator dispatch). Omit when only a total is available (takeover, Task() without usage metadata).
+     - `tokens_estimated: true` — **REQUIRED when the value is estimated** (not extracted from real metadata). Absent means the value was measured. This lets downstream tooling (`/trace`, Phase B rollup) distinguish measured from estimated with a trivial `jq` filter.
+   - **Takeover-specific fallback.** When top-level Claude dispatches via `Task()` during a takeover (see `docs/subagent-orchestration.md § Takeover Protocol`), `total_tokens` is not exposed in the result. Apply the heuristic (`duration_min × 1500` opus / `× 800` sonnet), emit `tokens: <estimated>` and `tokens_estimated: true`. Do NOT write `tokens: 0`.
 
 2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `## Current State` fields (including resolved override fields such as `clickup_workspace_id` — the resolved ClickUp workspace id from the session-scoped override, precedence `override > persistent`), mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
 
@@ -2538,7 +2542,7 @@ At the end of every pipeline run (single or batch), write metrics to `workspaces
 }
 ```
 
-**Token estimation:** for each phase, the orchestrator records an approximate token weight based on inputs and outputs of that phase (status block size + workspace doc reads + KG searches). Precision is not the goal — these are approximations for trend analysis (e.g. "design tends to use ~5K, verify ~15K, but this run hit 40K → look at the iteration root causes"). If you cannot estimate precisely, use the heuristic: `tokens_estimated ≈ duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy.
+**Token estimation (cross-reference only):** the canonical heuristic for estimating tokens when metadata is unavailable (`duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy) is now defined in the live **Phase Transition Protocol** above (step 1, "Token tracking is mandatory") and in the **Execution Events JSONL Schema** table (`tokens` / `tokens_estimated` rows). The definition no longer lives in this deprecated section — read those locations for the authoritative fallback rule.
 
 **`iterations.root_causes`:** every iteration must record its case (A/B/C/D from Phase 3) and a one-line summary. This is the data that powers harness simplification later — without it, you cannot tell whether a gate caught real bugs or just produced false alarms.
 
@@ -2677,8 +2681,10 @@ Every line is a JSON object with these fields:
 | `agent` | conditional | Agent name. Required for `phase.*` events. |
 | `status` | conditional | `success` / `failed` / `blocked` / `skipped`. Required for `phase.end`. |
 | `duration_ms` | conditional | Wall-clock duration in milliseconds. Required for `phase.end`. |
-| `tokens_in` | optional | Approx input tokens consumed by this agent invocation. Use the same heuristic as `tokens_estimated` in pipeline-metrics if precise count is not available. |
-| `tokens_out` | optional | Approx output tokens. |
+| `tokens` | conditional | Total tokens for this agent invocation (integer). **Required for `phase.end`.** Extract from Agent()/Task() metadata when available; otherwise estimate using the heuristic (`duration_min × 1500` opus / `× 800` sonnet) and set `tokens_estimated: true`. Never omit or write 0. |
+| `tokens_in` | optional | Input tokens (breakdown). Optional — include when the metadata exposes the split (standard orchestrator dispatch). Omit in takeover or Task()-without-metadata contexts. |
+| `tokens_out` | optional | Output tokens (breakdown). Optional — same conditions as `tokens_in`. |
+| `tokens_estimated` | conditional | Boolean, `true` when `tokens` was computed via the heuristic rather than extracted from real metadata. Absent means the value was measured. Required whenever `tokens` is estimated. |
 | `iteration` | optional | Iteration number (0 for first pass, 1+ for retries). |
 | `verdict` | conditional | `pass` / `concerns` / `fail` / `partial-fail`. Required for `gate.*` and `stage.gate` events from Phases 1.5, 1.6, 3.6, STAGE-GATE-1. `partial-fail` is specific to `stage.gate stage: 2` when at least one PR in the round failed. |
 | `decision` | conditional | User reply at a stage gate: `approved` / `approved-autonomous` / `rejected` / `edit` / `next` / `next-autonomous` / `stop` / `redo` / `ship` / `amend` / `abort`. Required for `stage.gate.release`. |
@@ -2697,11 +2703,11 @@ Every line is a JSON object with these fields:
 {"ts":"2026-05-01T14:00:00-03:00","event":"pipeline.start","feature":"auth-jwt","extra":{"type":"feature","complexity":"standard","ac_count":5}}
 {"ts":"2026-05-01T14:00:12-03:00","event":"dispatch.blocked","feature":"auth-jwt","phase":"0a-intake","reason":"task tool stripped","action":"top-level takeover per CLAUDE.md §14"}
 {"ts":"2026-05-01T14:00:42-03:00","event":"phase.start","feature":"auth-jwt","phase":"1-design","agent":"architect","iteration":0}
-{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
+{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens":6300,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
 {"ts":"2026-05-01T14:03:25-03:00","event":"gate.pass","feature":"auth-jwt","phase":"1.5-ratify-plan","verdict":"pass","summary":"5/5 AC covered by Work Plan"}
 {"ts":"2026-05-01T14:18:52-03:00","event":"iteration.start","feature":"auth-jwt","phase":"3-verify","iteration":1,"summary":"AC-3 missing null check"}
 {"ts":"2026-05-01T14:25:11-03:00","event":"gate.fail","feature":"auth-jwt","phase":"3.5-acceptance-gate","verdict":"fail","summary":"AC-2 has no passing test"}
-{"ts":"2026-05-01T14:30:00-03:00","event":"phase.end","feature":"auth-jwt","phase":"4-delivery","agent":"delivery","status":"success","duration_ms":120000,"summary":"PR #40 opened, version 0.7.0 → 0.8.0","tools":{"kg_passive_capture":"written"}}
+{"ts":"2026-05-01T14:30:00-03:00","event":"phase.end","feature":"auth-jwt","phase":"4-delivery","agent":"delivery","status":"success","duration_ms":120000,"tokens":1600,"tokens_estimated":true,"summary":"PR #40 opened, version 0.7.0 → 0.8.0","tools":{"kg_passive_capture":"written"}}
 {"ts":"2026-05-01T14:30:00-03:00","event":"pipeline.end","feature":"auth-jwt","status":"success","duration_ms":1800000,"extra":{"iterations":1,"ac_passed":5,"ac_total":5}}
 ```
 

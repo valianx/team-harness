@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.42.1] - 2026-06-02
+
+### Fixed
+
+- Reconciled the tokens-required-vs-optional contradiction in the Phase Transition Protocol: `tokens` (total integer) is now REQUIRED on every `phase.end`; the silent escape `"tokens":0` is FORBIDDEN; the estimation heuristic (`duration_min × 1500` opus / `× 800` sonnet) is the mandatory fallback when Agent()/Task() metadata is absent, and `tokens_estimated:true` marks estimated values.
+- Relocated the heuristic formula from the deprecated `Pipeline Metrics` section to the live Phase Transition Protocol and JSONL schema table; the deprecated section now contains only a cross-reference.
+
 ### Changed
 
+- Takeover Pipeline Manifest (`docs/subagent-orchestration.md`) now explicitly declares the token-emission obligation for takeover-dispatched agents: apply the heuristic when `Task()` does not expose `total_tokens`, emit `tokens_estimated:true`, and never write `tokens:0`.
+- CLAUDE.md §5 "Pipeline observability is mandatory" now names `tokens` as an explicit requirement of every `phase.end`, including the takeover case (estimated + marked).
 - Stacked PRs (child branch off a parent PR's branch) are now explicitly prohibited across the agent system: `architect.md` reframes the default (single-repo long tasks → 1 PR, many commits), adds a situation→shape table, and adds a `Base:` field (default `main`) to the per-PR schema; `delivery.md` adds the named stacking prohibition and a serial-merge contract for multi-PR plans (open PR-N+1 only after PR-N lands, branch from updated `main`, rebase before merge); `plan-reviewer.md` adds Rule 9 (severity `fail`: any declared `Base:` ≠ `main`, or a service split without a valid closed-list reason) with coherent updates to the Verdict Calibration table, the report Summary table, the Findings block, and the Return Protocol; `orchestrator.md` adds a note distinguishing DAG implementation order (parallel worktrees per round) from merge order to `main` (always serial, governed by `delivery.md`).
 
 ## [2.42.0] - 2026-06-01
