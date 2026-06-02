@@ -769,37 +769,51 @@ check("orchestrator.md requires Plan Review section present before STAGE-GATE-1"
       or "Plan Review` section with a `**Verdict:**" in orchestrator_md,
       "orchestrator.md does not require Plan Review section presence before STAGE-GATE-1")
 
-# 10. orchestrator.md defines inline fallback when Task subagent invocation fails
-check("orchestrator.md defines inline fallback for plan-review subagent failures",
-      "Inline fallback" in orchestrator_md
-      and "not available as subagent_type" in orchestrator_md
-      and "Task is not available inside subagents" in orchestrator_md,
-      "orchestrator.md does not define inline fallback for nested-subagent constraint")
-check("orchestrator.md inline fallback procedure references plan-reviewer.md as spec",
-      "Read `agents/plan-reviewer.md`" in orchestrator_md,
-      "orchestrator.md inline fallback does not point to plan-reviewer.md as procedure spec")
-# Closing-consistency guard (C-01): the inline-fallback Rule 1 split-reason list
-# MUST match the canonical closed list in plan-reviewer.md (single source of truth)
-# and MUST NOT carry the stale/invalid reasons that drifted here once.
-check("orchestrator.md inline fallback Rule 1 uses the canonical split-reason closed list",
-      "coexistence window" in orchestrator_md
-      and "production signal" in orchestrator_md
-      and "cross-repo deploy gate" in orchestrator_md,
-      "orchestrator.md inline fallback Rule 1 does not reference the canonical"
-      " split-reason closed list (coexistence window / production signal / cross-repo deploy gate)")
-check("orchestrator.md inline fallback Rule 1 does NOT list oas-bump / breaking-change-isolation as valid split reasons",
-      "OAS bump independence" not in orchestrator_md
-      and "breaking-change isolation)" not in orchestrator_md,
-      "orchestrator.md inline fallback Rule 1 still lists an invalid split reason"
-      " (OAS bump independence / breaking-change isolation) — contradicts plan-reviewer.md canonical closed list")
-check("orchestrator.md emits mode: subagent | inline for telemetry",
-      "mode: subagent | inline" in orchestrator_md or "mode: subagent" in orchestrator_md,
-      "orchestrator.md status block does not distinguish subagent vs inline execution")
+# 10. orchestrator.md defines mandatory dispatch_handoff for nested-context plan-review/ux-review
+#     (replaces the old inline-fallback checks, retired in v2.48 — the inline-fallback
+#      blocks pre-dated the Takeover Protocol and allowed the plan-review panel to
+#      self-grade silently, skipping the security design-review in nested context).
+#
+#     New contract (AC-1, AC-2, AC-4):
+#       - Phase 1.6 and Phase 1.7 MUST emit dispatch_handoff in nested context.
+#       - The stale "Execute the audit yourself" / "Execute the enrich review yourself"
+#         strings MUST be absent (if present, the old inline-fallback was re-introduced).
+#       - The canonical nesting-error variants are still referenced so operators understand
+#         the trigger condition.
+#       - The plan-reviewer.md split-reason closed list is owned by plan-reviewer.md alone;
+#         the orchestrator no longer duplicates it here.
+check("orchestrator.md instructs mandatory dispatch_handoff for plan-review in nested context",
+      "dispatch_handoff" in orchestrator_md
+      and "th:plan-reviewer" in orchestrator_md,
+      "orchestrator.md does not wire dispatch_handoff to plan-reviewer for nested-context handling"
+      " — the mandatory handoff directive must be present in the Phase 1.6 section")
+check("orchestrator.md instructs mandatory dispatch_handoff for ux-reviewer in nested context",
+      "dispatch_handoff" in orchestrator_md
+      and "th:ux-reviewer" in orchestrator_md,
+      "orchestrator.md does not wire dispatch_handoff to ux-reviewer for nested-context handling"
+      " — the mandatory handoff directive must be present in the Phase 1.7 section")
+check("orchestrator.md does NOT instruct plan-review self-execution in nested context",
+      "Execute the audit yourself" not in orchestrator_md,
+      "orchestrator.md still contains 'Execute the audit yourself' — the Phase 1.6 inline-fallback"
+      " self-run must be replaced by a dispatch_handoff directive")
+check("orchestrator.md does NOT instruct ux-review self-execution in nested context",
+      "Execute the enrich review yourself" not in orchestrator_md,
+      "orchestrator.md still contains 'Execute the enrich review yourself' — the Phase 1.7"
+      " ux-reviewer inline self-run must be replaced by a dispatch_handoff directive")
+check("orchestrator.md references nesting-error trigger conditions for the nested-context handoff",
+      "not available as subagent_type" in orchestrator_md
+      or "Task is not available inside subagents" in orchestrator_md
+      or "nesting refusal" in orchestrator_md,
+      "orchestrator.md does not describe the nesting error conditions that trigger the handoff")
 
-# 11. orchestrator.md ties both execution modes to the same max-3 budget
-check("orchestrator.md subjects subagent + inline runs to the same max-3 budget",
-      "same max-3 budget" in orchestrator_md or "does not reset the counter" in orchestrator_md,
-      "orchestrator.md does not bind subagent+inline runs to the same iteration budget")
+# 11. orchestrator.md declares the plan-review iteration budget
+# (the old check asserted 'same max-3 budget' OR 'does not reset the counter';
+#  after the inline-fallback retirement the 'does not reset the counter' wording is gone
+#  because there is no longer a dual subagent/inline execution path — only subagent.
+#  'same max-3 budget' still appears in the Phase 1.5 iteration note so the check passes.)
+check("orchestrator.md declares the max-3 budget for plan-review round trips",
+      "same max-3 budget" in orchestrator_md or "max-3 budget" in orchestrator_md,
+      "orchestrator.md does not declare the max-3 iteration budget for plan-review round trips")
 
 # 12. Self-describing task-list contract — architect.md declares the Status field
 implementer_md = read(AGENTS_DIR / "implementer.md")
@@ -8692,7 +8706,7 @@ _S42_ENRICH_ANCHOR    = "### When frontend_scope: true — ux-reviewer enrich (P
 _S42_VALIDATE_ANCHOR  = "### When frontend_scope: true — ux-reviewer validate (Phase 3.4)"
 _S42_GATE35_ANCHOR    = "### UX gate — frontend_scope: true"
 _S42_CHECKLIST_ANCHOR = "### Phase Checklist — frontend_scope additions"
-_S42_FALLBACK_ANCHOR  = "### ux-reviewer fallback"
+_S42_FALLBACK_ANCHOR  = "### Phase 1.7 — ux-reviewer nested-context handoff"
 _S42_ACSINK_ANCHOR    = "### AC sink — 01-plan.md § Task List"
 
 # ---- slices ----------------------------------------------------------------
@@ -8836,20 +8850,23 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (6) / AC-6 — orchestrator.md ux-reviewer fallback block:
-# Inline/nested fallback documented, mirroring the plan-reviewer fallback tree.
-# Status-block gate reads verdict from findings.critical.
-# Tokens: "findings.critical" + "inline" + one of ("nested", "fallback") +
-# one of ("ux-reviewer.md", "agents/ux-reviewer.md") as the spec reference.
+# Check (6) / AC-6 — orchestrator.md ux-reviewer nested-context handoff block:
+# Nested-context handling documented: mandatory dispatch_handoff to ux-reviewer.
+# Status-block gate reads findings.critical; gate is advisory (non-blocking at 1.7).
+# Tokens: "findings.critical" + "dispatch_handoff" + one of ("nested", "handoff") +
+# one of ("ux-reviewer", "th:ux-reviewer") as the target agent reference.
+# (The old check required an inline-execution spec; the inline path was retired
+# in v2.48 and replaced with a dispatch_handoff contract — AC-2 of the
+# nested-inline-fallback-contract-fix PR.)
 # ---------------------------------------------------------------------------
-_S42_FALLBACK_BASE = ("findings.critical", "inline")
-_S42_FALLBACK_ALTS = ("nested", "fallback")
-_S42_FALLBACK_SPEC = ("ux-reviewer.md", "agents/ux-reviewer.md")
+_S42_FALLBACK_BASE = ("findings.critical", "dispatch_handoff")
+_S42_FALLBACK_ALTS = ("nested", "handoff")
+_S42_FALLBACK_SPEC = ("ux-reviewer", "th:ux-reviewer")
 
 check(
-    "frontend-wiring(6/ac-6): orchestrator.md ux-reviewer fallback anchor"
-    " documents inline/nested fallback path; verdict derived from findings.critical;"
-    " ux-reviewer.md referenced as spec",
+    "frontend-wiring(6/ac-6): orchestrator.md ux-reviewer nested-context handoff anchor"
+    " documents mandatory dispatch_handoff; verdict derived from findings.critical;"
+    " th:ux-reviewer referenced as target agent",
     bool(_s42_fallback_slice)
     and all(t in _s42_fallback_slice for t in _S42_FALLBACK_BASE)
     and any(a in _s42_fallback_slice for a in _S42_FALLBACK_ALTS)
@@ -11286,7 +11303,13 @@ for _kw in _S48_NEW_KEYWORDS_SEC_DR3:
 
 # -- Group E: new slices for item 2 (preserve-in-place) --
 _S48_ORCH_P16_DISPATCH_ANCHOR  = "## Phase 1.6 — Plan Review (Stage 1 closing gate)"
-_S48_ORCH_INLINE_FALLBACK_ANCHOR = "### Inline fallback when Task subagent invocation is not available"
+# The old "### Inline fallback when Task subagent invocation is not available"
+# section was retired in v2.48 (nested-inline-fallback-contract-fix) and replaced
+# by "### Phase 1.6 — Plan Review — nested-context handoff".  The inline-fallback
+# wrote ## Plan Review inline (with destructive semantics) which re-opened the
+# preserve-in-place bug PR H fixed.  Now the section only emits dispatch_handoff —
+# no inline write occurs, so the preserve-in-place contract is moot for this path.
+_S48_ORCH_INLINE_FALLBACK_ANCHOR = "### Phase 1.6 — Plan Review — nested-context handoff"
 
 _s48_orch_p16_dispatch_slice   = _slice_section(_s48_orch, _S48_ORCH_P16_DISPATCH_ANCHOR)
 _s48_orch_inline_fallback_slice = _slice_section(_s48_orch, _S48_ORCH_INLINE_FALLBACK_ANCHOR)
@@ -11324,22 +11347,20 @@ check(
 
 check(
     "recover-dedup(15b/ac-5+ac-6): orchestrator.md"
-    " § Inline fallback when Task subagent invocation is not available"
-    " step 4 uses preserve-in-place semantics"
-    " (sub-verdicts **Substance (qa):** / **Security design-review (security):**"
-    " preserved; destructive 'Replace the section if it already' absent)",
+    " § Phase 1.6 — Plan Review — nested-context handoff"
+    " emits dispatch_handoff (no inline write) and does NOT contain the old destructive"
+    " 'Replace the section if it already' phrase",
     bool(_s48_orch_inline_fallback_slice)
-    and any(t in _s48_orch_inline_fallback_slice for t in _S48_PRESERVE_ALTS)
+    and "dispatch_handoff" in _s48_orch_inline_fallback_slice
     and _S48_DESTRUCTIVE_INLINE not in _s48_orch_inline_fallback_slice,
     f"anchor '{_S48_ORCH_INLINE_FALLBACK_ANCHOR}' missing from orchestrator.md"
-    f" or preserve-in-place fix not applied to inline-fallback step 4;"
+    f" or the nested-context handoff section does not wire dispatch_handoff;"
     f" anchor present: {bool(_s48_orch_inline_fallback_slice)};"
-    f" preserve-token found: {any(t in _s48_orch_inline_fallback_slice for t in _S48_PRESERVE_ALTS)};"
+    f" dispatch_handoff present: {'dispatch_handoff' in _s48_orch_inline_fallback_slice};"
     f" destructive phrase still present: {_S48_DESTRUCTIVE_INLINE in _s48_orch_inline_fallback_slice}"
-    f" — implementer must reconcile :1268 (inline-fallback step 4) to preserve-in-place"
-    f" semantics (PR H § Plan-review panel centralization contract at :1338);"
-    f" preserve **Substance (qa):** / **Security design-review (security):**;"
-    f" remove 'Replace the section if it already exists'",
+    f" — the inline-fallback for plan-review was retired (v2.48+): check"
+    f" that orchestrator.md has '### Phase 1.6 — Plan Review — nested-context handoff'"
+    f" with a dispatch_handoff directive (no inline ## Plan Review write).",
 )
 
 # ---------------------------------------------------------------------------
@@ -11838,6 +11859,173 @@ check(
     f" Suite 50 must be registered only in docs/testing.md, not in CLAUDE.md §11;"
     f" §11 slice found: {bool(_s50_claude_s11)}"
     " — remove 'Suite 50' from CLAUDE.md §11 and register it in docs/testing.md",
+)
+
+
+# ---------------------------------------------------------------------------
+# Suite 51 — nested-inline-fallback-contract-fix (Phase 2.0 regression test)
+# ---------------------------------------------------------------------------
+# Guards the contract that the orchestrator NEVER self-runs reviewers inline
+# in a nested context (Task tool unavailable).  In both Phase 1.6 (plan-review)
+# and Phase 1.7 (ux-reviewer), the ONLY permitted response to a Task-nesting
+# refusal is to emit a dispatch_handoff directed at the real reviewer agent.
+#
+# Defect being locked out:
+#   - orchestrator.md:1330-1357 "Inline fallback when Task subagent invocation
+#     is not available" instructed: "Execute the audit yourself" (plan-review).
+#   - orchestrator.md:1242-1261 "ux-reviewer fallback" instructed:
+#     "Execute the enrich review yourself" (ux-reviewer).
+# Both blocks pre-date the Takeover Protocol and contradict the canonical
+# Dispatch-blocked exit (orchestrator.md:51-77) and Dispatch invariant #2
+# (orchestrator.md:116: "Never substitute yourself for a subagent…
+# There is no degraded mode.").
+#
+# Legitimate inline paths (NOT flagged — fenced by AC-5):
+#   - Tier-1/hotfix self-authoring of 01-plan.md (orchestrator.md:1436-1439,1478)
+#   - --fast carve-out / security-review wiring (orchestrator.md:1328)
+# Those paths write *artefacts* in the absence of a producer agent; they are
+# categorically different from self-grading a reviewer role.
+#
+# AC-6 + AC-7 coverage:
+#   (a) ABSENCE assertions — these FAIL pre-fix (strings are present today).
+#   (b) PRESENCE assertions — these FAIL pre-fix (dispatch_handoff not yet wired).
+#   Both classes must PASS after the implementer's fix.
+#
+# Security hardening note (from plan-review panel):
+#   Each site is asserted independently so a half-fix (one site left) still
+#   FAILS.  A single combined assertion could pass against a half-fix.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 51: nested-inline-fallback-contract-fix ===")
+
+_orch_s51 = orchestrator_md  # orchestrator.md content, read earlier in Suite 18
+
+# -----------------------------------------------------------------------
+# (a) ABSENCE assertions — self-execution strings must NOT be present
+#     after the fix.  Pre-fix: strings ARE present → assertions FAIL.
+# -----------------------------------------------------------------------
+
+# (a1) Fase 1.6 plan-review: "Execute the audit yourself"
+#      Present today at orchestrator.md:1339 (inside the Inline fallback block).
+check(
+    "Suite 51(a1): orchestrator.md does NOT instruct 'Execute the audit yourself'"
+    " — plan-review self-run must be replaced by dispatch_handoff",
+    "Execute the audit yourself" not in _orch_s51,
+    "orchestrator.md:~1339 still contains 'Execute the audit yourself' — "
+    "the Phase 1.6 inline-fallback block has not been replaced by a dispatch_handoff directive; "
+    "this string must be absent after the fix",
+)
+
+# (a2) Fase 1.7 ux-reviewer: "Execute the enrich review yourself"
+#      Present today at orchestrator.md:1249 (inside the ux-reviewer fallback block).
+check(
+    "Suite 51(a2): orchestrator.md does NOT instruct 'Execute the enrich review yourself'"
+    " — ux-reviewer self-run must be replaced by dispatch_handoff",
+    "Execute the enrich review yourself" not in _orch_s51,
+    "orchestrator.md:~1249 still contains 'Execute the enrich review yourself' — "
+    "the Phase 1.7 ux-reviewer fallback block has not been replaced by a dispatch_handoff directive; "
+    "this string must be absent after the fix",
+)
+
+# -----------------------------------------------------------------------
+# (b) PRESENCE assertions — dispatch_handoff wiring must appear in BOTH
+#     the plan-review region and the ux-reviewer region after the fix.
+#     Pre-fix: these wording strings do NOT exist in those regions → FAIL.
+#
+#     Strategy: slice each phase's region by its section header so an
+#     ambient dispatch_handoff elsewhere in the file cannot produce a
+#     false-green.  The region extends from the section header to the
+#     next "---" horizontal rule or next "##" section header, whichever
+#     comes first.
+# -----------------------------------------------------------------------
+
+def _slice_section(text: str, start_marker: str, stop_markers: tuple[str, ...]) -> str:
+    """Return the substring from start_marker to the first stop_marker found after it."""
+    idx = text.find(start_marker)
+    if idx == -1:
+        return ""
+    tail = text[idx:]
+    end = len(tail)
+    for stop in stop_markers:
+        pos = tail.find(stop, len(start_marker))
+        if pos != -1 and pos < end:
+            end = pos
+    return tail[:end]
+
+_PHASE16_HEADER = "### Inline fallback when Task subagent invocation is not available"
+_PHASE17_HEADER = "### ux-reviewer fallback"
+
+# Post-fix, the inline-fallback headers will be replaced; the new region
+# will carry "dispatch_handoff" instead.  Both absence assertions above
+# already catch the stale *content* of those blocks; the presence
+# assertions below verify the *replacement* content is wired.
+# We anchor the presence check to the surrounding Phase 1.6 / 1.7 prose
+# rather than the (now-absent) stale headers, so the region still resolves
+# correctly post-fix.
+
+_PHASE16_ANCHOR = "### Phase 1.6 — Plan Review"
+_PHASE17_ANCHOR = "### Phase 1.7"
+
+_STOP_MARKERS = ("\n## ", "\n---\n", "\n### Phase 1.5", "\n### Phase 1.6", "\n### Phase 2")
+
+_phase16_region = _slice_section(_orch_s51, _PHASE16_ANCHOR, _STOP_MARKERS)
+_phase17_region = _slice_section(_orch_s51, _PHASE17_ANCHOR, _STOP_MARKERS)
+
+# (b1) Fase 1.6: the plan-review region must reference dispatch_handoff
+#      directing top-level Claude to run plan-reviewer as a real subagent.
+check(
+    "Suite 51(b1): orchestrator.md Phase 1.6 region references 'dispatch_handoff'"
+    " for plan-reviewer nested-context handling",
+    "dispatch_handoff" in _phase16_region,
+    "orchestrator.md Phase 1.6 region (from '### Phase 1.6 — Plan Review' to next "
+    "section boundary) does not contain 'dispatch_handoff' — "
+    "the nested-context handling must emit a dispatch_handoff to plan-reviewer, "
+    "not self-execute the audit inline; add the handoff directive in that section",
+)
+
+# (b2) Fase 1.7: the ux-reviewer region must reference dispatch_handoff
+#      directing top-level Claude to run ux-reviewer as a real subagent.
+check(
+    "Suite 51(b2): orchestrator.md Phase 1.7 region references 'dispatch_handoff'"
+    " for ux-reviewer nested-context handling",
+    "dispatch_handoff" in _phase17_region,
+    "orchestrator.md Phase 1.7 region (from '### Phase 1.7' to next section boundary) "
+    "does not contain 'dispatch_handoff' — "
+    "the nested-context handling must emit a dispatch_handoff to ux-reviewer, "
+    "not self-execute the enrich review inline; add the handoff directive in that section",
+)
+
+# -----------------------------------------------------------------------
+# (c) Fence — legitimate inline paths must NOT be disturbed.
+#     These are PRESENCE assertions that must pass both pre-fix AND post-fix.
+#     If any goes red, the fix over-reached and removed a legitimate inline path.
+# -----------------------------------------------------------------------
+
+# (c1) Tier-1/hotfix self-authoring of 01-plan.md (orchestrator.md:1436-1439)
+check(
+    "Suite 51(c1): Tier-1/hotfix self-authoring contract still present"
+    " (orchestrator authors 01-plan.md for type:hotfix / fix Tier 1)",
+    "orchestrator authors `01-plan.md`" in _orch_s51
+    or "orchestrator-self-authored" in _orch_s51
+    or "Tier-1-fix authoring pattern" in _orch_s51,
+    "legitimate Tier-1/hotfix self-authoring path was accidentally removed — "
+    "only the reviewer self-run paths must be replaced; "
+    "check orchestrator.md:~1436-1439,1478",
+)
+
+# (c2) Phase 1.6 inviolable declaration must still be present (unchanged)
+check(
+    "Suite 51(c2): 'Phase 1.6 is inviolable' contract still present",
+    "Phase 1.6 is inviolable" in _orch_s51,
+    "Phase 1.6 inviolable contract was removed — must be preserved",
+)
+
+# (c3) Dispatch invariant #2 ("never substitute yourself / no degraded mode") still present
+check(
+    "Suite 51(c3): Dispatch invariant #2 'no degraded mode' still present",
+    "no degraded mode" in _orch_s51.lower()
+    or "There is no degraded mode" in _orch_s51,
+    "Dispatch invariant #2 was removed — must be preserved",
 )
 
 
