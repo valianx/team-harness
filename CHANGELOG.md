@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.46.0] - 2026-06-02
+
+### Added
+
+- `docs/discover-phase.md`: full Discover phase contract (Fase E1 of the pipeline-collaboration-cost-redesign program): default patient-by-default intake disposition, fast-path for clear tasks, advance signal definition (3 forms), intake survey with 4 attributable meta-decisions, 7 new `00-state.md` survey fields, observability (`phase: "0-discover"` events), PR `Intake survey:` line, and 6 hard invariants (HI-1..HI-6).
+- Discover phase disposition in `orchestrator.md` Step 6d/6e: architect fires only on explicit advance signal; intake survey captures shape/effort/autonomy/scope-hint as attributable `00-state.md` answers before Step 7; survey never writes `security_sensitive`; path-pattern auto-escalation remains input-independent of all survey answers.
+- 7 new `00-state.md` fields: `discover_state`, `advance_signal`, `survey_pipeline_shape`, `survey_effort`, `survey_iteration_autonomy`, `survey_scope_hint`, `survey_source`.
+- Conditional `Intake survey:` line in `delivery.md` PR body template (Step 11.2), enumerating shape/effort/autonomy/scope-hint/source — never includes `security_sensitive`.
+
 ## [2.45.0] - 2026-06-02
 
 ### Added
