@@ -250,3 +250,34 @@ The `operation.*` schema is the log target for the silent-on-success rule:
 - **On failure**: emit `operation.failed` to the events file AND surface one line to the operator: `{error} — {suggestion}`.
 
 Full behavioral contract: see `agents/_shared/output-template.md` § "Output Discipline".
+
+---
+
+## Working-agreement rationale (CLAUDE.md §5 long-form)
+
+This section contains the extended rationale for the pipeline observability working-agreement declared in CLAUDE.md §5. It was relocated from CLAUDE.md to keep the main file under its size cap (pure relocation — zero behavior change).
+
+### Why observability is mandatory, not best-effort
+
+Skipping event appends to save tokens deletes the only signal available to diagnose pipeline health. The working-agreement is strict: **Writing observability events is mandatory.** Every pipeline run produces two artifacts in `workspaces/{feature}/`:
+
+- `00-execution-events.jsonl` (local mode) — append-only event trace, machine-readable, queryable with `jq`
+- `00-execution-events.md` (obsidian mode) — same trace wrapped in YAML frontmatter + `# Execution Events` heading + ` ```jsonl ` code fence
+
+Both are written exclusively by the orchestrator. Agents return tool-usage counts in their status blocks; the orchestrator propagates them into the `tools` field of `phase.end` events and aggregates them into `00-pipeline-summary.md` (human-readable rollup, rewritten in full at every phase transition).
+
+### tokens field on phase.end
+
+Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/`Task()` metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true`. **Zero is forbidden** — a zero token count is indistinguishable from a missing field and breaks the cost rollup.
+
+### kg_write write-integrity rollup
+
+Every KG write emits a reason-coded `kg_write` event carrying `attempted`/`succeeded` counters and the closed vocabulary `ok | skipped:mcp-down | skipped:malformed-call | skipped:policy-filtered`. The `/th:trace` skill aggregates these into a write-integrity rollup so a silently-skipped KG write is never invisible.
+
+### /trace as the canonical 30-second answer
+
+The `/trace <feature>` skill is the canonical 30-second answer to "did this pipeline work and were the tools effective?". It detects both `.jsonl` (local) and `.md` (obsidian) formats automatically. The legacy `pipeline-metrics.json` / `done.yml` artifacts are deprecated in favor of the trace.
+
+### Tier 0 carve-out
+
+**Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. This is the only exception; all other pipeline types including Tier 1-4 bug fixes, features, refactors, and documentation flows are subject to the mandatory observability contract.
