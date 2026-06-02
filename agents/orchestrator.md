@@ -1697,6 +1697,7 @@ Next: delivery (or: iterating — implementer fixing N issues)
 ```markdown
 ## Iteration {N} — {agent} — {YYYY-MM-DD HH:MM}
 **Root cause type:** A (impl) | B (design) | C (criteria) | D (security-only)
+**Blast radius:** localized {AC-2, STEP-3} | structural
 
 ### Failures
 - {failing AC / test / check} — `{file:line}` — {1-line reason}
@@ -1713,10 +1714,36 @@ Next: delivery (or: iterating — implementer fixing N issues)
 - **Case C** if: brief flags the AC itself as contradictory, ambiguous, or incomplete.
 - **Case D** if: brief comes only from `security` with Critical/High findings, while tester+qa marked PASS.
 
-**Case A — Implementation issue:** route the brief verbatim to `implementer`. After fix → re-run tester+qa+security in parallel.
-**Case B — Design issue:** route to `architect` with the brief. After revised design → re-route to `implementer`. Then re-run all verifiers.
+**Step 2b — Classify blast radius and modulate routing:**
+
+Read the `**Blast radius:**` line from the brief (declared by the verifier, never inferred by you). Route based on the combination of case type + blast radius:
+
+| Case | Blast radius | Producer dispatch | Verifier re-run | Coherence gate |
+|------|-------------|-------------------|-----------------|----------------|
+| A | `localized {IDs}` | `implementer` — BOUNDED-PATCH on named IDs | `tester` + `qa` only (security skipped unless fix touches security-sensitive code) | `qa validate` on the patched AC |
+| A | `structural` | `implementer` — full re-implement | `tester` + `qa` + `security` (full) | standard acceptance gate |
+| B | `localized {IDs}` | `architect` — BOUNDED-PATCH on named IDs | `plan-reviewer` only | `plan-reviewer` on the patched plan |
+| B | `structural` | `architect` — full re-design | all verifiers (full) | standard acceptance gate |
+| C | any | adjust `01-plan.md` § Task List AC, mark change in brief | all verifiers (full) | standard acceptance gate |
+| D | `localized {IDs}` | `implementer` — BOUNDED-PATCH on named IDs | `security` only | `security` re-run (already the Case D pattern) |
+| D | `structural` | `implementer` — full re-implement | `security` only | standard security re-run |
+
+**Default to `structural` when the blast radius field is absent, ambiguous, or you cannot confirm the named IDs are self-contained.** Never narrow a structural change to a localized patch.
+
+**Step 2c — Coherence gate (mandatory after every localized patch):**
+
+After a producer applies a BOUNDED-PATCH (localized blast radius), run the coherence gate before proceeding. The gate is selective but never absent:
+- **Patch of implementation (Case A/D localized):** dispatch `qa` in validate mode limited to the patched AC IDs. A pass clears the iteration. A fail opens a new iteration (counts against the max-3 budget).
+- **Patch of plan (Case B localized):** dispatch `plan-reviewer` on the updated `01-plan.md`. A pass clears the iteration. A fail (or `concerns` that require edits) opens a new iteration.
+
+The coherence gate exists to catch partial patches that resolve the named failing element but introduce inconsistency elsewhere. Patch mode makes iteration cheaper (selective), never absent.
+
+**Case A — Implementation issue (full re-run):** route the brief verbatim to `implementer`. After fix → re-run tester+qa+security in parallel.
+**Case A — Implementation issue (localized):** dispatch `implementer` with BOUNDED-PATCH contract (named IDs only). After fix → re-run tester+qa, coherence gate via `qa validate`.
+**Case B — Design issue (full re-run):** route to `architect` with the brief. After revised design → re-route to `implementer`. Then re-run all verifiers.
+**Case B — Design issue (localized):** dispatch `architect` with BOUNDED-PATCH contract (named IDs only). After revised plan → coherence gate via `plan-reviewer`.
 **Case C — Criteria issue:** adjust `01-plan.md` § Task List AC, mark the change in the brief, re-run all verifiers.
-**Case D — Security-only:** route the brief to `implementer`, then re-run only `security` (tester+qa already passed; re-run them only if the fix touches test-relevant code).
+**Case D — Security-only:** route the brief to `implementer`, then re-run only `security` (tester+qa already passed; re-run them only if the fix touches test-relevant code). Blast radius modulates whether the implementer uses BOUNDED-PATCH or full re-implement, but security always re-runs.
 
 ### KG read on error
 
@@ -2530,7 +2557,7 @@ At the end of every pipeline run (single or batch), write metrics to `workspaces
   "iterations": {
     "count": {N},
     "root_causes": [
-      { "phase": "verify", "case": "A|B|C|D", "summary": "test failure: missing null check" }
+      { "phase": "verify", "case": "A|B|C|D", "blast_radius": "localized|structural", "summary": "test failure: missing null check" }
     ]
   },
   "agents_invoked": {N},
@@ -2548,7 +2575,7 @@ At the end of every pipeline run (single or batch), write metrics to `workspaces
 
 **Token estimation (cross-reference only):** the canonical heuristic for estimating tokens when metadata is unavailable (`duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy) is now defined in the live **Phase Transition Protocol** above (step 1, "Token tracking is mandatory") and in the **Execution Events JSONL Schema** table (`tokens` / `tokens_estimated` rows). The definition no longer lives in this deprecated section — read those locations for the authoritative fallback rule.
 
-**`iterations.root_causes`:** every iteration must record its case (A/B/C/D from Phase 3) and a one-line summary. This is the data that powers harness simplification later — without it, you cannot tell whether a gate caught real bugs or just produced false alarms.
+**`iterations.root_causes`:** every iteration must record its case (A/B/C/D from Phase 3), blast radius (`localized|structural`), and a one-line summary. This is the data that powers harness simplification later — without it, you cannot tell whether a gate caught real bugs or just produced false alarms.
 
 **`estimation_accuracy`:** if the architect did planning (Planning Mode) and produced an agent-time estimate, the orchestrator captures the delta between estimated and actual at the end. Persistent over-estimation (positive delta) means the planning model is sandbagging; persistent under-estimation means scope grew silently.
 
@@ -2699,7 +2726,7 @@ Every line is a JSON object with these fields:
 | `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
 | `reason` | conditional | For `dispatch.blocked`: short reason (`task tool stripped`, `agent not registered`, `tool permission denied`). For `stage.gate.skipped`: `autonomous` / `legacy`. |
 | `action` | conditional | For `dispatch.blocked`: what you did about it (`top-level takeover per CLAUDE.md §14`, `aborted`). |
-| `extra` | optional | Object for event-specific extras (e.g., `{"tests_before": 42, "tests_after": 47}` for the test-ratchet gate). |
+| `extra` | optional | Object for event-specific extras (e.g., `{"tests_before": 42, "tests_after": 47}` for the test-ratchet gate). For `iteration.start` events: include `{"blast_radius": "localized\|structural", "patched_ids": [...]}` when the verifier declared a blast radius (omit `patched_ids` when `blast_radius` is `"structural"`). |
 
 ### Examples
 
@@ -2709,7 +2736,7 @@ Every line is a JSON object with these fields:
 {"ts":"2026-05-01T14:00:42-03:00","event":"phase.start","feature":"auth-jwt","phase":"1-design","agent":"architect","iteration":0}
 {"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens":6300,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
 {"ts":"2026-05-01T14:03:25-03:00","event":"gate.pass","feature":"auth-jwt","phase":"1.5-ratify-plan","verdict":"pass","summary":"5/5 AC covered by Work Plan"}
-{"ts":"2026-05-01T14:18:52-03:00","event":"iteration.start","feature":"auth-jwt","phase":"3-verify","iteration":1,"summary":"AC-3 missing null check"}
+{"ts":"2026-05-01T14:18:52-03:00","event":"iteration.start","feature":"auth-jwt","phase":"3-verify","iteration":1,"summary":"AC-3 missing null check","extra":{"blast_radius":"localized","patched_ids":["AC-3"]}}
 {"ts":"2026-05-01T14:25:11-03:00","event":"gate.fail","feature":"auth-jwt","phase":"3.5-acceptance-gate","verdict":"fail","summary":"AC-2 has no passing test"}
 {"ts":"2026-05-01T14:30:00-03:00","event":"phase.end","feature":"auth-jwt","phase":"4-delivery","agent":"delivery","status":"success","duration_ms":120000,"tokens":1600,"tokens_estimated":true,"summary":"PR #40 opened, version 0.7.0 → 0.8.0","tools":{"kg_passive_capture":"written"}}
 {"ts":"2026-05-01T14:30:00-03:00","event":"pipeline.end","feature":"auth-jwt","status":"success","duration_ms":1800000,"extra":{"iterations":1,"ac_passed":5,"ac_total":5}}
