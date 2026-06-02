@@ -138,7 +138,9 @@ These flags affect Steps 2, 3, 10, and 11. All other steps run identically.
 
 ### Step 3 — Create or validate feature branch
 
-**Always create a dedicated branch for the delivery commit. The base branch is always `main`.**
+**Always create a dedicated branch for the delivery commit. The base branch is always `main`, never a sibling branch. Stacked PRs (child branch off a parent PR's branch) are PROHIBITED — when a parent PR merges, GitHub automatically re-targets child PRs to the parent's base; under rapid serial merges this re-targeting is asynchronous and races the merge, silently losing commits (see https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches).**
+
+**Multi-PR plans (valid split reason from the closed list):** open and merge PRs serially — PR-N+1 opens only AFTER PR-N lands on `main`. Branch each subsequent PR from the updated `main` (`git checkout main && git pull --ff-only origin main && git checkout -b {branch}`). Before merging each PR after the first, rebase it on the current `main` (`git fetch origin && git rebase origin/main`) to incorporate all prior merges cleanly.
 
 **Step 3.1 — Check current branch:**
 - Run `git rev-parse --abbrev-ref HEAD` to get the current branch name.
@@ -571,7 +573,7 @@ Do NOT stage unrelated files.
 
 **If `has_gh: false`:** do NOT skip. Use the Tier B fallback chain from `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When neither `gh` nor a token is available, emit the compare URL and body file and report `status: blocked-manual-push` (see Return Protocol).
 
-**Always target `main`.**
+**Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For multi-PR plans, follow the serial-merge contract: open PR-N+1 only after PR-N is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
 
 **Step 11.0 — Check for existing PR:**
 
