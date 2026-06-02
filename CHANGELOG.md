@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.5] - 2026-06-02
+
+### Fixed
+
+- Orchestrator nested-context inline-fallback no longer self-runs or defers the Stage-1 plan-review panel (incl. the security design-review); both stale reviewer sites now emit a dispatch_handoff, closing a security-gate-integrity bypass. Regression-locked by a new structural Suite (Suite 51).
+
 ## [2.47.4] - 2026-06-02
 
 ### Added
