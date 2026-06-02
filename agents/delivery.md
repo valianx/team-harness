@@ -650,6 +650,8 @@ gh pr create --base main \
 
 **Intake survey (conditional — include when `survey_source` in `00-state.md` is not null; omit entirely otherwise):** forma={full|fast}, esfuerzo={thorough|quick|agent-decides}, autonomía={manual|autonomous}, scope-hint="{text or none}", fuente={asked|confirmed|inferred}
 <!-- Prohibition: this line MUST NOT include security_sensitive or any gate status field. Read values from 00-state.md § Current State survey_* fields. -->
+**Spec-seed (conditional — include when `spec_seed_present: true` in `00-state.md`; omit entirely otherwise):** dev-seed=yes, architect-dissent={yes|no}
+<!-- Prohibition: this line MUST NOT include security_sensitive, any gate status, or any field beyond dev-seed and architect-dissent. Read spec_seed_present and spec_seed_dissents from 00-state.md § Current State. -->
 
 ## File map (mandatory)
 Group changed files by intent so the reviewer can navigate by purpose:
