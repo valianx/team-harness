@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Stacked PRs (child branch off a parent PR's branch) are now explicitly prohibited across the agent system: `architect.md` reframes the default (single-repo long tasks → 1 PR, many commits), adds a situation→shape table, and adds a `Base:` field (default `main`) to the per-PR schema; `delivery.md` adds the named stacking prohibition and a serial-merge contract for multi-PR plans (open PR-N+1 only after PR-N lands, branch from updated `main`, rebase before merge); `plan-reviewer.md` adds Rule 9 (severity `fail`: any declared `Base:` ≠ `main`, or a service split without a valid closed-list reason) with coherent updates to the Verdict Calibration table, the report Summary table, the Findings block, and the Return Protocol; `orchestrator.md` adds a note distinguishing DAG implementation order (parallel worktrees per round) from merge order to `main` (always serial, governed by `delivery.md`).
+
 ## [2.42.0] - 2026-06-01
 
 ### Added
