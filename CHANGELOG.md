@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.4] - 2026-06-02
+
+### Added
+
+- Roadmap document (`docs/roadmap.md`) — the sequenced path toward the vision; linked from README.
+
 ## [2.47.3] - 2026-06-02
 
 ### Changed

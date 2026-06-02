@@ -88,6 +88,7 @@ After install, open Claude Code. The entry points are:
 | | |
 |---|---|
 | [Vision](./docs/vision.md) | Where team-harness is headed — the developer amplified by a trusted agent team |
+| [Roadmap](./docs/roadmap.md) | What we are building next — the sequenced path toward the vision |
 | [How it works](./docs/how-it-works.md) | Pipeline walkthrough, why a harness, what ships |
 | [Pipelines reference](./docs/pipelines.md) | All 8+ pipelines, tier classification, phase tables, gate semantics |
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
