@@ -1373,6 +1373,8 @@ This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above
  ── PR Summary ─────────────────────────
  {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
 
+ Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)
+
  **Combined verdict:** {pass | concerns | fail}
  {if concerns or fail:}
  Concerns to review:
@@ -1968,6 +1970,7 @@ fi
    Tests added: {sum across PRs}
    Security findings: {sum across PRs, or "clean"}
    Acceptance-check: {worst verdict across PRs: pass|concerns|skipped}
+   Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)
 
  Next round: R{R+1} — {M} PR(s) scheduled
    - PR-{k}: {title} ({service})
@@ -2131,6 +2134,7 @@ fi
    Version: {old} → {new}
    Files touched: {N}
    PRs delivered this run: {N}
+   Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)
 
  Internal review (Phase 4.5): {criticals}C / {suggestions}S / {nitpicks}N
  {if criticals > 0:}
@@ -2878,14 +2882,14 @@ A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsi
 **Started:** {YYYY-MM-DD HH:MM} **Completed:** {YYYY-MM-DD HH:MM or "—"} **Duration:** {N}min
 
 ## TL;DR
-{1-2 lines: outcome (✓ shipped / ↻ iterating / ✗ failed / ⏸ paused at gate) + key numbers (AC pass/total, iterations, PR #) + the single most impactful issue or "no issues"}
+{1-2 lines: outcome (✓ shipped / ↻ iterating / ✗ failed / ⏸ paused at gate) + key numbers (AC pass/total, iterations, PR #, total tokens, ~${cost}) + the single most impactful issue or "no issues"}
 
 ## Phase Timeline
-| # | Phase | Agent | Duration | Status | Iter | Notes |
-|---|-------|-------|----------|--------|------|-------|
-| 0a | Intake | orchestrator | {N}min | success | — | KG: {N} hits |
-| 1 | Design | architect | {N}min | success | — | context7: {hit}/{miss} |
-| ... | ... | ... | ... | ... | ... | ... |
+| # | Phase | Agent | Duration | Tokens | Status | Iter | Notes |
+|---|-------|-------|----------|--------|--------|------|-------|
+| 0a | Intake | orchestrator | {N}min | {N} | success | — | KG: {N} hits |
+| 1 | Design | architect | {N}min | {N} | success | — | context7: {hit}/{miss} |
+| ... | ... | ... | ... | ... | ... | ... | ... |
 
 ## Dispatch Issues
 {(none) — or list every `dispatch.blocked` event with reason + action taken}
@@ -2898,6 +2902,22 @@ A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsi
 | kg_save_candidates | — | {N surfaced} | — | {entity names or —} |
 | kg_passive_capture | — | {written/skipped} | — | {entity name or skip reason} |
 
+## Cost
+**Total tokens:** {N} ({measured|estimated} — {M} phases with tokens_estimated:true)
+**Total cost:** ~${X.XX}  (or: price table not configured — showing tokens only)
+**Architect runs:** {N}x ({N} phases with agent: architect — signal for multi-run cost)
+
+| Agent | Phases | Tokens | % |
+|-------|--------|--------|---|
+| architect | {list} | {N} | {P}% |
+| implementer | {list} | {N} | {P}% |
+| **Total** | | **{N}** | 100% |
+
+| Phase | Agent | Tokens | Cost |
+|-------|-------|--------|------|
+| 1-design | architect | {N} | ~${X.XX} |
+| 2-implement | implementer | {N} | ~${X.XX} |
+
 ## Iterations
 {(none) — or "Iter N (phase, Case X): one-line summary" per iteration}
 
@@ -2905,7 +2925,7 @@ A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsi
 {N} files, {N} lines.
 ```
 
-The **TL;DR** is the contract: a human running `cat workspaces/*/00-pipeline-summary.md | head -3` per feature should know which pipelines are healthy.
+The **TL;DR** is the contract: a human running `cat workspaces/*/00-pipeline-summary.md | head -3` per feature should know which pipelines are healthy. Include total tokens and approximate cost as key numbers in TL;DR. Full spec for the `## Cost` section schema, price table format, and derivation algorithm: see `docs/observability.md § "Cost rollup"`.
 
 ### Counts derivation
 
@@ -2916,6 +2936,7 @@ All numbers come from `{docs_root}/{events_file}` — never re-invent them by wa
 - AC pass/total → from the latest `gate.pass`/`gate.fail` at `3.5-acceptance-gate` (read its `summary` and the `pipeline.end.extra`).
 - Tool counts → aggregate of `tools` sub-objects on `phase.end` events.
 - Files / lines changed → from `git diff main...HEAD --stat` at delivery time; "—" before Phase 4.
+- **Cost and token counts** → sum `tokens` from all `phase.end` events; multiply by price from `pricing` key in `~/.claude/.team-harness.json`; degrade to tokens-only when the key is absent. Both the per-agent table and the per-phase table rewrite in full at each phase transition. Marked `(~)` when any contributing event carries `tokens_estimated: true`. See `docs/observability.md § "Cost rollup"` for the full derivation algorithm.
 
 ### Bug-fix flow row mappings (type: fix | hotfix)
 
