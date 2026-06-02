@@ -1239,26 +1239,19 @@ Append a `phase.end` event:
 {"ts":"…","event":"phase.end","phase":"1.7-ux-enrich","feature":"{feature}","status":"{success|skipped|failed}","extra":{"ac_added":N,"findings_critical":N}}
 ```
 
-### ux-reviewer fallback
+### Phase 1.7 — ux-reviewer nested-context handoff
 
-**When:** the Task tool is unavailable (nested context — same condition as the plan-reviewer fallback at Phase 1.6).
+**When the Task tool is unavailable (nested context):** If the Task invocation fails with a nesting refusal (error variants: *"ux-reviewer not available as subagent_type"*, *"Task is not available inside subagents"*), the orchestrator MUST emit a `dispatch_handoff` block directed at `ux-reviewer` — following the Dispatch-blocked exit (orchestrator.md:51-77). **Never execute the enrich review inline.** Dispatch invariant #2 ("Never substitute yourself for a subagent… There is no degraded mode") applies unconditionally.
 
 | Task invocation outcome | Action |
 |---|---|
 | Task succeeds → subagent returns status block | proceed with normal Gate handling above. |
-| Task fails with "not available" / nesting refusal | **inline fallback (mandatory).** Do NOT report to user. Execute the enrich review yourself: |
-| Task fails with any other error (timeout, transient) | retry once. If still failing, fall back to inline. |
+| Task fails with "not available" / nesting refusal | **mandatory dispatch_handoff** — emit `dispatch_handoff` with `next_dispatch.agent: "th:ux-reviewer"`. Top-level Claude dispatches the real `ux-reviewer` agent via `Task`. **Never execute the enrich review yourself inline.** |
+| Task fails with any other error (timeout, transient) | retry once. If still failing, emit dispatch_handoff as above. |
 
-**Inline fallback procedure (when triggered):**
+**Mandatory handoff contract:** The `dispatch_handoff` JSON block follows the schema in `docs/subagent-orchestration.md § dispatch_handoff Schema`. Set `next_dispatch.agent: "th:ux-reviewer"`, `phase: "1.7-ux-enrich"`, and include `probe_error` with the literal harness error message. Top-level Claude takes over and dispatches the real `ux-reviewer` agent. There is no inline self-execution path for this reviewer — the inline-fallback that existed here was retired (v2.48+) because it contradicted the Takeover Protocol and could silently skip required review steps.
 
-1. Read `agents/ux-reviewer.md` as the procedure spec. Treat its enrich-mode prompt as your own checklist.
-2. Read `01-plan.md` exactly as the subagent would.
-3. Identify all UI-facing changes and evaluate against the ux-reviewer checklist.
-4. Write `01-ux-review.md` with findings and recommended AC.
-5. Append recommended AC into `01-plan.md § Task List` (same AC-sink contract: pin to `01-plan.md § Task List`, not only `01-ux-review.md`).
-6. Return your own status block with `mode: inline`.
-
-**Status-block gate:** read `findings.critical` from the ux-reviewer (or inline equivalent) status block. A non-zero `findings.critical` in enrich mode is advisory only (not a gate failure at Phase 1.7 — the gate runs at Phase 3.5 on the validate output). Log the count in Hot Context: `ux-enrich findings.critical: {N}`.
+**Status-block gate:** read `findings.critical` from the ux-reviewer status block. A non-zero `findings.critical` in enrich mode is advisory only (not a gate failure at Phase 1.7 — the gate runs at Phase 3.5 on the validate output). Log the count in Hot Context: `ux-enrich findings.critical: {N}`.
 
 ---
 
@@ -1327,34 +1320,21 @@ Routing to architect to revise Work Plan
 
 **Security design-review dispatch in-pipeline (SEC-002, wired here):** When the task is security-sensitive (`security_sensitive: true` in `00-state.md`, or determined by path/keyword/flag at Phase 0a), Phase 1.6 MUST also invoke the `security` agent in `design-review` mode BEFORE dispatching `plan-reviewer`. This is the in-pipeline equivalent of the panel that `/th:plan-review` runs in direct mode (centralization contract, `ref-direct-modes.md § "Plan Review Mode"`). The dispatch is conditional on security-sensitivity — it runs in addition to the `plan-reviewer`, never as a substitute. This wiring closes the latent gap where `--fast` or any other in-pipeline path could skip the security design-review for security-sensitive work. The carve-out in the `--fast` skip-set (see `§ "Fast mode"` in Phase 0a above) is the enforcement point; this wiring is the execution point. Both are required for the fail-closed guarantee.
 
-### Inline fallback when Task subagent invocation is not available
+### Phase 1.6 — Plan Review — nested-context handoff
 
-The orchestrator can run as a nested subagent (e.g., when invoked via the `/th:recover` or `/th:design` skills routing). In that nesting context, the harness sometimes refuses to spawn another Task subagent — the literal error is variants of *"plan-reviewer not available as subagent_type"* or *"Task is not available inside subagents"*. When this happens, the orchestrator MUST fall back to executing the audit inline rather than escalating to the user.
+**When the Task tool is unavailable (nested context):** If the Task invocation fails with a nesting refusal (error variants: *"plan-reviewer not available as subagent_type"*, *"Task is not available inside subagents"*), the orchestrator MUST emit a `dispatch_handoff` block directed at `plan-reviewer` — following the Dispatch-blocked exit (orchestrator.md:51-77). **Never self-execute the audit inline.** Dispatch invariant #2 ("Never substitute yourself for a subagent… There is no degraded mode") applies unconditionally, regardless of whether the task is design-only or full-pipeline.
 
-**Decision tree on the Task invocation result:**
+This ensures the plan-review panel runs via the real `plan-reviewer` agent — including the security design-review for security-sensitive plans (wired at the `--fast` carve-out enforcement point above). There is no inline self-execution path for this gate. The inline-fallback that existed here was retired (v2.48+) because it contradicted the Takeover Protocol, skipped the security design-review in nested context, and allowed the panel to self-grade silently.
 
 | Task invocation outcome | Action |
 |---|---|
-| Task succeeds → subagent returns status block | proceed with normal Gate handling below. `status_block.mode = subagent`. |
-| Task fails with "not available" / "not a valid subagent_type" / nesting refusal | **inline fallback (mandatory).** Do NOT report to user. Execute the audit yourself: |
-| Task fails with any other error (timeout, transient) | retry once. If still failing, fall back to inline. |
+| Task succeeds → subagent returns status block | proceed with normal Gate handling below. |
+| Task fails with "not available" / "not a valid subagent_type" / nesting refusal | **mandatory dispatch_handoff** — emit `dispatch_handoff` with `next_dispatch.agent: "th:plan-reviewer"`. Top-level Claude dispatches the real `plan-reviewer` agent. The full panel (including security design-review for security-sensitive plans) runs inside the real subagent. |
+| Task fails with any other error (timeout, transient) | retry once. If still failing, emit dispatch_handoff as above. |
 
-**Inline audit procedure (when fallback is triggered):**
+**Mandatory handoff contract:** The `dispatch_handoff` JSON block follows the schema in `docs/subagent-orchestration.md § dispatch_handoff Schema`. Set `next_dispatch.agent: "th:plan-reviewer"`, `phase: "1.6-plan-review"`, and include `probe_error` with the literal harness error message. Top-level Claude takes over and dispatches the real `plan-reviewer` agent.
 
-1. Read `agents/plan-reviewer.md` to load the rules and the report schema as the procedure spec. Treat its prompt as your own checklist.
-2. Read `01-plan.md` exactly as the subagent would (and `01-root-cause.md` when `type: fix`).
-3. Apply ALL rules from `agents/plan-reviewer.md` deterministically (Rules 1-8; the canonical rule set and its closed lists are owned by `agents/plan-reviewer.md` — enforce every rule there, not only the five summarized below):
-   - **Rule 1** — one PR per service (split allowed only with a closed-list reason; the canonical closed list lives in `agents/plan-reviewer.md` § "Valid Split reason values": `coexistence window`, `production signal`, `cross-repo deploy gate`. `oas bump`, `breaking-change isolation`, and reviewability/size reasons are explicitly INVALID per that section).
-   - **Rule 2** — every PR in `01-plan.md` (§ Task List) has at least one Given/When/Then acceptance criterion (the count must match the `### Summary` table).
-   - **Rule 3** — `01-plan.md` is consolidated (no version markers like `v6`, no "previously decided", no strikethrough, no inline changelog sections).
-   - **Rule 4** — every file mentioned in `01-plan.md` (§ Architecture → `### Work Plan`) appears in the `Files:` field of some PR in `01-plan.md` (§ Task List).
-   - **Rule 5** — `### Services Touched` in `01-plan.md` (§ Architecture) matches the set of repos that have at least one PR in `01-plan.md` (§ Task List).
-4. Write your report into `## Plan Review` in `01-plan.md` with the same schema as the subagent would (`**Verdict:**` line, per-rule findings tables, recommendations) using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, and the `**Combined verdict:**` block. Never append a second `## Plan Review` section. The schema is documented in `agents/plan-reviewer.md`.
-5. Return your own status block with `mode: inline` so the run is traceable.
-
-**Quality bar.** The inline audit must produce the same artifact a subagent would produce — same schema, same level of rigor, same overwrite semantics. The `mode: subagent | inline` field is for telemetry only; it never changes the gate logic.
-
-**Iteration budget.** Both subagent and inline executions count against the same max-3 budget for plan-review round trips (see Gate table below). The mode does not reset the counter.
+**Iteration budget.** Each plan-reviewer subagent dispatch counts against the same max-3 budget for plan-review round trips (see Gate table below).
 
 **Gate (status-block + verdict):**
 
