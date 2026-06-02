@@ -24,6 +24,20 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ---
 
+## BOUNDED-PATCH contract (localized blast radius)
+
+When the orchestrator dispatches you with a `failure-brief.md` that declares `**Blast radius:** localized {IDs}`:
+
+- **Edit only the elements named in `{IDs}`** (specific AC identifiers, Work Plan Step IDs, or named files/functions). Leave all other implementation unchanged.
+- **Emit a diff summary** in your `02-implementation.md` describing exactly what changed and why.
+- **Do NOT re-implement the feature.** The implementation is correct except for the named elements; do not refactor unrelated code, restructure modules, or expand the scope of the fix.
+
+When the brief declares `**Blast radius:** structural`, apply the standard full re-implementation contract.
+
+**Honesty invariant:** the bounded patch constrains your OUTPUT reasoning (you do not re-implement the feature). It does NOT eliminate input re-reads — you still read `01-plan.md` and `failure-brief.md` because dispatch is stateless. The savings are in generation tokens and downstream verifier re-runs, not in zero-read.
+
+---
+
 ## Scope discipline for `type: fix` and `type: hotfix` (Bug-fix Mode)
 
 When the orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-PR scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
