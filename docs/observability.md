@@ -130,6 +130,118 @@ suggestion on failure — without event persistence.
 
 **Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A Phase 6 batch may write up to 5 nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes. See the orchestrator's "Emitting kg_write events" subsection for the full rationale and the explicit exception.
 
+## Cost rollup
+
+This section defines the cost-visibility surface introduced in Phase B of the
+pipeline-collaboration-cost-redesign programme. It covers: (a) the price table
+key format in `~/.claude/.team-harness.json`; (b) the schema of the `## Cost`
+section in `00-pipeline-summary.md`; and (c) the derivation rule shared by the
+orchestrator summary writer and the `/th:trace --cost` skill.
+
+### Price table — `pricing` key in `~/.claude/.team-harness.json`
+
+The price table lives in a namespaced `pricing` key within the single-config-file
+`~/.claude/.team-harness.json`. The orchestrator and the `/th:trace --cost` skill
+read it at render time; they never write to it. Maintenance is the operator's
+responsibility — Anthropic changes prices without notice.
+
+**Format:**
+
+```json
+{
+  "pricing": {
+    "opus":   { "input": 15.0, "output": 75.0 },
+    "sonnet": { "input":  3.0, "output": 15.0 },
+    "updated": "2026-06-02"
+  }
+}
+```
+
+Field definitions:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `pricing.opus.input` | float | USD per 1 M input tokens for any `claude-opus-*` model |
+| `pricing.opus.output` | float | USD per 1 M output tokens for any `claude-opus-*` model |
+| `pricing.sonnet.input` | float | USD per 1 M input tokens for any `claude-sonnet-*` model |
+| `pricing.sonnet.output` | float | USD per 1 M output tokens for any `claude-sonnet-*` model |
+| `pricing.updated` | string | ISO date of the last price check — operator-maintained |
+
+**Degradation rule.** When the `pricing` key is absent, malformed, or any required
+sub-field is missing, every surface that computes cost MUST fall back to displaying
+tokens only, with the line:
+
+```
+price table not configured — showing tokens only
+```
+
+Never invent a price, never fail, never crash.
+
+**Model classification.** Phases whose primary agent runs on `claude-opus-*` use the
+`opus` prices; phases on `claude-sonnet-*` (or any other model) use the `sonnet`
+prices. When `tokens_in` / `tokens_out` are both present in the `phase.end` event,
+compute cost as `(tokens_in × input_rate + tokens_out × output_rate) / 1_000_000`.
+When only the total `tokens` is present, use `tokens × (input_rate + output_rate) / 2`
+as a conservative blended estimate and mark the result with `(~)`.
+
+### `## Cost` section schema for `00-pipeline-summary.md`
+
+The orchestrator appends a `## Cost` section to the pipeline summary whenever it
+rewrites the file (every phase transition). The section derives entirely from the
+`phase.end` events in `00-execution-events.{md,jsonl}` — it is a render of the
+trace, not an independent source.
+
+**Schema:**
+
+```markdown
+## Cost
+**Total tokens:** {N} ({measured|estimated} — {M} phases with tokens_estimated:true)
+**Total cost:** ~${X.XX}  (or: price table not configured — showing tokens only)
+**Architect runs:** {N}x ({N} phases with agent: architect — signal for multi-run cost)
+
+| Agent | Phases | Tokens | % |
+|-------|--------|--------|---|
+| architect | {list} | {N} | {P}% |
+| implementer | {list} | {N} | {P}% |
+| ... | ... | ... | ... |
+| **Total** | | **{N}** | 100% |
+
+| Phase | Agent | Tokens | Cost |
+|-------|-------|--------|------|
+| 1-design | architect | {N} | ~${X.XX} |
+| 2-implement | implementer | {N} | ~${X.XX} |
+| ... | ... | ... | ... |
+```
+
+**Rendering rules:**
+
+- `## Cost` is placed after `## Tool Effectiveness` and before `## Iterations` in
+  the schema order.
+- `tokens_estimated: true` on a `phase.end` event marks that phase's row with `(~)`.
+  The section header reports the total count of estimated phases so the reader can
+  assess reliability.
+- When the price table is not configured, omit the `Cost` column from both tables
+  and replace `~${X.XX}` with `—`.
+- The "Architect runs" line is a cost-awareness signal: a feature where the architect
+  ran 3 times spent 3× architect-tier tokens in Stage 1. It is not a quality judgment.
+- In obsidian mode, extract the JSONL fence from `00-execution-events.md` before
+  summing tokens (same `sed -n '/^```jsonl$/,/^```$/{/^```/d;p}'` pattern used by
+  `/th:trace --tools`).
+
+### Derivation rule
+
+1. Read all `phase.end` events from `{docs_root}/{events_file}`.
+2. For each event, extract `agent`, `phase`, `tokens`, and `tokens_estimated`.
+3. Classify the agent's model tier: `architect` → `opus`; all others → `sonnet`
+   (conservative default; override if the agent's frontmatter states a different model).
+4. Compute cost per phase using the price table (see above). Sum to get total.
+5. Build the per-agent and per-phase tables.
+6. Count phases where `tokens_estimated == true` for the header annotation.
+7. If the price table is absent or malformed, skip the cost columns and emit the
+   degradation line instead.
+
+---
+
 ## Relationship to the Output Discipline contract
 
 The `operation.*` schema is the log target for the silent-on-success rule:
