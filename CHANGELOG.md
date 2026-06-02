@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.44.0] - 2026-06-02
+
+### Added
+
+- New `qa-plan` agent (`agents/qa-plan.md`, model: opus, effort: high, read-only tools): carries the pre-code QA modes (ratify-plan, define-ac, reconcile, plan-review panel substance-reviewer) that previously lived in `qa.md`. Producer/gate asymmetry rationale: ratify-plan gates the opus architect (warrants an opus gate); validate gates a sonnet implementer (sonnet gate is balanced).
+
+### Changed
+
+- `agents/architect.md`: `effort: max → high` — MEASURED + REVERTIBLE quality bet (operator-accepted, option B). Revisit with Phase B cost surface once baseline runs accumulate; revert to `max` if Phase 3 iterations or plan-reviewer findings increase measurably.
+- `agents/documenter.md`: `model: opus → sonnet` — document-transform work (not design); effort `high` preserved.
+- `agents/init.md`: `model: opus → sonnet` — discover-and-document work; effort `medium` preserved. Resolves opus/medium pairing inconsistency.
+- `agents/tester.md`: `effort: medium → high` — adversarial regression test reasoning; model `sonnet` preserved. Cost impact is negligible (sonnet).
+- `agents/qa.md`: reduced to post-code modes only (validate, pr-review-qa, docs-validation, review); `model: opus → sonnet`, effort `high` preserved. 16 dispatch sites rewired from `qa` to `qa-plan` for pre-code modes; `**Substance (qa):**` panel label preserved unchanged.
+
 ## [2.43.0] - 2026-06-02
 
 ### Added
