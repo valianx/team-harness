@@ -2286,7 +2286,7 @@ fi
 
 ## Phase 5 — GitHub Update
 
-**Owner:** You (orchestrator) — only runs if the task originated from a GitHub issue. If not from GitHub, skip to Phase 6.
+**Owner:** You (orchestrator) — the GitHub steps (1–3) only run if the task originated from a GitHub issue. If not from GitHub, skip the GitHub steps. The ClickUp closing step (4) runs whenever the task originated from a ClickUp task, independent of GitHub. If the task came from neither, skip to Phase 6.
 
 1. **Comment on the issue** with: branch, commit, version, files changed, test results, **every AC individually with pass/fail status** (read `04-validation.md` for this — never summarize as "15/15 passed"), and QA notes/warnings.
    **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — comment on an issue". When `has_gh=true`, use `gh issue comment`. When `has_gh=false`, use the curl POST fallback if a token + GitHub origin are available; else write the comment body to `workspaces/{feature}/inputs/issue-comment.md` and instruct the operator to paste it.
@@ -2295,6 +2295,8 @@ fi
    **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier D — project board ops". When `has_gh=true`, use `gh project` commands (same pattern as Phase 0a). When `has_gh=false`, log "Project board update skipped — gh CLI unavailable". Target column is **"In Review"** — never "Done", never "Closed". If the board lacks "In Review", leave in "In Progress". Report errors to user.
 
 3. **Do NOT close the issue.** Leave it open in "In Review" for human review.
+
+4. **Close the ClickUp origin (mandatory when `clickup_workspace_id` is set in `00-state.md` and a ClickUp task ID was the task origin).** Post a single functional comment on the originating ClickUp task via `clickup_create_task_comment`, describing what was done in terms of the effect for the user / SAC / operations — not implementation detail — with PR/branch references on a trailing line. This is the pipeline-side realization of the skill's closing contract; see `skills/clickup/SKILL.md` § "Closing a ClickUp-originated task — mandatory" and § "Comments" for the functional-register and post-once rules. Run the MCP call from this top-level context, not from a phase agent (the connector can be unavailable inside a subagent). The comment cannot be edited or deleted afterward — compose it correctly before posting. Do not assert any attachment unless an attach call returned success.
 
 This phase does NOT iterate — if GitHub update fails, report to the user but continue to Phase 6.
 
