@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `th:clickup` skill — § "Comments": added rule "Never state the PR's status". The functional comment includes only the bare PR link and states the result as an accomplished fact; PR lifecycle status ("pendiente de merge", "merged", "pending merge") and temporal rollout qualifiers are prohibited. Rationale: ClickUp comments are immutable — a frozen transient status becomes false once the PR moves on, with no way to correct it. (#239)
+
 ## [2.49.0] - 2026-06-03
 
 ### Changed
