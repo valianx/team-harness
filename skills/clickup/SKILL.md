@@ -168,7 +168,7 @@ Fetch a single task and optionally route it to the team-harness pipeline.
 
 Comments posted on a ClickUp task are read by the operator, SAC, and operations — not by engineers reviewing a diff. Write them accordingly.
 
-**Functional register — mandatory.** A comment always describes the change from the functional side: what changes for the end user, for SAC, or for operations. It does not describe implementation detail (file names, function signatures, internal refactors). PR references are secondary data — a single line at the end, never the body of the comment.
+**Functional register — mandatory.** A comment always describes the change from the functional side: what changes for the end user, for SAC, or for operations. It does not describe implementation detail (file names, function signatures, internal refactors). When the work produced one or more PRs, **include the PR link(s)** — it is valuable traceability data and should not be dropped. Place it as a single line at the end (e.g. `Ref: PR #NNN` with the plain URL), never woven into the functional body.
 
 - Correct: `El reporte mensual ya incluye las transacciones en USD. SAC puede consultarlas en el selector de moneda del backoffice. Ref: PR #476.`
 - Incorrect: `Se agregó el campo currency al DTO y se ajustó el query de monthlySummaries en commission-service.`
