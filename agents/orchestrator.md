@@ -157,7 +157,8 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | verdict appended to `01-plan.md` | — |
 | **STAGE-GATE-1** | **human** | plan + verdict | approve / reject / edit | **MANDATORY STOP** |
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
-| 3 — Verify | `tester` + `qa` + `security`* | code + `01-plan.md` | `03-testing.md`, `04-validation.md`, `04-security.md` | parallel dispatch |
+| 2.7 — Test Authoring | `tester` (authoring mode) | code + AC from `01-plan.md` | `03-testing.md` (authoring section) | must complete before Phase 3 |
+| 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md` (verify section), `04-validation.md`, `04-security.md` | parallel dispatch over immutable artifact |
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
 | 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
 | 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — |
@@ -373,7 +374,8 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 | `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
 | `architect` | 1 (docs-flow research mode) | `00-research.md` |
 | `implementer` | 2 | `02-implementation.md` |
-| `tester` | 3 | `03-testing.md` |
+| `tester` | 2.7 (authoring mode) | `03-testing.md` |
+| `tester` | 3 (run-only mode) | `03-testing.md` |
 | `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
 | `qa` | 3 (validate mode) | `04-validation.md` |
 | `qa` | 3 (docs validation — docs-flow Phase 3) | `04-validation.md` |
@@ -1607,9 +1609,9 @@ Next: verify (tester + qa in parallel)
 
 **CRITICAL: Immediately proceed to Phase 3. Do NOT stop here, do NOT ask the user, do NOT report "done". Implementation without verification is incomplete.**
 
-**Rewrite TL;DR when Phase 2 per-PR starts** (row 8 of §5.2): `Now`: "Phase 2 implementer working on PR-{i} in Round R{R}." `Last`: prior PR or round result. `Next`: "Phase 2.5 reconcile, then Phase 3 verify." For parallel rounds with N>1, rewrite once when the round opens and once at each PR completion.
+**Rewrite TL;DR when Phase 2 per-PR starts** (row 8 of §5.2): `Now`: "Phase 2 implementer working on PR-{i} in Round R{R}." `Last`: prior PR or round result. `Next`: "Phase 2.5 reconcile, then Phase 2.7 test authoring, then Phase 3 verify." For parallel rounds with N>1, rewrite once when the round opens and once at each PR completion.
 
-**Rewrite TL;DR when Phase 2 per-PR ends** (row 9 of §5.2): `Now`: "Phase 3 verify launching for PR-{i}." `Last`: "PR-{i} Phase 2 done — {N} files touched, build clean." `Next`: "Phase 3 tester + qa in parallel." `Open issues`: any CONSTRAINT-DISCOVERED annotations.
+**Rewrite TL;DR when Phase 2 per-PR ends** (row 9 of §5.2): `Now`: "Phase 2.7 test authoring launching for PR-{i}." `Last`: "PR-{i} Phase 2 done — {N} files touched, build clean." `Next`: "Phase 2.7 tester authoring, then Phase 3 tester (run-only) + qa in parallel." `Open issues`: any CONSTRAINT-DISCOVERED annotations.
 
 **Emit Stage 2 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 2 of the **last PR in the last round** completes — not after every PR's Phase 2. Determine "last PR in last round" from the DAG: the round has no successor rounds, and all PRs in that round have returned `status: success` from Phase 2. Status: `complete` on success, `FAILED` if iteration budget was exhausted in Phase 2.
 
@@ -1690,9 +1692,39 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 ---
 
+## Phase 2.7 — Test Authoring (pre-verify, Stage 2)
+
+**Agent:** `tester` (mode: `authoring`) — **runs BEFORE the Phase 3 parallel block**
+
+**Purpose:** Produce the frozen AC-test artifact before the parallel verify block opens. Once Phase 2.7 completes, `qa`, `tester` (run-only), and `security` operate on a stable, immutable working tree. This eliminates the race condition where `qa` reads the tree while `tester` is still writing test files.
+
+**When to run:** After Phase 2.5 (Constraint Reconciliation) and the Phase 2-close scope check complete. Before launching Phase 3. Applies to all pipeline types (`feature`, `refactor`, `enhancement`, `fix`, `hotfix`).
+
+**Dispatch via Task tool:**
+- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-PR AC block)** — the tester must map each AC to at least one test and run the suite once to confirm all authored tests pass. Reference to `00-knowledge-context.md` if it exists.
+- Instruction: "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this PR. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)."
+
+**Scope constraint (security advisory):** The `authoring` mode must not become a seam to touch production code. The tester writes and edits test files exclusively — the same "test files only" invariant that governs all other tester modes.
+
+**Gate (status-block):** Read the `tester` status block only.
+- If `status: success` → proceed to Phase 3. The working tree now has a complete, stable AC-test artifact.
+- If `status: failed` → read `failure-brief.md` and route back to tester (counts against max-3 budget). Do NOT launch Phase 3 until authoring succeeds.
+
+**Emit events:**
+```json
+{"ts":"…","event":"phase.start","phase":"2.7","feature":"{feature}"}
+{"ts":"…","event":"phase.end","phase":"2.7","feature":"{feature}","status":"{success|failed}"}
+```
+
+**Phase Checklist:** Mark `[x] 2.7-test-authoring` on success before launching Phase 3.
+
+---
+
 ## Phase 3 — Verify (Test + Validate + Security in parallel)
 
-**Agents:** `tester` + `qa` (validate mode) + `security` (conditional) — **launched in parallel**
+**Agents:** `tester` (run-only mode) + `qa` (validate mode) + `security` (conditional) — **launched in parallel over an immutable artifact**
+
+**Immutable artifact invariant:** Phase 2.7 has completed before Phase 3 opens. The AC tests already exist. The tester in Phase 3 is run-only: it executes the frozen suite, confirms no regressions, and maps AC to existing tests. It does NOT author new AC tests. `qa` and `security` read the same stable working tree without risk of observing partially-written test files.
 
 **For `type: fix` and `type: hotfix`:** the Phase 3 parallel-dispatch is tier-gated. The "security runs always for bugs" rule from PR #50 is preserved for Tier 3+ — the tier system is what determines whether the bug is Tier 3+. Tier 1 and Tier 2 fixes skip the security agent because the impacted scope is non-functional or non-production code; any fix touching a security-sensitive path auto-promotes to Tier 3 at classification time, so a Tier 1/2 run cannot accidentally bypass security on sensitive paths.
 
@@ -1711,7 +1743,7 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 → When `security` reports Critical/High findings and a KG write is performed (see § "KG write on security findings" below), emit a `kg_write` event per § "Emitting kg_write events".
 
 Launch agents simultaneously using Task tool calls in the same message:
-- **tester**: feature name, list of files created/modified (from implementer's status block summary), **acceptance criteria from `01-plan.md` § Task List (per-PR AC block)** (the tester must map each AC to at least one test), reference to `00-knowledge-context.md` if it exists. For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
+- **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
 - **qa** (validate mode): feature name, summary of what was implemented (from implementer's status block summary). For `type: fix` / `type: hotfix` (Tier 2-4): also instruct: "Validate AC-1 (reproduction-no-longer-bug) by reading reproduction steps from `01-plan.md` § Review Summary and verifying observed behaviour matches expected. Validate AC-2 (regression-test-exists) by cross-checking `02-regression-test.md` against the current suite. Set `regression_test_referenced: true|false` and `reproduction_steps_validated: true|false` in your status block." For `type: fix` Tier 1: instruct: "Reduced validation. Verify the diff matches the intent stated in `01-plan.md` § Review Summary. AC list is implicit — the cited issue is fixed. Set `regression_test_referenced: null` (Phase 2.0 was skipped) and `reproduction_steps_validated: true|false` in your status block."
 - **security** (pipeline mode, only when the dispatch table above says so): feature name, list of files created/modified, summary of what was implemented, reference to `00-knowledge-context.md` if it exists. Instruct: "This is pipeline mode — focus on the changed files and their security implications." For `bug_tier: 4`: additionally instruct: "Extended analysis. Read `01-root-cause.md ## Prior Art` and cross-reference any prior `process-insight` nodes describing similar failure modes. Analyse the adjacent code paths beyond the diff (one hop out in the call graph) for related vulnerability classes. Surface findings on adjacent code as `## Adjacent Surface Findings` in `04-security.md` separate from the diff findings."
 

@@ -90,6 +90,8 @@ Used inside the pipeline after implementation. Validates code against existing A
 
 In validate mode, you read AC from `01-plan.md` § Task List and check the implementation against them. You do NOT redefine or supplement the criteria — only validate.
 
+**Immutable artifact invariant (Phase 3).** When invoked in Phase 3, the AC tests already exist — they were authored in Phase 2.7 (Test Authoring) before the parallel verify block opened. You do not wait for the tester to write tests; the test artifact is stable when you start. If an AC has no test in the suite (a Phase 2.7 failure), report it as a FAIL finding and flag it for tester re-dispatch — do NOT author the missing test yourself. The race condition where you read a partially-written test tree no longer exists by construction.
+
 ### PR Review QA Mode (`pr-review-qa`)
 
 Used by `/th:review-pr` to validate a PR's changes against workspaces AC (if the PR came from a team-harness pipeline). Runs in parallel with the reviewer and security agents at Tier 2+ when AC are available.
