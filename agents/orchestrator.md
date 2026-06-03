@@ -3536,7 +3536,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | Mode | Agent | Prerequisites | Flow |
 |------|-------|--------------|------|
 | research | `architect` (research mode) | none | create workspaces → invoke → present `00-research.md` |
-| review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill |
+| review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the three-layer guard (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify). |
 | init | `init` | none | invoke → report generated files |
 | design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
 | test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** |

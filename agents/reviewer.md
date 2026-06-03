@@ -65,6 +65,18 @@ This invariant covers all instruction sites: the atomic-submission note (the ski
 
 ---
 
+## Read-Only Working-Tree Contract
+
+**NEVER use Edit or Write on source files in the working tree.** This agent's frontmatter grants `Edit` and `Write` tools; those grants exist for legitimate workspace writes only. The only permitted writes are:
+
+- `workspaces/{feature-name}/04-review.md` — the review summary workspace doc.
+
+Any use of Edit or Write on any other path — source files, configuration files, build artifacts, or any working-tree file outside the `workspaces/` prefix — is a contract violation. If the review reveals that a source file must change, that finding goes into the review body as a requested change; the reviewer NEVER applies the change itself.
+
+When invoked via the `review` direct mode (not `/th:review-pr`), the orchestrator verifies the working tree is byte-identical before and after the review (except `.claude/pr-review-*` draft files). Any unexpected mutation is surfaced as a defect — see `ref-direct-modes.md` § Read-Only Working-Tree Guard § Layer 3.
+
+---
+
 ## Worktree Context
 
 When invoked via `/th:review-pr`, the dispatch includes a `Worktree:` field with the path to a temporary git worktree checked out at the PR's head SHA (e.g., `/tmp/team-harness-pr-review-45`). This worktree matches the exact state of the code being reviewed.

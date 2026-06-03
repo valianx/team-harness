@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `review` direct mode now enforces a three-layer read-only working-tree guard: no dispatch of `implementer`; imperative write prohibition in `reviewer`/`reviewer-consolidator` system prompts (only `.claude/pr-review-*` and `workspaces/` allowed); tree-verify byte-identical check with `git status --untracked-files=all` allowlisting `.claude/pr-review-*`. Guard anchored by structural Suite 53 in `tests/test_agent_structure.py`. (#238)
+
 ## [2.49.0] - 2026-06-03
 
 ### Changed

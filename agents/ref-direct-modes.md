@@ -219,6 +219,48 @@ The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) a
 
 **No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The orchestrator writes the draft to a file and returns control to the skill. The skill handles user approval and all GitHub API calls (POST, PUT, reply) exclusively after the operator confirms in the Phase 4 decision menu.
 
+## Read-Only Working-Tree Guard
+
+This guard applies to the `review` direct mode running over the operator's active repository. It does NOT apply to the `/th:review-pr` skill flow, which already runs in a separate worktree with a cleanup trap (`skills/review-pr/SKILL.md:71-78`) and does not mutate the operator's checkout.
+
+### Layer 1 — No-dispatch
+
+Review mode MUST NOT dispatch `implementer` or any agent that has write tools over working-tree source files. The review pipeline invokes only `reviewer` and (in multi-reviewer mode) `reviewer-consolidator`. Any intent that would require implementation work must be routed to the full pipeline, not handled within a review mode invocation.
+
+### Layer 2 — Deny-tools (system-prompt prohibition)
+
+`reviewer` and `reviewer-consolidator` both declare `Edit` and `Write` in their frontmatter tool grants. Those grants cannot be revoked from the dispatch side; the prohibition is therefore expressed as an imperative constraint in each agent's system prompt (see `agents/reviewer.md` § Read-Only Working-Tree Contract and `agents/reviewer-consolidator.md` § Read-Only Working-Tree Contract). The permitted writes for each agent are:
+
+- `reviewer-consolidator`: ONLY `.claude/pr-review-*` draft files (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`, etc.).
+- `reviewer`: ONLY the workspace doc `workspaces/{feature-name}/04-review.md`.
+
+NEVER write to source files, configuration files, or any other path in the working tree outside those two zones.
+
+### Layer 3 — Tree-verify
+
+Scope: the `review` direct mode over the operator's active repo only.
+
+The orchestrator captures the working-tree state BEFORE invoking the reviewer:
+
+```bash
+git status --untracked-files=all
+git diff HEAD
+```
+
+After the review completes, the orchestrator re-verifies using the same commands. The tree is considered clean if it is byte-identical to the pre-review state EXCEPT for the allowlisted draft zone `.claude/pr-review-*`.
+
+Verification uses `git status --untracked-files=all` (not plain `git status`) to capture new untracked files outside the allowlisted zone — those would not appear in `git diff HEAD` and would otherwise be silently missed.
+
+If the post-review state differs outside the `.claude/pr-review-*` zone, the orchestrator MUST surface the detected changes explicitly as a defect:
+
+```
+review mode modified the working tree — this is a defect.
+Detected changes outside the allowed draft zone:
+{output of git status / git diff showing the unexpected changes}
+```
+
+The review output is still returned to the operator, but the defect report is prepended so the operator is aware of the unexpected mutation before approving any publish step.
+
 ### Submode routing
 
 Check the `Submode` / `Mode` field in the task payload:
