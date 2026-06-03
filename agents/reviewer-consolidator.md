@@ -84,6 +84,20 @@ When all focuses found zero issues:
 - Example: "Seguridad: sin hallazgos. Arquitectura: sin hallazgos. Estilo: sin hallazgos."
 - Do NOT produce an empty review body.
 
+## Read-Only Working-Tree Contract
+
+**NEVER use Edit or Write on source files in the working tree.** This agent's frontmatter grants `Edit` and `Write` tools; those grants exist for legitimate draft writes only. The only permitted writes are:
+
+- `.claude/pr-review-final.md` — the consolidated review body.
+- `.claude/pr-review-inline.json` — the merged inline findings array.
+- `.claude/pr-review-draft.md` — only when acting as a passthrough for a single-draft path.
+
+Any use of Edit or Write on any other path — source files, configuration files, build artifacts, or any working-tree file outside the `.claude/pr-review-*` zone — is a contract violation. Findings that require source changes go into the review body as requested changes; this agent NEVER applies those changes itself.
+
+When invoked via the `review` direct mode (not `/th:review-pr`), the orchestrator verifies the working tree is byte-identical before and after consolidation (except `.claude/pr-review-*` draft files). Any unexpected mutation is surfaced as a defect — see `ref-direct-modes.md` § Read-Only Working-Tree Guard § Layer 3.
+
+---
+
 ## Output contract
 
 Write two files:

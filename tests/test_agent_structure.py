@@ -12204,6 +12204,140 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 54 — Read-Only Working-Tree Guard for review/direct-review mode (#238)
+# ---------------------------------------------------------------------------
+# Asserts that the three-layer guard described in ref-direct-modes.md is present
+# and cannot be silently removed by a future refactor without turning this suite red.
+# SEC-DR-3 contract: structural assertion anchors the guard.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 54: Read-only working-tree guard (review mode, #238) ===")
+
+_ref_direct = read(AGENTS_DIR / "ref-direct-modes.md")
+_reviewer = read(AGENTS_DIR / "reviewer.md")
+_consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
+_orch_s54 = read(AGENTS_DIR / "orchestrator.md")
+
+# SEC-DR-3 (hardened): every assertion is ANCHOR-SCOPED via _slice_section, so a
+# phrase surviving elsewhere in the file cannot mask removal of the guard from its
+# section. The guard block uses '### Layer N' subheadings, so each layer is sliced
+# on its own subheading (slicing the parent '##' would truncate at the first '###').
+_S54_HEAD_STOPS = ("\n### ", "\n## ", "\n---\n")
+_S54_SEC_STOPS = ("\n## ", "\n### ", "\n---\n")
+_s54_guard = _slice_section(_ref_direct, "## Read-Only Working-Tree Guard", _S54_HEAD_STOPS)
+_s54_l1 = _slice_section(_ref_direct, "### Layer 1 — No-dispatch", _S54_HEAD_STOPS)
+_s54_l2 = _slice_section(_ref_direct, "### Layer 2 — Deny-tools", _S54_HEAD_STOPS)
+_s54_l3 = _slice_section(_ref_direct, "### Layer 3 — Tree-verify", _S54_HEAD_STOPS)
+_s54_rev = _slice_section(_reviewer, "Read-Only Working-Tree Contract", _S54_SEC_STOPS)
+_s54_con = _slice_section(_consolidator, "Read-Only Working-Tree Contract", _S54_SEC_STOPS)
+_s54_dm = _slice_section(_orch_s54, "When invoked with a `Direct Mode Task`", ("\n## ",))
+
+# (a) ref-direct-modes.md contains the ## Read-Only Working-Tree Guard block
+check(
+    "Suite 54(a): ref-direct-modes.md contains '## Read-Only Working-Tree Guard' block",
+    _s54_guard != "",
+    "## Read-Only Working-Tree Guard section missing from ref-direct-modes.md — "
+    "future refactors that remove it will be caught by this assertion (SEC-DR-3)",
+)
+
+# (b) Layer 1 (no-dispatch) — asserted WITHIN the Layer 1 subsection, with intent
+check(
+    "Suite 54(b): Layer 1 subsection forbids dispatching the implementer (no-dispatch intent)",
+    "MUST NOT dispatch" in _s54_l1 and "implementer" in _s54_l1,
+    "### Layer 1 — No-dispatch does not state 'MUST NOT dispatch' + 'implementer' within its "
+    "own subsection — a mutant that keeps the heading but neuters the prohibition would survive",
+)
+# (c) Layer 2 (deny-tools) — the prohibition must live in the agents' system prompts
+check(
+    "Suite 54(c): Layer 2 subsection routes the prohibition to the agents' system prompts",
+    "system prompt" in _s54_l2 and "Read-Only Working-Tree Contract" in _s54_l2,
+    "### Layer 2 — Deny-tools does not, within its own subsection, route the prohibition to "
+    "each agent's system prompt (§ Read-Only Working-Tree Contract) — the inexecutable "
+    "'deny in the dispatch' framing must not return (SEC-DR-1)",
+)
+# (d) Layer 3 (tree-verify) — the verification command must be inside the Layer 3 subsection
+check(
+    "Suite 54(d): Layer 3 subsection verifies the tree with 'git status --untracked-files=all'",
+    "git status --untracked-files=all" in _s54_l3 and ".claude/pr-review-*" in _s54_l3,
+    "### Layer 3 — Tree-verify does not, within its own subsection, use "
+    "'git status --untracked-files=all' and allowlist '.claude/pr-review-*' — "
+    "a weakened verify (plain 'git status', no allowlist) would survive a whole-file check",
+)
+# (e) reviewer.md — the read-only contract section forbids source writes WITHIN the section
+check(
+    "Suite 54(e): reviewer.md § Read-Only Working-Tree Contract forbids source writes and names its sole write",
+    _s54_rev != "" and "NEVER" in _s54_rev and "source files" in _s54_rev and "04-review.md" in _s54_rev,
+    "reviewer.md § Read-Only Working-Tree Contract must contain 'NEVER' + 'source files' AND name "
+    "'workspaces/{feature-name}/04-review.md' as its sole permitted write — all within the section "
+    "(Layer 2 prohibition lives in the agent's own system prompt, not the dispatch)",
+)
+# (f) reviewer-consolidator.md — same contract, sliced to its own section
+check(
+    "Suite 54(f): reviewer-consolidator.md § Read-Only Working-Tree Contract forbids source writes and names its draft zone",
+    _s54_con != "" and "NEVER" in _s54_con and "source files" in _s54_con and ".claude/pr-review-" in _s54_con,
+    "reviewer-consolidator.md § Read-Only Working-Tree Contract must contain 'NEVER' + 'source files' "
+    "AND name '.claude/pr-review-*' as its sole permitted write zone — all within the section",
+)
+# (g) orchestrator.md § Direct Modes review row references the guard (sliced to the Direct Modes section)
+check(
+    "Suite 54(g): orchestrator.md § Direct Modes review row references the read-only guard",
+    _s54_dm != "" and ("Read-only guard" in _s54_dm or "Read-Only Working-Tree Guard" in _s54_dm),
+    "orchestrator.md § Direct Modes (sliced) does not reference the read-only guard — "
+    "the review row must point to ref-direct-modes.md § Read-Only Working-Tree Guard (AC-4)",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 53 — Process-guard: branch/worktree always bases from origin/main (#240)
+# ---------------------------------------------------------------------------
+# SEC-DR-3 binding assertion (hardened): each check is ANCHOR-SCOPED via
+# _slice_section AND asserts the intent phrase ("never from the active local
+# branch"), so a mutant that keeps "git fetch origin main" somewhere in the file
+# while neutering the guard in its own section does not survive.
+# PR-1 AC-5: red suite = guard is gone or semantically weakened.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 53: origin/main fetch guard (process-security, #240) ===")
+
+_s53_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s53_delivery = read(AGENTS_DIR / "delivery.md")
+
+_S53_STOPS = ("\n#### ", "\n### ", "\n## ", "\n---\n")
+_s53_orch_4a = _slice_section(_s53_orchestrator, "#### 4a. Determine base branch", _S53_STOPS)
+_s53_orch_wt = _slice_section(_s53_orchestrator, "**Worktree branch base:**", ("\n\n",))
+_s53_deliv_33 = _slice_section(_s53_delivery, "**Step 3.3 — Create a new branch**", ("\n- Then create the branch",))
+
+
+def _s53_guard(slice_text):
+    return (
+        "git fetch origin main" in slice_text
+        and "origin/main" in slice_text
+        and "never from the active local branch" in slice_text
+    )
+
+
+check(
+    "Suite 53(a): orchestrator.md § Parallel Dispatch 4a bases Round 1 from origin/main, never the active local branch",
+    _s53_guard(_s53_orch_4a),
+    "§ Parallel Dispatch '#### 4a. Determine base branch' must, within its own section, require "
+    "'git fetch origin main', base from 'origin/main', and state 'never from the active local branch' — "
+    "a mutant that drops the fetch or neuters the intent is caught here (SEC-DR-3 / #240).",
+)
+check(
+    "Suite 53(b): orchestrator.md worktree-base paragraph bases from origin/main, never the active local branch",
+    _s53_guard(_s53_orch_wt),
+    "The '**Worktree branch base:**' paragraph must require 'git fetch origin main', base from "
+    "'origin/main', and state 'never from the active local branch' — the worktree spawn must not "
+    "regress to basing from the active local branch (SEC-DR-3 / #240).",
+)
+check(
+    "Suite 53(c): delivery.md Step 3.3 bases the new branch from origin/main, never the active local branch",
+    _s53_guard(_s53_deliv_33),
+    "delivery.md '**Step 3.3 — Create a new branch**' must, before creating the branch, require "
+    "'git fetch origin main', base from 'origin/main', and state 'never from the active local branch' "
+    "(SEC-DR-3 / #240).",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
