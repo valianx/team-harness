@@ -175,6 +175,11 @@ Comments posted on a ClickUp task are read by the operator, SAC, and operations 
 
 **Post once, post correct.** The ClickUp MCP exposes only create and read for comments: `clickup_create_task_comment` creates, `clickup_get_task_comments` reads. There is no tool to edit or delete a comment. A wrong comment cannot be retracted by the agent — it requires manual action by the operator. Compose the full comment, verify the functional framing, then post it a single time.
 
+**Never state the PR's status.** The functional comment includes only the bare PR link and states the result as an accomplished fact. It MUST NOT include the PR lifecycle status ("pendiente de merge", "merged", "pending merge", "en revisión", "pending deploy") nor temporal rollout qualifiers ("se desplegará", "quedará disponible tras el deploy", "will be live after the deploy"). Rationale: ClickUp comments are immutable (post-once — no edit, no delete). A frozen transient status ("pendiente de merge") becomes false the moment the PR is merged, with no way to correct it. State only what has already happened.
+
+- Correct: `El selector de moneda ya está disponible en el backoffice. Ref: PR #476 https://github.com/org/repo/pull/476`
+- Incorrect: `Se abrió el PR #476, pendiente de merge. Quedará disponible tras el deploy.`
+
 **Never claim evidence that does not exist.** Do not write "adjunto", "attached", "evidencia", "se adjunta la captura", or any equivalent unless an attachment call has returned success in the same flow. A comment that promises an attachment with no attachment behind it is a misleading comment and requires manual operator action to correct (see § "Post once, post correct"). See § "Evidence / attachments" for why attachments are usually not possible.
 
 ### Evidence / attachments

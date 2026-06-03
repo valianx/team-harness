@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `orchestrator-dispatch-rule` managed block — new **Default to team-harness flows** directive: the top-level agent routes development tasks through the orchestrator or a `th` skill by default; direct/manual handling requires an explicit operator opt-out. (#242)
+- `orchestrator-dispatch-rule` managed block — new **Report team-harness problems via `/th:report-issue`** directive: harness bugs/gaps must be reported via the skill (correct pattern, dedup, confirmation gate), not via `gh issue create` or transient cache edits. (#241)
+
 ### Fixed
 
+- `agents/delivery.md` Step 3.3 and `agents/orchestrator.md` § Parallel Dispatch 4a + worktree spawn: branch/worktree creation now always runs `git fetch origin main` and bases from `origin/main`, never from the active local branch; operator-supplied explicit base is still respected. (#240)
+- `review` direct mode now enforces a three-layer read-only working-tree guard: no dispatch of `implementer`; imperative write prohibition in `reviewer`/`reviewer-consolidator` system prompts (only `.claude/pr-review-*` and `workspaces/` allowed); tree-verify byte-identical check with `git status --untracked-files=all` allowlisting `.claude/pr-review-*`. Guard anchored by structural Suite 54 in `tests/test_agent_structure.py`. (#238)
+- `th:clickup` skill — § "Comments": added rule "Never state the PR's status". The functional comment includes only the bare PR link and states the result as an accomplished fact; PR lifecycle status ("pendiente de merge", "merged", "pending merge") and temporal rollout qualifiers are prohibited. Rationale: ClickUp comments are immutable — a frozen transient status becomes false once the PR moves on, with no way to correct it. (#239)
 - `th:report-issue` skill now composes issue title and body in English (placeholder strings, section labels, secrets warning), per CLAUDE.md §7.3 (English-only persisted repo content); operator-facing chat prompts remain in the operator's language. (#243)
 
 ## [2.49.0] - 2026-06-03
