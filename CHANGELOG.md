@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.6] - 2026-06-03
+
+### Fixed
+
+- Pipeline race condition in Phase 3: `tester` and `qa` no longer parallelize over a partially-written test tree. AC-test authoring is moved to a new pre-verify sub-phase (Phase 2.7 — Test Authoring) in Stage 2; the Phase 3 tester is now run-only (executes the frozen suite, does not write AC tests). Regression-locked by a new structural Suite (Suite 52). (#232)
+
 ## [2.47.5] - 2026-06-02
 
 ### Fixed

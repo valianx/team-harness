@@ -1581,9 +1581,11 @@ for ref in sorted(plausible_agent_refs):
 # 5. Phase numbers mentioned in orchestrator.md are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
+    # 2.7 is the Test Authoring sub-phase (Stage 2, pre-verify): tester writes AC tests
+    # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
     # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
@@ -12028,6 +12030,178 @@ check(
     "Dispatch invariant #2 was removed — must be preserved",
 )
 
+
+# ---------------------------------------------------------------------------
+# Suite 52 — Phase 3 tester/QA race-condition fix (issue #232, pre-fix regression)
+# ---------------------------------------------------------------------------
+# These assertions FAIL against the current (pre-fix) agent prompt files.
+# They pass once the implementer applies the approved fix (Opción 2 from the
+# root-cause analysis): AC-test authoring is moved to a pre-verify sub-phase
+# in Stage 2; the Phase 3 tester becomes run-only (no AC-test authoring).
+#
+# Marker strings the implementer MUST introduce to make these pass:
+#
+#  In agents/orchestrator.md:
+#    (a) A sub-phase header for test authoring that precedes Phase 3, e.g.:
+#        "## Phase 2.7 — Test Authoring"  (exact name may vary but must
+#        contain both "Phase 2.7" and "Test Authoring")
+#    (b) In the Phase 3 section: the word "run-only" (without quotes) to
+#        describe what the tester does in the parallel verify block.
+#    (c) In the Phase 3 section: a statement that the tester does NOT write
+#        or author AC tests in Phase 3 — captured by the absence of
+#        "acceptance criteria from `01-plan.md` § Task List" in the Phase 3
+#        tester dispatch instruction (this instruction drives authoring today).
+#
+#  In agents/tester.md:
+#    (d) An explicit "authoring" mode section, e.g.:
+#        "### Mode: `authoring`"  (must contain "authoring" as a declared mode)
+#    (e) An explicit run-only / verify-run mode section, e.g.:
+#        "### Mode: `verify-run`"  OR a section containing the phrase
+#        "run-only" to distinguish it from the authoring mode.
+#
+# NOTE: Assertions (c) uses region-slicing to scope the check to the Phase 3
+# section body only — preventing false negatives if the phrase appears
+# legitimately in Phase 2.7 (where the implementer SHOULD put the authoring).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 52: Phase 3 tester/QA race-condition fix (issue #232) ===")
+
+_orch_s52 = read(AGENTS_DIR / "orchestrator.md")
+_tester_s52 = read(AGENTS_DIR / "tester.md")
+
+# (a) orchestrator.md declares the pre-verify Test Authoring sub-phase (Phase 2.7)
+# The sub-phase must be present and must appear in Stage 2 BEFORE the Phase 3 section.
+_ph27_marker = "Phase 2.7"
+_ph27_label = "Test Authoring"
+check(
+    "Suite 52(a1): orchestrator.md declares 'Phase 2.7' sub-phase",
+    _ph27_marker in _orch_s52,
+    f"marker '{_ph27_marker}' not found — implementer must add the pre-verify "
+    "Test Authoring sub-phase to Stage 2 of orchestrator.md",
+)
+check(
+    "Suite 52(a2): orchestrator.md Phase 2.7 sub-phase is labelled 'Test Authoring'",
+    _ph27_label in _orch_s52 and _ph27_marker in _orch_s52,
+    f"'Phase 2.7' is present but '{_ph27_label}' label not found alongside it — "
+    "the sub-phase must be named 'Test Authoring' (or contain that phrase)",
+)
+
+# Positional check: Phase 2.7 must appear BEFORE Phase 3 in the document.
+_ph27_idx = _orch_s52.find(_ph27_marker)
+_ph3_section_marker = "## Phase 3 — Verify"
+_ph3_idx = _orch_s52.find(_ph3_section_marker)
+check(
+    "Suite 52(a3): orchestrator.md Phase 2.7 appears BEFORE '## Phase 3 — Verify'",
+    _ph27_idx != -1 and _ph3_idx != -1 and _ph27_idx < _ph3_idx,
+    f"Phase 2.7 index ({_ph27_idx}) must precede Phase 3 index ({_ph3_idx}) — "
+    "Test Authoring is a Stage 2 sub-phase and must come before the parallel verify block",
+)
+
+# (b) Phase 3 describes the tester as run-only (not authoring)
+# Slice the Phase 3 section body to avoid false positives from other sections.
+_ph3_body_start = _orch_s52.find(_ph3_section_marker)
+# Find the next top-level section after Phase 3 to bound the slice.
+_ph35_marker = "## Phase 3.5"
+_ph3_body_end = _orch_s52.find(_ph35_marker, _ph3_body_start + 1)
+_ph3_body = (
+    _orch_s52[_ph3_body_start:_ph3_body_end]
+    if _ph3_body_start != -1 and _ph3_body_end != -1 and _ph3_body_end > _ph3_body_start
+    else ""
+)
+
+check(
+    "Suite 52(b1): orchestrator.md Phase 3 section describes tester as 'run-only'",
+    "run-only" in _ph3_body,
+    "marker 'run-only' not found in the Phase 3 section — implementer must add a "
+    "'run-only' qualifier for the tester in the Phase 3 parallel dispatch description",
+)
+
+# (c) Phase 3 tester dispatch must NOT instruct AC-test authoring.
+# The current Phase 3 dispatch instruction contains:
+#   "acceptance criteria from `01-plan.md` § Task List (per-PR AC block)"
+#   "(the tester must map each AC to at least one test)"
+# After the fix, AC-test authoring is in Phase 2.7; this phrase must be gone from
+# the Phase 3 tester dispatch (it belongs in Phase 2.7 now).
+_authoring_instruction = "the tester must map each AC to at least one test"
+check(
+    "Suite 52(c1): orchestrator.md Phase 3 section does NOT instruct tester to map AC to tests",
+    _authoring_instruction not in _ph3_body,
+    f"authoring instruction '{_authoring_instruction}' still present in Phase 3 section — "
+    "AC-test authoring must be moved to the Phase 2.7 pre-verify sub-phase; "
+    "Phase 3 tester must be run-only (executes the frozen suite, does not write new tests)",
+)
+
+# (d) tester.md declares an explicit 'authoring' mode
+# The implementer must add a Mode: authoring section (per AC-3 of the fix plan).
+_authoring_mode_markers = [
+    "Mode: `authoring`",
+    "### Mode: `authoring`",
+    "## Mode: `authoring`",
+    "`authoring` mode",
+    "mode: authoring",
+]
+_has_authoring_mode = any(m in _tester_s52 for m in _authoring_mode_markers)
+check(
+    "Suite 52(d1): tester.md declares an explicit 'authoring' mode section",
+    _has_authoring_mode,
+    "tester.md has no 'authoring' mode declaration — implementer must add an explicit "
+    "authoring mode (Stage 2, pre-verify: writes AC tests and runs them once to confirm "
+    "green; does NOT validate AC). Example markers: 'Mode: `authoring`' or '`authoring` mode'",
+)
+
+# (e) tester.md declares an explicit run-only / verify-run mode for Phase 3
+# The implementer must separate the Phase 3 verify mode from the authoring mode (AC-3).
+_run_only_mode_markers = [
+    "Mode: `verify-run`",
+    "### Mode: `verify-run`",
+    "## Mode: `verify-run`",
+    "`verify-run` mode",
+    "mode: verify-run",
+    "run-only mode",
+    "run-only",
+]
+_has_run_only_mode = any(m in _tester_s52 for m in _run_only_mode_markers)
+check(
+    "Suite 52(e1): tester.md declares an explicit run-only / verify-run mode for Phase 3",
+    _has_run_only_mode,
+    "tester.md has no 'run-only' or 'verify-run' mode declaration — implementer must "
+    "add an explicit run-only mode for Phase 3 (executes the frozen suite, confirms "
+    "no regressions, does NOT write AC tests in the parallel verify block). "
+    "Example markers: 'Mode: `verify-run`' or 'run-only'",
+)
+
+# (f) tester.md does NOT describe the two new modes as the same unified flow.
+# Regression guard: if both 'authoring' and 'run-only' markers are present but
+# collapsed into the same section (same header), the separation is illusory.
+# Check that 'authoring' and 'run-only' are in different positions in the file.
+# We use index distance as a proxy — they must be at least 200 chars apart to be
+# separate sections (same-paragraph co-location would be less than 200 chars).
+_authoring_idx = min(
+    (_tester_s52.find(m) for m in _authoring_mode_markers if m in _tester_s52),
+    default=-1,
+)
+_run_only_idx = min(
+    (_tester_s52.find(m) for m in _run_only_mode_markers if m in _tester_s52),
+    default=-1,
+)
+check(
+    "Suite 52(f1): tester.md authoring and run-only modes are in separate sections (index distance > 200 chars)",
+    _authoring_idx != -1 and _run_only_idx != -1 and abs(_authoring_idx - _run_only_idx) > 200,
+    f"'authoring' index ({_authoring_idx}) and 'run-only' index ({_run_only_idx}) are too "
+    "close — they appear to be in the same section; the two modes must be declared "
+    "separately (each with its own section header and distinct responsibilities)",
+)
+
+# (g) Canonical phase number Phase 2.7 is added to the canonical set in Suite 19.
+# This check validates that Phase 2.7 is now a recognized phase in orchestrator.md
+# (Suite 19 assertion 5 also validates phase numbers; this check specifically asserts
+# Phase 2.7 is used somewhere in the Phase Dispatch Reference or header).
+check(
+    "Suite 52(g1): orchestrator.md uses 'Phase 2.7' as a named phase (appears in dispatch reference or header)",
+    "Phase 2.7" in _orch_s52,
+    "orchestrator.md does not mention 'Phase 2.7' — implementer must introduce this "
+    "phase number when adding the Test Authoring sub-phase",
+)
 
 # ---------------------------------------------------------------------------
 # Summary

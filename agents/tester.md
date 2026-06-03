@@ -145,6 +145,60 @@ issues: {blockers — e.g., "bug-not-reproducible" — or "none"}
 
 ---
 
+---
+
+## Mode: `authoring` (Stage 2 — Phase 2.7, pre-verify)
+
+Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current PR BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
+
+- **Trigger:** orchestrator invokes with `mode: authoring` (or dispatch instruction specifies "authoring mode, Phase 2.7")
+- **Flow:** Phase 0 (discovery) → read AC from `01-plan.md` § Task List (per-PR AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
+- **Output:** `workspaces/{feature-name}/03-testing.md`
+
+**This mode does NOT validate AC verdicts.** Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
+
+**Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes.
+
+**Run the suite once after authoring.** Execute the full suite (or the relevant subset) to confirm:
+1. All newly authored tests pass.
+2. No previously-passing tests have regressed.
+
+If newly authored tests fail, diagnose and fix the tests before returning (max 3 internal fix attempts). The fix must stay within test files — if a test fails because of a bug in production code, report `status: failed` with `issues: test-requires-impl-fix — authored test {name} fails because {reason}; implementer must fix before authoring can complete`.
+
+**Status block (authoring mode):**
+```
+agent: tester
+mode: authoring
+status: success | failed | blocked
+output: workspaces/{feature-name}/03-testing.md
+summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
+tests_count: {N}
+tests_authored: {N}
+context7_consult: hit:N miss:N skipped:M
+memory_consult: search_nodes:N open_nodes:N
+kg_save_candidates: [...]
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+issues: {list of blockers or "none"}
+```
+
+---
+
+## Mode: `verify-run` (Phase 3 — run-only)
+
+Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-only mode: you execute the frozen test suite (authored in Phase 2.7), confirm there are no regressions, and map each AC to the existing tests. You do NOT author new AC tests — authoring is complete.
+
+- **Trigger:** orchestrator invokes with `mode: verify-run` (or dispatch instruction specifies "run-only mode, Phase 3")
+- **Flow:** Phase 0 (discovery) → run the full suite → confirm no regressions → map AC to existing tests → write or update `03-testing.md` (verify section)
+- **Output:** `workspaces/{feature-name}/03-testing.md`
+
+**This mode does NOT write new AC tests.** The AC tests already exist from Phase 2.7. Writing new tests in this mode would break the immutable-artifact invariant that allows `qa` and `security` to parallelize safely. If a test is missing for an AC, report it as a finding — do NOT write the missing test; that is a Phase 2.7 failure that must be corrected before verify can succeed.
+
+**Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes. In run-only mode, test-file writes are restricted to updating `03-testing.md` (the workspace doc) — no new test files, no edits to existing test files.
+
+**For `type: fix` / `type: hotfix` (Tier 2-4):** confirm the regression test from `02-regression-test.md` now passes and the full suite has no regressions. Set `regression_test_status: passing` in your status block.
+
+---
+
 ## Review Mode (read-only)
 
 Used by `/th:cross-repo` to evaluate the quality of an existing test suite without writing any tests. Assesses coverage, test quality, missing scenarios, and alignment with business rules.
@@ -669,7 +723,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 
 ```
 agent: tester
-mode: default | pre-fix-regression | review | coverage-config | test-infra | module-test
+mode: default | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}
