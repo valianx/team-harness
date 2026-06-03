@@ -12204,6 +12204,57 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 53 — Process-guard: branch/worktree always bases from origin/main (#240)
+# ---------------------------------------------------------------------------
+# SEC-DR-3 binding assertion (hardened): each check is ANCHOR-SCOPED via
+# _slice_section AND asserts the intent phrase ("never from the active local
+# branch"), so a mutant that keeps "git fetch origin main" somewhere in the file
+# while neutering the guard in its own section does not survive.
+# PR-1 AC-5: red suite = guard is gone or semantically weakened.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 53: origin/main fetch guard (process-security, #240) ===")
+
+_s53_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s53_delivery = read(AGENTS_DIR / "delivery.md")
+
+_S53_STOPS = ("\n#### ", "\n### ", "\n## ", "\n---\n")
+_s53_orch_4a = _slice_section(_s53_orchestrator, "#### 4a. Determine base branch", _S53_STOPS)
+_s53_orch_wt = _slice_section(_s53_orchestrator, "**Worktree branch base:**", ("\n\n",))
+_s53_deliv_33 = _slice_section(_s53_delivery, "**Step 3.3 — Create a new branch**", ("\n- Then create the branch",))
+
+
+def _s53_guard(slice_text):
+    return (
+        "git fetch origin main" in slice_text
+        and "origin/main" in slice_text
+        and "never from the active local branch" in slice_text
+    )
+
+
+check(
+    "Suite 53(a): orchestrator.md § Parallel Dispatch 4a bases Round 1 from origin/main, never the active local branch",
+    _s53_guard(_s53_orch_4a),
+    "§ Parallel Dispatch '#### 4a. Determine base branch' must, within its own section, require "
+    "'git fetch origin main', base from 'origin/main', and state 'never from the active local branch' — "
+    "a mutant that drops the fetch or neuters the intent is caught here (SEC-DR-3 / #240).",
+)
+check(
+    "Suite 53(b): orchestrator.md worktree-base paragraph bases from origin/main, never the active local branch",
+    _s53_guard(_s53_orch_wt),
+    "The '**Worktree branch base:**' paragraph must require 'git fetch origin main', base from "
+    "'origin/main', and state 'never from the active local branch' — the worktree spawn must not "
+    "regress to basing from the active local branch (SEC-DR-3 / #240).",
+)
+check(
+    "Suite 53(c): delivery.md Step 3.3 bases the new branch from origin/main, never the active local branch",
+    _s53_guard(_s53_deliv_33),
+    "delivery.md '**Step 3.3 — Create a new branch**' must, before creating the branch, require "
+    "'git fetch origin main', base from 'origin/main', and state 'never from the active local branch' "
+    "(SEC-DR-3 / #240).",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
