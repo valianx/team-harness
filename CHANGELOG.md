@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `agents/delivery.md` Step 3.3 and `agents/orchestrator.md` § Parallel Dispatch 4a + worktree spawn: branch/worktree creation now always runs `git fetch origin main` and bases from `origin/main`, never from the active local branch; operator-supplied explicit base is still respected. (#240)
+
 ## [2.49.0] - 2026-06-03
 
 ### Changed
