@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `orchestrator-dispatch-rule` managed block — new **Default to team-harness flows** directive: the top-level agent routes development tasks through the orchestrator or a `th` skill by default; direct/manual handling requires an explicit operator opt-out. (#242)
+- `orchestrator-dispatch-rule` managed block — new **Report team-harness problems via `/th:report-issue`** directive: harness bugs/gaps must be reported via the skill (correct pattern, dedup, confirmation gate), not via `gh issue create` or transient cache edits. (#241)
 
 ## [2.49.0] - 2026-06-03
 
