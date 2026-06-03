@@ -3238,8 +3238,9 @@ Using dispatch labels and the dependency graph:
 **If 2+ tasks in round:**
 
 #### 4a. Determine base branch
-- Round 1 → branch from `main`
-- Round N → branch from the completed branch of the dependency in Round N-1
+- **Round 1** → run `git fetch origin main` first, then base the branch from `origin/main` (never from the active local branch, which may carry unmerged commits from a prior session).
+- **Round N** → branch from the completed branch of the dependency in Round N-1.
+- **Operator-override:** if the operator explicitly names a different base branch, use it as provided and skip the forced `origin/main` base. This override is intentional and deliberate; it is never implicit or automatic.
 
 #### 4b. Launch parallel instances with completion hooks
 
@@ -3248,6 +3249,8 @@ Determine how many tasks to launch: `launch_count = min(tasks_in_round, 5)`. Que
 For each task being launched, spawn a worktree with a `Stop` hook that writes the result to a shared directory:
 
 **IMPORTANT: Worktree tasks run the FULL orchestrator pipeline (specify → design → implement → verify) but STOP BEFORE delivery.** Each worktree produces verified, tested code. The consolidated delivery (version bump, changelog, PR) happens once in Step 5 after all tasks complete.
+
+**Worktree branch base:** the branch created for each worktree task MUST be based from updated `origin/main` (or from the completed dependency branch for Round N tasks), never from the active local branch. Run `git fetch origin main` before spawning worktrees so the base reflects the remote canonical state.
 
 To stop before delivery, pass `--skip-delivery` to the issue command. The orchestrator inside each worktree will run Phases 0a through 3 (verify) and then stop — no Phase 4 (delivery), no Phase 5 (GitHub), no Phase 6 (KG save). Those happen once in the parent after all worktrees complete.
 
@@ -3536,7 +3539,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | Mode | Agent | Prerequisites | Flow |
 |------|-------|--------------|------|
 | research | `architect` (research mode) | none | create workspaces → invoke → present `00-research.md` |
-| review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill |
+| review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the three-layer guard (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify). |
 | init | `init` | none | invoke → report generated files |
 | design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
 | test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** |
