@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `orchestrator-dispatch-rule` managed block — new **Default to team-harness flows** directive: the top-level agent routes development tasks through the orchestrator or a `th` skill by default; direct/manual handling requires an explicit operator opt-out. (#242)
+
 ## [2.49.0] - 2026-06-03
 
 ### Changed
