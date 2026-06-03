@@ -112,8 +112,9 @@ List the operator's open ClickUp tasks.
 - `--list <id>`: override `default_list_id` for this run.
 
 **Error handling:**
-- If `clickup_filter_tasks` returns an error, surface the MCP error message verbatim and exit.
-- Do not retry silently — report failures immediately.
+- Transient infrastructure errors (HTTP 5xx, 502 Cloudflare, connection reset): retry the call 1–2 times with a short backoff before surfacing anything. These are not task-level failures.
+- Real errors (HTTP 4xx, validation, not-found, auth): surface the MCP error message verbatim and exit. Do not retry these — a retry will return the same error.
+- See § "Transient-error retry policy" for the full distinction. Outside the transient set, do not retry silently — report failures immediately.
 
 ---
 
@@ -163,14 +164,71 @@ Fetch a single task and optionally route it to the team-harness pipeline.
 
 ---
 
+## Comments
+
+Comments posted on a ClickUp task are read by the operator, SAC, and operations — not by engineers reviewing a diff. Write them accordingly.
+
+**Functional register — mandatory.** A comment always describes the change from the functional side: what changes for the end user, for SAC, or for operations. It does not describe implementation detail (file names, function signatures, internal refactors). When the work produced one or more PRs, **include the PR link(s)** — it is valuable traceability data and should not be dropped. Place it as a single line at the end (e.g. `Ref: PR #NNN` with the plain URL), never woven into the functional body.
+
+- Correct: `El reporte mensual ya incluye las transacciones en USD. SAC puede consultarlas en el selector de moneda del backoffice. Ref: PR #476.`
+- Incorrect: `Se agregó el campo currency al DTO y se ajustó el query de monthlySummaries en commission-service.`
+
+**Post once, post correct.** The ClickUp MCP exposes only create and read for comments: `clickup_create_task_comment` creates, `clickup_get_task_comments` reads. There is no tool to edit or delete a comment. A wrong comment cannot be retracted by the agent — it requires manual action by the operator. Compose the full comment, verify the functional framing, then post it a single time.
+
+**Never claim evidence that does not exist.** Do not write "adjunto", "attached", "evidencia", "se adjunta la captura", or any equivalent unless an attachment call has returned success in the same flow. A comment that promises an attachment with no attachment behind it is a misleading comment and requires manual operator action to correct (see § "Post once, post correct"). See § "Evidence / attachments" for why attachments are usually not possible.
+
+### Evidence / attachments
+
+The agent cannot reliably attach local files. `clickup_attach_task_file` accepts only:
+
+- **base64 inline** — a legible screenshot is ~80–100 KB, which is 28,000+ characters of base64. A payload that size cannot be transcribed into a tool parameter without corruption; any single transposed character produces a broken file. This path is not viable for the agent.
+- **an http(s) URL** (`file_url`) — uploading a screenshot to a public host to obtain a URL leaks customer PII. This path is not viable either.
+
+**Correct path:** the operator drags the file into the ClickUp task directly, or the operator provides their own https URL (an already-hosted, PII-safe asset) for `file_url`. The agent states this limitation plainly and does not promise an attachment it cannot deliver. When evidence is needed and neither path is available, the comment describes the result in words and notes that the operator can attach the file.
+
+### Closing a ClickUp-originated task — mandatory
+
+Any task that originated from ClickUp — started via `task <id>`, or routed from a ClickUp task into the team-harness pipeline (see `agents/orchestrator.md` Step 6c "route task" intent) — MUST be closed with a functional comment on that ClickUp task when the work completes. The comment describes what was done in terms of the effect for the user / SAC / operations, following the rules in § "Comments". This is not optional: a ClickUp-originated task left without a closing comment is incomplete work.
+
+When the task is routed through the pipeline, the orchestrator persists the originating task reference in `00-state.md § Current State` (`clickup_task_id` and `clickup_task_url`) at intake, so the closing comment can be posted at delivery (Phase 5) even after context compaction or a recovery resume.
+
+- The comment is posted once and correct (the MCP cannot edit it afterward).
+- It is functional, not implementation detail.
+- PR or branch references are secondary, on a trailing line.
+
+When the task ran through the full pipeline, the orchestrator's Phase 5 (GitHub Update) carries the equivalent obligation for the ClickUp origin — see `agents/orchestrator.md` § "Phase 5 — GitHub Update". The principal contract lives here in the skill; the orchestrator reference exists so the pipeline honors it when the origin is a ClickUp task rather than a GitHub issue.
+
+## Transient-error retry policy
+
+The ClickUp MCP connector sits behind Cloudflare and returns transient infrastructure errors intermittently (HTTP 5xx, 502, connection reset). These are distinct from real errors and are handled differently.
+
+| Error class | Examples | Action |
+|---|---|---|
+| Transient infrastructure | HTTP 5xx, 502 Cloudflare, connection reset/timeout | Retry 1–2 times with a short backoff, then surface verbatim if still failing |
+| Real error | HTTP 4xx, validation rejection, 404 not-found, auth failure | Surface the MCP error verbatim and stop. Do not retry — the result will not change |
+
+A bounded retry on the transient class prevents a single 502 from aborting an otherwise valid operation. The retry ceiling is 2 attempts; do not loop beyond that. This refines the "no silent retries" rule — it applies to real errors, not to transient infrastructure blips.
+
+## Available-states discovery
+
+Before any `clickup_update_task` that changes `status`, the valid status names of the target list must be known. ClickUp status names are arbitrary per list, and setting a status that does not exist in the list fails. `clickup_get_list` does **not** return the list's status set.
+
+**Discovery method:** call `clickup_filter_tasks` over the target list with `include_closed: true`, then collect the distinct `status` values present across the returned tasks. That distinct set is the list's valid status vocabulary. Example of a discovered set:
+
+`"not started", "in progress", "blocked", "review business", "testing", "ready for prod", "done", "Closed", "pause"`
+
+Use the **exact** discovered string (including casing) when setting `status` via `clickup_update_task`. Do not guess a status name, normalize casing, or assume a generic value like `closed` is present — discover first, then set.
+
 ## MCP tools used by this skill
 
 This skill calls the following ClickUp MCP tools. Tool names are used verbatim — no aliases.
 
-- `clickup_filter_tasks` — list tasks with optional filters (list, assignees, statuses).
+- `clickup_filter_tasks` — list tasks with optional filters (list, assignees, statuses); with `include_closed: true`, also the means to discover a list's valid status set (see § "Available-states discovery").
 - `clickup_search` — search tasks by keyword or name.
 - `clickup_get_task` — fetch a single task by ID.
-- `clickup_create_task_comment` — post a comment on a task.
+- `clickup_get_task_comments` — read the existing comments on a task (read-only).
+- `clickup_create_task_comment` — post a comment on a task (create-only; no edit, no delete).
+- `clickup_attach_task_file` — attach a file via base64 inline or an http(s) `file_url`. Subject to the limits in § "Evidence / attachments" — the agent cannot reliably use it for local files.
 - `clickup_update_task` — update task fields (status, assignee, etc.).
 - `clickup_find_member_by_name` — resolve a workspace member name to their member ID.
 - `clickup_resolve_assignees` — resolve a list of names to ClickUp assignee objects.
@@ -191,4 +249,6 @@ This flow does not write the persistent config file — the `single-config-file`
 
 - This skill does NOT route through the orchestrator. The `task <id>` sub-command prepares a handoff payload and prints it for the operator to forward to `@th:orchestrator` — the skill itself never invokes another agent.
 - ClickUp settings are stored in the `clickup` key of `~/.claude/.team-harness.json` — the shared plugin config file. This skill never creates a separate config file. The file is the operator's private config and must not be committed to any repository.
-- All MCP tool errors are surfaced verbatim to the operator. No silent retries, no fallback assumptions.
+- Run ClickUp MCP operations from the top-level context, not from inside a subagent. The ClickUp connector can report "Failed to connect" within a dispatched subagent while the same tools succeed at the top level. When a pipeline needs a ClickUp comment or status change, the orchestrator performs it at top level (Step 6c / Phase 5), not by delegating the MCP call to a phase agent.
+- Real MCP tool errors (4xx, validation, not-found, auth) are surfaced verbatim to the operator, with no fallback assumptions. Transient infrastructure errors (5xx / 502) are retried 1–2 times with backoff before surfacing — see § "Transient-error retry policy".
+- A ClickUp-originated task is closed with a single, functional comment when the work completes — see § "Closing a ClickUp-originated task — mandatory". Comments cannot be edited or deleted by the agent; post once and correct.

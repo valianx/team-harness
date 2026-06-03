@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.48.0] - 2026-06-03
+
+### Added
+
+- `th:clickup` skill — § "Comments": comments are written from the functional side (effect for end user / SAC / operations), not implementation detail; the PR link(s) are included as valuable traceability data on a trailing line. Posted once and correct because the MCP exposes only create/read (`clickup_create_task_comment`, `clickup_get_task_comments`) — no edit, no delete. Never claim "attached/evidence" unless an attach call returned success. (#234)
+- `th:clickup` skill — § "Evidence / attachments": documents that the agent cannot reliably attach local files (`clickup_attach_task_file` accepts only base64 inline — ~28k+ chars for a legible screenshot, not transcribable without corruption — or an http(s) `file_url` — public upload leaks PII). Correct path: operator drags the file in ClickUp, or supplies a PII-safe https URL. (#234)
+- `th:clickup` skill — § "Closing a ClickUp-originated task — mandatory": every task started via `task <id>` or routed from a ClickUp task into the pipeline MUST be closed with a single functional comment on that task at completion. Mirrored as a pipeline-side step in `orchestrator.md` Phase 5 for ClickUp-origin tasks. (#234)
+- `orchestrator.md` — `00-state.md § Current State` gains `clickup_task_id` and `clickup_task_url`, seeded at intake by the "route task" intent so the mandatory Phase 5 closing comment can target the originating task even after compaction/recovery. The Phase 5 closing step now triggers on `clickup_task_id` being set. (#234)
+- `th:clickup` skill — § "Transient-error retry policy": 5xx / 502 Cloudflare / connection-reset errors are retried 1–2 times with backoff before surfacing; real errors (4xx, validation, not-found, auth) are still surfaced verbatim with no retry. (#234)
+- `th:clickup` skill — § "Available-states discovery": `clickup_get_list` does not return a list's status set; discover it by calling `clickup_filter_tasks` with `include_closed: true` and collecting the distinct `status` values, then set the exact discovered string via `clickup_update_task`. (#234)
+
+### Changed
+
+- `th:clickup` skill — `tasks` error handling and § "Important" refined: the "no silent retries / surface verbatim" rule now applies to real errors only; transient infrastructure errors follow the bounded-retry policy. Added a top-level-context note (ClickUp MCP ops run at top level, not inside a subagent, where the connector can report "Failed to connect"). `clickup_get_task_comments` and `clickup_attach_task_file` added to the "MCP tools used by this skill" list. (#234)
+
 ## [2.47.6] - 2026-06-03
 
 ### Fixed
