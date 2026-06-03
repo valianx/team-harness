@@ -500,7 +500,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - clickup_task_id: {id | null}            # originating ClickUp task id when the run started from a ClickUp task (routed via the `task <id>` intent); null otherwise. Read at Phase 5 to post the mandatory functional closing comment; survives compaction/recovery.
 - clickup_task_url: {url | null}          # https link to the originating ClickUp task (e.g. https://app.clickup.com/t/<id>); null when the run did not originate from ClickUp
 - fast_mode: {true|false}                  # operator-declared via --fast; lightweight path — skips Design+plan-review+STAGE-GATE-1, qa, security (unless sensitive path), 3.6, 4.5. Never auto-set
-- discover_state: {open | closed | bypassed | null}   # null before Discover runs; open = in ideation; closed = advance signal received; bypassed = task was already clear (fast-path)
+- discover_state: {open | closed | bypassed | null}   # null before Discover runs; open = framing/ideation in progress; closed = advance response received at the confirmation gate; bypassed = explicit skip marker only (--fast / [TIER: N] / hotfix)
 - advance_signal: {keyword:<word> | fastpath-confirm | close-phrase | literal-marker:<marker> | null}   # null while Discover still open; the specific signal that closed it
 - survey_pipeline_shape: {full | fast | null}         # null = not asked; full = all gates; fast = alias for --fast (inherits SEC-002 carve-out)
 - survey_effort: {thorough | quick | agent-decides | null}   # modulates depth, not stages
@@ -783,24 +783,19 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      `Routing to {description} mode (≡ /th:{skill}). This will modify code. Proceed? [Y/n]:`
      Wait for user response. If the mode has submodes (e.g., translate: full/glossary-only/translate-only), default to the most complete and mention alternatives in one line.
 
-   - **Full pipeline** → **Discover disposition (patient by default).** Do NOT proceed directly to step 7. Enter the Discover phase before dispatching the architect. Full contract: `docs/discover-phase.md`.
+   - **Full pipeline** → **Discover disposition (always confirm before planning).** Do NOT proceed directly to step 7. Discovery always runs; entry into Phase 1 is always gated by an explicit operator confirmation. Discovery is interactive (it waits for the operator's advance response across turns), so it runs INLINE at the top level (the main chat session) — no subagent — and is governed by the **session/chat model**, not a subagent frontmatter. Run the chat on an Opus-class model for Discovery. Full contract: `docs/discover-phase.md`.
 
      **Step 6d — Discover disposition (full pipeline only).**
 
-     1. **Detect task clarity.** A task is "already clear" when ANY of these hold:
-        - The message contains a literal marker: `--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`.
-        - The message contains an explicit advance signal (keyword `planeá`/`diseñá`/`dale`/`go`/`plan it`/`design it`/`let's go`, a close phrase `listo`/`done`/`that's it`, or an affirmative reply to a prior fast-path prompt).
-        - The message contains a complete spec with stated AC.
+     **Hard rule:** never advance into planning without (a) framing the task back to the operator (1–2 line restatement + tentative shape), (b) optionally asking clarifying questions to gather missing context, and (c) an explicit advance response to the confirmation prompt. An advance signal in the INITIAL message does NOT skip this — only an explicit skip marker does.
 
-     2. **Clear task → fast-path.** Record `discover_state: bypassed`. Offer ONE confirmation:
-        `Tarea clara. Arranco la planeación, o querés explorar la idea primero? [plan/explorar]`
-        (`Task is clear. Start planning, or explore first? [plan/explore]`)
-        On any advance response → record `advance_signal`, run intake survey (Step 6e), proceed to step 7.
-        On `explorar`/`explore` → enter Discover open (below). ONE prompt only.
+     1. **Explicit skip marker → bypass.** If the message carries `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:`, record `discover_state: bypassed`, skip the confirmation, run intake survey (Step 6e, skipping declared fields), proceed to step 7. (`--fast` keeps every security carve-out — a skip marker is never a security waiver.)
 
-     3. **Unclear task → Discover open.** Record `discover_state: open`. Stay conversational. Assist scope exploration using only the orchestrator's own capability — do NOT dispatch any subagent. After N turns without an advance signal, emit one soft reminder (once only): `Cuando quieras avanzar, decime y arranco la planeación.` On advance signal → record `discover_state: closed`, `advance_signal`, run intake survey (Step 6e), proceed to step 7.
+     2. **Clear task (no marker) → brief framing gate.** Record `discover_state: open`. Emit a 1–2 line restatement of the understood task + tentative pipeline shape / affected services; if context needed to plan well is missing or ambiguous, ask targeted clarifying questions (`AskUserQuestion` where available) — do NOT dispatch any subagent. Close with: `¿Pasamos a planeación, o querés ajustar/explorar primero? [plan/explorar]` and WAIT. On an advance response → record `discover_state: closed`, `advance_signal`, run intake survey (Step 6e), proceed to step 7. On `explorar`/a question/new scope detail → continue Discover open (step 3).
 
-     **Step 6e — Intake survey (immediately after advance signal or fast-path confirmation).**
+     3. **Unclear task → Discover open.** Record `discover_state: open`. Stay conversational. Assist scope exploration and ask clarifying questions using only the orchestrator's own capability — do NOT dispatch any subagent. After N turns without an advance signal, emit one soft reminder (once only): `Cuando quieras avanzar, decime y arranco la planeación.` On advance response → record `discover_state: closed`, `advance_signal`, run intake survey (Step 6e), proceed to step 7.
+
+     **Step 6e — Intake survey (immediately after the confirmation-gate advance response, or after a skip marker).**
 
      Capture the operator's four meta-decisions as attributable answers before proceeding to step 7. Use `AskUserQuestion` where available; fall back to conversational prose where not. Skip a question if the operator already declared its answer via a literal marker; record `survey_source: inferred` for skipped fields.
 

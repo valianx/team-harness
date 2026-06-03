@@ -2,26 +2,31 @@
 
 The Discover phase is the orchestrator's default intake posture for development tasks. It replaces the previous eager-dispatch model (architect fires on message arrival) with a patient-by-default model: the architect is dispatched **only** after the operator emits an explicit advance signal. Before that signal, the orchestrator stays conversational and cheap — no subagent dispatch during ideation.
 
+**Model.** Discovery is interactive and multi-turn: it frames the task, may ask clarifying questions, and WAITS for the operator's advance response across turns. A dispatched subagent runs single-shot and cannot hold a multi-turn conversation, so Discovery cannot run inside a subagent — it is necessarily performed at the **top level (the main chat session)**, and is therefore governed by the **session / chat model**, not by any subagent frontmatter. The orchestrator's own `model: opus` / `effort: high` frontmatter governs its non-interactive single-pass orchestration when it IS dispatched as a subagent — but that path cannot conduct interactive Discovery.
+
+Practical consequence: Discovery quality tracks the chat model directly. Run the session on an Opus-class model for Discovery — it is a high-value framing/steering step. Raising the chat model to its strongest setting improves Discovery; lowering it (a faster/cheaper tier) degrades Discovery with it.
+
 This document is the full contract. `CLAUDE.md §5` carries a one-line pointer to it.
 
 ---
 
 ## 1. Disposición predeterminada (default intake disposition)
 
-When Step 6b routes a request as `full pipeline`, the orchestrator does NOT proceed immediately to Step 7 (Classify) and Phase 1 (Design). Instead, it enters the Discover disposition:
+When Step 6b routes a request as `full pipeline`, the orchestrator does NOT proceed immediately to Step 7 (Classify) and Phase 1 (Design). Discovery ALWAYS runs first, and entry into planning is ALWAYS gated by an explicit operator confirmation.
 
-1. **Detect task clarity.** A task is "already clear" if ANY of these conditions hold:
-   - The message contains a literal marker: `--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`, or similar operator-declared override.
-   - The message contains an explicit advance signal (see §2).
-   - The message contains a complete spec with stated AC (user stories + Given/When/Then or VERIFY criteria already written).
+**HARD RULE — no silent advance into planning.** The orchestrator never transitions from intake to Phase 1 without first: (a) framing the task back to the operator — a 1–2 line restatement of what was understood plus the tentative pipeline shape / affected services; (b) asking any clarifying questions needed to gather the context required to plan well; and (c) emitting the planning-confirmation prompt and WAITING for an explicit advance response. An advance signal present in the operator's INITIAL message (e.g. `armá el plan`, `dale`, `analizá`) does NOT pre-satisfy this gate — the prompt is still shown and a fresh response is awaited. The ONLY bypass is an explicit operator-declared skip marker (§3.1).
 
-2. **Clear task → fast-path (§3).** Offer one confirmation, then proceed on any advance response.
+1. **Detect task clarity** (this sets framing depth, NOT whether to confirm). A task is "clear" when it carries a complete spec with stated AC, or an explicit skip marker. Otherwise it is "unclear". Either way, the confirmation gate fires (unless a skip marker is present).
 
-3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration using only the orchestrator's own capability. Do NOT dispatch any subagent (no architect, no qa-plan, no specifier). Remain in this state until an advance signal is received.
+2. **Clear task (no marker) → brief framing gate (§3.2).** Restate, optionally ask clarifying questions, then confirm. Wait for the advance response.
 
-4. **Advance signal received → intake survey (§5) → Step 7.** The survey captures meta-decisions, then the orchestrator proceeds to Step 7 (Classify) → Phase 0b (Specify) → Phase 1 (Design).
+3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only the orchestrator's own capability. Do NOT dispatch any subagent (no architect, no qa-plan, no specifier). Remain until an advance response is received.
 
-**The advance signal is the ONLY trigger for the architect.** Without it, the architect is never dispatched.
+4. **Explicit skip marker → bypass (§3.1).** `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:` are deliberate opt-outs: proceed to the intake survey (§5) → Step 7 without the confirmation prompt.
+
+5. **Advance response received → intake survey (§5) → Step 7.** The survey captures meta-decisions, then the orchestrator proceeds to Step 7 (Classify) → Phase 0b (Specify) → Phase 1 (Design).
+
+**An advance response to the planning-confirmation prompt — or an explicit skip marker — is the ONLY trigger for the architect.** Without one, the architect is never dispatched.
 
 ---
 
@@ -35,27 +40,36 @@ Any one of the following counts as an advance signal:
 | **Fast-path confirmation** | Any affirmative reply to the fast-path `[plan/explorar]` prompt — `plan`, `y`, `yes`, `sí`, `ok`, `adelante` |
 | **Close phrase** | `listo`, `ya está`, `eso es todo`, `done`, `that's it`, `terminé de pensar` |
 
-Literal operator-declared markers (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`) ALSO count as advance signals — an operator who arrives with a marker has already decided and must not be forced through Discover.
+**Skip markers are NOT the same as advance keywords.** Literal operator-declared markers (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`) are a deliberate opt-out: they bypass the confirmation gate entirely (§3.1). Advance keywords and close phrases, by contrast, only close Discover when given as a **response to the planning-confirmation prompt** — the same words appearing in the operator's INITIAL message do NOT bypass the gate. The orchestrator still frames the task, may ask clarifying questions, and waits for a fresh advance response.
 
 **What does NOT count:** a question, a new piece of scope detail, "what do you think?", or "one more thing" — those extend the Discover conversation, they do not close it.
 
 ---
 
-## 3. Fast-path (task already clear)
+## 3. Entry into planning — always gated
 
-When the task is already clear (§1 condition 1 or 2), emit a single one-line confirmation prompt:
+### 3.1 Explicit skip marker → bypass
+
+The ONLY way to skip the confirmation gate is a deliberate operator-declared marker in the message: `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:`. These mean "I have decided, skip the gate." Record `discover_state: bypassed`, skip the framing+confirm, and go straight to the intake survey (§5) → Step 7. (`--fast` still inherits every security carve-out — see §6 HI-1/HI-2; a skip marker is not a security waiver.)
+
+### 3.2 Clear task (no marker) → brief framing gate
+
+When the task is clear but carries NO skip marker, the orchestrator still confirms before planning. Record `discover_state: open`. Emit the framing and the confirmation in a single turn:
 
 ```
-Tarea clara. Arranco la planeación, o querés explorar la idea primero? [plan/explorar]
+Esto entendí: <1–2 line restatement + tentative pipeline shape / affected services>.
+[si falta contexto para planear bien, una o más preguntas concretas acá]
+¿Pasamos a planeación, o querés ajustar/explorar primero? [plan/explorar]
 ```
 
-(In English: `Task is clear. Start planning, or explore first? [plan/explore]`)
+(In English: `Here's what I understood: <…>. Shall we move to planning, or adjust/explore first? [plan/explore]`)
 
-- Response `plan` (or any advance signal) → proceed immediately to intake survey (§5) → Step 7.
-- Response `explorar` / `explore` / any diverging response → enter Discover open (§4).
-- No response within the conversation → wait; the fast-path does not time out automatically.
+- Use `AskUserQuestion` for the clarifying questions where available. Ask only what is genuinely needed to plan well — do NOT interrogate beyond that. Do NOT dispatch any subagent in this step.
+- Response = advance (`plan`, `dale`, `sí`, `ok`, `procedé`, …) → record `discover_state: closed`, `advance_signal`, proceed to intake survey (§5) → Step 7.
+- Response = `explorar`/`explore`, a question, or new scope detail → continue conversational Discover (§4).
+- No response → wait; the gate does not time out.
 
-The fast-path is ONE interaction. Do not offer a second confirmation.
+This is always at least ONE interaction. An advance keyword in the operator's initial message does NOT skip it — the framing+confirm still happens.
 
 ---
 
@@ -126,7 +140,7 @@ All 7 survey fields in `00-state.md` are plain-text key: value pairs readable by
 
 ```
 - discover_state: {open | closed | bypassed}
-  # open = in ideation; closed = advance signal received; bypassed = task was already clear (fast-path)
+  # open = framing/ideation in progress; closed = advance response received at the confirmation gate; bypassed = explicit skip marker only (--fast / [TIER: N] / hotfix)
 - advance_signal: {keyword:<word> | fastpath-confirm | close-phrase | literal-marker:<marker> | null}
   # the specific signal that closed Discover; null while still open
 - survey_pipeline_shape: {full | fast | null}

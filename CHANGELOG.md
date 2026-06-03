@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.49.0] - 2026-06-03
+
+### Changed
+
+- **Discover phase — planning entry is now ALWAYS gated by an explicit confirmation.** For every full-pipeline task the orchestrator first frames the task back (1–2 line restatement + tentative shape / affected services), may ask clarifying questions to gather missing context, then asks `¿Pasamos a planeación? [plan/explorar]` and WAITS. An advance keyword in the operator's INITIAL message (`armá el plan`, `dale`, `analizá`) no longer auto-advances — the gate still fires. The only bypass is an explicit operator-declared skip marker (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`), which stays a deliberate opt-out (never a security waiver). `docs/discover-phase.md` §1–§3 and `orchestrator.md` Step 6d rewritten; `discover_state: bypassed` now means "skip marker only".
+- **Discover phase — model clarified.** Discovery is interactive/multi-turn, so it runs at the top level (main chat session) and is governed by the session/chat model — not by a subagent frontmatter. Documented that Discovery should run on an Opus-class chat model and that lowering the chat model degrades it. (`docs/discover-phase.md` intro + `orchestrator.md` Step 6d.)
+
 ## [2.48.0] - 2026-06-03
 
 ### Added
