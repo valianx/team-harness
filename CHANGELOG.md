@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `th:report-issue` skill now composes issue title and body in English (placeholder strings, section labels, secrets warning), per CLAUDE.md §7.3 (English-only persisted repo content); operator-facing chat prompts remain in the operator's language. (#243)
+
 ## [2.49.0] - 2026-06-03
 
 ### Changed

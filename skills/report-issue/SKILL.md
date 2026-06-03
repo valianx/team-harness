@@ -52,10 +52,10 @@ Uso: /th:report-issue <type> "<summary>" [options]
   summary  : descripción breve (obligatoria, no puede estar vacía)
 
 Ejemplos:
-  /th:report-issue bug "El comando /th:pipelines no muestra el estado cuando..."
-  /th:report-issue feature "Agregar soporte para reportar issues de seguridad"
-  /th:report-issue docs "La documentación de gh-fallback.md no menciona el caso X"
-  /th:report-issue question "¿Cómo se configura el Memory MCP en un entorno sin Docker?"
+  /th:report-issue bug "The /th:pipelines command does not show the status when..."
+  /th:report-issue feature "Add support for reporting security issues"
+  /th:report-issue docs "The gh-fallback.md documentation does not mention case X"
+  /th:report-issue question "How is the Memory MCP configured in a Docker-less environment?"
 ```
 
 Then stop. Do not proceed.
@@ -122,8 +122,8 @@ Compose the full issue body before any duplicate check or confirmation.
 **Title format:** `{type}: {summary}`
 
 Examples:
-- `bug: El comando /th:pipelines no muestra el estado cuando...`
-- `feature: Agregar soporte para reportar issues de seguridad`
+- `bug: The /th:pipelines command does not show the status when...`
+- `feature: Add support for reporting security issues`
 
 **Body template:**
 
@@ -134,7 +134,7 @@ Examples:
 
 ## Environment
 
-| Campo | Valor |
+| Field | Value |
 |-------|-------|
 | th version | {th_version} |
 | Claude Code | {claude_version} |
@@ -143,16 +143,16 @@ Examples:
 {# [bug block — include only when type=bug] }
 ## Steps to Reproduce
 
-1. {step_1 — derived from the summary/input or placeholder "Describe los pasos para reproducir el problema"}
+1. {step_1 — derived from the summary/input or placeholder "Describe the steps to reproduce the problem"}
 2. ...
 
 ## Expected Behavior
 
-{expected — derived from input or placeholder "Describe el comportamiento esperado"}
+{expected — derived from input or placeholder "Describe the expected behavior"}
 
 ## Actual Behavior
 
-{actual — derived from input or placeholder "Describe el comportamiento actual"}
+{actual — derived from input or placeholder "Describe the actual behavior"}
 
 ## Severity
 
@@ -162,11 +162,11 @@ Examples:
 {# [feature block — include only when type=feature] }
 ## Problem / Motivation
 
-{problem — derived from input or placeholder "Describe el problema o motivación"}
+{problem — derived from input or placeholder "Describe the problem or motivation"}
 
 ## Proposed Behavior
 
-{proposed — derived from input or placeholder "Describe el comportamiento propuesto"}
+{proposed — derived from input or placeholder "Describe the proposed behavior"}
 
 ## Alternatives Considered
 
@@ -177,7 +177,7 @@ Examples:
 
 {optional_context — paste workspace paths, trace refs, or reproduction logs here.}
 
-> **Atención:** antes de pegar logs, verifica que no contengan tokens, API keys, secrets u otro material sensible.
+> **Warning:** before pasting logs, verify they do not contain tokens, API keys, secrets, or other sensitive material.
 ```
 
 Notes on body composition:
