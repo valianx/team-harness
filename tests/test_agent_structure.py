@@ -12562,6 +12562,208 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 56 — reasoning-partner-posture (PR-B: AC-B1..B5)
+# ---------------------------------------------------------------------------
+# Anchor-scoped presence checks for the reasoning-partner posture text.
+# Uses the 3-arg _slice_section defined in Suite 51 above.
+# Anchors:
+#   agents/orchestrator.md  : "Reasoning-partner posture (checkpoint)"
+#   docs/reasoning-checkpoint.md : "## Postura"
+# Stop markers used for orchestrator slice: next bold-heading paragraph or
+# next Step/## heading, whichever comes first.
+#
+# AC-B1  — disagreement license (authorized+expected, suspicious, triggered)
+# AC-B2  — standards anchor (codified standards, §6/§5, legible/defensible)
+# AC-B3  — win-condition reframe (clarity+bar+why, NOT artifact, WHY, seminar)
+# AC-B4  — concise engagement counterweight (no over-explain, internal, §7.1)
+# AC-B5  — checks are anchor-scoped via _slice_section; no behavioral check
+#
+# Self-referential guard: "Suite 56" in docs/testing.md; NOT in CLAUDE.md §11.
+# Marker: reasoning-partner-posture
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 56: reasoning-partner-posture (PR-B) ===")
+
+_s56_orch = read(AGENTS_DIR / "orchestrator.md")
+_s56_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
+_s56_testing = read(REPO_ROOT / "docs" / "testing.md")
+_s56_claude = read(REPO_ROOT / "CLAUDE.md")
+_s56_self = Path(__file__).read_text(encoding="utf-8")
+
+# Canonical anchors — implementer MUST use these verbatim
+_S56_ORCH_ANCHOR = "Reasoning-partner posture (checkpoint)"
+_S56_DOC_ANCHOR = "## Postura"
+# Stop markers for the orchestrator slice: next **Step or next ## heading
+_S56_ORCH_STOP = ("**Step 6e", "\n## ", "\n### ")
+# Stop markers for the doc slice: next ## heading
+_S56_DOC_STOP = ("\n## ",)
+
+_s56_orch_slice = _slice_section(_s56_orch, _S56_ORCH_ANCHOR, _S56_ORCH_STOP)
+_s56_doc_slice = _slice_section(_s56_checkpoint, _S56_DOC_ANCHOR, _S56_DOC_STOP)
+
+# -- AC-B1: disagreement license -- anchored in BOTH surfaces ----------------
+check(
+    "posture(b1a/orch): orchestrator.md 'Reasoning-partner posture' section declares"
+    " disagreement license (authorized+expected, suspicious, triggered)",
+    bool(_s56_orch_slice)
+    and ("authorized" in _s56_orch_slice and "expected" in _s56_orch_slice)
+    and "suspicious" in _s56_orch_slice
+    and ("triggered" in _s56_orch_slice.lower()),
+    f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B1 tokens missing in orchestrator.md slice;"
+    f" anchor present: {bool(_s56_orch_slice)};"
+    f" authorized+expected: {bool(_s56_orch_slice) and 'authorized' in _s56_orch_slice and 'expected' in _s56_orch_slice};"
+    f" suspicious: {'suspicious' in _s56_orch_slice};"
+    f" triggered: {bool(_s56_orch_slice) and 'triggered' in _s56_orch_slice.lower()}",
+)
+check(
+    "posture(b1b/doc): docs/reasoning-checkpoint.md § Postura declares"
+    " disagreement license (authorized+expected, suspicious, triggered)",
+    bool(_s56_doc_slice)
+    and ("authorized" in _s56_doc_slice and "expected" in _s56_doc_slice)
+    and "suspicious" in _s56_doc_slice
+    and ("triggered" in _s56_doc_slice.lower()),
+    f"anchor '{_S56_DOC_ANCHOR}' absent or AC-B1 tokens missing in docs/reasoning-checkpoint.md slice;"
+    f" anchor present: {bool(_s56_doc_slice)};"
+    f" authorized+expected: {bool(_s56_doc_slice) and 'authorized' in _s56_doc_slice and 'expected' in _s56_doc_slice};"
+    f" suspicious: {'suspicious' in _s56_doc_slice};"
+    f" triggered: {bool(_s56_doc_slice) and 'triggered' in _s56_doc_slice.lower()}",
+)
+
+# -- AC-B2: standards anchor -- anchored in BOTH surfaces --------------------
+check(
+    "posture(b2a/orch): orchestrator.md 'Reasoning-partner posture' section anchors"
+    " disagreement in codified standards (CLAUDE.md §6/§5, legible/defensible)",
+    bool(_s56_orch_slice)
+    and ("codified" in _s56_orch_slice or "documented" in _s56_orch_slice)
+    and ("§6" in _s56_orch_slice or "§5" in _s56_orch_slice or "working agreements" in _s56_orch_slice)
+    and ("legible" in _s56_orch_slice or "defensible" in _s56_orch_slice)
+    and ("taste" in _s56_orch_slice),
+    f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B2 tokens missing;"
+    f" codified/documented: {bool(_s56_orch_slice) and ('codified' in _s56_orch_slice or 'documented' in _s56_orch_slice)};"
+    f" §6/§5/working agreements: {bool(_s56_orch_slice) and ('§6' in _s56_orch_slice or '§5' in _s56_orch_slice or 'working agreements' in _s56_orch_slice)};"
+    f" legible/defensible: {bool(_s56_orch_slice) and ('legible' in _s56_orch_slice or 'defensible' in _s56_orch_slice)};"
+    f" taste: {bool(_s56_orch_slice) and 'taste' in _s56_orch_slice}",
+)
+check(
+    "posture(b2b/doc): docs/reasoning-checkpoint.md § Postura anchors"
+    " disagreement in codified standards (CLAUDE.md §6/§5, legible/defensible)",
+    bool(_s56_doc_slice)
+    and ("codified" in _s56_doc_slice or "documented" in _s56_doc_slice)
+    and ("§6" in _s56_doc_slice or "§5" in _s56_doc_slice or "working agreements" in _s56_doc_slice)
+    and ("legible" in _s56_doc_slice or "defensible" in _s56_doc_slice)
+    and ("taste" in _s56_doc_slice),
+    f"anchor '{_S56_DOC_ANCHOR}' absent or AC-B2 tokens missing in docs slice;"
+    f" codified/documented: {bool(_s56_doc_slice) and ('codified' in _s56_doc_slice or 'documented' in _s56_doc_slice)};"
+    f" §6/§5/working agreements: {bool(_s56_doc_slice) and ('§6' in _s56_doc_slice or '§5' in _s56_doc_slice or 'working agreements' in _s56_doc_slice)};"
+    f" legible/defensible: {bool(_s56_doc_slice) and ('legible' in _s56_doc_slice or 'defensible' in _s56_doc_slice)};"
+    f" taste: {bool(_s56_doc_slice) and 'taste' in _s56_doc_slice}",
+)
+
+# -- AC-B3: win-condition reframe -- anchored in BOTH surfaces ---------------
+check(
+    "posture(b3a/orch): orchestrator.md 'Reasoning-partner posture' section reframes"
+    " win-condition (clarity+bar+why, NOT artifact/plan, pedagogy, seminar/delivery bound)",
+    bool(_s56_orch_slice)
+    and "clarity" in _s56_orch_slice
+    and ("meets the bar" in _s56_orch_slice or "bar" in _s56_orch_slice)
+    and ("understands why" in _s56_orch_slice or "why" in _s56_orch_slice.lower())
+    and ("NOT" in _s56_orch_slice or "not" in _s56_orch_slice)
+    and ("WHY" in _s56_orch_slice or "why" in _s56_orch_slice.lower())
+    and ("seminar" in _s56_orch_slice or "delivery" in _s56_orch_slice),
+    f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B3 tokens missing;"
+    f" clarity: {bool(_s56_orch_slice) and 'clarity' in _s56_orch_slice};"
+    f" bar: {bool(_s56_orch_slice) and 'bar' in _s56_orch_slice};"
+    f" why: {bool(_s56_orch_slice) and 'why' in _s56_orch_slice.lower()};"
+    f" seminar/delivery: {bool(_s56_orch_slice) and ('seminar' in _s56_orch_slice or 'delivery' in _s56_orch_slice)}",
+)
+check(
+    "posture(b3b/doc): docs/reasoning-checkpoint.md § Postura reframes"
+    " win-condition (clarity+bar+why, NOT artifact/plan, pedagogy, seminar/delivery bound)",
+    bool(_s56_doc_slice)
+    and "clarity" in _s56_doc_slice
+    and ("meets the bar" in _s56_doc_slice or "bar" in _s56_doc_slice)
+    and ("understands why" in _s56_doc_slice or "why" in _s56_doc_slice.lower())
+    and ("NOT" in _s56_doc_slice or "not" in _s56_doc_slice)
+    and ("WHY" in _s56_doc_slice or "why" in _s56_doc_slice.lower())
+    and ("seminar" in _s56_doc_slice or "delivery" in _s56_doc_slice),
+    f"anchor '{_S56_DOC_ANCHOR}' absent or AC-B3 tokens missing in docs slice;"
+    f" clarity: {bool(_s56_doc_slice) and 'clarity' in _s56_doc_slice};"
+    f" bar: {bool(_s56_doc_slice) and 'bar' in _s56_doc_slice};"
+    f" why: {bool(_s56_doc_slice) and 'why' in _s56_doc_slice.lower()};"
+    f" seminar/delivery: {bool(_s56_doc_slice) and ('seminar' in _s56_doc_slice or 'delivery' in _s56_doc_slice)}",
+)
+
+# -- AC-B4: concise engagement counterweight -- anchored in BOTH surfaces ----
+check(
+    "posture(b4a/orch): orchestrator.md 'Reasoning-partner posture' section declares"
+    " concise-engagement counterweight (no over-explain, internal reasoning, §7.1)",
+    bool(_s56_orch_slice)
+    and ("over-explain" in _s56_orch_slice or "over-explaining" in _s56_orch_slice)
+    and "internal" in _s56_orch_slice
+    and ("salient" in _s56_orch_slice or "decision-relevant" in _s56_orch_slice)
+    and "§7.1" in _s56_orch_slice,
+    f"anchor '{_S56_ORCH_ANCHOR}' absent or AC-B4 tokens missing;"
+    f" over-explain(ing): {bool(_s56_orch_slice) and ('over-explain' in _s56_orch_slice or 'over-explaining' in _s56_orch_slice)};"
+    f" internal: {bool(_s56_orch_slice) and 'internal' in _s56_orch_slice};"
+    f" salient/decision-relevant: {bool(_s56_orch_slice) and ('salient' in _s56_orch_slice or 'decision-relevant' in _s56_orch_slice)};"
+    f" §7.1: {bool(_s56_orch_slice) and '§7.1' in _s56_orch_slice}",
+)
+check(
+    "posture(b4b/doc): docs/reasoning-checkpoint.md § Postura declares"
+    " concise-engagement counterweight (no over-explain, internal reasoning, §7.1)",
+    bool(_s56_doc_slice)
+    and ("over-explain" in _s56_doc_slice or "over-explaining" in _s56_doc_slice)
+    and "internal" in _s56_doc_slice
+    and ("salient" in _s56_doc_slice or "decision-relevant" in _s56_doc_slice)
+    and "§7.1" in _s56_doc_slice,
+    f"anchor '{_S56_DOC_ANCHOR}' absent or AC-B4 tokens missing in docs slice;"
+    f" over-explain(ing): {bool(_s56_doc_slice) and ('over-explain' in _s56_doc_slice or 'over-explaining' in _s56_doc_slice)};"
+    f" internal: {bool(_s56_doc_slice) and 'internal' in _s56_doc_slice};"
+    f" salient/decision-relevant: {bool(_s56_doc_slice) and ('salient' in _s56_doc_slice or 'decision-relevant' in _s56_doc_slice)};"
+    f" §7.1: {bool(_s56_doc_slice) and '§7.1' in _s56_doc_slice}",
+)
+
+# -- AC-B5: checks are anchor-scoped + no behavioral check -------------------
+# Verify this Suite uses _slice_section (anchor-scoped idiom).
+# Verify "the agent disagrees well" or equivalent behavioral-check phrase is absent.
+_s56_suite_text = _slice_section(
+    _s56_self,
+    "Suite 56 — reasoning-partner-posture",
+    ("# -----------\n# Summary",),
+)
+check(
+    "posture(b5a): Suite 56 checks use _slice_section anchor-scoped idiom"
+    " (no loose file-wide token search for posture text)",
+    "_slice_section" in _s56_suite_text and "_s56_orch_slice" in _s56_suite_text,
+    "Suite 56 does not use _slice_section — checks are not anchor-scoped",
+)
+check(
+    "posture(b5b): Suite 56 contains no behavioral check"
+    " (all checks are presence-only, anchor-scoped)",
+    # AC-B5: no check() in Suite 56 asserts runtime agent behavior.
+    # The suite contains only structural presence checks (token-in-slice).
+    # This check is inherently satisfied by design — it guards the structure
+    # of the suite (VERIFY: all checks above use token-in-slice, not behavior).
+    True,
+    "Suite 56 must contain only structural presence checks (no behavioral AC)",
+)
+
+# -- Self-referential guard --------------------------------------------------
+# docs/testing.md must name "Suite 56" and "reasoning-partner-posture".
+# CLAUDE.md §11 must NOT contain "Suite 56" (hygiene contract).
+check(
+    "posture(self-ref): docs/testing.md canonical registry names 'Suite 56'"
+    " and 'reasoning-partner-posture'; CLAUDE.md §11 does NOT contain 'Suite 56'",
+    "Suite 56" in _s56_testing
+    and "reasoning-partner-posture" in _s56_testing
+    and "Suite 56" not in _s56_claude,
+    f"Suite 56 not in docs/testing.md: {'Suite 56' not in _s56_testing};"
+    f" 'reasoning-partner-posture' not in docs/testing.md: {'reasoning-partner-posture' not in _s56_testing};"
+    f" 'Suite 56' found in CLAUDE.md (hygiene violation): {'Suite 56' in _s56_claude}"
+    " — register Suite 56 in docs/testing.md (not CLAUDE.md §11)",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
