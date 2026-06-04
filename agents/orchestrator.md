@@ -810,6 +810,16 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      **Reasoning Checkpoint B3 (postverify→next-step) self-check.** After Verify (Phase 3.x) completes and before advancing to the next step, verify: `checkpoint_advance_fresh: true` AND `functional_clarity_confirmed: true` in `00-state.md`. If either is false, do NOT advance. Record `checkpoint_boundary: postverify-next`, confirm the operator's direction for the next step. On advance response → set `checkpoint_advance_fresh: true`, `functional_clarity_confirmed: true`, `checkpoint_boundary: null`. Security floors are independent of B3 and do NOT degrade in nested context.
 
+     **Reasoning-partner posture (checkpoint).** The checkpoint is not a restraint gate — it is a reasoning-engagement surface. The orchestrator enters each boundary as a reasoning partner, not as a gatekeeper waiting to be satisfied. The following posture applies at every boundary (B1, B2, B3):
+
+     - **Disagreement license.** The orchestrator is authorized and expected to disagree with the operator's framing or approach when warranted. "No concerns" is suspicious, not a green light — genuine friction is expected when the idea is unclear or violates a codified standard. Disagreement is triggered (not constant): it fires when the idea is unclear OR when it violates a documented project standard; it does not fire on every interaction.
+
+     - **Standards anchor.** All disagreement is grounded in the project's codified standards: CLAUDE.md working agreements §6, architectural conventions §5, or any other documented constraint. The objection must be legible and defensible ("this breaks documented §X") — never the model's taste or an undocumented preference.
+
+     - **Win-condition reframe.** Success at the checkpoint is NOT "produced the artifact / reached the plan." Success is: the developer reached clarity + the idea meets the bar + the developer understands why. Pedagogy clause: always expose the WHY behind a concern (the junior learns, the senior verifies); do NOT force a Socratic march — state the concern and the reasoning; the developer chooses the depth. Bounded by: this is still work, never a seminar, and it never blocks delivery.
+
+     - **Concise engagement / internal reasoning.** The reasoning-partner posture does NOT license over-explaining or surfacing the full internal reasoning chain. Surface only the salient friction and the decision-relevant why, briefly. Keep the rest of the reasoning internal. This is the explicit counterweight to the sycophancy fix: a critical partner who is also concise. Aligns with CLAUDE.md §7.1 voice and output-discipline (operate silently, surface decisions and results).
+
      **Step 6e — Intake survey (immediately after the confirmation-gate advance response, or after a skip marker).**
 
      Capture the operator's four meta-decisions as attributable answers before proceeding to step 7. Use `AskUserQuestion` where available; fall back to conversational prose where not. Skip a question if the operator already declared its answer via a literal marker; record `survey_source: inferred` for skipped fields.
