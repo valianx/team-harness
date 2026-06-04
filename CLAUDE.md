@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.52.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.53.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -158,6 +158,7 @@ All commands run from the repo root.
 - **Patch mode + selective verifier re-run.** Localized verifier failure: producer edits named elements only; orchestrator re-runs only the affected domain; coherence gate follows. Default is structural (full re-dispatch). Full contract: `docs/patch-mode.md`.
 - **Plan-review panel centralization** — `plan-review` runs up to 3 reviewers into ONE `01-plan.md`; worst-of combined verdict; preserve-in-place sub-verdicts; vacuous-success guard. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
+- **Dev mode (output-style) — top-level orchestrator.** Opt-in session mode where the top-level agent adopts the orchestrator role and dispatches leaf agents directly via Task (no nested subagent, no handoff). Activated by the `developer-mode` output style (`keep-coding-instructions: false`) which REPLACES the built-in SWE instructions with the orchestrator contract — not just layers over them. Inline orchestration is permitted ONLY when the output style is active (signalled by `~/.claude/.dev-mode-active`); without it, inline orchestration is the prohibited ad-hoc improvisation. Outward actions in dev mode are gated by the deterministic hook `dev-guard.sh`. Security floors are non-waivable. See `docs/dev-mode.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
@@ -316,7 +317,11 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
-> **Limitation — nested-context dispatch.** When `orchestrator` runs nested (not top-level), the `Task` tool is stripped. The orchestrator emits a `dispatch_handoff` directive; top-level Claude takes over automatically. Full protocol in `docs/subagent-orchestration.md`.
+**Inline orchestration at top level — observable-flag gate (SEC-DR-2):** executing the orchestrator role inline at top level is PERMITTED ONLY when the `developer-mode` output style is active (signalled by the filesystem marker `~/.claude/.dev-mode-active` containing `dev_mode: true`). In that case the top-level agent IS the orchestrator — it has `Task` available and dispatches leaf agents directly without a `dispatch_handoff`. Without the output style active, executing orchestration inline — including reading `agents/orchestrator.md` "as reference" — is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED. The discriminant is the observable output style + filesystem marker, not a subjective judgment about whether the contract was read. In dev mode, outward/irreversible actions (git push to a remote, gh pr merge/review/comment, and equivalent API calls via any binary) are gated by the deterministic hook `dev-guard.sh`; they are escalated to operator approval (`ask`) and CANNOT be executed inline by rationalisation. For dev mode details and the security floor non-waivability invariant, see `docs/dev-mode.md`.
+
+**How to enter dev mode:** activate the `developer-mode` output style via `/config` -> Output style -> `developer-mode` and write `~/.claude/.dev-mode-active` (containing `dev_mode: true`). The style replaces the built-in SWE instructions with the orchestrator contract; the entry banner confirms activation at session start. To return to normal mode, select Default output style and delete the marker; takes effect after `/clear` or a new session.
+
+**FALLBACK — nested-handoff/takeover:** when dev mode is not active, the canonical invocation is `Agent(subagent_type='th:orchestrator', ...)`. When that invocation is nested and the `Task` tool is stripped, the orchestrator emits a `dispatch_handoff` directive; top-level Claude takes over automatically. This nested-handoff/takeover machinery is the safety net for invocations WITHOUT dev mode — it is not the primary path. Full protocol in `docs/subagent-orchestration.md`.
 
 **Universal rule — auto-takeover on `blocked-no-dispatch`:** when the orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. Parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. This is not a user-decision point. Full takeover protocol (8 steps), handoff JSON schema, and `blocked-manual-push` handling are in `docs/subagent-orchestration.md`.
 

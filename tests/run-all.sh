@@ -54,6 +54,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 5: hooks/dev-guard.sh — behavioral tests"
+echo "############################################################"
+if bash "$TESTS_DIR/test_dev_guard.sh"; then
+    echo "dev-guard: PASS"
+else
+    echo "dev-guard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

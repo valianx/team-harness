@@ -73,11 +73,15 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache and prints `… updated from <X> to <Y>. Restart to apply changes.` Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
 
 6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure MCP servers and workspace mode; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
-   - **Source of truth.** The three managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
+   - **Source of truth.** The four managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
      - `managed-blocks/orchestrator-dispatch-rule.md` (markers: `<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`)
      - `managed-blocks/nested-dispatch-takeover.md` (markers: `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->`)
      - `managed-blocks/voice-rule.md` (markers: `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`)
-     Full paths under the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/managed-blocks/{orchestrator-dispatch-rule,nested-dispatch-takeover,voice-rule}.md`
+     - `managed-blocks/dev-mode.md` (markers: `<!-- dev-mode:start -->` … `<!-- dev-mode:end -->`)
+     Full paths under the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/managed-blocks/{orchestrator-dispatch-rule,nested-dispatch-takeover,voice-rule,dev-mode}.md`
+   - **Note:** The `dev-mode-entry` block is no longer distributed (the `/dev-mode` skill trigger-phrase mechanism was replaced by the `developer-mode` output style). If the `<!-- dev-mode-entry:start -->` … `<!-- dev-mode-entry:end -->` markers exist in `~/.claude/CLAUDE.md`, remove the block between them (inclusive) as part of this sync.
+   - **Developer-mode output style sync.** After syncing managed blocks, re-copy `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (create the directory if absent). This keeps the output style aligned with the installed plugin version.
+   - **Sync the `/dev-mode` skill.** Re-copy `skills/dev-mode/SKILL.md` from the plugin cache to the USER-LEVEL path `~/.claude/skills/dev-mode/SKILL.md` (create the directory if absent), overwriting any existing version. This is the opt-in toggle that activates/deactivates the `developer-mode` output style; it must stay aligned with the installed plugin version (a bare `/dev-mode` requires a user-level skill, since plugin skills are namespaced).
    - **Back up** `~/.claude/CLAUDE.md` to `~/.claude/CLAUDE.md.bak-YYYYMMDD-HHMMSS` (UTC) before the first write. If the file does not exist, create it (blocks-only) and skip the backup. Retention: only the last 3 `CLAUDE.md.bak-*` backups are kept; older ones are pruned after each sync.
    - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the three canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
    - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
@@ -100,7 +104,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime | Select-Object -SkipLast 3 | Remove-Item -Force
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
-   foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule")) {
+   foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule", "dev-mode")) {
        $canonicalPath = "$mbDir\$block.md"
        $canonical = Get-Content $canonicalPath -Raw
        $startMarker = "<!-- $block`:start -->"
@@ -116,6 +120,28 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
            Add-Content $claudeMd "`n$canonical"
        }
    }
+
+   # Remove obsolete dev-mode-entry block if present
+   $content = Get-Content $claudeMd -Raw
+   $entryStart = "<!-- dev-mode-entry:start -->"
+   $entryEnd   = "<!-- dev-mode-entry:end -->"
+   if ($content -match [regex]::Escape($entryStart) -and $content -match [regex]::Escape($entryEnd)) {
+       $pattern = [regex]::Escape($entryStart) + "[\s\S]*?" + [regex]::Escape($entryEnd)
+       $content = [regex]::Replace($content, $pattern, "")
+       Set-Content $claudeMd $content -NoNewline
+   }
+
+   # Sync developer-mode output style
+   $outputStyleSrc = "$($latestDir.FullName)\output-styles\developer-mode.md"
+   $outputStyleDst = "$env:USERPROFILE\.claude\output-styles\developer-mode.md"
+   New-Item -ItemType Directory -Force -Path (Split-Path $outputStyleDst) | Out-Null
+   Copy-Item $outputStyleSrc $outputStyleDst -Force
+
+   # Sync /dev-mode user-level skill (the opt-in toggle for the output style)
+   $devModeSkillSrc = "$($latestDir.FullName)\skills\dev-mode\SKILL.md"
+   $devModeSkillDst = "$env:USERPROFILE\.claude\skills\dev-mode\SKILL.md"
+   New-Item -ItemType Directory -Force -Path (Split-Path $devModeSkillDst) | Out-Null
+   Copy-Item $devModeSkillSrc $devModeSkillDst -Force
    ```
 
    **Unix/macOS (bash) — run this block verbatim on Linux/macOS:**
@@ -132,7 +158,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
-   for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule; do
+   for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule dev-mode; do
        CANONICAL=$(cat "$MB_DIR/$BLOCK.md")
        START_MARKER="<!-- ${BLOCK}:start -->"
        END_MARKER="<!-- ${BLOCK}:end -->"
@@ -145,6 +171,23 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
            printf '\n%s\n' "$CANONICAL" >> "$CLAUDE_MD"
        fi
    done
+
+   # Remove obsolete dev-mode-entry block if present
+   if grep -qF "<!-- dev-mode-entry:start -->" "$CLAUDE_MD" && grep -qF "<!-- dev-mode-entry:end -->" "$CLAUDE_MD"; then
+       sed -i.tmp "/<!-- dev-mode-entry:start -->/,/<!-- dev-mode-entry:end -->/d" "$CLAUDE_MD"
+   fi
+
+   # Sync developer-mode output style
+   OUTPUT_STYLE_SRC="$PLUGIN_BASE/$LATEST_DIR/output-styles/developer-mode.md"
+   OUTPUT_STYLE_DST="$HOME/.claude/output-styles/developer-mode.md"
+   mkdir -p "$(dirname "$OUTPUT_STYLE_DST")"
+   cp "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST"
+
+   # Sync /dev-mode user-level skill (the opt-in toggle for the output style)
+   DEV_MODE_SKILL_SRC="$PLUGIN_BASE/$LATEST_DIR/skills/dev-mode/SKILL.md"
+   DEV_MODE_SKILL_DST="$HOME/.claude/skills/dev-mode/SKILL.md"
+   mkdir -p "$(dirname "$DEV_MODE_SKILL_DST")"
+   cp "$DEV_MODE_SKILL_SRC" "$DEV_MODE_SKILL_DST"
    ```
 
 7. **Emit the final report** — the single operator-facing message. Use the matching template below verbatim in structure (a fenced status block), filling the values from the run. Align the values into one column. Keep the labels lowercase as shown. Render the closing line outside the fence.

@@ -3,7 +3,7 @@
 
   "windows": {
     "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
-    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh",
+    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh",
     "_events": "PreToolUse + Notification (idle_prompt only)",
     "hooks": {
       "PreToolUse": [
@@ -13,6 +13,11 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/policy-block.sh",
+              "timeout": 5
+            },
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
               "timeout": 5
             }
           ]
@@ -45,7 +50,7 @@
 
   "macos": {
     "_requires": "osascript (included in macOS) + python3",
-    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh",
+    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh",
     "_events": "PreToolUse + Notification (idle_prompt only)",
     "hooks": {
       "PreToolUse": [
@@ -55,6 +60,11 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/policy-block.sh",
+              "timeout": 5
+            },
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
               "timeout": 5
             }
           ]
@@ -87,7 +97,7 @@
 
   "linux": {
     "_requires": "libnotify (notify-send) + python3",
-    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh",
+    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh",
     "_events": "PreToolUse + Notification (idle_prompt only)",
     "hooks": {
       "PreToolUse": [
@@ -97,6 +107,11 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/policy-block.sh",
+              "timeout": 5
+            },
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
               "timeout": 5
             }
           ]

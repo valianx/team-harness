@@ -78,6 +78,10 @@ These four fields coexist with the existing `discover_state`, `advance_signal`, 
 
 **Hook reads only the four clarity fields.** The hook does NOT read `security_sensitive`, `security_gate_status`, or any other security-related field from `00-state.md`. Its input is strictly limited to `checkpoint_boundary`, `checkpoint_advance_fresh`, `functional_clarity_artifact`, and `functional_clarity_confirmed`. The hook never conditions its decision on a security field.
 
+### Dev mode — Layer-1 hook is the active floor at top level
+
+When dev mode is active (the `developer-mode` output style is loaded, signalled by `~/.claude/.dev-mode-active` containing `dev_mode: true`), the top-level agent IS the orchestrator and the `Task` tool is always available. The Layer-1 hook (`hooks/checkpoint-guard.sh`, `PreToolUse`/matcher `Task`) fires on every leaf agent dispatch — including B1 (intake → plan), B2 (research → next), and B3 (postverify → next). This promotes the B1/B2/B3 boundaries from the Layer-2 self-check (non-deterministic, relies on orchestrator discipline) to the Layer-1 deterministic floor. In dev mode, the checkpoint gate is as strong as in a standard top-level orchestrator session. This is a strengthening, not a regression: security floors remain independent of the checkpoint state regardless of mode.
+
 ### Layer 2 — Orchestrator self-check (floor in nested-context sessions)
 
 When the orchestrator runs as a subagent (nested context), the `Task` tool is stripped by the harness and `PreToolUse` hooks never fire, because there is no `Task` call for the hook to intercept. In this context, enforcement falls back to a synchronous self-check inside the orchestrator's own Step 6d (B1), B2, and B3 contract blocks.

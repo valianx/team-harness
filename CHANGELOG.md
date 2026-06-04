@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.53.0] - 2026-06-04
+
+### Added
+
+- **Developer mode — top-level orchestrator with a precondition model.** Pipelines run ONLY when developer mode is active; **without it the top-level agent handles requests DIRECTLY** (no orchestrator, no pipeline, no workspace). This inverts the prior "default to team-harness flows" (#242) into **"default direct / dev mode is the opt-in"**. The disposition is the `developer-mode` **output style** (`output-styles/developer-mode.md`, `keep-coding-instructions: false`) that REPLACES the general-agent base — a local test proved a layered skill could not, because the general agent's make-progress base overrode it. When active, the top-level agent has Task and dispatches leaf agents directly (no `dispatch_handoff`); entry shows the team-harness ASCII wordmark + `DEVELOPER MODE ACTIVE`. The `orchestrator-dispatch-rule` managed block (+ byte-identical mirrors) and CLAUDE.md §14 carry the precondition; `docs/subagent-orchestration.md` takeover is reframed as the FALLBACK for explicit out-of-dev-mode invocation. Security floors (HI-2, path-pattern auto-escalation, bug-fix forcing rule) are input-independent of dev mode and non-waivable. Contract: `docs/dev-mode.md`.
+- **`/dev-mode` skill — the in-chat toggle.** A user-level skill (`~/.claude/skills/dev-mode/`, installed by `/th:setup`, synced by `/th:update`) that activates/deactivates the output style: `/dev-mode` writes `outputStyle: developer-mode` + the marker `~/.claude/.dev-mode-active`; `/dev-mode off` reverses both. Both require a `/clear` (or new session) to apply — the output style replaces the system prompt on reload (a Claude Code constraint). This gives a command toggle instead of navigating the `/config` menu.
+- **Deterministic outward-action gate (`hooks/dev-guard.sh`).** A `PreToolUse`/matcher-`Bash` hook, fail-CLOSED, that — when dev mode is active — gates outward/irreversible actions BY DESTINATION (`git push`, `gh pr merge`/`review`/`comment`, `gh api`/`curl`/`wget` with a mutating method against `api.github.com`/`pulls/...`, across `gh`/`git -C`/etc.) and authorizes via human `permissionDecision: "ask"` (the agent cannot self-approve — no forgeable marker). Marker manipulation is also `ask` (so `/dev-mode off` deactivates with operator confirmation, while the agent cannot silently disable the gate); outward actions are checked before marker manipulation so a combined command surfaces the outward intent. The safety floors are prompt-independent hooks, so they survive `keep-coding-instructions: false`. In dev mode the reasoning-checkpoint is promoted from the Layer-2 self-check to the Layer-1 hook. Anchored by `tests/test_dev_guard.sh` + Suite 59.
+
 ## [2.52.0] - 2026-06-04
 
 ### Added

@@ -71,6 +71,19 @@ After install, open Claude Code. The entry points are:
 
 ---
 
+## Developer mode
+
+Team Harness runs the orchestrated pipeline **only in developer mode** — an opt-in session mode. Without it, the top-level agent handles your request **directly** (normal Claude Code behavior, no pipeline). Developer mode is the opt-in; direct is the default.
+
+- **Enter:** `/dev-mode`, then `/clear` (or a new session).
+- **Exit:** `/dev-mode off`, then `/clear`.
+
+`/dev-mode` activates the `developer-mode` output style — the top-level agent adopts the orchestrator role and dispatches the pipeline directly — and arms a deterministic gate: outward, irreversible actions (`git push`, `gh pr merge`/`review`/`comment`, GitHub API writes) require explicit operator approval at the point of execution; the agent cannot publish or push on its own. The `/clear` is required because the mode replaces the system prompt, which applies on reload.
+
+Full contract: [docs/dev-mode.md](./docs/dev-mode.md).
+
+---
+
 ## Requirements
 
 **Required:**
