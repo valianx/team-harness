@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.50.0] - 2026-06-03
+
 ### Changed
 
 - `docs/roadmap.md` is now the single roadmap for the whole project: added a *Decision pending* item for test-first authoring + mutation-scored test strength (verdict adopt-partial, opt-in for logic-bearing repos), an *Internal hardening* item for batch-economy PR consolidation (#249), and a *Horizon* section for the runtime-independent harness (v2 direction).
@@ -26,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `review` direct mode now enforces a three-layer read-only working-tree guard: no dispatch of `implementer`; imperative write prohibition in `reviewer`/`reviewer-consolidator` system prompts (only `.claude/pr-review-*` and `workspaces/` allowed); tree-verify byte-identical check with `git status --untracked-files=all` allowlisting `.claude/pr-review-*`. Guard anchored by structural Suite 54 in `tests/test_agent_structure.py`. (#238)
 - `th:clickup` skill — § "Comments": added rule "Never state the PR's status". The functional comment includes only the bare PR link and states the result as an accomplished fact; PR lifecycle status ("pendiente de merge", "merged", "pending merge") and temporal rollout qualifiers are prohibited. Rationale: ClickUp comments are immutable — a frozen transient status becomes false once the PR moves on, with no way to correct it. (#239)
 - `th:report-issue` skill now composes issue title and body in English (placeholder strings, section labels, secrets warning), per CLAUDE.md §7.3 (English-only persisted repo content); operator-facing chat prompts remain in the operator's language. (#243)
+- `.claude-plugin/hooks.json` — wire `checkpoint-guard.sh` as a `PreToolUse` / matcher `Task` hook for plugin-mode installs. The reasoning-checkpoint work had wired the hook only in the Go-installer `hooks/config.json`, so plugin users would not have received Layer-1 checkpoint enforcement; this release closes that gap.
 
 ## [2.49.0] - 2026-06-03
 
