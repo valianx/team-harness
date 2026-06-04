@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.51.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.52.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -182,7 +182,7 @@ All commands run from the repo root.
 
 ### 6.3 Post-work (deliverables for any user-facing change)
 
-- Add a one-line entry under `## [Unreleased]` of CHANGELOG.md in the matching subsection (Added / Changed / Fixed / Removed / Security).
+- Write a CHANGELOG fragment to `changelog.d/{pr-slug}.md` (preferred) rather than editing `## [Unreleased]` inline. Each PR writes one file; no two PRs in the same session can conflict. The delivery agent assembles all fragments into the versioned CHANGELOG section at release cut (Step 9e). Fragment format: a standard Keep-a-Changelog subsection block (`### Added`, `### Changed`, `### Fixed`, `### Security`) with one-line entries. Slug rule: lowercase branch name with non-alphanumeric characters replaced by hyphens, matching `[a-z0-9-]+`. Direct `## [Unreleased]` edits are acceptable as a fallback when `changelog.d/` cannot be used (e.g., pre-convention repos).
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same PR — do not let CLAUDE.md drift from the repo.
 - If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`, `[pattern]`, `[stack]`, `[constraint]`).
 - If the repo has an OpenAPI spec (`openapi/openapi.yaml` or similar) and the change touches endpoints, bump `info.version` in the same commit as the spec change — never in a separate commit.

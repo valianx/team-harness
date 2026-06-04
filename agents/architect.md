@@ -121,6 +121,26 @@ The following are NOT valid split reasons (the plan-reviewer rejects them):
 
 If you find yourself wanting to split for a non-valid reason, default to one PR with per-concern commits. The reviewer reads commit-by-commit — this is the documented reviewability strategy in `agents/implementer.md` and `agents/reviewer.md`.
 
+#### Consolidation rule — small same-session declarative concerns
+
+**This rule is a SEPARATE control from `Split reason`.** `Split reason` justifies more PRs for one service (evaluated only when a service has `>1 PR`). Consolidation is the inverse: grouping concerns from N **different** services into one PR. The two controls are disjoint and operate on different axes; cabling a consolidation into `Split reason` would be structurally incorrect.
+
+**When consolidation is allowed.** The architect may group concerns from multiple distinct services into one PR with one commit per concern — declaring a per-PR `Consolidates: <svc-a>, <svc-b>, …` field — ONLY when ALL FIVE of the following conditions hold simultaneously:
+
+| # | Condition | Example that passes | Example that fails |
+|---|-----------|--------------------|--------------------|
+| (a) | Every concern is a **small declarative, doc, or asset change** — not production code | Prompt text edit, CHANGELOG entry, version bump | New service endpoint, DB migration, behavioral logic |
+| (b) | All concerns originate in the **same pipeline session** | Three issues resolved in one orchestrator run | Work spread across weeks / separate sprint items |
+| (c) | **No concern requires independent human review** of its own | Style guide copy update | Security contract hardening, breaking API change |
+| (d) | **No production coexistence need** — concerns do not need staged or independent rollout | Agent system-prompt updates | Feature flag staged rollout, dual-write window |
+| (e) | The concerns **would collide on append-only files** (CHANGELOG, version manifests) if shipped as separate parallel PRs | Same-session `[Unreleased]` entries | Concerns in different repos, no shared append-only files |
+
+**How to declare a consolidation.** Add the field `Consolidates: <svc-a>, <svc-b>, …` to the consolidated PR section in `## Task List`. The `Split reason:` field is OMITTED (this is not a split). The `## Services Touched` section must list ALL services whose concerns are fused. The `plan-reviewer` audits the consolidation via Rule 10 (fired only when `Consolidates:` is declared).
+
+**What does NOT change.** The default **"one PR per service"** rule for production-code services is unchanged. The closed list of valid `Split reason` values (coexistence window, production signal, cross-repo deploy gate) is unchanged. The PR-stacking prohibition (Rule 9) is unchanged. A PR that fuses production-code services is not eligible for this rule regardless of the conditions above.
+
+**Applying the rule reflexively.** When you use the consolidation rule in a plan, verify the plan itself satisfies the five conditions. If PR-1 of your own plan is a security contract change (condition (c) fails — it requires independent review), it is not consolidable with PR-2 even if the session is the same.
+
 #### Required `## Services Touched` section in `01-plan.md`
 
 `01-plan.md` MUST include a `## Services Touched` section (under `## Architecture`) listing every service the feature touches, one per line. The plan-reviewer cross-checks this against the union of `Service:` fields in the `## Task List` section. Mismatch is a Rule 5 finding.
