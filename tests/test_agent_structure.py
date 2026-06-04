@@ -13061,6 +13061,301 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 58 — Plan-shape batch-economy contract (plan-shape-contract, #249)
+# ---------------------------------------------------------------------------
+# Anti-drift assertions for the multi-service consolidation rule and
+# changelog.d fragment directory introduced in PR-2 (feat/plan-shape-batch-economy):
+#
+#   (a) agents/architect.md — '#### Consolidation rule' subsection present,
+#       contains `Consolidates:` field + all 5 cumulative conditions, asserts
+#       that Split reason / one-PR-per-service / stacking prohibition are UNCHANGED.
+#   (b) agents/plan-reviewer.md — '### Rule 10 — Multi-service consolidation'
+#       present, disjoint from Rule 1/9, fires only on `Consolidates:`, asserts
+#       that Rule 1/9 and the Split reason list are UNCHANGED.
+#   (c) agents/delivery.md — Step 7 references 'changelog.d/' fragment directory
+#       + slug rule; Step 9e references fragment assembly (idempotent, no-op when
+#       directory is empty).
+#   (d) CLAUDE.md §6.3 references changelog.d fragments.
+#
+# All checks use anchored _slice_section (anti-false-green idiom):
+#   anchor absent → _slice_section returns "" → token in "" is False → FAIL.
+# plan-shape-batch-economy is the PR-2 identifier for self-ref check.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 58: Plan-shape batch-economy contract (#249) ===")
+
+_S58_STOP_HEADS = ("\n#### ", "\n### ", "\n## ", "\n---\n")
+_S58_STOP_SECTION = ("\n### ", "\n## ", "\n---\n")
+_S58_STOP_H2 = ("\n## ", "\n---\n")
+
+_s58_architect = read(AGENTS_DIR / "architect.md")
+_s58_pr = read(AGENTS_DIR / "plan-reviewer.md")
+_s58_delivery = read(AGENTS_DIR / "delivery.md")
+_s58_claude = read(REPO_ROOT / "CLAUDE.md")
+
+# ---- slices ----------------------------------------------------------------
+
+_S58_CONSOL_ANCHOR = "#### Consolidation rule"
+_S58_RULE10_ANCHOR = "### Rule 10 — Multi-service consolidation"
+_S58_STEP7_ANCHOR = "### Step 7 — Write CHANGELOG fragment"
+_S58_STEP9E_ANCHOR = "### Step 9e — CHANGELOG release cut"
+_S58_CLAUDE_63_ANCHOR = "### 6.3 Post-work"
+
+_s58_consol_slice = _slice_section(_s58_architect, _S58_CONSOL_ANCHOR, _S58_STOP_HEADS)
+_s58_rule10_slice = _slice_section(_s58_pr, _S58_RULE10_ANCHOR, _S58_STOP_SECTION)
+_s58_step7_slice  = _slice_section(_s58_delivery, _S58_STEP7_ANCHOR, _S58_STOP_SECTION)
+_s58_step9e_slice = _slice_section(_s58_delivery, _S58_STEP9E_ANCHOR, _S58_STOP_SECTION)
+_s58_claude63_slice = _slice_section(_s58_claude, _S58_CLAUDE_63_ANCHOR, _S58_STOP_H2)
+
+# ---------------------------------------------------------------------------
+# (a) architect.md — Consolidation rule subsection
+# ---------------------------------------------------------------------------
+
+check(
+    "plan-shape(a1): agents/architect.md contains '#### Consolidation rule' subsection",
+    bool(_s58_consol_slice),
+    "Consolidation rule subsection missing from architect.md — "
+    "add '#### Consolidation rule — small same-session declarative concerns'",
+)
+check(
+    "plan-shape(a2): Consolidation rule declares the 'Consolidates:' field",
+    "Consolidates:" in _s58_consol_slice,
+    "Consolidation rule must introduce the per-PR 'Consolidates:' field",
+)
+check(
+    "plan-shape(a3): Consolidation rule lists condition (a) — declarative/doc/asset change",
+    bool(_s58_consol_slice)
+    and (
+        "(a)" in _s58_consol_slice
+        and ("declarative" in _s58_consol_slice.lower() or "doc" in _s58_consol_slice.lower() or "asset" in _s58_consol_slice.lower())
+    ),
+    "Consolidation rule must list condition (a): small declarative/doc/asset change",
+)
+check(
+    "plan-shape(a4): Consolidation rule lists condition (b) — same session",
+    bool(_s58_consol_slice)
+    and "(b)" in _s58_consol_slice
+    and "session" in _s58_consol_slice.lower(),
+    "Consolidation rule must list condition (b): same pipeline session",
+)
+check(
+    "plan-shape(a5): Consolidation rule lists condition (c) — no independent review",
+    bool(_s58_consol_slice)
+    and "(c)" in _s58_consol_slice
+    and ("independent" in _s58_consol_slice.lower() and "review" in _s58_consol_slice.lower()),
+    "Consolidation rule must list condition (c): no independent human review needed",
+)
+check(
+    "plan-shape(a6): Consolidation rule lists condition (d) — no production coexistence",
+    bool(_s58_consol_slice)
+    and "(d)" in _s58_consol_slice
+    and ("coexist" in _s58_consol_slice.lower() or "staged" in _s58_consol_slice.lower() or "rollout" in _s58_consol_slice.lower()),
+    "Consolidation rule must list condition (d): no production coexistence / staged rollout need",
+)
+check(
+    "plan-shape(a7): Consolidation rule lists condition (e) — append-only file collision",
+    bool(_s58_consol_slice)
+    and "(e)" in _s58_consol_slice
+    and ("append" in _s58_consol_slice.lower() or "collide" in _s58_consol_slice.lower() or "collision" in _s58_consol_slice.lower()),
+    "Consolidation rule must list condition (e): would collide on append-only files",
+)
+check(
+    "plan-shape(a8): architect.md asserts that Split reason closed list is UNCHANGED",
+    bool(_s58_consol_slice)
+    and (
+        "Split reason" in _s58_consol_slice
+        and ("unchanged" in _s58_consol_slice.lower() or "unchanged" in _s58_architect.lower())
+        and ("NOT" in _s58_consol_slice or "not" in _s58_consol_slice)
+    ),
+    "Consolidation rule must assert that Split reason values and one-PR-per-service default are UNCHANGED",
+)
+check(
+    "plan-shape(a9): architect.md asserts that PR-stacking prohibition (Rule 9) is UNCHANGED",
+    bool(_s58_consol_slice)
+    and (
+        "stacking" in _s58_consol_slice.lower()
+        or "Rule 9" in _s58_consol_slice
+        or "stacked" in _s58_consol_slice.lower()
+    ),
+    "Consolidation rule must assert that the PR-stacking prohibition (Rule 9) is UNCHANGED",
+)
+check(
+    "plan-shape(a10): Consolidation rule explains it is SEPARATE from Split reason (different control)",
+    bool(_s58_consol_slice)
+    and (
+        "SEPARATE" in _s58_consol_slice
+        or "separate" in _s58_consol_slice.lower()
+        or "DIFFERENT" in _s58_consol_slice
+        or "different" in _s58_consol_slice.lower()
+    )
+    and "Split reason" in _s58_consol_slice,
+    "Consolidation rule must explain it is a separate control from Split reason (not a new Split reason value)",
+)
+
+# ---------------------------------------------------------------------------
+# (b) plan-reviewer.md — Rule 10 (disjoint from Rule 1/9)
+# ---------------------------------------------------------------------------
+
+check(
+    "plan-shape(b1): agents/plan-reviewer.md contains '### Rule 10 — Multi-service consolidation'",
+    bool(_s58_rule10_slice),
+    "Rule 10 section missing from plan-reviewer.md — "
+    "add '### Rule 10 — Multi-service consolidation'",
+)
+check(
+    "plan-shape(b2): Rule 10 fires only when a PR declares 'Consolidates:'",
+    bool(_s58_rule10_slice)
+    and "Consolidates:" in _s58_rule10_slice
+    and ("only" in _s58_rule10_slice.lower() or "ONLY" in _s58_rule10_slice),
+    "Rule 10 must state it fires ONLY when a PR declares Consolidates:",
+)
+check(
+    "plan-shape(b3): Rule 10 explicitly states it is disjoint from Rule 1/9",
+    bool(_s58_rule10_slice)
+    and ("disjoint" in _s58_rule10_slice.lower() or "DISJOINT" in _s58_rule10_slice)
+    and ("Rule 1" in _s58_rule10_slice and "Rule 9" in _s58_rule10_slice),
+    "Rule 10 must explicitly state it is disjoint from Rule 1 and Rule 9",
+)
+check(
+    "plan-shape(b4): Rule 10 affirms Rule 1 closed-list of Split reason values is UNCHANGED",
+    bool(_s58_rule10_slice)
+    and "Split reason" in _s58_rule10_slice
+    and ("unchanged" in _s58_rule10_slice.lower() or "unchanged" in _s58_pr.lower()),
+    "Rule 10 must affirm that Rule 1's closed-list of Split reason values is unchanged",
+)
+check(
+    "plan-shape(b5): Rule 10 affirms default one-PR-per-service is UNCHANGED",
+    bool(_s58_rule10_slice)
+    and (
+        "one PR per service" in _s58_rule10_slice.lower()
+        or "one-PR-per-service" in _s58_rule10_slice
+        or "one pr per service" in _s58_rule10_slice.lower()
+    ),
+    "Rule 10 must affirm that the default one-PR-per-service rule is unchanged",
+)
+check(
+    "plan-shape(b6): Rule 10 affirms PR-stacking prohibition (Rule 9) is UNCHANGED",
+    bool(_s58_rule10_slice)
+    and (
+        "Rule 9" in _s58_rule10_slice
+        and ("unchanged" in _s58_rule10_slice.lower() or "unchanged" in _s58_rule10_slice)
+    ),
+    "Rule 10 must affirm that the PR-stacking prohibition (Rule 9) is unchanged",
+)
+check(
+    "plan-shape(b7): Rule 10 section covers the 5 conditions",
+    bool(_s58_rule10_slice)
+    and ("(a)" in _s58_rule10_slice)
+    and ("(b)" in _s58_rule10_slice)
+    and ("(c)" in _s58_rule10_slice)
+    and ("(d)" in _s58_rule10_slice)
+    and ("(e)" in _s58_rule10_slice),
+    "Rule 10 must reference all 5 cumulative conditions (a) through (e)",
+)
+
+# ---------------------------------------------------------------------------
+# (c) delivery.md — Step 7 changelog.d fragment + Step 9e assembly
+# ---------------------------------------------------------------------------
+
+check(
+    "plan-shape(c1): agents/delivery.md Step 7 references changelog.d/ fragment directory",
+    bool(_s58_step7_slice)
+    and "changelog.d/" in _s58_step7_slice,
+    "delivery.md Step 7 must reference the changelog.d/ fragment directory",
+)
+check(
+    "plan-shape(c2): delivery.md Step 7 defines the pr-slug naming rule",
+    bool(_s58_step7_slice)
+    and (
+        "pr-slug" in _s58_step7_slice
+        or "{pr-slug}" in _s58_step7_slice
+    )
+    and (
+        "a-z0-9" in _s58_step7_slice
+        or "alphanumeric" in _s58_step7_slice.lower()
+        or "lowercase" in _s58_step7_slice.lower()
+    ),
+    "delivery.md Step 7 must define the pr-slug naming rule (lowercase, [a-z0-9-]+)",
+)
+check(
+    "plan-shape(c3): delivery.md Step 9e assembles changelog.d/ fragments",
+    bool(_s58_step9e_slice)
+    and "changelog.d/" in _s58_step9e_slice,
+    "delivery.md Step 9e must reference changelog.d/ fragment assembly",
+)
+check(
+    "plan-shape(c4): delivery.md Step 9e fragment assembly is idempotent (no-op when empty)",
+    bool(_s58_step9e_slice)
+    and (
+        "no-op" in _s58_step9e_slice.lower()
+        or "idempotent" in _s58_step9e_slice.lower()
+    )
+    and (
+        "empty" in _s58_step9e_slice.lower()
+        or "absent" in _s58_step9e_slice.lower()
+    ),
+    "delivery.md Step 9e must state the assembly is idempotent / no-op when changelog.d/ is empty",
+)
+check(
+    "plan-shape(c5): delivery.md Step 9e includes path-traversal guard for fragment slugs",
+    bool(_s58_step9e_slice)
+    and (
+        "path" in _s58_step9e_slice.lower()
+        and (
+            "traversal" in _s58_step9e_slice.lower()
+            or "separator" in _s58_step9e_slice.lower()
+            or ".." in _s58_step9e_slice
+        )
+    ),
+    "delivery.md Step 9e must include a path-traversal guard for fragment filenames",
+)
+
+# ---------------------------------------------------------------------------
+# (d) CLAUDE.md §6.3 references changelog.d fragments
+# ---------------------------------------------------------------------------
+
+check(
+    "plan-shape(d1): CLAUDE.md §6.3 Post-work references changelog.d/ fragment mechanism",
+    bool(_s58_claude63_slice)
+    and "changelog.d/" in _s58_claude63_slice,
+    "CLAUDE.md §6.3 Post-work must reference the changelog.d/ fragment mechanism",
+)
+check(
+    "plan-shape(d2): CLAUDE.md §6.3 describes fragment format (Keep-a-Changelog subsection)",
+    bool(_s58_claude63_slice)
+    and (
+        "### Added" in _s58_claude63_slice
+        or "### Fixed" in _s58_claude63_slice
+        or "subsection" in _s58_claude63_slice.lower()
+        or "Keep-a-Changelog" in _s58_claude63_slice
+    ),
+    "CLAUDE.md §6.3 must describe the fragment format (Keep-a-Changelog subsection block)",
+)
+check(
+    "plan-shape(d3): CLAUDE.md §6.3 notes direct [Unreleased] edit as a valid fallback",
+    bool(_s58_claude63_slice)
+    and (
+        "fallback" in _s58_claude63_slice.lower()
+        or "Unreleased" in _s58_claude63_slice
+    ),
+    "CLAUDE.md §6.3 must note that direct [Unreleased] editing is a valid fallback",
+)
+
+# --- (e) Self-ref: Suite 58 uses _slice_section and covers plan-shape-batch-economy ---
+
+_s58_self = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s58_suite_text = _slice_section(
+    _s58_self,
+    "Suite 58 — Plan-shape batch-economy contract",
+    ("# -----------\n# Summary",),
+)
+check(
+    "plan-shape(e): Suite 58 uses _slice_section anchor-scoped idiom and covers 'plan-shape-batch-economy'",
+    "_slice_section" in _s58_suite_text and "plan-shape-batch-economy" in _s58_suite_text,
+    "Suite 58 must use _slice_section (anchor-scoped) and contain the 'plan-shape-batch-economy' marker",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

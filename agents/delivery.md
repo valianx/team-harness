@@ -309,20 +309,17 @@ If the feature was non-trivial (had >2 AC or documented significant decisions), 
 - **If README.md does not exist, do NOT create it**
 - If no README.md changes are needed (and docs/ reference already exists), skip this step
 
-### Step 7 — Update CHANGELOG.md
+### Step 7 — Write CHANGELOG fragment
 
-- Read existing `CHANGELOG.md`. If it doesn't exist, create it with Keep a Changelog format.
-- Add entry under `## [Unreleased]` in the appropriate subsection:
-  - `### Added` — new features
-  - `### Changed` — changes to existing functionality
-  - `### Fixed` — bug fixes
-  - `### Security` — security changes
-- Format: `- {Short description}`
-- Do NOT modify entries outside `[Unreleased]`
+**Preferred path — `changelog.d/` fragment (default for all PRs).** Write a fragment file `changelog.d/{pr-slug}.md` instead of editing `## [Unreleased]` inline. Each PR writes its own file; because each PR touches a distinct file, concurrent PRs in the same session never produce merge conflicts on CHANGELOG.md.
 
-**Routing rules (mandatory):**
+**Deriving `{pr-slug}`.** Use the feature name or branch name, lowercased and with all non-alphanumeric characters replaced by hyphens. The slug MUST match `[a-z0-9-]+` — no slashes, dots, underscores, or path separators. Examples: `feat/plan-shape-batch-economy` → `plan-shape-batch-economy`; `fix/auth-bypass` → `auth-bypass`.
 
-| Task payload `type:` | Target subsection | Rationale |
+The fragment is a standard Keep-a-Changelog subsection block (examples below).
+
+**Routing rules (mandatory — same as before, now applied to the fragment subsection header):**
+
+| Task payload `type:` | Fragment subsection | Rationale |
 |---|---|---|
 | `feature`, `enhancement` | `### Added` | new functionality |
 | `refactor` | `### Changed` | behaviour preserved; structure changed |
@@ -333,14 +330,7 @@ If the feature was non-trivial (had >2 AC or documented significant decisions), 
 
 **For `type: fix` and `type: hotfix`** the entry format is: `- {past-tense bug description}. Fixes #{issue-number-if-any}.`
 
-Example:
-```markdown
-## [Unreleased]
-
-### Fixed
-
-- Date-range picker now correctly excludes the `to` boundary instead of including it (`[from, to)` semantics). Fixes #287.
-```
+**Fallback — direct `[Unreleased]` edit (legacy, use only when `changelog.d/` cannot be used).** If `changelog.d/` does not exist and cannot be created (e.g., a repo that predates this convention), fall back to adding the entry under `## [Unreleased]` in `CHANGELOG.md` directly, following the same subsection routing rules above. Do NOT modify entries outside `[Unreleased]` when using the fallback path. The `changelog.d/` path is preferred; the fallback is for compatibility with older repos.
 
 ### Step 8 — Update OpenAPI (backend only, if applicable)
 
@@ -451,17 +441,28 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
 
 **Step 9.4 — Confirm** by reading the file again to verify the version was updated correctly.
 
-### Step 9e — CHANGELOG release cut
+### Step 9e — CHANGELOG release cut (with `changelog.d/` assembly)
 
 **Gated on Step 9 having produced a version bump.** If Step 9 was skipped (`skip-version: true`) or produced no version change, skip this step entirely.
 
-When a version bump was performed in Step 9, move the accumulated `[Unreleased]` entries into a new versioned release heading and recreate an empty `[Unreleased]` section above it. The new versioned heading format is `## [<version>] - <date>` (using the bumped version from Step 9 and today's date in `YYYY-MM-DD` format). The empty `[Unreleased]` section is recreated above the new heading as the placeholder for the next release cycle.
+When a version bump was performed in Step 9:
 
-**Procedure:**
+**Sub-step 9e-1 — Assemble `changelog.d/` fragments (idempotent).**
+
+1. Check whether the `changelog.d/` directory exists and contains any `*.md` fragment files.
+2. If the directory is absent or empty: this sub-step is a **no-op** — nothing to assemble. Proceed to sub-step 9e-2 using whatever `[Unreleased]` content is already in `CHANGELOG.md`.
+3. If fragments are present: read each fragment file in lexicographic order. Merge the subsection entries from all fragments into a single combined block, grouping entries under their subsection headers (`### Added`, `### Changed`, `### Fixed`, `### Security`). Deduplicate subsection headers (merge all `### Fixed` entries under one `### Fixed` heading, etc.). Append the combined block to `## [Unreleased]` in `CHANGELOG.md`.
+4. Delete every fragment file from `changelog.d/` (the directory itself may remain empty). This makes the sub-step idempotent: running it again on an already-assembled-and-emptied `changelog.d/` is a no-op.
+
+**Sub-step 9e-2 — Promote `[Unreleased]` to versioned release.**
+
+Move the accumulated `[Unreleased]` entries (including anything assembled from fragments in sub-step 9e-1) into a new versioned release heading, and recreate an empty `[Unreleased]` section above it. The new versioned heading format is `## [<version>] - <date>` (using the bumped version from Step 9 and today's date in `YYYY-MM-DD` format). The empty `[Unreleased]` section is recreated above the new heading as the placeholder for the next release cycle.
+
+**Procedure for sub-step 9e-2:**
 
 1. Read `CHANGELOG.md`.
 2. Collect all content under `## [Unreleased]` (between the `[Unreleased]` heading and the next `## [` heading).
-3. If `[Unreleased]` is empty (no entries since the last release), skip the cut — there is nothing to promote.
+3. If `[Unreleased]` is empty (no entries since the last release, and no fragments were assembled), skip the cut — there is nothing to promote.
 4. Insert the new versioned release section between the empty `[Unreleased]` and the previous release:
    - Keep `## [Unreleased]` at the top (now empty — placeholder for the next cycle).
    - Add a blank line, then `## [<version>] - <date>` where `<version>` is the bumped version and `<date>` is today in `YYYY-MM-DD` format.
@@ -471,6 +472,7 @@ When a version bump was performed in Step 9, move the accumulated `[Unreleased]`
 **Format rules:**
 - Do NOT touch any existing `## [X.Y.Z]` headings below the cut point.
 - Do NOT reformat the moved entries.
+- Fragment slugs (`{pr-slug}`) must match `[a-z0-9-]+`; reject any fragment filename that contains path separators (`/`, `\`, `..`) before reading it (path-traversal guard).
 
 ### Step 9b — Definition of Done (DoD) checklist
 

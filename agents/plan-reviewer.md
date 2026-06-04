@@ -351,19 +351,60 @@ Note: Rule 9's split-check is complementary to Rule 1's split-check. Rule 1 fire
 
 **Override:** the architect may NOT override Rule 9. Stacked PRs are unconditionally prohibited.
 
+### Rule 10 — Multi-service consolidation (disjoint from Rule 1/9; fires only when `Consolidates:` is declared)
+
+**This rule is DISJOINT from Rule 1 and Rule 9.** Rule 1 audits services that have `>1 PR` (the split path). Rule 9 prohibits stacked PRs and invalid base branches. Rule 10 audits the opposite case: a single PR that claims to consolidate concerns from multiple distinct services. It fires ONLY when a PR in `## Task List` explicitly declares the field `Consolidates: <svc-a>, <svc-b>, …`. A PR without `Consolidates:` is never audited by Rule 10.
+
+**What to check (only when a PR declares `Consolidates:`):**
+
+Verify that ALL FIVE cumulative conditions documented in `agents/architect.md` `#### Consolidation rule` are satisfied for the consolidated PR:
+
+| # | Condition | Finding when absent |
+|---|-----------|---------------------|
+| (a) | Every fused concern is a small declarative, doc, or asset change — not production code | "Rule 10: PR declares `Consolidates:` but at least one fused concern appears to be production code (fails condition a)" |
+| (b) | All concerns originate in the same pipeline session | "Rule 10: PR declares `Consolidates:` but concerns appear to span multiple sessions (fails condition b)" |
+| (c) | No fused concern requires independent human review of its own | "Rule 10: PR declares `Consolidates:` but at least one concern requires independent review (fails condition c)" |
+| (d) | No fused concern needs production coexistence or staged rollout | "Rule 10: PR declares `Consolidates:` but at least one concern needs independent production coexistence (fails condition d)" |
+| (e) | The fused concerns would collide on append-only files if shipped as separate parallel PRs | "Rule 10: PR declares `Consolidates:` but the collide-on-append-only condition is not established (fails condition e)" |
+
+**Detection algorithm:**
+
+```
+PRs = parse PRs from 01-plan.md § Task List
+for pr in PRs:
+    if pr.consolidates is None:
+        continue  # Rule 10 is a no-op; Rule 1/9 govern normally
+    for condition in [a, b, c, d, e]:
+        if not satisfied(pr, condition):
+            findings.append((pr.id, f"Rule 10: {condition_finding_text[condition]}"))
+```
+
+**Relationship to Rule 1/9 (explicit non-interference contract):**
+
+- Rule 1's closed list of `Split reason` values (coexistence window, production signal, cross-repo deploy gate) is **unchanged** by Rule 10. Rule 10 does NOT add a new value to that list.
+- The default "one PR per service" for production-code services is **unchanged**.
+- The PR-stacking prohibition (Rule 9) is **unchanged**. A `Consolidates:` PR must still declare `Base: main`; Rule 9's base check applies normally.
+- A PR that declares both `Consolidates:` and a non-empty `Split reason:` is contradictory — report as a Rule 10 finding.
+
+**Severity:** `concerns` by default. Escalates to `fail` when a fused concern is clearly production code (condition (a) is definitively violated — e.g., the consolidated PR modifies a service's API handler, data model, or business logic, not just its system-prompt, docs, or assets). The escalation prevents the consolidation rule from being used to bypass independent review of production changes.
+
+**Override:** the architect may add `Plan-reviewer override: Rule 10 — {one-line justification}` on the PR to degrade a `concerns` finding. Override is not available to escape a `fail` escalation (production-code fusion). Rule 1 and Rule 9 have no such escape; Rule 10's `fail` escalation does not either.
+
 ---
 
 ## Verdict Calibration
 
 | Verdict | When |
 |---|---|
-| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rules 7-8 when `type: fix | hotfix`). |
-| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), or rule 7 size overflow (>120 lines in `01-root-cause.md`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
-| `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
+| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`). |
+| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
+| `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` PR), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
 
-**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, and 9 are; rules 3, 4, 5, 6-overflow/order, and 7-size-overflow are not.
+**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, and rule 10 `concerns` are not.
 
 **Rules 7 and 8 are no-ops for non-bug-fix types.** When the task payload declares `type: feature | refactor | enhancement | research | spike`, Rules 7 and 8 do not fire (zero findings, no severity assigned). The plan-reviewer determines applicability from the `type` field passed in the task payload (sourced from `00-state.md`).
+
+**Rule 10 is a no-op when no PR declares `Consolidates:`.** The rule fires only when explicitly triggered by the architect's field declaration; a plan without `Consolidates:` is governed solely by Rules 1-9.
 
 ---
 
@@ -393,6 +434,7 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 | 7 — Regression Test Approach (Bug-fix) | {N} | mixed (structural=fail, size=concerns); no-op for non-fix |
 | 8 — Regression test AC cross-ref (Bug-fix) | {N} | fail-blocking; no-op for non-fix |
 | 9 — No stacked PRs / base must be main | {N} | fail-blocking |
+| 10 — Multi-service consolidation | {N} | mixed (concerns default; fail when production code fused); no-op when no PR declares `Consolidates:` |
 | **Total** | **{N}** | — |
 
 ## Findings
@@ -445,6 +487,13 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 - 01-plan.md:{line} — PR-{id} declares Base: `{value}` — base must be `main`; stacked PRs are PROHIBITED (FAIL).
 - 01-plan.md:{line} — service `{service}` split across {N} PRs without a valid closed-list Split reason — cite coexistence window, production signal, or cross-repo deploy gate, or consolidate into one PR (FAIL).
 (or "None — all declared Base: fields are main (or absent, treated as main); all service splits cite a valid temporal-prod reason.")
+
+### Rule 10 — Multi-service consolidation
+- 01-plan.md:{line} — PR-{id} declares `Consolidates:` but condition (a) fails: at least one fused concern is production code, not a declarative/doc/asset change (FAIL).
+- 01-plan.md:{line} — PR-{id} declares `Consolidates:` but condition (c) fails: at least one fused concern requires independent human review (FAIL).
+- 01-plan.md:{line} — PR-{id} declares `Consolidates:` but condition (e) is not established: the concerns would not collide on append-only files as separate PRs (CONCERNS).
+(or "Not applicable — no PR in § Task List declares `Consolidates:`. Rule 10 is a no-op.")
+(or "None — all `Consolidates:` PRs satisfy the five cumulative conditions.")
 
 ### Overrides honoured
 - PR-{id}: `Plan-reviewer override: <one-line justification>` on Rule {N}. Finding kept; severity degraded from fail to concerns.
@@ -515,6 +564,7 @@ findings:
   - rule-7: {count}    # Bug-fix Flow; reports 0 when type is not fix/hotfix
   - rule-8: {count}    # Bug-fix Flow; reports 0 when type is not fix/hotfix
   - rule-9: {count}    # Always fires; stacked PRs / base ≠ main
+  - rule-10: {count}   # Fires only when a PR declares `Consolidates:`; reports 0 otherwise
 human_entry_points:
   tldr: {true|false}
   decisions_for_human_review: {true|false}
