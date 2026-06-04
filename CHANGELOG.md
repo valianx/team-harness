@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Reasoning checkpoint** — deterministic 3-boundary gate that blocks phase dispatch until the operator provides a fresh advance signal and a confirmed functional-clarity artifact. Enforced by `hooks/checkpoint-guard.sh` (`PreToolUse` / matcher `Task`) in top-level sessions; orchestrator self-check fallback (Layer 2) declared for nested-context sessions with limitation explicit. Boundaries: B1 intake→plan (generalizes the Discover gate in-place), B2 research→next, B3 postverify→next. Skip markers (`--fast`, `[TIER: N]`, hotfix) bypass the checkpoint but never the security floor (HI-2 non-waivable at all 3 boundaries). Contract: `docs/reasoning-checkpoint.md`; hook: `hooks/checkpoint-guard.sh`; wired in `hooks/config.json`; Layer-2 self-check in `agents/orchestrator.md` Step 6d; generalization of `docs/discover-phase.md §3`; 4 new `00-state.md` fields (`checkpoint_boundary`, `checkpoint_advance_fresh`, `functional_clarity_artifact`, `functional_clarity_confirmed`); Suite 55 in `tests/test_agent_structure.py`.
+
 - `orchestrator-dispatch-rule` managed block — new **Default to team-harness flows** directive: the top-level agent routes development tasks through the orchestrator or a `th` skill by default; direct/manual handling requires an explicit operator opt-out. (#242)
 - `orchestrator-dispatch-rule` managed block — new **Report team-harness problems via `/th:report-issue`** directive: harness bugs/gaps must be reported via the skill (correct pattern, dedup, confirmation gate), not via `gh issue create` or transient cache edits. (#241)
 
