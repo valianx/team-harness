@@ -43,6 +43,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 4: hooks/checkpoint-guard.sh — functional tests"
+echo "############################################################"
+if bash "$TESTS_DIR/test_checkpoint_guard.sh"; then
+    echo "checkpoint-guard: PASS"
+else
+    echo "checkpoint-guard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

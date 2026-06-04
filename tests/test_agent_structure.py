@@ -12338,6 +12338,230 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 55 — Reasoning checkpoint (PR-A: deterministic 3-boundary gate)
+# ---------------------------------------------------------------------------
+# Anchor-scoped structural assertions for AC-A1..A7 + SEC-AC-1/2/3.
+# Uses the 3-arg _slice_section(text, start_marker, stop_markers) helper defined
+# in Suite 51 above. Presence checks are scoped to the named sections so an
+# ambient phrase elsewhere in the file cannot produce a false green.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 55: reasoning-checkpoint enforcement (PR-A) ===")
+
+_s55_orch = read(AGENTS_DIR / "orchestrator.md")
+_s55_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
+_s55_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
+_s55_hooks = REPO_ROOT / "hooks"
+_s55_config = json.loads(read(_s55_hooks / "config.json"))
+_STOP_SECTION = ("\n## ", "\n### ", "\n---\n")
+
+# -- (1) docs/reasoning-checkpoint.md exists and names the 3 boundaries ------
+check(
+    "Suite 55(1a): docs/reasoning-checkpoint.md exists",
+    (_s55_hooks.parent / "docs" / "reasoning-checkpoint.md").exists(),
+    "docs/reasoning-checkpoint.md does not exist",
+)
+for _boundary_id in ("intake-plan", "research-next", "postverify-next"):
+    check(
+        f"Suite 55(1b): docs/reasoning-checkpoint.md names boundary '{_boundary_id}'",
+        _boundary_id in _s55_checkpoint,
+        f"boundary '{_boundary_id}' not found in docs/reasoning-checkpoint.md",
+    )
+
+# -- (2) hooks/checkpoint-guard.sh exists and names deny + matcher Task ------
+_s55_guard_path = _s55_hooks / "checkpoint-guard.sh"
+check(
+    "Suite 55(2a): hooks/checkpoint-guard.sh exists",
+    _s55_guard_path.exists(),
+    "hooks/checkpoint-guard.sh does not exist",
+)
+if _s55_guard_path.exists():
+    _s55_guard = read(_s55_guard_path)
+    check(
+        "Suite 55(2b): checkpoint-guard.sh emits permissionDecision deny",
+        "permissionDecision" in _s55_guard and "deny" in _s55_guard,
+        "guard script does not reference permissionDecision:deny",
+    )
+    check(
+        "Suite 55(2c): checkpoint-guard.sh checks checkpoint_advance_fresh",
+        "checkpoint_advance_fresh" in _s55_guard,
+        "guard script does not check checkpoint_advance_fresh",
+    )
+    check(
+        "Suite 55(2d): checkpoint-guard.sh checks functional_clarity_confirmed",
+        "functional_clarity_confirmed" in _s55_guard,
+        "guard script does not check functional_clarity_confirmed",
+    )
+    check(
+        "Suite 55(2e): checkpoint-guard.sh uses strict line-token parsing (grep -q pattern)",
+        "grep -q" in _s55_guard,
+        "guard script does not use strict grep -q line-token parsing",
+    )
+    check(
+        "Suite 55(2f): checkpoint-guard.sh honors skip markers (fast_mode / bug_tier / discover_state)",
+        "fast_mode" in _s55_guard and "bug_tier" in _s55_guard and "bypassed" in _s55_guard,
+        "guard script does not honor all three skip-marker signals",
+    )
+    check(
+        "Suite 55(2g): checkpoint-guard.sh does NOT read security_sensitive",
+        "security_sensitive" not in _s55_guard,
+        "guard script reads security_sensitive — must not touch security fields",
+    )
+
+# -- (3) hooks/config.json wires checkpoint-guard.sh for Task on all 3 OS ----
+for _os_key in ("windows", "macos", "linux"):
+    _os_hooks = _s55_config.get(_os_key, {}).get("hooks", {}).get("PreToolUse", [])
+    _task_entries = [e for e in _os_hooks if e.get("matcher") == "Task"]
+    check(
+        f"Suite 55(3a): hooks/config.json[{_os_key}] has Task PreToolUse entry",
+        len(_task_entries) > 0,
+        f"no Task PreToolUse entry found for OS '{_os_key}'",
+    )
+    if _task_entries:
+        _task_cmd = (_task_entries[0].get("hooks", [{}])[0]).get("command", "")
+        check(
+            f"Suite 55(3b): hooks/config.json[{_os_key}] Task entry invokes checkpoint-guard.sh",
+            "checkpoint-guard.sh" in _task_cmd,
+            f"Task hook command does not invoke checkpoint-guard.sh: '{_task_cmd}'",
+        )
+
+# -- (4) AC-A5: orchestrator.md self-check for all 3 boundaries + nested-context limitation --
+_s55_orch_6d = _slice_section(_s55_orch, "Step 6d", _STOP_SECTION)
+check(
+    "Suite 55(4a): orchestrator.md Step 6d names Reasoning Checkpoint B1",
+    "Reasoning Checkpoint B1" in _s55_orch_6d or "checkpoint_boundary: intake-plan" in _s55_orch_6d,
+    "orchestrator.md Step 6d does not reference Reasoning Checkpoint B1 / intake-plan",
+)
+check(
+    "Suite 55(4b): orchestrator.md Step 6d names Reasoning Checkpoint B2 (research-next)",
+    "Reasoning Checkpoint B2" in _s55_orch_6d or "research-next" in _s55_orch_6d,
+    "orchestrator.md Step 6d does not reference Reasoning Checkpoint B2 / research-next",
+)
+check(
+    "Suite 55(4c): orchestrator.md Step 6d names Reasoning Checkpoint B3 (postverify-next)",
+    "Reasoning Checkpoint B3" in _s55_orch_6d or "postverify-next" in _s55_orch_6d,
+    "orchestrator.md Step 6d does not reference Reasoning Checkpoint B3 / postverify-next",
+)
+check(
+    "Suite 55(4d): orchestrator.md Step 6d declares nested-context limitation (not a harness floor)",
+    "nested" in _s55_orch_6d.lower() and (
+        "not a harness floor" in _s55_orch_6d.lower() or "harness-level" in _s55_orch_6d.lower()
+    ),
+    "orchestrator.md Step 6d does not declare the nested-context limitation as not a harness floor",
+)
+
+# -- (5) AC-A6: 4 new state fields in orchestrator.md § Current State + Recovery Instructions --
+_s55_curstate = _slice_section(_s55_orch, "## Current State", ("\n## Phase Checklist",))
+for _field in ("checkpoint_boundary:", "checkpoint_advance_fresh:", "functional_clarity_artifact:", "functional_clarity_confirmed:"):
+    check(
+        f"Suite 55(5a): orchestrator.md § Current State declares '{_field}'",
+        _field in _s55_curstate,
+        f"field '{_field}' not found in orchestrator.md § Current State",
+    )
+_s55_recovery = _slice_section(_s55_orch, "## Recovery Instructions", ("\n## Agent Results", "\n**Recover safety"))
+check(
+    "Suite 55(5b): orchestrator.md Recovery Instructions references checkpoint fields",
+    "checkpoint_boundary" in _s55_recovery or "checkpoint_advance_fresh" in _s55_recovery,
+    "orchestrator.md Recovery Instructions does not reference reasoning checkpoint fields",
+)
+
+# -- (6) AC-A6 no-regression: existing discover/survey fields still present --
+for _existing_field in (
+    "discover_state:", "advance_signal:", "survey_pipeline_shape:", "survey_effort:",
+    "survey_iteration_autonomy:", "survey_scope_hint:", "survey_source:",
+    "spec_seed_present:", "approach_checkpoint:",
+):
+    check(
+        f"Suite 55(6): orchestrator.md § Current State still declares '{_existing_field}' (no regression)",
+        _existing_field in _s55_curstate,
+        f"existing field '{_existing_field}' was removed from orchestrator.md § Current State — regression",
+    )
+
+# -- (7) AC-A7: docs/discover-phase.md §3 generalized in-place as B1 --------
+# Slice §3 down to ## 4 only (not stopping at ###, so subsections are included)
+_s55_disc_3 = _slice_section(_s55_discover, "## 3. Entry into planning", ("\n## 4.", "\n## 5.", "\n---\n"))
+check(
+    "Suite 55(7a): docs/discover-phase.md §3 references Reasoning Checkpoint B1",
+    "Reasoning Checkpoint B1" in _s55_disc_3 or "docs/reasoning-checkpoint.md" in _s55_disc_3,
+    "docs/discover-phase.md §3 was not generalized in-place to reference Reasoning Checkpoint B1",
+)
+check(
+    "Suite 55(7b): docs/discover-phase.md §3.1 skip-marker bypass is unchanged",
+    "3.1" in _s55_disc_3 and "skip marker" in _s55_disc_3.lower(),
+    "docs/discover-phase.md §3 no longer documents the skip-marker bypass in §3.1",
+)
+check(
+    "Suite 55(7c): hooks/checkpoint-guard.sh is cross-platform (bash shebang)",
+    _s55_guard_path.exists() and read(_s55_guard_path).startswith("#!/usr/bin/env bash"),
+    "checkpoint-guard.sh does not use #!/usr/bin/env bash (cross-platform shebang)",
+)
+
+# -- (8) SEC-AC-1: HI-2 non-waivable at all THREE boundaries ----------------
+# Slice § Enforcement to the next ## heading only (not ###), so Layer 1 + Layer 2 bodies are included.
+_STOP_H2 = ("\n## ",)
+_s55_enforcement = _slice_section(_s55_checkpoint, "## Enforcement", _STOP_H2)
+_s55_skip_section = _slice_section(_s55_checkpoint, "## Skip-marker bypass", _STOP_H2)
+_s55_hi2_text = _s55_enforcement + _s55_skip_section
+check(
+    "Suite 55(8a): docs/reasoning-checkpoint.md § Enforcement declares HI-2 inviolable (never waives security floor)",
+    ("NEVER" in _s55_enforcement or "never" in _s55_enforcement.lower()) and "security" in _s55_enforcement.lower(),
+    "docs/reasoning-checkpoint.md § Enforcement does not declare HI-2 (NEVER waives security floor)",
+)
+for _b in ("B1", "B2", "B3"):
+    check(
+        f"Suite 55(8b): docs/reasoning-checkpoint.md declares HI-2 non-waivable at boundary {_b}",
+        _b in _s55_checkpoint and "security" in _s55_checkpoint.lower(),
+        f"docs/reasoning-checkpoint.md does not assert HI-2 non-waivable at boundary {_b}",
+    )
+_s55_orch_6d_hi2 = _slice_section(_s55_orch, "Step 6d", _STOP_SECTION)
+check(
+    "Suite 55(8c): orchestrator.md Step 6d declares HI-2 inviolable at B1 (skip marker never waives security gate)",
+    "security" in _s55_orch_6d_hi2.lower() and (
+        "never" in _s55_orch_6d_hi2.lower() or "NEVER" in _s55_orch_6d_hi2
+    ) and "waiver" in _s55_orch_6d_hi2.lower() or (
+        "not a security waiver" in _s55_orch_6d_hi2 or "never a security waiver" in _s55_orch_6d_hi2
+    ),
+    "orchestrator.md Step 6d does not declare HI-2 inviolable (skip marker is never a security waiver)",
+)
+
+# -- (9) SEC-AC-2: strict parsing + intra-privilege trust + no security fields in hook --
+_s55_strict_section = _slice_section(_s55_checkpoint, "**Strict line-token parsing.**", ("\n\n**", "\n##"))
+_s55_trust_section = _slice_section(_s55_checkpoint, "**Trust model", ("\n\n**", "\n##"))
+_s55_hook_fields_section = _slice_section(_s55_checkpoint, "**Hook reads only", ("\n\n**", "\n##"))
+check(
+    "Suite 55(9a): docs/reasoning-checkpoint.md declares strict line-token parsing",
+    "Strict line-token parsing" in _s55_checkpoint or "strict" in _s55_checkpoint.lower(),
+    "docs/reasoning-checkpoint.md does not declare strict line-token parsing",
+)
+check(
+    "Suite 55(9b): docs/reasoning-checkpoint.md declares intra-privilege trust model",
+    "intra-privilege" in _s55_checkpoint or "intra-priv" in _s55_checkpoint,
+    "docs/reasoning-checkpoint.md does not declare the intra-privilege trust model",
+)
+check(
+    "Suite 55(9c): docs/reasoning-checkpoint.md declares hook does NOT read security fields",
+    "Hook reads only" in _s55_checkpoint or (
+        "security_sensitive" in _s55_checkpoint and "NOT" in _s55_checkpoint
+    ),
+    "docs/reasoning-checkpoint.md does not declare the hook's exclusion of security fields",
+)
+
+# -- (10) SEC-AC-3: Layer 2 degradation does NOT touch security floors -------
+_s55_layer2_section = _slice_section(_s55_checkpoint, "### Layer 2", ("\n## ", "\n### Layer "))
+check(
+    "Suite 55(10a): docs/reasoning-checkpoint.md § Layer 2 declares security floors do not degrade in nested context",
+    "security" in _s55_layer2_section.lower() and (
+        "independent" in _s55_layer2_section.lower() or "not" in _s55_layer2_section.lower()
+    ),
+    "docs/reasoning-checkpoint.md § Layer 2 does not state that security floors are independent of the fallback",
+)
+check(
+    "Suite 55(10b): orchestrator.md Step 6d declares security floors independent of B2/B3 self-check",
+    "Security floors" in _s55_orch_6d or "security floors" in _s55_orch_6d.lower(),
+    "orchestrator.md Step 6d does not declare that security floors are independent of the B2/B3 self-check",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

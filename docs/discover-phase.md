@@ -46,15 +46,19 @@ Any one of the following counts as an advance signal:
 
 ---
 
-## 3. Entry into planning — always gated
+## 3. Entry into planning — always gated (Reasoning Checkpoint B1)
+
+This section defines Boundary B1 of the reasoning checkpoint (`docs/reasoning-checkpoint.md`). The Discover gate is generalized in-place as the intake→plan instance of the reusable three-boundary checkpoint. The mechanism is unchanged; the abstraction is made explicit so B2 (research→next) and B3 (postverify→next) share the same contract.
+
+**Enforcement.** In top-level sessions, `hooks/checkpoint-guard.sh` (`PreToolUse` / matcher `Task`) enforces this deterministically — the architect is not dispatched until both `checkpoint_advance_fresh: true` AND `functional_clarity_confirmed: true` are recorded in `00-state.md`. In nested-context sessions, the orchestrator self-check (Layer 2) applies; see `docs/reasoning-checkpoint.md § Layer 2`.
 
 ### 3.1 Explicit skip marker → bypass
 
-The ONLY way to skip the confirmation gate is a deliberate operator-declared marker in the message: `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:`. These mean "I have decided, skip the gate." Record `discover_state: bypassed`, skip the framing+confirm, and go straight to the intake survey (§5) → Step 7. (`--fast` still inherits every security carve-out — see §6 HI-1/HI-2; a skip marker is not a security waiver.)
+The ONLY way to skip the confirmation gate is a deliberate operator-declared marker in the message: `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:`. These mean "I have decided, skip the gate." Record `discover_state: bypassed`, skip the framing+confirm, and go straight to the intake survey (§5) → Step 7. (`--fast` still inherits every security carve-out — see §6 HI-1/HI-2; a skip marker is not a security waiver. A skip marker bypasses the checkpoint but NOT the security gate — this invariant holds at B1, B2, and B3.)
 
 ### 3.2 Clear task (no marker) → brief framing gate
 
-When the task is clear but carries NO skip marker, the orchestrator still confirms before planning. Record `discover_state: open`. Emit the framing and the confirmation in a single turn:
+When the task is clear but carries NO skip marker, the orchestrator still confirms before planning. Record `discover_state: open`, `checkpoint_boundary: intake-plan`, `checkpoint_advance_fresh: false`, `functional_clarity_confirmed: false`. Emit the framing and the confirmation in a single turn:
 
 ```
 Esto entendí: <1–2 line restatement + tentative pipeline shape / affected services>.
@@ -65,7 +69,8 @@ Esto entendí: <1–2 line restatement + tentative pipeline shape / affected ser
 (In English: `Here's what I understood: <…>. Shall we move to planning, or adjust/explore first? [plan/explore]`)
 
 - Use `AskUserQuestion` for the clarifying questions where available. Ask only what is genuinely needed to plan well — do NOT interrogate beyond that. Do NOT dispatch any subagent in this step.
-- Response = advance (`plan`, `dale`, `sí`, `ok`, `procedé`, …) → record `discover_state: closed`, `advance_signal`, proceed to intake survey (§5) → Step 7.
+- Confirm the functional clarity artifact with the operator during this turn: "¿Qué construimos, funcionalmente? / What are we building, functionally?" (one line is enough — quality is not evaluated, only existence + confirmation).
+- Response = advance (`plan`, `dale`, `sí`, `ok`, `procedé`, …) + confirmed functional artifact → record `discover_state: closed`, `advance_signal`, `checkpoint_advance_fresh: true`, `functional_clarity_artifact: <statement>`, `functional_clarity_confirmed: true`, `checkpoint_boundary: null`, proceed to intake survey (§5) → Step 7.
 - Response = `explorar`/`explore`, a question, or new scope detail → continue conversational Discover (§4).
 - No response → wait; the gate does not time out.
 
@@ -153,6 +158,14 @@ All 7 survey fields in `00-state.md` are plain-text key: value pairs readable by
   # captured in E1; consumed by architect in E2
 - survey_source: {asked | confirmed | inferred | null}
   # how responses were obtained: asked = full form; confirmed = 1-screen confirm; inferred = from marker
+- checkpoint_boundary: {intake-plan | research-next | postverify-next | null}
+  # active reasoning-checkpoint boundary (§3); null when no boundary is armed
+- checkpoint_advance_fresh: {true | false}
+  # true when the advance signal was a response to the checkpoint prompt (not carried over)
+- functional_clarity_artifact: {<short functional statement> | null}
+  # confirmed functional statement ("what we are building, functionally"); null until confirmed
+- functional_clarity_confirmed: {true | false}
+  # true when the operator confirmed the functional clarity artifact
 ```
 
 **Recovery Instructions update (add to `## Recovery Instructions`):**
@@ -161,6 +174,10 @@ All 7 survey fields in `00-state.md` are plain-text key: value pairs readable by
 - discover_state / advance_signal: indicate whether Discover is still open, what signal closed it.
 - survey_* fields: the operator's meta-decisions; use to skip re-asking on resume.
   survey_source: inferred → field was derived from an operator marker, not asked anew.
+- checkpoint_boundary / checkpoint_advance_fresh / functional_clarity_confirmed: reasoning
+  checkpoint state (docs/reasoning-checkpoint.md). If checkpoint_boundary is not null and either
+  advance_fresh or clarity_confirmed is false, do not dispatch the gated agent — re-emit the
+  checkpoint confirmation prompt first.
 ```
 
 ---
