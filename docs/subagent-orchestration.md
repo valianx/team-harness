@@ -88,6 +88,7 @@ Inviolable gates (annotate `dispatch_handoff.type` to determine which items appl
 - **Phase 3.5 Acceptance Gate + Phase 3.6 Acceptance Check** — acceptance-checker appends to `04-validation.md § Drift Analysis`. `[all types]`
 - **STAGE-GATE-3** — mandatory human approval before push; autonomy never covers this gate. `[all types]`
 - **KG passive capture** — `delivery` agent persists one `process-insight` node (best-effort). `[all types]`
+- **Publish Gate (review path)** — when the takeover/inline path (top-level Claude after Task-strip) handles a review operation, any GitHub-write verb (POST fresh review, PUT update-body, POST reply, dismiss) is subject to the same preview-and-confirm Publish Gate defined in `agents/ref-direct-modes.md § Publish Gate (preview-and-confirm)`. The gate is bound to the ACTION, not to the execution site: present the full draft to the operator and wait for explicit approval before executing any write verb. There is no execution path that bypasses this gate — not even in takeover context. `[review direct mode]`
 
 1. Do NOT ask the user "should I take over?" The directive in the orchestrator's response is itself the authorisation.
 2. Do NOT re-invoke `@th:orchestrator` or any skill that routes via `Task(subagent_type=orchestrator, ...)` — that recreates the nested context and the boot probe will fail again.

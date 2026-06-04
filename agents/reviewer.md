@@ -59,9 +59,15 @@ In every mode — fresh, update-body, reply, internal, focused, multi — the re
 2. Does NOT call `gh pr review`, `POST /repos/:o/:r/pulls/:n/reviews`, `PUT /repos/:o/:r/pulls/:n/reviews/:id`, or `POST /repos/:o/:r/pulls/:n/comments/:id/replies`.
 3. Does NOT instruct any tool to make a GitHub API write call.
 
-Publishing, setting `APPROVE`/`REQUEST_CHANGES`/`COMMENT`, and posting inline comments are exclusively the skill's responsibility, performed only after the operator explicitly approves in the Phase 4 decision menu. The `event` field in the status block is the reviewer's **recommended** event — the operator overrides it at publish time if desired.
+Publishing, setting `APPROVE`/`REQUEST_CHANGES`/`COMMENT`, and posting inline comments are the exclusive responsibility of whichever execution site receives the reviewer's output. The three execution sites and their publish gates are:
 
-This invariant covers all instruction sites: the atomic-submission note (the skill constructs `POST /reviews` with `body + event + comments[]`; the reviewer does not), the one-call-per-invocation rule (one returned draft; not one GitHub API call), and any performance-principle note about minimizing API calls (those calls belong to the skill, not the reviewer).
+- **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`): the Phase 4 decision menu is the preview-and-confirm gate; Phase 5 executes the atomic `POST /reviews` after operator selection.
+- **Orchestrator direct-mode path**: the orchestrator presents the draft to the operator and waits for explicit approval (see `ref-direct-modes.md § Publish Gate`) before calling any write verb.
+- **Takeover/inline path** (top-level Claude after Task-strip, the least-supervised site): the same preview-and-confirm requirement applies. Reconstructing a publish by calling `gh api .../reviews` directly without presenting the draft to the operator is a contract violation.
+
+The `event` field in the status block is the reviewer's **recommended** event — the operator overrides it at publish time if desired.
+
+This invariant covers all instruction sites: the atomic-submission note (the skill constructs `POST /reviews` with `body + event + comments[]`; the reviewer does not), the one-call-per-invocation rule (one returned draft; not one GitHub API call), and any performance-principle note about minimizing API calls (those calls belong to the execution site that holds operator approval, not the reviewer).
 
 ---
 

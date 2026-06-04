@@ -751,6 +751,26 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier D — project board ops". Run the detection probe (sets `has_gh`). When `has_gh=true`, use `gh project list`, `gh project field-list`, `gh project item-list`, and `gh project item-edit`. When `has_gh=false`, log "Project board update skipped — gh CLI unavailable" and continue. If any command fails, report the error and continue.
 6. **MANDATORY — Intent detection and smart routing** — when the task arrives as plain text (NOT from a skill's `Direct Mode Task` payload), detect whether the user's intent maps to a known direct mode before entering the full pipeline. Skip this step entirely for skill payloads — the skill already declared the intent.
 
+   **Step 6a-pre — `review_context` guard (run BEFORE the intent table, every turn).**
+
+   Before matching any intent pattern below, check `00-state.md` for an active `review_context` field:
+   ```
+   review_context: { pr: {N}, status: in-progress|recently-completed, author: {login} }
+   ```
+   If `review_context` is present and references a specific PR, AND the current message contains corrective or implementation language directed at that PR — keywords include: `corregir`, `arreglar`, `fixear`, `fix`, `implementar`, `aplicar cambios`, `aplica el fix`, `hace los cambios`, `está rompiendo`, `no funciona`, `arréglalo`, `corrígelo`, `debemos corregirlo` — then:
+
+   1. **Do NOT map to `full pipeline`.** The global routing rule ("route dev tasks through orchestrator") is neutralized during the `review_context` window.
+   2. Route to **Layer 4 — Mode-transition gate** (`ref-direct-modes.md § Layer 4`): emit the confirmation prompt and WAIT.
+   3. On an explicit `implementar` (or equivalent affirmative) response: clear `review_context` from `00-state.md`, then proceed to the full pipeline (Step 7 classify + Discover) with `review_context` cleared.
+   4. On any other response: stay in the current review context. Do NOT dispatch `implementer`.
+
+   This guard applies to fresh turns as well as same-turn messages — a message arriving as a new conversational turn ("corrige X en el PR") is intercepted here before the intent table classifies it as `full pipeline`. This closes the re-entry seam identified in SEC-DR-1 (CWE-863): a turn that arrives after a review is complete bypasses Layers 1-3 entirely without this guard.
+
+   **`review_context` lifecycle:**
+   - **Write** `review_context` to `00-state.md` when entering review mode (receiving a `Direct Mode Task: review` payload or routing a plain-text request to review mode).
+   - **Clear** `review_context` when: (a) the operator confirms the mode transition ("implementar"), or (b) the review session is explicitly closed by the operator.
+   - The field persists across turns until explicitly cleared, so re-entry by a new conversational turn is caught.
+
    **Step 6a — Classify intent.** Match the request against known direct modes:
 
    | Intent Pattern (es/en) | Route | Category |
@@ -3564,7 +3584,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | Mode | Agent | Prerequisites | Flow |
 |------|-------|--------------|------|
 | research | `architect` (research mode) | none | create workspaces → invoke → present `00-research.md` |
-| review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the three-layer guard (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify). |
+| review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the five-layer guard: Layers 1-3 (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify); **Layer 4** (mode-transition gate — corrective language NEVER auto-routes, requires explicit confirmation); **Layer 5** (branch-author guard — fail-closed if author-of-PR or operator identity is indeterminate). **Publish gate:** before ANY `gh pr review`/`POST reviews`, `PUT reviews/:id`, reply, or dismiss verb, present the full draft to the operator and wait for explicit approval (`ref-direct-modes.md § Publish Gate`); `--auto-publish` opt-in skips the preview. **`review_context` state:** write `review_context: { pr: {N}, status: in-progress, author: {login} }` to `00-state.md` when entering review mode; clear it on a confirmed mode-transition or session close. |
 | init | `init` | none | invoke → report generated files |
 | design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
 | test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** |

@@ -217,7 +217,37 @@ When invoked with `Direct Mode Task: review`:
 
 The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The orchestrator and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
 
-**No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The orchestrator writes the draft to a file and returns control to the skill. The skill handles user approval and all GitHub API calls (POST, PUT, reply) exclusively after the operator confirms in the Phase 4 decision menu.
+**No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The orchestrator writes the draft to a file and returns control to the skill. Publishing is the sole responsibility of the execution site that receives operator approval — one of three sites:
+- **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`): the decision menu is the preview gate; Phase 5 does the atomic `POST /reviews`.
+- **Orchestrator direct-mode path**: presents the draft and waits for operator OK before calling any write verb.
+- **Takeover/inline path** (top-level Claude after Task-strip): same requirement — present the draft and wait before calling any write verb. This is the least-supervised path and the highest-risk gap if the gate is absent.
+
+The `### Publish Gate (preview-and-confirm)` section below defines the full contract binding all three sites.
+
+### Publish Gate (preview-and-confirm)
+
+**Purpose (closes #252 — CWE-862):** This gate is bound to the ACTION that publishes, not to the mode or to who executes. Before ANY GitHub-write verb over a review or comment is executed — in ANY execution site — the operator must explicitly approve a preview of the full draft.
+
+**Complete list of covered verbs (no exceptions):**
+- `gh pr review` / `POST /repos/:o/:r/pulls/:n/reviews` — fresh review submission
+- `PUT /repos/:o/:r/pulls/:n/reviews/:id` — update review body
+- `POST /repos/:o/:r/pulls/:n/comments/:id/replies` — reply to inline comment thread
+- Dismiss: `PUT /repos/:o/:r/pulls/:n/reviews/:id/dismissals`
+
+**Default behaviour — preview-first:**
+1. Before invoking any verb above, return the full draft (`review_body` + `inline_findings`, or the applicable body) to the operator.
+2. Show the draft explicitly.
+3. Wait for an explicit OK (e.g., confirmation in the Phase 4 decision menu, or an explicit `sí`/`yes`/`approve` in the conversational path).
+4. Only after receiving explicit approval, execute the write verb.
+
+**Opt-in flag:** `--auto-publish` skips the preview step ONLY when the operator has explicitly declared it in the invocation. Without the flag, preview is mandatory.
+
+**Execution sites — this gate applies at ALL three:**
+1. **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`) — decision menu is the existing preview-and-confirm mechanism; `--auto-publish` skips it.
+2. **Orchestrator direct-mode path** — when the orchestrator handles review without going through the skill's Phase 4, it MUST present the draft and wait for approval before calling any verb above.
+3. **Takeover/inline path** (top-level Claude after Task-strip, the least-supervised execution site) — the same gate applies. If top-level Claude reconstructs a publish by calling `gh api .../reviews` directly, it MUST present the draft and wait for explicit approval before executing. There is no execution path that bypasses this gate.
+
+**Anti-drift anchor:** Suite 57 in `tests/test_agent_structure.py` asserts the gate token at each of the three execution sites. A site that loses the gate turns the suite red.
 
 ## Read-Only Working-Tree Guard
 
@@ -260,6 +290,52 @@ Detected changes outside the allowed draft zone:
 ```
 
 The review output is still returned to the operator, but the defect report is prepended so the operator is aware of the unexpected mutation before approving any publish step.
+
+### Layer 4 — Mode-transition gate
+
+**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the full pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `orchestrator.md` Step 6 `review_context` guard).
+
+**When this gate fires:** Any of these signals appear while a review session is active (i.e., `review_context` is set in `00-state.md`):
+- Corrective language directed at the PR under review: "debemos corregirlo", "hay que arreglarlo", "fix this", "fix X", "corrige X", "arréglalo", "corrígelo", "implementa el fix", "aplica los cambios".
+- Instructions to edit/commit/push on the PR branch while in review mode.
+
+**Required behaviour — the gate NEVER auto-routes:**
+1. Surface the finding as part of the review output (e.g., "This finding requires a code change.").
+2. Emit an explicit mode-transition prompt and WAIT for an affirmative response:
+   ```
+   En modo review (solo hallazgos). ¿Salir de review e iniciar el pipeline de implementación sobre este PR? [implementar/seguir-revisando]
+   ```
+3. On an explicit `implementar` (or equivalent affirmative) response: clear `review_context` from `00-state.md`, then proceed to the full pipeline (Step 7 classify + Discover).
+4. On any other response (or no response): remain in review mode. Do NOT dispatch `implementer`. Do NOT exit review mode.
+
+**The global routing rule ("route all dev tasks through orchestrator") is neutralized within review mode and during the `review_context` window.** A corrective message that would otherwise map to `full pipeline` in Step 6 MUST pass through this gate first.
+
+### Layer 5 — Branch-author guard
+
+**Purpose (closes #251 another-author-branch):** Before ANY edit/commit/push on a PR branch, the orchestrator resolves two identities and fails closed if either is indeterminate.
+
+**Identity resolution (fail-closed by design — CWE-697):**
+- Author of the PR: `gh pr view {N} --json author --jq '.author.login'`
+- Identity of the operator: `gh api user --jq '.login'`
+
+**Decision matrix:**
+
+| Author resolved? | Operator resolved? | Author == Operator? | Result |
+|---|---|---|---|
+| Yes | Yes | Yes | No gate — allow mutation |
+| Yes | Yes | No | Fail-closed — emit confirmation prompt and WAIT |
+| No (any) | — | — | Fail-closed — emit confirmation prompt and WAIT |
+| — | No (any) | — | Fail-closed — emit confirmation prompt and WAIT |
+
+**Prohibited pattern — `unknown == unknown` → fail-open is FORBIDDEN.** If `gh pr view` fails (network, no auth, PR not found) OR if `gh api user` fails (not authenticated, login unavailable in session), the guard MUST treat the unresolvable side as indeterminate and fail closed. It MUST NOT compare two unresolved values and interpret the comparison as a match. The only path to allowing mutation without the gate is when BOTH identities resolve with certainty AND they are equal.
+
+**Confirmation prompt (when gate fires):**
+```
+Esta branch pertenece a otro autor ({author}) o la identidad del autor/operador no pudo resolverse. Editar/commitear/pushear sobre este PR requiere confirmación explícita. ¿Continuar? [sí/no]
+```
+Default: rechazar (no). Without an explicit `sí` the mutation is rejected.
+
+**Independence from Layer 4:** Confirming the mode transition ("implementar") does NOT implicitly confirm this gate. Layer 4 and Layer 5 are independent; both must be satisfied before any branch mutation proceeds.
 
 ### Submode routing
 

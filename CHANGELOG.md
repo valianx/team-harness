@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.51.0] - 2026-06-03
+
+### Fixed
+
+- `review` direct mode now enforces three additional hard gates to prevent mode-bleed and unauthorised publishing: **Layer 4** (mode-transition gate — corrective language during an in-progress review NEVER auto-routes to the full pipeline; an explicit confirmation prompt is emitted and waited on); **Layer 5** (branch-author guard — fail-closed if either the PR author or operator identity is indeterminate, `unknown==unknown→fail-open` explicitly prohibited per SEC-DR-3/CWE-697); **Publish Gate** (preview-and-confirm bound to the ACTION — all three execution sites: skill Phase 4/5, orchestrator direct-mode, takeover/inline — must show the full draft and wait for explicit approval before any `gh pr review`/POST fresh, PUT update-body, POST reply, or dismiss call; `--auto-publish` opt-in skips the preview). `orchestrator.md` Step 6 now carries a `Step 6a-pre` `review_context` guard that intercepts corrective language even on fresh conversational turns (closes SEC-DR-1/CWE-863 re-entry seam). Anti-drift Suite 57 in `tests/test_agent_structure.py` anchors all three gates with `_slice_section` per execution site. (#251 #252)
+
 ## [2.50.0] - 2026-06-03
 
 ### Changed
