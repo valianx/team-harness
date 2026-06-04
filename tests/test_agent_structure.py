@@ -13341,6 +13341,51 @@ check(
     "CLAUDE.md §6.3 must note that direct [Unreleased] editing is a valid fallback",
 )
 
+# ---------------------------------------------------------------------------
+# (b-ext) plan-reviewer.md — Rule 10 finding-emission and no-op contracts
+# These strengthen AC-2 (rejection when conditions fail) and confirm the
+# no-op pseudocode path that makes Rule 10 truly disjoint from Rule 1/9.
+# ---------------------------------------------------------------------------
+
+check(
+    "plan-shape(b8): Rule 10 specifies a 'Finding when absent' for each condition (AC-2 rejection contract)",
+    bool(_s58_rule10_slice)
+    and (
+        "Finding when absent" in _s58_rule10_slice
+        or "finding" in _s58_rule10_slice.lower()
+    )
+    and "findings.append" in _s58_rule10_slice,
+    "Rule 10 must specify findings when conditions are absent (Finding when absent column + findings.append)",
+)
+check(
+    "plan-shape(b9): Rule 10 no-op contract — PR without Consolidates: is not audited (disjoint enforcement)",
+    bool(_s58_rule10_slice)
+    and (
+        "no-op" in _s58_rule10_slice.lower()
+        or "not audited" in _s58_rule10_slice.lower()
+        or "never audited" in _s58_rule10_slice.lower()
+    )
+    and "Consolidates:" in _s58_rule10_slice,
+    "Rule 10 must state it is a no-op for PRs that do not declare Consolidates: (disjointness enforcement)",
+)
+
+# ---------------------------------------------------------------------------
+# (c-ext) delivery.md — Step 9e fragment deletion (makes idempotency true)
+# AC-5 claim: 'fragments deleted after assembly; running again on empty dir = no-op'
+# The deletion step is what proves the idempotency, not just the no-op label.
+# ---------------------------------------------------------------------------
+
+check(
+    "plan-shape(c6): delivery.md Step 9e deletes fragment files after assembly (idempotency mechanism)",
+    bool(_s58_step9e_slice)
+    and (
+        "delete" in _s58_step9e_slice.lower()
+        or "remov" in _s58_step9e_slice.lower()
+    )
+    and "changelog.d/" in _s58_step9e_slice,
+    "delivery.md Step 9e must state that fragment files are deleted from changelog.d/ after assembly",
+)
+
 # --- (e) Self-ref: Suite 58 uses _slice_section and covers plan-shape-batch-economy ---
 
 _s58_self = read(REPO_ROOT / "tests" / "test_agent_structure.py")

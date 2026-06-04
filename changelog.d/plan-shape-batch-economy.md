@@ -1,5 +1,0 @@
-### Added
-
-- Multi-service consolidation rule in `agents/architect.md` (`#### Consolidation rule`): a new per-PR `Consolidates:` field allows grouping small same-session declarative/doc/asset concerns from distinct services into one PR when all five cumulative conditions hold (declarative/doc/asset, same session, no independent-review need, no coexistence need, append-only collision). The default one-PR-per-service rule, Split reason closed list, and PR-stacking prohibition are unchanged.
-- `agents/plan-reviewer.md` Rule 10 (`### Rule 10 — Multi-service consolidation`): audits consolidation PRs only when `Consolidates:` is declared; verifies the five conditions; disjoint from Rule 1/9; escalates to `fail` when production code is fused; affirms Rule 1/9 and Split reason list are unchanged.
-- `changelog.d/` fragment directory mechanism: each PR writes `changelog.d/{pr-slug}.md` instead of editing `## [Unreleased]` inline; delivery Step 9e assembles fragments into the versioned release section at release cut (idempotent; no-op when directory is empty). Closes #249.
