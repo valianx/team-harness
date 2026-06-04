@@ -16,6 +16,9 @@ Before routing to a mode, parse optional flags from `$ARGUMENTS`:
 - `--reviewers <focus1[,focus2,...]>` → set `multi_reviewer=true`, `focuses` to the comma-separated list (e.g., `security,architecture` → `["security","architecture"]`).
 - `[TIER: N]` (in the PR number / arguments) → set `tier_override=N` (0–4). Takes precedence over auto-classification.
 - `--resume-from-draft` → skip Phases 1–3, go directly to Phase 4 using `.claude/pr-review-final.md` (or `.claude/pr-review-draft.md`).
+- `--auto-publish` → opt-in flag that skips the Phase 4 preview-and-confirm gate. The operator explicitly authorises publish without seeing the draft first. **Default (without this flag): preview is mandatory** — Phase 4 always shows the full draft and waits for an explicit operator selection before Phase 5 publishes. Set `auto_publish=true` when this flag is present, `auto_publish=false` otherwise.
+
+**Publish gate alignment (`ref-direct-modes.md § Publish Gate`):** This skill implements the canonical publish gate at Phase 4 (decision menu = preview-and-confirm). The `--auto-publish` flag satisfies the opt-in contract defined in that gate. When `auto_publish=true`, Phase 4 is skipped and Phase 5 executes immediately after Phase 3 completes; the operator's explicit `--auto-publish` declaration is the approval. When `auto_publish=false` (the default), Phase 4 MUST show the full draft and wait for an explicit choice before Phase 5.
 
 Remove parsed flags from the PR number/URL before processing. Remaining input is the PR number or URL.
 

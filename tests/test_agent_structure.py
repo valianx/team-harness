@@ -12764,6 +12764,246 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 57 — Review-mode hard gates (review-mode-contract, #251 + #252)
+# ---------------------------------------------------------------------------
+# Anti-drift assertions for the three new gates added in PR-1:
+#   Layer 4 (mode-transition gate): ref-direct-modes.md § Layer 4 AND orchestrator.md
+#     Step 6a-pre (review_context guard) — two sites must carry the gate.
+#   Layer 5 (branch-author guard): ref-direct-modes.md § Layer 5 — fail-closed when
+#     author-of-PR OR operator identity is indeterminate (no unknown==unknown).
+#   Publish gate: ref-direct-modes.md § Publish Gate — all three execution sites
+#     (skill, orchestrator direct-mode, takeover/inline) carry the gate; the
+#     complete list of covered verbs is present; --auto-publish opt-in documented.
+#
+# All checks use the 3-arg _slice_section (anchor → first stop_marker) defined
+# in Suite 51. Missing anchor → "" → token-in-"" is False → FAIL.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 57: Review-mode hard gates (#251 + #252) ===")
+
+_S57_STOP_HEADS = ("\n### ", "\n## ", "\n---\n")
+_S57_STOP_SECTION = ("\n## ", "\n---\n")
+
+_s57_ref = read(AGENTS_DIR / "ref-direct-modes.md")
+_s57_orch = read(AGENTS_DIR / "orchestrator.md")
+_s57_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s57_skill = read(skill_path("review-pr"))
+
+# --- (a) Layer 4 — mode-transition gate in ref-direct-modes.md ---
+
+_s57_l4 = _slice_section(_s57_ref, "### Layer 4 — Mode-transition gate", _S57_STOP_HEADS)
+
+check(
+    "Suite 57(a1): ref-direct-modes.md contains '### Layer 4 — Mode-transition gate' section",
+    bool(_s57_l4),
+    "Layer 4 section missing from ref-direct-modes.md — add '### Layer 4 — Mode-transition gate'",
+)
+check(
+    "Suite 57(a2): Layer 4 section forbids auto-routing (NEVER auto-rutea)",
+    "NEVER auto-routes" in _s57_l4 or "NEVER auto-rutea" in _s57_l4 or "never auto-route" in _s57_l4.lower(),
+    "Layer 4 section must state the gate NEVER auto-routes within its own section",
+)
+check(
+    "Suite 57(a3): Layer 4 section emits an explicit mode-transition confirmation prompt",
+    "confirmación explícita" in _s57_l4
+    or "explicit mode-transition" in _s57_l4.lower()
+    or ("explicit" in _s57_l4.lower() and "prompt" in _s57_l4.lower()),
+    "Layer 4 section must describe an explicit confirmation prompt within its own section",
+)
+check(
+    "Suite 57(a4): Layer 4 section neutralizes the global routing rule within review",
+    "global routing rule" in _s57_l4 or "neutralized" in _s57_l4 or "neutralizes" in _s57_l4,
+    "Layer 4 must state that the global routing rule is neutralized within review context",
+)
+
+# --- (b) Step 6a-pre gate in orchestrator.md (review_context guard) ---
+
+_s57_step6pre = _slice_section(_s57_orch, "Step 6a-pre", _S57_STOP_HEADS)
+
+check(
+    "Suite 57(b1): orchestrator.md contains 'Step 6a-pre' (review_context guard) section",
+    bool(_s57_step6pre),
+    "Step 6a-pre section missing from orchestrator.md — the review_context guard must live "
+    "in the Step 6 intent-classification flow, not only in ref-direct-modes.md (SEC-DR-1)",
+)
+check(
+    "Suite 57(b2): Step 6a-pre section consults review_context before mapping to full pipeline",
+    "review_context" in _s57_step6pre and "full pipeline" in _s57_step6pre,
+    "Step 6a-pre must check review_context AND reference full pipeline routing within its section",
+)
+check(
+    "Suite 57(b3): Step 6a-pre routes corrective language to mode-transition gate",
+    "mode-transition gate" in _s57_step6pre or "Layer 4" in _s57_step6pre,
+    "Step 6a-pre must route corrective language to the mode-transition gate (Layer 4), not full pipeline",
+)
+check(
+    "Suite 57(b4): Step 6a-pre documents the review_context lifecycle (write + clear)",
+    "review_context" in _s57_step6pre
+    and ("lifecycle" in _s57_step6pre or ("write" in _s57_step6pre and "clear" in _s57_step6pre)),
+    "Step 6a-pre must document when review_context is written and cleared (lifecycle)",
+)
+
+# --- (c) Layer 5 — branch-author guard in ref-direct-modes.md ---
+
+_s57_l5 = _slice_section(_s57_ref, "### Layer 5 — Branch-author guard", _S57_STOP_HEADS)
+
+check(
+    "Suite 57(c1): ref-direct-modes.md contains '### Layer 5 — Branch-author guard' section",
+    bool(_s57_l5),
+    "Layer 5 section missing from ref-direct-modes.md — add '### Layer 5 — Branch-author guard'",
+)
+check(
+    "Suite 57(c2): Layer 5 section uses 'gh api user' to resolve operator identity",
+    "gh api user" in _s57_l5,
+    "Layer 5 must reference 'gh api user' within its section (operator identity resolution)",
+)
+check(
+    "Suite 57(c3): Layer 5 section is fail-closed (uses 'fail-closed' token)",
+    "fail-closed" in _s57_l5 or "fail closed" in _s57_l5,
+    "Layer 5 must use 'fail-closed' within its section",
+)
+check(
+    "Suite 57(c4): Layer 5 section prohibits unknown==unknown → fail-open pattern",
+    "unknown" in _s57_l5 and ("fail-open" in _s57_l5 or "fail open" in _s57_l5),
+    "Layer 5 must explicitly state that comparing two unknown/indeterminate values "
+    "that collapses to fail-open is FORBIDDEN (SEC-DR-3 / CWE-697)",
+)
+check(
+    "Suite 57(c5): Layer 5 section names 'identidad del operador indeterminada → fail-closed' or equivalent",
+    "operator identity" in _s57_l5.lower()
+    or "identidad del operador" in _s57_l5
+    or "indeterminate" in _s57_l5
+    or "indeterminada" in _s57_l5,
+    "Layer 5 must describe that operator identity indeterminacy forces fail-closed "
+    "(not just PR-author indeterminacy)",
+)
+
+# --- (d) Publish gate in ref-direct-modes.md ---
+
+_s57_pubgate = _slice_section(_s57_ref, "\n### Publish Gate (preview-and-confirm)", _S57_STOP_HEADS)
+
+check(
+    "Suite 57(d1): ref-direct-modes.md contains '### Publish Gate (preview-and-confirm)' section",
+    bool(_s57_pubgate),
+    "Publish Gate section missing from ref-direct-modes.md — add '### Publish Gate (preview-and-confirm)'",
+)
+check(
+    "Suite 57(d2): Publish Gate lists 'gh pr review' verb",
+    "gh pr review" in _s57_pubgate,
+    "Publish Gate must list 'gh pr review' in its verb list within the section",
+)
+check(
+    "Suite 57(d3): Publish Gate lists PUT /reviews/:id (update-body verb)",
+    "PUT" in _s57_pubgate and "reviews" in _s57_pubgate and ("reviews/:id" in _s57_pubgate or "reviews/:review_id" in _s57_pubgate or "update" in _s57_pubgate.lower()),
+    "Publish Gate must cover the PUT update-body verb within the section",
+)
+check(
+    "Suite 57(d4): Publish Gate lists reply verb (POST .../comments/:id/replies)",
+    "replies" in _s57_pubgate or "reply" in _s57_pubgate,
+    "Publish Gate must cover the POST reply verb within the section",
+)
+check(
+    "Suite 57(d5): Publish Gate lists dismiss verb",
+    "dismiss" in _s57_pubgate.lower(),
+    "Publish Gate must cover the dismiss verb within the section",
+)
+check(
+    "Suite 57(d6): Publish Gate names all three execution sites",
+    "skill" in _s57_pubgate.lower()
+    and ("orchestrator" in _s57_pubgate.lower() or "direct-mode" in _s57_pubgate.lower())
+    and ("takeover" in _s57_pubgate.lower() or "inline" in _s57_pubgate.lower()),
+    "Publish Gate must name all three execution sites: skill, orchestrator direct-mode, takeover/inline",
+)
+check(
+    "Suite 57(d7): Publish Gate documents --auto-publish opt-in flag",
+    "--auto-publish" in _s57_pubgate,
+    "Publish Gate must document the --auto-publish opt-in flag within the section",
+)
+
+# --- (e) Publish gate present in orchestrator.md Direct Modes review row ---
+
+_s57_dm = _slice_section(_s57_orch, "When invoked with a `Direct Mode Task`", ("\n## ",))
+
+check(
+    "Suite 57(e1): orchestrator.md Direct Modes review row references the Publish Gate",
+    "Publish Gate" in _s57_dm or "publish-gate" in _s57_dm or "preview-and-confirm" in _s57_dm,
+    "orchestrator.md § Direct Modes review row must reference the Publish Gate "
+    "(ref-direct-modes.md § Publish Gate)",
+)
+check(
+    "Suite 57(e2): orchestrator.md Direct Modes review row references Layers 4 and 5",
+    "Layer 4" in _s57_dm and "Layer 5" in _s57_dm,
+    "orchestrator.md § Direct Modes review row must reference Layer 4 and Layer 5",
+)
+check(
+    "Suite 57(e3): orchestrator.md Direct Modes review row references review_context",
+    "review_context" in _s57_dm,
+    "orchestrator.md § Direct Modes review row must reference review_context state",
+)
+
+# --- (f) Publish gate present in skill (Phase 4 decision menu) ---
+
+_s57_ph4 = _slice_section(_s57_skill, "### Phase 4 — Decision Menu", _S57_STOP_HEADS)
+
+check(
+    "Suite 57(f1): skills/review-pr/SKILL.md contains Phase 4 Decision Menu section",
+    bool(_s57_ph4),
+    "Phase 4 Decision Menu section missing from review-pr/SKILL.md",
+)
+check(
+    "Suite 57(f2): skill Phase 4 shows the draft to the operator (preview-first)",
+    "draft" in _s57_ph4.lower() and ("display" in _s57_ph4.lower() or "show" in _s57_ph4.lower() or "Read" in _s57_ph4),
+    "skill Phase 4 must present the review draft to the operator before publishing",
+)
+
+# --- (g) skill Flag parsing documents --auto-publish ---
+
+_s57_flags = _slice_section(_s57_skill, "## Flag parsing", _S57_STOP_HEADS)
+
+check(
+    "Suite 57(g1): skills/review-pr/SKILL.md Flag parsing section exists",
+    bool(_s57_flags),
+    "Flag parsing section missing from review-pr/SKILL.md",
+)
+check(
+    "Suite 57(g2): skill Flag parsing documents --auto-publish opt-in flag",
+    "--auto-publish" in _s57_flags or "--auto-publish" in _s57_skill,
+    "skill must document --auto-publish in Flag parsing section (or near it)",
+)
+
+# --- (h) reviewer.md No-Publish Invariant enumerates three execution sites ---
+
+_s57_nopub = _slice_section(_s57_reviewer, "## No-Publish Invariant", ("\n## ",))
+
+check(
+    "Suite 57(h1): reviewer.md No-Publish Invariant section exists",
+    bool(_s57_nopub),
+    "No-Publish Invariant section missing from reviewer.md",
+)
+check(
+    "Suite 57(h2): reviewer.md No-Publish Invariant names three execution sites",
+    ("skill" in _s57_nopub.lower() or "Phase 4" in _s57_nopub or "Phase 5" in _s57_nopub)
+    and ("orchestrator" in _s57_nopub.lower() or "direct-mode" in _s57_nopub.lower())
+    and ("takeover" in _s57_nopub.lower() or "inline" in _s57_nopub.lower()),
+    "reviewer.md No-Publish Invariant must enumerate all three execution sites: "
+    "skill, orchestrator direct-mode, takeover/inline",
+)
+
+# --- (i) Self-ref: Suite 57 uses _slice_section and covers review-mode-hard-gates ---
+
+_s57_self = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+_s57_suite_text = _slice_section(
+    _s57_self,
+    "Suite 57 — Review-mode hard gates",
+    ("# -----------\n# Summary",),
+)
+check(
+    "Suite 57(i): Suite 57 uses _slice_section anchor-scoped idiom and covers 'review-mode-hard-gates'",
+    "_slice_section" in _s57_suite_text and "review-mode-hard-gates" in _s57_suite_text,
+    "Suite 57 must use _slice_section (anchor-scoped) and contain the 'review-mode-hard-gates' marker",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
