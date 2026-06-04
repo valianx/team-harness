@@ -13919,17 +13919,29 @@ _s59_marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json"
 _s59_main_go = read(REPO_ROOT / "cmd" / "install" / "main.go")
 _s59_changelog = read(REPO_ROOT / "CHANGELOG.md")
 
+# Dev-mode shipped in 2.53.0; assert a version FLOOR (>=) rather than an exact
+# pin so routine patch bumps (2.53.1, 2.54.0, ...) do not break this suite.
+# _S59_EXPECTED_VERSION is the historical release anchor (the [2.53.0] CHANGELOG
+# section and the dev-mode release surfaces); the floor governs the live
+# plugin/marketplace version which advances with each patch.
 _S59_EXPECTED_VERSION = "2.53.0"
+_S59_MIN_VERSION = (2, 53, 0)
+
+def _s59_ver_tuple(v):
+    try:
+        return tuple(int(x) for x in str(v).split(".")[:3])
+    except Exception:
+        return (0, 0, 0)
 
 check(
-    "dev-mode(version-plugin-json): .claude-plugin/plugin.json version == 2.53.0",
-    _s59_plugin_json.get("version") == _S59_EXPECTED_VERSION,
-    f"plugin.json version must be {_S59_EXPECTED_VERSION}",
+    "dev-mode(version-plugin-json): .claude-plugin/plugin.json version >= 2.53.0 (dev-mode release floor)",
+    _s59_ver_tuple(_s59_plugin_json.get("version")) >= _S59_MIN_VERSION,
+    "plugin.json version must be >= 2.53.0 (the dev-mode feature release)",
 )
 check(
-    "dev-mode(version-marketplace-json): .claude-plugin/marketplace.json plugins[0].version == 2.53.0",
-    _s59_marketplace.get("plugins", [{}])[0].get("version") == _S59_EXPECTED_VERSION,
-    f"marketplace.json plugins[0].version must be {_S59_EXPECTED_VERSION}",
+    "dev-mode(version-marketplace-json): .claude-plugin/marketplace.json plugins[0].version >= 2.53.0",
+    _s59_ver_tuple(_s59_marketplace.get("plugins", [{}])[0].get("version")) >= _S59_MIN_VERSION,
+    "marketplace.json plugins[0].version must be >= 2.53.0",
 )
 check(
     "dev-mode(version-main-go): cmd/install/main.go var version == 2.53.0",

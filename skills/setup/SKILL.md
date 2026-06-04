@@ -118,11 +118,11 @@ Both files are copied idempotently from the plugin cache (`~/.claude/plugins/cac
 1. **Output style** (the disposition): `output-styles/developer-mode.md` -> `~/.claude/output-styles/developer-mode.md`.
 2. **`/dev-mode` skill** (the toggle): `skills/dev-mode/SKILL.md` -> `~/.claude/skills/dev-mode/SKILL.md`. This is a USER-LEVEL skill so the bare `/dev-mode` command is available (plugin skills are namespaced; a bare command requires a user-level skill).
 
-**Activation is opt-in (NOT forced); the toggle is the `/dev-mode` skill, not the `/config` menu.** After copying, tell the operator:
+**Activation is opt-in (NOT forced); the toggle is the `/dev-mode` skill.** After copying, tell the operator:
 
-`Developer mode installed. To enter it: run /dev-mode, then /clear (or a new session). To exit: /dev-mode off, then /clear. (The /clear is required because the output style replaces the system prompt and applies on reload.)`
+`Developer mode installed. To enter it: run /dev-mode — it starts in the current session immediately, no /clear needed. New sessions auto-resume while it is on (a SessionStart hook shows the banner instantly). To exit: /dev-mode off.`
 
-`/dev-mode` writes `outputStyle: developer-mode` to settings + the marker `~/.claude/.dev-mode-active`; `/dev-mode off` reverses both. The `/config` -> Output style menu remains an equivalent manual path.
+`/dev-mode` writes the marker `~/.claude/.dev-mode-active` (`dev_mode: true`) and adopts the orchestrator role in-session; `/dev-mode off` removes the marker. The marker is the single source of truth. The `developer-mode` output style via `/config` -> Output style remains an equivalent persistent path (it replaces the system prompt on reload).
 
 **The `developer-mode` output style is NOT force-installed** (`force-for-plugin` is false). Normal mode remains the default.
 

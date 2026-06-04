@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.53.1] - 2026-06-04
+
+### Fixed
+
+- **Stale dev-mode activation instructions in `/th:setup` §4e and `docs/dev-mode.md`.** Both still described the pre-final flow — "run `/dev-mode`, then `/clear`" and "`/dev-mode` writes `outputStyle: developer-mode` to settings". Corrected to the shipped in-session design: `/dev-mode` starts developer mode in the current session immediately (writes the marker, shows the banner, adopts the orchestrator role — no `/clear`), the `SessionStart` hook auto-resumes new sessions, and the marker is the single source of truth (the skill does not write `outputStyle`). The `developer-mode` output style remains documented as the optional persistent path via `/config`. Install/sync logic was already correct — this is a documentation/operator-message fix surfaced by a clean-install test of `/th:setup` and `/th:update`.
+
 ## [2.53.0] - 2026-06-04
 
 ### Added
