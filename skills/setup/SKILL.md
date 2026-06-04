@@ -70,13 +70,11 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 <!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
-**When to use:** For any development task — features, bug fixes, refactors, enhancements, hotfixes — always route through the orchestrator. Do not implement, test, or deliver directly. The orchestrator coordinates the full pipeline (architect → implementer → tester + qa + security → delivery) and enforces quality gates at each stage boundary.
+**Precondition — developer mode gates the pipeline.** The orchestrator and its pipeline run ONLY when developer mode is active (the `developer-mode` output style is loaded; observable via the filesystem marker `~/.claude/.dev-mode-active` containing `dev_mode: true`). **Without developer mode, the top-level agent handles the request DIRECTLY** — normal behavior, no orchestrator, no pipeline, no workspace. Developer mode is the opt-in; direct is the default. (The one exception is reporting team-harness problems via `/th:report-issue`, below — that never requires dev mode.)
 
-**How to invoke:** `Agent(subagent_type='th:orchestrator', ...)`. The orchestrator dispatches phase agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery, etc.) internally via Task. Do not execute the orchestrator role inline at top level — the orchestrator's contract is its system prompt, and inline execution weakens enforcement of pipeline gates.
+**In developer mode — the agent IS the orchestrator.** When dev mode is active the top-level agent has `Task` and dispatches leaf agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery) DIRECTLY — no `dispatch_handoff`. It routes each development task (features, fixes, refactors, enhancements, hotfixes, issue work, review) through the full pipeline (architect → implementer → tester + qa + security → delivery) with quality gates at each stage boundary. Executing the orchestrator role inline is PERMITTED ONLY when the developer-mode output style is active (the contract is loaded); doing it WITHOUT dev mode — including reading `agents/orchestrator.md` "as reference" — is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED (without dev mode, work directly). If the operator explicitly invokes `Agent(subagent_type='th:orchestrator', ...)` outside dev mode, the nested-handoff/takeover machinery in `docs/subagent-orchestration.md` is the FALLBACK — but it is not the default path.
 
-**Default to team-harness flows.** For any development task — features, bug fixes, refactors, enhancements, hotfixes, issue work, code review — the top-level agent routes through the orchestrator or the matching `th` skill by default. Direct or manual handling (writing code, running commands, editing files outside a pipeline) is the exception and requires an explicit operator opt-out. When in doubt, use th flows.
-
-**Full pipeline is the default.** Every development task runs the complete pipeline unless the operator explicitly requests a direct mode (research, design, validate, deliver, review). Do not skip stages or substitute yourself for a subagent — the pipeline runs in full or stops with a real error.
+**Full pipeline is the default within dev mode.** When dev mode is active, a development task runs the complete pipeline unless the operator explicitly requests a lighter path. Do not skip stages or substitute yourself for a subagent — the pipeline runs in full or stops with a real error.
 
 **Operator-declared fast path.** The operator — and only the operator — may request a lighter pipeline; the orchestrator never shrinks it on its own. Declarations: `--fast` for a very small change (a version bump, a one-line edit) skips the plan review, qa, and security stages; `[TIER: 0]` / `[TIER: 1]` for trivial or docs-only fixes; or Simple Mode keywords (`simple`, `just implement`, `skip tests`). In every case Specify and Delivery still run — every change is spec'd, branched, committed, and shipped as a PR — and security still runs on security-sensitive paths (`auth`, `api`, `db`, `crypto`, `session`) regardless of the declaration.
 
@@ -86,6 +84,47 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 
 **Report team-harness problems via `/th:report-issue`.** When a bug, gap, or improvement is detected in the `th` plugin itself — its agents, skills, or any orchestrator behavior — report it with `/th:report-issue <bug|feature|docs|question> "<summary>"`, not with `gh issue create` directly and not by editing files under the plugin cache (those edits are transient and are overwritten on the next `th:update`). The skill builds the correct issue pattern (Summary, Environment with `th`/Claude Code/OS versions), de-duplicates against open issues, and requires confirmation before creating; a manual `gh issue create` skips that pattern and the dedup check.
 <!-- orchestrator-dispatch-rule:end -->
+
+### 4d. Write dev-mode block
+
+Read the canonical block from `managed-blocks/dev-mode.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/dev-mode.md`).
+
+Read `~/.claude/CLAUDE.md`. Apply idempotently: if both the start and end markers of the dev-mode block are present, replace the content between those markers (inclusive) with the canonical block. Otherwise append the block at the end of the file.
+
+The canonical block (source of truth in `managed-blocks/dev-mode.md`):
+
+<!-- dev-mode:start -->
+## dev mode
+
+**What it is:** An opt-in session mode where the top-level agent adopts the orchestrator role and dispatches leaf agents directly via Task — no nested subagent, no dispatch_handoff round-trip. Normal mode (general assistant) is the default; developer mode is the precondition for the orchestrated pipeline.
+
+**Start it (in-session, no reload):** run `/dev-mode`. The skill starts developer mode in the current session immediately — it writes the marker `~/.claude/.dev-mode-active` (`dev_mode: true`), prints the DEVELOPER MODE banner, and adopts the orchestrator operating contract. No `/clear` is required.
+
+**Auto-resume on new sessions:** while the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) loads the disposition into context at the start of every new session, so each chat opens in developer mode and shows the banner on its first reply. The marker is the single source of truth. The determination is loaded silently — the agent never narrates it or re-inspects the marker.
+
+**Stop it:** run `/dev-mode off`. The skill removes the marker (`dev-guard.sh` intercepts the removal with `permissionDecision: "ask"` — the operator confirms) and returns to normal mode; new sessions then open in normal mode.
+
+**Persistent alternative (optional):** the `developer-mode` output style — `/config` -> Output style -> `developer-mode` to enable, `/config` -> Output style -> Default to disable — replaces the built-in software engineering instructions with the orchestrator contract (`keep-coding-instructions: false`) and applies on reload. It is equivalent; the marker remains the observable flag either way.
+
+**What dev mode does:** development tasks route through the full pipeline (architect -> implementer -> tester + qa + security -> delivery) with all gates enforced. Outward actions (git push, gh pr merge/review/comment, GitHub API writes) require explicit operator approval via the deterministic gate `hooks/dev-guard.sh`. Security floors are non-waivable — dev mode is a disposition signal, not a stage-switch. Full contract: `docs/dev-mode.md`.
+
+**What dev mode does NOT do:** it does not skip stages, waive gates, or relax security checks. Ambiguous tasks are routed to the pipeline or confirmed — never handled inline without gates. Outward actions cannot be executed inline by rationalisation — the gate escalates them to operator approval.
+<!-- dev-mode:end -->
+
+### 4e. Copy the developer-mode output style and the /dev-mode skill
+
+Both files are copied idempotently from the plugin cache (`~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/`), overwriting any existing version. Create the target directories if absent.
+
+1. **Output style** (the disposition): `output-styles/developer-mode.md` -> `~/.claude/output-styles/developer-mode.md`.
+2. **`/dev-mode` skill** (the toggle): `skills/dev-mode/SKILL.md` -> `~/.claude/skills/dev-mode/SKILL.md`. This is a USER-LEVEL skill so the bare `/dev-mode` command is available (plugin skills are namespaced; a bare command requires a user-level skill).
+
+**Activation is opt-in (NOT forced); the toggle is the `/dev-mode` skill, not the `/config` menu.** After copying, tell the operator:
+
+`Developer mode installed. To enter it: run /dev-mode, then /clear (or a new session). To exit: /dev-mode off, then /clear. (The /clear is required because the output style replaces the system prompt and applies on reload.)`
+
+`/dev-mode` writes `outputStyle: developer-mode` to settings + the marker `~/.claude/.dev-mode-active`; `/dev-mode off` reverses both. The `/config` -> Output style menu remains an equivalent manual path.
+
+**The `developer-mode` output style is NOT force-installed** (`force-for-plugin` is false). Normal mode remains the default.
 
 ### 4b. Write nested-dispatch-takeover rule
 

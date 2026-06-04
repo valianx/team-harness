@@ -13401,6 +13401,592 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 59 — dev-mode top-level orchestrator (PR-1, v2.53.0)
+# Mechanism: output-style (replaces base) + deterministic outward-action gate
+# ---------------------------------------------------------------------------
+print("=== Suite 59: dev-mode-top-level-orchestrator (v2.53.0) ===")
+
+_S59_STOP_SECTION = ("\n### ", "\n## ", "\n---\n")
+_S59_STOP_H2 = ("\n## ", "\n---\n")
+_S59_STOP_H3 = ("\n### ", "\n## ", "\n---\n")
+
+# Output-style path (new mechanism — replaces skill)
+_s59_style_path = REPO_ROOT / "output-styles" / "developer-mode.md"
+_s59_style = _s59_style_path.read_text(encoding="utf-8") if _s59_style_path.exists() else ""
+
+_s59_mb_dispatch = (SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md").read_text(encoding="utf-8") if (SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md").exists() else ""
+_s59_mb_devmode = (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").read_text(encoding="utf-8") if (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").exists() else ""
+
+_s59_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s59_update = read(SKILLS_DIR / "update" / "SKILL.md")
+_s59_go_global = read(REPO_ROOT / "cmd" / "install" / "global_claude_md.go")
+_s59_claude = read(REPO_ROOT / "CLAUDE.md")
+_s59_docs_devmode = read(REPO_ROOT / "docs" / "dev-mode.md") if (REPO_ROOT / "docs" / "dev-mode.md").exists() else ""
+_s59_docs_subagent = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s59_docs_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
+_s59_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
+
+# ---- slices ----------------------------------------------------------------
+
+_S59_STYLE_ANTI_RUSHING_ANCHOR = "## ANTI-RUSHING CONTRACT"
+_S59_STYLE_ROLE_ADOPT_ANCHOR = "## Role adoption"
+_S59_DOCS_DEVMODE_INVARIANT_ANCHOR = "## Security Floor Non-Waivability"
+_S59_DOCS_DEVMODE_TRIAGE_ANCHOR = "## Triage Safety-Bias"
+_S59_CLAUDE_S14_ANCHOR = "## 14. Subagent Orchestration"
+_S59_SUBAGENT_DEV_ANCHOR = "## Dev Mode — Primary Path"
+_S59_CHECKPOINT_DEV_ANCHOR = "### Dev mode — Layer-1 hook"
+
+_s59_style_antirush_slice = _slice_section(_s59_style, _S59_STYLE_ANTI_RUSHING_ANCHOR, _S59_STOP_H2)
+_s59_style_role_slice = _slice_section(_s59_style, _S59_STYLE_ROLE_ADOPT_ANCHOR, _S59_STOP_H2)
+_s59_docs_invariant_slice = _slice_section(_s59_docs_devmode, _S59_DOCS_DEVMODE_INVARIANT_ANCHOR, _S59_STOP_H2)
+_s59_docs_triage_slice = _slice_section(_s59_docs_devmode, _S59_DOCS_DEVMODE_TRIAGE_ANCHOR, _S59_STOP_H2)
+_s59_claude_s14_slice = _slice_section(_s59_claude, _S59_CLAUDE_S14_ANCHOR, _S59_STOP_H2)
+_s59_subagent_devmode_slice = _slice_section(_s59_docs_subagent, _S59_SUBAGENT_DEV_ANCHOR, _S59_STOP_H2)
+_s59_checkpoint_devmode_slice = _slice_section(_s59_docs_checkpoint, _S59_CHECKPOINT_DEV_ANCHOR, _S59_STOP_H3)
+
+# ---------------------------------------------------------------------------
+# AC-2 — output-style exists + frontmatter + banner + observable flag + no force-for-plugin
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(output-style-exists): output-styles/developer-mode.md exists",
+    _s59_style_path.exists(),
+    "Create output-styles/developer-mode.md — the disposition mechanism (replaces the base built-in SWE instructions)",
+)
+check(
+    "dev-mode(output-style-name-frontmatter): developer-mode.md frontmatter has name: developer-mode",
+    "name: developer-mode" in _s59_style,
+    "output-styles/developer-mode.md frontmatter must declare name: developer-mode",
+)
+check(
+    "dev-mode(output-style-keep-coding-instructions): developer-mode.md frontmatter has keep-coding-instructions: false",
+    "keep-coding-instructions: false" in _s59_style,
+    "output-styles/developer-mode.md must declare keep-coding-instructions: false (replaces, not layers, the SWE base)",
+)
+check(
+    "dev-mode(output-style-no-force-for-plugin): developer-mode.md does NOT set force-for-plugin: true",
+    "force-for-plugin: true" not in _s59_style,
+    "output-styles/developer-mode.md must NOT set force-for-plugin: true (opt-in, normal is default, SEC-DR-4)",
+)
+check(
+    "dev-mode(banner-wordmark): developer-mode.md contains team-harness ASCII wordmark (block chars)",
+    "█" in _s59_style,
+    "output-styles/developer-mode.md must include the ANSI Shadow block-letter wordmark",
+)
+check(
+    "dev-mode(banner-orbital): developer-mode.md contains the orbital decoration lines",
+    ". . . . . . ." in _s59_style and "O" in _s59_style,
+    "output-styles/developer-mode.md must include the orbital decoration (. . . . . . . / O hub dot)",
+)
+check(
+    "dev-mode(banner-developer-mode-active): developer-mode.md contains 'DEVELOPER MODE ACTIVE'",
+    "DEVELOPER MODE ACTIVE" in _s59_style,
+    "output-styles/developer-mode.md must contain 'DEVELOPER MODE ACTIVE' as the mode indicator line",
+)
+check(
+    "dev-mode(observable-flag): developer-mode.md references the .dev-mode-active filesystem marker",
+    ".dev-mode-active" in _s59_style,
+    "output-styles/developer-mode.md must reference ~/.claude/.dev-mode-active as the observable session flag",
+)
+
+# ---------------------------------------------------------------------------
+# AC-4 / AC-11 — fail-closed triage invariant (SEC-DR-1) in output-style
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(triage-invariant-en): developer-mode.md anti-rushing block contains fail-closed triage invariant (EN form)",
+    bool(_s59_style_antirush_slice)
+    and "NEVER treat ambiguity as a license to handle the task inline without gates" in _s59_style_antirush_slice,
+    "output-styles/developer-mode.md must contain the literal fail-closed triage invariant (EN): "
+    "'NEVER treat ambiguity as a license to handle the task inline without gates'",
+)
+check(
+    "dev-mode(triage-invariant-es): developer-mode.md anti-rushing block contains fail-closed triage invariant (ES form)",
+    bool(_s59_style_antirush_slice)
+    and "NUNCA tratar la ambig" in _s59_style_antirush_slice,
+    "output-styles/developer-mode.md must contain the literal ES form: "
+    "'NUNCA tratar la ambigüedad como licencia para manejar la tarea inline sin gates'",
+)
+
+# ---------------------------------------------------------------------------
+# AC-4 / AC-10 — HI-2 non-waivability (SEC-DR-3) in docs/dev-mode.md
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(hi2-docs-nonwaivable): docs/dev-mode.md declares HI-2-equivalent non-waivability invariant",
+    bool(_s59_docs_invariant_slice)
+    and "HI-2" in _s59_docs_invariant_slice
+    and (
+        "never" in _s59_docs_invariant_slice.lower()
+        or "non-waivable" in _s59_docs_invariant_slice.lower()
+        or "NOT waivable" in _s59_docs_invariant_slice
+    ),
+    "docs/dev-mode.md Security Floor Non-Waivability section must reference HI-2 and state non-waivability",
+)
+check(
+    "dev-mode(hi2-docs-no-security-field): docs/dev-mode.md states dev mode NEVER writes security_sensitive",
+    bool(_s59_docs_invariant_slice)
+    and "security_sensitive" in _s59_docs_invariant_slice
+    and (
+        "NEVER" in _s59_docs_invariant_slice
+        or "never" in _s59_docs_invariant_slice
+    ),
+    "docs/dev-mode.md must state dev mode NEVER writes security_sensitive",
+)
+
+# ---------------------------------------------------------------------------
+# AC-11 — no normative duplication (pointer-only) in output-style role-adoption
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(no-duplication-orchestrator): developer-mode.md role-adoption section references agents/orchestrator.md by pointer",
+    bool(_s59_style_role_slice)
+    and "agents/orchestrator.md" in _s59_style_role_slice,
+    "output-styles/developer-mode.md role-adoption must reference agents/orchestrator.md by pointer, not duplicate content",
+)
+check(
+    "dev-mode(no-duplication-discover): developer-mode.md role-adoption section references docs/discover-phase.md by pointer",
+    bool(_s59_style_role_slice)
+    and "docs/discover-phase.md" in _s59_style_role_slice,
+    "output-styles/developer-mode.md role-adoption must reference docs/discover-phase.md by pointer",
+)
+check(
+    "dev-mode(no-duplication-checkpoint): developer-mode.md role-adoption section references docs/reasoning-checkpoint.md by pointer",
+    bool(_s59_style_role_slice)
+    and "docs/reasoning-checkpoint.md" in _s59_style_role_slice,
+    "output-styles/developer-mode.md role-adoption must reference docs/reasoning-checkpoint.md by pointer",
+)
+
+# ---------------------------------------------------------------------------
+# AC-9 — byte-identical 3-mirror check for orchestrator-dispatch-rule
+# The canonical .md is the reference. Compare against setup embedded copy and Go const.
+# ---------------------------------------------------------------------------
+
+# Extract the block content from setup/SKILL.md (between markers, inclusive)
+_S59_ODR_START = "<!-- orchestrator-dispatch-rule:start -->"
+_S59_ODR_END = "<!-- orchestrator-dispatch-rule:end -->"
+
+def _extract_between_markers(text: str, start: str, end: str) -> str:
+    """Return text from start marker to end marker inclusive, or '' if not found."""
+    si = text.find(start)
+    if si == -1:
+        return ""
+    ei = text.find(end, si)
+    if ei == -1:
+        return ""
+    return text[si : ei + len(end)]
+
+_s59_canonical_block = _extract_between_markers(_s59_mb_dispatch, _S59_ODR_START, _S59_ODR_END)
+_s59_setup_block = _extract_between_markers(_s59_setup, _S59_ODR_START, _S59_ODR_END)
+
+# Extract Go const value between backtick delimiters for orchestratorRule
+_s59_go_const_match = re.search(
+    r'const orchestratorRule = `(.*?)`',
+    _s59_go_global,
+    re.DOTALL,
+)
+_s59_go_block = _s59_go_const_match.group(1).strip() if _s59_go_const_match else ""
+
+# The Go const uses Go string concatenation (` + ` joins), so we can't do a raw
+# byte comparison. Instead verify the key discriminant phrase (the revised inline-permit
+# text anchored to "developer-mode output style") is present in the Go const.
+_S59_INLINE_PERMIT_PHRASE = "PERMITTED ONLY when the developer-mode output style is active"
+
+check(
+    "dev-mode(mirror-canonical-nonempty): orchestrator-dispatch-rule canonical .md block is non-empty",
+    bool(_s59_canonical_block),
+    "skills/setup/managed-blocks/orchestrator-dispatch-rule.md must contain the start/end markers and content",
+)
+check(
+    "dev-mode(mirror-setup-nonempty): orchestrator-dispatch-rule embedded in setup/SKILL.md is non-empty",
+    bool(_s59_setup_block),
+    "skills/setup/SKILL.md must contain the orchestrator-dispatch-rule block between its markers",
+)
+check(
+    "dev-mode(mirror-canonical-inline-permit): canonical .md contains the inline-permit phrase",
+    _S59_INLINE_PERMIT_PHRASE in _s59_canonical_block,
+    f"skills/setup/managed-blocks/orchestrator-dispatch-rule.md must contain: '{_S59_INLINE_PERMIT_PHRASE}'",
+)
+check(
+    "dev-mode(mirror-setup-inline-permit): setup/SKILL.md embedded block contains the inline-permit phrase",
+    _S59_INLINE_PERMIT_PHRASE in _s59_setup_block,
+    f"skills/setup/SKILL.md embedded orchestrator-dispatch-rule must contain: '{_S59_INLINE_PERMIT_PHRASE}'",
+)
+check(
+    "dev-mode(mirror-go-inline-permit): Go const orchestratorRule contains the inline-permit phrase",
+    _S59_INLINE_PERMIT_PHRASE in _s59_go_global,
+    f"cmd/install/global_claude_md.go orchestratorRule const must contain: '{_S59_INLINE_PERMIT_PHRASE}'",
+)
+check(
+    "dev-mode(mirror-canonical-fallback): canonical .md declares FALLBACK pointer to subagent-orchestration.md",
+    "FALLBACK" in _s59_canonical_block
+    and "docs/subagent-orchestration.md" in _s59_canonical_block,
+    "orchestrator-dispatch-rule canonical .md must mark docs/subagent-orchestration.md as FALLBACK",
+)
+check(
+    "dev-mode(mirror-setup-fallback): setup/SKILL.md block declares FALLBACK pointer",
+    "FALLBACK" in _s59_setup_block
+    and "docs/subagent-orchestration.md" in _s59_setup_block,
+    "orchestrator-dispatch-rule in setup/SKILL.md must declare FALLBACK",
+)
+check(
+    "dev-mode(mirror-go-fallback): Go const orchestratorRule declares FALLBACK pointer",
+    "FALLBACK" in _s59_go_global
+    and "subagent-orchestration.md" in _s59_go_global,
+    "Go const orchestratorRule must declare FALLBACK to docs/subagent-orchestration.md",
+)
+check(
+    "dev-mode(mirrors-byte-identical-canonical-vs-setup): canonical .md block == setup/SKILL.md block",
+    bool(_s59_canonical_block)
+    and bool(_s59_setup_block)
+    and _s59_canonical_block == _s59_setup_block,
+    "orchestrator-dispatch-rule canonical .md and setup/SKILL.md embedded copy must be byte-identical",
+)
+
+# ---------------------------------------------------------------------------
+# AC-9 — §14 prose anchored to observable flag (SEC-DR-2) in CLAUDE.md and mirrors
+# ---------------------------------------------------------------------------
+
+_S59_OBSERVABLE_PHRASE = "dev_mode: true"
+_S59_AD_HOC_PHRASE = "ad-hoc improvisation"
+
+check(
+    "dev-mode(claude-s14-observable-flag): CLAUDE.md §14 anchors inline permit to observable flag dev_mode: true",
+    bool(_s59_claude_s14_slice)
+    and _S59_OBSERVABLE_PHRASE in _s59_claude_s14_slice,
+    "CLAUDE.md §14 must anchor inline orchestration permit to the observable flag 'dev_mode: true'",
+)
+check(
+    "dev-mode(claude-s14-prohibited-adhoc): CLAUDE.md §14 prohibits inline without the flag",
+    bool(_s59_claude_s14_slice)
+    and _S59_AD_HOC_PHRASE in _s59_claude_s14_slice,
+    "CLAUDE.md §14 must use the phrase 'ad-hoc improvisation' for the prohibited case",
+)
+check(
+    "dev-mode(claude-s14-fallback): CLAUDE.md §14 marks nested-handoff/takeover as FALLBACK",
+    bool(_s59_claude_s14_slice)
+    and "FALLBACK" in _s59_claude_s14_slice,
+    "CLAUDE.md §14 must label the nested-handoff/takeover as FALLBACK",
+)
+check(
+    "dev-mode(canonical-observable-flag): orchestrator-dispatch-rule canonical .md contains dev_mode: true",
+    _S59_OBSERVABLE_PHRASE in _s59_canonical_block,
+    "orchestrator-dispatch-rule canonical .md must declare 'dev_mode: true' as the observable flag",
+)
+check(
+    "dev-mode(canonical-ad-hoc): orchestrator-dispatch-rule canonical .md contains ad-hoc improvisation phrase",
+    _S59_AD_HOC_PHRASE in _s59_canonical_block,
+    "orchestrator-dispatch-rule canonical .md must name the prohibited case as 'ad-hoc improvisation'",
+)
+
+# ---------------------------------------------------------------------------
+# AC-13 — dev-mode managed block (operator-facing directive) — markers + content
+# The dev-mode-entry block is NOT distributed (obsolete skill trigger-phrase mechanism).
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(devmode-block-exists): skills/setup/managed-blocks/dev-mode.md exists",
+    (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").exists(),
+    "Create skills/setup/managed-blocks/dev-mode.md",
+)
+check(
+    "dev-mode(devmode-block-start-marker): dev-mode.md has start marker <!-- dev-mode:start -->",
+    "<!-- dev-mode:start -->" in _s59_mb_devmode,
+    "dev-mode.md must contain the start marker <!-- dev-mode:start -->",
+)
+check(
+    "dev-mode(devmode-block-end-marker): dev-mode.md has end marker <!-- dev-mode:end -->",
+    "<!-- dev-mode:end -->" in _s59_mb_devmode,
+    "dev-mode.md must contain the end marker <!-- dev-mode:end -->",
+)
+check(
+    "dev-mode(devmode-block-how-to-activate): dev-mode.md documents developer-mode output style activation",
+    "developer-mode" in _s59_mb_devmode,
+    "dev-mode.md must document how to activate via the developer-mode output style (not /dev-mode skill)",
+)
+check(
+    "dev-mode(devmode-block-deactivation): dev-mode.md documents deactivation via Default output style",
+    "Default" in _s59_mb_devmode
+    or "rm ~/.claude/.dev-mode-active" in _s59_mb_devmode,
+    "dev-mode.md must document how to deactivate (Default output style or delete marker)",
+)
+check(
+    "dev-mode(devmode-entry-block-not-distributed): skills/setup/managed-blocks/dev-mode-entry.md does NOT exist",
+    not (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode-entry.md").exists(),
+    "skills/setup/managed-blocks/dev-mode-entry.md must NOT exist (obsolete skill trigger-phrase, dropped in v2.53.0)",
+)
+check(
+    "dev-mode(setup-installs-devmode-block): setup/SKILL.md wires dev-mode managed block",
+    "<!-- dev-mode:start -->" in _s59_setup,
+    "skills/setup/SKILL.md must install the dev-mode managed block",
+)
+check(
+    "dev-mode(setup-installs-output-style): setup/SKILL.md copies output-styles/developer-mode.md to ~/.claude/output-styles/",
+    "output-styles/developer-mode.md" in _s59_setup
+    and ("output-styles" in _s59_setup),
+    "skills/setup/SKILL.md must include a step that copies output-styles/developer-mode.md to ~/.claude/output-styles/",
+)
+check(
+    "dev-mode(setup-no-entry-block): setup/SKILL.md does NOT wire dev-mode-entry block",
+    "<!-- dev-mode-entry:start -->" not in _s59_setup,
+    "skills/setup/SKILL.md must NOT install the obsolete dev-mode-entry managed block (dropped in v2.53.0)",
+)
+check(
+    "dev-mode(update-syncs-devmode-block): update/SKILL.md syncs dev-mode block",
+    "dev-mode" in _s59_update
+    and "<!-- dev-mode:start -->" in _s59_update,
+    "skills/update/SKILL.md must sync the dev-mode managed block",
+)
+check(
+    "dev-mode(update-syncs-output-style): update/SKILL.md syncs developer-mode output style",
+    "output-styles/developer-mode.md" in _s59_update
+    and "output-styles" in _s59_update,
+    "skills/update/SKILL.md must re-copy output-styles/developer-mode.md on update",
+)
+check(
+    "dev-mode(update-removes-entry-block): update/SKILL.md removes obsolete dev-mode-entry block if present",
+    "dev-mode-entry" in _s59_update,
+    "skills/update/SKILL.md must remove the obsolete dev-mode-entry block from ~/.claude/CLAUDE.md if present",
+)
+check(
+    "dev-mode(go-devmode-block): global_claude_md.go has devModeBlock const",
+    "devModeBlock" in _s59_go_global
+    and "<!-- dev-mode:start -->" in _s59_go_global,
+    "cmd/install/global_claude_md.go must define devModeBlock const with dev-mode markers",
+)
+check(
+    "dev-mode(go-removes-entry-block): global_claude_md.go calls removeManagedBlock for obsolete dev-mode-entry",
+    "removeManagedBlock" in _s59_go_global
+    and "devModeEntryMarker" in _s59_go_global,
+    "cmd/install/global_claude_md.go must call removeManagedBlock() to remove the obsolete dev-mode-entry block",
+)
+_s59_skill_path = SKILLS_DIR / "dev-mode" / "SKILL.md"
+_s59_skill = read(_s59_skill_path) if _s59_skill_path.exists() else ""
+check(
+    "dev-mode(skill-exists): skills/dev-mode/SKILL.md exists (the /dev-mode in-session activator)",
+    _s59_skill_path.exists(),
+    "Create skills/dev-mode/SKILL.md — the user-level /dev-mode skill that starts developer mode in the current session",
+)
+check(
+    "dev-mode(skill-frontmatter): /dev-mode skill declares name: dev-mode + disable-model-invocation: true",
+    "name: dev-mode" in _s59_skill and "disable-model-invocation: true" in _s59_skill,
+    "skills/dev-mode/SKILL.md frontmatter must declare name: dev-mode and disable-model-invocation: true (explicit operator opt-in)",
+)
+check(
+    "dev-mode(skill-starts-in-session): /dev-mode skill starts dev mode in-session — writes the marker, prints the banner, adopts the orchestrator role (no outputStyle config, no /clear)",
+    ".dev-mode-active" in _s59_skill
+    and "DEVELOPER MODE ACTIVE" in _s59_skill
+    and "orchestrator" in _s59_skill,
+    "skills/dev-mode/SKILL.md must start developer mode in the current session: write/remove the ~/.claude/.dev-mode-active marker, print the DEVELOPER MODE ACTIVE banner, and adopt the orchestrator role — it does NOT configure the outputStyle setting (that is the /config output-style path, not the skill's job)",
+)
+
+# AC — SessionStart hook: auto-load dev mode at session start, silently.
+_s59_ss_hook_path = HOOKS_DIR / "dev-mode-session-start.sh"
+_s59_ss_hook = read(_s59_ss_hook_path) if _s59_ss_hook_path.exists() else ""
+check(
+    "dev-mode(sessionstart-hook-exists): hooks/dev-mode-session-start.sh exists",
+    _s59_ss_hook_path.exists(),
+    "Create hooks/dev-mode-session-start.sh — the SessionStart hook that loads dev mode into context at session start when the marker is present",
+)
+check(
+    "dev-mode(sessionstart-hook-marker-gated): hook gates on .dev-mode-active (dev_mode: true) — inert in normal mode",
+    ".dev-mode-active" in _s59_ss_hook and "dev_mode: true" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh must gate on the ~/.claude/.dev-mode-active marker so it injects nothing in normal mode",
+)
+check(
+    "dev-mode(sessionstart-hook-injects-context): hook emits SessionStart additionalContext",
+    "additionalContext" in _s59_ss_hook and "SessionStart" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh must emit hookSpecificOutput.additionalContext for the SessionStart event",
+)
+check(
+    "dev-mode(sessionstart-hook-silent): injected context forbids narrating the determination and re-inspecting the marker",
+    "SILENT" in _s59_ss_hook and "re-verify" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh injected context must instruct the agent to keep the dev-mode determination SILENT and never re-verify the marker mid-session",
+)
+check(
+    "dev-mode(sessionstart-hook-systemmessage): hook emits an instant app-rendered systemMessage banner",
+    "systemMessage" in _s59_ss_hook and "DEVELOPER MODE ACTIVE" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh must emit a systemMessage carrying the DEVELOPER MODE banner — app-rendered and instant — instead of instructing the model to render slow ASCII art",
+)
+check(
+    "dev-mode(sessionstart-hook-no-model-banner): injected context tells the model NOT to print a banner itself",
+    "do NOT print any banner" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh additionalContext must instruct the model not to render its own banner (the systemMessage already shows it)",
+)
+for _os_key in ("windows", "macos", "linux"):
+    _ss = cfg.get(_os_key, {}).get("hooks", {}).get("SessionStart", [])
+    _ss_cmd = (_ss[0].get("hooks", [{}])[0]).get("command", "") if _ss else ""
+    _ss_matcher = _ss[0].get("matcher", "") if _ss else ""
+    check(
+        f"dev-mode(sessionstart-wired-{_os_key}): config.json[{_os_key}] wires SessionStart -> dev-mode-session-start.sh",
+        len(_ss) > 0 and "dev-mode-session-start.sh" in _ss_cmd,
+        f"hooks/config.json[{_os_key}] must wire a SessionStart hook invoking dev-mode-session-start.sh",
+    )
+    check(
+        f"dev-mode(sessionstart-matcher-{_os_key}): config.json[{_os_key}] SessionStart entry declares a 'startup' matcher",
+        "startup" in _ss_matcher,
+        f"hooks/config.json[{_os_key}] SessionStart entry MUST declare a matcher (e.g. 'startup|resume|clear') — a SessionStart entry without a matcher is silently ignored by Claude Code",
+    )
+
+# ---------------------------------------------------------------------------
+# AC-8 / AC-13 — docs/dev-mode.md: gate + disposition mechanism + reconciliation
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(docs-devmode-exists): docs/dev-mode.md exists",
+    (REPO_ROOT / "docs" / "dev-mode.md").exists(),
+    "Create docs/dev-mode.md",
+)
+check(
+    "dev-mode(docs-devmode-disposition-mechanism): docs/dev-mode.md documents output-style as disposition mechanism",
+    "output-style" in _s59_docs_devmode.lower()
+    and "replac" in _s59_docs_devmode.lower(),
+    "docs/dev-mode.md must document the output-style as the disposition mechanism that replaces the base",
+)
+check(
+    "dev-mode(docs-devmode-no-force-for-plugin): docs/dev-mode.md states force-for-plugin is NOT adopted",
+    "force-for-plugin" in _s59_docs_devmode
+    and (
+        "NOT" in _s59_docs_devmode
+        or "not" in _s59_docs_devmode
+    ),
+    "docs/dev-mode.md must state that force-for-plugin is not adopted",
+)
+check(
+    "dev-mode(docs-devmode-outward-action-gate): docs/dev-mode.md documents the Outward-Action Gate section",
+    "Outward-Action Gate" in _s59_docs_devmode
+    or "outward-action gate" in _s59_docs_devmode.lower(),
+    "docs/dev-mode.md must contain an Outward-Action Gate section (dev-guard.sh contract)",
+)
+check(
+    "dev-mode(docs-devmode-reconciliation-251-252): docs/dev-mode.md reconciles with #251/#252 publish-gate",
+    "#251" in _s59_docs_devmode
+    or "#252" in _s59_docs_devmode
+    or "Publish Gate" in _s59_docs_devmode,
+    "docs/dev-mode.md must reconcile with the review-mode publish gates (#251/#252)",
+)
+check(
+    "dev-mode(subagent-fallback-reframe): docs/subagent-orchestration.md intro reframes takeover as FALLBACK",
+    "FALLBACK" in _s59_docs_subagent
+    and (
+        "## Nested-Context Dispatch — FALLBACK" in _s59_docs_subagent
+        or "nested-handoff/takeover" in _s59_docs_subagent.lower()
+    ),
+    "docs/subagent-orchestration.md must label nested-handoff/takeover as FALLBACK (not primary path)",
+)
+check(
+    "dev-mode(checkpoint-layer1-promotion): docs/reasoning-checkpoint.md documents Layer-1 hook promotion in dev mode",
+    bool(_s59_checkpoint_devmode_slice)
+    and "dev mode" in _s59_checkpoint_devmode_slice.lower()
+    and "Layer-1" in _s59_checkpoint_devmode_slice,
+    "docs/reasoning-checkpoint.md must document that dev mode promotes B1/B2/B3 to Layer-1 hook (deterministic floor)",
+)
+
+# ---------------------------------------------------------------------------
+# AC-18 (SEC — prompt-independence reconciliation): docs/dev-mode.md declares that
+# keep-coding-instructions: false discards SWE workflow guidance (not harm-rejection layer)
+# and that security floors are PreToolUse hooks wired by matcher (prompt-independent).
+# ---------------------------------------------------------------------------
+
+check(
+    "dev-mode(ac18-discards-swe-workflow): docs/dev-mode.md declares keep-coding-instructions:false discards SWE workflow",
+    "keep-coding-instructions: false" in _s59_docs_devmode
+    and (
+        "workflow" in _s59_docs_devmode.lower()
+        or "scope" in _s59_docs_devmode.lower()
+    ),
+    "docs/dev-mode.md must declare that keep-coding-instructions: false discards SWE workflow guidance "
+    "(scope/comments/verify), NOT the model's harm-rejection layer",
+)
+check(
+    "dev-mode(ac18-security-floors-prompt-independent): docs/dev-mode.md declares security floors are prompt-independent hooks",
+    (
+        "prompt-independent" in _s59_docs_devmode.lower()
+        or "prompt independent" in _s59_docs_devmode.lower()
+        or "wired by matcher" in _s59_docs_devmode.lower()
+    )
+    and "PreToolUse" in _s59_docs_devmode,
+    "docs/dev-mode.md must declare that security floors (policy-block.sh, dev-guard.sh, checkpoint-guard.sh) "
+    "are PreToolUse hooks wired by matcher — prompt-independent — and survive the base-prompt replacement intact",
+)
+
+# ---------------------------------------------------------------------------
+# AC-14 — version bump at all 5 sites + CHANGELOG entries + knowledge.md
+# ---------------------------------------------------------------------------
+
+_s59_plugin_json = json.loads((REPO_ROOT / ".claude-plugin" / "plugin.json").read_text())
+_s59_marketplace = json.loads((REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text())
+_s59_main_go = read(REPO_ROOT / "cmd" / "install" / "main.go")
+_s59_changelog = read(REPO_ROOT / "CHANGELOG.md")
+
+_S59_EXPECTED_VERSION = "2.53.0"
+
+check(
+    "dev-mode(version-plugin-json): .claude-plugin/plugin.json version == 2.53.0",
+    _s59_plugin_json.get("version") == _S59_EXPECTED_VERSION,
+    f"plugin.json version must be {_S59_EXPECTED_VERSION}",
+)
+check(
+    "dev-mode(version-marketplace-json): .claude-plugin/marketplace.json plugins[0].version == 2.53.0",
+    _s59_marketplace.get("plugins", [{}])[0].get("version") == _S59_EXPECTED_VERSION,
+    f"marketplace.json plugins[0].version must be {_S59_EXPECTED_VERSION}",
+)
+check(
+    "dev-mode(version-main-go): cmd/install/main.go var version == 2.53.0",
+    f'var version = "{_S59_EXPECTED_VERSION}"' in _s59_main_go,
+    f"cmd/install/main.go must declare var version = \"{_S59_EXPECTED_VERSION}\"",
+)
+check(
+    "dev-mode(version-claude-md): CLAUDE.md §3 Current version == 2.53.0",
+    _S59_EXPECTED_VERSION in _s59_claude
+    and "Current version" in _s59_claude,
+    f"CLAUDE.md §3 must declare Current version: {_S59_EXPECTED_VERSION}",
+)
+check(
+    "dev-mode(version-changelog): CHANGELOG.md has ## [2.53.0] release section",
+    f"## [{_S59_EXPECTED_VERSION}]" in _s59_changelog,
+    f"CHANGELOG.md must have a ## [{_S59_EXPECTED_VERSION}] release section",
+)
+check(
+    "dev-mode(changelog-added-entry): CHANGELOG.md [2.53.0] has Added/Changed entry for dev-mode output-style",
+    f"## [{_S59_EXPECTED_VERSION}]" in _s59_changelog
+    and (
+        "developer-mode" in _s59_changelog.lower()
+        or "output-style" in _s59_changelog.lower()
+        or "DEVELOPER MODE ACTIVE" in _s59_changelog
+    ),
+    "CHANGELOG.md [2.53.0] must have an entry for the developer-mode output-style feature",
+)
+check(
+    "dev-mode(knowledge-updated): docs/knowledge.md has updated [decision] for dev mode inline permit",
+    "dev mode" in _s59_knowledge.lower()
+    and (
+        "inline permit gated on observable" in _s59_knowledge.lower()
+        or "output-style" in _s59_knowledge.lower()
+    ),
+    "docs/knowledge.md must have an updated [decision] entry for dev mode inline permit (output-style mechanism)",
+)
+check(
+    "dev-mode(knowledge-output-style-replaces): docs/knowledge.md has [decision] that output-style replaces base",
+    "output-style" in _s59_knowledge.lower()
+    and (
+        "replac" in _s59_knowledge.lower()
+        or "v2.53.0" in _s59_knowledge
+    ),
+    "docs/knowledge.md must have a [decision] entry: dev mode disposition via output-style replaces the base (v2.53.0 lesson)",
+)
+
+# ---------------------------------------------------------------------------
+# Summary check for Suite 59 — dev-mode-top-level-orchestrator marker
+# (anti-false-green: the anchor must be present for the slice to have worked)
+# ---------------------------------------------------------------------------
+check(
+    "dev-mode(suite59-anchor): dev-mode-top-level-orchestrator suite-marker present in test file",
+    "dev-mode-top-level-orchestrator" in (REPO_ROOT / "tests" / "test_agent_structure.py").read_text(encoding="utf-8"),
+    "Suite 59 must contain the 'dev-mode-top-level-orchestrator' marker string (anti-false-green)",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
