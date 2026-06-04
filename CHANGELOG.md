@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/roadmap.md` is now the single roadmap for the whole project: added a *Decision pending* item for test-first authoring + mutation-scored test strength (verdict adopt-partial, opt-in for logic-bearing repos), an *Internal hardening* item for batch-economy PR consolidation (#249), and a *Horizon* section for the runtime-independent harness (v2 direction).
+
 ### Added
 
 - `orchestrator-dispatch-rule` managed block — new **Default to team-harness flows** directive: the top-level agent routes development tasks through the orchestrator or a `th` skill by default; direct/manual handling requires an explicit operator opt-out. (#242)

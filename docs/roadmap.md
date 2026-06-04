@@ -77,7 +77,7 @@ These four are native to the harness, carry no infrastructure assumptions, and h
 
 ---
 
-## Decision pending — the one genuine trade-off
+## Decision pending — genuine trade-offs
 
 ### Selective dual-model-family review on high-risk changes
 
@@ -88,6 +88,16 @@ These four are native to the harness, carry no infrastructure assumptions, and h
 **Why it is a decision and not a default.** A second reviewer on *every* change reintroduces exactly the cost and latency a recent optimization program worked to remove, and a dependency on external model CLIs the operator may not have installed. As a selective net for high-risk paths it enriches the decision genuinely; as a gate on everything it becomes expensive machinery the developer learns to ignore. The resolution is not technical — it is the team's call on how much high-risk cost a second perspective is worth. The roadmap frames the trade-off; it does not pre-decide it.
 
 **Form (team-harness-native, if adopted).** A conditional step triggered only by the existing high-risk signals (the security-sensitive flag, the critical bug-fix tier, breaking migrations). The external perspective receives the diff and returns text — never a write tool — and degrades gracefully with a note when no external CLI is present, following the harness's existing graceful-degradation pattern. The disagreement-escalates-to-the-human rule keeps the developer at the center.
+
+### Test-first authoring and mutation-scored test strength
+
+**What it is.** For changes that carry real logic, the acceptance criteria — already written and ratified before any code — would be materialized as failing tests first, with the implementer then writing code to turn them green; and after the suite passes, a mutation pass scoped to the changed lines would measure whether those tests actually detect faults rather than merely execute the code. The plan-side QA context specifies the behaviors to cover, the tester authors and runs both the tests and the mutation pass, and the acceptance QA context reads the mutation report and gates on it.
+
+**Why (enhances the collaboration).** When the author of the code is an agent, a test written before the code is an input contract that constrains what the agent may generate — and the evidence on test-guided generation is materially stronger than the modest, context-dependent benefit test-first shows for human authors. But a test that exists is not a test that catches anything, and an agent-written suite is exactly where weak, passing-but-undetecting tests accumulate. Mutation scoring is the only measure that tells the developer whether the safety net has holes, and it hands that signal to the same acceptance reviewer the developer already trusts to read a verdict rather than construct it.
+
+**Why it is a decision and not a default.** Test-first adds a round-trip before implementation, and a mutation pass adds real compute even scoped to the diff; neither earns its cost on documentation or asset work, where there is no logic to specify or mutate — and this repository is mostly such work. There is also an open design question the evidence surfaces but does not settle: triaging a surviving mutant — a genuine gap versus an equivalent mutant that can never be killed — is cognitively heavy, and the acceptance QA context that would own it runs on a lighter model than the plan-side context that owns the spec. The roadmap frames adoption as opt-in for logic-bearing repositories under a thorough-effort setting, with the mutation gate advisory rather than blocking by default; it does not pre-commit it as a global default.
+
+**Form (team-harness-native, if adopted).** Generalize the regression-test-authoring sub-phase the bug-fix flow already runs — the test written before the fix — to feature work, rather than inventing a new phase: the plan QA emits a test manifest from the acceptance criteria, the tester turns it red, the implementer turns it green, and the tester runs a changed-lines mutation pass whose report the acceptance QA interprets. The mutation threshold mirrors the established tooling default of advisory-not-blocking, with a hard gate reserved, opt-in, for the same high-risk paths the harness already floors. An A/B run on a real target repository with this harness's own models should precede making any of it a default — the supporting evidence is all external.
 
 ---
 
@@ -106,6 +116,26 @@ These are improvements to the harness's own pipeline, surfaced by running it on 
 **What it is.** A measured comparison of harness quality before and after the architect's effort setting was raised, to confirm the bet paid off rather than assuming it.
 
 **Why (enhances the collaboration).** A tuning change made without a measurement is exactly the blind improvement the scoreboard exists to end. This depends on the self-audit scoreboard (item 4 above) and is planned to follow it.
+
+### Consolidate small same-session changes into one pull request
+
+**What it is.** When several small, related changes are produced in a single session — work that touches only documentation, configuration, or agent and skill assets and ships together anyway — the plan would group them into one pull request with a commit per change, rather than one pull request per service. The append-only files every change touches, the changelog above all, would stop being a shared edit point that forces a conflict on every pull request after the first.
+
+**Why (protects the collaboration — the developer's time).** The plan-shape rule that gives each service its own pull request is right for production code, where independent revert and focused review earn their keep; applied to a batch of small asset changes shipped in one sitting it does the opposite — splitting one coherent piece of work into several pull requests that then collide on the changelog and cost the developer a round of conflict resolution per merge, for no review benefit. The harness learned this by running on itself: a six-issue batch became five pull requests that each had to resolve the same changelog conflict in turn.
+
+**Form (team-harness-native).** A batch-economy heuristic in the planning stage — when changes are small, asset-only, same-session, and would collide on shared append-only files, prefer one pull request with per-change commits — kept as a scoped exception to the one-per-service default, which stays in force for production-code services. The changelog-conflict class itself can be removed by design: either delivery writes a single consolidated entry at the end, or a changelog-fragment directory assembles at release. Tracked as issue #249.
+
+---
+
+## Horizon — the longer arc
+
+One direction sits beyond the next batch and is named here so the path is honest about where it leads, not because it is scheduled.
+
+### A runtime-independent harness
+
+**What it is.** Today the harness is a distribution of agents, skills, and hooks wired into one coding runtime. The longer arc is a version that abstracts over the runtime — so the same orchestrated team, the same pipeline and gates, the same way of working, are not bound to a single host.
+
+**Why (enhances the collaboration).** The vision is a way of working a team adopts together; binding it to one runtime limits who can join that team and on what tools. Abstracting the runtime widens the collaboration to wherever the developers already are, without asking them to standardize on one host to get the standardized way of working. This is a direction, not a committed plan — named so the roadmap does not pretend the present coupling is permanent.
 
 ---
 
@@ -129,9 +159,9 @@ The order follows one principle: protect the collaboration first, then enhance i
 
 1. **Guardrails first — protect the collaboration.** Pre-push secret scanning, then machine validation of the JSONL event stream. These are the deterministic floors that close the irreversible-mistake gaps the harness's own history shows hurt most. Lowest effort, no dependencies, no tension.
 2. **Then the collaboration-enhancing teammates and the scoreboard.** The specialized analyzer passes give the developer a higher-resolution teammate to consult; the self-audit scoreboard gives the developer and their agents a shared language for directing improvement. Both are native, and the scoreboard's value does not wait on accumulated history — the comparison data builds for free once it is in place.
-3. **Then the cost-sensitive item, by explicit decision.** Selective dual-model-family review on high-risk changes enriches the decision genuinely, but it touches the cost envelope a recent optimization program worked to protect. It is a deliberate per-change choice for the team to make, not a default the roadmap sets.
+3. **Then the cost-sensitive items, by explicit decision.** Selective dual-model-family review on high-risk changes, and test-first authoring with mutation-scored test strength, each enrich the decision genuinely but touch the cost envelope a recent optimization program worked to protect. Each is a deliberate, opt-in choice for the team to make — for high-risk paths, for logic-bearing repositories — not a default the roadmap sets.
 
-The internal-hardening items land alongside the batch as the harness's own pipeline reveals the need; the boundary items stay where they are. Every step on this path ties back to the same line: the developer more central, supported by agents that extend their reach, never one where they are engineered out.
+The internal-hardening items land alongside the batch as the harness's own pipeline reveals the need; the horizon item is the longer arc, named but not scheduled; the boundary items stay where they are. Every step on this path ties back to the same line: the developer more central, supported by agents that extend their reach, never one where they are engineered out.
 
 ---
 
