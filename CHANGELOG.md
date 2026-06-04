@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `docs/roadmap.md` is now the single roadmap for the whole project: added a *Decision pending* item for test-first authoring + mutation-scored test strength (verdict adopt-partial, opt-in for logic-bearing repos), an *Internal hardening* item for batch-economy PR consolidation (#249), and a *Horizon* section for the runtime-independent harness (v2 direction).
+- CLAUDE.md §6.3 — added a mandatory rule: any change touching distributed plugin assets (`agents/`, `skills/`, `hooks/`) MUST bump `.claude-plugin/plugin.json` + the `th` entry in `.claude-plugin/marketplace.json`, otherwise `claude plugin update` will not propagate the change to installed users.
 
 ### Added
 
