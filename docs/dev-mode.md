@@ -24,27 +24,19 @@ This distinction is load-bearing:
 
 **Conclusion:** `keep-coding-instructions: false` is safe for this harness because the security floors are hooks, not prompt. No security-relevant default lives exclusively in the discarded SWE instructions that the orchestrator contract + hooks do not re-establish.
 
-**Honest trade-off (accepted by the operator):** the output style is SESSION-LEVEL. It is read once at session start. Changing modes requires `/clear` or a new session — there is no clean mid-session toggle. The `/output-style` command was removed in Claude Code v2.1.91; activation is via `/config` → Output style, or the `outputStyle` field in a settings file. The trade is accepted: the base-replacement benefit (orchestrator contract as the governing set of instructions) outweighs the session-level toggle cost. Normal mode remains the default; the cost only applies to operators who deliberately enter dev mode.
+**Honest trade-off (accepted by the operator):** the output style is SESSION-LEVEL — read once at session start, so changing it requires `/clear` or a new session. The `/dev-mode` skill avoids that cost: it is the in-session toggle that loads the disposition and writes the marker immediately, with no reload. The output style remains the optional persistent path (strong base-replacement via `keep-coding-instructions: false`), applied on reload via `/config` → Output style. Either way the marker is the observable flag. Normal mode remains the default; the cost only applies to operators who deliberately enter dev mode.
 
 ---
 
 ## Activation and the filesystem marker
 
-**Activation:** select the `developer-mode` output style via `/config` → Output style → `developer-mode`. The style is distributed by the plugin (`output-styles/`) and copied to `~/.claude/output-styles/developer-mode.md` by `/th:setup`. Write the filesystem marker:
+**Activation:** run `/dev-mode`. The skill starts developer mode in the current session immediately — it writes the marker `~/.claude/.dev-mode-active` (`dev_mode: true`), shows the banner, and adopts the orchestrator role. No `/clear` is required. While the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) auto-resumes dev mode in every new session, surfacing the banner instantly via `systemMessage`. The marker is the single source of truth.
 
-```bash
-echo 'dev_mode: true' > ~/.claude/.dev-mode-active
-```
+The marker is the observable signal that (a) dev mode is active for the session and (b) the outward-action gate `dev-guard.sh` applies. `/th:setup` installs the `/dev-mode` skill and the `developer-mode` output style into `~/.claude/`; the plugin's `.claude-plugin/hooks.json` wires the `SessionStart` and `dev-guard` hooks (run from the plugin cache).
 
-The marker is the observable signal that (a) dev mode is active for this session and (b) the outward-action gate `dev-guard.sh` applies. Takes effect at session start (or after `/clear`).
+**Persistent alternative:** select the `developer-mode` output style via `/config` → Output style → `developer-mode` (replaces the system prompt on reload — `keep-coding-instructions: false`). Equivalent; the marker remains the flag.
 
-**Deactivation:** `/config` → Output style → Default (or remove `outputStyle` from settings). Delete the marker:
-
-```bash
-rm ~/.claude/.dev-mode-active
-```
-
-Takes effect after `/clear` or a new session.
+**Deactivation:** run `/dev-mode off` — it removes the marker (`dev-guard.sh` intercepts the removal with `permissionDecision: "ask"`; the operator confirms). New sessions then open in normal mode. (Output-style users: `/config` → Output style → Default.)
 
 **Normal is the default.** `force-for-plugin` is NOT set on the output style — it is never applied automatically. Every operator enters dev mode by deliberate action.
 
