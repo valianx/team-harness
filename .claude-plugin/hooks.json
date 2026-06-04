@@ -1,5 +1,5 @@
 {
-  "_comment": "Plugin-mode hooks (loaded by Claude Code plugin runtime). Uses ${CLAUDE_PLUGIN_ROOT} — a plugin runtime variable that resolves to the plugin's install cache directory. For Go installer mode, use hooks/config.json instead (uses ~/.claude/hooks/ paths). Policy gate (PreToolUse) fires on every write/exec tool; notification (Notification) fires only on idle_prompt.",
+  "_comment": "Plugin-mode hooks (loaded by Claude Code plugin runtime). Uses ${CLAUDE_PLUGIN_ROOT} — a plugin runtime variable that resolves to the plugin's install cache directory. For Go installer mode, use hooks/config.json instead (uses ~/.claude/hooks/ paths). Policy gate (PreToolUse Bash|Write|Edit|NotebookEdit) fires on every write/exec tool; reasoning-checkpoint guard (PreToolUse Task) gates phase dispatch; notification (Notification) fires only on idle_prompt.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/policy-block.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/checkpoint-guard.sh",
             "timeout": 5
           }
         ]
