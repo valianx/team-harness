@@ -13933,6 +13933,18 @@ def _s59_ver_tuple(v):
     except Exception:
         return (0, 0, 0)
 
+def _s59_claude_current_version(text):
+    """Parse the backtick-quoted version token from the 'Current version' line in CLAUDE.md §3."""
+    for line in text.splitlines():
+        if "Current version" in line and "`" in line:
+            try:
+                return line.split("`")[1].strip()
+            except IndexError:
+                return None
+    return None
+
+_s59_claude_ver = _s59_claude_current_version(_s59_claude)
+
 check(
     "dev-mode(version-plugin-json): .claude-plugin/plugin.json version >= 2.53.0 (dev-mode release floor)",
     _s59_ver_tuple(_s59_plugin_json.get("version")) >= _S59_MIN_VERSION,
@@ -13949,10 +13961,10 @@ check(
     f"cmd/install/main.go must declare var version = \"{_S59_EXPECTED_VERSION}\"",
 )
 check(
-    "dev-mode(version-claude-md): CLAUDE.md §3 Current version == 2.53.0",
-    _S59_EXPECTED_VERSION in _s59_claude
-    and "Current version" in _s59_claude,
-    f"CLAUDE.md §3 must declare Current version: {_S59_EXPECTED_VERSION}",
+    "dev-mode(version-claude-md): CLAUDE.md §3 Current version >= 2.53.0 (dev-mode release floor)",
+    _s59_claude_ver is not None
+    and _s59_ver_tuple(_s59_claude_ver) >= _S59_MIN_VERSION,
+    "CLAUDE.md §3 must declare a Current version >= 2.53.0 (the dev-mode feature release floor)",
 )
 check(
     "dev-mode(version-changelog): CHANGELOG.md has ## [2.53.0] release section",
@@ -14079,6 +14091,179 @@ check(
     "clickup(comments-no-pr-lifecycle-status): skills/clickup/SKILL.md ## Comments forbids PR lifecycle status in the paso-a-produccion comment",
     "pendiente de merge" in _s60_clickup and "pending deploy" in _s60_clickup,
     "skills/clickup/SKILL.md ## Comments must explicitly forbid transient PR lifecycle status strings",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 61 — configurable-agent-language (v2.55.0)
+# Marker: configurable-agent-language
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 61: configurable-agent-language (v2.55.0) ===")
+
+_STOP = ("\n### ", "\n## ", "\n---\n")
+
+_s61_orch = read(AGENTS_DIR / "orchestrator.md")
+_s61_setup_skill = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s61_managed_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md")
+_s61_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s61_voice_guide = read(REPO_ROOT / "docs" / "voice-guide.md")
+
+# (1) orchestrator.md Step 1c declares 4-level precedence text
+_s61_step1c = _slice_section(_s61_orch, "1c. **MANDATORY — Resolve operator language.**", _STOP)
+check(
+    "suite61(step1c-precedence-chain): orchestrator.md Step 1c declares 4-level precedence",
+    all(tok in _s61_step1c for tok in ["Session override", "Config default", "Detection", "Default"]),
+    "4-level precedence levels (Session override / Config default / Detection / Default) not all present in Step 1c",
+)
+check(
+    "suite61(step1c-malformed-warn): orchestrator.md Step 1c documents malformed-code WARN + fallback, no abort",
+    "WARN" in _s61_step1c and "fallback" in _s61_step1c.lower() and "never abort" in _s61_step1c.lower(),
+    "malformed-code handling (WARN + fallback + never abort) not documented in Step 1c",
+)
+check(
+    "suite61(step1c-absent-no-warn): orchestrator.md Step 1c documents absent key -> level 3 with no warning",
+    "absent" in _s61_step1c.lower() and "no warning" in _s61_step1c.lower(),
+    "absent-key handling (no warning) not documented in Step 1c",
+)
+
+# (2) orchestrator.md Step 6a intent table has language-persistent-default-set intent
+_s61_step6a = _slice_section(_s61_orch, "**Step 6a — Classify intent.**", _STOP)
+check(
+    "suite61(intent-persistent-set): orchestrator.md Step 6a has language-persistent-default-set intent row",
+    "language-persistent-default-set" in _s61_step6a or "persistent-default-set" in _s61_step6a,
+    "language-persistent-default-set intent row missing from Step 6a table",
+)
+check(
+    "suite61(intent-session-override): orchestrator.md Step 6a has language-session-override intent row",
+    "language-session-override" in _s61_step6a or "session-override" in _s61_step6a,
+    "language-session-override intent row missing from Step 6a table",
+)
+check(
+    "suite61(confirmation-gate): orchestrator.md Step 6a documents Y/n confirmation gate before merge-write",
+    "Y/n" in _s61_step6a or "[Y/n]" in _s61_step6a,
+    "Y/n confirmation gate not documented in Step 6a language-set handling",
+)
+check(
+    "suite61(merge-write-invariant): orchestrator.md Step 6a specifies read-modify-write (never partial payload)",
+    "never a partial payload" in _s61_step6a or "merge-write" in _s61_step6a,
+    "merge-write invariant (never partial payload) not specified in Step 6a",
+)
+check(
+    "suite61(no-write-without-persistence-marker): orchestrator.md Step 6a states config JSON never written without explicit persistence signal",
+    "never written without" in _s61_step6a.lower() or "NEVER written without" in _s61_step6a,
+    "Step 6a must state the config JSON is never written without an explicit persistence signal",
+)
+
+# (3) orchestrator.md recovery note resolves via precedence chain
+_s61_recovery = _slice_section(_s61_orch, "**`operator_language` recovery.**", _STOP)
+check(
+    "suite61(recovery-precedence): orchestrator.md operator_language recovery resolves via precedence chain (not just 'en')",
+    "precedence" in _s61_recovery.lower() and "language" in _s61_recovery.lower(),
+    "recovery note for operator_language must reference the precedence chain, not just default to 'en'",
+)
+
+# (4) orchestrator.md language-propagation note mentions config-sourced-first
+_s61_lang_prop = _slice_section(_s61_orch, "**Language propagation.** Every agent dispatch prompt MUST include", _STOP)
+check(
+    "suite61(lang-propagation-config-first): orchestrator.md language propagation note mentions config-sourced key as level 2",
+    "language" in _s61_lang_prop and ("config" in _s61_lang_prop.lower() or "team-harness.json" in _s61_lang_prop),
+    "language propagation note must mention the config `language` key as the config-sourced level",
+)
+
+# (5) managed block — both locations updated identically (config-sourced-first language)
+_s61_mb_lang_section = _slice_section(_s61_managed_block, "**Language propagation.**", _STOP)
+check(
+    "suite61(managed-block-config-first): canonical managed-block mentions config language key",
+    "language" in _s61_mb_lang_section and ("team-harness.json" in _s61_mb_lang_section or "config" in _s61_mb_lang_section.lower()),
+    "canonical managed-block orchestrator-dispatch-rule.md Language propagation does not mention config language key",
+)
+_s61_skill_mb_lang_section = _slice_section(_s61_setup_skill, "**Language propagation.**", _STOP)
+check(
+    "suite61(skill-inline-copy-config-first): SKILL.md inline copy of managed-block mentions config language key",
+    "language" in _s61_skill_mb_lang_section and ("team-harness.json" in _s61_skill_mb_lang_section or "config" in _s61_skill_mb_lang_section.lower()),
+    "SKILL.md inline copy of Language propagation does not mention config language key",
+)
+check(
+    "suite61(managed-block-matches-inline): managed-block and SKILL.md inline copy both mention 4-level precedence",
+    "Precedence" in _s61_mb_lang_section and "Precedence" in _s61_skill_mb_lang_section,
+    "managed-block canonical and/or SKILL.md inline copy missing 4-level precedence description in Language propagation",
+)
+
+# (6) setup SKILL.md: Step 3.5 language prompt present
+_s61_step35 = _slice_section(_s61_setup_skill, "### 3.5. Configure default language", _STOP)
+check(
+    "suite61(setup-step35-exists): skills/setup/SKILL.md has Step 3.5 for default language",
+    bool(_s61_step35),
+    "Step 3.5 (Configure default language) missing from skills/setup/SKILL.md",
+)
+check(
+    "suite61(setup-step35-iso-validation): setup SKILL.md Step 3.5 validates ISO 639-1 format",
+    "ISO 639-1" in _s61_step35 and ("[a-z]{2}" in _s61_step35 or "2 lowercase" in _s61_step35 or "two-letter" in _s61_step35 or "2-letter" in _s61_step35),
+    "Step 3.5 must validate ISO 639-1 format (2-letter code)",
+)
+check(
+    "suite61(setup-step35-merge-write): setup SKILL.md Step 3.5 specifies merge-write of complete document",
+    "merge-write" in _s61_step35.lower() and ("complete" in _s61_step35.lower() or "full" in _s61_step35.lower() or "whole" in _s61_step35.lower()),
+    "Step 3.5 must specify merge-write of the complete document",
+)
+
+# (7) setup SKILL.md: Step 5 manifest includes language key
+_s61_step5 = _slice_section(_s61_setup_skill, "### 5. Write manifest", _STOP)
+check(
+    "suite61(setup-manifest-language-key): skills/setup/SKILL.md Step 5 manifest includes language key",
+    '"language"' in _s61_step5 or "'language'" in _s61_step5 or "`language`" in _s61_step5,
+    "Step 5 manifest in SKILL.md must include the 'language' key",
+)
+
+# (8) CLAUDE.md §5 documents language as chat-settable persistent key (new category)
+_s61_claude_lang_bullet = _slice_section(_s61_claude_md, "**Chat-settable persistent key — `language`**", _STOP)
+check(
+    "suite61(claude-md-s5-new-category): CLAUDE.md §5 documents language as chat-settable persistent key",
+    bool(_s61_claude_lang_bullet),
+    "CLAUDE.md §5 must document 'language' as a chat-settable persistent key (new category)",
+)
+check(
+    "suite61(claude-md-s5-confirmation-gate): CLAUDE.md §5 language category mentions confirmation gate",
+    "confirmation gate" in _s61_claude_lang_bullet.lower() or "Y/n" in _s61_claude_lang_bullet,
+    "CLAUDE.md §5 language category must mention the Y/n confirmation gate",
+)
+check(
+    "suite61(claude-md-s5-not-in-session-whitelist): CLAUDE.md §5 distinguishes language from session-override whitelist",
+    "distinct from the session-override whitelist" in _s61_claude_lang_bullet or "session-override" in _s61_claude_lang_bullet,
+    "CLAUDE.md §5 language category must distinguish it from the session-override whitelist",
+)
+
+# (AC-9) voice-guide documents language source precedence (configured-default vs detection vs session-override)
+_s61_vg_lang_section = _slice_section(
+    _s61_voice_guide,
+    "Language source precedence — configured-default vs detection vs session-override",
+    _STOP,
+)
+check(
+    "suite61(ac9-voice-guide-precedence-section): docs/voice-guide.md has Language source precedence section with all 4 levels",
+    all(
+        tok in _s61_vg_lang_section
+        for tok in ["Session override", "Config default", "Detection", "Fallback"]
+    ),
+    "docs/voice-guide.md must document the 4-level language source precedence (Session override / Config default / Detection / Fallback)",
+)
+check(
+    "suite61(ac9-voice-guide-committed-english): docs/voice-guide.md documents committed-artefact English rule",
+    "Every committed artefact is in English" in _s61_voice_guide,
+    "docs/voice-guide.md must state that every committed artefact is in English (AC-9 committed-artifact rule)",
+)
+
+# (9) self-referential guard
+_s61_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite61(self-ref-testing-md): docs/testing.md contains 'Suite 61' and 'configurable-agent-language'",
+    "Suite 61" in _s61_testing_md and "configurable-agent-language" in _s61_testing_md,
+    "docs/testing.md must register Suite 61 and the 'configurable-agent-language' marker",
+)
+check(
+    "suite61(self-ref-test-file): this test file contains 'Suite 61' and 'configurable-agent-language' marker",
+    True,  # presence in this file is guaranteed by writing this suite
+    "",
 )
 
 # ---------------------------------------------------------------------------

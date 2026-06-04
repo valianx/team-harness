@@ -57,6 +57,16 @@ If obsidian mode:
 2. Ask for the subfolder within the vault (default: `work-logs`).
 3. Verify the vault path exists. If not, warn and ask to confirm or re-enter.
 
+### 3.5. Configure default language
+
+Ask the operator for the default language for agent responses and workspace prose. This setting persists across all future sessions.
+
+- **Prompt:** `Default language for agent responses (ISO 639-1 code, e.g. en, es, pt, fr, de). Press Enter to keep current value or use "en" as default:`
+- Show the current configured value from `~/.claude/.team-harness.json` `language` field (if present) as the default hint.
+- Accept any two-letter ISO 639-1 code (`[a-z]{2}`). Validate: if the input is not exactly 2 lowercase letters, warn and ask again.
+- If the operator presses Enter without input, keep the existing value (or `en` if none is set).
+- Persist the chosen value as the `language` key in `~/.claude/.team-harness.json` via **merge-write of the complete document**: read the full JSON, replace or add only the `language` key, write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, and all other existing keys.
+
 ### 4a. Write orchestrator dispatch rule
 
 Read the canonical block from `managed-blocks/orchestrator-dispatch-rule.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/orchestrator-dispatch-rule.md`).
@@ -78,9 +88,9 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 
 **Operator-declared fast path.** The operator — and only the operator — may request a lighter pipeline; the orchestrator never shrinks it on its own. Declarations: `--fast` for a very small change (a version bump, a one-line edit) skips the plan review, qa, and security stages; `[TIER: 0]` / `[TIER: 1]` for trivial or docs-only fixes; or Simple Mode keywords (`simple`, `just implement`, `skip tests`). In every case Specify and Delivery still run — every change is spec'd, branched, committed, and shipped as a PR — and security still runs on security-sensitive paths (`auth`, `api`, `db`, `crypto`, `session`) regardless of the declaration.
 
-**Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), and subfolder (`logs-subfolder`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
+**Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
 
-**Language propagation.** When dispatching the orchestrator, detect the operator's chat language and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` This ensures the orchestrator and all downstream agents write in the operator's language.
+**Language propagation.** When dispatching the orchestrator, resolve the operator's language using the 4-level precedence chain and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` Precedence: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from the operator's first message → (4) `en`. This ensures the orchestrator and all downstream agents write in the operator's language.
 
 **Report team-harness problems via `/th:report-issue`.** When a bug, gap, or improvement is detected in the `th` plugin itself — its agents, skills, or any orchestrator behavior — report it with `/th:report-issue <bug|feature|docs|question> "<summary>"`, not with `gh issue create` directly and not by editing files under the plugin cache (those edits are transient and are overwritten on the next `th:update`). The skill builds the correct issue pattern (Summary, Environment with `th`/Claude Code/OS versions), de-duplicates against open issues, and requires confirmation before creating; a manual `gh issue create` skips that pattern and the dedup check.
 <!-- orchestrator-dispatch-rule:end -->
@@ -184,11 +194,12 @@ Write `~/.claude/.team-harness.json` with:
   "updated_at": "<current ISO timestamp>",
   "logs-mode": "<local|obsidian>",
   "logs-path": "<vault path or empty>",
-  "logs-subfolder": "<subfolder or empty>"
+  "logs-subfolder": "<subfolder or empty>",
+  "language": "<ISO 639-1 code, e.g. 'en' or 'es'; omit key if not configured>"
 }
 ```
 
-Preserve existing fields (like `files`) if the manifest already exists.
+Preserve existing fields (like `files`, `clickup`, `pricing`) if the manifest already exists. The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
 ### 6. Verify connectivity
 
