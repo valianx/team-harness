@@ -42,6 +42,19 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 
 **workspaces are NOT committed artefacts.** `workspaces/` is gitignored — it is local working memory on each operator's machine, not published. The English-only rule does NOT cover workspace doc PROSE content. Agent-composed prose inside workspace doc bodies follows the **operator's chat language**. Structural elements that must remain machine-readable across operators stay English regardless: section headers (`## TL;DR`, `## Current State`, `## Agent Results`), field names (`status:`, `phase:`, `verdict:`), status-block keys, closed-set enum values (`success`, `pass`, `fail`, `APPROVE`), filenames (`01-architecture.md`), `dispatch_handoff` JSON keys. The boundary is **structure = English, body prose = operator language**.
 
+**Language source precedence — configured-default vs detection vs session-override.** The operator's language is resolved via a 4-level chain. This matters when the language of chat and workspace prose differs from `en`:
+
+| Priority | Source | Description | Persistence |
+|----------|--------|-------------|-------------|
+| 1 (highest) | Session override | `operator_language` already in `00-state.md` from a mid-session request | Ephemeral (session only) |
+| 2 | Config default | `language` key in `~/.claude/.team-harness.json` | Persistent (all sessions) |
+| 3 | Detection | Inferred from operator's first message | Per-pipeline |
+| 4 (lowest) | Fallback | `en` | — |
+
+**Setting a configured default from chat.** An explicit persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) in a language-change request routes to the persistent-default-set path with a Y/n confirmation gate before any config write. Without that marker — including temporality markers like `por ahora`, `esta vez`, `now` — the change is always ephemeral (session override). The config JSON is NEVER written without an explicit persistence signal.
+
+**Scope of the configured language.** Chat responses and workspace prose follow the configured language. Committed artefacts (repo files, KG nodes, commits, PR bodies, docs) stay in English regardless of the configured language. This scope rule is unchanged by the `language` feature.
+
 **Documented exceptions** (committed artefacts where Spanish is allowed):
 
 - **`agents/security.md` report-body template, `04-security.md` report bodies, `agents/reviewer.md` review-body templates, `04-internal-review.md` / `05-internal-review.md` reviewer outputs.** The two agents produce Spanish-language reports per their contracts. The Spanish output is only the body of those workspace doc reports (and the GitHub PR-review comment). The agent's system prompt, status-block fields, and framework-level fields remain English.

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.55.0] - 2026-06-04
+
+### Added
+
+- Configurable default language: `language` key (ISO 639-1) in `~/.claude/.team-harness.json` with 4-level precedence resolution (session override > config default > detection > `en`); set via `/th:setup` prompt or chat persistent-set intent with Y/n confirmation gate; ephemeral session overrides remain unchanged.
+
 ## [2.54.0] - 2026-06-04
 
 ### Added

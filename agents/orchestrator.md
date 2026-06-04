@@ -694,15 +694,22 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    **If `session_start` is unavailable** (server returns an error or the tool is not exposed) → log `KG session: unavailable, skipping attribution` and continue without `session.json`. Downstream writes will succeed without `session_id` (the field is optional on `create_nodes`). The pipeline never fails on session-management errors.
 
-1c. **MANDATORY — Detect operator language.**
+1c. **MANDATORY — Resolve operator language.**
 
-   Analyze the operator's first message to determine their chat language. Store the result as `operator_language` (ISO 639-1 code: `es`, `en`, `pt`, `fr`, `de`, etc.).
+   Resolve `operator_language` (ISO 639-1 code: `es`, `en`, `pt`, `fr`, `de`, etc.) using the following **4-level precedence chain** (level 1 wins over all lower levels):
 
-   Detection rules:
-   - Infer the language from the operator's message text (the original request, not a skill payload).
-   - If the message is ambiguous or too short to determine (e.g., "fix auth bug"), default to `en`.
-   - If invoked via a skill (Direct Mode Task payload), detect from the last conversational message before the skill, or default to `en`.
-   - The operator can override at any time ("responde en español", "switch to English"). Update `operator_language` in `00-state.md` under `## Current State` accordingly.
+   1. **Session override** — if `operator_language` is already written in `00-state.md § Current State` from a mid-session language-change request, use it and stop here.
+   2. **Config default** — if `~/.claude/.team-harness.json` contains a `language` key with a valid 2-letter ISO 639-1 code (`[a-z]{2}`), use that value. Already read in boot Step 2; no extra I/O required. Edge cases:
+      - Key **absent**: fall to level 3, no warning.
+      - Key **present but malformed** (not a 2-letter lowercase code): emit one-line WARN (`config language "<value>" is not a valid ISO 639-1 code — falling back to detection`) and fall to level 3. Never abort the pipeline.
+   3. **Detection** — infer the language from the operator's message text (the original request, not a skill payload). If the message is ambiguous or too short to determine (e.g., "fix auth bug"), fall to level 4.
+   4. **Default** — `en`.
+
+   The operator can change the language at any time. Two distinct intents — handle them differently:
+   - **Session override** ("responde en español por ahora", "switch to English", "answer in X now", or any language request WITHOUT an explicit persistence marker): update only `operator_language` in `00-state.md § Current State`. Do NOT write `~/.claude/.team-harness.json`. Ephemeral.
+   - **Persistent default set** ("configurá el idioma por defecto en X", "set my default language to X", "siempre respondé en X", or any language request WITH an explicit persistence marker such as `por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`): see Step 6a intent table for the full confirmation gate and merge-write procedure.
+
+   Discriminant: **explicit persistence marker present** → persistent-default-set (Step 6a intent (b)); **absence of persistence marker** (including temporality markers like `por ahora`, `esta vez`, `now`, `for this session`) → session-override. The config JSON is NEVER written without an explicit persistence signal.
 
    This step runs BEFORE creating workspaces so that `00-state.md` is written with the correct language from the start.
 
@@ -789,6 +796,8 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | documentar, documenta, document, "write docs", "genera documentación", "documenta en obsidian", "create documentation" | `docs` | write |
    | entregar, deliver, "crear branch y commitear" | `deliver` | write |
    | inicializar, init, bootstrap | `init` | write |
+   | **(b) language-persistent-default-set** — "configurá/configura el idioma por defecto en X", "poné el idioma por defecto en X", "set my default language to X", "make X my default language", "siempre respondé en X", or any language request with an explicit persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) | **language-set** (persistent) | write |
+   | **(c) language-session-override** — "respondé en X por ahora", "switch to X", "en X esta vez", "answer in X now", "for this session use X", or any language request WITHOUT an explicit persistence marker | **language-set** (ephemeral) | write |
    | feature, fix, bug, refactor, enhancement, hotfix, implementar, solucionar, arreglar, corregir, fixear, debuguear, regresión, error, "corrija un bug", "haga un fix", "haga un hotfix", "corregir error", "arreglar el bug", "hay un bug en X", "está rompiendo", "no funciona Y", "error en Z" | **full pipeline** | write |
    | ambiguous / mixed concerns | **unclear** | — |
 
@@ -796,6 +805,18 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
+
+   **Language-set intent handling.** When the intent matches a `language-set` row:
+
+   - **(b) Persistent-default-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
+     ```
+     About to set the default language to "<X>" (persistent write to ~/.claude/.team-harness.json).
+     This affects all future sessions. The current session also switches to "<X>".
+     Confirm? [Y/n]:
+     ```
+     - On **Y**: perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `language` key, write the whole document back (never a partial payload). Then update `operator_language` in `00-state.md § Current State` for the current session.
+     - On **n**: offer to apply the change as an ephemeral session override instead (intent (c) path). Do NOT write the config file.
+   - **(c) Session-override** (no persistence marker, or ephemeral marker present): update only `operator_language` in `00-state.md § Current State`. Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
 
    **Step 6b — Route based on category:**
 
@@ -3550,7 +3571,7 @@ On failure or iteration:
 
 > Operator language: {operator_language}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.
 
-This ensures agents follow the "workspaces prose follows the operator's chat language" Voice rule even though they never see the operator's original messages. The `operator_language` value comes from Phase 0a Step 1c detection or from `00-state.md` on recovery. When `operator_language` is `en`, the instruction still applies (agents default to English anyway, but the explicit instruction prevents ambiguity).
+This ensures agents follow the "workspaces prose follows the operator's chat language" Voice rule even though they never see the operator's original messages. The `operator_language` value is resolved via the 4-level precedence chain in Phase 0a Step 1c: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` (config-sourced default, persisted by `/th:setup` or chat persistent-set) → (3) detection from the operator's first message → (4) `en`. On recovery, the same chain applies if `operator_language` is absent from `00-state.md`. When `operator_language` is `en`, the instruction still applies (agents default to English anyway, but the explicit instruction prevents ambiguity).
 
 ### Status block expectations:
 Every agent returns a compact status block as its final message. You use this to gate phases without re-reading workspaces. See agent Return Protocol for format.
@@ -3624,7 +3645,7 @@ When context is compacted (auto or manual), recovery is simple because state liv
 
 **Do NOT re-read all workspaces.** The state file has everything you need to resume. Only read specific agent outputs if you need to debug a failure.
 
-**`operator_language` recovery.** When recovering from `00-state.md`, read `operator_language` from `## Current State`. If the field does not exist (legacy pipeline), default to `en`. Apply the recovered value to all subsequent agent dispatch prompts.
+**`operator_language` recovery.** When recovering from `00-state.md`, read `operator_language` from `## Current State`. If the field does not exist (legacy pipeline or first turn before Step 1c ran), resolve it via the 4-level precedence chain from Step 1c: (1) session override from `00-state.md` (absent here by definition) → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from context → (4) `en`. Apply the resolved value to all subsequent agent dispatch prompts.
 
 **`events_file` recovery.** When recovering from `00-state.md`, read `events_file` from `## Current State`. If the field does not exist (legacy pipeline), re-derive it from `logs_mode`: `obsidian` → `00-execution-events.md`; `local` → `00-execution-events.jsonl`.
 

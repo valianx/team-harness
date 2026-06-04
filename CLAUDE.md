@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.54.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.55.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -148,6 +148,7 @@ All commands run from the repo root.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on the block without re-reading full workspaces on happy paths.
 - **Installer always overwrites embedded files.** Agents, skills, and hooks are canonical bytes from the repo; direct edits to `~/.claude/agents/*.md` (or skills/hooks) are not a supported customization path and are replaced on every install. Unchanged files (hash-match) are skipped. `~/.claude.json` is backed up before every merge. Operator-specific identity (`mcpServers.memory` URL/bearer, context7 API key) uses a Keep/Change preservation menu and is never silently clobbered.
 - **Session-scoped config override whitelist** — overridable (chat → `00-state.md` only): `logs-mode`, `logs-path`, `logs-subfolder`, `clickup.workspace_id`. Excluded → /th:setup: MCP URL, context7, model, effort.
+- **Chat-settable persistent key — `language`** — ISO 639-1 in `.team-harness.json`; not in session-override whitelist. Write needs persistence marker + Y/n confirmation gate; without it → session-override only.
 - **Single config file — `~/.claude/.team-harness.json`.** All Team Harness settings live in one operator-private file: workspace log mode (`logs-mode`, `logs-path`, `logs-subfolder`), the installer `files` manifest, version metadata, and any skill-specific settings (e.g. ClickUp credentials under a `clickup` key). Skills MUST NOT create their own config files in `~/.claude/` (no `clickup.json`, no per-skill `.json`) — a setting belongs under a namespaced key inside `.team-harness.json`. Every write is a merge: read the full document, replace only the owned key, write the whole document back. Never overwrite the file with a skill-only payload — that destroys the log config and the manifest. The sole exception is `~/.claude/settings.json`, which is Claude Code's own native file (hook wiring, permissions) and is owned by the harness, not by Team Harness.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux. Avoid Unix-only tools or shell-specific syntax in agent prompts.
 - **KG content is technical-only.** The knowledge graph must never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
