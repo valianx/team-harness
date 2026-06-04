@@ -262,6 +262,24 @@ TMP=$(make_tmp_with_marker)
 assert_allow "ls (innocent, with marker)" "$TMP" "$(make_payload 'ls -la /tmp')"
 rm -rf "$TMP"
 
+# Case 16 — ALLOW: activation write (echo 'dev_mode: true' > marker) with marker present.
+# An activation write arms MORE gating, so it must NOT prompt — this is what makes
+# /dev-mode (re)activation reliable and friction-free. Regression guard: a previous
+# version asked on any marker write, which could leave the marker unwritten on
+# re-activation so new sessions silently lost dev mode.
+echo
+echo "=== ALLOW: echo 'dev_mode: true' > marker (activation write, with marker) ==="
+TMP=$(make_tmp_with_marker)
+assert_allow "activation write: echo dev_mode: true > marker" "$TMP" "$(make_payload "echo 'dev_mode: true' > $TMP/.claude/.dev-mode-active")"
+rm -rf "$TMP"
+
+# Case 17 — ALLOW: the exact /dev-mode skill activation command (printf 'dev_mode: true\n' > marker).
+echo
+echo "=== ALLOW: printf 'dev_mode: true' > marker (skill activation command, with marker) ==="
+TMP=$(make_tmp_with_marker)
+assert_allow "skill activation: printf dev_mode: true > marker" "$TMP" "$(make_payload "printf 'dev_mode: true\\n' > $TMP/.claude/.dev-mode-active")"
+rm -rf "$TMP"
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

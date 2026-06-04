@@ -13763,9 +13763,9 @@ check(
 _s59_skill_path = SKILLS_DIR / "dev-mode" / "SKILL.md"
 _s59_skill = read(_s59_skill_path) if _s59_skill_path.exists() else ""
 check(
-    "dev-mode(skill-exists): skills/dev-mode/SKILL.md exists (the /dev-mode toggle)",
+    "dev-mode(skill-exists): skills/dev-mode/SKILL.md exists (the /dev-mode in-session activator)",
     _s59_skill_path.exists(),
-    "Create skills/dev-mode/SKILL.md — the user-level /dev-mode toggle that activates/deactivates the developer-mode output style",
+    "Create skills/dev-mode/SKILL.md — the user-level /dev-mode skill that starts developer mode in the current session",
 )
 check(
     "dev-mode(skill-frontmatter): /dev-mode skill declares name: dev-mode + disable-model-invocation: true",
@@ -13773,10 +13773,60 @@ check(
     "skills/dev-mode/SKILL.md frontmatter must declare name: dev-mode and disable-model-invocation: true (explicit operator opt-in)",
 )
 check(
-    "dev-mode(skill-toggles-output-style): /dev-mode skill sets/unsets the output style + marker",
-    "developer-mode" in _s59_skill and "outputStyle" in _s59_skill and ".dev-mode-active" in _s59_skill,
-    "skills/dev-mode/SKILL.md must toggle outputStyle: developer-mode and the ~/.claude/.dev-mode-active marker",
+    "dev-mode(skill-starts-in-session): /dev-mode skill starts dev mode in-session — writes the marker, prints the banner, adopts the orchestrator role (no outputStyle config, no /clear)",
+    ".dev-mode-active" in _s59_skill
+    and "DEVELOPER MODE ACTIVE" in _s59_skill
+    and "orchestrator" in _s59_skill,
+    "skills/dev-mode/SKILL.md must start developer mode in the current session: write/remove the ~/.claude/.dev-mode-active marker, print the DEVELOPER MODE ACTIVE banner, and adopt the orchestrator role — it does NOT configure the outputStyle setting (that is the /config output-style path, not the skill's job)",
 )
+
+# AC — SessionStart hook: auto-load dev mode at session start, silently.
+_s59_ss_hook_path = HOOKS_DIR / "dev-mode-session-start.sh"
+_s59_ss_hook = read(_s59_ss_hook_path) if _s59_ss_hook_path.exists() else ""
+check(
+    "dev-mode(sessionstart-hook-exists): hooks/dev-mode-session-start.sh exists",
+    _s59_ss_hook_path.exists(),
+    "Create hooks/dev-mode-session-start.sh — the SessionStart hook that loads dev mode into context at session start when the marker is present",
+)
+check(
+    "dev-mode(sessionstart-hook-marker-gated): hook gates on .dev-mode-active (dev_mode: true) — inert in normal mode",
+    ".dev-mode-active" in _s59_ss_hook and "dev_mode: true" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh must gate on the ~/.claude/.dev-mode-active marker so it injects nothing in normal mode",
+)
+check(
+    "dev-mode(sessionstart-hook-injects-context): hook emits SessionStart additionalContext",
+    "additionalContext" in _s59_ss_hook and "SessionStart" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh must emit hookSpecificOutput.additionalContext for the SessionStart event",
+)
+check(
+    "dev-mode(sessionstart-hook-silent): injected context forbids narrating the determination and re-inspecting the marker",
+    "SILENT" in _s59_ss_hook and "re-verify" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh injected context must instruct the agent to keep the dev-mode determination SILENT and never re-verify the marker mid-session",
+)
+check(
+    "dev-mode(sessionstart-hook-systemmessage): hook emits an instant app-rendered systemMessage banner",
+    "systemMessage" in _s59_ss_hook and "DEVELOPER MODE ACTIVE" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh must emit a systemMessage carrying the DEVELOPER MODE banner — app-rendered and instant — instead of instructing the model to render slow ASCII art",
+)
+check(
+    "dev-mode(sessionstart-hook-no-model-banner): injected context tells the model NOT to print a banner itself",
+    "do NOT print any banner" in _s59_ss_hook,
+    "hooks/dev-mode-session-start.sh additionalContext must instruct the model not to render its own banner (the systemMessage already shows it)",
+)
+for _os_key in ("windows", "macos", "linux"):
+    _ss = cfg.get(_os_key, {}).get("hooks", {}).get("SessionStart", [])
+    _ss_cmd = (_ss[0].get("hooks", [{}])[0]).get("command", "") if _ss else ""
+    _ss_matcher = _ss[0].get("matcher", "") if _ss else ""
+    check(
+        f"dev-mode(sessionstart-wired-{_os_key}): config.json[{_os_key}] wires SessionStart -> dev-mode-session-start.sh",
+        len(_ss) > 0 and "dev-mode-session-start.sh" in _ss_cmd,
+        f"hooks/config.json[{_os_key}] must wire a SessionStart hook invoking dev-mode-session-start.sh",
+    )
+    check(
+        f"dev-mode(sessionstart-matcher-{_os_key}): config.json[{_os_key}] SessionStart entry declares a 'startup' matcher",
+        "startup" in _ss_matcher,
+        f"hooks/config.json[{_os_key}] SessionStart entry MUST declare a matcher (e.g. 'startup|resume|clear') — a SessionStart entry without a matcher is silently ignored by Claude Code",
+    )
 
 # ---------------------------------------------------------------------------
 # AC-8 / AC-13 — docs/dev-mode.md: gate + disposition mechanism + reconciliation

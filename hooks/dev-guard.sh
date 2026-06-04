@@ -208,6 +208,14 @@ if printf '%s' "$cmd" | grep -qE "(rm|mv|cp)\s.*${MARKER_PATH_PATTERN}" 2>/dev/n
     ask "dev-guard: removing/moving the dev-mode marker EXITS developer mode and DISABLES the outward-action gate. Approve ONLY if you intend to deactivate dev mode (e.g. /dev-mode off)."
 fi
 if printf '%s' "$cmd" | grep -qE "(>|>>|tee)\s.*${MARKER_PATH_PATTERN}" 2>/dev/null; then
+    # A write that SETS "dev_mode: true" is an ACTIVATION — it arms MORE gating,
+    # so it is safe and is allowed without a prompt. This makes /dev-mode
+    # (re)activation reliable and friction-free, including re-enabling after an
+    # /dev-mode off in the same session. Any OTHER write to the marker (clearing
+    # or disabling it) still prompts, since that would disarm the gate.
+    if printf '%s' "$cmd" | grep -qE "dev_mode:[[:space:]]*true" 2>/dev/null; then
+        allow
+    fi
     ask "dev-guard: writing the dev-mode marker changes the gate's armed state. Approve ONLY if you intend to change developer mode."
 fi
 

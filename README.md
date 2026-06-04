@@ -75,12 +75,14 @@ After install, open Claude Code. The entry points are:
 
 Team Harness runs the orchestrated pipeline **only in developer mode** — an opt-in session mode. Without it, the top-level agent handles your request **directly** (normal Claude Code behavior, no pipeline). Developer mode is the opt-in; direct is the default.
 
-- **Enter:** `/dev-mode`, then `/clear` (or a new session).
-- **Exit:** `/dev-mode off`, then `/clear`.
+- **Enter:** `/dev-mode` — starts immediately in the current session, no `/clear` needed.
+- **Exit:** `/dev-mode off`.
 
-`/dev-mode` activates the `developer-mode` output style — the top-level agent adopts the orchestrator role and dispatches the pipeline directly — and arms a deterministic gate: outward, irreversible actions (`git push`, `gh pr merge`/`review`/`comment`, GitHub API writes) require explicit operator approval at the point of execution; the agent cannot publish or push on its own. The `/clear` is required because the mode replaces the system prompt, which applies on reload.
+`/dev-mode` writes the marker `~/.claude/.dev-mode-active`, shows the `DEVELOPER MODE ACTIVE` banner, and the top-level agent adopts the orchestrator role — routing development tasks through the pipeline and dispatching leaf agents directly. While the marker is present, every new session auto-resumes developer mode: a `SessionStart` hook surfaces the banner **instantly** (rendered by Claude Code, not the model) and loads the disposition silently. A deterministic gate (`hooks/dev-guard.sh`) requires explicit operator approval for outward, irreversible actions (`git push`, `gh pr merge`/`review`/`comment`, GitHub API writes) at the point of execution — the agent cannot publish or push on its own.
 
-Full contract: [docs/dev-mode.md](./docs/dev-mode.md).
+A persistent alternative is the `developer-mode` output style (`/config` → Output style → `developer-mode`), which replaces the system prompt on reload.
+
+Full contract: docs/dev-mode.md.
 
 ---
 
