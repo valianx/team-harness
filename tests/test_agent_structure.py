@@ -12837,6 +12837,15 @@ check(
     "Step 6a-pre must route corrective language to the mode-transition gate (Layer 4), not full pipeline",
 )
 check(
+    "Suite 57(b3b): Step 6a-pre explicitly covers fresh/new conversational turns (SEC-DR-1 re-entry seam)",
+    ("fresh turn" in _s57_step6pre.lower() or "fresh turns" in _s57_step6pre.lower()
+     or "new conversational turn" in _s57_step6pre.lower()
+     or "re-entry seam" in _s57_step6pre.lower()),
+    "Step 6a-pre must state that fresh/new conversational turns are intercepted before the "
+    "intent table classifies them as full pipeline (SEC-DR-1 / CWE-863) — without this, "
+    "the re-entry seam is undocumented and removal goes undetected",
+)
+check(
     "Suite 57(b4): Step 6a-pre documents the review_context lifecycle (write + clear)",
     "review_context" in _s57_step6pre
     and ("lifecycle" in _s57_step6pre or ("write" in _s57_step6pre and "clear" in _s57_step6pre)),
@@ -13001,6 +13010,54 @@ check(
     "Suite 57(i): Suite 57 uses _slice_section anchor-scoped idiom and covers 'review-mode-hard-gates'",
     "_slice_section" in _s57_suite_text and "review-mode-hard-gates" in _s57_suite_text,
     "Suite 57 must use _slice_section (anchor-scoped) and contain the 'review-mode-hard-gates' marker",
+)
+
+# --- (j) Publish Gate anchored in takeover-path doc (SEC-IMP-1 anti-drift) ---
+# docs/subagent-orchestration.md § Takeover Protocol must carry an operative
+# Publish Gate statement for the takeover/inline review path — not just a
+# transitive pointer via ref-direct-modes.md. If a maintainer edits the takeover
+# doc and removes the statement, this check turns red immediately.
+
+_s57_takeover_doc = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s57_takeover_section = _slice_section(
+    _s57_takeover_doc,
+    "## Takeover Protocol",
+    ("\n## ",),
+)
+
+check(
+    "Suite 57(j): docs/subagent-orchestration.md Takeover Protocol section contains Publish Gate statement",
+    bool(_s57_takeover_section),
+    "Takeover Protocol section not found in docs/subagent-orchestration.md — "
+    "anchor '## Takeover Protocol' must be present",
+)
+
+check(
+    "Suite 57(j): Takeover Protocol names 'Publish Gate' within the section",
+    "Publish Gate" in _s57_takeover_section,
+    "docs/subagent-orchestration.md § Takeover Protocol must contain 'Publish Gate' — "
+    "the gate must be operative text on this document, not only a transitive ref via ref-direct-modes.md "
+    "(SEC-IMP-1 anti-drift; removal turns this check red)",
+)
+
+check(
+    "Suite 57(j): Takeover Protocol names the Publish Gate definition source (ref-direct-modes.md)",
+    "ref-direct-modes.md" in _s57_takeover_section,
+    "docs/subagent-orchestration.md § Takeover Protocol must reference 'ref-direct-modes.md' as "
+    "the authoritative Publish Gate definition — this makes the cross-reference verifiable",
+)
+
+check(
+    "Suite 57(j): Takeover Protocol Publish Gate entry covers at least one write verb",
+    (
+        "gh pr review" in _s57_takeover_section
+        or "PUT" in _s57_takeover_section
+        or "POST" in _s57_takeover_section
+        or "dismiss" in _s57_takeover_section.lower()
+        or "write verb" in _s57_takeover_section.lower()
+    ),
+    "docs/subagent-orchestration.md § Takeover Protocol Publish Gate entry must name at least one "
+    "covered write verb (or 'write verb' generically) — review direct mode",
 )
 
 # ---------------------------------------------------------------------------
