@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.54.0] - 2026-06-04
+
+### Added
+
+- `/th:clickup create` sub-command: create a ClickUp task with list resolution (`--list` > `default_list_id` > fail-closed), functional-register enforcement for the task description, preview + explicit confirmation before writing, and `clickup_create_task` MCP tool call.
+- `/th:clickup update` sub-command: update an existing task by literal ID (never by title), with mandatory "Available-states discovery" before any status change, preview + explicit confirmation before writing, and transient-vs-real error policy.
+
+### Changed
+
+- `/th:report-issue` is now model-invocable: removed `disable-model-invocation: true` from the skill frontmatter. The Step 6 confirmation gate (read-only until the operator replies "sí"/"yes"/"y") remains the sole human-in-loop guard. `disable-model-invocation` is now documented as exclusive to operator-only mode-switch skills (e.g. `/th:dev-mode`).
+- `/th:clickup` `## Comments` section extended: functional register now explicitly covers task descriptions (not only comments); the "paso a producción" comment is defined as the single permitted technical comment and the sole carrier of the deploy marker + PR link; all other technical detail stays in the repository and workspace, never in ClickUp.
+- `docs/knowledge.md` `[pattern]` line reconciled: standalone side-effecting skills rely on the confirmation gate; `disable-model-invocation` is documented as exclusive to mode-switch skills.
+
 ## [2.53.1] - 2026-06-04
 
 ### Fixed

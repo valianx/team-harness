@@ -13999,6 +13999,89 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 60 — report-issue model-invocable + clickup create/update (v2.54.0)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 60: report-issue model-invocable + clickup create/update (v2.54.0) ===")
+
+_s60_report_issue_path = SKILLS_DIR / "report-issue" / "SKILL.md"
+_s60_report_issue = read(_s60_report_issue_path) if _s60_report_issue_path.exists() else ""
+_s60_devmode_path = SKILLS_DIR / "dev-mode" / "SKILL.md"
+_s60_devmode = read(_s60_devmode_path) if _s60_devmode_path.exists() else ""
+_s60_clickup_path = SKILLS_DIR / "clickup" / "SKILL.md"
+_s60_clickup = read(_s60_clickup_path) if _s60_clickup_path.exists() else ""
+
+# AC-1 / AC-2 — report-issue is now model-invocable (flag removed)
+check(
+    "report-issue(no-disable-flag): skills/report-issue/SKILL.md does NOT contain disable-model-invocation: true",
+    "disable-model-invocation: true" not in _s60_report_issue,
+    "skills/report-issue/SKILL.md must not declare disable-model-invocation: true (removed in v2.54.0)",
+)
+check(
+    "report-issue(step6-gate-present): skills/report-issue/SKILL.md still contains the Step 6 confirmation gate",
+    "Step 6" in _s60_report_issue and ("sí" in _s60_report_issue or "yes" in _s60_report_issue),
+    "skills/report-issue/SKILL.md must still contain the Step 6 confirmation gate as the human-in-loop guard",
+)
+
+# AC-3 — dev-mode skill retains its flag (must not be touched)
+check(
+    "dev-mode(flag-retained): skills/dev-mode/SKILL.md still declares disable-model-invocation: true",
+    "disable-model-invocation: true" in _s60_devmode,
+    "skills/dev-mode/SKILL.md must retain disable-model-invocation: true (operator-only mode-switch)",
+)
+
+# AC-5 / AC-6 / AC-7 — clickup create sub-command documented
+check(
+    "clickup(create-subcommand): skills/clickup/SKILL.md documents `create` sub-command",
+    "### `create`" in _s60_clickup or "### create" in _s60_clickup,
+    "skills/clickup/SKILL.md must document the `create` sub-command section",
+)
+check(
+    "clickup(create-list-precedence): skills/clickup/SKILL.md documents list resolution precedence (--list > default_list_id > fail-closed)",
+    "--list" in _s60_clickup and "default_list_id" in _s60_clickup and "No list configured" in _s60_clickup,
+    "skills/clickup/SKILL.md create section must document --list override, default_list_id fallback, and fail-closed guidance",
+)
+check(
+    "clickup(create-task-tool): skills/clickup/SKILL.md references clickup_create_task verbatim",
+    "clickup_create_task" in _s60_clickup,
+    "skills/clickup/SKILL.md must reference clickup_create_task in the MCP tools section",
+)
+
+# AC-8 — clickup update sub-command with Available-states discovery
+check(
+    "clickup(update-subcommand): skills/clickup/SKILL.md documents `update` sub-command",
+    "### `update`" in _s60_clickup or "### update" in _s60_clickup,
+    "skills/clickup/SKILL.md must document the `update` sub-command section",
+)
+check(
+    "clickup(update-explicit-id): skills/clickup/SKILL.md update section requires explicit literal ID (no title resolution)",
+    "literal" in _s60_clickup and "title" in _s60_clickup.lower(),
+    "skills/clickup/SKILL.md update section must document that the task ID is required as a literal (no title search)",
+)
+check(
+    "clickup(update-states-discovery): skills/clickup/SKILL.md update section references Available-states discovery",
+    "Available-states discovery" in _s60_clickup,
+    "skills/clickup/SKILL.md update section must reference Available-states discovery for status changes",
+)
+
+# AC-12 / AC-13 — functional register for descriptions; single "paso a producción" technical comment
+check(
+    "clickup(comments-functional-register-descriptions): skills/clickup/SKILL.md ## Comments documents functional register for task descriptions",
+    "task descriptions" in _s60_clickup or ("description" in _s60_clickup and "functional register" in _s60_clickup),
+    "skills/clickup/SKILL.md ## Comments must document that task descriptions (not only comments) use functional register",
+)
+check(
+    "clickup(comments-paso-a-produccion): skills/clickup/SKILL.md ## Comments documents the single permitted technical comment",
+    "paso a producción" in _s60_clickup,
+    "skills/clickup/SKILL.md ## Comments must document the 'paso a producción' as the single permitted technical comment",
+)
+check(
+    "clickup(comments-no-pr-lifecycle-status): skills/clickup/SKILL.md ## Comments forbids PR lifecycle status in the paso-a-produccion comment",
+    "pendiente de merge" in _s60_clickup and "pending deploy" in _s60_clickup,
+    "skills/clickup/SKILL.md ## Comments must explicitly forbid transient PR lifecycle status strings",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

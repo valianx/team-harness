@@ -1,7 +1,6 @@
 ---
 name: report-issue
 description: File a structured GitHub issue against valianx/team-harness with confirmation gate, dedup check, and gh/curl/paste fallback.
-disable-model-invocation: true
 ---
 name: report-issue
 
