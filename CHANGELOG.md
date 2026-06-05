@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.55.1] - 2026-06-04
+
+### Fixed
+
+- The configured `language` default in `~/.claude/.team-harness.json` was inert for plain conversational sessions (non-pipeline turns) because the only consumer was the orchestrator's pipeline boot path. A new `hooks/language-session-start.sh` SessionStart hook now reads the same config key at every session start, validates it against `^[a-z]{2}$` (full-string-anchored, SEC-DR-A), and injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session — independent of dev mode. An explicit per-session override from the operator still takes precedence. Hook is registered in both `.claude-plugin/hooks.json` (plugin installs, activated on `/th:update` + `/reload-plugins`) and `hooks/config.json` (Go installer, applied on next install run). Version bump: 2.55.0 → 2.55.1.
+
 ## [2.55.0] - 2026-06-04
 
 ### Added

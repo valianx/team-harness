@@ -65,6 +65,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 6: hooks/language-session-start.sh — functional tests"
+echo "############################################################"
+if bash "$TESTS_DIR/test_language_hook.sh"; then
+    echo "language-hook: PASS"
+else
+    echo "language-hook: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

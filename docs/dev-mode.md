@@ -32,6 +32,8 @@ This distinction is load-bearing:
 
 **Activation:** run `/dev-mode`. The skill starts developer mode in the current session immediately — it writes the marker `~/.claude/.dev-mode-active` (`dev_mode: true`), shows the banner, and adopts the orchestrator role. No `/clear` is required. While the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) auto-resumes dev mode in every new session, surfacing the banner instantly via `systemMessage`. The marker is the single source of truth.
 
+**Language directive (dev-mode-independent):** a separate SessionStart hook, `hooks/language-session-start.sh`, runs at every session start regardless of dev mode. When `~/.claude/.team-harness.json` contains a valid `language` key, it injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence for that session. Both hooks run under the same `startup|resume|clear` matcher and are order-independent.
+
 The marker is the observable signal that (a) dev mode is active for the session and (b) the outward-action gate `dev-guard.sh` applies. `/th:setup` installs the `/dev-mode` skill and the `developer-mode` output style into `~/.claude/`; the plugin's `.claude-plugin/hooks.json` wires the `SessionStart` and `dev-guard` hooks (run from the plugin cache).
 
 **Persistent alternative:** select the `developer-mode` output style via `/config` → Output style → `developer-mode` (replaces the system prompt on reload — `keep-coding-instructions: false`). Equivalent; the marker remains the flag.

@@ -702,6 +702,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    2. **Config default** — if `~/.claude/.team-harness.json` contains a `language` key with a valid 2-letter ISO 639-1 code (`[a-z]{2}`), use that value. Already read in boot Step 2; no extra I/O required. Edge cases:
       - Key **absent**: fall to level 3, no warning.
       - Key **present but malformed** (not a 2-letter lowercase code): emit one-line WARN (`config language "<value>" is not a valid ISO 639-1 code — falling back to detection`) and fall to level 3. Never abort the pipeline.
+      - **Note:** the same config key is also consumed by `hooks/language-session-start.sh` (a SessionStart hook, independent of dev mode) to inject a one-time language directive into every session — including non-pipeline sessions. A `00-state.md` session override (level 1) still takes precedence over the hook directive for that session.
    3. **Detection** — infer the language from the operator's message text (the original request, not a skill payload). If the message is ambiguous or too short to determine (e.g., "fix auth bug"), fall to level 4.
    4. **Default** — `en`.
 
