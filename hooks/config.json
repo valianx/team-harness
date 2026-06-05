@@ -3,7 +3,7 @@
 
   "windows": {
     "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
-    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh",
+    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh",
     "_events": "SessionStart + PreToolUse + Notification (idle_prompt only)",
     "hooks": {
       "SessionStart": [
@@ -13,6 +13,11 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/dev-mode-session-start.sh",
+              "timeout": 5
+            },
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/language-session-start.sh",
               "timeout": 5
             }
           ]
@@ -62,7 +67,7 @@
 
   "macos": {
     "_requires": "osascript (included in macOS) + python3",
-    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh",
+    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh",
     "_events": "SessionStart + PreToolUse + Notification (idle_prompt only)",
     "hooks": {
       "SessionStart": [
@@ -72,6 +77,11 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/dev-mode-session-start.sh",
+              "timeout": 5
+            },
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/language-session-start.sh",
               "timeout": 5
             }
           ]
@@ -121,7 +131,7 @@
 
   "linux": {
     "_requires": "libnotify (notify-send) + python3",
-    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh",
+    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh",
     "_events": "SessionStart + PreToolUse + Notification (idle_prompt only)",
     "hooks": {
       "SessionStart": [
@@ -131,6 +141,11 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/dev-mode-session-start.sh",
+              "timeout": 5
+            },
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/language-session-start.sh",
               "timeout": 5
             }
           ]
