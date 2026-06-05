@@ -242,6 +242,42 @@ Wait for explicit confirmation. Do not write until confirmed.
 
 ---
 
+### Comment preview gate (mandatory)
+
+Every comment posted via `clickup_create_task_comment` — a closing comment at task
+completion, a pipeline-side closing comment at delivery, or a standalone "leave a comment
+on task" action — MUST be shown to the operator as a literal preview and approved before
+it is posted. The ClickUp MCP exposes only create and read for comments (no edit, no
+delete): a wrong comment is irreversible and requires manual operator action to correct.
+The preview-and-approve gate is the safety mechanism, identical in intent to the PR-review
+message gate (`skills/review-pr/SKILL.md` Phase 4) and the create/update preview blocks
+above.
+
+**Render this block before posting (read-only until approved):**
+
+```
+ClickUp comment to post
+═══════════════════════
+Task:      <task_id>  (<task_url or "(url not resolved)">)
+Workspace: <workspace_id>
+
+<verbatim comment body — exactly the text that will be posted, no truncation>
+
+Approve posting? Reply "sí"/"yes"/"y" to post, "edit" to revise the text,
+or "no"/"n" to cancel.
+```
+
+**Accepted replies:**
+- `sí` / `yes` / `y` — post the comment once via `clickup_create_task_comment`, exactly as previewed.
+- `edit` — the operator supplies revised text (or the agent revises per instruction); re-render the preview block and wait again. Never post an un-previewed revision.
+- `no` / `n` — cancel. Do not post. For a mandatory closing comment, report that the task was left without a closing comment and that the operator must post it manually.
+
+**Do not post until an explicit approval reply is received.** No timeout auto-approves; silence is not approval.
+
+**Non-waivable in autonomous runs.** This gate holds even when `00-state.md` has `autonomous: true`. Irreversibility overrides autonomy — the same principle as STAGE-GATE-3. A ClickUp comment is never auto-posted without the operator seeing the literal text. An autonomous run that reaches a mandatory closing comment pauses for this gate; it does not skip the comment and does not post it unseen.
+
+---
+
 ## Comments
 
 Comments and task descriptions posted on a ClickUp task are read by the operator, SAC, and operations — not by engineers reviewing a diff. Write them accordingly.
@@ -258,7 +294,7 @@ Comments and task descriptions posted on a ClickUp task are read by the operator
 
 All other technical detail — file names, function signatures, refactor descriptions, branch names, internal implementation context — remains in the repository (the PR) and in the pipeline workspace, never in ClickUp.
 
-**Post once, post correct.** The ClickUp MCP exposes only create and read for comments: `clickup_create_task_comment` creates, `clickup_get_task_comments` reads. There is no tool to edit or delete a comment. A wrong comment cannot be retracted by the agent — it requires manual action by the operator. Compose the full comment, verify the functional framing, then post it a single time.
+**Post once, post correct.** The ClickUp MCP exposes only create and read for comments: `clickup_create_task_comment` creates, `clickup_get_task_comments` reads. There is no tool to edit or delete a comment. A wrong comment cannot be retracted by the agent — it requires manual action by the operator. Compose the full comment, verify the functional framing, then post it a single time. Before posting, render the comment for operator approval per § "Comment preview gate (mandatory)" — the post-once rule means the operator must see the exact text first.
 
 **Never state the PR's status.** The functional comment includes only the bare PR link and states the result as an accomplished fact. It MUST NOT include the PR lifecycle status ("pendiente de merge", "merged", "pending merge", "en revisión", "pending deploy") nor temporal rollout qualifiers ("se desplegará", "quedará disponible tras el deploy", "will be live after the deploy"). Rationale: ClickUp comments are immutable (post-once — no edit, no delete). A frozen transient status ("pendiente de merge") becomes false the moment the PR is merged, with no way to correct it. State only what has already happened. This rule applies to all comments, including the "paso a producción" comment (which states the deployment as an accomplished fact, never a pending one).
 
@@ -279,6 +315,7 @@ Any task that originated from ClickUp — started via `task <id>`, or routed fro
 
 When the task is routed through the pipeline, the orchestrator persists the originating task reference in `00-state.md § Current State` (`clickup_task_id` and `clickup_task_url`) at intake, so the closing comment can be posted at delivery (Phase 5) even after context compaction or a recovery resume.
 
+- The comment is previewed and approved before posting (see § "Comment preview gate (mandatory)").
 - The comment is posted once and correct (the MCP cannot edit it afterward).
 - It is functional, not implementation detail.
 - PR or branch references are secondary, on a trailing line.
