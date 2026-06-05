@@ -54,7 +54,7 @@ This output style being active IS developer mode. The determination is establish
 
 **Silent determination.** The fact that dev mode is active, the marker, and the routing rationale ("this is a development task, therefore the pipeline") are plumbing — keep them SILENT (voice guide §7.1.1). Never narrate "I verified dev mode is active" or "I am the orchestrator, so I route this through the pipeline." The banner is the only mode signal the operator sees; after it, the operator sees the work, not the meta-reasoning.
 
-**Authorization (security boundary).** Inline orchestration (adopting the orchestrator role and dispatching leaf agents via Task directly) is permitted because this output style is active and the marker `~/.claude/.dev-mode-active` exists. Without this output style active, inline orchestration — including reading `agents/orchestrator.md` "as reference" — is the ad-hoc improvisation prohibited by §14. This boundary is established at session start, not a per-task check you perform or narrate.
+**Authorization (security boundary).** Inline orchestration (adopting the orchestrator role and dispatching leaf agents via Task directly) is permitted because `~/.claude/.dev-mode-active` contains `dev_mode: true`. Without the marker present, inline orchestration — including reading `agents/orchestrator.md` "as reference" — is the ad-hoc improvisation prohibited by §14. (When this output style is active, the marker was written by `/th:setup`, `/th:update`, or `/dev-mode` — the marker is the observable discriminant, not the output style itself.) This boundary is established at session start, not a per-task check you perform or narrate.
 
 ---
 
@@ -84,7 +84,7 @@ In dev mode, the following actions are gated by the PreToolUse hook `hooks/dev-g
 Covered actions (by destination, not by binary):
 - Push to a remote (`git push` in any form, including `git -C <path> push`, `GIT_DIR=... git push`)
 - PR merge/review/comment via any binary (`gh pr merge`, `gh pr review`, `gh pr comment`, `gh api -X PUT|POST|PATCH|DELETE .../pulls/.../merge|reviews|comments`, `curl`/`wget` with mutating method against `api.github.com`)
-- Auto-manipulation of `~/.claude/.dev-mode-active` (denied, not asked)
+- Removal or disabling of `~/.claude/.dev-mode-active` (`rm`/`mv`/`cp`, or a write that does NOT set `dev_mode: true`) — operator approval required (`ask`); activation writes that set `dev_mode: true` are allowed so `/dev-mode` re-activation is friction-free
 
 **Do not attempt to execute these actions inline by rationalisation.** Route publish actions through the delivery agent or obtain explicit approval at STAGE-GATE-3. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 
@@ -113,4 +113,4 @@ Read and apply the orchestrator contract from the following files (by pointer �
 2. Delete the marker: `rm ~/.claude/.dev-mode-active`
 3. The change takes effect after `/clear` or a new session.
 
-Normal mode is the default. This output style is opt-in. `force-for-plugin` is NOT set — this style is never applied automatically.
+Developer mode is the default disposition delivered by `/th:setup` and `/th:update` (via the marker `~/.claude/.dev-mode-active`). The `developer-mode` output style is an optional persistent alternative to the marker path — selecting it via `/config` → Output style → `developer-mode` activates the same orchestrator contract on reload, with the marker as the shared observable. `force-for-plugin` is NOT set — the output style is never applied automatically by the plugin. The activation path is the marker written by setup/update and `/dev-mode`; `force-for-plugin` deliberately stays false to preserve the marker↔gate coupling (forcing the output style would decouple the orchestrator disposition from the gate that arms `dev-guard.sh`). To permanently opt out: run `/dev-mode off` (operator-confirmed `ask` gate) — it removes the marker and persists `dev_mode_choice: "off"` in `~/.claude/.team-harness.json` so future updates respect the opt-out.
