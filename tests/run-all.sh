@@ -76,6 +76,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 7: hooks/language-user-prompt.sh — functional tests"
+echo "############################################################"
+if bash "$TESTS_DIR/test_language_user_prompt.sh"; then
+    echo "language-user-prompt: PASS"
+else
+    echo "language-user-prompt: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
