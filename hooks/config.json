@@ -3,9 +3,20 @@
 
   "windows": {
     "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
-    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh",
-    "_events": "SessionStart + PreToolUse + Notification (idle_prompt only)",
+    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh, language-user-prompt.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse + Notification (idle_prompt only)",
     "hooks": {
+      "UserPromptSubmit": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/language-user-prompt.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
       "SessionStart": [
         {
           "matcher": "startup|resume|clear",
@@ -67,9 +78,20 @@
 
   "macos": {
     "_requires": "osascript (included in macOS) + python3",
-    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh",
-    "_events": "SessionStart + PreToolUse + Notification (idle_prompt only)",
+    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh, language-user-prompt.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse + Notification (idle_prompt only)",
     "hooks": {
+      "UserPromptSubmit": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/language-user-prompt.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
       "SessionStart": [
         {
           "matcher": "startup|resume|clear",
@@ -131,9 +153,20 @@
 
   "linux": {
     "_requires": "libnotify (notify-send) + python3",
-    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh",
-    "_events": "SessionStart + PreToolUse + Notification (idle_prompt only)",
+    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh, language-user-prompt.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse + Notification (idle_prompt only)",
     "hooks": {
+      "UserPromptSubmit": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/language-user-prompt.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
       "SessionStart": [
         {
           "matcher": "startup|resume|clear",
