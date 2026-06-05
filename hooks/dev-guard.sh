@@ -43,6 +43,16 @@
 #   A forged ~/.claude/.dev-mode-active only makes the gate MORE active (ask
 #   on more actions) — the safe direction.
 #
+# DEFAULT-ON (v2.56.0): dev mode is now the DEFAULT disposition. /th:setup and
+#   /th:update write the marker (~/.claude/.dev-mode-active) automatically unless
+#   the operator has explicitly opted out (dev_mode_choice: "off" in
+#   ~/.claude/.team-harness.json). This gate does NOT read dev_mode_choice and is
+#   NOT affected by default-on: it fires solely on the marker. The sentinel in
+#   .team-harness.json influences only setup/update marker-write decisions — it
+#   cannot disable this gate in a live session, by design. Activation writes
+#   (printf 'dev_mode: true' > marker) remain allowed without prompting (Step 6
+#   below) — that path is what makes /dev-mode and default-on reliable.
+#
 # Cross-platform: runs under Git Bash on Windows, native bash on macOS/Linux.
 # Generic: no tokens, no private endpoints, no personal config. CLAUDE.md §12.
 #
