@@ -73,7 +73,7 @@ After install, open Claude Code. The entry points are:
 
 ## Developer mode
 
-Team Harness runs the orchestrated pipeline **only in developer mode** — an opt-in session mode. Without it, the top-level agent handles your request **directly** (normal Claude Code behavior, no pipeline). Developer mode is the opt-in; direct is the default.
+Team Harness runs the orchestrated pipeline in **developer mode** — the **default disposition** as of v2.56.0. `/th:setup` and `/th:update` activate it automatically. Without it, the top-level agent handles your request **directly** (normal Claude Code behavior, no pipeline). To exit: `/dev-mode off` — the choice persists across future updates.
 
 - **Enter:** `/dev-mode` — starts immediately in the current session, no `/clear` needed.
 - **Exit:** `/dev-mode off`.
