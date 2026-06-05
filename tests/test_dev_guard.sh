@@ -281,6 +281,43 @@ assert_allow "skill activation: printf dev_mode: true > marker" "$TMP" "$(make_p
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
+# Default-on assertions (v2.56.0)
+# These cases verify that the gate behavior is UNCHANGED by the default-on
+# model — the gate reads only the marker, never dev_mode_choice in
+# .team-harness.json. The sentinel cannot be a gate-disable bypass.
+# ---------------------------------------------------------------------------
+
+# Case 18 — ASK: marker present + dev_mode_choice="off" in config -> still ASK
+# The gate never reads .team-harness.json; sentinel "off" must not disarm it.
+echo
+echo "=== ASK: marker present + dev_mode_choice=off in config (sentinel not a gate bypass) ==="
+TMP=$(make_tmp_with_marker)
+# Write a fake .team-harness.json with dev_mode_choice: "off"
+mkdir -p "$TMP/.claude"
+printf '{"dev_mode_choice":"off","logs-mode":"local"}\n' > "$TMP/.claude/.team-harness.json"
+assert_ask "marker present + sentinel off -> still ask (gate reads marker, not sentinel)" "$TMP" "$(make_payload 'git push origin main')"
+rm -rf "$TMP"
+
+# Case 19 — ALLOW: activation write on marker-absent machine (default-on setup/update path)
+# /th:setup and /th:update write the marker via printf when dev_mode_choice != "off".
+# This is the exact activation command that the update skill runs; it must be allowed.
+echo
+echo "=== ALLOW: activation write on marker-absent machine (default-on setup/update path) ==="
+TMP=$(make_tmp_no_marker)
+assert_allow "activation write on absent-marker (default-on install path)" "$TMP" "$(make_payload "printf 'dev_mode: true\n' > $TMP/.claude/.dev-mode-active")"
+rm -rf "$TMP"
+
+# Case 20 — ALLOW: dev_mode: false in marker file (inactive, regardless of sentinel)
+# A marker that explicitly says dev_mode: false is treated as inactive.
+echo
+echo "=== ALLOW: marker present with dev_mode: false (explicit false -> inactive) ==="
+TMP="$(mktemp -d)"
+mkdir -p "$TMP/.claude"
+printf 'dev_mode: false\n' > "$TMP/.claude/.dev-mode-active"
+assert_allow "marker present with dev_mode: false (inactive)" "$TMP" "$(make_payload 'gh pr merge 123')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo

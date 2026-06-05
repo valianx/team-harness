@@ -13588,9 +13588,12 @@ _s59_go_const_match = re.search(
 _s59_go_block = _s59_go_const_match.group(1).strip() if _s59_go_const_match else ""
 
 # The Go const uses Go string concatenation (` + ` joins), so we can't do a raw
-# byte comparison. Instead verify the key discriminant phrase (the revised inline-permit
-# text anchored to "developer-mode output style") is present in the Go const.
-_S59_INLINE_PERMIT_PHRASE = "PERMITTED ONLY when the developer-mode output style is active"
+# byte comparison. Instead verify the key discriminant phrase (the inline-permit
+# text) is present in the Go const.
+# v2.56.0: phrase updated from "developer-mode output style is active" to "the
+# filesystem marker" (default-on model: all routes — setup/update, /dev-mode,
+# output style — satisfy the same observable marker condition).
+_S59_INLINE_PERMIT_PHRASE = "PERMITTED ONLY when the"
 
 check(
     "dev-mode(mirror-canonical-nonempty): orchestrator-dispatch-rule canonical .md block is non-empty",
@@ -14374,6 +14377,240 @@ check(
     "legacy-installer" in _s62_step90,
     "Step 9.0 must mark 'cmd/install/main.go' as a legacy-installer anchor — "
     "updated only on installer releases, not on plugin-asset-only changes (AC-3)",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 63 — Default-on dev mode (v2.56.0)
+# Guards the default-on behavioral inversion:
+#   1. Managed block (dev-mode.md) no longer claims "opt-in" / "Normal is the default"
+#   2. Orchestrator-dispatch-rule block no longer claims "Developer mode is the opt-in"
+#   3. setup/SKILL.md Step 4e writes the marker (default-on) not just copies files
+#   4. update/SKILL.md contains the default-on marker-write logic
+#   5. dev-mode/SKILL.md persists dev_mode_choice via merge-write
+#   6. docs/dev-mode.md documents the sentinel, decision table, and migration caveat
+#   7. output-styles/developer-mode.md (force-for-plugin stays absent/false)
+#   8. CLAUDE.md §5 dev-mode bullet reflects default-on
+#   9. README.md reflects default-on (no longer "opt-in" framing)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 63: Default-on dev mode (v2.56.0) ===")
+
+_setup_md = read(SKILLS_DIR / "setup" / "SKILL.md")
+_update_md = read(SKILLS_DIR / "update" / "SKILL.md")
+_dev_mode_skill = read(SKILLS_DIR / "dev-mode" / "SKILL.md")
+_dev_mode_doc = read(REPO_ROOT / "docs" / "dev-mode.md")
+_readme_md = read(REPO_ROOT / "README.md")
+_claude_md_repo = read(REPO_ROOT / "CLAUDE.md")
+_dev_mode_canonical_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md")
+_orch_dispatch_canonical_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md")
+
+# 1. dev-mode canonical managed block: must NOT say "opt-in" or "Normal is the default"
+# as the primary framing, but MUST document the escape hatch (/dev-mode off).
+check(
+    "managed-blocks/dev-mode.md does NOT claim 'opt-in' as primary framing",
+    "OPT-IN" not in _dev_mode_canonical_block.upper().replace("opt-out", "").replace("NOT set", ""),
+    "dev-mode managed block still uses 'opt-in' framing — must reflect default-on",
+)
+check(
+    "managed-blocks/dev-mode.md does NOT claim 'Normal mode (general assistant) is the default'",
+    "Normal mode (general assistant) is the default" not in _dev_mode_canonical_block,
+    "managed block still asserts 'Normal mode ... is the default' — contradicts default-on",
+)
+check(
+    "managed-blocks/dev-mode.md documents the escape hatch (/dev-mode off)",
+    "/dev-mode off" in _dev_mode_canonical_block,
+    "managed block must document the /dev-mode off escape hatch",
+)
+check(
+    "managed-blocks/dev-mode.md documents that off persists (dev_mode_choice)",
+    "dev_mode_choice" in _dev_mode_canonical_block or "persists" in _dev_mode_canonical_block,
+    "managed block must document that /dev-mode off persists the choice",
+)
+
+# 2. orchestrator-dispatch-rule canonical block: no "opt-in; direct is the default"
+check(
+    "managed-blocks/orchestrator-dispatch-rule.md does NOT say 'Developer mode is the opt-in; direct is the default'",
+    "Developer mode is the opt-in; direct is the default" not in _orch_dispatch_canonical_block,
+    "orchestrator-dispatch-rule block still claims 'Developer mode is the opt-in; direct is the default'",
+)
+check(
+    "managed-blocks/orchestrator-dispatch-rule.md states dev mode is the default",
+    "default" in _orch_dispatch_canonical_block and (
+        "written by" in _orch_dispatch_canonical_block or "th:setup" in _orch_dispatch_canonical_block
+    ),
+    "orchestrator-dispatch-rule block must state dev mode is the default (written by setup/update)",
+)
+
+# 3. setup/SKILL.md Step 4e: the surrounding conditional logic (outside the managed
+# blocks) must read dev_mode_choice and contain the marker-write and the opt-out branch.
+check(
+    "skills/setup/SKILL.md Step 4e: reads dev_mode_choice and writes dev_mode: true marker",
+    "dev_mode_choice" in _setup_md and "dev_mode: true" in _setup_md,
+    "setup/SKILL.md Step 4e must read dev_mode_choice and write the dev_mode: true marker",
+)
+check(
+    "skills/setup/SKILL.md Step 4e: has explicit 'do NOT write' branch for opt-out",
+    "do NOT write" in _setup_md,
+    "setup/SKILL.md Step 4e must have an explicit opt-out branch that does NOT write the marker",
+)
+
+# 3b. Inline managed-block copies in setup/SKILL.md must byte-match canonical files.
+# Extract the inline dev-mode block from setup/SKILL.md (between its markers).
+_DM_START = "<!-- dev-mode:start -->"
+_DM_END = "<!-- dev-mode:end -->"
+_setup_dm_a = _setup_md.find(_DM_START)
+_setup_dm_b = _setup_md.find(_DM_END)
+_setup_dm_inline = (
+    _setup_md[_setup_dm_a: _setup_dm_b + len(_DM_END)]
+    if _setup_dm_a != -1 and _setup_dm_b != -1
+    else ""
+)
+_canonical_dm = _dev_mode_canonical_block.strip()
+check(
+    "skills/setup/SKILL.md inline dev-mode block matches canonical managed-blocks/dev-mode.md",
+    _setup_dm_inline.strip() == _canonical_dm,
+    "inline copy diverges from canonical — edit both in the same commit",
+)
+
+# Extract the inline orchestrator-dispatch-rule block from setup/SKILL.md.
+_ODR_START = "<!-- orchestrator-dispatch-rule:start -->"
+_ODR_END = "<!-- orchestrator-dispatch-rule:end -->"
+_setup_odr_a = _setup_md.find(_ODR_START)
+_setup_odr_b = _setup_md.find(_ODR_END)
+_setup_odr_inline = (
+    _setup_md[_setup_odr_a: _setup_odr_b + len(_ODR_END)]
+    if _setup_odr_a != -1 and _setup_odr_b != -1
+    else ""
+)
+_canonical_odr = _orch_dispatch_canonical_block.strip()
+check(
+    "skills/setup/SKILL.md inline orchestrator-dispatch-rule block matches canonical",
+    _setup_odr_inline.strip() == _canonical_odr,
+    "inline orchestrator-dispatch-rule copy diverges from canonical — edit both in the same commit",
+)
+
+# 4. update/SKILL.md contains the default-on marker-write logic (both OS blocks).
+check(
+    "skills/update/SKILL.md PowerShell block contains default-on marker-write (dev_mode_choice check)",
+    "dev_mode_choice" in _update_md and "dev_mode: true" in _update_md,
+    "update/SKILL.md PowerShell block must read dev_mode_choice and write the marker",
+)
+check(
+    "skills/update/SKILL.md bash block contains default-on marker-write (DEV_MODE_CHOICE check)",
+    "DEV_MODE_CHOICE" in _update_md or "dev_mode_choice" in _update_md,
+    "update/SKILL.md bash block must read dev_mode_choice and conditionally write the marker",
+)
+check(
+    "skills/update/SKILL.md explicitly states it never writes .team-harness.json",
+    "never writes" in _update_md.lower() and "team-harness.json" in _update_md,
+    "update/SKILL.md must state it never writes .team-harness.json (reads sentinel, writes only marker)",
+)
+
+# 5. dev-mode/SKILL.md persists dev_mode_choice via merge-write in both steps.
+check(
+    "skills/dev-mode/SKILL.md Step 2A persists dev_mode_choice: 'on' via merge-write",
+    "dev_mode_choice" in _dev_mode_skill and '"on"' in _dev_mode_skill
+    and "merge-write" in _dev_mode_skill.lower(),
+    "dev-mode/SKILL.md Step 2A must merge-write dev_mode_choice: 'on'",
+)
+check(
+    "skills/dev-mode/SKILL.md Step 2B persists dev_mode_choice: 'off' via merge-write",
+    '"off"' in _dev_mode_skill and "merge-write" in _dev_mode_skill.lower(),
+    "dev-mode/SKILL.md Step 2B must merge-write dev_mode_choice: 'off'",
+)
+check(
+    "skills/dev-mode/SKILL.md states gate never reads dev_mode_choice",
+    "gate" in _dev_mode_skill.lower() and "dev_mode_choice" in _dev_mode_skill
+    and ("never reads" in _dev_mode_skill.lower() or "NEVER reads" in _dev_mode_skill
+         or "not a gate" in _dev_mode_skill.lower()),
+    "dev-mode/SKILL.md must document that the gate never reads dev_mode_choice",
+)
+
+# 6. docs/dev-mode.md: documents sentinel, decision table, migration caveat.
+check(
+    "docs/dev-mode.md has 'Default-on disposition' section",
+    "Default-on disposition" in _dev_mode_doc,
+    "docs/dev-mode.md missing the Default-on disposition section",
+)
+check(
+    "docs/dev-mode.md documents the dev_mode_choice sentinel (tri-state)",
+    "dev_mode_choice" in _dev_mode_doc and ("absent" in _dev_mode_doc or "tri-state" in _dev_mode_doc),
+    "docs/dev-mode.md must document the dev_mode_choice tri-state sentinel",
+)
+check(
+    "docs/dev-mode.md documents the migration caveat (pre-2.56.0 opt-outs re-activated)",
+    "pre-2.56.0" in _dev_mode_doc or ("migration" in _dev_mode_doc.lower() and "re-activat" in _dev_mode_doc.lower()),
+    "docs/dev-mode.md must document the pre-2.56.0 opt-out re-activation caveat",
+)
+check(
+    "docs/dev-mode.md records why force-for-plugin stays false",
+    "force-for-plugin" in _dev_mode_doc and "false" in _dev_mode_doc
+    and ("decouple" in _dev_mode_doc or "escape hatch" in _dev_mode_doc),
+    "docs/dev-mode.md must explain why force-for-plugin stays false (decouples gate, removes escape hatch)",
+)
+check(
+    "docs/dev-mode.md does NOT claim 'Normal mode remains the default' (contradicts default-on)",
+    "Normal mode remains the default" not in _dev_mode_doc,
+    "docs/dev-mode.md still has 'Normal mode remains the default' — contradicts default-on",
+)
+check(
+    "docs/dev-mode.md does NOT claim 'cost is zero outside dev mode' (contradicts default-on)",
+    "cost is zero outside dev mode" not in _dev_mode_doc,
+    "docs/dev-mode.md still claims 'cost is zero outside dev mode' — contradicts default-on",
+)
+
+# 7. output-styles/developer-mode.md: force-for-plugin must NOT be set to true.
+_output_style_path = REPO_ROOT / "output-styles" / "developer-mode.md"
+check(
+    "output-styles/developer-mode.md exists",
+    _output_style_path.exists(),
+    "output-styles/developer-mode.md not found",
+)
+if _output_style_path.exists():
+    _output_style_md = read(_output_style_path)
+    check(
+        "output-styles/developer-mode.md does NOT have force-for-plugin: true",
+        "force-for-plugin: true" not in _output_style_md,
+        "force-for-plugin: true found in output-styles/developer-mode.md — must stay absent/false",
+    )
+    check(
+        "output-styles/developer-mode.md does NOT claim 'Normal mode is the default' (contradicts default-on)",
+        "Normal mode is the default" not in _output_style_md,
+        "output-styles/developer-mode.md still says 'Normal mode is the default' — contradicts default-on",
+    )
+    check(
+        "output-styles/developer-mode.md does NOT claim 'This output style is opt-in' as primary disposition framing (contradicts default-on)",
+        "This output style is opt-in" not in _output_style_md,
+        "output-styles/developer-mode.md still says 'This output style is opt-in' — contradicts default-on disposition",
+    )
+    check(
+        "output-styles/developer-mode.md authorization clause uses marker-based discriminant (not output-style-active)",
+        "dev_mode: true" in _output_style_md or "marker" in _output_style_md,
+        "output-styles/developer-mode.md authorization clause must reference the marker as the discriminant",
+    )
+
+# 8. CLAUDE.md §5 dev-mode bullet: no longer says "Opt-in session mode"; reflects default-on.
+check(
+    "CLAUDE.md §5 dev-mode bullet says 'default' (default-on)",
+    "default" in _claude_md_repo and "dev mode" in _claude_md_repo.lower(),
+    "CLAUDE.md §5 dev-mode bullet must mention 'default' to reflect default-on",
+)
+check(
+    "CLAUDE.md §5 dev-mode bullet does NOT say 'Opt-in session mode'",
+    "Opt-in session mode" not in _claude_md_repo,
+    "CLAUDE.md §5 still says 'Opt-in session mode' — must reflect default-on",
+)
+
+# 9. README.md: no longer says "Developer mode is the opt-in; direct is the default".
+check(
+    "README.md does NOT say 'Developer mode is the opt-in; direct is the default'",
+    "Developer mode is the opt-in; direct is the default" not in _readme_md,
+    "README.md still claims 'Developer mode is the opt-in; direct is the default'",
+)
+check(
+    "README.md reflects default-on for developer mode",
+    "default" in _readme_md and ("dev" in _readme_md.lower()),
+    "README.md must reflect that dev mode is now the default",
 )
 
 # ---------------------------------------------------------------------------
