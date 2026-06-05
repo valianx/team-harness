@@ -1,10 +1,44 @@
 # Dev Mode — Contract
 
-Dev mode is an opt-in session state where the top-level Claude agent adopts the orchestrator role and dispatches leaf agents directly via the `Task` tool — no nested subagent invocation, no `dispatch_handoff` round-trip. Normal mode (general assistant, no pipeline overhead) remains the default.
+Dev mode is the **default disposition** delivered by `/th:setup` and `/th:update`. A fresh install or an update activates dev mode (orchestrator role + armed `dev-guard.sh`) automatically — unless the operator has explicitly opted out. The operator can exit at any time with `/dev-mode off`, and that choice persists so future updates respect it.
 
 ---
 
-## Disposition mechanism: output-style replaces the base
+## Default-on disposition
+
+**Mechanism — marker-write.** Setup and update write `dev_mode: true` to `~/.claude/.dev-mode-active` when the operator has not explicitly opted out. This arms `dev-guard.sh` and triggers the existing `SessionStart` injection — no hook change is needed.
+
+**Durable decision — `dev_mode_choice` sentinel in `~/.claude/.team-harness.json`.** Tri-state: absent (never decided → default-on applies), `"on"` (explicit), `"off"` (explicit opt-out). Written ONLY by the operator via `/dev-mode` on/off. Read by setup and update. The sentinel uses the **merge-write-whole-document** contract: read the full JSON, replace only `dev_mode_choice`, write the whole document back — never clobber `logs-mode`, `language`, `files`, `clickup`, `pricing`, or other keys.
+
+**Decision table (`dev_mode_choice` × action → marker outcome):**
+
+| `dev_mode_choice` | `/th:setup` (install) | `/th:update` |
+|---|---|---|
+| absent (never decided) | write marker `dev_mode: true` | write marker `dev_mode: true` |
+| `"on"` (explicit on) | write marker `dev_mode: true` | write marker `dev_mode: true` |
+| `"off"` (explicit opt-out) | do NOT write marker | do NOT write marker; never remove an existing one |
+
+**Skill writes (explicit operator actions):**
+
+| Action | Marker | Sentinel |
+|---|---|---|
+| `/dev-mode` (on) | write `dev_mode: true` | merge-write `dev_mode_choice: "on"` |
+| `/dev-mode off` | rm (gated `ask`, unchanged) | merge-write `dev_mode_choice: "off"` |
+
+**Invariants:**
+- Setup and update NEVER remove a marker — removal stays operator-driven via `/dev-mode off` (gated `ask`). They only conditionally WRITE one.
+- The gate (`dev-guard.sh`) NEVER reads `dev_mode_choice`. The sentinel influences only the setup/update marker-write decision; within an active session the gate fires on outward actions regardless of the sentinel value. This is why the sentinel cannot be a gate-disable bypass.
+- `force-for-plugin` is deliberately `false` on the `developer-mode` output style. Setting it would decouple the orchestrator disposition from the marker that arms `dev-guard.sh` (disposition could stay forced-on while `/dev-mode off` disarms the gate — a security regression), and would remove the per-operator escape hatch. The marker is the single coupling point.
+
+**Inline orchestration permit (SEC-DR-2) — restated for default-on.** Executing the orchestrator role inline at top level is PERMITTED when `~/.claude/.dev-mode-active` contains `dev_mode: true`. This condition is satisfied by default-on (setup/update write the marker), by `/dev-mode`, and by the `developer-mode` output style — all three routes satisfy the same observable.
+
+**Migration caveat (pre-2.56.0 opt-outs).** The old `/dev-mode off` only removed the marker; it persisted no sentinel. A pre-2.56.0 opt-out is therefore indistinguishable from "never decided" (both: marker absent, sentinel absent). The first `/th:update` after upgrading to 2.56.0 WILL re-activate those operators. Forward (post-2.56.0) opt-outs via `/dev-mode off` persist correctly. Operator communication is the recommended mitigation for the small user base.
+
+---
+
+---
+
+## Disposition mechanism: output-style replaces the base (persistent strong floor)
 
 **Why output-style, not a skill.** A prior implementation used a `/dev-mode` skill (commit 18ea492). A live test proved that mechanism structurally insufficient: the skill LAYERED the orchestrator contract OVER the base "make-progress" disposition of the general agent, and the base won — the agent operated inline, merged a PR to main without a pipeline, and rationalised the skip. A skill superposes; the base built-in beats it.
 
@@ -24,13 +58,15 @@ This distinction is load-bearing:
 
 **Conclusion:** `keep-coding-instructions: false` is safe for this harness because the security floors are hooks, not prompt. No security-relevant default lives exclusively in the discarded SWE instructions that the orchestrator contract + hooks do not re-establish.
 
-**Honest trade-off (accepted by the operator):** the output style is SESSION-LEVEL — read once at session start, so changing it requires `/clear` or a new session. The `/dev-mode` skill avoids that cost: it is the in-session toggle that loads the disposition and writes the marker immediately, with no reload. The output style remains the optional persistent path (strong base-replacement via `keep-coding-instructions: false`), applied on reload via `/config` → Output style. Either way the marker is the observable flag. Normal mode remains the default; the cost only applies to operators who deliberately enter dev mode.
+**Honest trade-off (accepted by the operator):** the output style is SESSION-LEVEL — read once at session start, so changing it requires `/clear` or a new session. The `/dev-mode` skill avoids that cost: it is the in-session toggle that loads the disposition and writes the marker immediately, with no reload. The output style remains the optional persistent path (strong base-replacement via `keep-coding-instructions: false`), applied on reload via `/config` → Output style. Either way the marker is the observable flag. Default-on means every session pays the orchestrator-contract token cost (mitigated by prompt caching after the first turn — see `§ Token Cost`).
 
 ---
 
 ## Activation and the filesystem marker
 
-**Activation:** run `/dev-mode`. The skill starts developer mode in the current session immediately — it writes the marker `~/.claude/.dev-mode-active` (`dev_mode: true`), shows the banner, and adopts the orchestrator role. No `/clear` is required. While the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) auto-resumes dev mode in every new session, surfacing the banner instantly via `systemMessage`. The marker is the single source of truth.
+**Default activation (v2.56.0+):** `/th:setup` and `/th:update` write the marker `~/.claude/.dev-mode-active` (`dev_mode: true`) automatically when `dev_mode_choice` is absent or `"on"` in `~/.claude/.team-harness.json`. A fresh install or update leaves the operator in dev mode without any extra command. While the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) auto-resumes dev mode in every new session, surfacing the banner instantly via `systemMessage`. The marker is the single source of truth.
+
+**In-session activation:** run `/dev-mode`. The skill starts developer mode in the current session immediately — it writes the marker, shows the banner, adopts the orchestrator role, and merge-writes `dev_mode_choice: "on"` to `~/.claude/.team-harness.json` so future updates also assert the marker. No `/clear` is required.
 
 **Language directive (dev-mode-independent):** a separate SessionStart hook, `hooks/language-session-start.sh`, runs at every session start regardless of dev mode. When `~/.claude/.team-harness.json` contains a valid `language` key, it injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence for that session. Both hooks run under the same `startup|resume|clear` matcher and are order-independent.
 
@@ -38,9 +74,9 @@ The marker is the observable signal that (a) dev mode is active for the session 
 
 **Persistent alternative:** select the `developer-mode` output style via `/config` → Output style → `developer-mode` (replaces the system prompt on reload — `keep-coding-instructions: false`). Equivalent; the marker remains the flag.
 
-**Deactivation:** run `/dev-mode off` — it removes the marker (`dev-guard.sh` intercepts the removal with `permissionDecision: "ask"`; the operator confirms). New sessions then open in normal mode. (Output-style users: `/config` → Output style → Default.)
+**Deactivation (escape hatch):** run `/dev-mode off` — it removes the marker (`dev-guard.sh` intercepts the removal with `permissionDecision: "ask"`; the operator confirms), and merge-writes `dev_mode_choice: "off"` to `~/.claude/.team-harness.json` so future updates respect the opt-out. New sessions then open in normal mode. (Output-style users: `/config` → Output style → Default.)
 
-**Normal is the default.** `force-for-plugin` is NOT set on the output style — it is never applied automatically. Every operator enters dev mode by deliberate action.
+**`force-for-plugin` is NOT set** on the `developer-mode` output style — it is never applied automatically via the plugin mechanism. The activation path is the marker written by setup/update and by `/dev-mode`, not the output-style auto-apply. See `§ Default-on disposition` above for the rationale (force-for-plugin would decouple the disposition from the marker-armed gate and remove the per-operator escape hatch).
 
 ---
 
@@ -58,7 +94,8 @@ The deterministic security layer is the PreToolUse hook `hooks/dev-guard.sh`, wi
 | `gh pr comment` | `ask` | Publishes a comment on behalf of the operator |
 | `gh api -X PUT|POST|PATCH|DELETE` against PR endpoints (`/pulls/.../merge|reviews|comments`) | `ask` | Covers API-level bypass of the `gh` CLI |
 | `curl`/`wget` with mutating method against `api.github.com` | `ask` | Covers binary-level bypass |
-| Write/remove/move `~/.claude/.dev-mode-active` (`rm`/`mv`/`>`/`>>`/`tee`/`cp`) | `deny` | Disabling the gate while dev mode is active is not operator-approvable inline |
+| Activation write (`>`/`>>`/`tee`) setting `dev_mode: true` | `allow` | Arming MORE gating is safe; enables `/dev-mode` (re)activation without friction |
+| Remove/move/other-write to `~/.claude/.dev-mode-active` (`rm`/`mv`/`cp`, or write not setting `dev_mode: true`) | `ask` | Disabling the gate requires operator confirmation — `/dev-mode off` relies on this |
 
 **What `ask` means:** `permissionDecision: "ask"` causes the Claude Code runtime to prompt the OPERATOR interactively for that specific call. The agent CANNOT auto-approve an `ask`. There is NO authorisation marker file — the authorisation is human out-of-band. A legitimate delivery push at STAGE-GATE-3 proceeds through this same operator approval, mirroring the preview-and-confirm contract of review-mode (#251/#252).
 
@@ -74,10 +111,12 @@ The deterministic security layer is the PreToolUse hook `hooks/dev-guard.sh`, wi
 
 Executing the orchestrator role inline at top level is **PERMITTED ONLY** when:
 
-- The `developer-mode` output style is active (signalled by `~/.claude/.dev-mode-active` containing `dev_mode: true`), AND
+- `~/.claude/.dev-mode-active` contains `dev_mode: true` (the marker is present and active), AND
 - The top-level session has the `Task` tool available (it always does at level 0).
 
-**Without the output style active:** executing orchestration inline — including reading `agents/orchestrator.md` "as reference" without the output style loaded — is the ad-hoc improvisation that weakens gate enforcement. It is PROHIBITED. The discriminant is the observable output style + filesystem marker, not a subjective judgment about whether the contract was loaded.
+This condition is satisfied by default-on (setup/update write the marker), by `/dev-mode`, and by the `developer-mode` output style — all three routes converge on the same observable (the marker). The discriminant is the **filesystem marker**, not a subjective judgment about whether a particular output style or skill was loaded.
+
+**Without the marker active:** executing orchestration inline — including reading `agents/orchestrator.md` "as reference" — is the ad-hoc improvisation that weakens gate enforcement. It is PROHIBITED.
 
 **FALLBACK:** when dev mode is not active, the canonical invocation is `Agent(subagent_type='th:orchestrator', ...)` and the nested-handoff/takeover machinery in `docs/subagent-orchestration.md` is the safety net.
 
@@ -150,8 +189,10 @@ The dev-mode gate does NOT re-implement the review-mode publish gate. It reinfor
 The orchestrator contract is loaded into the top-level context and persists for the session. Mitigants:
 
 1. **Prompt caching** — after the first turn, the stable prefix is billed at the cached rate.
-2. **Opt-in only** — normal mode loads nothing; cost is zero outside dev mode.
-3. **Pointer-based loading** — the output style body references files by pointer; the agent reads them on demand rather than keeping a verbatim copy in the style body itself.
+2. **Pointer-based loading** — the output style body references files by pointer; the agent reads them on demand rather than keeping a verbatim copy in the style body itself.
+3. **Opt-out available** — `/dev-mode off` exits dev mode and persists the decision. New sessions open in normal mode (zero orchestrator cost). The escape hatch is always available.
+
+Default-on means the cost applies to all sessions where the operator has not explicitly opted out. For operators who rarely use the pipeline, this is a trade-off the operator accepted for the current small user base.
 
 Compared to the prior path (nested orchestrator that fails + dispatch_handoff round-trip + takeover), dev mode is similar or lower cost for sessions that would have triggered the handoff.
 
@@ -162,8 +203,9 @@ Compared to the prior path (nested orchestrator that fails + dispatch_handoff ro
 `/th:setup` installs dev mode by:
 1. Copying `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (makes the `developer-mode` style available in `/config`).
 2. Writing the `dev-mode` managed block to `~/.claude/CLAUDE.md` (operator-facing documentation of the feature).
-3. Offering (opt-in, NOT forced) to activate the style and write the filesystem marker.
+3. Copying `skills/dev-mode/SKILL.md` to `~/.claude/skills/dev-mode/SKILL.md` (user-level toggle).
+4. **Default-on activation:** reading `dev_mode_choice` from `~/.claude/.team-harness.json` (absent/"on" → write marker `dev_mode: true` to `~/.claude/.dev-mode-active`; "off" → leave absent). No explicit `/dev-mode` is required on a fresh install.
 
-`/th:update` re-synchronizes the output style copy on every run and retires the obsolete `/dev-mode` user-level skill (`~/.claude/skills/dev-mode/SKILL.md`) if present.
+`/th:update` re-synchronizes the output style and managed blocks on every run, and applies the same default-on logic (reads `dev_mode_choice`; absent/"on" → assert marker; "off" → skip). The update NEVER removes an existing marker — removal is operator-driven via `/dev-mode off`.
 
-The Go installer (legacy path) also writes the `dev-mode` managed block via `ensureGlobalClaudeMD()` in `cmd/install/global_claude_md.go` and removes the obsolete `dev-mode-entry` block.
+The Go installer (legacy deprecated path) also writes the `dev-mode` managed block via `ensureGlobalClaudeMD()` in `cmd/install/global_claude_md.go` and removes the obsolete `dev-mode-entry` block. The legacy installer does NOT write the activation marker (parity gap — the marker is asserted on the next plugin-runtime session via `/th:update`, or the operator can run `/dev-mode` manually).
