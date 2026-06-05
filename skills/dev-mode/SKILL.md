@@ -4,9 +4,9 @@ description: Start Team Harness developer mode in the current session — adopt 
 disable-model-invocation: true
 ---
 
-This skill **starts developer mode now, in this session**. It is not a configuration step and it does NOT require `/clear`. On invocation you adopt the orchestrator disposition immediately: print the banner, arm the gate, and serve the operator as the orchestrator for the rest of this session.
+This skill **starts or stops developer mode in the current session**. It is not a configuration step and it does NOT require `/clear`. When starting: print the banner, arm the gate, and serve the operator as the orchestrator for the rest of this session.
 
-Developer mode is the OPT-IN that routes development tasks through the full pipeline (architect → implementer → tester + qa + security → delivery) with every gate enforced, and arms the deterministic outward-action gate (`hooks/dev-guard.sh`). Normal mode is the default; this skill is how the operator turns dev mode on, in-session, on demand.
+Developer mode is the **default disposition** delivered by `/th:setup` and `/th:update`. This skill is how the operator explicitly toggles it in-session and persists the decision for future updates. Running `/dev-mode off` saves the opt-out so `/th:update` will not re-activate the operator; running `/dev-mode on` re-asserts the default.
 
 ## Step 1 — Parse the argument
 
@@ -28,7 +28,11 @@ Activation is fast and functional: a one-line banner, then serve the operator's 
 TEAM HARNESS | DEVELOPER MODE ACTIVE | pipeline on | outward actions require operator approval | stop: /dev-mode off
 ```
 
-2. **Write the marker — always, silently.** Run exactly one Bash command, unconditionally, every time `on` is invoked: `printf 'dev_mode: true\n' > ~/.claude/.dev-mode-active`. This is idempotent and the gate allows activation writes, so do NOT make it conditional and do NOT skip it on the assumption that dev mode is "already active" — that assumption is what previously left the marker missing after a re-activation, so new sessions lost dev mode. Persisting the marker is what lets new terminals open in dev mode. Never use the Write tool for the marker (it errors when overwriting a file not read this session). **Never narrate the marker**: no "developer mode is armed", no "marker already set", no recovery commentary.
+2. **Write the marker and persist the sentinel — always, silently.**
+
+   a. **Write the marker:** run `printf 'dev_mode: true\n' > ~/.claude/.dev-mode-active`. This is idempotent and the gate allows activation writes, so do NOT make it conditional and do NOT skip it on the assumption that dev mode is "already active" — that assumption is what previously left the marker missing after a re-activation, so new sessions lost dev mode. Persisting the marker is what lets new terminals open in dev mode. Never use the Write tool for the marker (it errors when overwriting a file not read this session). **Never narrate the marker**: no "developer mode is armed", no "marker already set", no recovery commentary.
+
+   b. **Merge-write the sentinel:** read `~/.claude/.team-harness.json` (or start from `{}` if absent), set `dev_mode_choice` to `"on"`, write the whole document back. This persists the explicit activation so future `/th:update` runs also assert the marker. Use the **merge-write-whole-document** contract: never emit a partial payload — preserve all existing keys (`logs-mode`, `language`, `files`, `clickup`, `pricing`, etc.). Do this silently (no narration).
 
 3. **Then serve the operator's first message.** After the banner, look at what the operator actually said:
    - **If it is already a concrete request or question** (for example "qué hay acá?", "abrí el PR", "arreglá X"), address it directly — do NOT fall back to a canned greeting. Answer simple, non-development queries yourself (listing a directory IS the answer to "qué hay acá?"); route development tasks through the pipeline per triage. Fulfilling an explicit request is expected — the "keep it short" rule forbids UNPROMPTED exploration, git, or environment statistics, not answering what was asked.
@@ -55,7 +59,8 @@ TEAM HARNESS | DEVELOPER MODE ACTIVE | pipeline on | outward actions require ope
 ## Step 2B — Stop developer mode (in-session)
 
 1. Remove the marker: `rm ~/.claude/.dev-mode-active`. The `dev-guard.sh` gate intercepts marker removal with `permissionDecision: "ask"` — the **operator** confirms the exit. This is expected and correct: it prevents silently disarming the gate. If the operator declines, dev mode stays active; report that and stop.
-2. After the marker is removed, drop the orchestrator disposition: report `Developer mode stopped. Back to normal mode — requests are handled directly.` and resume normal (general-assistant) behavior for the rest of the session.
+2. **Merge-write the sentinel:** read `~/.claude/.team-harness.json` (or start from `{}` if absent), set `dev_mode_choice` to `"off"`, write the whole document back. This persists the opt-out so future `/th:update` runs do NOT re-activate dev mode. Use the **merge-write-whole-document** contract: never emit a partial payload — preserve all existing keys (`logs-mode`, `language`, `files`, `clickup`, `pricing`, etc.). Do this silently (no narration).
+3. After the marker is removed and the sentinel persisted, drop the orchestrator disposition: report `Developer mode stopped. Back to normal mode — requests are handled directly. Future updates will respect the opt-out.` and resume normal (general-assistant) behavior for the rest of the session.
 
 ## Step 2C — Status
 
@@ -64,5 +69,6 @@ Check for `~/.claude/.dev-mode-active` (and its `dev_mode: true` content). Repor
 ## Notes
 
 - **In-session, no reload.** This skill loads the disposition into the current context, so dev mode takes effect on the same turn. This is the difference from the `developer-mode` output style (set via `/config`), which is the persistent, whole-session option and applies on reload. Both set the same observable marker; either is a sanctioned activation path.
+- **Sentinel persistence.** Unlike prior versions, this skill now merge-writes `dev_mode_choice: "on"|"off"` to `~/.claude/.team-harness.json` so the explicit choice survives `/th:update` runs. Absent sentinel = never decided = default-on applies. See `docs/dev-mode.md § Default-on disposition`.
 - This file is the **canonical repo source**. It is installed as a USER-LEVEL skill at `~/.claude/skills/dev-mode/` by `/th:setup` and re-synced by `/th:update`, so the bare `/dev-mode` is available (plugin skills are namespaced; a bare command requires a user-level skill).
-- The gate (`hooks/dev-guard.sh`) and the precondition contract (managed block + `docs/dev-mode.md`) are independent of this skill — it does not modify them; it loads the disposition and arms the marker.
+- The gate (`hooks/dev-guard.sh`) NEVER reads `dev_mode_choice` from `~/.claude/.team-harness.json`. The sentinel influences only setup/update marker-write decisions; within a live session the gate fires on outward actions based solely on the marker. The sentinel is not a gate-disable bypass.

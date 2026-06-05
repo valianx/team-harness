@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.56.0] - 2026-06-05
+
+### Changed
+
+- Developer mode is now the **default disposition** for Team Harness. `/th:setup` and `/th:update` write the activation marker (`~/.claude/.dev-mode-active`, `dev_mode: true`) automatically — no explicit `/dev-mode` required after install or update.
+- `/dev-mode off` now persists the opt-out as `dev_mode_choice: "off"` in `~/.claude/.team-harness.json` (merge-write contract) so future updates respect the choice and do not re-activate.
+- `/dev-mode on` now persists `dev_mode_choice: "on"` to make explicit activations durable across updates.
+- All repo surfaces that described dev mode as "opt-in only" / "Normal mode is the default" / "cost is zero outside dev mode" have been reconciled to the default-on model.
+- `docs/dev-mode.md` updated with: Default-on disposition section (decision table, tri-state sentinel, mechanism, migration caveat), Installation section reflecting marker-write, Token Cost section updated.
+- `README.md` Developer mode section updated to reflect default-on framing.
+- `CLAUDE.md §5` dev-mode bullet updated to reflect default-on.
+- Managed blocks (`dev-mode.md`, `orchestrator-dispatch-rule.md`) updated; inline copies in `setup/SKILL.md` kept in sync.
+
+### Added
+
+- `dev_mode_choice` sentinel in `~/.claude/.team-harness.json`: tri-state (`absent` = never decided → default-on; `"on"` = explicit; `"off"` = explicit opt-out). Written only by `/dev-mode on|off`. Read by `/th:setup` Step 4e and `/th:update`.
+- `tests/test_dev_guard.sh`: three new cases — sentinel-off + marker-present → still ASK (AC-6); activation write on marker-absent machine → ALLOW (AC-7 default-on path); `dev_mode: false` in marker → ALLOW.
+- `tests/test_agent_structure.py` Suite 63: structural assertions for default-on invariants — managed block coherence, inline copy sync, update skill contains sentinel-read logic, dev-mode skill persists sentinel, docs/dev-mode.md has required sections, no contradictory claims remain.
+- `hooks/dev-guard.sh`: clarifying comment documenting that the gate never reads `dev_mode_choice` and that default-on does not change gate behavior.
+
+### Security
+
+- Gate invariant preserved: `dev-guard.sh` reads only `~/.claude/.dev-mode-active` (the marker) and never reads `dev_mode_choice` from `~/.claude/.team-harness.json`. The sentinel cannot disable the gate in a live session.
+- `force-for-plugin` stays `false` on the `developer-mode` output style. Setting it would decouple the orchestrator disposition from the marker that arms `dev-guard.sh` and would remove the per-operator escape hatch — both security regressions.
+- Migration caveat documented: pre-2.56.0 opt-outs (old `/dev-mode off` persisted no sentinel) are indistinguishable from never-decided and are re-activated by the first `/th:update` after upgrading to 2.56.0. Forward opt-outs persist correctly.
+
 ## [2.55.1] - 2026-06-04
 
 ### Fixed

@@ -16,7 +16,7 @@ const orchestratorRule = `<!-- orchestrator-dispatch-rule:start -->
 
 **How to invoke:** ` + "`Agent(subagent_type='th:orchestrator', ...)`" + `. The orchestrator dispatches phase agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery, etc.) internally via Task.
 
-**Inline orchestration at top level:** executing the orchestrator role inline at top level is PERMITTED ONLY when the developer-mode output style is active (signalled by the filesystem marker ` + "`~/.claude/.dev-mode-active`" + ` containing ` + "`dev_mode: true`" + `). In that case the top-level agent IS the orchestrator — it has Task available and dispatches leaf agents directly without a dispatch_handoff. Without the output style active, executing orchestration inline — including reading ` + "`agents/orchestrator.md`" + ` "as reference" — is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED. **FALLBACK:** when dev mode is not active, the canonical invocation is ` + "`Agent(subagent_type='th:orchestrator', ...)`" + ` and the nested-handoff/takeover machinery in ` + "`docs/subagent-orchestration.md`" + ` is the safety net.
+**Inline orchestration at top level:** executing the orchestrator role inline at top level is PERMITTED ONLY when the filesystem marker ` + "`~/.claude/.dev-mode-active`" + ` contains ` + "`dev_mode: true`" + `. In that case the top-level agent IS the orchestrator — it has Task available and dispatches leaf agents directly without a dispatch_handoff. Developer mode is the default (written by `/th:setup` and `/th:update`); without the marker active, executing orchestration inline — including reading ` + "`agents/orchestrator.md`" + ` "as reference" — is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED. **FALLBACK:** when dev mode is not active, the canonical invocation is ` + "`Agent(subagent_type='th:orchestrator', ...)`" + ` and the nested-handoff/takeover machinery in ` + "`docs/subagent-orchestration.md`" + ` is the safety net.
 
 **Default to team-harness flows.** For any development task — features, bug fixes, refactors, enhancements, hotfixes, issue work, code review — the top-level agent routes through the orchestrator or the matching ` + "`th`" + ` skill by default. Direct or manual handling (writing code, running commands, editing files outside a pipeline) is the exception and requires an explicit operator opt-out. When in doubt, use th flows.
 
@@ -32,16 +32,23 @@ const orchestratorRule = `<!-- orchestrator-dispatch-rule:start -->
 const devModeMarkerStart = "<!-- dev-mode:start -->"
 const devModeMarkerEnd = "<!-- dev-mode:end -->"
 
+// devModeBlock is the prose written to ~/.claude/CLAUDE.md by the legacy Go
+// installer path (deprecated since v2.33.0). It is intentionally kept in sync
+// with the plugin-path canonical block (skills/setup/managed-blocks/dev-mode.md)
+// for doc-coherence, but the Go installer DOES NOT write the activation marker
+// (~/.claude/.dev-mode-active). The marker is asserted on the next plugin-runtime
+// session via /th:update, or the operator can run /dev-mode manually.
+// Parity gap (by design, not a bug): marker-activation is not added to this
+// deprecated path to avoid complexity in code that will be removed in a future
+// version. See docs/dev-mode.md § Installation for the documented caveat.
 const devModeBlock = `<!-- dev-mode:start -->
 ## dev mode
 
-**What it is:** An opt-in session mode where the top-level agent adopts the orchestrator role and dispatches leaf agents directly via Task — no nested subagent, no dispatch_handoff round-trip. Normal mode (general assistant) remains the default.
+**What it is:** The default session disposition for Team Harness. Developer mode activates automatically on install and update (via the plugin path) — the top-level agent adopts the orchestrator role and dispatches leaf agents directly via Task (no nested subagent, no dispatch_handoff round-trip). To exit: run ` + "`/dev-mode off`" + ` — the choice persists so future updates respect it.
 
-**Mechanism:** Dev mode is activated by selecting the ` + "`developer-mode`" + ` output style. The output style replaces the built-in software engineering instructions with the Team Harness orchestrator operating contract (` + "`keep-coding-instructions: false`" + `). This replacement — not just layering — ensures the orchestrator contract governs the session.
+**Start it (in-session, no reload):** run ` + "`/dev-mode`" + `. The skill writes the marker ` + "`~/.claude/.dev-mode-active`" + ` (` + "`dev_mode: true`" + `), prints the DEVELOPER MODE banner, adopts the orchestrator operating contract, and persists ` + "`dev_mode_choice: \"on\"`" + ` in ` + "`~/.claude/.team-harness.json`" + `. No ` + "`/clear`" + ` is required.
 
-**How to activate:** ` + "`/config`" + ` -> Output style -> ` + "`developer-mode`" + `. Write the filesystem marker to enable the outward-action gate: ` + "`echo 'dev_mode: true' > ~/.claude/.dev-mode-active`" + `. Takes effect at session start (or after ` + "`/clear`" + `).
-
-**How to deactivate:** ` + "`/config`" + ` -> Output style -> Default (or remove ` + "`outputStyle`" + ` from settings). Delete the marker: ` + "`rm ~/.claude/.dev-mode-active`" + `. Takes effect after ` + "`/clear`" + ` or a new session.
+**Stop it:** run ` + "`/dev-mode off`" + `. The skill removes the marker (` + "`dev-guard.sh`" + ` intercepts with ` + "`permissionDecision: \"ask\"`" + ` — operator confirms), returns to normal mode, and persists ` + "`dev_mode_choice: \"off\"`" + ` so future ` + "`/th:update`" + ` runs respect the opt-out.
 
 **What dev mode does:** Development tasks are routed through the full pipeline (architect -> implementer -> tester + qa + security -> delivery) with all gates enforced. Outward actions (git push, gh pr merge/review/comment, and equivalent API calls) require explicit operator approval via the deterministic gate ` + "`hooks/dev-guard.sh`" + `. Security floors (HI-2, path-pattern auto-escalation, bug-fix forcing rule) are non-waivable — dev mode is a disposition signal, not a stage-switch. Full contract: ` + "`docs/dev-mode.md`" + `.
 
