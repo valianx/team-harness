@@ -375,15 +375,15 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 For repos that maintain version literals in multiple synchronized files, edit **each** of the following sites explicitly — do NOT rely on Glob-first-match, which structurally finds only one site and leaves the rest out of sync.
 
-**This repo's canonical version sites (all five must be updated together):**
+**This repo's canonical version sites — mandatory for plugin-asset changes (`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` + `CLAUDE.md §3`):**
 
 | Site | File | Field / location |
 |------|------|-----------------|
 | Plugin manifest | `.claude-plugin/plugin.json` | `"version"` field |
 | Marketplace entry | `.claude-plugin/marketplace.json` | `plugins[0].version` — the per-plugin version inside the `plugins` array |
-| Go installer | `cmd/install/main.go` | `var version = "X.Y.Z"` literal |
 | CLAUDE.md §3 | `CLAUDE.md` | `**Current version:** \`X.Y.Z\`` line |
-| CHANGELOG.md | `CHANGELOG.md` | Release heading `## [X.Y.Z] - YYYY-MM-DD` (cut in Step 9e) |
+| Go installer | `cmd/install/main.go` | `var version = "X.Y.Z"` literal — **legacy-installer** anchor; update only on installer releases, NOT on plugin-asset-only changes |
+| CHANGELOG.md | `CHANGELOG.md` | Release heading `## [X.Y.Z] - YYYY-MM-DD` (cut in Step 9e, not part of the synchronized "sites" set) |
 
 **FENCED OFF — do NOT touch:**
 The top-level `"version"` field in `.claude-plugin/marketplace.json` (value `"1.1.0"`) is the schema/format version of the marketplace document, not the plugin version. It is a different field from `plugins[0].version`. Never modify the schema version.
@@ -476,6 +476,20 @@ Move the accumulated `[Unreleased]` entries (including anything assembled from f
 - Fragment slugs (`{pr-slug}`) must match `[a-z0-9-]+`; reject any fragment filename that contains path separators (`/`, `\`, `..`) before reading it (path-traversal guard).
 
 ### Step 9b — Definition of Done (DoD) checklist
+
+**Recorded-state gate (consult this FIRST):** Before running any Golden Command, check whether Phase 3 verify already recorded a green outcome. The gate is satisfied by the recorded outcome — WITHOUT re-running — when ALL three of the following are present:
+1. `03-testing.md` verify section reports no regressions (the tester wrote this artifact in Phase 3).
+2. The tester status block contains `regression_test_status: passing` and `suite_still_passing: true`.
+3. A Phase-3-verify `phase.end` event exists in `00-execution-events`.
+
+Re-run the test gate ONLY when one of these three exceptions applies:
+- (a) **no Phase 3 green** is recorded (any of the three fields above is absent or does not confirm green).
+- (b) The record is stale: delivery's HEAD is ahead of the commit Phase 3 verify ran against, or test-relevant files (source, tests, build config) changed since Phase 3 verify completed.
+- (c) Delivery itself modified test-relevant files in this run (source code, test files, or build config).
+
+Lint, typecheck, and build rows that were NOT covered by Phase 3 verify still run regardless.
+
+When a re-run is warranted, use the discovery procedure below.
 
 Before staging, run the project's quality gates. Discover DoD commands from two sources, in this order of priority:
 
@@ -587,6 +601,8 @@ Do NOT stage unrelated files.
 
 **Step 11.0 — Check for existing PR:**
 
+**PR body — issue reference rule:** When a GitHub issue was detected in Step 2, include `Closes #N` or `Fixes #N` in the PR body (Step 11.2). When there is **no linked issue** (Step 2 found none), OMIT the `Closes #N` / `Fixes #N` line entirely — never synthesize a number.
+
 **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — list open PRs for a branch".
 
 Check if a PR already exists for the current branch:
@@ -636,9 +652,9 @@ gh pr create --base main \
   --label "{label1},{label2}" \
   --project "{project-number}" \
   --body "$(cat <<'EOF'
-{Closes #{number} OR Fixes #{number}}
+{Closes #{number} OR Fixes #{number} — when there is **no linked issue** (Step 2 found none), OMIT this line entirely — never synthesize a number}
 
-(`Fixes #` for `type: fix` / `type: hotfix` — triggers GitHub auto-close on merge; `Closes #` for everything else.)
+(`Fixes #` for `type: fix` / `type: hotfix` — triggers GitHub auto-close on merge; `Closes #` for everything else. When no linked issue exists, OMIT the `Closes #N` / `Fixes #N` line completely.)
 
 ## Bug Report (conditional — mandatory for type: fix and type: hotfix; omit entirely otherwise)
 
@@ -729,7 +745,7 @@ Also update labels if they changed: `gh pr edit {pr-number} --add-label "{label1
 Report the existing PR URL in the status block — do NOT fail.
 
 **Rules:**
-- `Closes #{number}` is **mandatory** when a GitHub issue exists — never omit it
+- `Closes #{number}` / `Fixes #{number}` is **mandatory** when a GitHub issue exists — never omit it. When **no linked issue** exists (Step 2 found none), OMIT the line entirely — never synthesize a number
 - `--label` uses labels from the linked issue. If no issue, infer from context (e.g., `bug`, `feature`, `enhancement`)
 - `--project` uses the repo's project board number. Omit flag if no project exists
 - `--assignee @me` always

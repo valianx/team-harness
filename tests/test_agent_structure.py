@@ -14267,6 +14267,116 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 62 — delivery state-verification (issue #266)
+# ---------------------------------------------------------------------------
+# Three structural assertions against agents/delivery.md.
+# ALL THREE fail against the pre-fix delivery.md (v2.55.1) and will pass
+# after the implementer makes the three edits (AC-1, AC-2, AC-3).
+#
+# Implementer contract — marker strings that MUST appear in delivery.md:
+#
+# AC-1 (Step 9b recorded-state gate):
+#   - "03-testing.md" must appear in the Step 9b region
+#   - "no Phase 3 green" must appear in the Step 9b region
+#   Both markers together assert that Step 9b reads the Phase 3 verify record
+#   and gates the re-run on whether a green record exists.
+#
+# AC-2 (no-issue PR ref omitted):
+#   - "OMIT" (uppercase) must appear in the Step 11.2 / rules region
+#   - "no linked issue" must appear in the same region
+#   Together they assert the no-issue branch is explicitly stated (not left
+#   unspecified), and the rule is to OMIT the Closes/Fixes line.
+#
+# AC-3 (version-site reconciliation):
+#   NEGATIVE: "all five must be updated together" must be ABSENT from Step 9.0
+#   POSITIVE: "legacy-installer" must appear in Step 9.0
+#   POSITIVE: "plugin.json" AND "marketplace.json" AND "CLAUDE.md" must appear
+#             in Step 9.0 (the 3-site mandatory set).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 62: delivery state-verification (issue #266) ===")
+
+_s62_delivery = read(AGENTS_DIR / "delivery.md")
+
+# Locate the Step 9b region (from "Step 9b" to "Step 9c")
+_s62_step9b_start = _s62_delivery.find("Step 9b")
+_s62_step9b_end = _s62_delivery.find("Step 9c", _s62_step9b_start)
+_s62_step9b = (
+    _s62_delivery[_s62_step9b_start:_s62_step9b_end]
+    if _s62_step9b_start != -1 and _s62_step9b_end != -1 and _s62_step9b_end > _s62_step9b_start
+    else ""
+)
+
+# Assertion 1 (AC-1): Step 9b contains recorded-state gate clause.
+# Markers: "03-testing.md" (the artifact delivery reads to gate) AND
+# "no Phase 3 green" (the first of the three re-run exceptions).
+check(
+    "delivery.md Step 9b contains recorded-state gate: '03-testing.md' reference",
+    "03-testing.md" in _s62_step9b,
+    "Step 9b must reference '03-testing.md' as the recorded Phase 3 verify artifact "
+    "it reads before deciding whether to re-run the test suite (AC-1)",
+)
+check(
+    "delivery.md Step 9b contains recorded-state gate: 'no Phase 3 green' re-run exception",
+    "no Phase 3 green" in _s62_step9b,
+    "Step 9b must state the first re-run exception: 'no Phase 3 green is recorded' "
+    "(AC-1 — gate treats recorded verify outcome as satisfying the test gate)",
+)
+
+# Locate the Step 11.2 / rules region.
+# IMPORTANT: anchor on the em-dash heading "Step 11.2 — Create the PR" (not the bare
+# "Step 11.2" string) so the region starts at the ACTUAL Step 11.2 heading (~line 631)
+# and NOT at the forward reference inside Step 9c (~line 526).  The bare "Step 11.2"
+# first occurrence is that forward reference; using the full heading literal skips it.
+_s62_step112_start = _s62_delivery.find("Step 11.2 — Create the PR")
+_s62_step112_end = _s62_delivery.find("Step 11.3", _s62_step112_start)
+_s62_step112 = (
+    _s62_delivery[_s62_step112_start:_s62_step112_end]
+    if _s62_step112_start != -1 and _s62_step112_end != -1 and _s62_step112_end > _s62_step112_start
+    else ""
+)
+
+# Assertion 2 (AC-2): Step 11.2 PR-creation template contains no-issue omit rule.
+# Markers: "OMIT" (uppercase) AND "no linked issue" co-occurring in the region.
+# The region covers the actual PR-body template (the gh pr create heredoc) so a future
+# edit removing the guidance from the template while leaving the Step 11.0 note intact
+# will correctly fail this assertion.
+check(
+    "delivery.md Step 11.2 / rules contain no-issue omit rule: 'OMIT' + 'no linked issue'",
+    "OMIT" in _s62_step112 and "no linked issue" in _s62_step112,
+    "Step 11.2 and/or its rules section must declare the no-issue branch explicitly: "
+    "OMIT the Closes/Fixes line when there is no linked issue — never synthesize a number "
+    "(AC-2 — markers: 'OMIT' uppercase + 'no linked issue')",
+)
+
+# Locate the Step 9.0 region (from "Step 9.0" to "Step 9.1")
+_s62_step90_start = _s62_delivery.find("Step 9.0")
+_s62_step90_end = _s62_delivery.find("Step 9.1", _s62_step90_start)
+_s62_step90 = (
+    _s62_delivery[_s62_step90_start:_s62_step90_end]
+    if _s62_step90_start != -1 and _s62_step90_end != -1 and _s62_step90_end > _s62_step90_start
+    else ""
+)
+
+# Assertion 3 (AC-3): Step 9.0 reconciles version sites.
+# NEGATIVE: "all five must be updated together" must be absent (the erroneous caption).
+# POSITIVE: "legacy-installer" must be present (marks main.go as the legacy anchor).
+# POSITIVE: 3-site mandatory set named (plugin.json + marketplace.json + CLAUDE.md).
+check(
+    "delivery.md Step 9.0 no longer asserts 'all five must be updated together' (AC-3 negative guard)",
+    "all five must be updated together" not in _s62_step90,
+    "Step 9.0 still contains the erroneous caption 'all five must be updated together'; "
+    "it must be replaced with a split that marks plugin.json + marketplace.json + CLAUDE.md §3 "
+    "as mandatory and cmd/install/main.go as a legacy-installer anchor (AC-3)",
+)
+check(
+    "delivery.md Step 9.0 marks main.go as a 'legacy-installer' anchor (AC-3 positive)",
+    "legacy-installer" in _s62_step90,
+    "Step 9.0 must mark 'cmd/install/main.go' as a legacy-installer anchor — "
+    "updated only on installer releases, not on plugin-asset-only changes (AC-3)",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
