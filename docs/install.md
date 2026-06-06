@@ -128,7 +128,13 @@ The canonical entry point after install is the `orchestrator` agent. Type `@th:o
 
 ## Updating
 
-**Plugin (canonical):** run `/plugin marketplace update team-harness-marketplace` then `/reload-plugins` inside Claude Code.
+**Plugin (canonical):** run `/th:update` inside Claude Code. A `th` update is three steps — the skill does two, the operator does one:
+
+1. **Refresh the catalog** — `claude plugin marketplace update team-harness-marketplace` (updates marketplace metadata; downloads nothing).
+2. **Download the new version** — `claude plugin update th@team-harness-marketplace` (fetches the new version into the plugin cache).
+3. **Activate** — `/reload-plugins` (or restart Claude Code) to load the downloaded version.
+
+`/th:update` performs steps 1 and 2 from Bash, then re-syncs the fixed-path artifacts that the plugin runtime does **not** auto-load (the managed `~/.claude/CLAUDE.md` blocks, `output-styles/developer-mode.md`, the user-level `/dev-mode` skill, and the `.dev-mode-active` marker). Step 3 is operator-driven — the skill cannot reload the session. Running `/th:update` every release keeps both the cache and the fixed-path artifacts aligned; re-running `/th:setup` is **not** part of the update flow. For the full mental model — division of labour, the cache-vs-fixed-path propagation model, and the self-healing property — see [`setup-update-model.md`](./setup-update-model.md).
 
 **Legacy installer:** re-run the bootstrap. Unchanged files are skipped; files that differ from the embedded release bytes are overwritten.
 

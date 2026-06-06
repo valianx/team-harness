@@ -274,9 +274,9 @@ Every committed artefact is in English. workspaces prose follows the operator's 
 
 ## 7b. Document Hygiene
 
-CLAUDE.md is a quick-reference surface — it tells agents *where to look*, not *everything to know*. Detailed content lives in `docs/`. The delivery agent checks file size after every update; if CLAUDE.md exceeds **35 KB**, it must offload the largest non-structural section to `docs/` before committing. Hard cap: **40 KB** (Claude Code warns above this threshold).
+CLAUDE.md is a quick-reference surface — it points to `docs/`, not duplicates it. If CLAUDE.md exceeds **35 KB**, the delivery agent must offload the largest non-structural section to `docs/` before committing. Hard cap: **40 KB**.
 
-See `docs/document-hygiene.md` for the section-size rules, the overflow targets, and the what-belongs-where tables.
+See `docs/document-hygiene.md` for section-size rules, overflow targets, and what-belongs-where tables.
 
 ---
 
@@ -339,4 +339,6 @@ Routing table and escalation rules: see `docs/subagent-orchestration.md § Routi
 
 ## 16. Meta-Note
 
-**This is the repo that produces the agents and skills of the orchestrator system.** A CLAUDE.md edit here does *not* propagate automatically — agents in this repo are read from `agents/*.md` as source artifacts, and developers pick them up via the installer. If you change agent behavior and want it to take effect on your own machine, re-run the installer.
+**This is the repo that produces the agents and skills of the orchestrator system.** A CLAUDE.md edit here does *not* propagate automatically — agents are read from `agents/*.md` as source artifacts and deployed via the installer. To apply a local agent change, re-run the installer.
+
+- **Setup/update model** — `/th:setup` owns KEYS (once); `/th:update` owns FILES + FLOWS each release. Fixed-path `~/.claude/` artifacts need explicit sync. See `docs/setup-update-model.md`.
