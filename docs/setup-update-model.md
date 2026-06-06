@@ -88,7 +88,7 @@ Running `/th:update` every release keeps both the cache artifacts (via the plugi
 
 Because Step 6 is unconditional and destructive, a machine that missed one or more updates self-corrects on the next run: the fixed-path artifacts are overwritten with the current version's canonical content.
 
-**Concrete example:** the update to v2.56.0 introduced the `voice-rule` and `dev-mode` managed blocks, which did not exist in prior versions. Operators on pre-2.56.0 installs who ran `/th:update` after the release had those blocks inserted (appended, since the markers were absent) automatically — no manual intervention was required.
+**Concrete example:** an operator whose `~/.claude/CLAUDE.md` was missing one or more managed blocks — because the version of the plugin they installed did not write them yet — gets those blocks restored on the next `/th:update`. Step 6 appends any block whose start/end markers are absent, so no manual intervention is required. The same behavior applies whether a block was never written or was accidentally deleted: the next update run re-inserts it unconditionally.
 
 ---
 
