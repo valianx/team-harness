@@ -14614,6 +14614,78 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 64 — Version-staleness guard in skills/setup/SKILL.md (v2.56.1 / #272)
+# ---------------------------------------------------------------------------
+# These checks are anchor-scoped: they slice the content between the ### 0.
+# heading and the ### 1. heading so that tokens that appear elsewhere in
+# setup/SKILL.md (e.g., in the update/SKILL.md description or in a code
+# block further down) cannot produce a false-green.  Prior art: SEC-INFO-01.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 64: Version-staleness guard in setup/SKILL.md (#272) ===")
+
+_s64_setup_md = read(SKILLS_DIR / "setup" / "SKILL.md")
+
+# --- Presence of the guard section heading ---
+_S64_GUARD_HEADING = "### 0. Version-staleness guard"
+_S64_STEP1_HEADING = "### 1. Detect installation mode"
+
+check(
+    "skills/setup/SKILL.md contains '### 0. Version-staleness guard' section",
+    _S64_GUARD_HEADING in _s64_setup_md,
+    "the version-staleness guard section is missing from setup/SKILL.md",
+)
+
+# --- Ordering: guard must appear BEFORE Step 1 ---
+_s64_guard_idx = _s64_setup_md.find(_S64_GUARD_HEADING)
+_s64_step1_idx = _s64_setup_md.find(_S64_STEP1_HEADING)
+check(
+    "skills/setup/SKILL.md guard (### 0.) appears BEFORE '### 1. Detect installation mode'",
+    _s64_guard_idx != -1 and _s64_step1_idx != -1 and _s64_guard_idx < _s64_step1_idx,
+    f"guard index ({_s64_guard_idx}) must precede Step 1 index ({_s64_step1_idx})",
+)
+
+# --- Anchor-scoped token checks ---
+# Extract only the content between ### 0. and ### 1. to avoid false-greens
+# on tokens that appear in other sections (e.g. update/SKILL.md citations).
+_s64_guard_slice = (
+    _s64_setup_md[_s64_guard_idx:_s64_step1_idx]
+    if _s64_guard_idx != -1 and _s64_step1_idx != -1 and _s64_guard_idx < _s64_step1_idx
+    else ""
+)
+
+check(
+    "skills/setup/SKILL.md guard section contains 'claude plugin marketplace update team-harness-marketplace'",
+    "claude plugin marketplace update team-harness-marketplace" in _s64_guard_slice,
+    "the catalog-refresh command must be present in the ### 0. guard section",
+)
+check(
+    "skills/setup/SKILL.md guard section contains catalog path 'plugins/marketplaces/team-harness-marketplace/.claude-plugin/marketplace.json'",
+    "plugins/marketplaces/team-harness-marketplace/.claude-plugin/marketplace.json" in _s64_guard_slice,
+    "the catalog file path must be present in the ### 0. guard section",
+)
+check(
+    "skills/setup/SKILL.md guard section contains 'claude plugin list'",
+    "claude plugin list" in _s64_guard_slice,
+    "the installed-version capture command must be present in the ### 0. guard section",
+)
+check(
+    "skills/setup/SKILL.md guard section recommends '/th:update'",
+    "/th:update" in _s64_guard_slice,
+    "the /th:update recommendation must be present in the ### 0. guard section",
+)
+check(
+    "skills/setup/SKILL.md guard section recommends '/reload-plugins' (AC-1 full recommendation)",
+    "/reload-plugins" in _s64_guard_slice,
+    "the /reload-plugins step must be present in the ### 0. guard section recommendation (AC-1)",
+)
+check(
+    "skills/setup/SKILL.md guard section declares advisory/non-blocking contract",
+    "advisory" in _s64_guard_slice,
+    "the guard must describe itself as advisory (non-blocking) in the ### 0. section (AC-1, AC-4)",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

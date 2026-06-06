@@ -7,6 +7,33 @@ Configure the Team Harness system. Run this after installing the plugin or to re
 
 ## Steps
 
+### 0. Version-staleness guard (run first, before any configuration)
+
+Before configuring anything, verify that this setup skill is running on the latest published `th` version. A stale plugin runs stale setup/update logic; catching it here prevents the operator from configuring against an out-of-date contract. This guard is advisory — it warns and recommends, but never hard-blocks: the operator may choose to proceed.
+
+This mirrors `/th:update` Steps 1–4. Run quietly; emit operator-facing output only when a staleness warning or an inconclusive-check note is warranted.
+
+1. **Refresh the marketplace catalog.** Run `claude plugin marketplace update team-harness-marketplace`. If `claude` is not on PATH, or the command fails (for example, offline), do NOT block setup: note one line (`Version-staleness check skipped: <reason>.`) and continue to Step 1. The guard is advisory; an inability to check is not a reason to halt configuration.
+
+2. **Read the latest available version.** Read `~/.claude/plugins/marketplaces/team-harness-marketplace/.claude-plugin/marketplace.json` (refreshed by the previous command) with the Read tool — not a shell `cat` — so the path resolves portably on Windows, macOS, and Linux. Take the `version` field of the `th` entry under `plugins`. If the file is missing, note the path checked and continue to Step 1 (do not fabricate a version).
+
+3. **Capture the installed version.** Run `claude plugin list` and parse the `th@team-harness-marketplace` block for its `Version:` value. If the plugin is not listed (for example, a Go-installer install), skip the comparison and continue to Step 1.
+
+4. **Compare (semantic-version ordering).**
+   - **Installed < latest (stale):** WARN the operator and RECOMMEND updating before continuing. Present:
+     ```
+     Setup is running on a stale th version.
+       installed version  <X>
+       latest version     <Y>
+     Recommended: run /th:update, then /reload-plugins, then re-run /th:setup
+     so configuration runs against the current contract.
+     ```
+     Ask whether to proceed with setup anyway or stop to update first. If the operator proceeds, continue to Step 1. Do NOT hard-block.
+   - **Installed == latest:** continue to Step 1 silently (no version output).
+   - **Installed > latest:** note both versions and that the catalog may not have propagated the latest release yet, then continue to Step 1.
+
+This guard never writes any file; it only reads versions and, when stale, advises the operator.
+
 ### 1. Detect installation mode
 
 Read `~/.claude/.team-harness.json`. If the file exists, this is a reconfiguration — show current values. If missing, this is a first-time setup — create the file with defaults.
