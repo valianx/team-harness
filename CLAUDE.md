@@ -339,4 +339,6 @@ Routing table and escalation rules: see `docs/subagent-orchestration.md § Routi
 
 ## 16. Meta-Note
 
-**This is the repo that produces the agents and skills of the orchestrator system.** A CLAUDE.md edit here does *not* propagate automatically — agents in this repo are read from `agents/*.md` as source artifacts, and developers pick them up via the installer. If you change agent behavior and want it to take effect on your own machine, re-run the installer.
+**This is the repo that produces the agents and skills of the orchestrator system.** A CLAUDE.md edit here does *not* propagate automatically — agents are read from `agents/*.md` as source artifacts and deployed via the installer. To apply a local agent change, re-run the installer.
+
+- **Setup/update model** — `/th:setup` owns KEYS (once); `/th:update` owns FILES + FLOWS each release. Cache artifacts auto-load; fixed-path `~/.claude/` artifacts need explicit sync. See `docs/setup-update-model.md`.
