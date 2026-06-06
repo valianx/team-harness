@@ -113,7 +113,7 @@ This is the same family of failure as issue #272: an artifact was shipped to the
 
 `/th:update` never writes `~/.claude/.team-harness.json`. That file is `/th:setup`'s domain — it holds the operator's personal configuration (MCP URLs, tokens, workspace mode, language preference).
 
-**Consequence:** when a new operator KEY is introduced in a release (for example, the `language` key introduced in v2.50+), an operator who already has Team Harness installed does not receive a prompt to configure the new key when they run `/th:update`. The key is simply absent from their `~/.claude/.team-harness.json` until they re-run `/th:setup`.
+**Consequence:** when a new operator KEY is introduced in a release (for example, the `language` key), an operator who already has Team Harness installed does not receive a prompt to configure the new key when they run `/th:update`. The key is simply absent from their `~/.claude/.team-harness.json` until they re-run `/th:setup`.
 
 This is a known, intentional limitation. The alternative — having `/th:update` write to `.team-harness.json` — would require it to prompt for sensitive values (MCP URL, tokens) on every update, which conflicts with the goal of a non-interactive repeatable command.
 
