@@ -15024,6 +15024,197 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 67 — pr-update-prune-sandbox (fix/th-update-prune-sandbox, #278)
+# ---------------------------------------------------------------------------
+# Regression guard for the bug where the backup-retention prune in
+# skills/update/SKILL.md Step 6 aborted the entire per-OS block (before the
+# managed-block sync, output-style copy, /dev-mode skill copy, and dev-mode
+# marker write) whenever ≥3 backups existed.
+#
+# Root cause: the prune used an unresolvable piped delete (position 2 of the
+# block) which the Claude Code sandbox fails-closed on, killing the block.
+#
+# Fix contract (AC-3 / AC-7 of the plan):
+#   - Both OS blocks must have the prune AFTER the marker-write statement.
+#   - Both OS blocks must NOT contain the unresolvable piped-delete forms.
+#
+# These two assertions FAIL against the pre-fix code (prune is at position 2,
+# piped forms are present) and PASS after the fix (prune relocated to end,
+# rewritten as explicit-path loop).
+#
+# Anchor idiom: slice each OS fenced block using the verbatim heading strings
+# that delimit the two per-OS blocks in the SKILL.md prose.  A missing anchor
+# returns "" → position lookups return -1 → ordering assertion fails → no
+# false-green possible even if the section is restructured.
+#
+# Marker: pr-update-prune-sandbox
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 67: pr-update-prune-sandbox (fix #278) ===")
+
+_s67_update_skill = read(SKILLS_DIR / "update" / "SKILL.md")
+
+# --- Anchor strings for each per-OS block ---
+# These are the verbatim bold heading strings that separate the two blocks in
+# Step 6 of SKILL.md.  The stop marker for the Windows block is the Unix
+# block header (the next per-OS heading); the stop for the Unix block is the
+# next Step 7 header (or EOF).
+_S67_WIN_ANCHOR = "Windows (PowerShell) — run this block verbatim on Windows:"
+_S67_UNIX_ANCHOR = "Unix/macOS (bash) — run this block verbatim on Linux/macOS:"
+_S67_WIN_STOP = (_S67_UNIX_ANCHOR,)
+_S67_UNIX_STOP = ("## Error handling", "## Important", "7. **Emit", "\n## ", "\n---\n")
+
+_s67_win_block = _slice_section(_s67_update_skill, _S67_WIN_ANCHOR, _S67_WIN_STOP)
+_s67_unix_block = _slice_section(_s67_update_skill, _S67_UNIX_ANCHOR, _S67_UNIX_STOP)
+
+# --- Marker-write statement anchors (the LAST step in each block before the fix) ---
+# Windows: Set-Content $markerPath "dev_mode: true" -NoNewline
+# Unix:    printf 'dev_mode: true'
+_S67_WIN_MARKER_WRITE = "Set-Content $markerPath"
+_S67_UNIX_MARKER_WRITE = "printf 'dev_mode: true\\n' > \"$MARKER_PATH\""
+
+# --- Unresolvable piped-delete forms that must be ABSENT after the fix ---
+# These are the exact problematic patterns identified in the root-cause analysis.
+_S67_WIN_PIPED_DELETE = "Select-Object -SkipLast 3 | Remove-Item"
+_S67_UNIX_PIPED_DELETE = "tail -n +4 | xargs -r rm"
+
+# ---------------------------------------------------------------------------
+# (1a) Windows block: anchor must be found (anti-false-green guard)
+# ---------------------------------------------------------------------------
+check(
+    "Suite 67(1a): update/SKILL.md contains Windows block anchor (anti-false-green)",
+    bool(_s67_win_block),
+    f"anchor '{_S67_WIN_ANCHOR}' not found in skills/update/SKILL.md — "
+    "the Windows per-OS block heading has changed; update the anchor in Suite 67",
+)
+
+# ---------------------------------------------------------------------------
+# (1b) Windows block: piped-delete form MUST be absent
+# Assert: "Select-Object -SkipLast 3 | Remove-Item" is NOT in the Windows block.
+# Pre-fix state: PRESENT (line 104 of SKILL.md) → assertion FAILS as required.
+# Post-fix state: absent → assertion passes.
+# ---------------------------------------------------------------------------
+check(
+    "Suite 67(1b): update/SKILL.md Windows block does NOT contain piped-delete form "
+    "'Select-Object -SkipLast 3 | Remove-Item'",
+    _S67_WIN_PIPED_DELETE not in _s67_win_block,
+    f"Windows block still contains the unresolvable piped-delete form "
+    f"'{_S67_WIN_PIPED_DELETE}'; the Claude Code sandbox fails-closed on this "
+    "pattern and aborts the whole block (issue #278) — relocate the prune to "
+    "the end of the block and rewrite as an explicit-path enumerate-then-delete loop",
+)
+
+# ---------------------------------------------------------------------------
+# (1c) Windows block: ordering — prune statement appears AFTER marker-write.
+# The marker-write is "Set-Content $markerPath"; the prune-indicator after the fix
+# is the explicit-path prune comment or variable ($backups / Remove-Item -LiteralPath).
+# We assert two things:
+#   (i)  marker-write is present at all (non-vacuous)
+#   (ii) no SkipLast/Remove-Item prune precedes the marker-write
+#
+# For the ordering assertion we measure the index of the marker-write statement
+# and the index of ANY Remove-Item occurrence in the block.  Pre-fix, the only
+# Remove-Item is the piped-delete at line 104 (position 2), which is BEFORE the
+# marker-write — so marker_write_idx > remove_item_idx → assertion fails as required.
+# Post-fix, the only Remove-Item is in the explicit-path loop AFTER the marker-write,
+# so remove_item_idx > marker_write_idx AND the piped form is gone → both pass.
+# ---------------------------------------------------------------------------
+_s67_win_marker_idx = _s67_win_block.find(_S67_WIN_MARKER_WRITE) if _s67_win_block else -1
+_s67_win_remove_idx = _s67_win_block.find(_S67_WIN_PIPED_DELETE) if _s67_win_block else -1
+
+check(
+    "Suite 67(1c): update/SKILL.md Windows block: marker-write ('Set-Content $markerPath') is present",
+    _s67_win_marker_idx != -1,
+    f"marker-write statement '{_S67_WIN_MARKER_WRITE}' not found in the Windows block — "
+    "the dev-mode marker-write step may have been removed or renamed",
+)
+# Ordering: the piped-delete (if present) must NOT precede the marker-write.
+# Pre-fix: piped-delete IS present and IS before marker-write → fails.
+# Post-fix: piped-delete absent → _s67_win_remove_idx == -1 → condition holds.
+check(
+    "Suite 67(1d): update/SKILL.md Windows block: prune does NOT precede the marker-write "
+    "(ordering guarantee — prune must be the last statement, after the marker write)",
+    # Passes when: piped-delete absent (-1) OR piped-delete comes AFTER marker-write.
+    _s67_win_remove_idx == -1 or (
+        _s67_win_marker_idx != -1 and _s67_win_remove_idx > _s67_win_marker_idx
+    ),
+    f"Windows block piped-delete (at char {_s67_win_remove_idx}) precedes marker-write "
+    f"(at char {_s67_win_marker_idx}); the prune must be relocated to AFTER the marker-write "
+    "so a sandbox block on the prune cannot abort the sync/copies/marker steps (issue #278)",
+)
+
+# ---------------------------------------------------------------------------
+# (2a) Unix block: anchor must be found (anti-false-green guard)
+# ---------------------------------------------------------------------------
+check(
+    "Suite 67(2a): update/SKILL.md contains Unix block anchor (anti-false-green)",
+    bool(_s67_unix_block),
+    f"anchor '{_S67_UNIX_ANCHOR}' not found in skills/update/SKILL.md — "
+    "the Unix per-OS block heading has changed; update the anchor in Suite 67",
+)
+
+# ---------------------------------------------------------------------------
+# (2b) Unix block: piped-delete form MUST be absent
+# Assert: "tail -n +4 | xargs -r rm" is NOT in the Unix block.
+# Pre-fix state: PRESENT (line 181 of SKILL.md) → assertion FAILS as required.
+# Post-fix state: absent → assertion passes.
+# ---------------------------------------------------------------------------
+check(
+    "Suite 67(2b): update/SKILL.md Unix block does NOT contain piped-delete form "
+    "'tail -n +4 | xargs -r rm'",
+    _S67_UNIX_PIPED_DELETE not in _s67_unix_block,
+    f"Unix block still contains the unresolvable piped-delete form "
+    f"'{_S67_UNIX_PIPED_DELETE}'; the Claude Code sandbox fails-closed on this "
+    "pattern and aborts the whole block (issue #278) — relocate the prune to "
+    "the end of the block and rewrite as an explicit-path while-read loop",
+)
+
+# ---------------------------------------------------------------------------
+# (2c) Unix block: ordering — prune statement appears AFTER marker-write.
+# The marker-write is "printf 'dev_mode: true'"; the prune-indicator is any
+# "rm -f" occurrence.  Pre-fix: "rm -f" from xargs at line 181, before the
+# marker-write → ordering assertion fails.  Post-fix: "rm -f" in the explicit
+# while-read loop AFTER the marker-write → passes.
+# ---------------------------------------------------------------------------
+_s67_unix_marker_idx = _s67_unix_block.find(_S67_UNIX_MARKER_WRITE) if _s67_unix_block else -1
+_s67_unix_rm_idx = _s67_unix_block.find(_S67_UNIX_PIPED_DELETE) if _s67_unix_block else -1
+
+check(
+    "Suite 67(2c): update/SKILL.md Unix block: marker-write ('printf 'dev_mode: true'') is present",
+    _s67_unix_marker_idx != -1,
+    f"marker-write statement '{_S67_UNIX_MARKER_WRITE}' not found in the Unix block — "
+    "the dev-mode marker-write step may have been removed or renamed",
+)
+# Ordering: the piped-delete (if present) must NOT precede the marker-write.
+check(
+    "Suite 67(2d): update/SKILL.md Unix block: prune does NOT precede the marker-write "
+    "(ordering guarantee — prune must be the last statement, after the marker write)",
+    _s67_unix_rm_idx == -1 or (
+        _s67_unix_marker_idx != -1 and _s67_unix_rm_idx > _s67_unix_marker_idx
+    ),
+    f"Unix block piped-delete (at char {_s67_unix_rm_idx}) precedes marker-write "
+    f"(at char {_s67_unix_marker_idx}); the prune must be relocated to AFTER the marker-write "
+    "so a sandbox block on the prune cannot abort the sync/copies/marker steps (issue #278)",
+)
+
+# ---------------------------------------------------------------------------
+# Self-referential guard: docs/testing.md must name "Suite 67" and
+# "pr-update-prune-sandbox".  CLAUDE.md must NOT contain "Suite 67" (hygiene).
+# ---------------------------------------------------------------------------
+_s67_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s67_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "Suite 67(self-ref): docs/testing.md names 'Suite 67' and 'pr-update-prune-sandbox'",
+    "Suite 67" in _s67_testing_md and "pr-update-prune-sandbox" in _s67_testing_md,
+    "docs/testing.md must register Suite 67 and the 'pr-update-prune-sandbox' marker",
+)
+check(
+    "Suite 67(hygiene): CLAUDE.md does NOT contain 'Suite 67' (hygiene contract)",
+    "Suite 67" not in _s67_claude_md,
+    "CLAUDE.md must not mention Suite 67 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

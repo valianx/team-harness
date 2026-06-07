@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.57.1] - 2026-06-06
+
+### Fixed
+
+- `/th:update` Step 6 now reliably syncs the managed `~/.claude/CLAUDE.md` blocks, the developer-mode output style, the `/dev-mode` skill, and the dev-mode marker even when ≥3 `CLAUDE.md.bak-*` backups already exist. The backup-retention prune was an unresolvable piped delete placed before the sync inside a single shell block; the Claude Code protected-path sandbox failed closed on this pattern and aborted the whole block. The prune is now relocated to the end of each per-OS block (after the marker write) and rewritten as an explicit enumerate-then-delete-by-path loop, so a sandbox block on the prune can no longer abort the sync. Retention of the last 3 backups is preserved. Fixes #278.
+
 ## [2.57.0] - 2026-06-06
 
 ### Added

@@ -101,7 +101,6 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup
    $ts = (Get-Date -Format "yyyyMMdd-HHmmss")
    Copy-Item $claudeMd "$claudeMd.bak-$ts"
-   Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime | Select-Object -SkipLast 3 | Remove-Item -Force
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
    foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule", "dev-mode")) {
@@ -165,6 +164,15 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    } else {
        Write-Host "  dev mode: marker not written (dev_mode_choice: off — opt-out respected)"
    }
+
+   # Prune old backups (retain last 3) — explicit-path delete, runs last so a
+   # sandbox block here can never abort the sync above.
+   $toDelete = @(Get-ChildItem "$claudeMd.bak-*" -File |
+       Sort-Object LastWriteTime |
+       Select-Object -SkipLast 3)
+   foreach ($old in $toDelete) {
+       Remove-Item -LiteralPath $old.FullName -Force
+   }
    ```
 
    **Unix/macOS (bash) — run this block verbatim on Linux/macOS:**
@@ -178,7 +186,6 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup
    TS=$(date -u +"%Y%m%d-%H%M%S")
    cp "$CLAUDE_MD" "$CLAUDE_MD.bak-$TS"
-   ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
    for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule dev-mode; do
@@ -237,6 +244,15 @@ except Exception:
        echo "  dev mode: marker written (dev_mode_choice: ${DEV_MODE_CHOICE:-absent})"
    else
        echo "  dev mode: marker not written (dev_mode_choice: off — opt-out respected)"
+   fi
+
+   # Prune old backups (retain last 3) — explicit-path delete, runs last so a
+   # sandbox block here can never abort the sync above.
+   OLD_BACKUPS=$(ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4)
+   if [ -n "$OLD_BACKUPS" ]; then
+       while IFS= read -r OLD; do
+           [ -n "$OLD" ] && rm -f "$OLD"
+       done <<< "$OLD_BACKUPS"
    fi
    ```
 
