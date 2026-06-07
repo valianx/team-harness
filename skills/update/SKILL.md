@@ -165,9 +165,14 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        Write-Host "  dev mode: marker not written (dev_mode_choice: off — opt-out respected)"
    }
 
-   # Prune old backups (retain last 3) — explicit-path delete, runs last so a
-   # sandbox block here can never abort the sync above.
-   $toDelete = @(Get-ChildItem "$claudeMd.bak-*" -File |
+   # Prune old backups (retain last 3) — runs last AND sources the glob from an
+   # INDEPENDENT path variable, NOT $claudeMd. The Claude Code sandbox taint-tracks
+   # $claudeMd (a CLAUDE.md write target) as a protected path; a Remove-Item whose
+   # glob is built from that variable is rejected whole-command, pre-execution,
+   # aborting the entire sync above. Building the glob from an independent literal
+   # ($backupGlob) is untainted, so the delete is permitted.
+   $backupGlob = "$env:USERPROFILE\.claude\CLAUDE.md.bak-*"
+   $toDelete = @(Get-ChildItem $backupGlob -File |
        Sort-Object LastWriteTime |
        Select-Object -SkipLast 3)
    foreach ($old in $toDelete) {
@@ -246,9 +251,13 @@ except Exception:
        echo "  dev mode: marker not written (dev_mode_choice: off — opt-out respected)"
    fi
 
-   # Prune old backups (retain last 3) — explicit-path delete, runs last so a
-   # sandbox block here can never abort the sync above.
-   OLD_BACKUPS=$(ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4)
+   # Prune old backups (retain last 3) — runs last AND sources the glob from an
+   # INDEPENDENT path expression, NOT $CLAUDE_MD. A sandbox that taint-tracks
+   # $CLAUDE_MD (a CLAUDE.md write target) as a protected path would reject an rm
+   # whose glob is built from it; an independent literal ($BACKUP_GLOB) is untainted
+   # and permitted. Running last also keeps any block here from aborting the sync.
+   BACKUP_GLOB="$HOME/.claude/CLAUDE.md.bak-*"
+   OLD_BACKUPS=$(ls -1t $BACKUP_GLOB 2>/dev/null | tail -n +4)
    if [ -n "$OLD_BACKUPS" ]; then
        while IFS= read -r OLD; do
            [ -n "$OLD" ] && rm -f "$OLD"

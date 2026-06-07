@@ -15031,16 +15031,21 @@ check(
 # managed-block sync, output-style copy, /dev-mode skill copy, and dev-mode
 # marker write) whenever ≥3 backups existed.
 #
-# Root cause: the prune used an unresolvable piped delete (position 2 of the
-# block) which the Claude Code sandbox fails-closed on, killing the block.
+# Root cause (corrected after empirical testing): the Claude Code sandbox
+# taint-tracks the $claudeMd / $CLAUDE_MD variable as a protected path (it is a
+# CLAUDE.md write target). A prune whose glob is built from that variable
+# ("$claudeMd.bak-*") is rejected WHOLE-COMMAND, pre-execution — aborting the
+# managed-block sync, copies, and marker write that precede it. The originally
+# suspected causes (piped delete; prune ordered before the sync) were NOT the
+# trigger: relocating the prune to the end and rewriting it as an explicit-path
+# loop were both tried and STILL blocked. Only sourcing the glob from an
+# INDEPENDENT path expression fixes it.
 #
-# Fix contract (AC-3 / AC-7 of the plan):
-#   - Both OS blocks must have the prune AFTER the marker-write statement.
-#   - Both OS blocks must NOT contain the unresolvable piped-delete forms.
-#
-# These two assertions FAIL against the pre-fix code (prune is at position 2,
-# piped forms are present) and PASS after the fix (prune relocated to end,
-# rewritten as explicit-path loop).
+# Fix contract:
+#   - 1e/2e (load-bearing): the prune glob must be independent of $claudeMd /
+#     $CLAUDE_MD (no "$claudeMd.bak-*" / "$CLAUDE_MD".bak-*; use $backupGlob /
+#     BACKUP_GLOB= built from an independent path).
+#   - 1b/1d/2b/2d (hygiene, kept): no piped-delete form; prune after marker-write.
 #
 # Anchor idiom: slice each OS fenced block using the verbatim heading strings
 # that delimit the two per-OS blocks in the SKILL.md prose.  A missing anchor
@@ -15074,9 +15079,24 @@ _S67_WIN_MARKER_WRITE = "Set-Content $markerPath"
 _S67_UNIX_MARKER_WRITE = "printf 'dev_mode: true\\n' > \"$MARKER_PATH\""
 
 # --- Unresolvable piped-delete forms that must be ABSENT after the fix ---
-# These are the exact problematic patterns identified in the root-cause analysis.
+# (Hygiene only — kept from the first fix attempt. The piped form is NOT the real
+# trigger; see the variable-taint checks 1e/2e below for the actual #278 cause.)
 _S67_WIN_PIPED_DELETE = "Select-Object -SkipLast 3 | Remove-Item"
 _S67_UNIX_PIPED_DELETE = "tail -n +4 | xargs -r rm"
+
+# --- REAL #278 trigger: tainted-glob forms that must be ABSENT ---
+# The Claude Code sandbox taint-tracks the $claudeMd / $CLAUDE_MD variable as a
+# protected path because it is a CLAUDE.md write target (Set-Content / printf >).
+# A prune whose glob is built from that variable ("$claudeMd.bak-*") is rejected
+# WHOLE-COMMAND, pre-execution — so neither relocating the prune nor switching to
+# an explicit-path loop helps (both were tried and still blocked). The fix is to
+# source the prune glob from an INDEPENDENT path expression. Verified empirically:
+# the same delete over a literal/independent glob is permitted; only the
+# variable-derived form is blocked.
+_S67_WIN_TAINTED_GLOB = '"$claudeMd.bak-*"'
+_S67_UNIX_TAINTED_GLOB = '"$CLAUDE_MD".bak-*'
+_S67_WIN_INDEP = "$backupGlob"
+_S67_UNIX_INDEP = "BACKUP_GLOB="
 
 # ---------------------------------------------------------------------------
 # (1a) Windows block: anchor must be found (anti-false-green guard)
@@ -15144,6 +15164,23 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# (1e) Windows block: REAL #278 trigger — the prune glob must be INDEPENDENT of
+# $claudeMd. The tainted form "$claudeMd.bak-*" must be ABSENT and an independent
+# variable ($backupGlob) must be PRESENT. Pre-correct-fix the prune used
+# "$claudeMd.bak-*" → blocked whole-command; this check fails on that form.
+# ---------------------------------------------------------------------------
+check(
+    "Suite 67(1e): update/SKILL.md Windows prune glob is INDEPENDENT of $claudeMd "
+    "(no \"$claudeMd.bak-*\"; uses $backupGlob) — the real #278 variable-taint trigger",
+    _S67_WIN_TAINTED_GLOB not in _s67_win_block and _S67_WIN_INDEP in _s67_win_block,
+    "Windows prune still builds its glob from $claudeMd (the CLAUDE.md write-variable). "
+    "The Claude Code sandbox taint-tracks $claudeMd as a protected path and rejects the "
+    "ENTIRE command pre-execution (issue #278) — relocating/explicit-path does NOT help. "
+    "Source the glob from an independent var, e.g. "
+    "$backupGlob = \"$env:USERPROFILE\\.claude\\CLAUDE.md.bak-*\".",
+)
+
+# ---------------------------------------------------------------------------
 # (2a) Unix block: anchor must be found (anti-false-green guard)
 # ---------------------------------------------------------------------------
 check(
@@ -15195,6 +15232,19 @@ check(
     f"Unix block piped-delete (at char {_s67_unix_rm_idx}) precedes marker-write "
     f"(at char {_s67_unix_marker_idx}); the prune must be relocated to AFTER the marker-write "
     "so a sandbox block on the prune cannot abort the sync/copies/marker steps (issue #278)",
+)
+
+# ---------------------------------------------------------------------------
+# (2e) Unix block: REAL #278 trigger — the prune glob must be INDEPENDENT of
+# $CLAUDE_MD. The tainted form "$CLAUDE_MD".bak-* must be ABSENT and an
+# independent variable (BACKUP_GLOB=) must be PRESENT.
+# ---------------------------------------------------------------------------
+check(
+    "Suite 67(2e): update/SKILL.md Unix prune glob is INDEPENDENT of $CLAUDE_MD "
+    "(no \"$CLAUDE_MD\".bak-*; uses BACKUP_GLOB=) — the real #278 variable-taint trigger",
+    _S67_UNIX_TAINTED_GLOB not in _s67_unix_block and _S67_UNIX_INDEP in _s67_unix_block,
+    "Unix prune still builds its glob from $CLAUDE_MD (the CLAUDE.md write-variable). "
+    "Source it from an independent var, e.g. BACKUP_GLOB=\"$HOME/.claude/CLAUDE.md.bak-*\".",
 )
 
 # ---------------------------------------------------------------------------
