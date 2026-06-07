@@ -60,11 +60,13 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 ### Ratify-Plan Mode (Phase 1.5 — sprint contract guard)
 
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. The `## Plan Ratification` section is appended in place to `01-plan.md` (replacing any prior copy) — never written to a `01-plan-ratification.md` sibling. When a ratification gap changes a canonical field (base branch, version bump) or AC text, edit that field in the plan body in place — do not append a second value beside the old one.
+
 Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa + security cycle.
 
 - **Trigger:** orchestrator invokes with `mode: ratify-plan`
 - **Flow:** Phase 0 (read intake + architecture) → Plan-AC Mapping → return verdict
-- **Output:** brief append to `workspaces/{feature-name}/01-plan.md` under `## Plan Ratification (Phase 1.5)` — do NOT create a new file.
+- **Output:** brief append to `workspaces/{feature-name}/01-plan.md` under `## Plan Ratification (Phase 1.5)` (replace any prior copy) — do NOT create a new file, do NOT create `01-plan-ratification.md`.
 
 **Process:**
 

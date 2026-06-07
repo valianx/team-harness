@@ -107,7 +107,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.56.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.57.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -160,6 +160,7 @@ All commands run from the repo root.
 - **Plan-review panel centralization** — `plan-review` runs up to 3 reviewers into ONE `01-plan.md`; worst-of combined verdict; preserve-in-place sub-verdicts; vacuous-success guard. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Dev mode — default-on, top-level orchestrator.** Default as of v2.56.0: `/th:setup`/`/th:update` write `~/.claude/.dev-mode-active` (`dev_mode: true`) unless `dev_mode_choice: "off"` in `.team-harness.json`. Top-level agent adopts orchestrator role, dispatches via Task. Inline orchestration permitted ONLY when marker present; without it, prohibited. `/dev-mode off` removes marker + persists opt-out; `/dev-mode on` re-activates. Outward actions gated by `dev-guard.sh`. `developer-mode` output style is the optional strong floor (`keep-coding-instructions: false`). `force-for-plugin` NOT set (decouples gate; removes escape hatch). Security floors non-waivable. See `docs/dev-mode.md`.
+- **Obsidian interlinking.** Step 11.6 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`. Plan consolidation (no forks, 3h): `agents/_shared/plan-consolidation.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 

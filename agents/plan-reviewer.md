@@ -152,6 +152,8 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 
 ### Rule 3 — Consolidated documents
 
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. The `## Plan Review` section is appended in place to `01-plan.md` — never written to a `01-plan-review.md` sibling.
+
 **What to check:** scan `01-plan.md` for forbidden patterns. Each match is a finding. The patterns are below.
 
 | # | Pattern (informal) | Regex (illustrative — implement with Grep) | Example hit |
@@ -163,10 +165,13 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 | 3e | Timestamped section headers (date in a header that is NOT the top-of-document date stamp) | `(?im)^##+ .*\b\d{4}-\d{2}-\d{2}\b` excluding the line beginning `**Date:**` | `## Decision — 2026-05-10` |
 | 3f | "Edit:" / "EDIT:" / "Update:" / "UPDATE:" prefixes on paragraphs | `(?m)^\s*(edit:\|update:)` | "Edit: changed batch size" |
 | 3g | "WIP" / "TODO" / "FIXME" markers in artifacts that are supposed to be final | `\b(WIP\|TODO\|FIXME)\b` (case-sensitive) | "TODO: revisit" |
+| 3h | Mutually contradictory canonical field (semantic, not regex) | Collect distinct values of each canonical field (base branch, version bump) across `## Review Summary`, `### Work Plan`, `## Task List`; emit finding when >1 mutually-exclusive value for the same field | Base branch declared `main` in `## Task List` but `release/test` in `### Work Plan Notes` |
 
 **Block-quote tolerance:** patterns 3b and 3c tolerate matches on lines that begin with `>` (markdown block-quote) — user-quoted text is preserved verbatim. Other patterns apply regardless.
 
 **The top-of-document `**Date:** YYYY-MM-DD` stamp is allowed** — rule 3e explicitly excludes that line.
+
+**Pattern 3h — Mutually contradictory canonical field (detection notes).** For each field in the canonical-field set defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set" (base branch, version bump): collect the distinct intended values it carries across `## Review Summary`, `### Work Plan`, and `## Task List` of the same plan. If a single canonical field holds more than one mutually-exclusive value, emit: `Rule 3h: canonical field '{field}' holds contradictory values {v1, v2, …} across {sections}`. Precision boundaries: for **base branch**, parse the `Base:` field of every PR section and any explicit base-branch statement in Review Summary/Work Plan Notes — all must agree per PR. For **version bump**, parse the intended target version from the suggested-bump notes across the three sections (the canonical *target*, not each version-site token — listing five version sites all at the same version is not a contradiction). Severity: `concerns` (consistent with the rest of Rule 3). A contradictory base or version is a real defect but never fail-blocks the gate.
 
 **Severity:** `concerns` (the architect can rewrite in place; the human at STAGE-GATE-1 sees the concerns and can bounce them back via `reject`).
 
@@ -427,7 +432,7 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 |------|----------|----------|
 | 1 — One PR per service | {N} | fail-blocking |
 | 2 — Per-PR ACs in GWT | {N} | fail-blocking |
-| 3 — Consolidated documents | {N} | concerns |
+| 3 — Consolidated documents (incl. 3h canonical-field contradiction) | {N} | concerns |
 | 4 — Cross-reference integrity | {N} | concerns |
 | 5 — Service identity | {N} | concerns |
 | 6 — Human-readability sections | {N} | mixed (missing=fail, overflow/order=concerns) |
@@ -452,7 +457,8 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 |-----------|---------|----------------|
 | 01-plan.md:{line} | 3a (version marker) | `## Approach v2 — 2026-05-14` |
 | 01-plan.md:{line} | 3c (strikethrough) | `~~old approach~~` |
-(or "None — document is consolidated.")
+| 01-plan.md | 3h (canonical-field contradiction) | `Rule 3h: canonical field 'base branch' holds contradictory values {main, release/test} across {## Task List, ### Work Plan Notes}` |
+(or "None — document is consolidated. Canonical-field consistency (3h): base branch and version bump hold single consistent values across all three sections.")
 
 ### Rule 4 — Cross-reference integrity
 - 01-plan.md:{line} — Work Plan file `src/foo.ts` not covered by any PR in § Task List.

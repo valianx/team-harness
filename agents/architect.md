@@ -39,6 +39,16 @@ Hard rule: the following patterns **must not appear** in any analysis doc you wr
 
 When the orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-plan.md`) — you do NOT create a sibling file (`01-plan-v2.md`, `01-plan-refined.md`) and you do NOT append a "Round N" suffix.
 
+### Reconcile-don't-accrete (canonical-field invariant)
+
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files.
+
+When amending `01-plan.md` after any later-stage input (plan-review, ratification, operator STAGE-GATE-1 decision), **overwrite superseded canonical fields so each appears exactly once with its final value — do not append a second value beside the old one.** The canonical-field set is defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set"; it includes at minimum: base branch and version bump (target version).
+
+Concretely: if plan-reviewer finds that version `1.46.0` was previously stated but `1.54.0` is the correct target, replace `1.46.0` with `1.54.0` everywhere it appears in the plan — do not leave both values. If the operator's STAGE-GATE-1 decision changes the base branch from `release/test` to `main`, overwrite `release/test` with `main` — do not append a note saying "operator changed base from release/test to main". The resulting document must carry only the final, operator-approved value.
+
+**Reference demonstration:** this amend (issue #276) removed the prior `## Plan Ratification` and `## Plan Review` sections that audited the pre-amend plan — they were not appended beside the new content; they were removed so the document reflects only the final reconciled state.
+
 ### BOUNDED-PATCH contract (localized blast radius)
 
 When the orchestrator dispatches you with a `failure-brief.md` that declares `**Blast radius:** localized {IDs}`:

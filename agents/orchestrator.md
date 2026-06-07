@@ -1457,6 +1457,8 @@ fi
 
 ### Plan-review panel centralization contract
 
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. Every plan-stage outcome folds into a named section of the single `01-plan.md` in place.
+
 All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `plan-review` direct mode) MUST fold their findings in-place into `01-plan.md`. Zero parallel correction-files. The contract:
 
 - **All findings go to `01-plan.md`.** No reviewer creates `04-security.md`, `*-review.md`, `security-reports/`, or any other side-file in the context of a plan review. Every correction, risk identification, and sub-verdict is written directly into the `01-plan.md` body (in-place).
@@ -1467,6 +1469,7 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 - **`plan-reviewer` is the sole writer of the `## Plan Review` header and the `**Combined verdict:**` block.** It runs last (after qa and security) and reads their sub-verdicts to produce the combined verdict. `qa` and `security` each append only their own labelled sub-verdict and MUST NOT touch the combined verdict.
 - **Preserve-in-place.** `plan-reviewer` preserves the upstream sub-verdicts (`**Substance (qa):**` and `**Security design-review (security):**`) written by the earlier panel reviewers. It MUST NOT overwrite or remove them. On repeated invocations, `plan-reviewer` rewrites only the header, the `## Summary` rules table, and the `**Combined verdict:**` block; `qa` and `security` replace their own labelled sub-verdict lines within the section.
 - **Deterministic worst-of roll-up.** The `**Combined verdict:**` is the worst-of the three sub-verdicts with severity order `fail > concerns > pass`. Security sub-verdict mapping: `clean → pass`, `risks-found → fail`. A missing-but-expected sub-verdict label means the panel is incomplete — the combined verdict MUST NOT be `pass` in that case.
+- **Canonical-field reconciliation requirement.** When Phase 1.6 (plan-reviewer) detects a Rule 3h contradiction (mutually contradictory values for a canonical field such as base branch or version bump across the plan), the orchestrator routes back to the architect for in-place reconciliation of `01-plan.md § ...` (whichever sections contain the contradiction) before re-running Phase 1.6. The architect overwrites the superseded value so only the final value remains. No forked `01-plan-*.md` — the reconciliation target is always the single `01-plan.md`.
 - **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa-plan reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of this same centralization principle: every correction folds to `01-plan.md`, nothing accretes in side-files. The plan-review panel applies the same rule at Stage 1.
 
 ---
@@ -1532,6 +1535,8 @@ This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above
 | `approve autonomous` | Set `autonomous: true` and `autonomous_granted_at: STAGE-GATE-1` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved-autonomous`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 is silently skipped between PRs. |
 | `reject {reason}` | Route back to architect with the user's reason. Re-run Phase 1 → 1.5 → 1.6 → STAGE-GATE-1. Iteration counts toward the architect's max-3 budget. |
 | `edit` | Pause. Wait for the user to edit `01-plan.md` manually. On the user's next `approve`, re-run Phase 1.6 (plan-reviewer) before re-emitting STAGE-GATE-1 (the user's edits could violate the rules). |
+
+**Canonical-field reconciliation at STAGE-GATE-1.** When the operator's `edit` or `reject + re-submit` decision changes a canonical field (base branch, version bump, scope — as defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set"), the orchestrator reconciles `01-plan.md` so only the operator's final values remain across all sections — `## Review Summary`, `### Work Plan`, and `## Task List` are the in-place consolidation targets. The superseded values are overwritten, not appended. No `01-plan-*.md` sibling is created. Phase 1.6 (which now also runs Rule 3h — the canonical-field contradiction scan) re-validates after the reconciliation.
 
 **JSONL trace:** append `stage.gate` event with `stage: 1, verdict: {pass|concerns|fail}` when the gate fires; append `stage.gate.release` with `stage: 1, decision: {approved|approved-autonomous|rejected|edit}` when the user replies.
 

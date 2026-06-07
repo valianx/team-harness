@@ -755,6 +755,9 @@ Report the existing PR URL in the status block — do NOT fail.
 - **Never fail just because a PR already exists** — always detect and handle gracefully
 - **When `has_gh=true` and push succeeded but `gh pr create` fails:** report `status: blocked-pr-pending` (see `agents/_shared/gh-fallback.md` § `status: blocked-pr-pending`). The remote branch already exists; do not re-push. Emit the compare URL and body file and wait for operator reply (`pr opened #N`). Step 3's OPEN/no-PR detection handles the pushed-but-PR-less state on re-run.
 
+
+---
+
 ### Step 11.5 — Persist a process-insight to the knowledge graph (passive capture)
 
 **Best-effort** — if the Memory MCP server is unavailable, log the skip and continue. Never fail the delivery on KG errors.
@@ -774,6 +777,8 @@ Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to v
 **Never invent a URL in the skip log.** You do not know what URL the harness is actually using — it is read from `~/.claude.json` at session start and may differ from any default documented in `CLAUDE.md §1`. Log only what `doctor` reports (or the literal tool-not-available error). Embellishing the log with a guessed URL produces misleading diagnostics for the operator.
 
 **Purpose.** Build the team's institutional knowledge automatically. Each completed task that passes its acceptance criteria represents a learning — what worked, what surprised, what conventions emerged — and persisting that as a `process-insight` node in the KG makes it searchable by future agents on future tasks. This is **passive capture**: no human curates the entry; the delivery agent synthesises it from the session it just witnessed.
+
+**One node per feature.** This step writes exactly one `process-insight` node per completed task. The node is synthesised from the consolidated `01-plan.md` (the single source of truth for what was designed and approved) and the CHANGELOG entry. Never read from forked `01-plan-*.md` siblings — they are prohibited and will not exist in a correctly-run pipeline.
 
 **Inputs (read-only).** Use the workspaces you already loaded in Step 0 + the artifacts from later steps:
 - `workspaces/{feature-name}/01-plan.md` § Review Summary — what was asked and approved at STAGE-GATE-1.
@@ -861,6 +866,189 @@ The orchestrator maps delivery's `kg_passive_capture` string to the 4-code reaso
 | `failed: <error>` | `skipped:mcp-down` | 0 |
 
 The delivery agent's resilience contract is unchanged: **never fail the delivery on KG errors**. The `kg_write` event records what already happened; it has no effect on the delivery outcome.
+
+
+---
+
+### Step 11.6 — Obsidian Work-Log Interlinking (obsidian mode only)
+
+**Gate:** proceed only if `logs_mode == "obsidian"` AND the run's `docs_root` exists on disk. If `logs_mode == "local"` or `docs_root` is absent (Tier-0 / no-workspace run), this step is a **no-op** — log `obsidian_interlink: skipped: local-mode` or `skipped: no-workspace` and continue. This step is **best-effort**: any error in the operations below logs `operation.failed` (`detail: "obsidian-interlink"`) and continues — never fail the pipeline.
+
+#### Path derivation
+
+Derive from the workspaces path (resolved at orchestrator boot, passed in the dispatch):
+
+```
+feature_dir = basename(docs_root)                          # e.g. "2026-06-06_obsidian-worklog-interlinking"
+repo         = basename(parent(docs_root))                 # e.g. "team-harness"
+worklogs_root = parent(parent(docs_root))                  # e.g. "/vault/work-logs"
+logs_subfolder = basename(worklogs_root)                   # e.g. "work-logs"
+```
+
+All path construction uses forward slashes (even on Windows — wikilinks are vault-relative, not OS paths).
+
+#### Sanitization (mandatory — run before any FS or wikilink operation)
+
+Validate `repo` and `feature_dir` against the pattern `[A-Za-z0-9._-]+`. Reject if either component:
+- Contains `..`, `/`, or `\`
+- Contains any character outside `[A-Za-z0-9._-]`
+
+Additionally, if `feature_dir` starts with a 10-character date prefix, validate it matches `^\d{4}-\d{2}-\d{2}`.
+
+On any validation failure: log `operation.failed` (`detail: "obsidian-interlink-sanitize"`) and skip the entire step. Do not write any partial file.
+
+#### Label derivation (`escape_alias`)
+
+For each file `f` being linked, derive its display alias:
+
+1. If `f` ends in `.md`: read its first ~60 lines.
+   - (a) First line matching `^# (.+)$` (a single `#` heading, not `##`) → use the captured text.
+   - (b) Else if a frontmatter block (`---`…`---`) is present and contains a `title:` key → use its value.
+   - (c) Else fall through to step 3.
+2. Non-`.md` target (e.g. a diagram file) → fall through to step 3.
+3. **Humanize the filename:** strip the extension, replace every run of `[-_]` with a single space, collapse whitespace, trim.
+
+After deriving the raw label, apply `escape_alias(s)`:
+- Remove `[` and `]`
+- Replace `|` with `/`
+- Replace any CR or LF with a space
+- Collapse repeated spaces
+- Trim
+- Truncate to 120 characters
+
+#### Knowledge-only allowlist
+
+When scanning the feature folder, **include only** files whose basename matches the knowledge allowlist:
+- `00-research.md` (and any `00-research*.md`) — the research/spike knowledge-tier doc
+- `01-plan.md` (and any `01-plan*.md`) — the consolidated design and decision record
+- `01-root-cause.md` (and any `01-root-cause*.md`) — the bug-fix flow knowledge-tier doc (fix flows have no `00-research`; `01-root-cause` is the research-equivalent artifact)
+
+**Everything else is excluded** — both process/verification docs (`02-implementation.md`, `02-documentation.md`, `03-testing.md`, `03-regression-tests.md`, `04-validation.md`, `04-security.md`, `05-diagram.*`, `00-acceptance-criteria.md`) and plumbing (`00-state.md`, `00-execution-events.md`, `00-execution-events.jsonl`, `session.json`) and the feature-index note itself (`{feature_dir}.md`).
+
+Wikilinks omit the `.md` extension for `.md` files; non-`.md` files keep their extension.
+
+#### Three-tier topology (exact names — operator-binding)
+
+```
+{worklogs_root}/_MOC-work-logs.md                               top MOC
+{worklogs_root}/{repo}/_MOC-{repo}.md                           repo MOC
+{worklogs_root}/{repo}/{feature_dir}/{feature_dir}.md           feature index
+```
+
+All cross-note links use vault-relative path wikilinks with forward slashes and a display alias:
+
+```
+[[{logs_subfolder}/{repo}/{feature_dir}/{basename_no_ext}|{alias}]]
+```
+
+Example: `[[work-logs/team-harness/2026-06-06_obsidian-worklog-interlinking/01-plan|Plan: obsidian-worklog-interlinking]]`
+
+Never use bare basename wikilinks (`[[01-plan]]`) — they collide across feature folders.
+
+#### Regeneration algorithm
+
+**Step 11.6.1 — Feature index (write first).**
+
+Scan `docs_root` for **knowledge-allowlist** docs (`00-research*`, `01-plan*`, `01-root-cause*`). For each, derive its alias via label derivation. Sort by basename. Fully overwrite `{docs_root}/{feature_dir}.md` with:
+
+```markdown
+---
+repo: {repo}
+feature: {feature_dir}
+type: index
+tags:
+  - work-logs
+  - {repo}
+  - index
+---
+
+# {feature_dir} — Work Log ({date})
+
+> Auto-generated index of the knowledge docs for this run. Regenerated on each obsidian-mode delivery — do not hand-edit.
+
+Up: [[{logs_subfolder}/{repo}/_MOC-{repo}|{repo}]]
+
+## Knowledge
+- [[{logs_subfolder}/{repo}/{feature_dir}/{basename_no_ext}|{alias}]]
+- ... (knowledge-allowlist docs only — 00-research, 01-plan, 01-root-cause — that exist, sorted by basename)
+```
+
+Write this file first so its H1 is available when the repo MOC scan reads it.
+
+**Step 11.6.2 — Repo MOC.**
+
+Scan `{worklogs_root}/{repo}/`:
+- **Feature-index notes:** for each immediate subdirectory `<d>/`, if `<d>/<d>.md` exists, include it; derive alias from its H1 (label-derivation algorithm). Sort by subdirectory name descending (newest first).
+- **Stray repo-root docs:** each `*.md` directly under `{worklogs_root}/{repo}/` except `_MOC-{repo}.md` itself; derive alias from H1. Sort by basename.
+
+Fully overwrite `{worklogs_root}/{repo}/_MOC-{repo}.md` with:
+
+```markdown
+---
+repo: {repo}
+type: moc
+tags:
+  - work-logs
+  - {repo}
+  - moc
+---
+
+# {repo} — Work Logs
+
+> Auto-generated index of pipeline runs and repo-level docs for `{repo}`. Regenerated on each obsidian-mode delivery — do not hand-edit.
+
+Up: [[{logs_subfolder}/_MOC-work-logs|Work Logs — Master Index]]
+
+## Features
+- [[{logs_subfolder}/{repo}/{feature_dir}/{feature_dir}|{alias}]]
+- ...
+
+## Repo Docs
+- [[{logs_subfolder}/{repo}/{stray_basename_no_ext}|{alias}]]
+- ...
+```
+
+Omit the `## Repo Docs` section entirely when there are no stray repo-root docs.
+
+**Step 11.6.3 — Top MOC.**
+
+Scan immediate subdirectories of `{worklogs_root}/`. For each subdirectory `<r>/` that contains a `_MOC-<r>.md`, include it; derive alias from its H1. Sort by subdirectory name.
+
+Fully overwrite `{worklogs_root}/_MOC-work-logs.md` with:
+
+```markdown
+---
+type: moc
+tags:
+  - work-logs
+  - moc
+---
+
+# Work Logs — Master Index
+
+> Auto-generated index of repositories with pipeline work-logs. Regenerated on each obsidian-mode delivery — do not hand-edit.
+
+## Repositories
+- [[{logs_subfolder}/{repo}/_MOC-{repo}|{alias}]]
+- ...
+```
+
+#### Forward-only reconciliation
+
+Steps 11.6.2 and 11.6.3 discover feature-index notes and repo MOCs that **already exist** on disk — they never create index notes for historical feature folders that lack one. Historical folders the operator indexed manually are discovered and kept (their `<d>/<d>.md` exists); historical folders without an index note are left untouched.
+
+#### Idempotency
+
+Each index/MOC file is fully rewritten (whole-(sub)tree regeneration) from a deterministic scan on every run. Re-runs and `/th:recover` converge to identical file content with no duplicate entries.
+
+#### Status line
+
+After Step 11.6 completes, add one line to the delivery status block:
+```
+obsidian_interlink: regenerated | skipped: local-mode | skipped: no-workspace | skipped: sanitize | failed: {error}
+```
+
+The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfolder}/...`), NOT into the repo working tree — they are never staged or committed.
 
 ---
 
