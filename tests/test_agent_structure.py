@@ -13959,9 +13959,16 @@ check(
     "marketplace.json plugins[0].version must be >= 2.53.0",
 )
 check(
-    "dev-mode(version-main-go): cmd/install/main.go var version == 2.53.0",
-    f'var version = "{_S59_EXPECTED_VERSION}"' in _s59_main_go,
-    f"cmd/install/main.go must declare var version = \"{_S59_EXPECTED_VERSION}\"",
+    "dev-mode(version-main-go): cmd/install/main.go var version >= 2.53.0 (dev-mode release floor)",
+    any(
+        f'var version = "{_s59_main_go_ver}"' in _s59_main_go
+        for _s59_main_go_ver in [_S59_EXPECTED_VERSION]
+    ) or any(
+        f'var version = "{m}"' in _s59_main_go
+        for m in [_s59_main_go.split('var version = "')[1].split('"')[0]]
+        if _s59_ver_tuple(m) >= _S59_MIN_VERSION
+    ) if 'var version = "' in _s59_main_go else False,
+    f"cmd/install/main.go must declare a var version >= \"{_S59_EXPECTED_VERSION}\" (the dev-mode feature floor)",
 )
 check(
     "dev-mode(version-claude-md): CLAUDE.md §3 Current version >= 2.53.0 (dev-mode release floor)",
@@ -14683,6 +14690,337 @@ check(
     "skills/setup/SKILL.md guard section declares advisory/non-blocking contract",
     "advisory" in _s64_guard_slice,
     "the guard must describe itself as advisory (non-blocking) in the ### 0. section (AC-1, AC-4)",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 65 — Obsidian work-log interlinking (obsidian-worklog-interlinking, v2.57.0)
+# ---------------------------------------------------------------------------
+# Asserts that delivery.md Step 11.6 contains the required structural elements:
+# (1) the section exists with the obsidian-only gate phrasing;
+# (2) the three exact MOC/index names are present; (2b) ## Repo Docs section;
+# (3) the H1-label fallback chain (H1 -> frontmatter title -> humanized filename);
+# (4) the knowledge-only allowlist (00-research, 01-plan, 01-root-cause) phrasing;
+# (4b) the four plumbing files are still excluded; (4c) ## Knowledge heading;
+# (5) the forward-slash wikilink rule.
+# All checks are anchor-scoped to the ### Step 11.6 section to prevent false-greens.
+# Self-referential guard: "Suite 65" in docs/testing.md + "obsidian-worklog-interlinking"
+# marker in the test file; "Suite 65" NOT in CLAUDE.md §11 (hygiene contract).
+# Marker: obsidian-worklog-interlinking
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 65: Obsidian work-log interlinking (obsidian-worklog-interlinking) ===")
+
+_s65_delivery = read(AGENTS_DIR / "delivery.md")
+
+# --- Helper: slice to Step 11.6 section ---
+# Anchor: "### Step 11.6" — stop at "## Session Documentation" (the section that
+# follows Step 11.6 in the delivery doc). Step 11.6 runs AFTER Step 11.5 (KG
+# capture); the physical ordering in delivery.md is 11.5 then 11.6.
+_S65_ANCHOR = "### Step 11.6 — Obsidian Work-Log Interlinking"
+_S65_STOP = "## Session Documentation"
+_s65_anchor_idx = _s65_delivery.find(_S65_ANCHOR)
+_s65_stop_idx = _s65_delivery.find(_S65_STOP)
+# Step 11.6 comes before ## Session Documentation in the delivery doc.
+_s65_slice = (
+    _s65_delivery[_s65_anchor_idx:_s65_stop_idx]
+    if _s65_anchor_idx != -1 and _s65_stop_idx != -1 and _s65_anchor_idx < _s65_stop_idx
+    else ""
+)
+
+# (1) Section existence + obsidian-only gate phrasing
+check(
+    "delivery.md has '### Step 11.6 — Obsidian Work-Log Interlinking' section",
+    _s65_anchor_idx != -1,
+    "Step 11.6 section missing from agents/delivery.md",
+)
+check(
+    "delivery.md Step 11.6 declares obsidian-only gate (logs_mode == obsidian)",
+    "logs_mode" in _s65_slice and "obsidian" in _s65_slice,
+    "Step 11.6 must gate on logs_mode == 'obsidian'",
+)
+check(
+    "delivery.md Step 11.6 declares Tier-0/no-workspace no-op",
+    "docs_root" in _s65_slice and ("no-op" in _s65_slice or "no-workspace" in _s65_slice),
+    "Step 11.6 must declare a no-op when docs_root is absent",
+)
+
+# (2) Three exact MOC/index names
+check(
+    "delivery.md Step 11.6 references '_MOC-work-logs' (top MOC name)",
+    "_MOC-work-logs" in _s65_slice,
+    "_MOC-work-logs top-MOC name not found in Step 11.6",
+)
+check(
+    "delivery.md Step 11.6 references '_MOC-{repo}' (repo MOC name)",
+    "_MOC-" in _s65_slice and "repo" in _s65_slice,
+    "repo MOC name (_MOC-{repo}) not found in Step 11.6",
+)
+check(
+    "delivery.md Step 11.6 references feature-index pattern '{feature_dir}/{feature_dir}.md'",
+    "feature_dir" in _s65_slice and "{feature_dir}.md" in _s65_slice,
+    "feature-index naming pattern ({feature_dir}/{feature_dir}.md) not found in Step 11.6",
+)
+
+# (2b) AC-8 — stray repo-root docs section header in Repo MOC template
+check(
+    "delivery.md Step 11.6 repo-MOC template includes '## Repo Docs' section for stray repo-root docs",
+    "## Repo Docs" in _s65_slice,
+    "## Repo Docs section header missing from Step 11.6 repo-MOC template (AC-8)",
+)
+
+# (3) H1-label fallback chain
+check(
+    "delivery.md Step 11.6 documents H1 as primary label source",
+    "H1" in _s65_slice or "# heading" in _s65_slice or "^# " in _s65_slice,
+    "H1 label derivation not documented in Step 11.6",
+)
+check(
+    "delivery.md Step 11.6 documents frontmatter 'title:' as fallback",
+    "title:" in _s65_slice or "frontmatter" in _s65_slice,
+    "frontmatter title: fallback not documented in Step 11.6",
+)
+check(
+    "delivery.md Step 11.6 documents humanized-filename as final fallback",
+    "humanize" in _s65_slice.lower() or "humanized" in _s65_slice.lower(),
+    "humanized-filename fallback not documented in Step 11.6",
+)
+
+# (4) Knowledge-only allowlist — the three allowlisted basenames must be named
+check(
+    "delivery.md Step 11.6 names '00-research' in the knowledge allowlist",
+    "00-research" in _s65_slice,
+    "00-research not named in the Step 11.6 knowledge-only allowlist",
+)
+check(
+    "delivery.md Step 11.6 names '01-plan' in the knowledge allowlist",
+    "01-plan" in _s65_slice,
+    "01-plan not named in the Step 11.6 knowledge-only allowlist",
+)
+check(
+    "delivery.md Step 11.6 names '01-root-cause' in the knowledge allowlist",
+    "01-root-cause" in _s65_slice,
+    "01-root-cause not named in the Step 11.6 knowledge-only allowlist",
+)
+
+# (4b) Plumbing files remain explicitly excluded
+for _plumbing in ("00-state.md", "00-execution-events.md", "00-execution-events.jsonl", "session.json"):
+    check(
+        f"delivery.md Step 11.6 explicitly excludes '{_plumbing}'",
+        _plumbing in _s65_slice,
+        f"plumbing file '{_plumbing}' not in the Step 11.6 exclusion list",
+    )
+
+# (4c) Feature-index section heading is '## Knowledge' (not '## Stage Docs')
+check(
+    "delivery.md Step 11.6 feature-index template uses '## Knowledge' heading (not '## Stage Docs')",
+    "## Knowledge" in _s65_slice and "## Stage Docs" not in _s65_slice,
+    "Step 11.6 feature-index template must use '## Knowledge' heading; '## Stage Docs' is the old name",
+)
+
+# (5) Forward-slash wikilink rule
+check(
+    "delivery.md Step 11.6 specifies forward-slash wikilinks",
+    "forward slash" in _s65_slice.lower() or "forward-slash" in _s65_slice.lower() or "forward slashes" in _s65_slice.lower(),
+    "forward-slash wikilink rule not stated in Step 11.6",
+)
+
+# (6) Alias escaping / sanitization
+check(
+    "delivery.md Step 11.6 declares alias escaping (escape_alias or strip [ ] |)",
+    "escape_alias" in _s65_slice or ("escape" in _s65_slice and ("`[`" in _s65_slice or "`]`" in _s65_slice or "`|`" in _s65_slice)),
+    "alias escaping (escape_alias) not documented in Step 11.6",
+)
+check(
+    "delivery.md Step 11.6 declares path component sanitization ([A-Za-z0-9._-]+)",
+    "[A-Za-z0-9._-]" in _s65_slice or "sanitiz" in _s65_slice.lower(),
+    "path component sanitization not documented in Step 11.6",
+)
+
+# (7) Idempotency / whole-tree regeneration
+check(
+    "delivery.md Step 11.6 declares idempotent whole-tree regeneration",
+    "regenerat" in _s65_slice.lower() and ("overwrite" in _s65_slice.lower() or "fully" in _s65_slice.lower()),
+    "idempotent whole-tree regeneration not documented in Step 11.6",
+)
+
+# (8) Forward-only reconciliation (no historical backfill)
+check(
+    "delivery.md Step 11.6 declares forward-only reconciliation",
+    "forward-only" in _s65_slice.lower() or "forward only" in _s65_slice.lower() or "already exist" in _s65_slice.lower(),
+    "forward-only reconciliation not documented in Step 11.6",
+)
+
+# (9) Best-effort posture
+check(
+    "delivery.md Step 11.6 declares best-effort error handling (never fail pipeline)",
+    "best-effort" in _s65_slice.lower() or "never fail" in _s65_slice.lower(),
+    "best-effort / never-fail-pipeline posture not declared in Step 11.6",
+)
+
+# (10) docs/obsidian-linking.md exists
+_s65_obsidian_linking_path = REPO_ROOT / "docs" / "obsidian-linking.md"
+check(
+    "docs/obsidian-linking.md exists (normative contract document)",
+    _s65_obsidian_linking_path.exists(),
+    "docs/obsidian-linking.md is missing — normative contract document required",
+)
+if _s65_obsidian_linking_path.exists():
+    _s65_linking_doc = read(_s65_obsidian_linking_path)
+    check(
+        "docs/obsidian-linking.md documents Obsidian dot-label-uses-filename limitation",
+        "filename" in _s65_linking_doc and ("dot" in _s65_linking_doc.lower() or "limitation" in _s65_linking_doc.lower() or "graph" in _s65_linking_doc.lower()),
+        "docs/obsidian-linking.md must document the Obsidian graph dot-label limitation",
+    )
+    check(
+        "docs/obsidian-linking.md states three-tier topology with exact names",
+        "_MOC-work-logs" in _s65_linking_doc and "_MOC-" in _s65_linking_doc and "feature_dir" in _s65_linking_doc,
+        "docs/obsidian-linking.md must specify all three exact tier names",
+    )
+
+# (11) CLAUDE.md §5 pointer to docs/obsidian-linking.md
+_s65_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "CLAUDE.md §5 has a pointer bullet to docs/obsidian-linking.md",
+    "docs/obsidian-linking.md" in _s65_claude_md,
+    "CLAUDE.md §5 must contain a one-line pointer to docs/obsidian-linking.md",
+)
+check(
+    "CLAUDE.md §5 does NOT contain the Suite 65 literal (hygiene contract)",
+    "Suite 65" not in _s65_claude_md,
+    "CLAUDE.md §11 must not mention Suite 65 — only docs/testing.md is the canonical registry",
+)
+
+# (12) Self-referential guard
+check(
+    "docs/testing.md canonical registry names 'Suite 65' and 'obsidian-worklog-interlinking'",
+    "Suite 65" in read(REPO_ROOT / "docs" / "testing.md")
+    and "obsidian-worklog-interlinking" in read(REPO_ROOT / "docs" / "testing.md"),
+    "docs/testing.md must register Suite 65 and the obsidian-worklog-interlinking marker",
+)
+
+# ---------------------------------------------------------------------------
+# Suite 66 — Plan consolidation invariant (plan-consolidation-invariant, v2.57.0)
+# ---------------------------------------------------------------------------
+# Asserts the prompt-language presence of the #276 plan-consolidation contract:
+# (1) agents/_shared/plan-consolidation.md exists with the invariant, canonical-field
+#     set (base branch, version bump), no-forked-file prohibition, section-ownership map;
+# (2) each of the five plan-writer/auditor agents references plan-consolidation.md
+#     and contains the no-forked-file prohibition;
+# (3) plan-reviewer.md Rule 3 defines the 3h canonical-field contradiction scan
+#     and names the two canonical fields (base branch, version bump);
+# (4) qa.md defines ## Validation Outcome fold-in;
+# (5) self-referential guard.
+# Marker: plan-consolidation-invariant
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 66: Plan consolidation invariant (plan-consolidation-invariant) ===")
+
+_s66_snippet_path = AGENTS_DIR / "_shared" / "plan-consolidation.md"
+_s66_snippet = read(_s66_snippet_path) if _s66_snippet_path.exists() else ""
+
+# (1a) Shared snippet exists
+check(
+    "agents/_shared/plan-consolidation.md exists",
+    _s66_snippet_path.exists(),
+    "agents/_shared/plan-consolidation.md is missing — plan-consolidation invariant snippet required",
+)
+
+# (1b) Snippet contains the invariant text
+check(
+    "plan-consolidation.md contains the invariant statement (snapshot, not a log)",
+    "snapshot" in _s66_snippet and "not" in _s66_snippet and ("log" in _s66_snippet or "accret" in _s66_snippet),
+    "plan-consolidation.md must contain the invariant: 01-plan.md is a snapshot of the final reconciled state, not a log",
+)
+
+# (1c) Snippet names the canonical-field set with both required fields
+check(
+    "plan-consolidation.md names 'base branch' in the canonical-field set",
+    "base branch" in _s66_snippet.lower() or "Base branch" in _s66_snippet,
+    "plan-consolidation.md must name 'base branch' in the canonical-field set",
+)
+check(
+    "plan-consolidation.md names 'version bump' in the canonical-field set",
+    "version bump" in _s66_snippet.lower() or "Version bump" in _s66_snippet,
+    "plan-consolidation.md must name 'version bump' (target version) in the canonical-field set",
+)
+
+# (1d) Snippet contains the no-forked-file prohibition
+check(
+    "plan-consolidation.md contains the no-forked-file prohibition",
+    "01-plan-" in _s66_snippet and ("prohibit" in _s66_snippet.lower() or "never create" in _s66_snippet.lower() or "Never create" in _s66_snippet),
+    "plan-consolidation.md must prohibit creating 01-plan-*.md sibling files",
+)
+
+# (1e) Snippet contains the section-ownership map
+check(
+    "plan-consolidation.md contains the section-ownership map",
+    "Section-ownership map" in _s66_snippet or "section-ownership map" in _s66_snippet.lower() or "Sole writer" in _s66_snippet,
+    "plan-consolidation.md must include the section-ownership map (who writes which 01-plan.md section)",
+)
+
+# (2) The five plan-writer/auditor agents each reference the snippet and contain the no-forked-file prohibition
+_S66_AGENTS = {
+    "architect": AGENTS_DIR / "architect.md",
+    "plan-reviewer": AGENTS_DIR / "plan-reviewer.md",
+    "qa-plan": AGENTS_DIR / "qa-plan.md",
+    "qa": AGENTS_DIR / "qa.md",
+    "orchestrator": AGENTS_DIR / "orchestrator.md",
+}
+for _agent_name, _agent_path in _S66_AGENTS.items():
+    _agent_text = read(_agent_path)
+    check(
+        f"agents/{_agent_name}.md references _shared/plan-consolidation.md",
+        "plan-consolidation.md" in _agent_text,
+        f"agents/{_agent_name}.md must reference agents/_shared/plan-consolidation.md",
+    )
+    check(
+        f"agents/{_agent_name}.md contains the no-forked-file prohibition (01-plan-*.md or no forked)",
+        "01-plan-" in _agent_text or "forked" in _agent_text.lower() or "no forked" in _agent_text.lower(),
+        f"agents/{_agent_name}.md must contain the no-forked 01-plan-*.md prohibition",
+    )
+
+# (3) plan-reviewer.md Rule 3 defines the 3h canonical-field contradiction scan
+_s66_plan_reviewer = read(AGENTS_DIR / "plan-reviewer.md")
+check(
+    "plan-reviewer.md Rule 3 defines pattern 3h (canonical-field contradiction scan)",
+    "3h" in _s66_plan_reviewer and ("canonical" in _s66_plan_reviewer.lower() or "contradictory" in _s66_plan_reviewer.lower()),
+    "plan-reviewer.md Rule 3 must define pattern 3h — the canonical-field contradiction scan",
+)
+check(
+    "plan-reviewer.md Rule 3h names 'base branch' as a canonical field",
+    "base branch" in _s66_plan_reviewer.lower() or "Base branch" in _s66_plan_reviewer,
+    "plan-reviewer.md Rule 3h must name 'base branch' as one of the scanned canonical fields",
+)
+check(
+    "plan-reviewer.md Rule 3h names 'version bump' as a canonical field",
+    "version bump" in _s66_plan_reviewer.lower() or "Version bump" in _s66_plan_reviewer,
+    "plan-reviewer.md Rule 3h must name 'version bump' as one of the scanned canonical fields",
+)
+
+# (4) qa.md defines the ## Validation Outcome fold-in
+_s66_qa = read(AGENTS_DIR / "qa.md")
+check(
+    "qa.md defines '## Validation Outcome' fold-in to 01-plan.md",
+    "## Validation Outcome" in _s66_qa,
+    "qa.md validate mode must define the ## Validation Outcome fold-in to 01-plan.md",
+)
+check(
+    "qa.md Validation Outcome fold-in expands the validate-mode write scope beyond checkbox-flips",
+    "## Validation Outcome" in _s66_qa and ("04-validation.md" in _s66_qa or "deep" in _s66_qa.lower()),
+    "qa.md must state that deep per-AC detail stays in 04-validation.md while ## Validation Outcome folds into 01-plan.md",
+)
+
+# (5) Self-referential guard
+_s66_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "docs/testing.md canonical registry names 'Suite 66' and 'plan-consolidation-invariant'",
+    "Suite 66" in _s66_testing_md and "plan-consolidation-invariant" in _s66_testing_md,
+    "docs/testing.md must register Suite 66 and the plan-consolidation-invariant marker",
+)
+check(
+    "CLAUDE.md §5 does NOT contain the Suite 66 literal (hygiene contract)",
+    "Suite 66" not in read(REPO_ROOT / "CLAUDE.md"),
+    "CLAUDE.md §11 must not mention Suite 66 — only docs/testing.md is the canonical registry",
 )
 
 # ---------------------------------------------------------------------------
