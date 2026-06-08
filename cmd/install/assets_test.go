@@ -24,9 +24,10 @@ func TestEmbeddedAssets_AgentCount(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// Skip the _shared/ subdirectory — it holds cross-cutting snippets,
-		// not invocable subagents. Skip README.md and ref-*.md for the same reason.
-		if d.IsDir() && d.Name() == "_shared" {
+		// Skip _shared/ (cross-cutting snippets) and testing-refs/ (reference
+		// library loaded on demand by the tester agent) — neither contains
+		// invocable subagents. Skip README.md and ref-*.md for the same reason.
+		if d.IsDir() && (d.Name() == "_shared" || d.Name() == "testing-refs") {
 			return fs.SkipDir
 		}
 		isRef := d.Name() == "README.md" || strings.HasPrefix(d.Name(), "ref-")

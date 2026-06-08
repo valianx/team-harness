@@ -15024,6 +15024,298 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 67: tester lean-core + by-test-type reference library
+# (tester-lean-core-testing-refs, v2.58.0)
+# ---------------------------------------------------------------------------
+print("=== Suite 67: tester lean-core + by-test-type reference library (v2.58.0) ===")
+
+_s67_tester = read(AGENTS_DIR / "tester.md")
+_s67_testing_refs = AGENTS_DIR / "testing-refs"
+# Stop markers for anchor-scoped slicing: any heading boundary or --- separator
+_S67_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# (1) Core retains every named mode/contract (anchor-scoped)
+# Pre-Fix Regression Test Mode
+_s67_regression = _slice_section(_s67_tester, "## Pre-Fix Regression Test Mode", _S67_STOP)
+check(
+    "suite67(1a): tester.md ## Pre-Fix Regression Test Mode slice is non-empty",
+    len(_s67_regression) > 0,
+    "tester.md must contain ## Pre-Fix Regression Test Mode (STAYS row 4)",
+)
+check(
+    "suite67(1b): Pre-Fix Regression slice contains 'pre-fix-regression'",
+    "pre-fix-regression" in _s67_regression,
+    "## Pre-Fix Regression Test Mode must contain the 'pre-fix-regression' mode token",
+)
+check(
+    "suite67(1c): Pre-Fix Regression slice contains '02-regression-test.md'",
+    "02-regression-test.md" in _s67_regression,
+    "## Pre-Fix Regression Test Mode must reference '02-regression-test.md'",
+)
+
+# authoring mode
+_s67_authoring = _slice_section(_s67_tester, "## Mode: `authoring`", _S67_STOP)
+check(
+    "suite67(1d): tester.md ## Mode: `authoring` slice is non-empty",
+    len(_s67_authoring) > 0,
+    "tester.md must contain ## Mode: `authoring` (STAYS row 5)",
+)
+check(
+    "suite67(1e): authoring slice contains 'Phase 2.7'",
+    "Phase 2.7" in _s67_authoring,
+    "## Mode: `authoring` must contain 'Phase 2.7'",
+)
+check(
+    "suite67(1f): authoring slice contains 'does NOT validate AC verdicts'",
+    "does NOT validate AC verdicts" in _s67_authoring,
+    "## Mode: `authoring` must contain 'does NOT validate AC verdicts'",
+)
+
+# verify-run mode
+_s67_verifyrun = _slice_section(_s67_tester, "## Mode: `verify-run`", _S67_STOP)
+check(
+    "suite67(1g): tester.md ## Mode: `verify-run` slice is non-empty",
+    len(_s67_verifyrun) > 0,
+    "tester.md must contain ## Mode: `verify-run` (STAYS row 6)",
+)
+check(
+    "suite67(1h): verify-run slice contains 'run-only'",
+    "run-only" in _s67_verifyrun,
+    "## Mode: `verify-run` must contain 'run-only'",
+)
+check(
+    "suite67(1i): verify-run slice contains 'does NOT write new AC tests'",
+    "does NOT write new AC tests" in _s67_verifyrun,
+    "## Mode: `verify-run` must contain 'does NOT write new AC tests'",
+)
+
+# Review Mode
+_s67_review = _slice_section(_s67_tester, "## Review Mode", _S67_STOP)
+check(
+    "suite67(1j): tester.md ## Review Mode slice is non-empty",
+    len(_s67_review) > 0,
+    "tester.md must contain ## Review Mode (STAYS row 7)",
+)
+check(
+    "suite67(1k): Review Mode slice contains 'read-only'",
+    "read-only" in _s67_review,
+    "## Review Mode must contain 'read-only'",
+)
+
+# Phase 0 — Discovery
+_s67_phase0 = _slice_section(_s67_tester, "## Phase 0 — Discovery", _S67_STOP)
+check(
+    "suite67(1l): tester.md ## Phase 0 — Discovery slice is non-empty",
+    len(_s67_phase0) > 0,
+    "tester.md must contain ## Phase 0 — Discovery (STAYS row 9)",
+)
+check(
+    "suite67(1m): Phase 0 slice contains 'context7'",
+    "context7" in _s67_phase0,
+    "## Phase 0 — Discovery must contain 'context7'",
+)
+
+# coverage-config mode
+_s67_covconfig = _slice_section(_s67_tester, "### Mode: `coverage-config`", _S67_STOP)
+check(
+    "suite67(1n): tester.md ### Mode: `coverage-config` slice is non-empty",
+    len(_s67_covconfig) > 0,
+    "tester.md must contain ### Mode: `coverage-config` (STAYS row 21)",
+)
+
+# test-infra mode
+_s67_testinfra = _slice_section(_s67_tester, "### Mode: `test-infra`", _S67_STOP)
+check(
+    "suite67(1o): tester.md ### Mode: `test-infra` slice is non-empty",
+    len(_s67_testinfra) > 0,
+    "tester.md must contain ### Mode: `test-infra` (STAYS row 22)",
+)
+
+# module-test mode
+_s67_moduletest = _slice_section(_s67_tester, "### Mode: `module-test`", _S67_STOP)
+check(
+    "suite67(1p): tester.md ### Mode: `module-test` slice is non-empty",
+    len(_s67_moduletest) > 0,
+    "tester.md must contain ### Mode: `module-test` (STAYS row 23)",
+)
+
+# Return Protocol + status block fields — needs a wide stop so the full status block is included
+_S67_RETURN_STOP = ("\n## ",)
+_s67_return = _slice_section(_s67_tester, "## Return Protocol", _S67_RETURN_STOP)
+_s67_return_mode_tokens = [
+    "pre-fix-regression", "authoring", "verify-run", "review",
+    "coverage-config", "test-infra", "module-test",
+]
+_s67_return_ratchet_tokens = [
+    "tests_count", "tests_deleted", "regression_test_path",
+    "regression_test_status", "blast_radius",
+]
+check(
+    "suite67(1q): tester.md ## Return Protocol slice is non-empty",
+    len(_s67_return) > 0,
+    "tester.md must contain ## Return Protocol (STAYS row 26)",
+)
+for _tok in _s67_return_mode_tokens:
+    check(
+        f"suite67(1r): Return Protocol contains mode token '{_tok}'",
+        _tok in _s67_return,
+        f"## Return Protocol must contain mode token '{_tok}'",
+    )
+for _tok in _s67_return_ratchet_tokens:
+    check(
+        f"suite67(1s): Return Protocol contains ratchet field '{_tok}'",
+        _tok in _s67_return,
+        f"## Return Protocol must contain ratchet field '{_tok}'",
+    )
+
+# KG read-only
+_s67_kg = _slice_section(_s67_tester, "## Knowledge Graph Access", _S67_STOP)
+check(
+    "suite67(1t): tester.md ## Knowledge Graph Access slice is non-empty",
+    len(_s67_kg) > 0,
+    "tester.md must contain ## Knowledge Graph Access (STAYS row 25)",
+)
+check(
+    "suite67(1u): KG Access slice contains 'read-only'",
+    "read-only" in _s67_kg,
+    "## Knowledge Graph Access must contain 'read-only'",
+)
+check(
+    "suite67(1v): KG Access slice prohibits create_nodes (lists it under Do NOT)",
+    "create_nodes" not in _s67_kg or "Do NOT" in _s67_kg or "do not" in _s67_kg.lower() or "read-only" in _s67_kg,
+    "## Knowledge Graph Access must not authorize create_nodes — must prohibit it or declare read-only",
+)
+
+# (2) Router section exists and is AC-scoped
+_s67_router = _slice_section(_s67_tester, "## Reference Router", _S67_STOP)
+check(
+    "suite67(2a): tester.md ## Reference Router slice is non-empty",
+    len(_s67_router) > 0,
+    "tester.md must contain ## Reference Router (STAYS row 29 — new section)",
+)
+check(
+    "suite67(2b): Reference Router contains '_index.md'",
+    "_index.md" in _s67_router,
+    "## Reference Router must reference '_index.md' (the manifest)",
+)
+check(
+    "suite67(2c): Reference Router contains 'Read'",
+    "Read" in _s67_router,
+    "## Reference Router must use 'Read' as the load mechanism",
+)
+check(
+    "suite67(2d): Reference Router is AC-scoped (contains 'AC')",
+    "AC" in _s67_router,
+    "## Reference Router must reference AC-scoped warranted-type derivation",
+)
+check(
+    "suite67(2e): Reference Router contains a never-fabricate / degrade token",
+    "never fabricate" in _s67_router.lower() or "degrade" in _s67_router.lower() or "fabricate" in _s67_router.lower(),
+    "## Reference Router must declare graceful-degradation / never-fabricate fallback",
+)
+
+# (3) Manifest lists every type file + filesystem agreement (bidirectional)
+_s67_type_names = ["unit", "integration", "e2e", "ui-component", "visual", "a11y"]
+_s67_index_path = _s67_testing_refs / "_index.md"
+_s67_index_text = read(_s67_index_path) if _s67_index_path.exists() else ""
+check(
+    "suite67(3a): agents/testing-refs/_index.md exists",
+    _s67_index_path.exists(),
+    "agents/testing-refs/_index.md must exist (the Reference Router manifest)",
+)
+for _type in _s67_type_names:
+    check(
+        f"suite67(3b): _index.md names type '{_type}'",
+        _type in _s67_index_text,
+        f"agents/testing-refs/_index.md must list type '{_type}'",
+    )
+    _s67_type_path = _s67_testing_refs / f"{_type}.md"
+    check(
+        f"suite67(3c): agents/testing-refs/{_type}.md exists on disk",
+        _s67_type_path.exists(),
+        f"agents/testing-refs/{_type}.md must exist (listed in manifest, must be present on disk)",
+    )
+# Every existing type file is listed in the manifest (reverse direction)
+for _type in _s67_type_names:
+    _s67_type_path = _s67_testing_refs / f"{_type}.md"
+    if _s67_type_path.exists():
+        check(
+            f"suite67(3d): existing file {_type}.md is listed in _index.md",
+            _type in _s67_index_text,
+            f"agents/testing-refs/{_type}.md exists on disk but is not listed in _index.md",
+        )
+
+# (4) Every reference path the core names resolves to a file
+_s67_router_paths_present = all(
+    (_s67_testing_refs / f"{_type}.md").exists() for _type in _s67_type_names
+)
+check(
+    "suite67(4): every agents/testing-refs/*.md path named in the router mapping exists",
+    _s67_router_paths_present,
+    "all six type files named in ## Reference Router must exist on disk",
+)
+
+# (5) Type files have canonical shape: Principles + react-nextjs, no YAML frontmatter
+for _type in _s67_type_names:
+    _s67_type_text = read(_s67_testing_refs / f"{_type}.md") if (_s67_testing_refs / f"{_type}.md").exists() else ""
+    check(
+        f"suite67(5a): {_type}.md contains '## Principles'",
+        "## Principles" in _s67_type_text,
+        f"agents/testing-refs/{_type}.md must contain a '## Principles' section",
+    )
+    check(
+        f"suite67(5b): {_type}.md contains '## react-nextjs'",
+        "## react-nextjs" in _s67_type_text,
+        f"agents/testing-refs/{_type}.md must contain a '## react-nextjs' section",
+    )
+    check(
+        f"suite67(5c): {_type}.md has NO YAML frontmatter (does not start with '---')",
+        not _s67_type_text.startswith("---"),
+        f"agents/testing-refs/{_type}.md must not have YAML frontmatter (reference files are not agents)",
+    )
+
+# (6) MOVED content landed in references AND absent from tester.md
+_s67_nestjs_tokens = ["TypeORM", "setImmediate", "useFakeTimers"]
+_s67_unit_text = read(_s67_testing_refs / "unit.md") if (_s67_testing_refs / "unit.md").exists() else ""
+_s67_integration_text = read(_s67_testing_refs / "integration.md") if (_s67_testing_refs / "integration.md").exists() else ""
+for _tok in _s67_nestjs_tokens:
+    check(
+        f"suite67(6a): NestJS pitfall token '{_tok}' present in unit.md or integration.md nestjs section",
+        _tok in _s67_unit_text or _tok in _s67_integration_text,
+        f"NestJS pitfall token '{_tok}' must appear in unit.md or integration.md (proves MOVE preserved it)",
+    )
+    check(
+        f"suite67(6b): NestJS pitfall token '{_tok}' absent from tester.md (true MOVE, not copy)",
+        _tok not in _s67_tester,
+        f"NestJS pitfall token '{_tok}' must not appear in tester.md (proves MOVE removed it from core)",
+    )
+
+# (7) tester stays a single agent
+check(
+    "suite67(7a): EXPECTED_AGENTS still lists 'tester' exactly once",
+    EXPECTED_AGENTS.count("tester") == 1,
+    "EXPECTED_AGENTS must list 'tester' exactly once — no tester variant was added",
+)
+check(
+    "suite67(7b): no tester-frontend.md or ui-tester.md in agents/",
+    not (AGENTS_DIR / "tester-frontend.md").exists() and not (AGENTS_DIR / "ui-tester.md").exists(),
+    "no tester-variant agent file (tester-frontend.md, ui-tester.md) must exist — one tester agent only",
+)
+
+# Self-referential guard
+_s67_testing_md_text = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite67(self-ref): docs/testing.md names 'Suite 67' and 'tester-lean-core-testing-refs'",
+    "Suite 67" in _s67_testing_md_text and "tester-lean-core-testing-refs" in _s67_testing_md_text,
+    "docs/testing.md must register Suite 67 and the 'tester-lean-core-testing-refs' marker",
+)
+check(
+    "suite67(claude-hygiene): CLAUDE.md does NOT contain 'Suite 67'",
+    "Suite 67" not in read(REPO_ROOT / "CLAUDE.md"),
+    "CLAUDE.md §11 must not mention Suite 67 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

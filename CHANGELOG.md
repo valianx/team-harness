@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.58.0] - 2026-06-08
+
+### Changed
+
+- `agents/tester.md` refactored to lean core: all modes, contracts, and workflow skeleton preserved; stack/type-specific pattern lists (NestJS pitfalls, backend/frontend scenario lists) moved to the new reference library.
+- `agents/tester.md` Phase 0 augmented with stack detection (`react-nextjs`/`nestjs`/`go`/`python`) and warranted-type derivation from AC list + changed files.
+
+### Added
+
+- `agents/testing-refs/` — by-test-type reference library loaded on demand by the `tester` agent via `## Reference Router`. Contains: `_index.md` (manifest), `unit.md`, `integration.md`, `e2e.md`, `ui-component.md`, `visual.md`, `a11y.md`.
+- `## Reference Router` section in `agents/tester.md`: deterministic, manifest-based, AC-scoped load mechanism; graceful-degradation fallback when a `(type, stack)` reference is absent.
+- react-nextjs sections fully seeded (Vitest 4.x, Storybook 10.x + `@storybook/addon-vitest`, Playwright 1.60, MSW 2.x, `@axe-core/playwright`) in all six type files.
+- NestJS pitfalls block (TypeORM cap, `setImmediate` capture, `useFakeTimers`/TZ boundaries, exclusive-`to` date math) moved verbatim into `unit.md` and `integration.md` `## nestjs` sections.
+- Suite 67 structural tests (`tests/test_agent_structure.py`): 47 checks asserting core retains all contracts, router section is AC-scoped, manifest↔filesystem bidirectional agreement, type-file canonical shape, NestJS pitfall tokens moved (present in refs, absent from core), tester remains a single agent.
+
 ## [2.57.0] - 2026-06-06
 
 ### Added
