@@ -965,13 +965,14 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      ```
      This task appears to be part of initiative "{slug}".
-     Overview location: {mode-resolved overview path}
-     Set initiative to "{slug}" and create/join the overview? [Y/n]:
+        Overview location: {mode-resolved overview path}
+     Keep this name (Y), enter a different name (type it), or skip the initiative (n)?
      ```
 
-     Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit Y response.
+     Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit operator response.
 
-     - **On Y:** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, below) during intake.
+     - **On Y (accept proposed name):** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, below) during intake.
+     - **On a different name typed by the operator:** re-slugify the operator's input to `[a-z0-9-]` max 60 chars (same rule as the feature-name slug). Set `initiative` to that re-slugified value. If an existing `00-overview.md` is found under the new slug (same join-aid inspection as detection signal 2), JOIN it; otherwise CREATE. Proceed to Step 6d-initiative-join as usual. This path is also gated behind explicit operator input — it is a third explicit choice, not an auto-advance.
      - **On n (or no signal fires):** set `initiative: null` in `00-state.md § Current State`. Proceed exactly as today — zero behaviour change.
 
      **Never auto-create.** No initiative folder, no `00-overview.md`, and no `initiative` state field is written without explicit operator confirmation. The confirmation prompt is the hard gate. This sub-step follows the same patient-intake / advance-signal model as the rest of Discover — it never dispatches a subagent and never auto-advances.

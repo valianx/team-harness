@@ -15399,11 +15399,16 @@ check(
     "orchestrator.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
 )
 
-# AC-5: confirmation prompt + WAIT + never auto-create documented in orchestrator.md and discover-phase.md
+# AC-5: confirmation prompt + WAIT + 3-way choice + never auto-create documented in orchestrator.md and discover-phase.md
 check(
     "suite68(ac5a): Step 6d-initiative contains confirmation prompt and WAIT",
-    "WAIT" in _s68_detect_slice and "[Y/n]" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must contain confirmation prompt with [Y/n] and WAIT",
+    "WAIT" in _s68_detect_slice and ("Keep this name" in _s68_detect_slice or "enter a different name" in _s68_detect_slice),
+    "orchestrator.md Step 6d-initiative must contain 3-way confirmation prompt and WAIT",
+)
+check(
+    "suite68(ac5a-rename): Step 6d-initiative contains the rename affordance (3-way choice)",
+    "enter a different name" in _s68_detect_slice,
+    "orchestrator.md Step 6d-initiative must offer 'enter a different name' as a third choice (not binary [Y/n])",
 )
 check(
     "suite68(ac5b): Step 6d-initiative states 'never auto-create' or equivalent",
@@ -15582,11 +15587,12 @@ check(
     '"2.59.0"' in _s68_marketplace,
     ".claude-plugin/marketplace.json plugins[0].version must be 2.59.0",
 )
-_s68_changelog_fragment = REPO_ROOT / "changelog.d" / "multi-project-initiative-overview.md"
+_s68_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
-    "suite68(ac12c): changelog.d/multi-project-initiative-overview.md exists",
-    _s68_changelog_fragment.exists(),
-    "changelog.d/multi-project-initiative-overview.md fragment must exist",
+    "suite68(ac12c): CHANGELOG.md contains ## [2.59.0] section with initiative entry",
+    "## [2.59.0]" in _s68_changelog and "initiative" in _s68_changelog,
+    "CHANGELOG.md must contain a ## [2.59.0] section that mentions the initiative feature "
+    "(fragment is transient and correctly absent post-delivery)",
 )
 # Self-referential: this test file contains Suite 68 and the marker
 _s68_this_file = read(Path(__file__))

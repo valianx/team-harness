@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `agents/orchestrator.md`: Step 2 path-resolution gains an `initiative`-conditional branch (no-initiative rows are verbatim current expressions); Phase 0a gains Step 1f create-or-join with read-modify-write one-row-per-project rule; Step 6d-initiative sub-step added to Discover; new `## 00-overview.md Template` section with template, section-ownership map, and no-fork invariant.
+- `agents/orchestrator.md`: Step 2 path-resolution gains an `initiative`-conditional branch (no-initiative rows are verbatim current expressions); Phase 0a gains Step 1f create-or-join with read-modify-write one-row-per-project rule; Step 6d-initiative sub-step added to Discover; new `## 00-overview.md Template` section with template, section-ownership map, and no-fork invariant. Initiative confirmation prompt is 3-way: accept the proposed name (Y), type a different name (re-slugified and used as the initiative slug), or skip the initiative entirely (n).
 - `agents/delivery.md`: new Step 11.7 initiative overview write-back (initiative-gated, best-effort).
 - `CLAUDE.md §5`: new initiative-layer bullet; §3 version bumped to 2.59.0.
 - `docs/discover-phase.md`: new § 11 Initiative detection sub-section.
