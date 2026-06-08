@@ -1052,6 +1052,41 @@ The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfol
 
 ---
 
+### Step 11.7 — Initiative overview write-back (initiative-gated, best-effort)
+
+**Gate:** proceed only when `initiative` in `00-state.md § Current State` is non-null (a confirmed initiative slug). When `initiative == null`, this step is a **no-op** — log `initiative_overview: skipped: no-initiative` and continue. This step is **best-effort**: any failure logs a one-line WARN and continues — the pipeline NEVER fails or blocks on an overview-write error.
+
+**Purpose:** update this project's row in `00-overview.md` with the resolved branch, version, PR number/URL, and status, now that Delivery has that information.
+
+**Resolve `overview_path`** (same rule as orchestrator Phase 0a Step 1f):
+- Obsidian: `{logs-path}/{logs-subfolder}/{initiative}/00-overview.md` (read `logs-path` and `logs-subfolder` from `~/.claude/.team-harness.json`, same as used at boot)
+- Local: `{common-parent-of-cwd-repo}/00-overview.md`
+
+If `overview_path` does not exist, log `initiative_overview: skipped: overview-not-found` and continue. Do NOT create the file in this step — creation is the orchestrator's job at intake.
+
+**Read-modify-write:** read the full `00-overview.md`, locate the row whose `Project` column equals this run's `{project-slug}` (derived from `repo_name`). Replace that row in-place with the updated values:
+
+```
+| {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
+```
+
+Where:
+- `{branch}` — the feature branch created in Step 3 of this delivery run
+- `{version}` — the bumped version from Step 9 (or `—` if version was skipped)
+- `{#PR-number}` — the PR number from Step 11 (or `—` if no PR was created)
+- `delivered` — the status is advanced to `delivered` on successful delivery
+
+Also update `updated:` in the frontmatter to today's date. Write the whole document back. Never write a partial payload.
+
+If the row for this project does not exist in the `## Projects` table, append a new row rather than failing — a delivery run should always be able to record its outcome.
+
+**Status line (add to delivery status block):**
+```
+initiative_overview: updated | skipped: no-initiative | skipped: overview-not-found | failed: {error}
+```
+
+---
+
 ## Session Documentation
 
 **Document format:** Structure your output file with two top-level sections:

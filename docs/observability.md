@@ -78,6 +78,35 @@ and events file exist. When no workspace exists (one-shot invocation), these
 skills apply the same output discipline — silence on success, one-line error +
 suggestion on failure — without event persistence.
 
+## 00-overview.md — initiative parent index (NOT an events file)
+
+When the `initiative` field in `00-state.md` is set, the orchestrator also
+maintains a parent-level `00-overview.md` at the initiative root. This file is
+**not an events file** and does not contain pipeline observability data. It is
+a living index — one row per project, updated by the orchestrator at intake and
+by the delivery agent at Step 11.7.
+
+**What it is:**
+- A snapshot of the current state of the initiative (project rows with branch /
+  version / PR / status).
+- A cross-project narrative (`## Big-Picture Plan`) that no single `01-plan.md`
+  owns.
+
+**What it is NOT:**
+- Not an execution-events file. No JSONL. No `phase.*` or `operation.*` events.
+- Not a replacement for `00-state.md` or `00-execution-events.*`. Those per-project
+  files remain the per-project observability record.
+- Not subject to the mandatory observability invariant (CLAUDE.md §5 "Pipeline
+  observability is mandatory") — that invariant governs `00-execution-events.*`
+  only. `00-overview.md` writes are **best-effort** and a write failure never
+  fails the pipeline.
+
+**Location (mode-dependent):**
+- Obsidian: `{logs-path}/{logs-subfolder}/{initiative}/00-overview.md`
+- Local: `{common-parent-of-sibling-repos}/00-overview.md`
+
+Full template and section-ownership map: `agents/orchestrator.md § 00-overview.md Template`.
+
 ## kg_write event
 
 `kg_write` is a **sibling event** (peer of `phase.*` / `gate.*` / `operation.*`) emitted by the orchestrator after each Knowledge Graph write batch. Unlike `operation.*`, which models a single discrete operation, a KG write site may attempt multiple writes in one batch; `kg_write` carries per-batch counters (`attempted`, `succeeded`) and a per-write `writes[]` array so `/th:trace` can aggregate across all three write sites.

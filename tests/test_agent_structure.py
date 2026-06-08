@@ -15316,6 +15316,304 @@ check(
 )
 
 # ---------------------------------------------------------------------------
+# Suite 68: multi-project initiative overview layer
+# (multi-project-initiative-overview, v2.59.0)
+# ---------------------------------------------------------------------------
+print("=== Suite 68: multi-project initiative overview layer (v2.59.0) ===")
+
+_s68_orch = read(AGENTS_DIR / "orchestrator.md")
+_s68_delivery = read(AGENTS_DIR / "delivery.md")
+_s68_claude = read(REPO_ROOT / "CLAUDE.md")
+_s68_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
+_s68_observability = read(REPO_ROOT / "docs" / "observability.md")
+_S68_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# AC-1: initiative state field defined in orchestrator.md
+_s68_state_slice = _slice_section(_s68_orch, "- initiative:", _S68_STOP)
+check(
+    "suite68(ac1a): orchestrator.md defines 'initiative' state field",
+    "- initiative:" in _s68_orch,
+    "orchestrator.md must define an 'initiative' field in 00-state.md § Current State",
+)
+check(
+    "suite68(ac1b): initiative field documents 'null' as today's behaviour",
+    "null" in _s68_state_slice and ("today" in _s68_state_slice or "no initiative" in _s68_state_slice),
+    "orchestrator.md initiative field must document that null = today's behaviour exactly",
+)
+
+# AC-2: no-initiative path is verbatim current expressions (byte-identical guarantee)
+_s68_step2_slice = _slice_section(_s68_orch, "**Step 2 — Resolve workspaces base path.**", ("\n**Step 3", "\n## ", "\n---\n"))
+check(
+    "suite68(ac2a): Step 2 contains initiative == null row for obsidian mode (verbatim expression)",
+    "{logs-path}/{logs-subfolder}/{repo_name}" in _s68_step2_slice,
+    "orchestrator.md Step 2 must contain verbatim obsidian base_path = {logs-path}/{logs-subfolder}/{repo_name} for initiative==null",
+)
+check(
+    "suite68(ac2b): Step 2 contains initiative == null row for local mode (verbatim expression)",
+    'base_path = "workspaces"' in _s68_step2_slice,
+    'orchestrator.md Step 2 must contain verbatim local base_path = "workspaces" for initiative==null',
+)
+check(
+    "suite68(ac2c): Step 2 contains backward-compatibility guarantee statement",
+    "backward-compat" in _s68_step2_slice or "byte-identical" in _s68_step2_slice or "Backward-compatibility" in _s68_step2_slice,
+    "orchestrator.md Step 2 must state the backward-compatibility guarantee (no extra level on null)",
+)
+
+# AC-3: initiative-set paths (obsidian inserts {initiative} level; local per-project stays "workspaces")
+check(
+    "suite68(ac3a): Step 2 shows obsidian initiative-set path with {initiative} level",
+    "{logs-path}/{logs-subfolder}/{initiative}/{repo_name}" in _s68_step2_slice,
+    "orchestrator.md Step 2 must define obsidian path with {initiative} level when initiative is set",
+)
+check(
+    "suite68(ac3b): Step 2 shows obsidian overview path",
+    "{logs-path}/{logs-subfolder}/{initiative}/00-overview.md" in _s68_step2_slice,
+    "orchestrator.md Step 2 must define overview path at {logs-path}/{logs-subfolder}/{initiative}/00-overview.md",
+)
+check(
+    "suite68(ac3c): Step 2 states local per-project base_path stays unchanged (workspaces) when initiative is set",
+    "workspaces" in _s68_step2_slice and ("unchanged" in _s68_step2_slice or "NOT re-prefixed" in _s68_step2_slice or "not re-prefixed" in _s68_step2_slice),
+    "orchestrator.md Step 2 must state that local per-project base_path stays 'workspaces' unchanged when initiative is set",
+)
+check(
+    "suite68(ac3d): Step 2 states local overview lives at common parent of sibling repos",
+    "common parent" in _s68_step2_slice,
+    "orchestrator.md Step 2 must state local overview lives at the common parent directory of sibling repos",
+)
+
+# AC-4: generic-root misfire guard documented in orchestrator.md
+_s68_detect_slice = _slice_section(_s68_orch, "**Step 6d-initiative", _S68_STOP)
+check(
+    "suite68(ac4a): orchestrator.md Step 6d-initiative exists (slice non-empty)",
+    len(_s68_detect_slice) > 0,
+    "orchestrator.md must contain Step 6d-initiative sub-step for initiative detection",
+)
+check(
+    "suite68(ac4b): Step 6d-initiative contains generic-root guard list",
+    "projects" in _s68_detect_slice and "repos" in _s68_detect_slice and "src" in _s68_detect_slice and "code" in _s68_detect_slice,
+    "orchestrator.md Step 6d-initiative must list generic-root guard words (projects, repos, src, code, ...)",
+)
+check(
+    "suite68(ac4c): Step 6d-initiative states do NOT propose on directory layout alone",
+    "do NOT propose" in _s68_detect_slice or "NOT propose" in _s68_detect_slice,
+    "orchestrator.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
+)
+
+# AC-5: confirmation prompt + WAIT + 3-way choice + never auto-create documented in orchestrator.md and discover-phase.md
+check(
+    "suite68(ac5a): Step 6d-initiative contains confirmation prompt and WAIT",
+    "WAIT" in _s68_detect_slice and ("Keep this name" in _s68_detect_slice or "enter a different name" in _s68_detect_slice),
+    "orchestrator.md Step 6d-initiative must contain 3-way confirmation prompt and WAIT",
+)
+check(
+    "suite68(ac5a-rename): Step 6d-initiative contains the rename affordance (3-way choice)",
+    "enter a different name" in _s68_detect_slice,
+    "orchestrator.md Step 6d-initiative must offer 'enter a different name' as a third choice (not binary [Y/n])",
+)
+check(
+    "suite68(ac5b): Step 6d-initiative states 'never auto-create' or equivalent",
+    "auto-create" in _s68_detect_slice or "Never auto-create" in _s68_detect_slice or "never auto-create" in _s68_detect_slice,
+    "orchestrator.md Step 6d-initiative must state the initiative is never auto-created",
+)
+_s68_discover_initiative = _slice_section(_s68_discover, "## 11. Initiative detection", ("\n## ",))
+check(
+    "suite68(ac5c): docs/discover-phase.md contains initiative-detection sub-section",
+    len(_s68_discover_initiative) > 0,
+    "docs/discover-phase.md must contain '## 11. Initiative detection' sub-section",
+)
+check(
+    "suite68(ac5d): discover-phase.md initiative section contains confirmation gate description",
+    "confirmation" in _s68_discover_initiative and "WAIT" in _s68_discover_initiative,
+    "docs/discover-phase.md § 11 must document the confirmation gate and WAIT",
+)
+
+# AC-6: cross-run JOIN rule documented in orchestrator.md
+_s68_join_slice = _slice_section(_s68_orch, "1f. **CONDITIONAL — Initiative create-or-join", ("\n2. **MANDATORY",))
+check(
+    "suite68(ac6a): Phase 0a Step 1f exists (initiative create-or-join, slice non-empty)",
+    len(_s68_join_slice) > 0,
+    "orchestrator.md must contain Phase 0a Step 1f (initiative create-or-join)",
+)
+check(
+    "suite68(ac6b): Step 1f defines JOIN rule (replace-in-place if row exists)",
+    "replace" in _s68_join_slice and ("in-place" in _s68_join_slice or "in place" in _s68_join_slice),
+    "orchestrator.md Step 1f must define the replace-in-place JOIN rule for existing project rows",
+)
+check(
+    "suite68(ac6c): Step 1f defines append if row absent",
+    "append" in _s68_join_slice,
+    "orchestrator.md Step 1f must define append-if-absent for new project rows",
+)
+check(
+    "suite68(ac6d): Step 1f states rows are never duplicated (idempotent)",
+    "never duplicate" in _s68_join_slice or "idempotent" in _s68_join_slice,
+    "orchestrator.md Step 1f must state that rows are never duplicated (idempotent)",
+)
+
+# AC-7: concurrency/idempotency + best-effort posture documented
+check(
+    "suite68(ac7a): Step 1f contains concurrency/idempotency rule (rows keyed by project slug)",
+    ("project" in _s68_join_slice and "slug" in _s68_join_slice) or "project slug" in _s68_join_slice,
+    "orchestrator.md Step 1f must state rows are keyed by project slug",
+)
+check(
+    "suite68(ac7b): Step 1f states best-effort posture (overview failure does NOT fail pipeline)",
+    "best-effort" in _s68_join_slice or "best effort" in _s68_join_slice or "NEVER fails" in _s68_join_slice or "never fail" in _s68_join_slice.lower(),
+    "orchestrator.md Step 1f must state best-effort posture (overview-write failure does not fail pipeline)",
+)
+check(
+    "suite68(ac7c): Step 1f mentions WARN on failure",
+    "WARN" in _s68_join_slice or "warn" in _s68_join_slice.lower(),
+    "orchestrator.md Step 1f must mention WARN on overview-write failure",
+)
+
+# AC-8: 00-overview.md template embedded with all required sections
+_s68_template_slice = _slice_section(_s68_orch, "## 00-overview.md Template", ("\n## Phase Checkpointing",))
+check(
+    "suite68(ac8a): orchestrator.md contains '## 00-overview.md Template' section",
+    len(_s68_template_slice) > 0,
+    "orchestrator.md must contain '## 00-overview.md Template' section",
+)
+check(
+    "suite68(ac8b): template contains frontmatter keys (initiative, created, updated, projects)",
+    "initiative:" in _s68_template_slice and "created:" in _s68_template_slice and "projects:" in _s68_template_slice,
+    "orchestrator.md template must contain frontmatter keys: initiative, created, projects",
+)
+check(
+    "suite68(ac8c): template contains '## Review Summary' section",
+    "## Review Summary" in _s68_template_slice,
+    "orchestrator.md template must contain '## Review Summary' section",
+)
+check(
+    "suite68(ac8d): template contains '## Projects' table with required columns",
+    "## Projects" in _s68_template_slice and "Branch" in _s68_template_slice and "Version" in _s68_template_slice and "Status" in _s68_template_slice,
+    "orchestrator.md template must contain '## Projects' table with Branch/Version/PR/Status columns",
+)
+check(
+    "suite68(ac8e): template contains '## Big-Picture Plan' section",
+    "## Big-Picture Plan" in _s68_template_slice,
+    "orchestrator.md template must contain '## Big-Picture Plan' section",
+)
+check(
+    "suite68(ac8f): section-ownership map names orchestrator and delivery as writers",
+    "orchestrator" in _s68_template_slice and "delivery" in _s68_template_slice,
+    "orchestrator.md section-ownership map must name orchestrator and delivery as respective writers",
+)
+
+# AC-9: no-fork / consolidation invariant documented in orchestrator.md
+check(
+    "suite68(ac9a): template section contains no-fork invariant (snapshot not log)",
+    "snapshot" in _s68_template_slice and "not a log" in _s68_template_slice,
+    "orchestrator.md must state the no-fork invariant: 00-overview.md is a snapshot, not a log",
+)
+check(
+    "suite68(ac9b): no-fork invariant states never create 00-overview-*.md siblings",
+    "00-overview-" in _s68_template_slice or "siblings" in _s68_template_slice,
+    "orchestrator.md must state never create 00-overview-*.md sibling files",
+)
+
+# AC-10: delivery.md Step 11.7 (initiative-gated, obsidian/local-aware, read-modify-write, best-effort, no-op when null)
+_s68_delivery_slice = _slice_section(_s68_delivery, "### Step 11.7", ("\n---\n",))
+check(
+    "suite68(ac10a): delivery.md contains Step 11.7 (slice non-empty)",
+    len(_s68_delivery_slice) > 0,
+    "delivery.md must contain '### Step 11.7' for initiative overview write-back",
+)
+check(
+    "suite68(ac10b): Step 11.7 is gated on initiative (no-op when null)",
+    "null" in _s68_delivery_slice and ("no-op" in _s68_delivery_slice or "no op" in _s68_delivery_slice),
+    "delivery.md Step 11.7 must be a no-op when initiative is null",
+)
+check(
+    "suite68(ac10c): Step 11.7 updates branch/version/PR/status row",
+    "branch" in _s68_delivery_slice and "version" in _s68_delivery_slice and "PR" in _s68_delivery_slice and "status" in _s68_delivery_slice,
+    "delivery.md Step 11.7 must update branch/version/PR/status in the project row",
+)
+check(
+    "suite68(ac10d): Step 11.7 is best-effort (failure does not block pipeline)",
+    "best-effort" in _s68_delivery_slice or "best effort" in _s68_delivery_slice or "WARN" in _s68_delivery_slice,
+    "delivery.md Step 11.7 must be best-effort (overview failure never blocks delivery)",
+)
+check(
+    "suite68(ac10e): Step 11.7 uses read-modify-write (whole document)",
+    "read-modify-write" in _s68_delivery_slice or "read the full" in _s68_delivery_slice,
+    "delivery.md Step 11.7 must use read-modify-write (read full doc, edit row, write back)",
+)
+
+# AC-11: CLAUDE.md §5 initiative bullet + discover-phase.md + observability.md + CLAUDE.md §3 version
+_s68_claude_dual = _slice_section(_s68_claude, "**Initiative layer", _S68_STOP)
+check(
+    "suite68(ac11a): CLAUDE.md §5 contains initiative-layer bullet (slice non-empty)",
+    len(_s68_claude_dual) > 0,
+    "CLAUDE.md §5 must contain an '**Initiative layer' bullet documenting the initiative layer",
+)
+check(
+    "suite68(ac11b): CLAUDE.md initiative bullet mentions opt-in detect-confirm",
+    "detect" in _s68_claude_dual and "confirm" in _s68_claude_dual,
+    "CLAUDE.md §5 initiative bullet must mention detect-confirm (opt-in trigger)",
+)
+check(
+    "suite68(ac11c): docs/discover-phase.md § 11 initiative section is non-empty",
+    len(_s68_discover_initiative) > 0,
+    "docs/discover-phase.md must contain § 11 Initiative detection sub-section",
+)
+_s68_obs_overview = _slice_section(_s68_observability, "## 00-overview.md — initiative parent index", _S68_STOP)
+check(
+    "suite68(ac11d): docs/observability.md contains '00-overview.md' parent-index section",
+    len(_s68_obs_overview) > 0,
+    "docs/observability.md must document 00-overview.md as a parent index (not an events file)",
+)
+check(
+    "suite68(ac11e): observability.md states 00-overview.md is NOT an events file",
+    "not an events file" in _s68_obs_overview or "NOT an events file" in _s68_obs_overview,
+    "docs/observability.md must state 00-overview.md is NOT an events file",
+)
+check(
+    "suite68(ac11f): CLAUDE.md §3 current-version reads 2.59.0",
+    "2.59.0" in _s68_claude,
+    "CLAUDE.md §3 current-version line must read 2.59.0",
+)
+
+# AC-12: plugin.json + marketplace.json version + changelog fragment + Suite 68 self-ref + CLAUDE.md hygiene
+_s68_plugin = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s68_marketplace = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+check(
+    "suite68(ac12a): .claude-plugin/plugin.json version is 2.59.0",
+    '"2.59.0"' in _s68_plugin,
+    ".claude-plugin/plugin.json version field must be 2.59.0",
+)
+check(
+    "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.59.0",
+    '"2.59.0"' in _s68_marketplace,
+    ".claude-plugin/marketplace.json plugins[0].version must be 2.59.0",
+)
+_s68_changelog = read(REPO_ROOT / "CHANGELOG.md")
+check(
+    "suite68(ac12c): CHANGELOG.md contains ## [2.59.0] section with initiative entry",
+    "## [2.59.0]" in _s68_changelog and "initiative" in _s68_changelog,
+    "CHANGELOG.md must contain a ## [2.59.0] section that mentions the initiative feature "
+    "(fragment is transient and correctly absent post-delivery)",
+)
+# Self-referential: this test file contains Suite 68 and the marker
+_s68_this_file = read(Path(__file__))
+check(
+    "suite68(ac12d-self-ref): this test file contains 'Suite 68' and '_slice_section' and 'multi-project-initiative-overview'",
+    "Suite 68" in _s68_this_file and "_slice_section" in _s68_this_file and "multi-project-initiative-overview" in _s68_this_file,
+    "test file must contain 'Suite 68', '_slice_section', and 'multi-project-initiative-overview'",
+)
+_s68_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite68(ac12e-registry): docs/testing.md registers Suite 68 and multi-project-initiative-overview",
+    "Suite 68" in _s68_testing_md and "multi-project-initiative-overview" in _s68_testing_md,
+    "docs/testing.md must register Suite 68 and the 'multi-project-initiative-overview' marker",
+)
+check(
+    "suite68(ac12f-hygiene): CLAUDE.md does NOT contain 'Suite 68'",
+    "Suite 68" not in _s68_claude,
+    "CLAUDE.md §11 must not mention Suite 68 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
