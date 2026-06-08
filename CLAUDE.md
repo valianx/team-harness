@@ -35,6 +35,7 @@
 ```
 team-harness/
 ├── agents/              System prompts — one .md per agent
+│   └── testing-refs/    On-demand reference library (tester agent)
 ├── skills/              Slash-command definitions
 │   ├── *.md             Simple skills (one-file slash commands)
 │   ├── d2-diagram/      Complex skills (SKILL.md + references/)
@@ -48,7 +49,7 @@ team-harness/
 │   ├── notify-windows.sh
 │   ├── notify-mac.sh
 │   ├── notify-linux.sh
-│   ├── notify-stage.sh  Cross-platform stage-end wrapper (orchestrator calls this at each Stage boundary)
+│   ├── notify-stage.sh  Stage-end wrapper (orchestrator calls at Stage boundaries)
 │   └── config.json      Per-OS hook templates for ~/.claude/settings.json
 ├── cmd/
 │   └── install/         Go installer source (cross-compiled to GH Release assets)
@@ -74,9 +75,9 @@ team-harness/
 │       ├── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
 │       └── pages.yml    Publish bootstrap scripts to GitHub Pages on release
 ├── assets.go            go:embed entry point (package teamharness) — embeds agents/, skills/, hooks/
-├── go.mod               Go module (github.com/valianx/team-harness, Go 1.23)
+├── go.mod               Go module (Go 1.23)
 ├── docs/
-│   └── knowledge.md     Project knowledge base — decisions, patterns, stack
+│   └── knowledge.md     Project knowledge base
 ├── README.md            Human-facing overview
 ├── CHANGELOG.md         Keep-a-Changelog + semver
 ├── CLAUDE.md            This file

@@ -326,15 +326,61 @@ For each business rule provided in the context:
 Before writing any test:
 
 1. **Read CLAUDE.md** to understand project conventions and test commands
-2. **Detect the test framework** from config files and dependencies (jest.config, vitest.config, pytest.ini, playwright.config, etc.)
+2. **Detect the test framework and stack** from config files and dependencies (jest.config, vitest.config, pytest.ini, playwright.config, etc.). Also detect the application stack for Reference Router resolution:
+   - `next.config.*` + `app/` directory → `react-nextjs`
+   - `nest-cli.json` or `@nestjs/*` in `package.json` → `nestjs`
+   - `go.mod` → `go`
+   - `pyproject.toml` / `pytest.ini` → `python`
+   Record the detected stack token.
 3. **Explore existing tests** — use Glob and Read to find test files and understand the project's patterns:
    - Directory structure (colocated vs centralized `/tests` directory)
    - Naming conventions (`.test.ts`, `.spec.ts`, `_test.go`, `_test.py`)
    - Mocking approach (factories, inline mocks, fixtures)
    - Helper/utility patterns already in use
+3b. **Derive warranted test types** from the AC list and changed files. This is AC- and change-driven — NOT "every frontend PR writes UI tests":
+   - Changed `*.stories.tsx` or interactive component + AC about rendering/interaction → `ui-component`
+   - AC mentioning accessibility / axe / keyboard / screen-reader → `a11y`
+   - AC mentioning a user flow across pages, or a changed route/page with a flow AC → `e2e`
+   - AC about a visual/snapshot/theme diff → `visual`
+   - Changed pure function / hook / util / reducer → `unit`
+   - Changed file that composes multiple units/services with mocked network → `integration`
+   Record the warranted type tokens. The Reference Router (§ Reference Router) fires only on these.
 4. **Verify the test runner + coverage tool via context7** (mandatory). Before generating tests that use Jest / Vitest / PyTest / Go test / c8 / istanbul / equivalent, confirm the runner's current API signatures and coverage-config syntax for the version pinned in this repo. Follow `docs/context7-usage.md` — §3 (resolve-library-id → get-library-docs with a granular topic), §4 (score hit/miss/n/a, retry once on miss). If the change touches only fixtures with no runner-specific syntax, this step can be skipped (and counted as `skipped` in the status block).
 
 **Follow the project's existing conventions.** If tests are colocated with source files, keep them colocated. If there's a centralized `/tests` directory, use it. If neither exists, recommend a structure appropriate to the stack.
+
+---
+
+## Reference Router
+
+After Phase 0, the router loads only the reference sections that the warranted test types and detected stack require. It never bulk-loads all six type files.
+
+**Load mechanism:**
+
+1. Read `agents/testing-refs/_index.md` once to obtain the manifest (maps type → file, records which stacks each file covers).
+2. For each warranted `(type, stack)` pair derived in Phase 0 step 3b:
+   - Resolve the path: `agents/testing-refs/{type}.md` (installed at `~/.claude/plugins/cache/.../th/<version>/agents/testing-refs/{type}.md`).
+   - `Read` that file and use the `## {stack}` section.
+3. Apply the loaded patterns during Phase 1 (test plan) and Phase 2 (implementation).
+
+**AC-scoped invariant:** the router fires only on the warranted types from Phase 0 step 3b. A backend PR whose ACs are about a pure utility loads `unit.md#react-nextjs` (or the detected stack), not `ui-component.md`. The router NEVER expands scope beyond what an AC or a changed file warrants.
+
+**(type × stack) → file/section mapping:**
+
+| Test type | File | Section anchor |
+|-----------|------|----------------|
+| unit | `agents/testing-refs/unit.md` | `## react-nextjs` / `## nestjs` / `## go` / `## python` |
+| integration | `agents/testing-refs/integration.md` | same four |
+| e2e | `agents/testing-refs/e2e.md` | same four |
+| ui-component | `agents/testing-refs/ui-component.md` | `## react-nextjs` (others stub) |
+| visual | `agents/testing-refs/visual.md` | `## react-nextjs` (others stub) |
+| a11y | `agents/testing-refs/a11y.md` | `## react-nextjs` (others stub) |
+
+**Fallback (degrade gracefully, never fabricate):**
+- If a `(type, stack)` section is absent or marked a stub: use the file's `## Principles` preamble for principles, then author from the repo's own existing test conventions (discovered in Phase 0), and **record a gap note** in `03-testing.md`:
+  `Reference gap: {type} × {stack} has no seeded section; authored from repo conventions + context7.`
+- If `_index.md` is missing (corrupt install): log `testing-refs unavailable` and fall back entirely to the core's stack-agnostic prose + Phase-0-discovered conventions — degraded but functional.
+- context7 verification (Phase 0 step 4) remains mandatory before emitting any library-specific code, regardless of whether a reference was loaded.
 
 ---
 
@@ -367,28 +413,6 @@ Tests verify the **acceptance criteria** from the spec. They are **ordered by th
    3. auth.controller.spec.ts → tests for auth.controller.ts (AC-2, AC-3)
    ```
 
-### Backend-specific scenarios *(backend/fullstack)*
-- API endpoint request/response validation
-- Service layer business logic
-- Input validation and schema enforcement
-- Authentication/authorization boundaries
-- External service call failures and retries
-- Message broker event publishing (if applicable)
-- Database operations and transactions
-- HTTP status codes and error responses
-- Timeout and retry behavior
-
-### Frontend-specific scenarios *(frontend/fullstack)*
-- Component rendering with different props/states
-- User interactions (click, type, tab, hover)
-- Loading, error, and empty states
-- Form validation and submission
-- Keyboard navigation and focus management
-- Screen reader support (ARIA attributes, announcements)
-- Accessibility compliance (axe/pa11y checks)
-- Responsive behavior at key breakpoints
-- Client/server state management
-
 ---
 
 ## Phase 2 — Implementation
@@ -420,20 +444,6 @@ For each external dependency: one factory file per dependency type (`{dependency
 - **Never define mocks inline** in test files — always import from the mocks directory
 - **Always reuse** existing factories before creating new ones
 - **Every mock factory must be importable** from the index file
-
-### Backend testing guidelines
-- Mock external services (HTTP clients, message brokers, third-party APIs)
-- Use proper database fixtures or in-memory databases for data layer tests
-- Test error handling thoroughly (network failures, timeouts, invalid responses)
-- Verify security validations are not broken by changes
-- Use the project's logger in tests, never `console.*`
-
-### Frontend testing guidelines
-- **User-centric queries** — prefer accessible queries (`getByRole`, `getByLabelText`) over test IDs when possible
-- **Real interactions** — use `userEvent` over `fireEvent` (or equivalent in the project's framework)
-- **Async handling** — use `waitFor` or `findBy*` for async operations
-- **Accessibility** — include axe/pa11y checks in component tests where the project supports it
-- **Visual outcomes** — verify what the user sees, not internal component state
 
 ### Coverage Configuration (mandatory)
 
@@ -471,21 +481,6 @@ scripts/**
 - Read the existing coverage config first — do not overwrite custom exclusions
 - If no config exists, create one and inform the user what was excluded and why
 - The goal is to measure coverage only on business logic, not boilerplate
-
----
-
-## Common Testing Pitfalls (NestJS / Node)
-
-When the project is NestJS / Express / Koa, walk through these checks during Phase 1 (test plan) — they shape how you mock and what coverage you can realistically chase:
-
-- **TypeORM entity coverage cap.** Decorators with `nullable: true` count as branches that are never exercised in normal tests; entity files cap naturally at ~56-80% branch coverage. If you are chasing >80% global branch coverage, exclude `**/entities/**` from coverage collection in the framework config. Don't fight the cap inline.
-- **Background callbacks (`setImmediate` / `setTimeout` for fire-and-forget).** If the service uses `setImmediate(() => method().catch(...))` for fire-and-forget work, the test must (1) replace `globalThis.setImmediate` with a capturer, (2) execute the captured callback via `Promise.resolve().then(fn)` to track the inner promise, (3) use a short timeout (≤50ms) so orphaned timer handles do not keep the Jest worker alive between specs.
-- **`error?.message || String(error)` branches.** To cover the right-hand side of the `||`, reject the mocked dependency with a raw string (`mockRejectedValue('raw-error-message')`), not `new Error(...)`. Both branches need coverage.
-- **Mocks of Koa / Express controllers with env vars.** Set `process.env.X` **before** `require()`-ing the controller module — env reads at module-load time will lock to whatever was set at first import. Prefer `jest.mock(path, () => factory)` and put the `require()` of the mock *inside* the factory function so re-mocks do not leak across files.
-- **Time-sensitive tests (`moment.utc()`, date ranges, boundary assertions).** Always use the framework's fake timer + system-time tools: `jest.useFakeTimers()` + `jest.setSystemTime(date)` (Jest), or `vi.useFakeTimers()` + `vi.setSystemTime(date)` (Vitest). `moment.utc()` respects fake timers. Cover boundary cases: `00:00:00 UTC`, `23:59:59 UTC`, and the offset where the local TZ flips day (e.g. `02:00 UTC` for Santiago).
-- **Date-range pickers exclusive on `to`.** When the code under test uses `[from, to)` (inclusive `from`, exclusive `to`), assert `dateTo - dateFrom === 86_400_000` for a one-day range — NOT `dateTo - dateFrom === 86_399_999` and NOT `=== 86_400_001`.
-
-These pitfalls have been observed repeatedly across NestJS services. Surface them in the test plan rather than re-discovering them through failing tests.
 
 ---
 
