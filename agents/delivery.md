@@ -1056,15 +1056,15 @@ The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfol
 
 **Gate:** proceed only when `initiative` in `00-state.md § Current State` is non-null (a confirmed initiative slug). When `initiative == null`, this step is a **no-op** — log `initiative_overview: skipped: no-initiative` and continue. This step is **best-effort**: any failure logs a one-line WARN and continues — the pipeline NEVER fails or blocks on an overview-write error.
 
-**Purpose:** update this project's row in `00-overview.md` with the resolved branch, version, PR number/URL, and status, now that Delivery has that information.
+**Purpose:** update this project's row in `overview.md` with the resolved branch, version, PR number/URL, and status, now that Delivery has that information.
 
-**Resolve `overview_path`** (same rule as orchestrator Phase 0a Step 1f):
-- Obsidian: `{logs-path}/{logs-subfolder}/{initiative}/00-overview.md` (read `logs-path` and `logs-subfolder` from `~/.claude/.team-harness.json`, same as used at boot)
-- Local: `{common-parent-of-cwd-repo}/00-overview.md`
+**Resolve `overview_path`** using the same date-agnostic JOIN rule as orchestrator Phase 0a Step 1f (delivery JOINs the day-1 dated folder; it does NOT create):
+- Obsidian: glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` (the `*_` wildcard absorbs the `{YYYY-MM-DD}_` prefix); confirm by `initiative:` frontmatter. The located path is the dated `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md` folder.
+- Local: glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md`; confirm by frontmatter.
 
 If `overview_path` does not exist, log `initiative_overview: skipped: overview-not-found` and continue. Do NOT create the file in this step — creation is the orchestrator's job at intake.
 
-**Read-modify-write:** read the full `00-overview.md`, locate the row whose `Project` column equals this run's `{project-slug}` (derived from `repo_name`). Replace that row in-place with the updated values:
+**Read-modify-write:** read the full `overview.md`, locate the row whose `Project` column equals this run's `{project-slug}` (derived from `repo_name`). Replace that row in-place with the updated values:
 
 ```
 | {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
@@ -1079,6 +1079,8 @@ Where:
 Also update `updated:` in the frontmatter to today's date. Write the whole document back. Never write a partial payload.
 
 If the row for this project does not exist in the `## Projects` table, append a new row rather than failing — a delivery run should always be able to record its outcome.
+
+**On-completion final reconcile:** after writing this project's row, re-read all rows in the `## Projects` table. If every row now shows status `delivered`, perform a final reconcile: update the frontmatter `updated:` to today's date and add a completion signal (e.g. `status: complete`), then finalize `## Functional Description` to reflect shipped reality by re-reading all sibling `01-plan.md` files. Write the whole document back.
 
 **Status line (add to delivery status block):**
 ```

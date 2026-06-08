@@ -78,10 +78,10 @@ and events file exist. When no workspace exists (one-shot invocation), these
 skills apply the same output discipline — silence on success, one-line error +
 suggestion on failure — without event persistence.
 
-## 00-overview.md — initiative parent index (NOT an events file)
+## overview.md — initiative parent index (NOT an events file)
 
 When the `initiative` field in `00-state.md` is set, the orchestrator also
-maintains a parent-level `00-overview.md` at the initiative root. This file is
+maintains a parent-level `overview.md` at the initiative root. This file is
 **not an events file** and does not contain pipeline observability data. It is
 a living index — one row per project, updated by the orchestrator at intake and
 by the delivery agent at Step 11.7.
@@ -89,8 +89,8 @@ by the delivery agent at Step 11.7.
 **What it is:**
 - A snapshot of the current state of the initiative (project rows with branch /
   version / PR / status).
-- A cross-project narrative (`## Big-Picture Plan`) that no single `01-plan.md`
-  owns.
+- A cross-project narrative (`## Functional Description` and `## Big-Picture Plan`)
+  that no single `01-plan.md` owns.
 
 **What it is NOT:**
 - Not an execution-events file. No JSONL. No `phase.*` or `operation.*` events.
@@ -98,14 +98,14 @@ by the delivery agent at Step 11.7.
   files remain the per-project observability record.
 - Not subject to the mandatory observability invariant (CLAUDE.md §5 "Pipeline
   observability is mandatory") — that invariant governs `00-execution-events.*`
-  only. `00-overview.md` writes are **best-effort** and a write failure never
+  only. `overview.md` writes are **best-effort** and a write failure never
   fails the pipeline.
 
 **Location (mode-dependent):**
-- Obsidian: `{logs-path}/{logs-subfolder}/{initiative}/00-overview.md`
-- Local: `{common-parent-of-sibling-repos}/00-overview.md`
+- Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md`
+- Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/overview.md`
 
-Full template and section-ownership map: `agents/orchestrator.md § 00-overview.md Template`.
+Full template and section-ownership map: `agents/orchestrator.md § overview.md Template`.
 
 ## kg_write event
 
