@@ -15359,16 +15359,16 @@ check(
     "orchestrator.md Step 2 must state the backward-compatibility guarantee (no extra level on null)",
 )
 
-# AC-3: initiative-set paths (obsidian inserts {initiative} level; local per-project stays "workspaces")
+# AC-3: initiative-set paths (obsidian: repo-base-first, date-prefixed initiative folder; local per-project stays "workspaces")
 check(
-    "suite68(ac3a): Step 2 shows obsidian initiative-set path with {initiative} level",
-    "{logs-path}/{logs-subfolder}/{initiative}/{repo_name}" in _s68_step2_slice,
-    "orchestrator.md Step 2 must define obsidian path with {initiative} level when initiative is set",
+    "suite68(ac3a): Step 2 shows obsidian initiative-set path with repo-base-first date-prefixed initiative folder",
+    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}" in _s68_step2_slice,
+    "orchestrator.md Step 2 must define obsidian path as {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative} (repo-base first, dated initiative) when initiative is set",
 )
 check(
-    "suite68(ac3b): Step 2 shows obsidian overview path",
-    "{logs-path}/{logs-subfolder}/{initiative}/00-overview.md" in _s68_step2_slice,
-    "orchestrator.md Step 2 must define overview path at {logs-path}/{logs-subfolder}/{initiative}/00-overview.md",
+    "suite68(ac3b): Step 2 shows obsidian overview path at dated initiative folder with overview.md",
+    "{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md" in _s68_step2_slice,
+    "orchestrator.md Step 2 must define overview path at {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md",
 )
 check(
     "suite68(ac3c): Step 2 states local per-project base_path stays unchanged (workspaces) when initiative is set",
@@ -15467,12 +15467,12 @@ check(
     "orchestrator.md Step 1f must mention WARN on overview-write failure",
 )
 
-# AC-8: 00-overview.md template embedded with all required sections
-_s68_template_slice = _slice_section(_s68_orch, "## 00-overview.md Template", ("\n## Phase Checkpointing",))
+# AC-8: overview.md template embedded with all required sections (renamed from 00-overview.md Template)
+_s68_template_slice = _slice_section(_s68_orch, "## overview.md Template", ("\n## Phase Checkpointing",))
 check(
-    "suite68(ac8a): orchestrator.md contains '## 00-overview.md Template' section",
+    "suite68(ac8a): orchestrator.md contains '## overview.md Template' section (renamed from '## 00-overview.md Template')",
     len(_s68_template_slice) > 0,
-    "orchestrator.md must contain '## 00-overview.md Template' section",
+    "orchestrator.md must contain '## overview.md Template' section (old '## 00-overview.md Template' heading must be renamed)",
 )
 check(
     "suite68(ac8b): template contains frontmatter keys (initiative, created, updated, projects)",
@@ -15557,35 +15557,35 @@ check(
     len(_s68_discover_initiative) > 0,
     "docs/discover-phase.md must contain § 11 Initiative detection sub-section",
 )
-_s68_obs_overview = _slice_section(_s68_observability, "## 00-overview.md — initiative parent index", _S68_STOP)
+_s68_obs_overview = _slice_section(_s68_observability, "## overview.md — initiative parent index", _S68_STOP)
 check(
-    "suite68(ac11d): docs/observability.md contains '00-overview.md' parent-index section",
+    "suite68(ac11d): docs/observability.md contains 'overview.md' parent-index section (renamed from '00-overview.md')",
     len(_s68_obs_overview) > 0,
-    "docs/observability.md must document 00-overview.md as a parent index (not an events file)",
+    "docs/observability.md must document overview.md as a parent index (heading must be renamed from '## 00-overview.md — initiative parent index')",
 )
 check(
-    "suite68(ac11e): observability.md states 00-overview.md is NOT an events file",
+    "suite68(ac11e): observability.md states overview.md is NOT an events file",
     "not an events file" in _s68_obs_overview or "NOT an events file" in _s68_obs_overview,
-    "docs/observability.md must state 00-overview.md is NOT an events file",
+    "docs/observability.md must state overview.md is NOT an events file",
 )
 check(
-    "suite68(ac11f): CLAUDE.md §3 current-version reads 2.59.0",
-    "2.59.0" in _s68_claude,
-    "CLAUDE.md §3 current-version line must read 2.59.0",
+    "suite68(ac11f): CLAUDE.md §3 current-version reads 2.60.0",
+    "2.60.0" in _s68_claude,
+    "CLAUDE.md §3 current-version line must read 2.60.0 (minor bump from 2.59.0)",
 )
 
 # AC-12: plugin.json + marketplace.json version + changelog fragment + Suite 68 self-ref + CLAUDE.md hygiene
 _s68_plugin = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
 _s68_marketplace = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
 check(
-    "suite68(ac12a): .claude-plugin/plugin.json version is 2.59.0",
-    '"2.59.0"' in _s68_plugin,
-    ".claude-plugin/plugin.json version field must be 2.59.0",
+    "suite68(ac12a): .claude-plugin/plugin.json version is 2.60.0",
+    '"2.60.0"' in _s68_plugin,
+    ".claude-plugin/plugin.json version field must be 2.60.0 (minor bump from 2.59.0)",
 )
 check(
-    "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.59.0",
-    '"2.59.0"' in _s68_marketplace,
-    ".claude-plugin/marketplace.json plugins[0].version must be 2.59.0",
+    "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.60.0",
+    '"2.60.0"' in _s68_marketplace,
+    ".claude-plugin/marketplace.json plugins[0].version must be 2.60.0 (minor bump from 2.59.0)",
 )
 _s68_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
@@ -15611,6 +15611,98 @@ check(
     "suite68(ac12f-hygiene): CLAUDE.md does NOT contain 'Suite 68'",
     "Suite 68" not in _s68_claude,
     "CLAUDE.md §11 must not mention Suite 68 — only docs/testing.md is the canonical registry",
+)
+
+# AC-13: new assertions proving the fix (failing-first against v2.59.0 docs)
+# These assert the FIXED state and therefore FAIL on the current (unfixed) tree.
+
+# ac13a: date-agnostic JOIN match rule present in orchestrator.md Step 2 / Step 1f
+_s68_join_overview_slice = _slice_section(_s68_orch, "1f. **CONDITIONAL — Initiative create-or-join", ("\n2. **MANDATORY",))
+check(
+    "suite68(ac13a): orchestrator.md Step 1f contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
+    "*_{" in _s68_join_overview_slice or ("*_" in _s68_join_overview_slice and ("slug" in _s68_join_overview_slice or "initiative:" in _s68_join_overview_slice)),
+    "orchestrator.md Step 1f must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
+)
+
+# ac13b: per-project docs_root drops {date}_{feature} leaf when initiative is set
+check(
+    "suite68(ac13b): orchestrator.md Step 2 states per-project docs_root is {base_path}/{project} (no {date}_{feature} leaf) when initiative is set",
+    "{base_path}/{project}" in _s68_step2_slice or ("docs_root" in _s68_step2_slice and "{project}" in _s68_step2_slice and "{date}" not in _s68_step2_slice.split("{project}")[0].split("initiative")[-1]),
+    "orchestrator.md Step 2 must state docs_root = {base_path}/{project} with no {date}_{feature} leaf when initiative is set",
+)
+
+# ac13c: delivery.md Step 11.7 overview_path uses the dated {YYYY-MM-DD}_{initiative} folder
+check(
+    "suite68(ac13c): delivery.md Step 11.7 overview_path uses dated {YYYY-MM-DD}_{initiative} folder",
+    "{YYYY-MM-DD}_{initiative}" in _s68_delivery_slice or "YYYY-MM-DD" in _s68_delivery_slice,
+    "delivery.md Step 11.7 must reference the dated {YYYY-MM-DD}_{initiative} folder in the overview_path",
+)
+
+# ac13d: parent index filename is overview.md (no 00- prefix) across all touched files; 00-overview.md must be absent
+_s68_orch_has_no_00_overview = "00-overview.md" not in _s68_orch
+_s68_delivery_has_no_00_overview = "00-overview.md" not in _s68_delivery
+_s68_discover_has_no_00_overview = "00-overview.md" not in _s68_discover
+_s68_obs_has_no_00_overview = "00-overview.md" not in _s68_observability
+_s68_claude_has_no_00_overview = "00-overview.md" not in _s68_claude
+check(
+    "suite68(ac13d): '00-overview.md' is absent from orchestrator.md, delivery.md, discover-phase.md, observability.md, CLAUDE.md",
+    (
+        _s68_orch_has_no_00_overview
+        and _s68_delivery_has_no_00_overview
+        and _s68_discover_has_no_00_overview
+        and _s68_obs_has_no_00_overview
+        and _s68_claude_has_no_00_overview
+    ),
+    "All references to '00-overview.md' must be renamed to 'overview.md' across orchestrator.md, delivery.md, discover-phase.md, observability.md, and CLAUDE.md",
+)
+
+# ac13e: overview.md Template body contains ## Functional Description section
+# between ## Review Summary and ## Projects; section-ownership map lists it as a distinct row
+check(
+    "suite68(ac13e): overview.md Template contains '## Functional Description' section between '## Review Summary' and '## Projects'",
+    "## Functional Description" in _s68_template_slice,
+    "orchestrator.md overview.md Template must contain a '## Functional Description' section (placed between '## Review Summary' and '## Projects')",
+)
+check(
+    "suite68(ac13e-ownership): overview.md Template section-ownership map lists '## Functional Description' as a distinct owned row",
+    "Functional Description" in _s68_template_slice and "orchestrator" in _s68_template_slice,
+    "orchestrator.md section-ownership map must list '## Functional Description' as a distinct owned section",
+)
+
+# ac13f: section-ownership map declares both refresh triggers
+# Trigger 1: on-plan-change reconcile (orchestrator, after Design / STAGE-GATE-1)
+# Trigger 2: on-completion final-reconcile (delivery, all rows delivered)
+check(
+    "suite68(ac13f-trigger-plan): overview.md Template section-ownership map declares on-plan-change reconcile trigger (orchestrator after Design/STAGE-GATE-1)",
+    ("STAGE-GATE-1" in _s68_template_slice or "Stage 1" in _s68_template_slice or "plan change" in _s68_template_slice or "plan-change" in _s68_template_slice)
+    and "reconcile" in _s68_template_slice,
+    "orchestrator.md section-ownership map must declare the on-plan-change reconcile trigger (orchestrator fires after Design / STAGE-GATE-1 for each project)",
+)
+check(
+    "suite68(ac13f-trigger-complete): overview.md Template section-ownership map declares on-completion final-reconcile trigger (delivery, all rows delivered)",
+    ("delivered" in _s68_template_slice or "completion" in _s68_template_slice or "final reconcile" in _s68_template_slice or "final-reconcile" in _s68_template_slice)
+    and "delivery" in _s68_template_slice,
+    "orchestrator.md section-ownership map must declare the on-completion final-reconcile trigger (delivery when all ## Projects rows = delivered)",
+)
+
+# ac13g: no-fork/consolidation invariant states the concurrency-safe write rules
+_s68_nofork_slice = _slice_section(_s68_orch, "### No-fork", _S68_STOP)
+check(
+    "suite68(ac13g-rows-keyed): no-fork invariant states per-project rows keyed one-per-project (parallel updates touch different rows)",
+    "one-per-project" in _s68_nofork_slice or ("keyed" in _s68_nofork_slice and "project" in _s68_nofork_slice),
+    "orchestrator.md no-fork invariant must state per-project rows are keyed one-per-project (parallel updates safe)",
+)
+check(
+    "suite68(ac13g-reconcile): no-fork invariant states functional/big-picture sections reconcile-in-place by re-reading all plans, last-writer-wins",
+    ("last-writer" in _s68_nofork_slice or "last writer" in _s68_nofork_slice)
+    and ("reconcile" in _s68_nofork_slice or "re-read" in _s68_nofork_slice or "re-reading" in _s68_nofork_slice),
+    "orchestrator.md no-fork invariant must state reconcile-in-place by re-reading all plans, last-writer-wins on a true race",
+)
+check(
+    "suite68(ac13g-parallel-dispatch-oos): no-fork invariant states single-session parallel dispatch is out of scope (follow-up)",
+    ("out of scope" in _s68_nofork_slice or "out-of-scope" in _s68_nofork_slice or "OUT of scope" in _s68_nofork_slice)
+    and ("parallel" in _s68_nofork_slice or "dispatch" in _s68_nofork_slice),
+    "orchestrator.md no-fork invariant must state that first-class single-session parallel dispatch is explicitly out of scope (follow-up)",
 )
 
 # ---------------------------------------------------------------------------

@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.59.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.60.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -145,7 +145,7 @@ All commands run from the repo root.
 - **orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `orchestrator`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** A workspace is the shared working directory for a single pipeline session. Each pipeline run creates its own isolated workspace. Agents communicate through files in `workspaces/{feature-name}/` (each reads prior agents' output, writes its own); the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored.
 - **Dual-mode workspaces.** Output to local `./workspaces/` (default) or a configured Obsidian vault (`work-logs/{repo-name}/{date}_{feature}/`), via `logs-mode` in `~/.claude/.team-harness.json`. The orchestrator resolves the base path once at start and passes it to every agent. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent).
-- **Initiative layer (opt-in).** Groups separate per-project pipelines under a `00-overview.md` parent index. detect-in-discover + confirm gate (never auto-created). `initiative: null` = today's exact behaviour. Contract: `agents/orchestrator.md § 00-overview.md Template`; `docs/discover-phase.md § 11`.
+- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index; layout `{repo_base}/{YYYY-MM-DD}_{initiative}/{project}/`. detect + confirm gate (never auto-created). `initiative: null` = today's exact behaviour. Contract: `agents/orchestrator.md § overview.md Template`; `docs/discover-phase.md § 11`.
 - **Human-first document format.** Every workspace doc file uses a two-section layout: `## Review Summary` (human-readable decisions, risks, trade-offs — scannable in under 2 minutes) followed by `## Technical Detail` (full content for agent-to-agent communication). This applies in both local and Obsidian modes.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on the block without re-reading full workspaces on happy paths.
 - **Installer always overwrites embedded files.** Agents, skills, and hooks are canonical bytes from the repo; direct edits to `~/.claude/agents/*.md` (or skills/hooks) are not a supported customization path and are replaced on every install. Unchanged files (hash-match) are skipped. `~/.claude.json` is backed up before every merge. Operator-specific identity (`mcpServers.memory` URL/bearer, context7 API key) uses a Keep/Change preservation menu and is never silently clobbered.

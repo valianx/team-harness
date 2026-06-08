@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.60.0] - 2026-06-08
+
+### Fixed
+- Initiative folder is now date-prefixed (`{YYYY-MM-DD}_{initiative}`) and repo-base-first in Obsidian mode — was `{initiative}/{repo_name}` (no date prefix, inverted order).
+- Per-project `docs_root` drops the `{date}_{feature}` leaf when `initiative` is set; files sit directly under `{project}/` — was producing a redundant inner workspace directory.
+
+### Changed
+- Parent initiative index renamed `00-overview.md` → `overview.md` across all references (orchestrator.md, delivery.md, discover-phase.md, observability.md, CLAUDE.md, Suite 68).
+- Phase 0a Step 1f and delivery Step 11.7 now use the date-agnostic JOIN rule (glob `*_{slug}` + `initiative:` frontmatter confirm) so a later-day run rejoins the day-1 dated folder rather than creating a duplicate.
+- Local-mode overview folder is now also date-prefixed (`{YYYY-MM-DD}_{initiative}/overview.md` under the common parent).
+- CLAUDE.md §3 version bumped to `2.60.0`; `.claude-plugin/plugin.json` and `marketplace.json` bumped to `2.60.0` (matched semver).
+
+### Added
+- `## Functional Description` section added to the `overview.md` template (between `## Review Summary` and `## Projects`) — cross-project behavioural view distinct from `## Big-Picture Plan`.
+- On-plan-change reconcile trigger: orchestrator reconciles `## Functional Description` + `## Big-Picture Plan` + the project's `## Projects` row after each project's Design / STAGE-GATE-1 completion.
+- On-completion final-reconcile trigger: delivery marks the initiative complete and finalizes `## Functional Description` when all `## Projects` rows reach `delivered`.
+- Concurrency-safe write rules documented in the no-fork invariant: per-project rows keyed one-per-project (parallel writes safe); narrative sections reconcile-in-place last-writer-wins; first-class parallel dispatch explicitly out of scope (follow-up).
+- Suite 68 assertions ac13a–g added to `tests/test_agent_structure.py` proving each contract refinement.
+
 ## [2.59.0] - 2026-06-08
 
 ### Added
