@@ -243,3 +243,57 @@ The `survey_scope_hint` captured in §5 above is passed to the architect regardl
 - **HI-E2-2 — No security fields from seed.** `security_sensitive` and all gate-status fields remain input-independent of seed content. HI-2 (§6) applies unchanged.
 - **HI-E2-3 — No gate skipped.** `spec_seed_present: true` never marks any Phase Checklist item as skipped. Specify (Phase 0b), Design (Phase 1), ratify-plan (1.5), and plan-review (1.6) all run in full.
 - **HI-E2-4 — Recoverable.** `spec_seed_present` and `spec_seed_dissents` are plain-text key:value fields in `00-state.md § Current State`; `00-spec-seed.md` is human-readable prose. Both survive context compaction without re-interrogating the manifest.
+
+---
+
+## 11. Initiative detection — multi-project grouping (opt-in)
+
+This section is the full contract for the Step 6d-initiative sub-step in `agents/orchestrator.md`. It runs during Discover, after framing and before the intake survey.
+
+### 11.1 Purpose and gating
+
+An **initiative** is an operator-named grouping of separate per-project pipeline runs that logically form one multi-project effort. The initiative layer is a **path-prefix insertion plus a parent index (`00-overview.md`)** — it never merges pipelines or creates a shared `01-plan.md`. Every per-project pipeline remains isolated; the overview is an additive living index.
+
+All initiative behaviour is gated on `initiative: {slug}` in `00-state.md`. When `initiative == null` (the default), no code path, no path expression, and no artifact differs from the pre-initiative behaviour. The `null` value is the backward-compatibility guarantee.
+
+### 11.2 Detection signals
+
+Three signals may fire during Discover; none auto-creates the initiative — all require confirmation:
+
+| Signal | Source | Weight |
+|--------|--------|--------|
+| Operator declaration | Operator's message names an initiative explicitly | Primary — the slug is extracted from the operator's own label |
+| Existing-folder inspection | Obsidian: scan `{logs-path}/{logs-subfolder}/` for sibling dirs with `00-overview.md`; Local: check parent of cwd repo for sibling `00-overview.md` | Join aid — surfaces a candidate to rejoin |
+| Sibling-directory inspection | Parent of cwd repo contains sibling repos with `.git` | Proposal aid only — a prompt to ask, never a trigger |
+
+**Generic-root guard (hard rule):** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone. The generic-root signal is filtered out before the confirmation prompt is emitted.
+
+### 11.3 Confirmation gate (hard gate — never auto-create)
+
+After any signal fires, the orchestrator emits a single confirmation prompt:
+
+```
+This task appears to be part of initiative "{slug}".
+Overview location: {mode-resolved overview path}
+Set initiative to "{slug}" and create/join the overview? [Y/n]:
+```
+
+Then WAIT. On Y → set `initiative: {slug}` and proceed to Phase 0a Step 1f. On n (or no signal) → set `initiative: null` and proceed exactly as today.
+
+The initiative slug is validated to `[a-z0-9-]`, max 60 chars (same rule as the feature-name slug). No slashes, dots, or `..` are permitted.
+
+### 11.4 Cross-run JOIN contract
+
+An initiative spans multiple separate pipeline runs (one per project, possibly across sessions). When `initiative` is set, Phase 0a Step 1f finds or creates the `00-overview.md`:
+
+- **CREATE** — if the overview file does not exist: write it from the template in `agents/orchestrator.md § 00-overview.md Template`.
+- **JOIN** — if the file already exists: read-modify-write, replacing this project's row in-place if it exists, appending a new row if absent. Rows are keyed by `project` slug; no row is ever duplicated.
+
+The join is idempotent: running the same project's pipeline twice updates its single row.
+
+### 11.5 Hard invariants
+
+- **Never auto-create.** No initiative folder, no `00-overview.md`, no `initiative` state field, and no path-prefix insertion happen without an explicit Y at the confirmation gate.
+- **Backward-compatible.** `initiative == null` produces byte-identical behaviour to any pre-initiative run.
+- **Best-effort overview writes.** A write failure on `00-overview.md` logs a WARN and continues. The per-project pipeline never fails on an overview error.
+- **Local-mode per-project workspace unchanged.** In local mode, `base_path = "workspaces"` is not re-prefixed when an initiative is set. Only the overview location changes (common parent of sibling repos).

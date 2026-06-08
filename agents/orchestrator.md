@@ -79,11 +79,22 @@ The `dispatch_handoff` JSON block follows the canonical schema defined in `docs/
 **Step 2 — Resolve workspaces base path.**
 
 1. Read `~/.claude/.team-harness.json`.
-2. Parse `logs-mode`:
-   - File missing, or `logs-mode` is `"local"` or absent → `base_path = "workspaces"` (relative to cwd), `logs_mode = "local"`.
-   - `logs-mode` is `"obsidian"` → read `logs-path` and `logs-subfolder` (default: `"work-logs"`), derive `repo_name` from cwd basename, `base_path = "{logs-path}/{logs-subfolder}/{repo_name}"`. If `logs-path` empty → fall back to `"local"`.
-3. Resolve `events_file`: obsidian → `00-execution-events.md`, local → `00-execution-events.jsonl`.
-4. Store `base_path`, `logs_mode`, `events_file` for all subsequent path construction.
+2. Parse `logs-mode` **and** the `initiative` field (read from `00-state.md` if a pipeline is resuming, or `null` on first boot):
+   - File missing, or `logs-mode` is `"local"` or absent → `logs_mode = "local"`.
+   - `logs-mode` is `"obsidian"` → read `logs-path` and `logs-subfolder` (default: `"work-logs"`), derive `repo_name` from cwd basename. If `logs-path` empty → fall back to `"local"`.
+3. Compose `base_path` using the `initiative`-conditional branch below (the `initiative == null` rows are the verbatim current expressions — byte-identical to the pre-initiative behaviour):
+
+   | Mode | `initiative == null` (unchanged) | `initiative` set |
+   |------|----------------------------------|------------------|
+   | **Local** | `base_path = "workspaces"` | `base_path = "workspaces"` (per-project path **unchanged**; overview lives at the common parent of the sibling repos — see `## 00-overview.md Template` section) |
+   | **Obsidian** | `base_path = "{logs-path}/{logs-subfolder}/{repo_name}"` | `base_path = "{logs-path}/{logs-subfolder}/{initiative}/{repo_name}"`; overview at `{logs-path}/{logs-subfolder}/{initiative}/00-overview.md` |
+
+   **Backward-compatibility guarantee:** when `initiative == null`, both mode rows are the literal current path expressions — no extra level is inserted. A single-project run (no initiative) produces today's exact `base_path` in both modes, byte-for-byte.
+
+   **Local-mode nuance:** in local mode the per-project workspace always stays inside the repo (decision 1 — per-project pipelines unchanged), so `base_path` is NOT re-prefixed when an initiative is set. Only the overview's location is initiative-aware: it lives at the common parent of the declared sibling repos (operator confirmed at the Discover gate). If only one repo is known, the overview is created at the parent of the current cwd repo; later runs join it by initiative slug.
+
+4. Resolve `events_file`: obsidian → `00-execution-events.md`, local → `00-execution-events.jsonl`.
+5. Store `base_path`, `logs_mode`, `events_file`, and `initiative` for all subsequent path construction. `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}` is composed at Phase 0a Step 1d (unchanged in both modes).
 
 Proceed to intake / recovery / direct-mode handling. No boot acknowledgment line.
 
@@ -334,6 +345,59 @@ views:
 
 ---
 
+## 00-overview.md Template
+
+This section defines the document contract for the multi-project initiative overview. It is used by Phase 0a Step 1f (create/join) and by `agents/delivery.md` Step 11.7 (write-back). The template, section-ownership map, and no-fork invariant here are the single source of truth — mirroring the role that `agents/_shared/plan-consolidation.md` plays for `01-plan.md`.
+
+### Template (obsidian mode shown; local mode omits obsidian-only frontmatter keys)
+
+```markdown
+---
+type: initiative-overview
+initiative: {initiative-slug}
+created: {YYYY-MM-DD}
+updated: {YYYY-MM-DD}
+projects: [{project-slug}, ...]
+---
+
+# Initiative: {initiative-slug}
+
+## Review Summary
+
+> One-paragraph statement of the initiative's goal — the cross-project big picture
+> that no single 01-plan.md owns. What is being built across all projects and why.
+
+## Projects
+
+| Project | Branch | Version | PR | Status |
+|---------|--------|---------|----|--------|
+| {project-slug} | {branch or —} | {version or —} | {#N / URL or —} | {planning\|in-progress\|delivered} |
+
+## Big-Picture Plan
+
+Cross-project narrative: the sequencing across projects, cross-project dependencies
+(e.g. backend ships before frontend), shared contracts, and any initiative-level
+decisions that span more than one repo. This section is owned at the initiative level
+and is NOT duplicated into any per-project 01-plan.md.
+```
+
+### Section-ownership map
+
+| Section | Sole writer | When | Write mode |
+|---------|-------------|------|------------|
+| Frontmatter (`updated`, `projects`) | orchestrator (create/join Step 1f) | intake | replace-in-place; append project slug to `projects` list if absent |
+| `## Review Summary` (initiative goal) | orchestrator | at creation; editable on operator request | author once; reconcile-in-place |
+| `## Projects` table — a project's row | orchestrator (initial row: project + branch + status `planning`/`in-progress`) AND delivery (branch confirm + version + PR + status `delivered`) | orchestrator at intake; delivery at Step 11.7 | one row per project keyed by `project` slug; replace-in-place; never duplicate |
+| `## Big-Picture Plan` | orchestrator | intake; updated as later runs join | append/reconcile-in-place; last-writer-wins on true race |
+
+### No-fork / consolidation invariant for `00-overview.md`
+
+`00-overview.md` is a **snapshot** of the current state of the initiative, not a log. Each project has exactly one row, carrying its latest values. When a later run supersedes a row's values (branch confirmed, version assigned, PR opened, status advanced), the row is overwritten in place — never appended beside the old one. Never create `00-overview-v2.md` or any `00-overview-*.md` sibling. The cross-project narrative is reconciled in place, not accreted. This invariant mirrors the `01-plan.md` consolidation invariant (`agents/_shared/plan-consolidation.md`).
+
+**Marker: multi-project-initiative-overview**
+
+---
+
 ## Phase Checkpointing
 
 After EVERY phase transition, update `{docs_root}/00-state.md`. This is your persistent memory — if context compacts, this file tells you exactly where you are. `docs_root` is the fully resolved workspaces path stored in `## Current State`.
@@ -514,6 +578,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - checkpoint_advance_fresh: {true | false}             # true when the advance signal was a response to the checkpoint prompt (not carried over from a prior message)
 - functional_clarity_artifact: {<short functional statement> | null}  # confirmed functional statement ("what we are building, functionally"); null until dev-confirmed
 - functional_clarity_confirmed: {true | false}         # true when the operator confirmed the functional clarity artifact
+- initiative: {slug | null}                            # operator-confirmed initiative slug (kebab-case [a-z0-9-], max 60 chars) or null. null = no initiative — today's behaviour exactly; every path expression and every new behaviour below is gated on this field being non-null.
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -720,6 +785,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - `events_file: {events_file}` (from boot)
    - `operator_language: {operator_language}` (from Step 1c)
    - `docs_root: {docs_root}` (the full resolved path)
+   - `initiative: {slug | null}` (from Step 6d-initiative; null = no initiative confirmed)
    - The full `## Phase Checklist` (all phases unchecked) — this is the structural guardrail against phase skipping
    - TL;DR (written in `operator_language`): `Now`: "Phase 0a intake — classifying task." `Last`: "Pipeline created." `Next`: "Classification, then Phase 0b SPECIFY." `Open issues`: "none".
 
@@ -732,6 +798,29 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    ```jsonl
    {"ts":"<ISO>","event":"session.start","project":"<repo_name>","feature":"<feature_name>"}
    ```
+
+1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
+
+   **Find or create the overview file:**
+   - Resolve `overview_path`:
+     - Obsidian: `{logs-path}/{logs-subfolder}/{initiative}/00-overview.md`
+     - Local: `{common-parent-of-sibling-repos}/00-overview.md` (the parent directory of the current cwd repo, confirmed at Step 6d-initiative)
+   - If `overview_path` exists → **JOIN**: read the file, find the row for this project slug in `## Projects`. If the row exists, replace it in-place with the current values; if absent, append a new row. Never duplicate a row for the same project. This is idempotent: re-running the same project's pipeline updates its single row rather than accumulating rows.
+   - If `overview_path` does not exist → **CREATE**: write the full `00-overview.md` template (see `## 00-overview.md Template` section below) with this project as the first row.
+
+   **Write the initial project row** (project, branch-at-Design, status):
+   ```
+   | {project-slug} | {current-branch or —} | — | — | planning |
+   ```
+   Branch-at-Design is the current git branch if already on a feature branch, or `—` if still on main/develop (the branch is set by the delivery agent once the PR is opened).
+
+   **Read-modify-write protocol:** read the full `00-overview.md`, edit only this project's row (or append it), update `updated:` in the frontmatter to today's date, and write the whole file back. Never write a partial payload. This is the cross-run join rule: keyed by `project` slug; replace-in-place if the row exists, append if absent.
+
+   **Concurrency/idempotency rule:** rows are keyed by `project` slug and are mutually independent — two concurrent runs editing different rows do not logically conflict. Last-writer-wins on the narrative sections (`## Review Summary`, `## Big-Picture Plan`) is acceptable because those sections are descriptive, not a gate.
+
+   **Best-effort posture:** if the overview write fails (path unavailable, permission error, file locked), log one WARN line and continue — the per-project pipeline NEVER fails or blocks on an overview-write error. The WARN is the only signal; the operator resolves it manually if needed.
+
+   **Obsidian mode:** if the `{initiative}/` directory does not yet exist, create it before writing `00-overview.md`. No other action needed for the directory — the per-project workspace already uses the `{logs-path}/{logs-subfolder}/{initiative}/{repo_name}/` path from Step 2.
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `workspaces/{feature-name}/00-knowledge-context.md`:
    ```markdown
@@ -861,6 +950,31 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - **Win-condition reframe.** Success at the checkpoint is NOT "produced the artifact / reached the plan." Success is: the developer reached clarity + the idea meets the bar + the developer understands why. Pedagogy clause: always expose the WHY behind a concern (the junior learns, the senior verifies); do NOT force a Socratic march — state the concern and the reasoning; the developer chooses the depth. Bounded by: this is still work, never a seminar, and it never blocks delivery.
 
      - **Concise engagement / internal reasoning.** The reasoning-partner posture does NOT license over-explaining or surfacing the full internal reasoning chain. Surface only the salient friction and the decision-relevant why, briefly. Keep the rest of the reasoning internal. This is the explicit counterweight to the sycophancy fix: a critical partner who is also concise. Aligns with CLAUDE.md §7.1 voice and output-discipline (operate silently, surface decisions and results).
+
+     **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
+
+     **Purpose:** detect whether this task is part of a multi-project initiative and, only with explicit operator confirmation, set the `initiative` slug that gates the path-resolution branch and the `00-overview.md` lifecycle.
+
+     **Three detection signals** (any one *proposes*; none *auto-creates*; all three require confirmation):
+
+     1. **Operator declaration (primary).** The operator explicitly names an initiative in the task — e.g. "this is part of the migration-2026 initiative", "junto con el backend repo". The orchestrator extracts the freeform label, slugifies it to `[a-z0-9-]` max 60 chars (same rule as feature-name), and proposes it.
+     2. **Existing-initiative-folder inspection (join aid).** At Discover time, inspect for an existing `00-overview.md`: obsidian mode → scan `{logs-path}/{logs-subfolder}/` for sibling subdirectories containing a `00-overview.md`; local mode → check the parent of the cwd repo for a sibling `00-overview.md`. A match surfaces a candidate to **join** — show the slug and ask the operator.
+     3. **Sibling-directory inspection (proposal aid only).** If the cwd repo's parent contains sibling repos (directories with their own `.git`), the orchestrator may note this as a *prompt to ask* — never as an automatic trigger. **Generic-root guard:** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone — a flat parent is not an initiative signal.
+
+     **After any signal fires**, emit a confirmation prompt naming the proposed/joined initiative slug and the resulting overview location:
+
+     ```
+     This task appears to be part of initiative "{slug}".
+     Overview location: {mode-resolved overview path}
+     Set initiative to "{slug}" and create/join the overview? [Y/n]:
+     ```
+
+     Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit Y response.
+
+     - **On Y:** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, below) during intake.
+     - **On n (or no signal fires):** set `initiative: null` in `00-state.md § Current State`. Proceed exactly as today — zero behaviour change.
+
+     **Never auto-create.** No initiative folder, no `00-overview.md`, and no `initiative` state field is written without explicit operator confirmation. The confirmation prompt is the hard gate. This sub-step follows the same patient-intake / advance-signal model as the rest of Discover — it never dispatches a subagent and never auto-advances.
 
      **Step 6e — Intake survey (immediately after the confirmation-gate advance response, or after a skip marker).**
 
