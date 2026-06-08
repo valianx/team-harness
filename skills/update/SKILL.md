@@ -82,7 +82,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    - **Note:** The `dev-mode-entry` block is no longer distributed (the `/dev-mode` skill trigger-phrase mechanism was replaced by the `developer-mode` output style). If the `<!-- dev-mode-entry:start -->` … `<!-- dev-mode-entry:end -->` markers exist in `~/.claude/CLAUDE.md`, remove the block between them (inclusive) as part of this sync.
    - **Developer-mode output style sync.** After syncing managed blocks, re-copy `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (create the directory if absent). This keeps the output style aligned with the installed plugin version.
    - **Sync the `/dev-mode` skill.** Re-copy `skills/dev-mode/SKILL.md` from the plugin cache to the USER-LEVEL path `~/.claude/skills/dev-mode/SKILL.md` (create the directory if absent), overwriting any existing version. This skill is the in-session toggle that writes or removes the marker, persists `dev_mode_choice` in `.team-harness.json`, and adopts or exits the orchestrator disposition; it must stay aligned with the installed plugin version (a bare `/dev-mode` requires a user-level skill, since plugin skills are namespaced).
-   - **Back up** `~/.claude/CLAUDE.md` to `~/.claude/CLAUDE.md.bak-YYYYMMDD-HHMMSS` (UTC) before the first write. If the file does not exist, create it (blocks-only) and skip the backup. Retention: only the last 3 `CLAUDE.md.bak-*` backups are kept; older ones are pruned after each sync.
+   - **Back up** `~/.claude/CLAUDE.md` to a single rolling backup `~/.claude/CLAUDE.md.bak` (overwritten each run) before the first write. If the file does not exist, create it (blocks-only) and skip the backup. No backup history accumulates and nothing is ever deleted — exactly one rolling backup is kept.
    - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the three canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
    - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
    - **Never touch anything outside the marker-delimited blocks.** All other content in `~/.claude/CLAUDE.md` is the operator's and is preserved byte-for-byte.
@@ -98,10 +98,8 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    $mbDir = "$($latestDir.FullName)\skills\setup\managed-blocks"
    $claudeMd = "$env:USERPROFILE\.claude\CLAUDE.md"
 
-   # Backup
-   $ts = (Get-Date -Format "yyyyMMdd-HHmmss")
-   Copy-Item $claudeMd "$claudeMd.bak-$ts"
-   Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime | Select-Object -SkipLast 3 | Remove-Item -Force
+   # Backup (single rolling backup — overwritten each run, never accumulates)
+   Copy-Item $claudeMd "$claudeMd.bak"
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
    foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule", "dev-mode")) {
@@ -131,17 +129,25 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        Set-Content $claudeMd $content -NoNewline
    }
 
-   # Sync developer-mode output style
+   # Sync developer-mode output style (skip-if-identical write — no -Force copy)
    $outputStyleSrc = "$($latestDir.FullName)\output-styles\developer-mode.md"
    $outputStyleDst = "$env:USERPROFILE\.claude\output-styles\developer-mode.md"
-   New-Item -ItemType Directory -Force -Path (Split-Path $outputStyleDst) | Out-Null
-   Copy-Item $outputStyleSrc $outputStyleDst -Force
+   $outputStyleDir = Split-Path $outputStyleDst
+   if (-not (Test-Path $outputStyleDir)) { New-Item -ItemType Directory -Path $outputStyleDir | Out-Null }
+   $srcContent = Get-Content $outputStyleSrc -Raw
+   if (-not (Test-Path $outputStyleDst) -or (Get-Content $outputStyleDst -Raw) -ne $srcContent) {
+       Set-Content $outputStyleDst $srcContent -NoNewline
+   }
 
-   # Sync /dev-mode user-level skill (the toggle for dev mode)
+   # Sync /dev-mode user-level skill (skip-if-identical write — no -Force copy, no -Force dir)
    $devModeSkillSrc = "$($latestDir.FullName)\skills\dev-mode\SKILL.md"
    $devModeSkillDst = "$env:USERPROFILE\.claude\skills\dev-mode\SKILL.md"
-   New-Item -ItemType Directory -Force -Path (Split-Path $devModeSkillDst) | Out-Null
-   Copy-Item $devModeSkillSrc $devModeSkillDst -Force
+   $devModeSkillDir = Split-Path $devModeSkillDst
+   if (-not (Test-Path $devModeSkillDir)) { New-Item -ItemType Directory -Path $devModeSkillDir | Out-Null }
+   $devSrcContent = Get-Content $devModeSkillSrc -Raw
+   if (-not (Test-Path $devModeSkillDst) -or (Get-Content $devModeSkillDst -Raw) -ne $devSrcContent) {
+       Set-Content $devModeSkillDst $devSrcContent -NoNewline
+   }
 
    # Default-on: assert dev-mode marker unless operator explicitly opted out.
    # Reads dev_mode_choice from ~/.claude/.team-harness.json:
@@ -175,10 +181,8 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    MB_DIR="$PLUGIN_BASE/$LATEST_DIR/skills/setup/managed-blocks"
    CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 
-   # Backup
-   TS=$(date -u +"%Y%m%d-%H%M%S")
-   cp "$CLAUDE_MD" "$CLAUDE_MD.bak-$TS"
-   ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f
+   # Backup (single rolling backup — overwritten each run, never accumulates)
+   cp "$CLAUDE_MD" "$CLAUDE_MD.bak"
 
    # Sync each managed block (DESTRUCTIVE replace between markers, or append)
    for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule dev-mode; do
@@ -200,17 +204,17 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        sed -i.tmp "/<!-- dev-mode-entry:start -->/,/<!-- dev-mode-entry:end -->/d" "$CLAUDE_MD"
    fi
 
-   # Sync developer-mode output style
+   # Sync developer-mode output style (write-if-different — no unconditional cp)
    OUTPUT_STYLE_SRC="$PLUGIN_BASE/$LATEST_DIR/output-styles/developer-mode.md"
    OUTPUT_STYLE_DST="$HOME/.claude/output-styles/developer-mode.md"
-   mkdir -p "$(dirname "$OUTPUT_STYLE_DST")"
-   cp "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST"
+   [ -d "$(dirname "$OUTPUT_STYLE_DST")" ] || mkdir -p "$(dirname "$OUTPUT_STYLE_DST")"
+   cmp -s "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST" || cp "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST"
 
-   # Sync /dev-mode user-level skill (the toggle for dev mode)
+   # Sync /dev-mode user-level skill (write-if-different — no unconditional cp)
    DEV_MODE_SKILL_SRC="$PLUGIN_BASE/$LATEST_DIR/skills/dev-mode/SKILL.md"
    DEV_MODE_SKILL_DST="$HOME/.claude/skills/dev-mode/SKILL.md"
-   mkdir -p "$(dirname "$DEV_MODE_SKILL_DST")"
-   cp "$DEV_MODE_SKILL_SRC" "$DEV_MODE_SKILL_DST"
+   [ -d "$(dirname "$DEV_MODE_SKILL_DST")" ] || mkdir -p "$(dirname "$DEV_MODE_SKILL_DST")"
+   cmp -s "$DEV_MODE_SKILL_SRC" "$DEV_MODE_SKILL_DST" || cp "$DEV_MODE_SKILL_SRC" "$DEV_MODE_SKILL_DST"
 
    # Default-on: assert dev-mode marker unless operator explicitly opted out.
    # Reads dev_mode_choice from ~/.claude/.team-harness.json:
