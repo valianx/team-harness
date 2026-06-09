@@ -11,7 +11,7 @@
       "displayName": "Team Harness",
       "source": {"source": "github", "repo": "valianx/team-harness"},
       "description": "Orchestrated Claude Code agent system: architect, implement, test, and deliver via a multi-agent pipeline",
-      "version": "2.62.0",
+      "version": "2.63.0",
       "category": "development",
       "tags": ["orchestration", "agents", "workflow"],
       "author": {

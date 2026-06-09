@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.62.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.63.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -134,7 +134,7 @@ All commands run from the repo root.
 | Run only the agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
 | Run the behavioral suite (dispatches orchestrator via `claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
 
-**Not applicable to this repo:** typecheck, unit test of agent prompt behaviour, integration test of the live pipeline, e2e, build, dev server, migrations, deploy. The repo ships declarative assets, an installer, and one MCP server — no code pipeline. The `tests/` suite covers the **three surfaces that ARE testable without a live LLM**: `hooks/policy-block.sh` (functional, ~48 cases), the structural integrity of the agent / skill / hook `.md` and `.json` files (~282 assertions across 16 suites), and the YAML frontmatter parseability of every `agents/*.md` (~19 files — catches the silent-agent-drop class of bug). It does NOT validate prompt behaviour — that still requires running pipelines through Claude Code.
+**Not applicable to this repo:** typecheck, unit test of agent prompt behaviour, integration test of the live pipeline, e2e, build, dev server, migrations, deploy. The repo ships declarative assets, an installer, and one MCP server — no code pipeline. See `docs/testing.md` for the full test-suite registry and scope.
 
 ---
 
@@ -155,6 +155,7 @@ All commands run from the repo root.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux. Avoid Unix-only tools or shell-specific syntax in agent prompts.
 - **KG content is technical-only.** The knowledge graph must never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
 - **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per successfully-completed task (Step 11.5 of its workflow). The insight is synthesised from workspaces + the CHANGELOG entry and describes what was learned that future tasks can reuse — not what changed (that's the CHANGELOG). The call is best-effort: if the Memory MCP server is unreachable or the task has no reusable learning, the step logs and skips. This builds team knowledge automatically without operator curation.
+- **Delivery post-create check (Step 11.4).** After `gh pr create`, queries merge state + CI with bounded backoff; `CONFLICTING`/failing-CI reported explicitly (never as clean); graceful skip when `gh` absent.
 - **Pipeline observability is mandatory.** Every pipeline run produces `00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode) and `00-pipeline-summary.md`. Writing events is mandatory, not best-effort. **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Every decision involving a third-party library's API or configuration syntax must be verified against context7 before code is generated. Training-snapshot knowledge is treated as potentially stale. Mandatory triggers per agent are documented in `docs/context7-usage.md` §2 (architect, implementer, tester, security, translator); `init` is a light reference. Every consulting agent emits `context7_consult: hit:N miss:N skipped:M` in its status block — even when all counts are zero, the line's presence signals the agent considered freshness. Absence of context7 ≠ excuse to ignore the check: fall back to training knowledge and document the fallback in the workspace doc's `## Documentation Consulted` section.
 - **Bug-fix flow forces security review and mandatory regression test.** For `type: fix` and `type: hotfix`, `security-sensitive: true` is forced — security runs at Phase 3 always. **Phase 2.0 — Regression Test Authoring** runs between STAGE-GATE-1 and Phase 2; the regression test is mandatory always. Full flow definition: `agents/ref-special-flows.md` § Bug-fix Flow § Tier System.

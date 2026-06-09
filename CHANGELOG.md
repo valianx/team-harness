@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.63.0] - 2026-06-09
+
+### Added
+- `delivery` agent Step 11.4 — post-create PR mergeability + CI check: after `gh pr create`, queries `gh pr view --json mergeable,mergeStateStatus,statusCheckRollup` with a bounded 3-attempt backoff (0s/2s/4s) for the `UNKNOWN` transient; reports `CONFLICTING`/`DIRTY` and failing CI explicitly in the delivery summary, status block (`mergeable_state:`, `ci_state:`), and PR-result line — never as a clean delivery; includes an offer-to-resolve on conflict (operator-gated, never automatic); skips gracefully when `gh` is unavailable (`mergeable_state: not-verified: gh-unavailable`). Report-only: delivery exit status is unchanged.
+
+### Changed
+- `skills/deliver/SKILL.md` Output section documents the post-create merge-state + CI verification contract.
+- Plugin version bumped 2.62.0 → 2.63.0.
+
 ## [2.62.0] - 2026-06-08
 
 ### Fixed

@@ -755,6 +755,52 @@ Report the existing PR URL in the status block — do NOT fail.
 - **Never fail just because a PR already exists** — always detect and handle gracefully
 - **When `has_gh=true` and push succeeded but `gh pr create` fails:** report `status: blocked-pr-pending` (see `agents/_shared/gh-fallback.md` § `status: blocked-pr-pending`). The remote branch already exists; do not re-push. Emit the compare URL and body file and wait for operator reply (`pr opened #N`). Step 3's OPEN/no-PR detection handles the pushed-but-PR-less state on re-run.
 
+---
+
+### Step 11.4 — Post-create mergeability + CI check (mandatory, best-effort, report-only)
+
+**Gate:** Run only when `has_remote=true` AND `has_gh=true` AND a PR number is known (from Step 11.2 create or Step 11.0/11.3 existing-PR detection). If `has_remote=false`, this step is a no-op (no PR exists). If `has_gh=false` (token-only or paste tiers), the query cannot run — log `mergeable_state: not-verified: gh-unavailable` and emit a one-line operator note: "Mergeability not verified — gh CLI unavailable." Continue without failing.
+
+**Query (single call, bundles CI):**
+
+```bash
+gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
+```
+
+`mergeable` is `MERGEABLE` | `CONFLICTING` | `UNKNOWN`. `mergeStateStatus` is `CLEAN` | `DIRTY` | `BLOCKED` | `BEHIND` | `UNSTABLE` | `UNKNOWN` | `DRAFT` | `HAS_HOOKS`. `statusCheckRollup` is an array of check entries each with a `conclusion`/`state`.
+
+**Bounded backoff for `UNKNOWN`.** GitHub computes `mergeable` asynchronously and returns `UNKNOWN` for the first few seconds after PR creation. Retry on `mergeable == UNKNOWN`:
+
+- **Attempt 1** — immediate (delay 0s).
+- **Attempt 2** — after `sleep 2`.
+- **Attempt 3** — after `sleep 4`.
+- **Cap:** 3 attempts, ~6s worst case. Stop early as soon as `mergeable != UNKNOWN`. After attempt 3, if still `UNKNOWN`, treat as terminal-undetermined.
+
+**Terminal-state handling:**
+
+| `mergeable` / `mergeStateStatus` | Reported as | Status block `mergeable_state:` |
+|---|---|---|
+| `MERGEABLE` / `CLEAN` | Clean delivery — "Merge state: CLEAN" added | `clean` |
+| `CONFLICTING` / `DIRTY` | **Explicit non-clean delivery** — "Merge state: CONFLICTING — base has diverged; PR cannot merge as-is" | `conflicting` |
+| `UNKNOWN` after 3 attempts | "Merge state: UNDETERMINED — GitHub did not resolve mergeability within the retry window; verify before merge" | `undetermined` |
+| Other `mergeStateStatus` (`BLOCKED`/`BEHIND`/`UNSTABLE`) | Surfaced verbatim with a one-line gloss | `<status-lowercased>` |
+
+**Report-only** — the PR was created successfully; merge/CI state is a downstream condition. This step NEVER changes delivery's exit status. A non-clean state is surfaced in three places: the status block, the `## Git Delivery` summary, and the PR-result line.
+
+**CI conclusion (bundled from `statusCheckRollup`).** Summarize the rollup:
+
+- All checks `SUCCESS` (or rollup empty) → `ci_state: none` (empty rollup: "no checks configured") or `ci_state: passing`.
+- Any check `FAILURE` / `ERROR` / `TIMED_OUT` / `CANCELLED` → `ci_state: failing` — "CI: FAILING — {N} check(s) not green" surfaced explicitly alongside the merge state.
+- Any check `PENDING` / `IN_PROGRESS` / `QUEUED` (and none failing) → `ci_state: pending` (informational — do not retry CI within this backoff window).
+- Add status-block line `ci_state: passing | failing | pending | none | not-verified`.
+
+**Offer-to-resolve on `CONFLICTING`.** When `mergeable == CONFLICTING`, append a one-line **offer** (not an action) to the operator-facing report: "To resolve: rebase the branch on the current base (`git fetch origin && git rebase origin/main`) and resolve conflicts, then re-push." Delivery does NOT perform the rebase automatically — it is an outward/irreversible action gated by `dev-guard.sh` and owned by the operator.
+
+**Reporting sites.** Step 11.4 writes:
+
+- Status block: `mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable` and `ci_state: passing | failing | pending | none | not-verified`.
+- `## Git Delivery` summary: a `Merge state:` line and a `CI:` line.
+- The PR-result line: append the merge state — e.g. "— created — merge: CLEAN, CI: passing".
 
 ---
 
@@ -1140,7 +1186,9 @@ Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}
 - Branch: {branch-name}
 - Commit: {hash}
 - Message: {message}
-- PR: {url} (targeting main) — {created | updated | already merged}
+- PR: {url} (targeting main) — {created | updated | already merged} — merge: {CLEAN | CONFLICTING | UNDETERMINED | not-verified}, CI: {passing | failing | pending | none | not-verified}
+- Merge state: {CLEAN | CONFLICTING — base has diverged; PR cannot merge as-is | UNDETERMINED — GitHub did not resolve mergeability within the retry window; verify before merge | not-verified: gh-unavailable}
+- CI: {passing | FAILING — {N} check(s) not green | in progress | no checks configured | not-verified}
 
 ## Files Committed
 - {file list}
@@ -1172,6 +1220,8 @@ output: workspaces/{feature-name}/00-state.md § Delivery
 summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections updated}
 gh_account: <login> | unknown | n/a (has_gh=false)
 dod: {pass | no gates discovered | failed: <command>}
+mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
+ci_state: passing | failing | pending | none | not-verified
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}

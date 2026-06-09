@@ -16307,18 +16307,18 @@ check(
 _s70_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
     "suite70(f1-plugin-json): plugin.json version is 2.62.0",
-    '"version": "2.62.0"' in _s70_plugin_json,
-    "plugin.json version must be 2.62.0 (minor bump from 2.61.0 — distributed-asset change requires version bump)",
+    _s59_ver_tuple(json.loads(_s70_plugin_json).get("version", "0.0.0")) >= (2, 62, 0),
+    "plugin.json version must be 2.62.0 or later (minor bump from 2.61.0 — distributed-asset change requires version bump)",
 )
 check(
     "suite70(f2-marketplace-json): marketplace.json plugins[0].version is 2.62.0",
-    '"version": "2.62.0"' in _s70_marketplace_json,
-    "marketplace.json plugins[0].version must be 2.62.0 (matched with plugin.json)",
+    _s59_ver_tuple(json.loads(_s70_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 62, 0),
+    "marketplace.json plugins[0].version must be 2.62.0 or later (matched with plugin.json)",
 )
 check(
     "suite70(f3-claude-version): CLAUDE.md §3 version is 2.62.0",
-    "2.62.0" in _s70_claude,
-    "CLAUDE.md §3 Current version must show 2.62.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s70_claude) or "0.0.0") >= (2, 62, 0),
+    "CLAUDE.md §3 Current version must show 2.62.0 or later",
 )
 check(
     "suite70(f4-changelog-version): CHANGELOG.md contains the 2.62.0 release section",
@@ -16332,6 +16332,276 @@ check(
 )
 
 # Marker: fix-plan-execution-workspace-continuity
+
+# ---------------------------------------------------------------------------
+# Suite 71 — delivery-pr-mergeability-check (v2.63.0)
+# ---------------------------------------------------------------------------
+# Structural tests for the post-create PR mergeability + CI check added as
+# Step 11.4 in agents/delivery.md (issue #263).
+#
+# Contract under test:
+#   - After gh pr create, Step 11.4 queries mergeable,mergeStateStatus,statusCheckRollup
+#   - Bounded 3-attempt backoff (0s/2s/4s) for UNKNOWN
+#   - CONFLICTING/DIRTY reported explicitly as non-clean; never as clean delivery
+#   - UNKNOWN after retries → "undetermined", never claims clean
+#   - gh-fallback graceful skip: not-verified: gh-unavailable, never hard-fail
+#   - CI conclusion (statusCheckRollup) surfaced alongside merge state
+#   - Offer-to-resolve on CONFLICTING is an offer, NOT an automatic action
+#   - skills/deliver/SKILL.md documents the post-create verification
+#   - Report-only: delivery exit status unchanged
+#
+# Group (a): Step 11.4 query contract — FAIL pre-fix
+# Group (b): backoff / UNKNOWN / CONFLICTING / gh-fallback — FAIL pre-fix
+# Group (c): CI rollup contract — FAIL pre-fix
+# Group (d): deliver SKILL.md output note — FAIL pre-fix
+# Group (e): Return Protocol status-block fields — FAIL pre-fix
+# Group (f): self-ref / registry — FAIL pre-fix (suite not yet registered)
+# Group (g): packaging — FAIL pre-fix (version still 2.62.0, CHANGELOG missing)
+#
+# All content checks use the _slice_section anchor idiom:
+#   missing anchor → empty slice → check fails (no false-green).
+#
+# CRITICAL: changelog assertion targets the DURABLE CHANGELOG.md [2.63.0]
+# section — NEVER changelog.d/delivery-pr-mergeability-check.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# This guard was written to prevent the bug that recurred 3× (#282/#285/#286).
+#
+# Written FAILING-FIRST in Phase 2.0 (2026-06-08).
+# Passes after the implementer lands all changes listed in 01-plan.md Work Plan.
+# Marker: delivery-pr-mergeability-check
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 71: delivery-pr-mergeability-check (v2.63.0) ===")
+
+_s71_delivery = read(AGENTS_DIR / "delivery.md")
+_s71_deliver_skill = read(skill_path("deliver"))
+_s71_claude = read(REPO_ROOT / "CLAUDE.md")
+_s71_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s71_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s71_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+_S71_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ---------------------------------------------------------------------------
+# Group (a) — Step 11.4 query contract
+#
+# delivery.md must contain a "Step 11.4" section that:
+#  (a1) runs the gh pr view command with the three required JSON fields
+#  (a2) gates on has_remote, has_gh, and PR number known
+#  (a3) is placed after Step 11.3 and before Step 11.5
+# ---------------------------------------------------------------------------
+
+_s71_step114_slice = _slice_section(_s71_delivery, "Step 11.4", _S71_STOP)
+
+check(
+    "suite71(a1-step114-exists): delivery.md contains a 'Step 11.4' section",
+    bool(_s71_step114_slice),
+    "delivery.md must contain a 'Step 11.4' section documenting the post-create mergeability check",
+)
+check(
+    "suite71(a2-query-fields): delivery.md Step 11.4 queries mergeable,mergeStateStatus,statusCheckRollup",
+    "mergeable,mergeStateStatus,statusCheckRollup" in _s71_delivery
+    or ("mergeable" in _s71_step114_slice and "mergeStateStatus" in _s71_step114_slice and "statusCheckRollup" in _s71_step114_slice),
+    "delivery.md Step 11.4 must query 'mergeable,mergeStateStatus,statusCheckRollup' in the gh pr view call",
+)
+check(
+    "suite71(a3-gate-conditions): delivery.md Step 11.4 gates on has_remote, has_gh, and PR number known",
+    ("has_remote" in _s71_step114_slice and "has_gh" in _s71_step114_slice)
+    or ("has_remote" in _s71_delivery and "has_gh" in _s71_delivery and "Step 11.4" in _s71_delivery),
+    "delivery.md Step 11.4 must gate on has_remote=true AND has_gh=true AND PR number known",
+)
+check(
+    "suite71(a4-step-ordering): delivery.md Step 11.4 appears before Step 11.5",
+    "Step 11.4" in _s71_delivery and "Step 11.5" in _s71_delivery
+    and _s71_delivery.index("Step 11.4") < _s71_delivery.index("Step 11.5"),
+    "delivery.md Step 11.4 must appear before Step 11.5 (post-create, before KG capture)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (b) — backoff / UNKNOWN / CONFLICTING / gh-fallback
+#
+# delivery.md Step 11.4 must document:
+#  (b1) bounded 3-attempt backoff for UNKNOWN (0s/2s/4s or equivalent)
+#  (b2) CONFLICTING/DIRTY reported explicitly as non-clean delivery
+#  (b3) UNKNOWN after retries → undetermined, never claims clean
+#  (b4) gh-fallback graceful skip — not-verified: gh-unavailable, never hard-fail
+# ---------------------------------------------------------------------------
+
+check(
+    "suite71(b1-backoff): delivery.md Step 11.4 documents bounded retry backoff for UNKNOWN",
+    ("3 attempt" in _s71_step114_slice or "3-attempt" in _s71_step114_slice
+     or "Attempt 1" in _s71_step114_slice or "attempt 1" in _s71_step114_slice
+     or "sleep 2" in _s71_step114_slice or "0s/2s/4s" in _s71_step114_slice
+     or ("UNKNOWN" in _s71_step114_slice and "sleep" in _s71_step114_slice))
+    or ("UNKNOWN" in _s71_delivery and ("sleep 2" in _s71_delivery or "3 attempt" in _s71_delivery or "0s/2s/4s" in _s71_delivery)),
+    "delivery.md Step 11.4 must document the bounded 3-attempt backoff (0s/2s/4s) for UNKNOWN",
+)
+check(
+    "suite71(b2-conflicting-explicit): delivery.md Step 11.4 reports CONFLICTING/DIRTY explicitly as non-clean",
+    "CONFLICTING" in _s71_step114_slice or "CONFLICTING" in _s71_delivery,
+    "delivery.md Step 11.4 must explicitly report CONFLICTING/DIRTY as a non-clean delivery",
+)
+check(
+    "suite71(b3-unknown-undetermined): delivery.md Step 11.4 reports UNKNOWN after retries as undetermined, never clean",
+    ("undetermined" in _s71_step114_slice or "UNDETERMINED" in _s71_step114_slice)
+    or ("undetermined" in _s71_delivery and "Step 11.4" in _s71_delivery),
+    "delivery.md Step 11.4 must report UNKNOWN-after-retries as 'undetermined', never as clean",
+)
+check(
+    "suite71(b4-gh-fallback): delivery.md Step 11.4 documents graceful gh-fallback skip (not-verified: gh-unavailable)",
+    ("not-verified: gh-unavailable" in _s71_step114_slice or "gh-unavailable" in _s71_step114_slice)
+    or ("gh-unavailable" in _s71_delivery and "Step 11.4" in _s71_delivery),
+    "delivery.md Step 11.4 must document the graceful gh-fallback skip with 'not-verified: gh-unavailable'",
+)
+check(
+    "suite71(b5-report-only): delivery.md Step 11.4 is report-only (never changes delivery exit status)",
+    ("report-only" in _s71_step114_slice or "Report-only" in _s71_step114_slice
+     or ("never changes" in _s71_step114_slice and "exit status" in _s71_step114_slice)
+     or ("exit status" in _s71_step114_slice and "unchanged" in _s71_step114_slice))
+    or ("report-only" in _s71_delivery.lower() and "Step 11.4" in _s71_delivery),
+    "delivery.md Step 11.4 must be report-only — never changes delivery's exit status",
+)
+
+# ---------------------------------------------------------------------------
+# Group (c) — CI rollup contract
+#
+# delivery.md must document the statusCheckRollup CI conclusion surfacing:
+#  (c1) ci_state values: passing / failing / pending / none / not-verified
+#  (c2) empty rollup is NOT treated as a failure (no checks configured)
+#  (c3) offer-to-resolve on CONFLICTING is an offer, NOT an automatic action
+# ---------------------------------------------------------------------------
+
+check(
+    "suite71(c1-ci-state-field): delivery.md documents ci_state field with passing/failing/pending/none/not-verified",
+    "ci_state" in _s71_delivery
+    and ("passing" in _s71_delivery and "failing" in _s71_delivery),
+    "delivery.md must document the ci_state status-block field with passing/failing/pending/none/not-verified values",
+)
+check(
+    "suite71(c2-empty-rollup): delivery.md documents empty statusCheckRollup as non-failure (no checks configured)",
+    ("no checks configured" in _s71_delivery or "empty rollup" in _s71_delivery
+     or ("empty" in _s71_delivery and "rollup" in _s71_delivery and "not" in _s71_delivery)),
+    "delivery.md must state that an empty statusCheckRollup is not a failure ('no checks configured')",
+)
+check(
+    "suite71(c3-offer-not-action): delivery.md Step 11.4 offer-to-resolve is an offer, NOT an automatic action",
+    ("offer" in _s71_step114_slice and ("not" in _s71_step114_slice or "NOT" in _s71_step114_slice))
+    or ("offer" in _s71_delivery and "automatic" in _s71_delivery and "NOT" in _s71_delivery),
+    "delivery.md Step 11.4 must document offer-to-resolve as an operator offer, NOT an automatic action",
+)
+
+# ---------------------------------------------------------------------------
+# Group (d) — deliver SKILL.md output note
+#
+# skills/deliver/SKILL.md must document that delivery verifies and reports
+# merge state + CI post-create.
+# ---------------------------------------------------------------------------
+
+check(
+    "suite71(d1-skill-merge-state): skills/deliver/SKILL.md documents post-create merge-state verification",
+    "merge" in _s71_deliver_skill.lower() and "state" in _s71_deliver_skill.lower()
+    and ("mergeable" in _s71_deliver_skill or "merge state" in _s71_deliver_skill.lower()),
+    "skills/deliver/SKILL.md must document that delivery verifies and reports PR merge state post-create",
+)
+check(
+    "suite71(d2-skill-conflicting): skills/deliver/SKILL.md notes conflicting PR is reported explicitly",
+    "conflicting" in _s71_deliver_skill.lower() or "mergeable_state" in _s71_deliver_skill,
+    "skills/deliver/SKILL.md must note that a conflicting PR is reported explicitly, never as clean delivery",
+)
+check(
+    "suite71(d3-skill-gh-fallback): skills/deliver/SKILL.md notes graceful skip when gh unavailable",
+    "gh-unavailable" in _s71_deliver_skill or "gh unavailable" in _s71_deliver_skill.lower()
+    or ("unavailable" in _s71_deliver_skill.lower() and "gh" in _s71_deliver_skill.lower()),
+    "skills/deliver/SKILL.md must note that the check is skipped gracefully when gh is unavailable",
+)
+
+# ---------------------------------------------------------------------------
+# Group (e) — Return Protocol status-block fields
+#
+# delivery.md Return Protocol must declare mergeable_state and ci_state fields.
+# ---------------------------------------------------------------------------
+
+_s71_return_slice = _slice_section(_s71_delivery, "## Return Protocol", _S71_STOP)
+
+check(
+    "suite71(e1-mergeable-state-field): delivery.md Return Protocol declares mergeable_state field",
+    "mergeable_state" in _s71_return_slice or "mergeable_state" in _s71_delivery,
+    "delivery.md Return Protocol status block must declare the 'mergeable_state:' field",
+)
+check(
+    "suite71(e2-ci-state-field): delivery.md Return Protocol declares ci_state field",
+    "ci_state" in _s71_return_slice or "ci_state" in _s71_delivery,
+    "delivery.md Return Protocol status block must declare the 'ci_state:' field",
+)
+
+# ---------------------------------------------------------------------------
+# Group (f) — self-referential / registry guards
+#
+# (f1) This test file contains the three required markers.
+# (f2) docs/testing.md registers Suite 71 and the feature marker.
+# (f3) CLAUDE.md does NOT contain 'Suite 71' (hygiene — same precedent as
+#       Suites 68-70: only docs/testing.md is the canonical registry).
+# ---------------------------------------------------------------------------
+
+_s71_this_file = read(Path(__file__))
+check(
+    "suite71(f1-self-ref): this test file contains 'Suite 71', '_slice_section', and 'delivery-pr-mergeability-check'",
+    "Suite 71" in _s71_this_file and "_slice_section" in _s71_this_file
+    and "delivery-pr-mergeability-check" in _s71_this_file,
+    "test file must contain the three required markers for Suite 71",
+)
+check(
+    "suite71(f2-registry): docs/testing.md registers Suite 71 and delivery-pr-mergeability-check",
+    "Suite 71" in _s71_testing_md and "delivery-pr-mergeability-check" in _s71_testing_md,
+    "docs/testing.md must register Suite 71 and the 'delivery-pr-mergeability-check' marker",
+)
+check(
+    "suite71(f3-hygiene): CLAUDE.md does NOT contain 'Suite 71'",
+    "Suite 71" not in _s71_claude,
+    "CLAUDE.md must not mention Suite 71 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
+# Group (g) — packaging
+#
+# Minor version bump 2.62.0 → 2.63.0 in both plugin files + CLAUDE.md §3.
+# CRITICAL: Assert the DURABLE CHANGELOG.md [2.63.0] section —
+# NEVER assert changelog.d/delivery-pr-mergeability-check.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# This is the guard that was built to prevent the bug that recurred 3× this
+# session (#282 ac12c, #285 suite69 ac9, #286 suite70 f4).
+# ---------------------------------------------------------------------------
+
+_s71_changelog = read(REPO_ROOT / "CHANGELOG.md")
+check(
+    "suite71(g1-plugin-json): plugin.json version is 2.63.0",
+    '"version": "2.63.0"' in _s71_plugin_json,
+    "plugin.json version must be 2.63.0 (minor bump from 2.62.0 — distributed-asset change requires version bump)",
+)
+check(
+    "suite71(g2-marketplace-json): marketplace.json plugins[0].version is 2.63.0",
+    '"version": "2.63.0"' in _s71_marketplace_json,
+    "marketplace.json plugins[0].version must be 2.63.0 (matched with plugin.json)",
+)
+check(
+    "suite71(g3-claude-version): CLAUDE.md §3 version is 2.63.0",
+    "2.63.0" in _s71_claude,
+    "CLAUDE.md §3 Current version must show 2.63.0",
+)
+check(
+    "suite71(g4-changelog-version): CHANGELOG.md contains the 2.63.0 release section",
+    "## [2.63.0]" in _s71_changelog,
+    "CHANGELOG.md must contain a '## [2.63.0]' release section (fragment assembled at delivery)",
+)
+check(
+    "suite71(g4-changelog-entry): CHANGELOG.md 2.63.0 section documents the mergeability check",
+    "mergeabilit" in _s71_changelog.lower() and "2.63.0" in _s71_changelog,
+    "CHANGELOG.md must document the PR mergeability check feature in the 2.63.0 release section",
+)
+
+# Marker: delivery-pr-mergeability-check
 
 # ---------------------------------------------------------------------------
 # Summary
