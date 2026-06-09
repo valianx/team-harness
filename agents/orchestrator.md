@@ -406,7 +406,7 @@ and is NOT duplicated into any per-project 01-plan.md.
 - `## Projects` rows are keyed **one-per-project** — parallel per-project pipeline runs touch different rows, so row writes are safe under concurrency.
 - `## Functional Description` and `## Big-Picture Plan` are **reconcile-in-place by re-reading ALL sibling `01-plan.md` files**; on a true race the resolution is **last-writer-wins** (eventual consistency — any later run re-derives both sections from the full plan set, healing any stale write).
 - The read-modify-write of the whole `overview.md` is the unit of write; never write a partial payload.
-- **First-class single-session parallel DISPATCH is explicitly out of scope (follow-up).** This PR only guarantees the write rules tolerate concurrent per-project pipelines; it does not add machinery to launch projects in parallel within one session.
+- **Reconcile-ordering rule (concurrent lanes):** when multiple lanes clear Design / STAGE-GATE-1 near-simultaneously and each triggers the on-plan-change reconcile of the narrative sections, the orchestrator serializes the reconcile step itself within the parent session — it performs the read-all-sibling-plans + write-overview as one atomic parent action per lane completion, never overlapping two reconciles. Because the fan-out is driven from the single parent session (not from independent OS processes), the parent naturally serializes its own writes; this rule makes it explicit: **the parent performs at most one `overview.md` read-modify-write at a time, processing lane completions in arrival order.** The per-project delivery Step 11.7 on-completion final-reconcile is unchanged and remains best-effort. These write rules are confirmed to hold under genuine simultaneous writes from concurrent lanes — see `## Parallel Multi-Project Dispatch` for the full parallel dispatch contract.
 
 **Marker: multi-project-initiative-overview**
 
@@ -3656,6 +3656,98 @@ Offer to clean completed worktrees. Do NOT auto-remove failed worktrees — user
 - **On user abort:** clean up worktrees and report partial results
 - **Recovery:** if the dispatcher itself dies, `/th:recover --batch` reads `batch-progress.md` and re-launches
 - **No remote:** delivery creates local branches only. Dispatcher offers merge options at the end
+
+---
+
+## Parallel Multi-Project Dispatch
+
+**Applies only when `initiative != null` AND the eligible set has ≥2 projects.** When `initiative: null` or there is only one project in scope, this section does not apply — the pipeline is byte-identical to today.
+
+**What this feature does.** When a multi-project initiative has 2+ independent, ready projects at the same time, the orchestrator fans out the Stage-2 implement+verify work concurrently — one lane per project — then re-converges for per-project ACCEPTANCE + STAGE-GATE-3 + delivery. It builds directly on PR #283's concurrency-safe `overview.md` write rules (keyed rows + reconcile-in-place last-writer-wins) and reuses the in-message concurrent-Task mechanism already live at Phase 3.
+
+### Concurrency model — fan-out at Stage 2
+
+Each eligible project runs its full Stage 1 independently and serially: Design → plan-review → its OWN STAGE-GATE-1 (one plan at a time, no batched plan cognition). A project becomes fan-out-eligible only after it has cleared its own STAGE-GATE-1 and has ready, independent Stage-2 work.
+
+Once ≥2 projects are eligible and the fan-out confirm gate is approved, the orchestrator **fans out the Stage-2 implement+verify work concurrently** — one lane per project. Each lane is an isolated implement→verify loop dispatched via concurrent `Task` calls in the parent session, exactly the in-message mechanism already live in Phase 3 for a single project's `tester+qa+security` trio. Sibling lanes run simultaneously and independently. No Workflow tool is needed; no nested-dispatch is required — the feature stays entirely within the dev-mode top-level Task-parallelism capability.
+
+The parallel region re-converges at delivery: the orchestrator waits for all lanes to reach the Stage-2 boundary (every PR of each lane verified), then runs per-project ACCEPTANCE and emits a batched STAGE-GATE-3 with per-project ship/amend/abort decisions, followed by per-project delivery.
+
+**Flow at a glance:**
+
+```
+Stage 1 (serial, per-project):
+  project-A:  Design → plan-review → STAGE-GATE-1(A)   ← one plan
+  project-B:  Design → plan-review → STAGE-GATE-1(B)   ← one plan
+  ─────────────────────────────────────────────────────────────────
+  [eligibility test + fan-out confirm gate]
+  ─────────────────────────────────────────────────────────────────
+Stage 2 (FAN-OUT — concurrent lanes, parent session):
+  lane A: implementer(A) → tester+qa+security(A) → [iterate if fail, isolated]
+  lane B: implementer(B) → tester+qa+security(B) → [iterate if fail, isolated]
+  ─────────────────────── barrier (re-convergence) ──────────────────
+Stage 3 (re-converged):
+  per-project ACCEPTANCE → batched STAGE-GATE-3 (per-project ship choice) → per-project delivery
+```
+
+**Concurrency cap.** Reuse `batch_concurrency` (default 5) from `## Pipeline Config` / `## Multi-Task Orchestration`. A fan-out set larger than the cap splits into waves using the same eager slot-fill rule as the worktree batch model.
+
+### Eligibility-detection contract
+
+Run this deterministic test only when `initiative != null` and ≥2 projects exist in the initiative:
+
+1. **Read `overview.md § Projects`** — enumerate candidate projects and their current `Status` (`planning` / `in-progress` / `delivered`).
+2. **Read each candidate project's `00-state.md § Current State`** — extract `status` and `phase`. Exclude any project whose status is `deferred` or `blocked`. Exclude `delivered` projects (done).
+3. **Read `overview.md § Big-Picture Plan`** — apply the independence test:
+   - **A-blocks-B sequencing:** if the Big-Picture Plan declares an ordering (backend ships before frontend; transactions deferred to a later phase; coexistence-window serialization), the blocked project is excluded from the concurrent set — it serializes behind its dependency.
+   - **Shared-contract-in-flux:** if a cross-project shared contract (an API schema, an event shape, a shared type) is still being defined or changed by one project, all projects that consume that contract are excluded until the contract is stable. A contract is "in flux" when the owning project has not yet cleared its STAGE-GATE-1 (the plan that defines the contract is not yet approved).
+4. **Result:** the eligible set is the candidate projects that survive all exclusions AND each have already cleared their own STAGE-GATE-1 (Stage-2 readiness is the fan-out precondition; a project still in Design or awaiting plan approval is not eligible). If the eligible set has <2 members, proceed serially with no fan-out — no behaviour change.
+
+### Fan-out confirm gate (mandatory before any concurrent dispatch)
+
+When the eligible set has ≥2 members, emit this confirmation prompt and WAIT for explicit operator approval. Never auto-fan-out:
+
+```
+========================================
+ Parallel fan-out — confirmation required
+========================================
+ Initiative: {slug}
+ Eligible for concurrent Stage-2 dispatch: {project-A}, {project-B}{, ...}
+   (each has cleared its own STAGE-GATE-1; only the implement+verify work fans out)
+ Excluded (and why): {project-C} (deferred), {project-D} (blocked behind {X} per Big-Picture Plan)
+ Concurrency cap: {N} (batch_concurrency)
+
+ Reply with:
+   - "parallel"        → fan out the eligible set concurrently
+   - "serial"          → run one project at a time (default-safe)
+   - "parallel {subset}" → fan out only the named subset
+========================================
+```
+
+**`--serial` / "one at a time" always wins.** If the operator declared `--serial` (or says "one at a time" / "uno a la vez" / "secuencial") at any point, skip the fan-out confirm gate entirely and run projects sequentially — this declaration is absolute and overrides eligibility.
+
+### Gate semantics with N concurrent projects
+
+- **STAGE-GATE-1:** stays **per-project, always serial**. Each project clears its own Design → plan-review → STAGE-GATE-1 before it becomes eligible. The operator reviews one plan at a time; STAGE-GATE-1 is never batched across projects.
+- **ACCEPTANCE (the Stage-2 internal acceptance gate, per-PR Phase 3.5/3.6):** within each lane, acceptance is per-PR exactly as today. The batched lane-level report surfaces only at the fan-out re-convergence: the orchestrator waits for all lanes to reach the Stage-2 boundary (all PRs of each lane verified), then reports a single consolidated status listing each lane's verdict.
+- **STAGE-GATE-3 (delivery): batched at re-convergence.** The orchestrator waits for all lanes to complete Stage 2, then emits ONE STAGE-GATE-3 block listing every project's PR ready to ship, with a per-project ship/amend/abort choice. This mirrors the existing per-round STAGE-GATE-2 batching rule. Delivery then runs per-project.
+- **One lane's fail/iteration does NOT block sibling lanes.** A lane that fails verify enters its own implementer↔verify iteration loop (counts toward that lane's own max-3 budget). Sibling lanes continue. At the batched re-convergence report, a failing lane is shown as `iterating` or `blocked`; passing lanes are shown ready. The operator can ship passing lanes and let the failing lane continue (the batched STAGE-GATE-3 offers per-project decisions). Failure isolation is a hard property of the design.
+
+### Safety floors
+
+- **Security unchanged.** Per-project security gates run exactly as today within each lane (Phase 3 security agent when `security-sensitive: true` or for `type: fix/hotfix` Tier 3+). Fan-out does not waive, batch, or weaken any security gate — each lane runs its own.
+- **Never parallelize across an in-flux shared contract.** Hard exclusion in the eligibility test: a project whose consumed cross-project contract is not yet stable is excluded from the concurrent set.
+- **Operator can always force serial.** `--serial` / "one at a time" bypasses the fan-out confirm gate and runs sequentially. The fan-out is opt-in and confirmed; it is never automatic.
+- **Backward-compat floor.** All new behaviour is gated on `initiative != null` AND explicit fan-out confirmation. With `initiative: null` (single-project) or no confirmation, the pipeline path is byte-identical to today.
+
+### Observability under concurrent projects
+
+- **Per-project `00-execution-events`:** each project keeps its own `{project}/00-execution-events.md` (or `.jsonl` in local mode) exactly as today. Concurrent lanes write to different files — no contention. This is mandatory and unchanged.
+- **Initiative-level trace (additive):** fan-out lifecycle events are written to an initiative-level `00-execution-events` file at the initiative folder root (`{YYYY-MM-DD}_{initiative}/00-execution-events.md`, or `.jsonl` in local mode). This file is additive — it does not replace the per-project traces. Events emitted: `fanout.start` (initiative slug + eligible set), `fanout.lane.start` (project key), `fanout.lane.end` (project key + status), `fanout.converge` (all lanes complete). Each event carries a `project` key so `/trace` can group by lane.
+- **`/th:pipelines` representation:** when an initiative has a live fan-out, `/th:pipelines` shows the initiative as a parent row with each concurrent project as a child lane row (Stage / Phase columns per lane), reusing the existing Stage/Phase surfacing exception for `/th:pipelines` and `/trace`.
+- **`/trace` representation:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end) and can drill into any lane's per-project trace. The `--cost` rollup sums across lanes for an initiative-level cost figure.
+
+**Marker: parallel-multi-project-dispatch**
 
 ---
 

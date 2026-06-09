@@ -15569,23 +15569,26 @@ check(
     "docs/observability.md must state overview.md is NOT an events file",
 )
 check(
-    "suite68(ac11f): CLAUDE.md §3 current-version reads 2.60.0",
-    "2.60.0" in _s68_claude,
-    "CLAUDE.md §3 current-version line must read 2.60.0 (minor bump from 2.59.0)",
+    "suite68(ac11f): CLAUDE.md §3 current-version is 2.60.0 or later",
+    # v2.60.0 was the initial version for this feature; v2.61.0 advances it further (parallel dispatch)
+    "2.60." in _s68_claude or "2.61." in _s68_claude or "2.6" in _s68_claude,
+    "CLAUDE.md §3 current-version must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
 
 # AC-12: plugin.json + marketplace.json version + changelog fragment + Suite 68 self-ref + CLAUDE.md hygiene
 _s68_plugin = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
 _s68_marketplace = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
 check(
-    "suite68(ac12a): .claude-plugin/plugin.json version is 2.60.0",
-    '"2.60.0"' in _s68_plugin,
-    ".claude-plugin/plugin.json version field must be 2.60.0 (minor bump from 2.59.0)",
+    "suite68(ac12a): .claude-plugin/plugin.json version is 2.60.0 or later",
+    # v2.60.0 was the initial version for this feature; v2.61.0 advances it further (parallel dispatch)
+    '"2.60.' in _s68_plugin or '"2.61.' in _s68_plugin,
+    ".claude-plugin/plugin.json version field must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
 check(
-    "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.60.0",
-    '"2.60.0"' in _s68_marketplace,
-    ".claude-plugin/marketplace.json plugins[0].version must be 2.60.0 (minor bump from 2.59.0)",
+    "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.60.0 or later",
+    # v2.60.0 was the initial version for this feature; v2.61.0 advances it further (parallel dispatch)
+    '"2.60.' in _s68_marketplace or '"2.61.' in _s68_marketplace,
+    ".claude-plugin/marketplace.json plugins[0].version must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
 _s68_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
@@ -15699,11 +15702,303 @@ check(
     "orchestrator.md no-fork invariant must state reconcile-in-place by re-reading all plans, last-writer-wins on a true race",
 )
 check(
-    "suite68(ac13g-parallel-dispatch-oos): no-fork invariant states single-session parallel dispatch is out of scope (follow-up)",
-    ("out of scope" in _s68_nofork_slice or "out-of-scope" in _s68_nofork_slice or "OUT of scope" in _s68_nofork_slice)
-    and ("parallel" in _s68_nofork_slice or "dispatch" in _s68_nofork_slice),
-    "orchestrator.md no-fork invariant must state that first-class single-session parallel dispatch is explicitly out of scope (follow-up)",
+    "suite68(ac13g-parallel-dispatch-oos): no-fork invariant no longer states single-session parallel dispatch is out of scope (superseded by v2.61.0 reconcile-ordering rule)",
+    # v2.61.0: the out-of-scope placeholder was replaced by the reconcile-ordering rule.
+    # The nofork slice must NOT contain the old "out of scope (follow-up)" text; it MUST
+    # contain the reconcile-ordering rule or a reference to the parallel dispatch contract.
+    ("out of scope (follow-up)" not in _s68_nofork_slice and "out-of-scope (follow-up)" not in _s68_nofork_slice)
+    and ("reconcile" in _s68_nofork_slice or "Parallel Multi-Project Dispatch" in _s68_nofork_slice or "parallel dispatch" in _s68_nofork_slice),
+    "orchestrator.md no-fork invariant must no longer contain 'out of scope (follow-up)'; it must contain the reconcile-ordering rule or reference to ## Parallel Multi-Project Dispatch (v2.61.0 supersedes this placeholder)",
 )
+
+# ---------------------------------------------------------------------------
+# Suite 69: parallel-multi-project-dispatch (v2.61.0)
+# ---------------------------------------------------------------------------
+print("=== Suite 69: parallel-multi-project-dispatch (v2.61.0) ===")
+
+_s69_orch = read(AGENTS_DIR / "orchestrator.md")
+_s69_delivery = read(AGENTS_DIR / "delivery.md")
+_s69_claude = read(REPO_ROOT / "CLAUDE.md")
+_s69_observability = read(REPO_ROOT / "docs" / "observability.md")
+_s69_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s69_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s69_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+# Top-level section stop: stop only at next ## heading or --- (not ### — subsections are inside the section)
+_S69_TOP_STOP = ("\n## Special Flows", "\n## Phase Checkpointing", "\n## Multi-Task Orchestration")
+# Subsection stop: stop at next ### or ## heading or ---
+_S69_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# AC-1: orchestrator.md contains '## Parallel Multi-Project Dispatch' section
+# Use a newline-prefixed anchor so we match the heading, not an inline code reference
+# Capture the ENTIRE section (all subsections) by stopping only at the next ## heading
+_s69_fanout_slice = _slice_section(_s69_orch, "\n## Parallel Multi-Project Dispatch", _S69_TOP_STOP)
+check(
+    "suite69(ac1-section-exists): orchestrator.md contains '## Parallel Multi-Project Dispatch' section",
+    "\n## Parallel Multi-Project Dispatch" in _s69_orch,
+    "orchestrator.md must contain a '## Parallel Multi-Project Dispatch' section",
+)
+# fan-out at Stage 2: per-project Stage 1 serial + concurrent Stage-2 lanes + re-convergence
+check(
+    "suite69(ac1-stage1-serial): fan-out section states Stage 1 runs serially per-project",
+    "Stage 1" in _s69_fanout_slice and ("serial" in _s69_fanout_slice or "independently" in _s69_fanout_slice),
+    "orchestrator.md ## Parallel Multi-Project Dispatch must state Stage 1 runs serially/independently per-project",
+)
+check(
+    "suite69(ac1-stage2-concurrent): fan-out section states Stage-2 implement+verify work fans out concurrently",
+    ("Stage-2" in _s69_fanout_slice or "Stage 2" in _s69_fanout_slice) and ("concurrent" in _s69_fanout_slice or "fans out" in _s69_fanout_slice),
+    "orchestrator.md ## Parallel Multi-Project Dispatch must state Stage-2 implement+verify fans out concurrently",
+)
+check(
+    "suite69(ac1-reconverge): fan-out section states re-convergence for ACCEPTANCE+STAGE-GATE-3+delivery",
+    "re-convergence" in _s69_fanout_slice or "re-converge" in _s69_fanout_slice or "converge" in _s69_fanout_slice,
+    "orchestrator.md ## Parallel Multi-Project Dispatch must state re-convergence for per-project ACCEPTANCE/STAGE-GATE-3/delivery",
+)
+
+# AC-2: in-message concurrent-Task mechanism referenced; no Workflow tool; no nested-dispatch
+check(
+    "suite69(ac2-task-mechanism): fan-out section references in-message concurrent-Task mechanism",
+    "concurrent" in _s69_fanout_slice and "Task" in _s69_fanout_slice,
+    "orchestrator.md ## Parallel Multi-Project Dispatch must reference the in-message concurrent-Task mechanism",
+)
+check(
+    "suite69(ac2-no-workflow): fan-out section states no Workflow tool required",
+    ("Workflow" in _s69_fanout_slice or "workflow" in _s69_fanout_slice) and ("No Workflow" in _s69_fanout_slice or "no Workflow" in _s69_fanout_slice or "not needed" in _s69_fanout_slice or "not required" in _s69_fanout_slice),
+    "orchestrator.md ## Parallel Multi-Project Dispatch must state no Workflow tool is required",
+)
+check(
+    "suite69(ac2-no-nested-dispatch): fan-out section states no nested-dispatch required",
+    "nested" in _s69_fanout_slice and ("no nested" in _s69_fanout_slice or "No nested" in _s69_fanout_slice or "not required" in _s69_fanout_slice),
+    "orchestrator.md ## Parallel Multi-Project Dispatch must state no nested-dispatch is required",
+)
+
+# AC-3: eligibility-detection contract documented
+_s69_elig_slice = _slice_section(_s69_orch, "### Eligibility-detection contract", _S69_STOP)
+check(
+    "suite69(ac3-eligibility-section): eligibility-detection contract section exists",
+    len(_s69_elig_slice) > 0,
+    "orchestrator.md must contain '### Eligibility-detection contract' section",
+)
+check(
+    "suite69(ac3-deferred): eligibility contract excludes 'deferred' projects",
+    "deferred" in _s69_elig_slice,
+    "orchestrator.md eligibility contract must exclude deferred projects",
+)
+check(
+    "suite69(ac3-blocked): eligibility contract excludes 'blocked' projects",
+    "blocked" in _s69_elig_slice,
+    "orchestrator.md eligibility contract must exclude blocked projects",
+)
+check(
+    "suite69(ac3-delivered): eligibility contract excludes 'delivered' projects",
+    "delivered" in _s69_elig_slice,
+    "orchestrator.md eligibility contract must exclude delivered projects",
+)
+check(
+    "suite69(ac3-a-blocks-b): eligibility contract excludes A-blocks-B sequencing",
+    "A-blocks-B" in _s69_elig_slice or "a-blocks-b" in _s69_elig_slice.lower() or "A blocks B" in _s69_elig_slice,
+    "orchestrator.md eligibility contract must exclude A-blocks-B sequenced projects",
+)
+check(
+    "suite69(ac3-contract-in-flux): eligibility contract excludes shared-contract-in-flux pairs",
+    "in-flux" in _s69_elig_slice or "in flux" in _s69_elig_slice or "contract" in _s69_elig_slice,
+    "orchestrator.md eligibility contract must exclude shared-contract-in-flux pairs",
+)
+
+# AC-4: fan-out confirm gate documented + --serial-always-wins
+_s69_gate_slice = _slice_section(_s69_orch, "### Fan-out confirm gate", _S69_STOP)
+check(
+    "suite69(ac4-gate-section): fan-out confirm gate section exists",
+    len(_s69_gate_slice) > 0,
+    "orchestrator.md must contain '### Fan-out confirm gate' section",
+)
+check(
+    "suite69(ac4-wait): fan-out confirm gate states WAIT for operator approval",
+    "WAIT" in _s69_gate_slice or "explicit operator approval" in _s69_gate_slice or "wait" in _s69_gate_slice.lower(),
+    "orchestrator.md fan-out confirm gate must state WAIT for explicit operator approval",
+)
+check(
+    "suite69(ac4-serial-choice): fan-out confirm gate lists 'serial' as a choice",
+    '"serial"' in _s69_gate_slice or "'serial'" in _s69_gate_slice or "serial" in _s69_gate_slice,
+    "orchestrator.md fan-out confirm gate must list 'serial' as a reply choice",
+)
+check(
+    "suite69(ac4-serial-wins): --serial / one-at-a-time always wins and bypasses gate",
+    ("--serial" in _s69_gate_slice or "serial" in _s69_gate_slice) and ("always wins" in _s69_gate_slice or "absolute" in _s69_gate_slice or "overrides" in _s69_gate_slice),
+    "orchestrator.md must state --serial / 'one at a time' always wins and bypasses the fan-out gate",
+)
+
+# AC-5: gate semantics with N concurrent projects
+_s69_gate_sem_slice = _slice_section(_s69_orch, "### Gate semantics with N concurrent projects", _S69_STOP)
+check(
+    "suite69(ac5-gate-semantics-section): gate semantics section exists",
+    len(_s69_gate_sem_slice) > 0,
+    "orchestrator.md must contain '### Gate semantics with N concurrent projects' section",
+)
+check(
+    "suite69(ac5-sg1-per-project): STAGE-GATE-1 stays per-project and serial",
+    "STAGE-GATE-1" in _s69_gate_sem_slice and ("per-project" in _s69_gate_sem_slice or "per project" in _s69_gate_sem_slice) and ("serial" in _s69_gate_sem_slice or "never batched" in _s69_gate_sem_slice),
+    "orchestrator.md gate semantics must state STAGE-GATE-1 stays per-project and serial (never batched across projects)",
+)
+check(
+    "suite69(ac5-sg3-batched): STAGE-GATE-3 batched at re-convergence",
+    "STAGE-GATE-3" in _s69_gate_sem_slice and ("batched" in _s69_gate_sem_slice or "re-convergence" in _s69_gate_sem_slice),
+    "orchestrator.md gate semantics must state STAGE-GATE-3 is batched at re-convergence",
+)
+check(
+    "suite69(ac5-per-project-delivery): per-project delivery after batched STAGE-GATE-3",
+    "per-project" in _s69_gate_sem_slice and "delivery" in _s69_gate_sem_slice,
+    "orchestrator.md gate semantics must state per-project delivery after the batched STAGE-GATE-3",
+)
+check(
+    "suite69(ac5-failure-isolation): one lane fail does not block sibling lanes",
+    ("does NOT block" in _s69_gate_sem_slice or "does not block" in _s69_gate_sem_slice.lower() or "isolated" in _s69_gate_sem_slice or "isolation" in _s69_gate_sem_slice),
+    "orchestrator.md gate semantics must state one lane's fail/iteration does not block sibling lanes (failure isolation)",
+)
+
+# AC-6: reconcile-ordering rule replaced the out-of-scope line in overview.md Template
+_s69_nofork_slice = _slice_section(_s69_orch, "### No-fork", _S69_STOP)
+check(
+    "suite69(ac6-oos-line-gone): out-of-scope line no longer present in no-fork invariant",
+    "out of scope (follow-up)" not in _s69_nofork_slice and "out-of-scope (follow-up)" not in _s69_nofork_slice,
+    "orchestrator.md no-fork invariant must no longer contain the 'out of scope (follow-up)' line — it has been superseded by the reconcile-ordering rule",
+)
+check(
+    "suite69(ac6-reconcile-ordering): reconcile-ordering rule present in no-fork invariant",
+    "reconcile-ordering" in _s69_nofork_slice or "at most one" in _s69_nofork_slice or "arrival order" in _s69_nofork_slice,
+    "orchestrator.md no-fork invariant must contain the reconcile-ordering rule (parent performs at most one overview read-modify-write at a time, arrival order)",
+)
+check(
+    "suite69(ac6-keyed-rows-confirmed): keyed-row rule confirmed present (no regression)",
+    "one-per-project" in _s69_nofork_slice or ("keyed" in _s69_nofork_slice and "project" in _s69_nofork_slice),
+    "orchestrator.md no-fork invariant must still state per-project rows are keyed one-per-project (no regression)",
+)
+check(
+    "suite69(ac6-last-writer-wins-confirmed): last-writer-wins rule confirmed present (no regression)",
+    "last-writer" in _s69_nofork_slice or "last writer" in _s69_nofork_slice,
+    "orchestrator.md no-fork invariant must still state last-writer-wins on a true race (no regression)",
+)
+
+# AC-7: observability — per-project traces unchanged + initiative-level fan-out trace
+_s69_obs_fanout_slice = _slice_section(_s69_observability, "## Initiative-level fan-out trace", _S69_STOP)
+check(
+    "suite69(ac7-obs-section): docs/observability.md contains initiative-level fan-out trace section",
+    len(_s69_obs_fanout_slice) > 0,
+    "docs/observability.md must contain '## Initiative-level fan-out trace' section",
+)
+check(
+    "suite69(ac7-fanout-start): fanout.start event documented in observability",
+    "fanout.start" in _s69_obs_fanout_slice or "fanout.start" in _s69_observability,
+    "docs/observability.md must document the fanout.start event",
+)
+check(
+    "suite69(ac7-lane-start): fanout.lane.start event documented in observability",
+    "fanout.lane.start" in _s69_obs_fanout_slice or "lane.start" in _s69_obs_fanout_slice,
+    "docs/observability.md must document the fanout.lane.start event",
+)
+check(
+    "suite69(ac7-lane-end): fanout.lane.end event documented in observability",
+    "fanout.lane.end" in _s69_obs_fanout_slice or "lane.end" in _s69_obs_fanout_slice,
+    "docs/observability.md must document the fanout.lane.end event",
+)
+check(
+    "suite69(ac7-converge): fanout.converge event documented in observability",
+    "fanout.converge" in _s69_obs_fanout_slice or "converge" in _s69_obs_fanout_slice,
+    "docs/observability.md must document the fanout.converge event",
+)
+check(
+    "suite69(ac7-project-key): each fan-out event carries a 'project' key",
+    "project" in _s69_obs_fanout_slice and "key" in _s69_obs_fanout_slice,
+    "docs/observability.md must state each fan-out event carries a 'project' key",
+)
+check(
+    "suite69(ac7-pipelines-rendering): /th:pipelines parent-with-lane-children representation documented",
+    "pipelines" in _s69_obs_fanout_slice or "/th:pipelines" in _s69_obs_fanout_slice,
+    "docs/observability.md must document the /th:pipelines parent-with-lane-children rendering",
+)
+check(
+    "suite69(ac7-orch-obs): orchestrator.md fan-out section documents observability",
+    "Observability" in _s69_fanout_slice or "observability" in _s69_fanout_slice or "00-execution-events" in _s69_fanout_slice,
+    "orchestrator.md ## Parallel Multi-Project Dispatch must document the observability surface",
+)
+
+# AC-8: backward-compatibility floor + safety floors
+_s69_safety_slice = _slice_section(_s69_orch, "### Safety floors", _S69_STOP)
+check(
+    "suite69(ac8-safety-section): safety floors section exists",
+    len(_s69_safety_slice) > 0,
+    "orchestrator.md must contain '### Safety floors' section under ## Parallel Multi-Project Dispatch",
+)
+check(
+    "suite69(ac8-initiative-null-gate): backward-compat floor: all new behaviour gated on initiative != null",
+    "initiative != null" in _s69_fanout_slice or "initiative: null" in _s69_fanout_slice or "initiative == null" in _s69_fanout_slice or "initiative: null" in _s69_safety_slice,
+    "orchestrator.md must state all new behaviour is gated on initiative != null (backward-compat floor)",
+)
+check(
+    "suite69(ac8-serial-floor): safety floors state --serial always wins",
+    "--serial" in _s69_safety_slice or "serial" in _s69_safety_slice,
+    "orchestrator.md safety floors must state --serial always wins (operator can force serial)",
+)
+check(
+    "suite69(ac8-security-unchanged): safety floors state security per-lane unchanged",
+    "security" in _s69_safety_slice and ("unchanged" in _s69_safety_slice or "per-lane" in _s69_safety_slice or "each lane" in _s69_safety_slice),
+    "orchestrator.md safety floors must state security gates run per-lane unchanged",
+)
+check(
+    "suite69(ac8-in-flux-exclusion): safety floors state never parallelize across in-flux shared contract",
+    "in-flux" in _s69_safety_slice or "in flux" in _s69_safety_slice or "shared contract" in _s69_safety_slice,
+    "orchestrator.md safety floors must state never parallelize across an in-flux shared contract",
+)
+
+# AC-9: packaging complete
+check(
+    "suite69(ac9-plugin-json): plugin.json version is 2.61.0",
+    '"version": "2.61.0"' in _s69_plugin_json,
+    "plugin.json version must be 2.61.0",
+)
+check(
+    "suite69(ac9-marketplace-json): marketplace.json plugins[0].version is 2.61.0",
+    '"version": "2.61.0"' in _s69_marketplace_json,
+    "marketplace.json plugins[0].version must be 2.61.0",
+)
+check(
+    "suite69(ac9-claude-version): CLAUDE.md §3 version is 2.61.0",
+    "2.61.0" in _s69_claude,
+    "CLAUDE.md §3 must show version 2.61.0",
+)
+check(
+    "suite69(ac9-claude-bullet): CLAUDE.md §5 contains parallel dispatch bullet",
+    "Parallel Multi-Project Dispatch" in _s69_claude or "parallel multi-project dispatch" in _s69_claude.lower() or "parallel" in _s69_claude and "fan-out" in _s69_claude,
+    "CLAUDE.md §5 must contain a bullet referencing the parallel multi-project dispatch contract",
+)
+_s69_changelog_path = REPO_ROOT / "changelog.d" / "parallel-multi-project-dispatch.md"
+check(
+    "suite69(ac9-changelog-fragment): changelog.d/parallel-multi-project-dispatch.md exists",
+    _s69_changelog_path.exists(),
+    "changelog.d/parallel-multi-project-dispatch.md must exist with a ### Added entry",
+)
+check(
+    "suite69(ac9-changelog-added): changelog fragment contains ### Added entry",
+    "### Added" in _s69_changelog_path.read_text(encoding="utf-8") if _s69_changelog_path.exists() else False,
+    "changelog.d/parallel-multi-project-dispatch.md must contain a ### Added subsection",
+)
+_s69_this_file = read(Path(__file__))
+check(
+    "suite69(ac9-self-ref): this test file contains 'Suite 69', '_slice_section', and 'parallel-multi-project-dispatch'",
+    "Suite 69" in _s69_this_file and "_slice_section" in _s69_this_file and "parallel-multi-project-dispatch" in _s69_this_file,
+    "test file must contain 'Suite 69', '_slice_section', and 'parallel-multi-project-dispatch'",
+)
+check(
+    "suite69(ac9-registry): docs/testing.md registers Suite 69 and parallel-multi-project-dispatch",
+    "Suite 69" in _s69_testing_md and "parallel-multi-project-dispatch" in _s69_testing_md,
+    "docs/testing.md must register Suite 69 and the 'parallel-multi-project-dispatch' marker",
+)
+check(
+    "suite69(ac9-hygiene): CLAUDE.md does NOT contain 'Suite 69'",
+    "Suite 69" not in _s69_claude,
+    "CLAUDE.md §11 must not mention Suite 69 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: parallel-multi-project-dispatch
 
 # ---------------------------------------------------------------------------
 # Summary

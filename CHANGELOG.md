@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.61.0] - 2026-06-08
+
+### Added
+- First-class parallel multi-project dispatch: the orchestrator fans out Stage-2 implement+verify lanes concurrently for initiatives with ≥2 independent, eligible projects (each past its own STAGE-GATE-1), reusing the in-message concurrent-Task mechanism already live at Phase 3; fan-out is opt-in and operator-confirmed (`--serial` always wins); safety floors, failure isolation, and backward-compat (`initiative: null` unchanged) are enforced; initiative-level fan-out trace (`fanout.start`/`lane.start`/`lane.end`/`fanout.converge`) is additive to per-project traces; `overview.md` reconcile-ordering rule added to orchestrator.md replacing the prior out-of-scope placeholder.
+
 ## [2.60.0] - 2026-06-08
 
 ### Fixed
