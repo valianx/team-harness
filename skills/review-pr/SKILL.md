@@ -93,6 +93,41 @@ name: review-pr
    ```
    Pass `workspaces_PATH` to qa when dispatched.
 
+9. **Fetch PR conversation as review context** (best-effort INPUT step — never blocks the review).
+
+   **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read PR comments". Run the probe (already set in step 2). Collect issue-level comments and line-level review comments separately:
+
+   ```bash
+   pr_comments=""
+   if [ "$has_gh" = "true" ]; then
+     issue_comments=$(gh pr view {number} --comments --json comments -q '.comments[] | "[\(.author.login)] \(.body)"' 2>/dev/null || true)
+     line_comments=$(gh api repos/{owner}/{repo}/pulls/{number}/comments --jq '.[] | "[line:\(.path):\(.line // "??")] \(.user.login): \(.body)"' 2>/dev/null || true)
+     pr_comments="${issue_comments}"$'\n'"${line_comments}"
+   elif [ "$is_github" = "true" ]; then
+     auth_header=""
+     token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+     [ -n "$token" ] && auth_header="-H \"Authorization: Bearer $token\""
+     issue_comments=$(curl -sf $auth_header \
+       -H "Accept: application/vnd.github+json" \
+       "https://api.github.com/repos/{owner}/{repo}/issues/{number}/comments?per_page=100" \
+       2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(f'[{c[\"user\"][\"login\"]}] {c[\"body\"]}' for c in d))" 2>/dev/null || true)
+     line_comments=$(curl -sf $auth_header \
+       -H "Accept: application/vnd.github+json" \
+       "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/comments?per_page=100" \
+       2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('\n'.join(f'[line:{c[\"path\"]}:{c.get(\"line\",\"??\")}] {c[\"user\"][\"login\"]}: {c[\"body\"]}' for c in d))" 2>/dev/null || true)
+     pr_comments="${issue_comments}"$'\n'"${line_comments}"
+   fi
+
+   # Degrade gracefully when gh/token unavailable
+   if [ -z "$pr_comments" ]; then
+     echo "Comments not fetched — gh unavailable. Review proceeds without prior conversation context."
+     pr_comments="(none — comments not fetched: gh unavailable)"
+   fi
+   ```
+
+   Truncate if the combined output exceeds ~200 lines: keep most recent 100 lines with a truncation note prepended.
+   Store result in `$pr_comments` and pass it to Phase 3 dispatcher as the `PR Comments:` field.
+
 ### Step 1.4 — Auto-suggest multi-reviewer for large PRs (no cost warning per operator policy)
 
 After step 8, compute diff size:
@@ -232,6 +267,7 @@ Dispatch review agents based on tier classification. ALL Bash happens in the mai
    - workspaces path: {workspaces_PATH or "none"}
    - Draft Output: .claude/pr-review-draft-{focus}.md
    - Inline Output: .claude/pr-review-inline-{focus}.json
+   - PR Comments: {$pr_comments from step 9 — same value as single-reviewer path}
    - {... same PR fields as single-reviewer ...}
    ```
    Dispatches run **in parallel** (same pattern as Phase 3 tester+qa+security parallel). Wait for all to complete.
@@ -301,6 +337,7 @@ For Tier 3 / 4: dispatch reviewer, qa (if `has_workspaces=true`), and security i
      {diff output from step 5}
    - Has Policy: {true if .team-harness/review-policy.md was found in Step 1.5, else false}
    - Review Policy: {verbatim content of .team-harness/review-policy.md, or omit field when has_policy=false}
+   - PR Comments: {$pr_comments from step 9 — issue-level + line-level combined; "(none — comments not fetched: gh unavailable)" when fetch failed}
    - Worktree: {WORKTREE}
    - workspaces path: {workspaces_PATH or "none"}
    ```
