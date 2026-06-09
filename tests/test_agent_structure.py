@@ -15645,14 +15645,15 @@ _s68_plugin = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
 _s68_marketplace = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
 check(
     "suite68(ac12a): .claude-plugin/plugin.json version is 2.60.0 or later",
-    # v2.60.0 was the initial version for this feature; v2.61.0 advances it further (parallel dispatch)
-    '"2.60.' in _s68_plugin or '"2.61.' in _s68_plugin,
+    # v2.60.0 was the initial version for this feature; v2.61.0 advances it (parallel dispatch);
+    # v2.62.0 advances it further (milestone-build continuity). Use tuple comparison for forward compat.
+    _s59_ver_tuple(json.loads(_s68_plugin).get("version", "0.0.0")) >= (2, 60, 0),
     ".claude-plugin/plugin.json version field must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
 check(
     "suite68(ac12b): .claude-plugin/marketplace.json plugins[0].version is 2.60.0 or later",
-    # v2.60.0 was the initial version for this feature; v2.61.0 advances it further (parallel dispatch)
-    '"2.60.' in _s68_marketplace or '"2.61.' in _s68_marketplace,
+    # Same floor as ac12a — forward-compatible tuple comparison.
+    _s59_ver_tuple(json.loads(_s68_marketplace).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 60, 0),
     ".claude-plugin/marketplace.json plugins[0].version must be 2.60.0 or later (minor bump from 2.59.0 for initiative layer)",
 )
 _s68_changelog = read(REPO_ROOT / "CHANGELOG.md")
@@ -16015,20 +16016,22 @@ check(
 )
 
 # AC-9: packaging complete
+# v2.61.0 was the initial deployment of parallel multi-project dispatch; forward-compatible
+# floor check so future version bumps (e.g. v2.62.0) continue to satisfy this guard.
 check(
     "suite69(ac9-plugin-json): plugin.json version is 2.61.0",
-    '"version": "2.61.0"' in _s69_plugin_json,
-    "plugin.json version must be 2.61.0",
+    _s59_ver_tuple(json.loads(_s69_plugin_json).get("version", "0.0.0")) >= (2, 61, 0),
+    "plugin.json version must be 2.61.0 or later",
 )
 check(
     "suite69(ac9-marketplace-json): marketplace.json plugins[0].version is 2.61.0",
-    '"version": "2.61.0"' in _s69_marketplace_json,
-    "marketplace.json plugins[0].version must be 2.61.0",
+    _s59_ver_tuple(json.loads(_s69_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 61, 0),
+    "marketplace.json plugins[0].version must be 2.61.0 or later",
 )
 check(
     "suite69(ac9-claude-version): CLAUDE.md §3 version is 2.61.0",
-    "2.61.0" in _s69_claude,
-    "CLAUDE.md §3 must show version 2.61.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s69_claude)) >= (2, 61, 0),
+    "CLAUDE.md §3 must show version 2.61.0 or later",
 )
 check(
     "suite69(ac9-claude-bullet): CLAUDE.md §5 contains parallel dispatch bullet",
@@ -16066,6 +16069,269 @@ check(
 )
 
 # Marker: parallel-multi-project-dispatch
+
+# ---------------------------------------------------------------------------
+# Suite 70 — fix-plan-execution-workspace-continuity (v2.62.0)
+# ---------------------------------------------------------------------------
+# Regression tests for three defects fixed in this PR:
+#
+#   Defect A — workspace fragmentation: milestone execution mints a new top-level
+#              workspace sibling instead of continuing inside the plan's workspace.
+#   Defect C — date-source ambiguity: workspace path uses an unpinned "today's
+#              date" (local) and resume/continue globs the EXACT date, so a
+#              midnight rollover or local/UTC mismatch forks a new workspace.
+#   Defect B — disambiguation (no mass-rename): 01-planning.md (planning-mode
+#              batch) and 01-plan.md (design/milestone build) are distinct and
+#              BOTH must be documented; mass-rename would regress the distinction.
+#
+# Group (a): UTC pin — FAIL pre-fix (no UTC wording at workspace-root definition)
+# Group (b): identity-keyed date-agnostic resume — FAIL pre-fix (exact-date glob)
+# Group (c): milestone-continuity contract — FAIL pre-fix (not documented)
+# Group (d): backward-compat negative assertion — FAIL pre-fix (guard absent)
+# Group (e): self-ref / registry — FAIL pre-fix (suite not yet registered)
+# Group (f): packaging — FAIL pre-fix (version still 2.61.0)
+#
+# All content checks use the anchor-scoped _slice_section idiom:
+#   missing anchor → empty slice → check fails (no false-green).
+#
+# Written FAILING-FIRST in Phase 2.0 (2026-06-08).
+# Passes after the implementer lands all changes listed in 01-plan.md Work Plan.
+# Marker: fix-plan-execution-workspace-continuity
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 70: fix-plan-execution-workspace-continuity (v2.62.0) ===")
+
+_s70_orch = read(AGENTS_DIR / "orchestrator.md")
+_s70_flows = read(AGENTS_DIR / "ref-special-flows.md")
+_s70_claude = read(REPO_ROOT / "CLAUDE.md")
+_s70_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s70_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s70_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# Stop-marker tuples for _slice_section — stop at next ## or ### heading or ---
+_S70_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ---------------------------------------------------------------------------
+# Group (a) — UTC pin
+#
+# orchestrator.md Step 0 workspace-root definition must explicitly pin the
+# {YYYY-MM-DD} date to UTC and state the prefix is cosmetic/display-only and
+# ignored when matching.  Currently says "today's date in ISO format" with no
+# UTC pin → all three assertions FAIL pre-fix.
+# ---------------------------------------------------------------------------
+
+# Slice the "Step 0 — workspaces base path" paragraph — the UTC wording should
+# appear at or near the workspace-root definition.
+_s70_step0_slice = _slice_section(
+    _s70_orch,
+    "Step 0 — workspaces base path",
+    _S70_STOP,
+)
+check(
+    "suite70(a1-utc-pin): orchestrator.md workspace-root definition pins the date prefix to UTC",
+    "UTC" in _s70_step0_slice,
+    "orchestrator.md Step 0 must explicitly reference UTC when defining the {YYYY-MM-DD} date prefix "
+    "(currently says 'today's date in ISO format' with no UTC pin — Defect C date-source ambiguity)",
+)
+check(
+    "suite70(a2-cosmetic): orchestrator.md workspace-root definition states the date prefix is cosmetic/display-only",
+    "cosmetic" in _s70_step0_slice or "display-only" in _s70_step0_slice,
+    "orchestrator.md Step 0 must state the {YYYY-MM-DD} prefix is cosmetic/display-only "
+    "(prefix must never be used as a match key — Defect C governing invariant)",
+)
+check(
+    "suite70(a3-ignored-when-matching): orchestrator.md workspace-root definition states the prefix is ignored when matching",
+    "ignored when matching" in _s70_step0_slice or "ignored for matching" in _s70_step0_slice
+    or ("ignored" in _s70_step0_slice and "matching" in _s70_step0_slice),
+    "orchestrator.md Step 0 must state the date prefix is ignored when matching "
+    "(identity-over-date invariant — Defect C fix)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (b) — identity-keyed date-agnostic resume
+#
+# orchestrator.md "At task start" resume rule must use *_{feature-name} glob +
+# frontmatter feature: confirm, mirroring the initiative JOIN at ~:818-824.
+# Currently uses the EXACT {YYYY-MM-DD}_{feature-name} glob → both assertions
+# FAIL pre-fix.
+# ---------------------------------------------------------------------------
+
+# Slice the "At task start" paragraph, which starts after the Step 0 paragraph.
+_s70_atstart_slice = _slice_section(
+    _s70_orch,
+    "At task start",
+    _S70_STOP,
+)
+check(
+    "suite70(b1-glob-date-agnostic): orchestrator.md 'At task start' resume uses date-agnostic glob '*_{feature-name}'",
+    "*_{feature-name}" in _s70_atstart_slice or "*_{feature" in _s70_atstart_slice,
+    "orchestrator.md 'At task start' must replace the exact-date glob with a date-agnostic "
+    "'*_{feature-name}' wildcard glob (Defect C: day-rollover / local-UTC mismatch fix)",
+)
+check(
+    "suite70(b2-frontmatter-confirm): orchestrator.md 'At task start' resume uses frontmatter 'feature:' confirm",
+    "feature:" in _s70_atstart_slice and ("confirm" in _s70_atstart_slice or "frontmatter" in _s70_atstart_slice),
+    "orchestrator.md 'At task start' must add a frontmatter 'feature:' confirm step after the glob "
+    "(mirrors the initiative JOIN at :818-824 — Defect C fix)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (c) — milestone-continuity contract
+#
+# ref-special-flows.md must document:
+#   (c1) the single-repo milestone-build flow — one plan workspace = home;
+#        milestones nest as child steps; build-level milestone index; detect-and-
+#        continue by identity
+#   (c2) the milestone-build plan artifact is 01-plan.md (not 01-planning.md)
+#   (c3) 01-planning.md (planning-mode batch) is PRESERVED — disambiguate only,
+#        no mass-rename; the distinction table is intact
+#   (c4) orchestrator.md Step 1d milestone detect-and-continue by identity
+#   (c5) orchestrator.md build-level milestone index template (one row per
+#        milestone, replace-in-place, no duplicate rows)
+# ---------------------------------------------------------------------------
+
+# Slice the milestone-build section in ref-special-flows.md.
+# The implementer will add a new section; the anchor should be the heading.
+_s70_flows_milestone_slice = _slice_section(
+    _s70_flows,
+    "milestone",
+    _S70_STOP,
+)
+
+check(
+    "suite70(c1-one-build-one-workspace): ref-special-flows.md documents one-build-one-workspace model for milestone builds",
+    "one-build-one-workspace" in _s70_flows or "one build" in _s70_flows and "one workspace" in _s70_flows,
+    "ref-special-flows.md must document the one-build-one-workspace model: plan = home; milestones = nested child steps "
+    "(Defect A continuity fix — currently absent from the Plan Flow section)",
+)
+check(
+    "suite70(c2-nested-child): ref-special-flows.md documents milestone executions nest as child steps",
+    ("child" in _s70_flows and "milestone" in _s70_flows and "nest" in _s70_flows)
+    or ("nested" in _s70_flows and "milestone" in _s70_flows),
+    "ref-special-flows.md must document that milestone executions nest as child steps "
+    "under the plan workspace ({plan-workspace}/{NN}_{milestone}/) — Defect A fix",
+)
+check(
+    "suite70(c3-milestone-index): ref-special-flows.md or orchestrator.md documents a build-level milestone index",
+    ("milestone index" in _s70_flows or "milestone-index" in _s70_flows
+     or "milestone index" in _s70_orch or "milestone-index" in _s70_orch),
+    "either ref-special-flows.md or orchestrator.md must document the build-level milestone index "
+    "(one row per milestone, status tracked, replace-in-place — Defect A build index)",
+)
+check(
+    "suite70(c4-detect-and-continue): orchestrator.md or ref-special-flows.md documents detect-and-continue by identity for milestone builds",
+    ("detect-and-continue" in _s70_orch or "detect and continue" in _s70_orch
+     or "detect-and-continue" in _s70_flows or "detect and continue" in _s70_flows),
+    "orchestrator.md or ref-special-flows.md must document 'detect-and-continue' by identity slug "
+    "for milestone builds (Defect A continuity — so the orchestrator finds the plan workspace, not a new sibling)",
+)
+check(
+    "suite70(c5-01plan-milestone): ref-special-flows.md states the milestone-build plan artifact is 01-plan.md",
+    "01-plan.md" in _s70_flows and "milestone" in _s70_flows,
+    "ref-special-flows.md must state that type:plan milestone builds use 01-plan.md as the plan artifact "
+    "(Defect B disambiguation — currently undocumented for this flow)",
+)
+
+# Defect B disambiguation — 01-planning.md MUST be preserved (no mass-rename)
+# The existing distinction check (already green in Suite 12 / ref-special-flows line 471)
+# is a no-regression guard here; the new assertion is that BOTH are named and the
+# distinction is stated explicitly for the milestone-build context.
+check(
+    "suite70(c6-01planning-preserved): ref-special-flows.md still documents 01-planning.md as planning-mode batch artifact (preserved, not renamed)",
+    "01-planning.md" in _s70_flows,
+    "ref-special-flows.md must still document 01-planning.md (planning-mode batch) — "
+    "Defect B fix is disambiguation only, not mass-rename; the artifact must remain documented",
+)
+
+# ---------------------------------------------------------------------------
+# Group (d) — backward-compat negative assertion (FROZEN)
+#
+# orchestrator.md must explicitly state that the new milestone-continuity path
+# activates ONLY for multi-milestone type:plan builds; a normal single-shot
+# feature/fix keeps the unchanged {date}_{feature} single-workspace behavior.
+# This is the frozen/guard assertion — it should FAIL pre-fix (guard absent)
+# and PASS after the implementer adds the backward-compat clause.
+# ---------------------------------------------------------------------------
+
+check(
+    "suite70(d1-single-shot-unchanged): orchestrator.md states single-shot feature/fix keeps unchanged {date}_{feature} behavior",
+    ("single-shot" in _s70_orch and ("unchanged" in _s70_orch or "byte-identical" in _s70_orch))
+    or ("single-shot" in _s70_orch and "feature/fix" in _s70_orch),
+    "orchestrator.md must explicitly state that a normal single-shot feature/fix (no plan/milestones) "
+    "keeps the exact {date}_{feature} single-workspace behavior unchanged — backward-compat guard",
+)
+check(
+    "suite70(d2-new-path-milestone-only): orchestrator.md states the new milestone-continuity path activates only for multi-milestone plan builds",
+    ("multi-milestone" in _s70_orch or "type: plan" in _s70_orch)
+    and ("only" in _s70_orch or "activates" in _s70_orch),
+    "orchestrator.md must state the milestone-continuity detect-and-continue path activates only for "
+    "multi-milestone type:plan builds — backward-compat invariant",
+)
+
+# ---------------------------------------------------------------------------
+# Group (e) — self-referential / registry guards
+#
+# (e1) This test file contains the three required markers.
+# (e2) docs/testing.md registers Suite 70 and the feature marker.
+# (e3) CLAUDE.md does NOT contain 'Suite 70' (hygiene — same precedent as
+#       Suite 68/69: only docs/testing.md is the canonical registry).
+# ---------------------------------------------------------------------------
+
+_s70_this_file = read(Path(__file__))
+check(
+    "suite70(e1-self-ref): this test file contains 'Suite 70', '_slice_section', and 'fix-plan-execution-workspace-continuity'",
+    "Suite 70" in _s70_this_file and "_slice_section" in _s70_this_file
+    and "fix-plan-execution-workspace-continuity" in _s70_this_file,
+    "test file must contain the three required markers for Suite 70",
+)
+check(
+    "suite70(e2-registry): docs/testing.md registers Suite 70 and fix-plan-execution-workspace-continuity",
+    "Suite 70" in _s70_testing_md and "fix-plan-execution-workspace-continuity" in _s70_testing_md,
+    "docs/testing.md must register Suite 70 and the 'fix-plan-execution-workspace-continuity' marker",
+)
+check(
+    "suite70(e3-hygiene): CLAUDE.md does NOT contain 'Suite 70'",
+    "Suite 70" not in _s70_claude,
+    "CLAUDE.md must not mention Suite 70 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
+# Group (f) — packaging
+#
+# Minor version bump 2.61.0 → 2.62.0 in both plugin files + CLAUDE.md §3.
+# CHANGELOG fragment at changelog.d/fix-plan-execution-workspace-continuity.md.
+# ---------------------------------------------------------------------------
+
+# The changelog.d fragment is assembled into CHANGELOG.md and DELETED at delivery,
+# so assert the DURABLE CHANGELOG.md [2.62.0] entry, not the transient fragment.
+_s70_changelog = read(REPO_ROOT / "CHANGELOG.md")
+check(
+    "suite70(f1-plugin-json): plugin.json version is 2.62.0",
+    '"version": "2.62.0"' in _s70_plugin_json,
+    "plugin.json version must be 2.62.0 (minor bump from 2.61.0 — distributed-asset change requires version bump)",
+)
+check(
+    "suite70(f2-marketplace-json): marketplace.json plugins[0].version is 2.62.0",
+    '"version": "2.62.0"' in _s70_marketplace_json,
+    "marketplace.json plugins[0].version must be 2.62.0 (matched with plugin.json)",
+)
+check(
+    "suite70(f3-claude-version): CLAUDE.md §3 version is 2.62.0",
+    "2.62.0" in _s70_claude,
+    "CLAUDE.md §3 Current version must show 2.62.0",
+)
+check(
+    "suite70(f4-changelog-version): CHANGELOG.md contains the 2.62.0 release section",
+    "## [2.62.0]" in _s70_changelog,
+    "CHANGELOG.md must contain a '## [2.62.0]' release section (fragment assembled at delivery)",
+)
+check(
+    "suite70(f4-changelog-entry): CHANGELOG.md 2.62.0 section documents the workspace-continuity fix",
+    "workspace" in _s70_changelog.lower() and "2.62.0" in _s70_changelog,
+    "CHANGELOG.md must document the one-build-one-workspace continuity fix",
+)
+
+# Marker: fix-plan-execution-workspace-continuity
 
 # ---------------------------------------------------------------------------
 # Summary

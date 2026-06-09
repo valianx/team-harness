@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.62.0] - 2026-06-08
+
+### Fixed
+- Milestone execution no longer mints a sibling top-level workspace; it detects (by identity slug, date-agnostic) the existing plan workspace and nests as a child step `{plan-workspace}/{NN}_{milestone}/` with its own `02/03/04` artifacts + PR (one-build-one-workspace continuity, Defect A).
+- Resume/continue now uses a date-agnostic glob `*_{feature-name}` + frontmatter `feature:` confirm so a build started on a different day (day-rollover or local/UTC mismatch) resolves to the same prior folder instead of forking (Defect C).
+- `agents/orchestrator.md` pins the `{YYYY-MM-DD}` workspace prefix to UTC and states it is cosmetic/display-only and ignored when matching (Defect C date-source pin).
+
+### Changed
+- `agents/ref-special-flows.md` documents the single-repo milestone-build flow: plan home (`01-plan.md`) + nested milestone child steps + build-level milestone index + detect-and-continue by identity; disambiguates `01-plan.md` (design + milestone build) from `01-planning.md` (planning-mode batch — preserved, not renamed).
+- `agents/orchestrator.md` Step 1d adds the milestone detect-and-continue algorithm and the build-level milestone index template, generalizing the #283/#285 initiative parent-index + nested-children machinery.
+- Plugin version bumped 2.61.0 → 2.62.0.
+
 ## [2.61.0] - 2026-06-08
 
 ### Added

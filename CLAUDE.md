@@ -108,14 +108,14 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.61.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.62.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
 - `standard` (default) — copies agent files byte-identical to the source-repo `agents/*.md`. Canonical quality contract; recommended for operators on Anthropic Max or Team plans.
-- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight during install, using the canonical matrix declared in `cmd/install/modes.go`. All 17 agents run on `sonnet`; effort is `medium` or `high` per agent. Suitable for developers on lower-tier Anthropic plans (Free, Pro, tight personal budget). Trade-offs, per-agent assignments, and the full matrix are documented in [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
+- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all 17 agents run on `sonnet`. Suitable for Free/Pro plan operators. See [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
-**Dependencies.** The installer uses `charm.land/huh/v2` for the interactive TUI (form inputs, masked secrets, select groups, progress spinner). Transitive deps: bubbletea v2, lipgloss v2, bubbles v2. Binary size: 7.9–8.5 MB across targets. No package manager or build step beyond `go build`.
+**Dependencies.** TUI: `charm.land/huh/v2` (bubbletea v2, lipgloss v2, bubbles v2 transitive). Binary size: 7.9–8.5 MB. No build step beyond `go build`.
 
 ---
 
@@ -163,6 +163,7 @@ All commands run from the repo root.
 - **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Dev mode — default-on, top-level orchestrator.** Default as of v2.56.0: `/th:setup`/`/th:update` write `~/.claude/.dev-mode-active` (`dev_mode: true`) unless `dev_mode_choice: "off"` in `.team-harness.json`. Top-level agent adopts orchestrator role, dispatches via Task. Inline orchestration permitted ONLY when marker present; without it, prohibited. `/dev-mode off` removes marker + persists opt-out; `/dev-mode on` re-activates. Outward actions gated by `dev-guard.sh`. `developer-mode` output style is the optional strong floor (`keep-coding-instructions: false`). `force-for-plugin` NOT set (decouples gate; removes escape hatch). Security floors non-waivable. See `docs/dev-mode.md`.
 - **Obsidian interlinking.** Step 11.6 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`. Plan consolidation (no forks, 3h): `agents/_shared/plan-consolidation.md`.
+- **Milestone-build continuity (one build = one workspace).** `type: plan` milestones nest as child steps under the plan workspace; detect-and-continue by identity slug (date-agnostic); `{YYYY-MM-DD}` prefix is UTC/display-only. See `agents/ref-special-flows.md § Milestone-Build Flow`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 

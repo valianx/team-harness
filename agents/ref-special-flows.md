@@ -69,7 +69,9 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeli
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
 | `01-planning.md` | planning mode (`/th:plan`, `/th:plan plan-and-execute`) | orchestrator (multi-task dispatch) | break a broad scope into N parallel tasks |
-| `01-plan.md` | design mode (normal pipeline) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List) |
+| `01-plan.md` | design mode (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List); milestone-build home |
+
+**Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See **Milestone-Build Flow** below.
 
 Inside each task dispatched by `plan-and-execute`, the child orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's PRs. The parent batch orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
 
@@ -89,6 +91,68 @@ Inside each task dispatched by `plan-and-execute`, the child orchestrator runs t
 **Mode: `plan`** → STOP after reporting.
 
 **Mode: `plan-and-execute`** → proceed to Parallel Dispatch (see below).
+
+---
+
+## Milestone-Build Flow (single-repo `type: plan`)
+
+A milestone build is when one project is decomposed into milestones (M0…MN) and the operator executes each milestone as a step of the plan. This is the **one-build-one-workspace model**: the plan workspace is the home; milestone executions nest as child steps under it.
+
+**Governing invariant:** a build is identified by IDENTITY, never the date. The orchestrator MUST NEVER create a new plan or workspace because the date changed. No code path may branch "new date → new workspace."
+
+### Plan artifact: `01-plan.md`
+
+The plan artifact for a milestone build is **`01-plan.md`** — the architect writes the milestone decomposition (Work Plan with milestones M0…MN, per-milestone ACs) into `01-plan.md` as the build home. This is distinct from:
+- `01-planning.md` (planning-mode batch: multi-task dispatch via `/th:plan`, consumed by the multi-task dispatcher)
+- A child milestone's own `02-implementation.md`, `03-testing.md`, `04-validation.md` (written inside the milestone's nested workspace)
+
+### One-build-one-workspace structure
+
+```
+{plan_workspace}/           ← plan home (e.g., 2026-06-08_v1-mvp-build/)
+  00-state.md               ← pipeline state + Milestone Index (build-level)
+  01-plan.md                ← milestone decomposition (architect output)
+  00-knowledge-context.md   ← KG results (if any)
+  01_m0-skeleton/           ← milestone M0 child workspace (nested one level)
+    02-implementation.md
+    03-testing.md
+    04-validation.md
+  02_m1-api/                ← milestone M1 child workspace
+    02-implementation.md
+    ...
+```
+
+Each milestone's child workspace carries its own implementation, testing, validation artifacts, and PR. The plan's `00-state.md` carries a **build-level milestone index** (see format below). The plan home (`01-plan.md`) is never overwritten by milestone executions.
+
+### Milestone execution: detect-and-continue by identity
+
+When the operator says "implement M0" (or "build M1", "execute milestone X"), the orchestrator:
+
+1. Extracts the plan identity slug from the task description.
+2. Runs the date-agnostic glob + frontmatter confirm (identical to the initiative JOIN rule at `orchestrator.md:818-824`) to locate the plan workspace by identity.
+3. On confirmed match: nests the milestone as a child step `{plan_workspace}/{NN}_{milestone-slug}/` — this is the detect-and-continue path. No new top-level sibling workspace is created.
+4. On no match: treats the task as a standalone pipeline (normal behavior).
+
+The detect-and-continue check runs in `orchestrator.md` **Step 1d** before composing a fresh `docs_root`. This is the Defect A fix: milestone execution continues inside the plan's workspace instead of minting a sibling `{date}_{feature}` folder.
+
+### Build-level milestone index
+
+The plan's `00-state.md` carries a `## Milestone Index` table. The orchestrator maintains it with the same read-modify-write rule as the initiative parent index: read full `00-state.md`, replace the row for this milestone slug in-place (never duplicate), write the whole file back.
+
+```markdown
+## Milestone Index
+| Milestone | Slug | Status | Branch | PR |
+|-----------|------|--------|--------|----|
+| M0 | m0-skeleton | complete | fix/m0-skeleton | #42 |
+| M1 | m1-api | implementing | fix/m1-api | — |
+| M2 | m2-worker | pending | — | — |
+```
+
+Status values: `pending` → `implementing` → `complete`. One row per milestone; replace-in-place; no duplicate rows.
+
+### Per-milestone pipeline
+
+Each milestone runs the full standard pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3) scoped to its child workspace. Each milestone PR branches from a fresh `main` after the prior milestone merges (no stacked PRs; see `stacked-branch-rebase-onto-fresh-main` in the KG).
 
 ---
 
