@@ -121,6 +121,54 @@ elif [ "$is_github" = "true" ]; then
 fi
 ```
 
+### Tier A — read PR comments
+
+Fetch the PR conversation (issue-level + line-level review comments) as INPUT
+context for the reviewer panel. This is a read-only, best-effort fetch — when
+`gh`/token is absent, emit a note and continue; never hard-fail the review.
+
+**Issue-level comments** (general PR discussion thread):
+
+```bash
+if [ "$has_gh" = "true" ]; then
+  gh pr view {number} --comments --json comments -q '.comments[] | {author: .author.login, body: .body, created_at: .createdAt}'
+elif [ "$is_github" = "true" ]; then
+  auth_header=""
+  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  [ -n "$token" ] && auth_header="-H \"Authorization: Bearer $token\""
+  curl -sf $auth_header \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$repo_path/issues/{number}/comments?per_page=100"
+fi
+```
+
+**Line-level review comments** (inline PR review thread comments):
+
+```bash
+if [ "$has_gh" = "true" ]; then
+  gh api repos/$repo_path/pulls/{number}/comments --jq '.[] | {path: .path, line: .line, body: .body, author: .user.login, resolved: (.in_reply_to_id // "root")}'
+elif [ "$is_github" = "true" ]; then
+  auth_header=""
+  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  [ -n "$token" ] && auth_header="-H \"Authorization: Bearer $token\""
+  curl -sf $auth_header \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$repo_path/pulls/{number}/comments?per_page=100"
+fi
+```
+
+**Degradation contract (best-effort):** when both `has_gh=false` and
+`is_github=false` (or when the API call fails), emit a one-line note to the
+operator and continue — the review is never blocked by comment-fetch failure:
+
+```
+Comments not fetched — gh unavailable. Review proceeds without prior conversation context.
+```
+
+Truncation: if the combined comment payload exceeds ~200 lines, keep the most
+recent 100 lines and prepend:
+`[COMMENTS TRUNCATED — showing most recent 100 lines of {total} total.]`
+
 ### Tier A — read prior PR reviews
 
 ```bash

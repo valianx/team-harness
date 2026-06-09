@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.65.0] - 2026-06-09
+
+### Fixed
+- `agents/orchestrator.md` Step 6a intent table now contains a deterministic PR-review routing row: "review this PR / revisa el PR #N / @th:orchestrator review PR" routes to the `/th:review-pr` skill flow (read-only, auto-route). Eliminates non-deterministic routing (inline read, bare `th:reviewer` dispatch, or skill) for conversational PR-review requests.
+- `agents/orchestrator.md` `:143/:150` wording reconciled: `reviewer` remains a standalone leaf agent never bare-dispatched by the orchestrator; the canonical pipeline for a PR review is the `/th:review-pr` skill flow the orchestrator routes the intent to. Removes the apparent contradiction with the dev-mode "review → pipeline" disposition.
+- `skills/review-pr/SKILL.md` Phase 1 now fetches the PR conversation (issue-level comments + line-level review comments) before the reviewer panel runs. Fetched comments are passed as `PR Comments:` in both single-reviewer and multi-reviewer Phase 3 dispatch payloads. Graceful degradation: when `gh`/token is unavailable, emits a note and continues — never hard-fails the review.
+- `agents/_shared/gh-fallback.md` new "Tier A — read PR comments" section: issue-level (`gh pr view --comments` / REST `issues/{n}/comments`) + line-level (`pulls/{n}/comments`) with the full fallback chain (gh → curl+token → best-effort note).
+- `agents/reviewer.md` Phase 0 now parses the `PR Comments:` context field and does NOT re-raise points already resolved in the thread. No-Publish Invariant unchanged; comment-fetch is INPUT-only.
+
+### Changed
+- Plugin version bumped 2.64.0 → 2.65.0.
+
 ## [2.64.0] - 2026-06-09
 
 ### Fixed

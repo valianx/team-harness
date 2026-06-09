@@ -16768,6 +16768,508 @@ check(
 # Marker: delivery-pr-mergeability-check
 
 # ---------------------------------------------------------------------------
+# Suite 72 — review-pr-routing-and-comments (v2.65.0)
+# ---------------------------------------------------------------------------
+# Regression tests for issue #290 — two independent defects in the PR-review
+# path:
+#
+#   Facet A — non-deterministic routing: the orchestrator's Step 6 intent table
+#             had no entry for "review this PR", so an @th:orchestrator review
+#             request had no deterministic route to /th:review-pr.  The :143/:150
+#             wording also contradicted the dev-mode "review → pipeline"
+#             disposition.
+#
+#   Facet B — comment blindness: skills/review-pr/SKILL.md Phase 1 (Gather)
+#             fetched code via a worktree but never the PR conversation, so the
+#             reviewer panel re-raised points already resolved in the thread.
+#
+# Group (a): Facet A — Step 6 PR-review intent row  — FAIL pre-fix
+# Group (b): Facet A — :143/:150 reconciliation  — FAIL pre-fix
+# Group (c): Facet B — gh-fallback "Tier A — read PR comments"  — FAIL pre-fix
+# Group (d): Facet B — Phase 1 comment-fetch step in SKILL.md  — FAIL pre-fix
+# Group (e): Facet B — reviewer.md comment-consumption clause  — FAIL pre-fix
+# Group (f): publish path frozen (regression guard)  — PASS pre-fix (must stay)
+# Group (g): self-ref / registry  — FAIL pre-fix (suite not yet registered)
+# Group (h): packaging  — FAIL pre-fix (version still 2.64.0, [2.65.0] absent)
+#
+# All content checks use the anchor-scoped _slice_section idiom:
+#   missing anchor → empty slice → check fails (no false-green).
+#
+# CRITICAL: changelog assertion targets the DURABLE CHANGELOG.md [2.65.0]
+# section — NEVER changelog.d/fix-review-pr-routing-and-comments.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+#
+# Written FAILING-FIRST in Phase 2.0 (2026-06-09).
+# Passes after the implementer lands all changes listed in 01-plan.md Work Plan.
+# Marker: review-pr-routing-and-comments
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 72: review-pr-routing-and-comments (v2.65.0) ===")
+
+_s72_orch = read(AGENTS_DIR / "orchestrator.md")
+_s72_skill = read(skill_path("review-pr"))
+_s72_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s72_gh_fallback = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
+_s72_claude = read(REPO_ROOT / "CLAUDE.md")
+_s72_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s72_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s72_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# Stop-marker tuple for _slice_section — stop at next ## or ### heading or ---
+_S72_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ---------------------------------------------------------------------------
+# Group (a) — Facet A: Step 6 PR-review intent row
+#
+# The orchestrator's Step 6a intent table must contain an entry that:
+#  (a1) routes "review this PR / revisa el PR #N / @th:orchestrator review PR"
+#       to the /th:review-pr skill flow (token `/th:review-pr` or `review-pr`)
+#  (a2) is distinct from the `plan-review` row (different intent pattern)
+#  (a3) is classified read-only (auto-route, same category as plan-review)
+# ---------------------------------------------------------------------------
+
+# Slice the Step 6a intent table region for scoped assertions
+_s72_step6_slice = _slice_section(_s72_orch, "revisa el plan", _S72_STOP)
+
+check(
+    "suite72(a1-pr-review-intent-row): orchestrator.md Step 6 table contains a PR-review"
+    " intent row routing to /th:review-pr or review-pr flow",
+    (
+        "review-pr" in _s72_orch
+        and (
+            "/th:review-pr" in _s72_orch
+            or "review-pr" in _s72_orch
+        )
+        and (
+            "review" in _s72_orch.lower()
+            and "PR" in _s72_orch
+        )
+    ),
+    "orchestrator.md must declare a PR-review intent row whose route resolves"
+    " to the /th:review-pr skill flow",
+)
+
+check(
+    "suite72(a2-intent-row-scoped): orchestrator.md intent table PR-review row"
+    " is in the Step 6 intent table (anchor-scoped)",
+    (
+        "/th:review-pr" in _s72_step6_slice
+        or "review-pr" in _s72_step6_slice
+    ),
+    "The PR-review → /th:review-pr route must appear in the Step 6 intent table"
+    " alongside 'revisa el plan' — not somewhere else in orchestrator.md",
+)
+
+check(
+    "suite72(a3-distinct-from-plan-review): orchestrator.md PR-review row is"
+    " distinct from the plan-review row",
+    (
+        "plan-review" in _s72_orch
+        and "revisa el plan" in _s72_orch
+        and (
+            "/th:review-pr" in _s72_orch
+            or "review-pr" in _s72_orch
+        )
+        # Both tokens coexist — the PR-review row is additive, not a replacement
+    ),
+    "Both plan-review and PR-review intent rows must coexist in the intent table",
+)
+
+# ---------------------------------------------------------------------------
+# Group (b) — Facet A: :143/:150 reconciliation
+#
+# The orchestrator's team/standalone-agents wording must:
+#  (b1) still state reviewer is a standalone agent (classification preserved)
+#  (b2) clarify that the orchestrator routes a PR-review INTENT to the
+#       /th:review-pr skill flow and does NOT bare-dispatch reviewer
+#  (b3) contain no remaining contradiction between "reviewer standalone" and
+#       "review → pipeline" — the reconciliation resolves this by naming the
+#       skill flow as the canonical pipeline for PR reviews
+# ---------------------------------------------------------------------------
+
+# Slice the standalone-agents note region
+_s72_standalone_slice = _slice_section(
+    _s72_orch,
+    "Standalone agents",
+    _S72_STOP,
+)
+
+check(
+    "suite72(b1-reviewer-still-standalone): orchestrator.md still classifies"
+    " reviewer as a standalone agent",
+    "reviewer" in _s72_standalone_slice and "standalone" in _s72_standalone_slice.lower(),
+    "orchestrator.md must still classify reviewer as a standalone agent"
+    " (the fix preserves the standalone rule)",
+)
+
+check(
+    "suite72(b2-no-bare-dispatch): orchestrator.md reconciliation wording states"
+    " orchestrator routes PR-review intent to /th:review-pr — NOT bare-dispatch reviewer",
+    (
+        # The reconciled wording must assert the skill-flow routing path
+        "/th:review-pr" in _s72_orch
+        or "review-pr" in _s72_orch
+    )
+    and (
+        # And must preserve the bare-dispatch prohibition — reviewer never directly dispatched
+        ("never" in _s72_standalone_slice.lower() and "reviewer" in _s72_standalone_slice)
+        or ("not" in _s72_standalone_slice.lower() and "reviewer" in _s72_standalone_slice)
+    ),
+    "orchestrator.md must state that the orchestrator routes PR-review intent to"
+    " the /th:review-pr skill flow and does NOT bare-dispatch reviewer",
+)
+
+check(
+    "suite72(b3-no-contradiction): orchestrator.md reconciliation removes the"
+    " contradiction — reviewer stays standalone AND intent routes to skill flow",
+    (
+        # Reviewer is standalone (never bare-dispatched by orchestrator)
+        "reviewer" in _s72_standalone_slice
+        # AND the canonical pipeline for PR review is the skill flow
+        and (
+            "/th:review-pr" in _s72_orch
+            or "review-pr" in _s72_orch
+        )
+        # AND the intent table routes to that skill flow (from group a)
+        and (
+            "/th:review-pr" in _s72_step6_slice
+            or "review-pr" in _s72_step6_slice
+        )
+    ),
+    "orchestrator.md reconciliation must resolve the contradiction: reviewer stays"
+    " standalone (never bare-dispatched) AND the intent routes to the /th:review-pr"
+    " skill flow — both contracts satisfied simultaneously",
+)
+
+# ---------------------------------------------------------------------------
+# Group (c) — Facet B: gh-fallback "Tier A — read PR comments"
+#
+# agents/_shared/gh-fallback.md must contain a new section:
+#  (c1) a "Tier A — read PR comments" subsection header
+#  (c2) issue-level comment fetch: gh pr view {number} --comments
+#       OR issues/{number}/comments REST endpoint
+#  (c3) line-level comment fetch: pulls/{number}/comments REST endpoint
+#  (c4) best-effort degradation note (gh unavailable → note, never hard-fail)
+# ---------------------------------------------------------------------------
+
+_s72_fallback_pr_comments_slice = _slice_section(
+    _s72_gh_fallback,
+    "Tier A — read PR comments",
+    _S72_STOP,
+)
+
+check(
+    "suite72(c1-fallback-section-exists): agents/_shared/gh-fallback.md contains"
+    " 'Tier A — read PR comments' section",
+    bool(_s72_fallback_pr_comments_slice),
+    "agents/_shared/gh-fallback.md must contain a 'Tier A — read PR comments'"
+    " subsection (input-side comment fetch for /th:review-pr Phase 1)",
+)
+
+check(
+    "suite72(c2-issue-level-comments): gh-fallback PR-comments section documents"
+    " issue-level comment fetch (gh pr view --comments or issues/{N}/comments)",
+    (
+        "--comments" in _s72_fallback_pr_comments_slice
+        or "issues/{" in _s72_fallback_pr_comments_slice
+        or "/issues/" in _s72_fallback_pr_comments_slice
+    ),
+    "gh-fallback must document issue-level comment fetch via"
+    " 'gh pr view {number} --comments' OR 'issues/{number}/comments' REST path",
+)
+
+check(
+    "suite72(c3-line-level-comments): gh-fallback PR-comments section documents"
+    " line-level comment fetch (pulls/{number}/comments)",
+    (
+        "pulls/" in _s72_fallback_pr_comments_slice
+        and "comments" in _s72_fallback_pr_comments_slice
+    ),
+    "gh-fallback must document line-level comment fetch via"
+    " 'pulls/{number}/comments' REST endpoint",
+)
+
+check(
+    "suite72(c4-best-effort-note): gh-fallback PR-comments section documents"
+    " best-effort degradation (gh unavailable → note, never hard-fail)",
+    (
+        "best-effort" in _s72_fallback_pr_comments_slice.lower()
+        or "unavailable" in _s72_fallback_pr_comments_slice.lower()
+        or "not fetched" in _s72_fallback_pr_comments_slice.lower()
+        or "degrad" in _s72_fallback_pr_comments_slice.lower()
+    ),
+    "gh-fallback PR-comments section must document best-effort degradation:"
+    " when gh/token absent, emit a note and continue — never hard-fail",
+)
+
+# ---------------------------------------------------------------------------
+# Group (d) — Facet B: Phase 1 comment-fetch step in SKILL.md
+#
+# skills/review-pr/SKILL.md Phase 1 (Gather) must:
+#  (d1) contain a step that fetches PR comments (issue-level + line-level)
+#  (d2) reference the gh-fallback section for the comment fetch
+#  (d3) pass the fetched comments into the Phase 3 reviewer dispatch payload
+#       (both single-reviewer AND multi-reviewer paths)
+#  (d4) document graceful degradation when gh/token is unavailable
+# ---------------------------------------------------------------------------
+
+_s72_phase1_slice = _slice_section(_s72_skill, "Phase 1", _S72_STOP)
+
+check(
+    "suite72(d1-phase1-comment-fetch): SKILL.md Phase 1 contains a comment-fetch"
+    " step (issue-level + line-level)",
+    (
+        "--comments" in _s72_phase1_slice
+        or "issues/" in _s72_phase1_slice
+        or "pr_comments" in _s72_phase1_slice
+        or "pulls/" in _s72_phase1_slice
+        or "comment" in _s72_phase1_slice.lower()
+    ),
+    "skills/review-pr/SKILL.md Phase 1 must contain a step that fetches PR"
+    " comments (issue-level AND line-level) as INPUT for the reviewer panel",
+)
+
+check(
+    "suite72(d2-phase1-gh-fallback-ref): SKILL.md Phase 1 comment-fetch step"
+    " references the gh-fallback section",
+    (
+        "gh-fallback" in _s72_phase1_slice
+        or "gh_fallback" in _s72_phase1_slice
+        or "_shared/gh-fallback" in _s72_phase1_slice
+    ),
+    "SKILL.md Phase 1 comment-fetch step must reference agents/_shared/gh-fallback.md"
+    " (same pattern as the existing PR-metadata and linked-issue fetch steps)",
+)
+
+check(
+    "suite72(d3-comments-passed-to-phase3): SKILL.md passes fetched comments into"
+    " the Phase 3 reviewer dispatch payload",
+    (
+        # After the fix, the Phase 3 single-reviewer payload must include a
+        # 'PR Comments:' field (or equivalent pr_comments token).
+        # The existing 'comment' references in Phase 3 are PUBLISH-side only
+        # (Phase 3.5 reply + Phase 5 comments[]); they must not trigger this check.
+        # We require the INPUT-side token that will only exist post-fix.
+        "PR Comments:" in _s72_skill
+        or "pr_comments" in _s72_skill
+        or "PR Comments" in _s72_skill
+    ),
+    "SKILL.md must pass the fetched PR comments into the Phase 3 reviewer dispatch"
+    " payload (single-reviewer and multi-reviewer paths) via a 'PR Comments:' field"
+    " or equivalent — the existing publish-side comment references do not satisfy this",
+)
+
+check(
+    "suite72(d4-graceful-degradation): SKILL.md specifies comment-fetch degrades"
+    " gracefully when gh/token unavailable",
+    (
+        # Post-fix: the new comment-fetch step will contain a specific degradation
+        # note. Require a phrase that only the new step would introduce — not the
+        # existing linked-issue or prior-review fallback wording that already
+        # mentions 'unavailable' in unrelated contexts.
+        "comments not fetched" in _s72_skill.lower()
+        or "gh-unavailable" in _s72_skill
+        or (
+            "comment" in _s72_skill.lower()
+            and "gh unavailable" in _s72_skill.lower()
+        )
+    ),
+    "SKILL.md must specify that the comment-fetch step degrades with a note"
+    " ('comments not fetched — gh unavailable') and the review continues"
+    " — never hard-fails",
+)
+
+# ---------------------------------------------------------------------------
+# Group (e) — Facet B: reviewer.md comment-consumption clause
+#
+# agents/reviewer.md must:
+#  (e1) declare a clause to consume PR-comment context (parse PR Comments:)
+#  (e2) state it does NOT re-raise points already resolved in the thread
+#  (e3) keep the No-Publish Invariant intact (reviewer never publishes)
+# ---------------------------------------------------------------------------
+
+_s72_reviewer_phase0_slice = _slice_section(_s72_reviewer, "Phase 0", _S72_STOP)
+
+check(
+    "suite72(e1-reviewer-consumes-comments): reviewer.md declares a clause to"
+    " consume PR-comment context",
+    (
+        "PR Comments" in _s72_reviewer
+        or "pr_comments" in _s72_reviewer
+        or (
+            "comment" in _s72_reviewer_phase0_slice.lower()
+            and "context" in _s72_reviewer_phase0_slice.lower()
+        )
+    ),
+    "agents/reviewer.md must declare a clause to consume the PR-comment context"
+    " passed by the /th:review-pr skill Phase 3 dispatch",
+)
+
+check(
+    "suite72(e2-no-reraise-resolved): reviewer.md states it does NOT re-raise"
+    " points already resolved in the thread",
+    (
+        "resolved" in _s72_reviewer.lower()
+        and (
+            "re-raise" in _s72_reviewer.lower()
+            or "not re-raise" in _s72_reviewer.lower()
+            or "do not re-raise" in _s72_reviewer.lower()
+            or "re-raise" in _s72_reviewer.lower()
+        )
+    ),
+    "agents/reviewer.md must state it does NOT re-raise points already resolved"
+    " in the PR thread (resolved-point suppression clause)",
+)
+
+check(
+    "suite72(e3-no-publish-invariant-intact): reviewer.md No-Publish Invariant"
+    " remains intact (reviewer never publishes)",
+    (
+        "Does NOT publish to GitHub" in _s72_reviewer
+        or "no GitHub publish" in _s72_reviewer.lower()
+        or "No-Publish" in _s72_reviewer
+        or "Never publish" in _s72_reviewer
+    ),
+    "agents/reviewer.md No-Publish Invariant must remain intact — the comment"
+    " context is INPUT-only, the reviewer still never publishes directly",
+)
+
+# ---------------------------------------------------------------------------
+# Group (f) — publish path FROZEN (regression guard)
+#
+# skills/review-pr/SKILL.md publish contract (Phase 5 atomic POST) must be
+# unchanged.  This is a POSITIVE assertion that must pass both pre-fix AND
+# post-fix — it guards against the implementer accidentally altering the
+# publish path while adding the INPUT comment-fetch.
+#
+# Assertions:
+#  (f1) Phase 5 single atomic POST .../reviews is still the only submission
+#  (f2) Phase 3.5 reply step is still present (no regression)
+# ---------------------------------------------------------------------------
+
+check(
+    "suite72(f1-atomic-post-unchanged): SKILL.md Phase 5 single atomic POST"
+    " .../reviews is still present (publish path frozen)",
+    (
+        "POST" in _s72_skill
+        and "reviews" in _s72_skill
+        and "Phase 5" in _s72_skill
+    ),
+    "SKILL.md must still declare the single atomic POST .../reviews in Phase 5"
+    " — the publish path must not be altered by the INPUT comment-fetch change",
+)
+
+check(
+    "suite72(f2-phase35-reply-present): SKILL.md Phase 3.5 reply step is still"
+    " present (no accidental removal)",
+    (
+        "Phase 3.5" in _s72_skill
+        or "3.5" in _s72_skill
+    ),
+    "SKILL.md must still contain Phase 3.5 (reply-to-thread step) — this step"
+    " must not be removed when adding the input-side comment-fetch",
+)
+
+# ---------------------------------------------------------------------------
+# Group (g) — self-referential / registry guards
+#
+#  (g1) This test file contains the three required markers.
+#  (g2) docs/testing.md registers Suite 72 and the feature marker.
+#  (g3) CLAUDE.md does NOT contain 'Suite 72' (hygiene — canonical registry
+#       is docs/testing.md, same precedent as Suites 68-71).
+# ---------------------------------------------------------------------------
+
+_s72_this_file = read(Path(__file__))
+
+check(
+    "suite72(g1-self-ref): this test file contains 'Suite 72', '_slice_section',"
+    " and 'review-pr-routing-and-comments'",
+    (
+        "Suite 72" in _s72_this_file
+        and "_slice_section" in _s72_this_file
+        and "review-pr-routing-and-comments" in _s72_this_file
+    ),
+    "test file must contain the three required markers for Suite 72",
+)
+
+check(
+    "suite72(g2-registry): docs/testing.md registers Suite 72 and"
+    " review-pr-routing-and-comments",
+    (
+        "Suite 72" in _s72_testing_md
+        and "review-pr-routing-and-comments" in _s72_testing_md
+    ),
+    "docs/testing.md must register Suite 72 and the 'review-pr-routing-and-comments'"
+    " marker",
+)
+
+check(
+    "suite72(g3-hygiene): CLAUDE.md does NOT contain 'Suite 72'",
+    "Suite 72" not in _s72_claude,
+    "CLAUDE.md must not mention Suite 72 — only docs/testing.md is the canonical"
+    " registry",
+)
+
+# ---------------------------------------------------------------------------
+# Group (h) — packaging
+#
+# Minor version bump 2.64.0 → 2.65.0 in both plugin files + CLAUDE.md §3.
+# CRITICAL: Assert the DURABLE CHANGELOG.md [2.65.0] section —
+# NEVER assert changelog.d/fix-review-pr-routing-and-comments.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# This is the recurring-bug guard (recurred 3× before: #282/#285/#286).
+# ---------------------------------------------------------------------------
+
+_s72_changelog = read(REPO_ROOT / "CHANGELOG.md")
+
+check(
+    "suite72(h1-plugin-json): plugin.json version is 2.65.0",
+    _s59_ver_tuple(json.loads(_s72_plugin_json).get("version", "0.0.0")) >= (2, 65, 0),
+    "plugin.json version must be 2.65.0 or later (minor bump from 2.64.0"
+    " — distributed-asset change requires version bump)",
+)
+
+check(
+    "suite72(h2-marketplace-json): marketplace.json plugins[0].version is 2.65.0",
+    _s59_ver_tuple(
+        json.loads(_s72_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= (2, 65, 0),
+    "marketplace.json plugins[0].version must be 2.65.0 or later"
+    " (matched with plugin.json)",
+)
+
+check(
+    "suite72(h3-claude-version): CLAUDE.md §3 version is 2.65.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s72_claude) or "0.0.0") >= (2, 65, 0),
+    "CLAUDE.md §3 Current version must show 2.65.0 or later",
+)
+
+check(
+    "suite72(h4-changelog-section): CHANGELOG.md contains the 2.65.0 release section",
+    "## [2.65.0]" in _s72_changelog,
+    "CHANGELOG.md must contain a '## [2.65.0]' release section"
+    " (fragment assembled at delivery — do NOT assert changelog.d/ fragment existence)",
+)
+
+check(
+    "suite72(h5-changelog-entry): CHANGELOG.md 2.65.0 section documents"
+    " PR-review routing or comment ingestion",
+    (
+        "review-pr" in _s72_changelog.lower()
+        or "review pr" in _s72_changelog.lower()
+        or "comment" in _s72_changelog.lower()
+        or "routing" in _s72_changelog.lower()
+    )
+    and "2.65.0" in _s72_changelog,
+    "CHANGELOG.md must document PR-review routing fix or comment-ingestion in"
+    " the 2.65.0 release section",
+)
+
+# Marker: review-pr-routing-and-comments
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
