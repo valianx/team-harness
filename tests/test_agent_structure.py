@@ -6003,39 +6003,38 @@ check(
 
 # Check (20) -- AC-7: orchestrator.md Step 6 disambiguation reflects three-way panel
 # while preserving distinction from `validate` and substance-refinement.
-# Anchor-scoped: the plan-review routing row is in a routing table; we extract a
-# window of text around the EXISTING 'revisar/auditar plan' | 'plan-review' row and
-# assert that window contains the three-way panel language ADDED by the implementer.
-# Using a 2000-char window around the first occurrence of 'revisar' (the existing
-# Spanish routing keyword) is specific enough to avoid false-greens from unrelated
-# 'three' / 'panel' occurrences elsewhere in orchestrator.md (there is currently
-# one 'panel' at char ~211389 in "Pipeline Summary panel" which is unrelated).
-_c20_revisar_idx = _s34_orch.find("revisar")
-_c20_window = (
-    _s34_orch[max(0, _c20_revisar_idx - 200): _c20_revisar_idx + 1800]
-    if _c20_revisar_idx != -1 else ""
-)
-_c20_plan_review_in_window = "plan-review" in _c20_window
-_c20_validate_in_window = "validate" in _c20_window  # validate route still present in same table
+# HARDENED (AC-6 of fix-agent-builder-and-diagram-routing, 2026-06-09):
+# Previously used a positional `find("revisar") + [-200:+1800]` window, which slides
+# whenever Step 6a rows are added above or below the revisar row.  Replaced with an
+# anchor-scoped _slice_section bounded by the literal "**Disambiguation —" line
+# (the existing disambiguation block header in orchestrator.md).  Missing anchor →
+# empty slice → all sub-checks fail (no false-green).  This is behavior-preserving:
+# the same tokens (plan-review / validate / panel) are asserted, just via a stable
+# structural anchor instead of a brittle positional offset.
+_C20_DISAMB_ANCHOR = "**Disambiguation —"
+_c20_disamb_slice = _slice_section(_s34_orch, _C20_DISAMB_ANCHOR)
+_c20_plan_review_in_window = "plan-review" in _c20_disamb_slice
+_c20_validate_in_window = "validate" in _c20_disamb_slice  # validate route still present in same block
 _c20_three_way_in_window = (
-    "three reviewer" in _c20_window.lower()
-    or "three-way" in _c20_window.lower()
-    or "three way" in _c20_window.lower()
-    or "three-reviewer" in _c20_window.lower()
-    or "panel" in _c20_window.lower()
+    "three reviewer" in _c20_disamb_slice.lower()
+    or "three-way" in _c20_disamb_slice.lower()
+    or "three way" in _c20_disamb_slice.lower()
+    or "three-reviewer" in _c20_disamb_slice.lower()
+    or "panel" in _c20_disamb_slice.lower()
 )
 check(
     "plan-review(20/ac-7): orchestrator.md Step 6 disambiguation"
-    " (window around 'revisar/auditar plan' routing row)"
+    " (anchor-scoped slice from '**Disambiguation —' block)"
     " reflects the three-way panel for plan-review"
     " while preserving distinct route for 'validate'",
     _c20_plan_review_in_window and _c20_validate_in_window and _c20_three_way_in_window,
     (
-        f"orchestrator.md Step-6 window (revisar+/-200..+1800):"
+        f"orchestrator.md '**Disambiguation —' anchor slice:"
         f" plan_review={_c20_plan_review_in_window},"
         f" validate_distinct={_c20_validate_in_window},"
         f" three_way_or_panel={_c20_three_way_in_window}"
-        " -- implementer must update Step 6 disambiguation to mention the three-way panel"
+        " -- anchor must be present and disambiguation block must mention"
+        " plan-review, validate, and the three-way panel"
     ),
 )
 
@@ -17268,6 +17267,456 @@ check(
 )
 
 # Marker: review-pr-routing-and-comments
+
+# ---------------------------------------------------------------------------
+# Suite 73 — fix-agent-builder-and-diagram-routing (v2.66.0)
+# ---------------------------------------------------------------------------
+# Regression tests for issue #290 residuals — two routing-determinism gaps
+# that survived the #291 fix:
+#
+#   Facet A — diagram-engine mis-route: orchestrator.md Step 6a had ONE
+#             diagram row routing ALL conversational diagram requests to the
+#             `diagram` (Excalidraw) mode.  "diagrama D2" / "diagrama C4" /
+#             "LikeC4" mis-routed to Excalidraw; D2/LikeC4 were only
+#             reachable via exact slash command.
+#
+#   Facet B — agent-builder no deterministic route: no Step 6a row existed
+#             for "create/design/improve an agent or skill".  Additionally
+#             the :150 standalone-agents note listed agent-builder without
+#             reconciling the routing intent or documenting the host-layer
+#             auto-selection bypass.
+#
+# Group (a): Facet A — D2 engine route             — FAIL pre-fix
+# Group (b): Facet A — LikeC4/C4 engine route      — FAIL pre-fix
+# Group (c): Facet A — generic Excalidraw default   — PASS pre-fix (regression guard)
+# Group (d): Facet A — disambiguation note          — FAIL pre-fix
+# Group (e): Facet B — agent-builder intent row     — FAIL pre-fix
+# Group (f): Facet B — :150 reconciliation          — FAIL pre-fix
+# Group (g): Facet B — residual-limit documented    — FAIL pre-fix
+# Group (h): self-ref / registry                   — FAIL pre-fix (suite not registered)
+# Group (i): packaging                              — FAIL pre-fix (version still 2.65.0)
+#
+# Groups (c) is a frozen regression guard — MUST pass both before and after fix.
+#
+# All content checks use anchor-scoped _slice_section (3-arg form available
+# here; missing anchor → empty slice → check fails — no false-green possible).
+#
+# CRITICAL: changelog assertion targets the DURABLE CHANGELOG.md [2.66.0]
+# section — NEVER changelog.d/agent-builder-and-diagram-routing.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# This is the recurring-bug guard (recurred 3× before: #282/#285/#286).
+#
+# Written FAILING-FIRST in Phase 2.0 (2026-06-09).
+# Passes after the implementer lands all changes listed in 01-plan.md Work Plan.
+# Marker: fix-agent-builder-and-diagram-routing
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 73: fix-agent-builder-and-diagram-routing (v2.66.0) ===")
+
+_s73_orch = read(AGENTS_DIR / "orchestrator.md")
+_s73_claude = read(REPO_ROOT / "CLAUDE.md")
+_s73_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s73_marketplace_json = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s73_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# Stop-marker tuple for _slice_section (3-arg form, defined at Suite 58+)
+_S73_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ---------------------------------------------------------------------------
+# Anchor: Step 6a intent table — slice bounded by the table / section context.
+# The "**Disambiguation —" block immediately follows the intent table in
+# orchestrator.md.  We use it as the anchor for disambiguation assertions and
+# use the intent-table header row as the anchor for table-level assertions.
+# ---------------------------------------------------------------------------
+
+# Slice the Step 6a intent table region — anchor from the table header that
+# introduces the intent classification table.
+_s73_step6a_table_slice = _slice_section(
+    _s73_orch,
+    "| Intent Pattern (es/en) | Route | Category |",
+    _S73_STOP,
+)
+
+# Slice the Disambiguation block — anchor from the bold "**Disambiguation —" line.
+_s73_disamb_slice = _slice_section(
+    _s73_orch,
+    "**Disambiguation —",
+    _S73_STOP,
+)
+
+# Slice the standalone-agents note — anchor from the bold "**Standalone agents**"
+# note at :150.
+_s73_standalone_slice = _slice_section(
+    _s73_orch,
+    "**Standalone agents**",
+    _S73_STOP,
+)
+
+# ---------------------------------------------------------------------------
+# Group (a) — Facet A: D2 engine-disambiguation route
+#
+# orchestrator.md Step 6a intent table must contain a row that:
+#  (a1) routes D2-related keywords (D2 / diagrama D2 / d2-diagram / dot) to
+#       the `d2-diagram` mode — distinct from the generic Excalidraw row
+#  (a2) the D2 route is present in the Step 6a table scope (anchor-scoped,
+#       not elsewhere in the file)
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(a1-d2-route-in-table): orchestrator.md Step 6a intent table"
+    " contains a D2 engine-disambiguation row routing D2 keywords to `d2-diagram`"
+    " (anchor-scoped to the intent table)",
+    "d2-diagram" in _s73_step6a_table_slice,
+    "orchestrator.md Step 6a intent table must declare a row routing"
+    " D2 / diagrama D2 keywords to the `d2-diagram` mode (distinct from"
+    " the generic Excalidraw row) — currently the table has only one diagram"
+    " row routing all requests to `diagram` (Excalidraw)",
+)
+
+check(
+    "suite73(a2-d2-keyword-in-table): orchestrator.md Step 6a intent table"
+    " row for d2-diagram includes D2 keyword (D2 / diagrama D2 / dot)",
+    (
+        "D2" in _s73_step6a_table_slice
+        or "d2" in _s73_step6a_table_slice.lower()
+        or "dot" in _s73_step6a_table_slice.lower()
+    ) and "d2-diagram" in _s73_step6a_table_slice,
+    "The D2 row in the Step 6a table must include a D2 / diagrama D2 / dot"
+    " keyword in the Intent Pattern column",
+)
+
+# ---------------------------------------------------------------------------
+# Group (b) — Facet A: LikeC4/C4 engine-disambiguation route
+#
+# orchestrator.md Step 6a intent table must contain a row that:
+#  (b1) routes LikeC4/C4 keywords to the `likec4-diagram` mode
+#  (b2) the LikeC4 route is in the Step 6a table scope
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(b1-likec4-route-in-table): orchestrator.md Step 6a intent table"
+    " contains a LikeC4/C4 engine-disambiguation row routing to `likec4-diagram`"
+    " (anchor-scoped to the intent table)",
+    "likec4-diagram" in _s73_step6a_table_slice,
+    "orchestrator.md Step 6a intent table must declare a row routing"
+    " LikeC4/C4 keywords to the `likec4-diagram` mode — currently the table"
+    " routes all diagram requests to `diagram` (Excalidraw)",
+)
+
+check(
+    "suite73(b2-likec4-keyword-in-table): orchestrator.md Step 6a intent table"
+    " row for likec4-diagram includes LikeC4/C4 keyword",
+    (
+        "LikeC4" in _s73_step6a_table_slice
+        or "C4" in _s73_step6a_table_slice
+        or "likec4" in _s73_step6a_table_slice.lower()
+        or "architecture-as-code" in _s73_step6a_table_slice.lower()
+    ) and "likec4-diagram" in _s73_step6a_table_slice,
+    "The LikeC4/C4 row in the Step 6a table must include a LikeC4 / C4 /"
+    " architecture-as-code keyword in the Intent Pattern column",
+)
+
+# ---------------------------------------------------------------------------
+# Group (c) — Facet A: generic Excalidraw diagram default (REGRESSION GUARD)
+#
+# The existing generic `diagram` (Excalidraw) route MUST still be present as
+# the default after the engine-disambiguation rows are added.  This check must
+# PASS both before and after the fix — it guards against the implementer
+# accidentally removing the default while adding engine-specific rows.
+#
+#  (c1) The generic `diagram` route still present in the Step 6a table
+#  (c2) A disambiguation note distinguishing the three engines is present
+#       (diagram/Excalidraw default, d2-diagram, likec4-diagram)
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(c1-excalidraw-default-preserved): orchestrator.md Step 6a still"
+    " contains the generic diagram/Excalidraw route as the default"
+    " (regression guard — must pass pre-fix AND post-fix)",
+    (
+        # The generic row must still be present — the word 'diagram' in the table
+        # as a route target (not just as a keyword in D2/LikeC4 rows)
+        "| `diagram`" in _s73_step6a_table_slice
+        or (
+            "diagram" in _s73_step6a_table_slice
+            and "visualizar arquitectura" in _s73_step6a_table_slice
+        )
+    ),
+    "The generic diagram/Excalidraw route must remain present as the default"
+    " fallback in the Step 6a intent table (the engine-specific D2/LikeC4 rows"
+    " are additive, not a replacement)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (d) — Facet A: disambiguation note for the three engines
+#
+# After the engine-specific rows, a Disambiguation note must be present that:
+#  (d1) names all three diagram engines (diagram/Excalidraw, d2-diagram, likec4-diagram)
+#  (d2) states the generic `diagram` route is the default
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(d1-disamb-note-three-engines): orchestrator.md Disambiguation"
+    " block names all three diagram engines (diagram, d2-diagram, likec4-diagram)",
+    (
+        "d2-diagram" in _s73_disamb_slice
+        and "likec4-diagram" in _s73_disamb_slice
+        and "diagram" in _s73_disamb_slice
+    ),
+    "The '**Disambiguation —' block in orchestrator.md must name all three"
+    " diagram engines: diagram (Excalidraw), d2-diagram, and likec4-diagram",
+)
+
+check(
+    "suite73(d2-disamb-note-excalidraw-default): orchestrator.md Disambiguation"
+    " block explicitly names Excalidraw as the default diagram engine",
+    "Excalidraw" in _s73_disamb_slice or "excalidraw" in _s73_disamb_slice.lower(),
+    "The '**Disambiguation —' block must explicitly name Excalidraw as the"
+    " default engine for the generic `diagram` route (currently the block"
+    " describes validate/plan-review/review-pr but has no diagram-engine"
+    " section)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (e) — Facet B: agent-builder intent row in Step 6a table
+#
+# orchestrator.md Step 6a table must contain a row that:
+#  (e1) routes agent/skill-building intent (create/design/improve an agent
+#       or skill) to the agent-builder canonical flow
+#  (e2) the row is in the Step 6a table scope (anchor-scoped)
+#  (e3) the row routes the INTENT to the flow (not bare-dispatch of the agent)
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(e1-agent-builder-intent-row-in-table): orchestrator.md Step 6a"
+    " intent table contains a row routing agent/skill-building intent to the"
+    " agent-builder canonical flow (anchor-scoped to the intent table)",
+    "agent-builder" in _s73_step6a_table_slice,
+    "orchestrator.md Step 6a intent table must declare a row routing"
+    " create/design/improve agent or skill intent to the agent-builder"
+    " canonical flow — currently no such row exists in the table",
+)
+
+check(
+    "suite73(e2-agent-builder-keyword-in-table): orchestrator.md Step 6a intent"
+    " table agent-builder row includes an agent/skill-building keyword",
+    (
+        "agent-builder" in _s73_step6a_table_slice
+        and (
+            "agent" in _s73_step6a_table_slice.lower()
+            or "skill" in _s73_step6a_table_slice.lower()
+            or "create" in _s73_step6a_table_slice.lower()
+        )
+    ),
+    "The agent-builder row in the Step 6a table must include an agent/skill"
+    " building keyword (create/design/improve an agent or skill) in the"
+    " Intent Pattern column",
+)
+
+# ---------------------------------------------------------------------------
+# Group (f) — Facet B: :150 standalone-agents note reconciliation
+#
+# The standalone-agents note at orchestrator.md:150 must:
+#  (f1) still classify agent-builder as standalone (kept standalone invariant)
+#  (f2) reconcile agent-builder: INTENT routes to its canonical flow, agent
+#       is never bare-dispatched by the orchestrator
+#  (f3) the reconciliation wording mirrors the reviewer reconciliation:
+#       intent is routed to the skill/canonical flow, not the agent directly
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(f1-agent-builder-still-standalone): orchestrator.md :150"
+    " standalone-agents note still classifies agent-builder as standalone",
+    "agent-builder" in _s73_standalone_slice,
+    "orchestrator.md :150 standalone-agents note must still list agent-builder"
+    " (the fix preserves the standalone rule — never bare-dispatched)",
+)
+
+check(
+    "suite73(f2-agent-builder-reconciled-not-bare-dispatched): orchestrator.md"
+    " :150 note reconciles agent-builder — a sentence specifically routes"
+    " agent-builder intent to its canonical flow (not bare-dispatch)",
+    (
+        # The note must contain a sentence specifically about routing agent-builder
+        # intent to its canonical flow.  Pre-fix the note only lists agent-builder
+        # as standalone (no reconciliation sentence for it — only reviewer has one).
+        # Post-fix: a sentence like "When the operator expresses an agent/skill-
+        # building intent ... the orchestrator routes that intent to the agent-builder
+        # canonical flow" will appear, positioning "agent-builder" near "agent" intent
+        # language WITHIN ~400 chars.
+        # We assert: 'agent-builder' appears within 400 chars of a phrase that contains
+        # both 'agent' and ('intent' or 'canonical flow' or 'skill flow') — a proximity
+        # pattern that is absent today (the reviewer reconciliation sentence mentions
+        # 'agent-builder' only in the list, not near intent/canonical/skill-flow language
+        # about agent-builder itself).
+        bool(
+            _s73_standalone_slice
+            and any(
+                abs(_s73_standalone_slice.lower().find(phrase) - _s73_standalone_slice.lower().rfind("agent-builder")) < 400
+                for phrase in ("agent/skill", "skill-building", "skill building", "agent-building",
+                               "build an agent", "create an agent", "design an agent",
+                               "improve an agent", "improve a skill", "create a skill")
+                if phrase in _s73_standalone_slice.lower()
+            )
+        )
+    ),
+    "orchestrator.md :150 standalone-agents note must contain a reconciliation"
+    " sentence specifically for agent-builder: 'When the operator expresses an"
+    " agent/skill-building intent, the orchestrator routes that intent to the"
+    " agent-builder canonical flow' (or equivalent) — currently the note lists"
+    " agent-builder as standalone but has no such reconciliation clause",
+)
+
+# ---------------------------------------------------------------------------
+# Group (g) — Facet B: residual-limit documented (host-auto-selection bypass)
+#
+# orchestrator.md must explicitly document the residual:
+#  (g1) Claude Code's native agent-description selector can dispatch
+#       th:agent-builder before the orchestrator sees the turn
+#  (g2) No hook can intercept native agent selection
+#  (g3) The Step 6a route covers orchestrator-mediated requests only —
+#       no over-claim of a full fix
+# ---------------------------------------------------------------------------
+
+check(
+    "suite73(g1-host-bypass-documented): orchestrator.md :150 standalone note"
+    " documents the host-layer auto-selection bypass — Claude Code native"
+    " selector can dispatch agent-builder before the orchestrator sees the turn",
+    (
+        # The residual must be documented in the standalone note (anchor-scoped).
+        # Pre-fix the note has no host-bypass language for agent-builder.
+        # Post-fix: a sentence about native selection / host auto-selection / no hook
+        # will appear near agent-builder in the standalone slice.
+        "native" in _s73_standalone_slice.lower()
+        or "host" in _s73_standalone_slice.lower()
+        or "auto-select" in _s73_standalone_slice.lower()
+        or "auto select" in _s73_standalone_slice.lower()
+        or "description" in _s73_standalone_slice.lower() and "select" in _s73_standalone_slice.lower()
+    ),
+    "orchestrator.md :150 standalone-agents note must document the host-layer"
+    " bypass: Claude Code's native agent-description selector can dispatch"
+    " th:agent-builder before the orchestrator sees the turn; no hook can"
+    " intercept native selection — currently absent from the standalone note",
+)
+
+check(
+    "suite73(g2-no-overclaim): orchestrator.md states the Step 6a route covers"
+    " only orchestrator-mediated requests (no over-claim of a full bypass fix)",
+    (
+        # The note must say the route covers orchestrator-mediated requests only
+        "orchestrator-mediated" in _s73_orch
+        or "orchestrator mediated" in _s73_orch.lower()
+        or (
+            "only" in _s73_standalone_slice.lower()
+            and (
+                "orchestrator" in _s73_standalone_slice
+                or "mediated" in _s73_standalone_slice.lower()
+            )
+        )
+    ),
+    "orchestrator.md must state the Step 6a route covers only"
+    " orchestrator-mediated requests — no over-claim that the host-layer"
+    " bypass is fully closed",
+)
+
+# ---------------------------------------------------------------------------
+# Group (h) — self-referential / registry guards
+#
+#  (h1) This test file contains the three required markers.
+#  (h2) docs/testing.md registers Suite 73 and the feature marker.
+#  (h3) CLAUDE.md does NOT contain 'Suite 73' (hygiene — canonical registry
+#       is docs/testing.md, same precedent as Suites 68-72).
+# ---------------------------------------------------------------------------
+
+_s73_this_file = read(Path(__file__))
+
+check(
+    "suite73(h1-self-ref): this test file contains 'Suite 73', '_slice_section',"
+    " and 'fix-agent-builder-and-diagram-routing'",
+    (
+        "Suite 73" in _s73_this_file
+        and "_slice_section" in _s73_this_file
+        and "fix-agent-builder-and-diagram-routing" in _s73_this_file
+    ),
+    "test file must contain the three required markers for Suite 73",
+)
+
+check(
+    "suite73(h2-registry): docs/testing.md registers Suite 73 and"
+    " fix-agent-builder-and-diagram-routing",
+    (
+        "Suite 73" in _s73_testing_md
+        and "fix-agent-builder-and-diagram-routing" in _s73_testing_md
+    ),
+    "docs/testing.md must register Suite 73 and the"
+    " 'fix-agent-builder-and-diagram-routing' marker",
+)
+
+check(
+    "suite73(h3-hygiene): CLAUDE.md does NOT contain 'Suite 73'",
+    "Suite 73" not in _s73_claude,
+    "CLAUDE.md must not mention Suite 73 — only docs/testing.md is the canonical"
+    " registry",
+)
+
+# ---------------------------------------------------------------------------
+# Group (i) — packaging
+#
+# Minor version bump 2.65.0 → 2.66.0 in both plugin files + CLAUDE.md §3.
+# CRITICAL: Assert the DURABLE CHANGELOG.md [2.66.0] section —
+# NEVER assert changelog.d/agent-builder-and-diagram-routing.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# Recurring-bug guard (recurred 3× before: #282/#285/#286).
+# ---------------------------------------------------------------------------
+
+_s73_changelog = read(REPO_ROOT / "CHANGELOG.md")
+
+check(
+    "suite73(i1-plugin-json): plugin.json version is 2.66.0",
+    _s59_ver_tuple(json.loads(_s73_plugin_json).get("version", "0.0.0")) >= (2, 66, 0),
+    "plugin.json version must be 2.66.0 or later (minor bump from 2.65.0"
+    " — distributed-asset change requires version bump)",
+)
+
+check(
+    "suite73(i2-marketplace-json): marketplace.json plugins[0].version is 2.66.0",
+    _s59_ver_tuple(
+        json.loads(_s73_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= (2, 66, 0),
+    "marketplace.json plugins[0].version must be 2.66.0 or later"
+    " (matched with plugin.json)",
+)
+
+check(
+    "suite73(i3-claude-version): CLAUDE.md §3 version is 2.66.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s73_claude) or "0.0.0") >= (2, 66, 0),
+    "CLAUDE.md §3 Current version must show 2.66.0 or later",
+)
+
+check(
+    "suite73(i4-changelog-section): CHANGELOG.md contains the 2.66.0 release section",
+    "## [2.66.0]" in _s73_changelog,
+    "CHANGELOG.md must contain a '## [2.66.0]' release section"
+    " (fragment assembled at delivery — do NOT assert changelog.d/ fragment existence)",
+)
+
+check(
+    "suite73(i5-changelog-entry): CHANGELOG.md 2.66.0 section documents"
+    " diagram-engine disambiguation or agent-builder routing",
+    (
+        "diagram" in _s73_changelog.lower()
+        or "agent-builder" in _s73_changelog.lower()
+        or "d2-diagram" in _s73_changelog.lower()
+        or "likec4" in _s73_changelog.lower()
+    )
+    and "2.66.0" in _s73_changelog,
+    "CHANGELOG.md must document diagram-engine disambiguation or agent-builder"
+    " routing reconciliation in the 2.66.0 release section",
+)
+
+# Marker: fix-agent-builder-and-diagram-routing
 
 # ---------------------------------------------------------------------------
 # Summary
