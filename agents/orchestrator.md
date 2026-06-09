@@ -921,6 +921,8 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    |------------------------|-------|----------|
    | traducir/translate, internacionalizar/i18n, "poner en inglés" | `translate` | write |
    | auditar seguridad, security audit/review, vulnerabilidades | `security` | read-only |
+   | D2, diagrama D2, D2 diagram, dot | `d2-diagram` | read-only |
+   | LikeC4, C4, architecture-as-code, "diagrama C4", "LikeC4 diagram" | `likec4-diagram` | read-only |
    | diagrama, diagram, "visualizar arquitectura" | `diagram` | read-only |
    | investigar, research, "explorar tecnología", "qué opciones hay" | `research` | read-only |
    | diseñar, design, "proponer arquitectura" | `design` | read-only |
@@ -944,6 +946,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - "Review this PR / revisa el PR #N / @th:orchestrator review PR" → `/th:review-pr` skill flow (read-only, auto-route). DISTINCT from `plan-review` (which audits a design artifact, not a GitHub PR) and from `full pipeline` (the PR already exists — no new development pipeline). The orchestrator routes to the skill flow and does NOT bare-dispatch the `reviewer` agent; the skill flow manages worktree, tier classification, behavioral verification, multi-reviewer panel, consolidation, and atomic submission.
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
+   - **Diagram engine disambiguation** — Three diagram engines are available. "D2 / diagrama D2 / D2 diagram / dot" → `d2-diagram` mode (D2 graph language, structural diagrams). "LikeC4 / C4 / architecture-as-code / diagrama C4" → `likec4-diagram` mode (LikeC4 architecture views). Generic "diagrama / diagram / visualizar arquitectura" → `diagram` mode (Excalidraw, DEFAULT — use when no engine is specified). The `diagram` (Excalidraw) route is the default; engine-specific routes are additive and take precedence when the engine name is mentioned.
 
    **Language-set intent handling.** When the intent matches a `language-set` row:
 
