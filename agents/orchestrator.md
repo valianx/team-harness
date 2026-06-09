@@ -147,7 +147,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `diagrammer` | Generates Excalidraw diagrams from architect analysis | No | `05-diagram.md` |
 | `gcp-cost-analyzer` | Analyzes GCP costs, inventories resources, fetches recommendations, produces optimization report | No | `00-gcp-costs.md` |
 
-> **Standalone agents** (not in pipeline, invoked directly by the user or via dedicated skills — never by the orchestrator): `translator`, `reviewer`, `agent-builder`.
+> **Standalone agents** (not in pipeline, invoked directly by the user or via dedicated skills — never by the orchestrator): `translator`, `reviewer`, `agent-builder`. The `reviewer` agent is never bare-dispatched by the orchestrator. When the operator expresses a PR-review intent ("review this PR", "revisa el PR #N"), the orchestrator routes that intent to the `/th:review-pr` skill flow — the canonical pipeline for PR reviews — which internally uses the reviewer panel. This satisfies the dev-mode "review → pipeline" disposition without contradicting the standalone rule: the orchestrator routes to the skill flow, not to the agent directly.
 
 > **Architecture note:** This system uses **subagents** (not agent teams) because the development pipeline is a predictable, sequential flow with clearly specialized roles. Each agent has a single responsibility and communicates unidirectionally through workspaces. Agent teams (bidirectional peer-to-peer) are experimental and suited for emergent collaboration — not needed here.
 
@@ -928,6 +928,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | definir criterios, define AC, "qué debería cumplir" | `define-ac` | read-only |
    | validar (implementación), validate, "verificar implementación" | `validate` | read-only |
    | revisar/auditar plan, "revisa el plan", review/audit my plan, "is my plan compliant?" | `plan-review` | read-only |
+   | revisar este PR, "revisa el PR #N", review this PR, review PR #N, @th:orchestrator review PR, "review pull request" | `/th:review-pr` skill flow | read-only |
    | planificar, plan, "desglosar en tareas", breakdown | `plan` | read-only |
    | spike, exploración rápida, prototype, PoC | `spike` | write |
    | documentar, documenta, document, "write docs", "genera documentación", "documenta en obsidian", "create documentation" | `docs` | write |
@@ -938,8 +939,9 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | feature, fix, bug, refactor, enhancement, hotfix, implementar, solucionar, arreglar, corregir, fixear, debuguear, regresión, error, "corrija un bug", "haga un fix", "haga un hotfix", "corregir error", "arreglar el bug", "hay un bug en X", "está rompiendo", "no funciona Y", "error en Z" | **full pipeline** | write |
    | ambiguous / mixed concerns | **unclear** | — |
 
-   **Disambiguation — `validate` vs `plan-review` vs substance refinement.**
+   **Disambiguation — `validate` vs `plan-review` vs `review-pr` vs substance refinement.**
    - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
+   - "Review this PR / revisa el PR #N / @th:orchestrator review PR" → `/th:review-pr` skill flow (read-only, auto-route). DISTINCT from `plan-review` (which audits a design artifact, not a GitHub PR) and from `full pipeline` (the PR already exists — no new development pipeline). The orchestrator routes to the skill flow and does NOT bare-dispatch the `reviewer` agent; the skill flow manages worktree, tier classification, behavioral verification, multi-reviewer panel, consolidation, and atomic submission.
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
 
