@@ -18158,6 +18158,129 @@ check(
 # Marker: d2-likec4-obsidian-output
 
 # ---------------------------------------------------------------------------
+# Suite 75 — hooks-secretscan-checkpoint-b2b3 (v2.68.0)
+# ---------------------------------------------------------------------------
+# Structural assertions for Facet A (secret-scanner in policy-block.sh) and
+# Facet B (checkpoint-guard B2/B3 extension). Written FAILING-FIRST in Phase 2.0.
+#
+# Assertions:
+#   (a1) hooks/policy-block.sh references a high-confidence secret pattern ("AKIA")
+#   (a2) hooks/policy-block.sh contains an ask() decision helper ("ask")
+#   (b1) hooks/checkpoint-guard.sh references "research-next" (B2 boundary value)
+#   (b2) hooks/checkpoint-guard.sh references "postverify-next" (B3 boundary value)
+#   (c1-c4) packaging: plugin.json 2.68.0, marketplace.json 2.68.0,
+#            CLAUDE.md §3 2.68.0, CHANGELOG.md [2.68.0] section present
+#   (d1) self-referential guard: test file contains "Suite 75" +
+#        "hooks-secretscan-checkpoint-b2b3"
+#   (d2) docs/testing.md registry contains "Suite 75"
+#   (d3) CLAUDE.md §11 does NOT contain "Suite 75" (hygiene contract)
+#
+# CRITICAL: changelog assertion targets the DURABLE CHANGELOG.md [2.68.0] section.
+# NEVER assert changelog.d/feat-hooks-secretscan-checkpoint-b2b3.md existence —
+# delivery deletes the fragment (recurring-bug guard, recurred 3x this session).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 75: hooks-secretscan-checkpoint-b2b3 (v2.68.0) ===")
+
+_s75_policy_block  = read(HOOKS_DIR / "policy-block.sh")
+_s75_chkpt_guard   = read(HOOKS_DIR / "checkpoint-guard.sh")
+_s75_plugin_json   = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s75_marketplace   = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s75_claude        = read(REPO_ROOT / "CLAUDE.md")
+_s75_changelog     = read(REPO_ROOT / "CHANGELOG.md")
+_s75_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s75_this_file     = read(Path(__file__))
+
+# (a1) policy-block.sh references the AWS high-confidence secret pattern (AKIA)
+check(
+    "suite75(a1-policy-block-akia): hooks/policy-block.sh references AKIA secret pattern",
+    "AKIA" in _s75_policy_block,
+    "hooks/policy-block.sh must contain the AKIA[0-9A-Z]{16} AWS-key pattern"
+    " — absent pre-fix (Facet A secret-scanner not yet implemented)",
+)
+
+# (a2) policy-block.sh contains an ask() helper for medium-confidence tier
+check(
+    "suite75(a2-policy-block-ask): hooks/policy-block.sh contains ask() decision",
+    '"ask"' in _s75_policy_block or "permissionDecision.*ask" in _s75_policy_block
+    or "ask" in _s75_policy_block,
+    "hooks/policy-block.sh must emit a permissionDecision: ask for medium-confidence patterns"
+    " — absent pre-fix (ask helper not yet added)",
+)
+
+# (b1) checkpoint-guard.sh references the B2 boundary value "research-next"
+check(
+    "suite75(b1-checkpoint-guard-b2): hooks/checkpoint-guard.sh references 'research-next'",
+    "research-next" in _s75_chkpt_guard,
+    "hooks/checkpoint-guard.sh must handle 'research-next' (B2 boundary)"
+    " — absent pre-fix (only B1 implemented today)",
+)
+
+# (b2) checkpoint-guard.sh references the B3 boundary value "postverify-next"
+check(
+    "suite75(b2-checkpoint-guard-b3): hooks/checkpoint-guard.sh references 'postverify-next'",
+    "postverify-next" in _s75_chkpt_guard,
+    "hooks/checkpoint-guard.sh must handle 'postverify-next' (B3 boundary)"
+    " — absent pre-fix (only B1 implemented today)",
+)
+
+# (c1) plugin.json version 2.68.0
+check(
+    "suite75(c1-plugin-json): plugin.json version is 2.68.0",
+    _s59_ver_tuple(json.loads(_s75_plugin_json).get("version", "0.0.0")) >= (2, 68, 0),
+    "plugin.json version must be 2.68.0 or later (minor bump for distributed-asset change)",
+)
+
+# (c2) marketplace.json version 2.68.0
+check(
+    "suite75(c2-marketplace-json): marketplace.json plugins[0].version is 2.68.0",
+    _s59_ver_tuple(
+        json.loads(_s75_marketplace).get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= (2, 68, 0),
+    "marketplace.json plugins[0].version must be 2.68.0 or later",
+)
+
+# (c3) CLAUDE.md §3 current-version 2.68.0
+check(
+    "suite75(c3-claude-version): CLAUDE.md §3 version is 2.68.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s75_claude) or "0.0.0") >= (2, 68, 0),
+    "CLAUDE.md §3 Current version must show 2.68.0 or later",
+)
+
+# (c4) CHANGELOG.md [2.68.0] section present (DURABLE — NEVER assert changelog.d/ fragment)
+check(
+    "suite75(c4-changelog-section): CHANGELOG.md contains the 2.68.0 release section",
+    "## [2.68.0]" in _s75_changelog,
+    "CHANGELOG.md must contain a '## [2.68.0]' release section"
+    " (fragment assembled at delivery — do NOT assert changelog.d/ fragment existence;"
+    " fragment is deleted by Step 9e: recurring-bug guard)",
+)
+
+# (d1) self-referential guard: test file contains both markers
+check(
+    "suite75(d1-self-ref-test-file): this test file contains 'Suite 75' and"
+    " 'hooks-secretscan-checkpoint-b2b3'",
+    "Suite 75" in _s75_this_file and "hooks-secretscan-checkpoint-b2b3" in _s75_this_file,
+    "test file must carry its own suite number and feature marker (self-referential guard)",
+)
+
+# (d2) docs/testing.md registry entry present
+check(
+    "suite75(d2-testing-md-registry): docs/testing.md registers 'Suite 75'",
+    "Suite 75" in _s75_testing_md,
+    "docs/testing.md must name Suite 75 (canonical suite registry)",
+)
+
+# (d3) CLAUDE.md hygiene: §11 must NOT contain 'Suite 75'
+check(
+    "suite75(d3-hygiene): CLAUDE.md does NOT contain 'Suite 75'",
+    "Suite 75" not in _s75_claude,
+    "CLAUDE.md must not mention Suite 75 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: hooks-secretscan-checkpoint-b2b3
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

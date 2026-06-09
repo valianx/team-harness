@@ -275,6 +275,195 @@ assert_deny "spoofed comment '# was true' — strict parse must produce DENY" "$
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
+# Case 13 — DENY: B2 (research-next) boundary armed, both conditions missing
+# ---------------------------------------------------------------------------
+echo
+echo "=== DENY: B2 (research-next) boundary armed, advance_fresh=false AND clarity=false ==="
+STATE_B2_BOTH_MISSING="$(cat <<'EOF'
+- checkpoint_boundary: research-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B2_BOTH_MISSING")
+assert_deny "B2 boundary armed, both missing (dispatch to th:implementer)" \
+    "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 14 — DENY: B2 armed, only advance_fresh missing
+# ---------------------------------------------------------------------------
+echo
+echo "=== DENY: B2 boundary armed, advance_fresh=false only ==="
+STATE_B2_FRESH_MISSING="$(cat <<'EOF'
+- checkpoint_boundary: research-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: true
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B2_FRESH_MISSING")
+assert_deny "B2 advance_fresh missing, clarity confirmed" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 15 — DENY: B2 armed, only clarity missing
+# ---------------------------------------------------------------------------
+echo
+echo "=== DENY: B2 boundary armed, clarity_confirmed=false only ==="
+STATE_B2_CLARITY_MISSING="$(cat <<'EOF'
+- checkpoint_boundary: research-next
+- checkpoint_advance_fresh: true
+- functional_clarity_confirmed: false
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B2_CLARITY_MISSING")
+assert_deny "B2 clarity missing, advance_fresh confirmed" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 16 — ALLOW: B2 armed, both conditions satisfied
+# ---------------------------------------------------------------------------
+echo
+echo "=== ALLOW: B2 boundary armed, both conditions satisfied ==="
+STATE_B2_SATISFIED="$(cat <<'EOF'
+- checkpoint_boundary: research-next
+- checkpoint_advance_fresh: true
+- functional_clarity_confirmed: true
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B2_SATISFIED")
+assert_allow "B2 both conditions satisfied" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 17 — ALLOW: B2 armed, skip marker fast_mode=true (per qa-plan note 2)
+# ---------------------------------------------------------------------------
+echo
+echo "=== ALLOW: B2 boundary armed, skip marker fast_mode=true ==="
+STATE_B2_FAST="$(cat <<'EOF'
+- checkpoint_boundary: research-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+- fast_mode: true
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B2_FAST")
+assert_allow "B2 boundary + fast_mode: true (skip marker honored)" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 18 — ALLOW: B2 armed, skip marker discover_state=bypassed (per qa-plan note 2)
+# ---------------------------------------------------------------------------
+echo
+echo "=== ALLOW: B2 boundary armed, skip marker discover_state=bypassed ==="
+STATE_B2_BYPASSED="$(cat <<'EOF'
+- checkpoint_boundary: research-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+- discover_state: bypassed
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B2_BYPASSED")
+assert_allow "B2 boundary + discover_state: bypassed (skip marker honored)" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 19 — DENY: B3 (postverify-next) boundary armed, both conditions missing
+# ---------------------------------------------------------------------------
+echo
+echo "=== DENY: B3 (postverify-next) boundary armed, advance_fresh=false AND clarity=false ==="
+STATE_B3_BOTH_MISSING="$(cat <<'EOF'
+- checkpoint_boundary: postverify-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B3_BOTH_MISSING")
+assert_deny "B3 boundary armed, both missing (dispatch to th:implementer)" \
+    "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 20 — ALLOW: B3 armed, both conditions satisfied
+# ---------------------------------------------------------------------------
+echo
+echo "=== ALLOW: B3 boundary armed, both conditions satisfied ==="
+STATE_B3_SATISFIED="$(cat <<'EOF'
+- checkpoint_boundary: postverify-next
+- checkpoint_advance_fresh: true
+- functional_clarity_confirmed: true
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B3_SATISFIED")
+assert_allow "B3 both conditions satisfied" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 21 — DENY: B3 armed, only advance_fresh missing
+# ---------------------------------------------------------------------------
+echo
+echo "=== DENY: B3 boundary armed, advance_fresh=false only ==="
+STATE_B3_FRESH_MISSING="$(cat <<'EOF'
+- checkpoint_boundary: postverify-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: true
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B3_FRESH_MISSING")
+assert_deny "B3 advance_fresh missing, clarity confirmed" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 22 — DENY: B3 armed, only clarity missing
+# ---------------------------------------------------------------------------
+echo
+echo "=== DENY: B3 boundary armed, clarity_confirmed=false only ==="
+STATE_B3_CLARITY_MISSING="$(cat <<'EOF'
+- checkpoint_boundary: postverify-next
+- checkpoint_advance_fresh: true
+- functional_clarity_confirmed: false
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B3_CLARITY_MISSING")
+assert_deny "B3 clarity missing, advance_fresh confirmed" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 23 — B1 REGRESSION GUARD: non-architect dispatch while B1 armed STILL allows
+# This mirrors Case 8 (original regression guard) after the B2/B3 refactor.
+# The B2/B3 extension must NOT change B1 behavior: when B1 (intake-plan) is
+# armed, only th:architect is gated; th:implementer still allows.
+# ---------------------------------------------------------------------------
+echo
+echo "=== B1 regression guard: th:implementer while B1 (intake-plan) armed still ALLOWS ==="
+STATE_B1_ARMED_IMPL="$(cat <<'EOF'
+- checkpoint_boundary: intake-plan
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B1_ARMED_IMPL")
+assert_allow "B1 armed + th:implementer dispatch (regression guard: Case 8 preserved)" \
+    "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Case 24 — B3 armed, skip marker fast_mode=true (per qa-plan note 2)
+# ---------------------------------------------------------------------------
+echo
+echo "=== ALLOW: B3 boundary armed, skip marker fast_mode=true ==="
+STATE_B3_FAST="$(cat <<'EOF'
+- checkpoint_boundary: postverify-next
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+- fast_mode: true
+EOF
+)"
+TMP=$(make_tmp_workspace "$STATE_B3_FAST")
+assert_allow "B3 boundary + fast_mode: true (skip marker honored at B3)" "$TMP" "$IMPLEMENTER_PAYLOAD"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo

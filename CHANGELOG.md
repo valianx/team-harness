@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.68.0] - 2026-06-09
+
+### Added
+- `hooks/policy-block.sh` — secret-scanner tier: high-confidence prefix patterns (AWS `AKIA[0-9A-Z]{16}`, GitHub `ghp_`/`github_pat_`, PEM private-key headers, `sk-`, `xoxb-`) deny fail-CLOSED; medium-confidence generic `KEY=/TOKEN=/SECRET=/PASSWORD=` + Shannon-entropy ≥3.5 value asks (operator confirms). Scan surface: `Write` content, `Edit` `new_string`, `NotebookEdit` `new_source`, commit-`Bash` commands. `.env.example/.sample/.template` allowlist short-circuits before the scan. Codifies CLAUDE.md §6.5 no-secrets rule at the deterministic hook layer.
+
+### Changed
+- `hooks/checkpoint-guard.sh` — extended from B1-only to B1/B2/B3: B1 (`intake-plan`) preserved name-keyed (`th:architect` only); B2 (`research-next`) and B3 (`postverify-next`) boundary-keyed (gate fires on any Task dispatch when the boundary is armed). Skip markers, strict line-token parsing, and fail-OPEN posture unchanged.
+- Plugin version bumped 2.67.0 → 2.68.0.
+
 ## [2.67.0] - 2026-06-09
 
 ### Added

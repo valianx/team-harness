@@ -45,10 +45,6 @@ input="$(cat)"
 
 # ---------------------------------------------------------------------------
 # Step 2 — Extract subagent_type from the JSON payload.
-# We need to identify whether the Task targets a gated phase agent.
-# Gated agents: th:architect (B1 — intake→plan).
-# B2/B3 gates are enforced by the orchestrator self-check (Layer 2) because
-# they dispatch non-fixed subagent types depending on context.
 # ---------------------------------------------------------------------------
 
 # Strict line-level extraction: look for "subagent_type" key, take its value.
@@ -68,21 +64,13 @@ else
     subagent_type=$(printf '%s' "$input" | grep -o '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"subagent_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
 fi
 
-# Only B1 is hook-enforced. B2/B3 rely on Layer-2 self-check.
-if [ "$subagent_type" != "th:architect" ]; then
-    allow
-fi
-
 # ---------------------------------------------------------------------------
 # Step 3 — Locate 00-state.md
 # The hook environment provides the working directory via $CWD or the process
-# working directory. We search up to 2 levels of workspaces/ directories.
+# working directory. We search up to 5 levels for workspaces/ subtrees.
 # ---------------------------------------------------------------------------
 
 STATE_FILE=""
-
-# Search heuristic: walk up from cwd looking for a workspaces/ subtree
-# containing 00-state.md (most recently modified wins if multiple found).
 search_root="${CWD:-$(pwd)}"
 
 # Look for workspaces/*/00-state.md and obsidian-style work-logs/*/*/00-state.md
@@ -115,6 +103,7 @@ read_field() {
 
 # ---------------------------------------------------------------------------
 # Step 5 — Check skip markers (deliberate opt-out → allow unconditionally)
+# Applied before the boundary branch; honoured at B1, B2, and B3 equally.
 # ---------------------------------------------------------------------------
 
 # fast_mode: true → skip marker active
@@ -133,7 +122,7 @@ if grep -q "^[[:space:]]*-[[:space:]]*bug_tier:[[:space:]]*[0-4][[:space:]]*$" "
 fi
 
 # ---------------------------------------------------------------------------
-# Step 6 — Check whether the checkpoint is armed
+# Step 6 — Read checkpoint_boundary and determine which gate (if any) is armed
 # ---------------------------------------------------------------------------
 
 # checkpoint_boundary: null → checkpoint is not armed; allow the dispatch.
@@ -146,8 +135,44 @@ if ! grep -q "^[[:space:]]*-[[:space:]]*checkpoint_boundary:" "$STATE_FILE" 2>/d
     allow
 fi
 
+# Extract the checkpoint_boundary value with strict line-token parsing.
+boundary_value=""
+boundary_value=$(grep "^[[:space:]]*-[[:space:]]*checkpoint_boundary:[[:space:]]*" "$STATE_FILE" 2>/dev/null \
+    | head -1 \
+    | sed 's/^[[:space:]]*-[[:space:]]*checkpoint_boundary:[[:space:]]*//' \
+    | sed 's/[[:space:]]*$//' \
+    || true)
+
 # ---------------------------------------------------------------------------
-# Step 7 — Evaluate the advance contract
+# Step 7 — B1 gate: name-keyed (preserves existing behaviour exactly).
+# When B1 (intake-plan) is armed, only th:architect triggers the advance check.
+# A non-architect dispatch while B1 is armed still allows (Case 8).
+# ---------------------------------------------------------------------------
+
+if [ "$boundary_value" = "intake-plan" ]; then
+    if [ "$subagent_type" != "th:architect" ]; then
+        allow
+    fi
+    # Fall through to advance-contract evaluation below (same predicate as B2/B3).
+fi
+
+# ---------------------------------------------------------------------------
+# Step 8 — B2/B3 gate: boundary-keyed.
+# When research-next or postverify-next is armed, the boundary itself is the
+# arming signal — evaluate the advance contract on ANY Task dispatch regardless
+# of destination agent. B2/B3 dispatch variable subagent types; keying on the
+# boundary value is the only stable arming signal already recorded in 00-state.md.
+# ---------------------------------------------------------------------------
+
+if [ "$boundary_value" != "intake-plan" ] && \
+   [ "$boundary_value" != "research-next" ] && \
+   [ "$boundary_value" != "postverify-next" ]; then
+    # Unknown boundary value — treat as unarmed (fail-open).
+    allow
+fi
+
+# ---------------------------------------------------------------------------
+# Step 9 — Evaluate the advance contract
 # Both conditions must hold: checkpoint_advance_fresh: true AND
 # functional_clarity_confirmed: true
 # ---------------------------------------------------------------------------
@@ -167,13 +192,39 @@ if [ "$advance_fresh" = "true" ] && [ "$clarity_confirmed" = "true" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 8 — Deny: explain which condition is missing
+# Step 10 — Deny: explain which condition is missing, naming the active boundary
 # ---------------------------------------------------------------------------
 
-if [ "$advance_fresh" = "false" ] && [ "$clarity_confirmed" = "false" ]; then
-    deny "Reasoning checkpoint not satisfied at boundary B1 (intake→plan): fresh advance signal missing and functional clarity artifact not confirmed. Respond to the planning-confirmation prompt and confirm the functional statement before the architect is dispatched."
-elif [ "$advance_fresh" = "false" ]; then
-    deny "Reasoning checkpoint not satisfied at boundary B1 (intake→plan): fresh advance signal missing. Respond explicitly to the planning-confirmation prompt (¿Pasamos a planeación? [plan/explorar]) before the architect is dispatched."
-else
-    deny "Reasoning checkpoint not satisfied at boundary B1 (intake→plan): functional clarity artifact not confirmed. Confirm a short functional statement (what we are building, functionally) before the architect is dispatched."
-fi
+case "$boundary_value" in
+    "intake-plan")
+        if [ "$advance_fresh" = "false" ] && [ "$clarity_confirmed" = "false" ]; then
+            deny "Reasoning checkpoint not satisfied at boundary B1 (intake→plan): fresh advance signal missing and functional clarity artifact not confirmed. Respond to the planning-confirmation prompt and confirm the functional statement before the architect is dispatched."
+        elif [ "$advance_fresh" = "false" ]; then
+            deny "Reasoning checkpoint not satisfied at boundary B1 (intake→plan): fresh advance signal missing. Respond explicitly to the planning-confirmation prompt (¿Pasamos a planeación? [plan/explorar]) before the architect is dispatched."
+        else
+            deny "Reasoning checkpoint not satisfied at boundary B1 (intake→plan): functional clarity artifact not confirmed. Confirm a short functional statement (what we are building, functionally) before the architect is dispatched."
+        fi
+        ;;
+    "research-next")
+        if [ "$advance_fresh" = "false" ] && [ "$clarity_confirmed" = "false" ]; then
+            deny "Reasoning checkpoint not satisfied at boundary B2 (research→next): fresh advance signal missing and functional clarity artifact not confirmed. Confirm what to do with the research findings and provide a fresh advance signal before the next phase is dispatched."
+        elif [ "$advance_fresh" = "false" ]; then
+            deny "Reasoning checkpoint not satisfied at boundary B2 (research→next): fresh advance signal missing. Respond explicitly to the checkpoint prompt before the next phase is dispatched."
+        else
+            deny "Reasoning checkpoint not satisfied at boundary B2 (research→next): functional clarity artifact not confirmed. Confirm the direction for the next step based on the research findings."
+        fi
+        ;;
+    "postverify-next")
+        if [ "$advance_fresh" = "false" ] && [ "$clarity_confirmed" = "false" ]; then
+            deny "Reasoning checkpoint not satisfied at boundary B3 (postverify→next): fresh advance signal missing and functional clarity artifact not confirmed. Confirm direction for the next step after verification and provide a fresh advance signal."
+        elif [ "$advance_fresh" = "false" ]; then
+            deny "Reasoning checkpoint not satisfied at boundary B3 (postverify→next): fresh advance signal missing. Respond explicitly to the checkpoint prompt before the next phase is dispatched."
+        else
+            deny "Reasoning checkpoint not satisfied at boundary B3 (postverify→next): functional clarity artifact not confirmed. Confirm the direction for the next step after verification."
+        fi
+        ;;
+    *)
+        # Should not reach here (handled in Step 8), but fail-open just in case.
+        allow
+        ;;
+esac
