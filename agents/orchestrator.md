@@ -223,13 +223,18 @@ workspaces/{feature-name}/
 
 `base_path` and `logs_mode` were resolved in **Mandatory boot sequence → Step 3**. Do NOT re-read the manifest here — use the values already stored from boot. If you skipped Step 3 at boot, stop and re-do the full boot sequence now.
 
-The workspaces root for this pipeline run is: `{base_path}/{YYYY-MM-DD}_{feature-name}/` where the date is today's date in ISO format (e.g., `2026-05-24`). This resolved value is called `docs_root`.
+The workspaces root for this pipeline run is: `{base_path}/{YYYY-MM-DD}_{feature-name}/` where the date is today's date in **UTC** ISO format (e.g., `2026-05-24`). This resolved value is called `docs_root`.
+
+**Date prefix is cosmetic/display-only.** The `{YYYY-MM-DD}` prefix anchors the folder to its creation day (UTC) as a human-readable label only. It is ignored when matching or resolving an existing workspace — a build created on a different day is found by its identity slug, never by date. No code path may branch "new date → new workspace." See **At task start** below.
 
 **Path convention.** Throughout this document, `workspaces/{feature-name}/` is shorthand for `{docs_root}/` — the fully resolved workspaces path for this pipeline run. `docs_root` is persisted in `00-state.md § Current State` so it survives context compaction without re-reading the manifest. After compaction or recovery, read `docs_root` from state — do NOT re-derive from the manifest or cwd.
 
-**At task start:**
-1. Use Glob to check for existing `{base_path}/{YYYY-MM-DD}_{feature-name}/`. If it exists, **read `00-state.md` first** (pipeline checkpoint), then read other files as needed to resume.
-2. Create the folder if it doesn't exist.
+**At task start (identity-keyed, date-agnostic):**
+1. Use Glob to check for existing `{base_path}/*_{feature-name}/` (date-agnostic wildcard — the `*_` absorbs any `{YYYY-MM-DD}_` prefix so a day-rollover or local/UTC mismatch never forks). For each candidate, read its `00-state.md` frontmatter and confirm `feature:` equals `{feature-name}` (identity key). Join on the first confirmed match. If it exists, **read `00-state.md` first** (pipeline checkpoint), then read other files as needed to resume.
+
+   **Backward compatibility — single-shot feature/fix (no plan/milestones):** this date-agnostic glob + frontmatter-confirm rule is the only change; the `{date}_{feature}` single-workspace behavior is otherwise unchanged and byte-identical. The new milestone-continuity detect-and-continue path (see **Step 1d**) activates only for multi-milestone `type: plan` builds.
+
+2. Create the folder if it doesn't exist (use the UTC date prefix for the new folder name).
 3. Ensure `.gitignore` includes `/workspaces`.
 4. Pass the resolved workspaces path to every agent so they write to the correct folder.
 
@@ -793,7 +798,30 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    This step runs BEFORE creating workspaces so that `00-state.md` is written with the correct language from the start.
 
-1d. **MANDATORY — Create workspaces immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title. Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
+1d. **MANDATORY — Create workspaces immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title.
+
+   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and nest the milestone as a child step instead of creating a new top-level sibling.
+
+   Detection algorithm:
+   1. Extract the plan identity slug from the task description (e.g., "v1-mvp-build" from "implement M0 of v1-mvp-build").
+   2. Glob `{base_path}/*_{plan-slug}/` (date-agnostic) and confirm by reading `00-state.md` frontmatter (`feature:` == `plan-slug`).
+   3. On first confirmed match: set `plan_workspace = {matched-path}`; compute `milestone_workspace = {plan_workspace}/{NN}_{milestone-slug}/` where `NN` is the zero-padded milestone sequence number (e.g., `01_m0-skeleton`). Use `milestone_workspace` as `docs_root` for this pipeline run.
+   4. Update the plan's `00-state.md` milestone index (see **Milestone Index** below): replace the row for this milestone in-place (if it exists) or append it (if absent). Never duplicate a row for the same milestone slug.
+   5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
+
+   **Milestone Index.** When a milestone execution nests under a plan workspace, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
+   ```
+   ## Milestone Index
+   | Milestone | Slug | Status | Branch | PR |
+   |-----------|------|--------|--------|----|
+   | M0 | m0-skeleton | implementing | fix/m0-skeleton | — |
+   | M1 | m1-api | pending | — | — |
+   ```
+   Status values: `pending` → `implementing` → `complete`. Replace the row in-place; never append a duplicate row for the same slug.
+
+   This generalizes the #283/#285 initiative parent-index + nested-children + identity-keyed-resolution pattern: the plan workspace is the parent home; each milestone is a nested child step with its own `02-implementation.md`, `03-testing.md`, `04-validation.md`, and PR; the milestone index in the plan's `00-state.md` tracks per-milestone status.
+
+   Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
    - `status: classifying`
    - `logs_mode: {logs_mode}` (from boot)
    - `events_file: {events_file}` (from boot)
