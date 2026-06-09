@@ -78,9 +78,15 @@ These four fields coexist with the existing `discover_state`, `advance_signal`, 
 
 **Hook reads only the four clarity fields.** The hook does NOT read `security_sensitive`, `security_gate_status`, or any other security-related field from `00-state.md`. Its input is strictly limited to `checkpoint_boundary`, `checkpoint_advance_fresh`, `functional_clarity_artifact`, and `functional_clarity_confirmed`. The hook never conditions its decision on a security field.
 
-### Dev mode — Layer-1 hook is the active floor at top level
+### Dev mode — Layer-1 hook is the active floor at all three boundaries
 
-When dev mode is active (the `developer-mode` output style is loaded, signalled by `~/.claude/.dev-mode-active` containing `dev_mode: true`), the top-level agent IS the orchestrator and the `Task` tool is always available. The Layer-1 hook (`hooks/checkpoint-guard.sh`, `PreToolUse`/matcher `Task`) fires on every leaf agent dispatch — including B1 (intake → plan), B2 (research → next), and B3 (postverify → next). This promotes the B1/B2/B3 boundaries from the Layer-2 self-check (non-deterministic, relies on orchestrator discipline) to the Layer-1 deterministic floor. In dev mode, the checkpoint gate is as strong as in a standard top-level orchestrator session. This is a strengthening, not a regression: security floors remain independent of the checkpoint state regardless of mode.
+When dev mode is active (the `developer-mode` output style is loaded, signalled by `~/.claude/.dev-mode-active` containing `dev_mode: true`), the top-level agent IS the orchestrator and the `Task` tool is always available. The Layer-1 hook (`hooks/checkpoint-guard.sh`, `PreToolUse`/matcher `Task`) fires on every leaf agent dispatch — covering all three boundaries:
+
+- **B1 (intake → plan):** name-keyed — gate fires only when the destination is `th:architect`. A non-architect dispatch while B1 is armed still allows (the orchestrator may dispatch other agents at B1 without triggering the gate).
+- **B2 (research → next):** boundary-keyed — gate fires on ANY Task dispatch when `checkpoint_boundary: research-next` is armed. B2 dispatches variable subagent types depending on context; the boundary value is the stable arming signal.
+- **B3 (postverify → next):** boundary-keyed — gate fires on ANY Task dispatch when `checkpoint_boundary: postverify-next` is armed, for the same reason as B2.
+
+This promotes all three B1/B2/B3 boundaries from the Layer-2 self-check (non-deterministic, relies on orchestrator discipline) to the Layer-1 deterministic floor. In dev mode, the checkpoint gate is as strong as in a standard top-level orchestrator session. This is a strengthening, not a regression: security floors remain independent of the checkpoint state regardless of mode.
 
 ### Layer 2 — Orchestrator self-check (floor in nested-context sessions)
 
