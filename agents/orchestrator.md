@@ -800,26 +800,28 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
 1d. **MANDATORY — Create workspaces immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title.
 
-   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and nest the milestone as a child step instead of creating a new top-level sibling.
+   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
 
    Detection algorithm:
    1. Extract the plan identity slug from the task description (e.g., "v1-mvp-build" from "implement M0 of v1-mvp-build").
    2. Glob `{base_path}/*_{plan-slug}/` (date-agnostic) and confirm by reading `00-state.md` frontmatter (`feature:` == `plan-slug`).
-   3. On first confirmed match: set `plan_workspace = {matched-path}`; compute `milestone_workspace = {plan_workspace}/{NN}_{milestone-slug}/` where `NN` is the zero-padded milestone sequence number (e.g., `01_m0-skeleton`). Use `milestone_workspace` as `docs_root` for this pipeline run.
+   3. On first confirmed match: set `plan_workspace = {matched-path}`; use `plan_workspace` as `docs_root` for this pipeline run. Do NOT create a `{NN}_{milestone-slug}/` sub-folder — milestones are commits within ONE flat workspace, not nested child workspaces.
    4. Update the plan's `00-state.md` milestone index (see **Milestone Index** below): replace the row for this milestone in-place (if it exists) or append it (if absent). Never duplicate a row for the same milestone slug.
    5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
 
-   **Milestone Index.** When a milestone execution nests under a plan workspace, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
+   **Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
    ```
    ## Milestone Index
-   | Milestone | Slug | Status | Branch | PR |
-   |-----------|------|--------|--------|----|
-   | M0 | m0-skeleton | implementing | fix/m0-skeleton | — |
-   | M1 | m1-api | pending | — | — |
+   | Milestone | Slug | Status | Commit |
+   |-----------|------|--------|--------|
+   | M0 | m0-skeleton | implementing | — |
+   | M1 | m1-api | pending | — |
    ```
-   Status values: `pending` → `implementing` → `complete`. Replace the row in-place; never append a duplicate row for the same slug.
+   Status values: `pending` → `implementing` → `complete`. The `Commit` column records the commit sha after each milestone lands on the single feature branch. No per-milestone `PR` column — milestones are commits, not PRs. A single build-level PR is recorded once at the end (when ALL milestones are complete). Replace the row in-place; never append a duplicate row for the same slug.
 
-   This generalizes the #283/#285 initiative parent-index + nested-children + identity-keyed-resolution pattern: the plan workspace is the parent home; each milestone is a nested child step with its own `02-implementation.md`, `03-testing.md`, `04-validation.md`, and PR; the milestone index in the plan's `00-state.md` tracks per-milestone status.
+   **Parallelization.** Independent milestone implementations MUST be PARALLELIZED whenever the `01-plan.md` dependency annotations allow, reusing the #285 in-message concurrent-`Task` mechanism at milestone granularity within ONE workspace. Dependent milestones serialize in dependency order. Each parallel lane works in an isolated worktree; at the convergence barrier the orchestrator applies each lane's diff as ONE COMMIT to the single feature branch in dependency order (committed serially, never concurrently). The result is one feature branch, one commit per milestone (in dependency order), ONE PR at the end.
+
+   This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace is the single home; the milestone index in the plan's `00-state.md` tracks per-milestone status and commit shas; stage files (`02-implementation.md`, `03-testing.md`, `04-security.md`, `04-validation.md`) are FLAT, whole-task documents covering the entire build — not split or suffixed per milestone.
 
    Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
    - `status: classifying`

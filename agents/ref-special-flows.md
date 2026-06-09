@@ -71,7 +71,7 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeli
 | `01-planning.md` | planning mode (`/th:plan`, `/th:plan plan-and-execute`) | orchestrator (multi-task dispatch) | break a broad scope into N parallel tasks |
 | `01-plan.md` | design mode (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List); milestone-build home |
 
-**Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See **Milestone-Build Flow** below.
+**Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 
 Inside each task dispatched by `plan-and-execute`, the child orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's PRs. The parent batch orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
 
@@ -96,44 +96,70 @@ Inside each task dispatched by `plan-and-execute`, the child orchestrator runs t
 
 ## Milestone-Build Flow (single-repo `type: plan`)
 
-A milestone build is when one project is decomposed into milestones (M0…MN) and the operator executes each milestone as a step of the plan. This is the **one-build-one-workspace model**: the plan workspace is the home; milestone executions nest as child steps under it.
+A milestone build is when one project is decomposed into milestones (M0…MN) and the operator executes each milestone as a step of the plan. This is the **one-build-one-workspace model**: one task = one plan (`01-plan.md`) = one workspace = ONE PR (opened only when ALL milestones are complete).
 
 **Governing invariant:** a build is identified by IDENTITY, never the date. The orchestrator MUST NEVER create a new plan or workspace because the date changed. No code path may branch "new date → new workspace."
 
+**Milestone definition.** A milestone is an internal unit of work-division WITHIN ONE TASK that maps to ONE COMMIT on the single feature branch. Milestones are NOT deliverables and NOT PRs — they are commit-sized steps that (a) produce a clean granular history and (b) can be PARALLELIZED when independent. The task ships as ONE PR at the end after all milestones are complete.
+
+**PROHIBITED — per-milestone artifact splitting:** Per-milestone-suffixed filenames (e.g., `02-implementation-m{N}.md`, `03-testing-m1.md`) and `{NN}_{milestone}/` child folders (e.g., `01_m0-skeleton/`, `02_m1-api/`) are explicitly PROHIBITED. Agents that create these are in defect.
+
+**Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `04-security.md`, and `04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
+
+**Milestone Index (summary).** The plan's `00-state.md` `## Milestone Index` table tracks one row per milestone with a `Commit` column (commit sha per milestone). No per-milestone `PR` column. A single build-level PR is recorded once at the end.
+
+```
+## Milestone Index
+| Milestone | Slug | Status | Commit |
+|-----------|------|--------|--------|
+| M0 | m0-skeleton | complete | abc1234 |
+| M1 | m1-api | implementing | — |
+```
+
 ### Plan artifact: `01-plan.md`
 
-The plan artifact for a milestone build is **`01-plan.md`** — the architect writes the milestone decomposition (Work Plan with milestones M0…MN, per-milestone ACs) into `01-plan.md` as the build home. This is distinct from:
-- `01-planning.md` (planning-mode batch: multi-task dispatch via `/th:plan`, consumed by the multi-task dispatcher)
-- A child milestone's own `02-implementation.md`, `03-testing.md`, `04-validation.md` (written inside the milestone's nested workspace)
+The plan artifact for a milestone build is **`01-plan.md`** — the architect writes the milestone decomposition (Work Plan with milestones M0…MN) into `01-plan.md` as the build home. The milestone breakdown — WITH per-milestone **dependency annotations** (independent vs depends-on-Mx) — lives ONLY in `01-plan.md`. This is distinct from:
+- `01-planning.md` (planning-mode batch: multi-task dispatch via `/th:plan`, consumed by the multi-task dispatcher — preserved, not renamed)
 
-### One-build-one-workspace structure
+### One-build-one-workspace structure (FLAT whole-task stage files)
 
 ```
-{plan_workspace}/           ← plan home (e.g., 2026-06-08_v1-mvp-build/)
-  00-state.md               ← pipeline state + Milestone Index (build-level)
-  01-plan.md                ← milestone decomposition (architect output)
-  00-knowledge-context.md   ← KG results (if any)
-  01_m0-skeleton/           ← milestone M0 child workspace (nested one level)
-    02-implementation.md
-    03-testing.md
-    04-validation.md
-  02_m1-api/                ← milestone M1 child workspace
-    02-implementation.md
-    ...
+{plan_workspace}/                 ← the ONE workspace = the ONE task (e.g., 2026-06-08_v1-mvp-build/)
+  00-state.md                     ← pipeline state + Milestone Index (Commit column; single build-level PR)
+  00-knowledge-context.md         ← KG results (if any)
+  00-execution-events.md          ← event trace
+  01-plan.md                      ← milestone breakdown w/ per-milestone DEPENDENCY annotations (independent vs depends-on-Mx)
+  02-implementation.md            ← FLAT whole-task implementer report (NO per-milestone subsections)
+  03-testing.md                   ← FLAT whole-task tester report
+  04-security.md                  ← FLAT whole-task security report (tier-gated)
+  04-validation.md                ← FLAT whole-task qa report
+  00-pipeline-summary.md          ← rollup
 ```
 
-Each milestone's child workspace carries its own implementation, testing, validation artifacts, and PR. The plan's `00-state.md` carries a **build-level milestone index** (see format below). The plan home (`01-plan.md`) is never overwritten by milestone executions.
+One flat workspace. ONE file of each stage type, each covering the WHOLE TASK with no per-milestone subsections. NO child workspaces, NO `{NN}_{milestone-slug}/` sub-folders, NO `-m{N}`-suffixed files (e.g., `02-implementation-m1.md` is PROHIBITED). The milestone breakdown lives ONLY in `01-plan.md`.
+
+The `02-implementation.md`, `03-testing.md`, `04-security.md`, and `04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
 
 ### Milestone execution: detect-and-continue by identity
 
 When the operator says "implement M0" (or "build M1", "execute milestone X"), the orchestrator:
 
 1. Extracts the plan identity slug from the task description.
-2. Runs the date-agnostic glob + frontmatter confirm (identical to the initiative JOIN rule at `orchestrator.md:818-824`) to locate the plan workspace by identity.
-3. On confirmed match: nests the milestone as a child step `{plan_workspace}/{NN}_{milestone-slug}/` — this is the detect-and-continue path. No new top-level sibling workspace is created.
+2. Runs the date-agnostic glob + frontmatter confirm (identical to the initiative JOIN rule) to locate the plan workspace by identity.
+3. On confirmed match: resumes the SAME plan workspace as `docs_root` — this is the detect-and-continue path. No new top-level sibling workspace is created; no `{NN}_{milestone-slug}/` sub-folder is nested.
 4. On no match: treats the task as a standalone pipeline (normal behavior).
 
-The detect-and-continue check runs in `orchestrator.md` **Step 1d** before composing a fresh `docs_root`. This is the Defect A fix: milestone execution continues inside the plan's workspace instead of minting a sibling `{date}_{feature}` folder.
+The detect-and-continue check runs in `orchestrator.md` **Step 1d** before composing a fresh `docs_root`. Milestone execution continues inside the plan's workspace instead of minting a sibling `{date}_{feature}` folder.
+
+### Independent milestones: parallelization + convergence
+
+**Parallelization.** The milestone breakdown in `01-plan.md` carries per-milestone dependency annotations (`independent` vs `depends-on-Mx`). Independent milestone implementations MUST be PARALLELIZED whenever dependencies allow, reusing the #285 in-message concurrent-`Task` mechanism at MILESTONE granularity within ONE workspace. Dependent milestones serialize in dependency order.
+
+**Convergence (race-free, one commit per milestone).** Each parallel lane implements its milestone in an isolated worktree (no file-system race between lanes). At the convergence barrier the orchestrator applies each completed lane's diff as ONE COMMIT to the single feature branch, in dependency order. Commits are applied serially to the branch — never concurrently — so the history is deterministic: one commit per milestone, dependency-ordered.
+
+**Result:** one feature branch, one commit per milestone (in dependency order), ONE PR opened at the end after STAGE-GATE-3.
+
+**Concurrency cap.** Reuse `batch_concurrency` (default 5); a milestone fan-out larger than the cap splits into waves using the same eager slot-fill rule as the worktree batch model.
 
 ### Build-level milestone index
 
@@ -141,18 +167,25 @@ The plan's `00-state.md` carries a `## Milestone Index` table. The orchestrator 
 
 ```markdown
 ## Milestone Index
-| Milestone | Slug | Status | Branch | PR |
-|-----------|------|--------|--------|----|
-| M0 | m0-skeleton | complete | fix/m0-skeleton | #42 |
-| M1 | m1-api | implementing | fix/m1-api | — |
-| M2 | m2-worker | pending | — | — |
+| Milestone | Slug | Status | Commit |
+|-----------|------|--------|--------|
+| M0 | m0-skeleton | complete | abc1234 |
+| M1 | m1-api | implementing | — |
+| M2 | m2-worker | pending | — |
+
+Build PR: #42 (recorded once when ALL milestones are complete)
 ```
 
-Status values: `pending` → `implementing` → `complete`. One row per milestone; replace-in-place; no duplicate rows.
+Status values: `pending` → `implementing` → `complete`. One row per milestone; replace-in-place; no duplicate rows. The `Commit` column records the commit sha after each milestone lands. The `PR` column is REMOVED — milestones are commits, not PRs. A single build-level PR is recorded once at the end.
 
-### Per-milestone pipeline
+### Gate model (once each)
 
-Each milestone runs the full standard pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3) scoped to its child workspace. Each milestone PR branches from a fresh `main` after the prior milestone merges (no stacked PRs; see `stacked-branch-rebase-onto-fresh-main` in the KG).
+| Gate | Fires | Scope |
+|------|-------|-------|
+| STAGE-GATE-1 | ONCE | Approve the whole milestone plan (`01-plan.md`) including the dependency graph + parallelization layout. NOT per-milestone. |
+| (implement) | per milestone | Implement milestone (parallel where independent, serial where dependent) → ONE COMMIT on the single feature branch (dependency order) → update Milestone Index status + record the commit sha. NO per-milestone PR, NO per-milestone gate. |
+| (verify) | once, whole-task | The flat whole-task `03-testing.md` / `04-validation.md` (and `04-security.md` if tier-gated) cover the whole task. No gate fires per milestone. |
+| STAGE-GATE-3 | ONCE | After ALL milestones are complete (functionality complete). ONE PR opened with all milestone commits. NOT per-milestone. |
 
 ---
 

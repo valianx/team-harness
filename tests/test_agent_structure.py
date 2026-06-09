@@ -16071,9 +16071,9 @@ check(
 # Marker: parallel-multi-project-dispatch
 
 # ---------------------------------------------------------------------------
-# Suite 70 — fix-plan-execution-workspace-continuity (v2.62.0)
+# Suite 70 — fix-plan-execution-workspace-continuity (v2.64.0)
 # ---------------------------------------------------------------------------
-# Regression tests for three defects fixed in this PR:
+# Regression tests covering workspace-continuity (PRs #286 + this fix):
 #
 #   Defect A — workspace fragmentation: milestone execution mints a new top-level
 #              workspace sibling instead of continuing inside the plan's workspace.
@@ -16083,23 +16083,28 @@ check(
 #   Defect B — disambiguation (no mass-rename): 01-planning.md (planning-mode
 #              batch) and 01-plan.md (design/milestone build) are distinct and
 #              BOTH must be documented; mass-rename would regress the distinction.
+#   Defect D — wrong milestone model: #286 modeled each milestone as a child
+#              workspace with its own STAGE-GATE-3 and PR; the correct model is
+#              milestones = internal commit-sized units within ONE workspace,
+#              NOT deliverables and NOT PRs.
 #
 # Group (a): UTC pin — FAIL pre-fix (no UTC wording at workspace-root definition)
 # Group (b): identity-keyed date-agnostic resume — FAIL pre-fix (exact-date glob)
-# Group (c): milestone-continuity contract — FAIL pre-fix (not documented)
-# Group (d): backward-compat negative assertion — FAIL pre-fix (guard absent)
-# Group (e): self-ref / registry — FAIL pre-fix (suite not yet registered)
-# Group (f): packaging — FAIL pre-fix (version still 2.61.0)
+# Group (c): milestone FINAL-contract assertions — FAIL against current main
+#             (old #286 child-workspace / per-milestone-PR text still present)
+# Group (d): backward-compat negative assertion — FROZEN (must stay passing)
+# Group (e): self-ref / registry — passes once suite is registered
+# Group (f): packaging — FAIL pre-fix (version still 2.62.0/2.63.0)
 #
 # All content checks use the anchor-scoped _slice_section idiom:
 #   missing anchor → empty slice → check fails (no false-green).
 #
-# Written FAILING-FIRST in Phase 2.0 (2026-06-08).
+# Written FAILING-FIRST in Phase 2.0 (2026-06-09).
 # Passes after the implementer lands all changes listed in 01-plan.md Work Plan.
 # Marker: fix-plan-execution-workspace-continuity
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 70: fix-plan-execution-workspace-continuity (v2.62.0) ===")
+print("=== Suite 70: fix-plan-execution-workspace-continuity (v2.64.0) ===")
 
 _s70_orch = read(AGENTS_DIR / "orchestrator.md")
 _s70_flows = read(AGENTS_DIR / "ref-special-flows.md")
@@ -16176,71 +16181,207 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Group (c) — milestone-continuity contract
+# Group (c) — milestone FINAL-contract assertions (revised in Phase 2.0 2026-06-09)
 #
-# ref-special-flows.md must document:
-#   (c1) the single-repo milestone-build flow — one plan workspace = home;
-#        milestones nest as child steps; build-level milestone index; detect-and-
-#        continue by identity
-#   (c2) the milestone-build plan artifact is 01-plan.md (not 01-planning.md)
-#   (c3) 01-planning.md (planning-mode batch) is PRESERVED — disambiguate only,
-#        no mass-rename; the distinction table is intact
-#   (c4) orchestrator.md Step 1d milestone detect-and-continue by identity
-#   (c5) orchestrator.md build-level milestone index template (one row per
-#        milestone, replace-in-place, no duplicate rows)
+# FINAL standard (supersedes #286 child-workspace model):
+#   milestone = internal unit of work-division, maps to ONE COMMIT, NOT a PR.
+#   One task = one workspace. Stage files 02/03/04 are FLAT, whole-task docs.
+#   Per-milestone-suffixed filenames and {NN}_{milestone}/ child folders are
+#   EXPLICITLY PROHIBITED. Milestone breakdown (with dependency annotations)
+#   lives ONLY in 01-plan.md. Independent milestones are PARALLELIZED via the
+#   #285 concurrent-Task mechanism at milestone granularity. ONE PR at the end.
+#
+# KEPT from #286 (must remain passing):
+#   (c1)  one-build-one-workspace invariant
+#   (c3)  milestone index documented
+#   (c4)  detect-and-continue by identity
+#   (c5)  01-plan.md as the plan artifact
+#   (c6)  01-planning.md preserved (no mass-rename)
+#
+# FLIPPED (old #286 child-workspace shape → FINAL standard):
+#   OLD c2-nested-child → NEW c2-flat-stage-files
+#   + c7-no-milestone-suffix (PROHIBITION wording)
+#   + c8-milestone-not-pr
+#   + c9-parallelize-independent
+#   + c10-single-pr-at-end
+#   + c11-commit-per-milestone
+#   + c12-index-commit-column
+#
+# These NEW assertions FAIL against current main (old #286 text is present).
+# They will PASS after the implementer rewrites ref-special-flows.md §
+# Milestone-Build Flow.
 # ---------------------------------------------------------------------------
 
 # Slice the milestone-build section in ref-special-flows.md.
-# The implementer will add a new section; the anchor should be the heading.
+# Use the section heading as the anchor; stop at the next ## heading or ---.
 _s70_flows_milestone_slice = _slice_section(
     _s70_flows,
-    "milestone",
+    "Milestone-Build Flow",
     _S70_STOP,
 )
 
+# ---- KEPT assertions (must remain passing) ----
+
 check(
     "suite70(c1-one-build-one-workspace): ref-special-flows.md documents one-build-one-workspace model for milestone builds",
-    "one-build-one-workspace" in _s70_flows or "one build" in _s70_flows and "one workspace" in _s70_flows,
-    "ref-special-flows.md must document the one-build-one-workspace model: plan = home; milestones = nested child steps "
-    "(Defect A continuity fix — currently absent from the Plan Flow section)",
-)
-check(
-    "suite70(c2-nested-child): ref-special-flows.md documents milestone executions nest as child steps",
-    ("child" in _s70_flows and "milestone" in _s70_flows and "nest" in _s70_flows)
-    or ("nested" in _s70_flows and "milestone" in _s70_flows),
-    "ref-special-flows.md must document that milestone executions nest as child steps "
-    "under the plan workspace ({plan-workspace}/{NN}_{milestone}/) — Defect A fix",
+    "one-build-one-workspace" in _s70_flows or ("one build" in _s70_flows and "one workspace" in _s70_flows),
+    "ref-special-flows.md must document the one-build-one-workspace model: one task = one plan = one workspace "
+    "(Defect A continuity invariant — must remain present)",
 )
 check(
     "suite70(c3-milestone-index): ref-special-flows.md or orchestrator.md documents a build-level milestone index",
     ("milestone index" in _s70_flows or "milestone-index" in _s70_flows
      or "milestone index" in _s70_orch or "milestone-index" in _s70_orch),
     "either ref-special-flows.md or orchestrator.md must document the build-level milestone index "
-    "(one row per milestone, status tracked, replace-in-place — Defect A build index)",
+    "(one row per milestone, status tracked, replace-in-place)",
 )
 check(
     "suite70(c4-detect-and-continue): orchestrator.md or ref-special-flows.md documents detect-and-continue by identity for milestone builds",
     ("detect-and-continue" in _s70_orch or "detect and continue" in _s70_orch
      or "detect-and-continue" in _s70_flows or "detect and continue" in _s70_flows),
     "orchestrator.md or ref-special-flows.md must document 'detect-and-continue' by identity slug "
-    "for milestone builds (Defect A continuity — so the orchestrator finds the plan workspace, not a new sibling)",
+    "for milestone builds (Defect A continuity — orchestrator finds the plan workspace, not a new sibling)",
 )
 check(
     "suite70(c5-01plan-milestone): ref-special-flows.md states the milestone-build plan artifact is 01-plan.md",
     "01-plan.md" in _s70_flows and "milestone" in _s70_flows,
     "ref-special-flows.md must state that type:plan milestone builds use 01-plan.md as the plan artifact "
-    "(Defect B disambiguation — currently undocumented for this flow)",
+    "(Defect B disambiguation)",
 )
-
-# Defect B disambiguation — 01-planning.md MUST be preserved (no mass-rename)
-# The existing distinction check (already green in Suite 12 / ref-special-flows line 471)
-# is a no-regression guard here; the new assertion is that BOTH are named and the
-# distinction is stated explicitly for the milestone-build context.
 check(
     "suite70(c6-01planning-preserved): ref-special-flows.md still documents 01-planning.md as planning-mode batch artifact (preserved, not renamed)",
     "01-planning.md" in _s70_flows,
     "ref-special-flows.md must still document 01-planning.md (planning-mode batch) — "
     "Defect B fix is disambiguation only, not mass-rename; the artifact must remain documented",
+)
+
+# ---- FLIPPED / NEW assertions (FAIL against current main, PASS after implementer fix) ----
+
+# c2-flat-stage-files: replaces old c2-nested-child.
+# The FINAL standard requires 02-implementation.md / 03-testing.md /
+# 04-security.md / 04-validation.md to be FLAT, whole-task documents —
+# no per-milestone subsections.  The old text says "child workspace" with
+# milestone-specific 02/03/04 files nested inside — the opposite.
+check(
+    "suite70(c2-flat-stage-files): ref-special-flows.md documents 02/03/04 stage files as FLAT whole-task docs (no per-milestone subsections)",
+    (
+        # The rewritten section will state the stage files are flat/whole-task
+        ("flat" in _s70_flows_milestone_slice.lower() or "whole-task" in _s70_flows_milestone_slice.lower()
+         or "whole task" in _s70_flows_milestone_slice.lower())
+        and ("02-implementation.md" in _s70_flows_milestone_slice
+             or "03-testing.md" in _s70_flows_milestone_slice)
+    ),
+    "ref-special-flows.md § Milestone-Build Flow must document 02-implementation.md / 03-testing.md / "
+    "04-security.md / 04-validation.md as FLAT, whole-task documents with no per-milestone subsections "
+    "(FINAL standard — Defect D fix; old text models them as child-workspace artifacts)",
+)
+
+# c7-no-milestone-suffix: The FINAL standard EXPLICITLY PROHIBITS
+# per-milestone-suffixed filenames (02-implementation-m{N}.md etc.) and
+# {NN}_{milestone}/ child folders.  This prohibition wording must be present.
+check(
+    "suite70(c7-no-milestone-suffix): ref-special-flows.md explicitly PROHIBITS per-milestone-suffixed filenames and child folders",
+    (
+        ("prohibit" in _s70_flows_milestone_slice.lower() or "prohibited" in _s70_flows_milestone_slice.lower()
+         or "forbid" in _s70_flows_milestone_slice.lower() or "must not" in _s70_flows_milestone_slice.lower()
+         or "PROHIBIT" in _s70_flows_milestone_slice)
+        and ("-m{" in _s70_flows_milestone_slice or "milestone-suffix" in _s70_flows_milestone_slice.lower()
+             or "per-milestone-suffix" in _s70_flows_milestone_slice.lower()
+             or "-m1" in _s70_flows_milestone_slice or "-mN" in _s70_flows_milestone_slice
+             or "m{N}" in _s70_flows_milestone_slice)
+    ),
+    "ref-special-flows.md § Milestone-Build Flow must explicitly PROHIBIT per-milestone-suffixed filenames "
+    "(e.g., 02-implementation-m{N}.md) and {NN}_{milestone}/ child folders "
+    "(FINAL standard requirement — must be stated, not implied)",
+)
+
+# c8-milestone-not-pr: milestones are explicitly NOT deliverables and NOT PRs.
+# The old #286 text says "each milestone … gets its OWN PR" — the opposite.
+check(
+    "suite70(c8-milestone-not-pr): ref-special-flows.md states milestones are NOT deliverables and NOT PRs",
+    (
+        "not" in _s70_flows_milestone_slice.lower()
+        and (
+            ("deliverable" in _s70_flows_milestone_slice.lower() and "pr" in _s70_flows_milestone_slice.lower())
+            or ("NOT a PR" in _s70_flows_milestone_slice or "not a PR" in _s70_flows_milestone_slice
+                or "NOT deliverable" in _s70_flows_milestone_slice.lower()
+                or "NOT a deliverable" in _s70_flows_milestone_slice.lower()
+                or "not deliverable" in _s70_flows_milestone_slice.lower())
+        )
+    ),
+    "ref-special-flows.md § Milestone-Build Flow must explicitly state that milestones are NOT deliverables "
+    "and NOT PRs — they are internal units of work-division that each map to ONE commit "
+    "(FINAL standard — old #286 text says each milestone gets its own PR, which is the defect)",
+)
+
+# c9-parallelize-independent: independent milestones must be PARALLELIZED.
+# Absent entirely from #286 — this assertion must FAIL pre-fix.
+check(
+    "suite70(c9-parallelize-independent): ref-special-flows.md states independent milestone implementations are PARALLELIZED",
+    (
+        ("parallel" in _s70_flows_milestone_slice.lower() or "paralleliz" in _s70_flows_milestone_slice.lower()
+         or "concurrent" in _s70_flows_milestone_slice.lower())
+        and ("independent" in _s70_flows_milestone_slice.lower()
+             or "depend" in _s70_flows_milestone_slice.lower())
+    ),
+    "ref-special-flows.md § Milestone-Build Flow must state that independent milestone implementations "
+    "are PARALLELIZED whenever dependencies allow (reusing the #285 concurrent-Task mechanism at "
+    "milestone granularity within ONE workspace) — absent from #286, must be added",
+)
+
+# c10-single-pr-at-end: ONE PR opened only when ALL milestones complete.
+# Old #286 says each milestone gets its own PR — the opposite.
+check(
+    "suite70(c10-single-pr-at-end): ref-special-flows.md states ONE PR is opened only when ALL milestones are complete",
+    (
+        ("one pr" in _s70_flows_milestone_slice.lower()
+         or "single pr" in _s70_flows_milestone_slice.lower()
+         or "one PR" in _s70_flows_milestone_slice
+         or "ONE PR" in _s70_flows_milestone_slice)
+        and ("all milestones" in _s70_flows_milestone_slice.lower()
+             or "all milestone" in _s70_flows_milestone_slice.lower()
+             or "complete" in _s70_flows_milestone_slice.lower()
+             or "after" in _s70_flows_milestone_slice.lower())
+    ),
+    "ref-special-flows.md § Milestone-Build Flow must state that the PR is opened ONLY when ALL milestones "
+    "are complete — one PR for the whole build, no per-milestone PR "
+    "(FINAL standard — old #286 text opens a PR per milestone, which is the defect)",
+)
+
+# c11-commit-per-milestone: each milestone maps to ONE COMMIT on the single branch.
+# Absent from #286 — must FAIL pre-fix.
+check(
+    "suite70(c11-commit-per-milestone): ref-special-flows.md states each milestone maps to ONE COMMIT on the single feature branch",
+    (
+        ("commit" in _s70_flows_milestone_slice.lower())
+        and ("per milestone" in _s70_flows_milestone_slice.lower()
+             or "one commit" in _s70_flows_milestone_slice.lower()
+             or "ONE commit" in _s70_flows_milestone_slice
+             or "each milestone" in _s70_flows_milestone_slice.lower())
+    ),
+    "ref-special-flows.md § Milestone-Build Flow must state that each milestone maps to ONE commit "
+    "on the single feature branch (FINAL standard — absent from #286)",
+)
+
+# c12-index-commit-column: the Milestone Index has a Commit column, NOT a PR column.
+# Old #286 Milestone Index table has 'PR' column — must FAIL pre-fix.
+check(
+    "suite70(c12-index-commit-column): ref-special-flows.md or orchestrator.md Milestone Index has a Commit column (not a per-milestone PR column)",
+    (
+        # After the fix, the table header will say 'Commit' not 'PR'
+        ("| Commit |" in _s70_flows or "| Commit" in _s70_flows
+         or "Commit" in _s70_flows_milestone_slice)
+        and (
+            # The old '| PR |' column header at the milestone-index level is gone
+            # (a build-level single PR recorded once at the end is acceptable,
+            # but per-row PR column is prohibited)
+            "| PR |" not in _s70_flows_milestone_slice
+            or "| Commit |" in _s70_flows_milestone_slice
+        )
+    ),
+    "ref-special-flows.md § Milestone-Build Flow Milestone Index must have a 'Commit' column "
+    "(one commit per milestone) — the per-milestone 'PR' column from #286 must be removed "
+    "(FINAL standard: milestones are commits, not PRs)",
 )
 
 # ---------------------------------------------------------------------------
@@ -16296,39 +16437,62 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Group (f) — packaging
+# Group (f) — packaging (revised: 2.62.0 → 2.64.0)
 #
-# Minor version bump 2.61.0 → 2.62.0 in both plugin files + CLAUDE.md §3.
-# CHANGELOG fragment at changelog.d/fix-plan-execution-workspace-continuity.md.
+# Minor version bump 2.63.0 → 2.64.0 in both plugin files + CLAUDE.md §3.
+#
+# CRITICAL — changelog guard (this bug recurred 3× this session: #282/#285/#286):
+# The changelog.d fragment is assembled into CHANGELOG.md and DELETED at delivery
+# (Step 9e).  Assert the DURABLE CHANGELOG.md [2.64.0] section — NEVER assert
+# changelog.d/standardize-milestone-concept.md existence.  That file is transient
+# and its absence on CI would produce a false-FAIL.
 # ---------------------------------------------------------------------------
 
-# The changelog.d fragment is assembled into CHANGELOG.md and DELETED at delivery,
-# so assert the DURABLE CHANGELOG.md [2.62.0] entry, not the transient fragment.
 _s70_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
-    "suite70(f1-plugin-json): plugin.json version is 2.62.0",
-    _s59_ver_tuple(json.loads(_s70_plugin_json).get("version", "0.0.0")) >= (2, 62, 0),
-    "plugin.json version must be 2.62.0 or later (minor bump from 2.61.0 — distributed-asset change requires version bump)",
+    "suite70(f1-plugin-json): plugin.json version is 2.64.0",
+    _s59_ver_tuple(json.loads(_s70_plugin_json).get("version", "0.0.0")) >= (2, 64, 0),
+    "plugin.json version must be 2.64.0 or later (minor bump from 2.63.0 — distributed-asset change requires version bump)",
 )
 check(
-    "suite70(f2-marketplace-json): marketplace.json plugins[0].version is 2.62.0",
-    _s59_ver_tuple(json.loads(_s70_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 62, 0),
-    "marketplace.json plugins[0].version must be 2.62.0 or later (matched with plugin.json)",
+    "suite70(f2-marketplace-json): marketplace.json plugins[0].version is 2.64.0",
+    _s59_ver_tuple(json.loads(_s70_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 64, 0),
+    "marketplace.json plugins[0].version must be 2.64.0 or later (matched with plugin.json)",
 )
 check(
-    "suite70(f3-claude-version): CLAUDE.md §3 version is 2.62.0",
-    _s59_ver_tuple(_s59_claude_current_version(_s70_claude) or "0.0.0") >= (2, 62, 0),
-    "CLAUDE.md §3 Current version must show 2.62.0 or later",
+    "suite70(f3-claude-version): CLAUDE.md §3 version is 2.64.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s70_claude) or "0.0.0") >= (2, 64, 0),
+    "CLAUDE.md §3 Current version must show 2.64.0 or later",
 )
 check(
-    "suite70(f4-changelog-version): CHANGELOG.md contains the 2.62.0 release section",
-    "## [2.62.0]" in _s70_changelog,
-    "CHANGELOG.md must contain a '## [2.62.0]' release section (fragment assembled at delivery)",
+    "suite70(f4-changelog-version): CHANGELOG.md contains the 2.64.0 release section",
+    "## [2.64.0]" in _s70_changelog,
+    "CHANGELOG.md must contain a '## [2.64.0]' release section (fragment assembled at delivery — "
+    "assert the durable section, NEVER changelog.d/standardize-milestone-concept.md)",
 )
 check(
-    "suite70(f4-changelog-entry): CHANGELOG.md 2.62.0 section documents the workspace-continuity fix",
-    "workspace" in _s70_changelog.lower() and "2.62.0" in _s70_changelog,
-    "CHANGELOG.md must document the one-build-one-workspace continuity fix",
+    "suite70(f5-changelog-entry): CHANGELOG.md 2.64.0 section documents the milestone-standard fix",
+    "milestone" in _s70_changelog.lower() and "## [2.64.0]" in _s70_changelog,
+    "CHANGELOG.md must document the milestone-standard correction in the [2.64.0] section "
+    "(milestone = commit-sized unit, not a PR; flat whole-task stage files; single PR at end)",
+)
+check(
+    "suite70(f6-claude-milestone-bullet): CLAUDE.md §5 milestone bullet states milestones are commits NOT PRs and uses flat whole-task stage files",
+    (
+        # The FINAL-standard bullet must state milestones are commits, not PRs/deliverables.
+        # The OLD #286 bullet says "nest as child steps" — that is the disqualifying phrase.
+        # The new bullet must include the FINAL-standard wording.
+        # Exact phrases expected after the implementer rewrites the §5 bullet:
+        "milestones = commits" in _s70_claude
+        or "milestones are commits" in _s70_claude
+        or ("milestone" in _s70_claude.lower() and "NOT PRs" in _s70_claude)
+        or ("milestone" in _s70_claude.lower() and "not PRs" in _s70_claude)
+        or ("milestone" in _s70_claude.lower() and "flat whole-task" in _s70_claude)
+    ),
+    "CLAUDE.md §5 must carry a milestone-standard bullet stating: "
+    "one workspace = one task; milestones = commits, NOT PRs/deliverables; "
+    "flat whole-task stage files; parallelize independent; one PR at end. "
+    "The old 'nest as child steps' wording must be replaced with the FINAL standard.",
 )
 
 # Marker: fix-plan-execution-workspace-continuity
@@ -16577,18 +16741,18 @@ check(
 _s71_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
     "suite71(g1-plugin-json): plugin.json version is 2.63.0",
-    '"version": "2.63.0"' in _s71_plugin_json,
-    "plugin.json version must be 2.63.0 (minor bump from 2.62.0 — distributed-asset change requires version bump)",
+    _s59_ver_tuple(json.loads(_s71_plugin_json).get("version", "0.0.0")) >= (2, 63, 0),
+    "plugin.json version must be 2.63.0 or later (minor bump from 2.62.0 — distributed-asset change requires version bump)",
 )
 check(
     "suite71(g2-marketplace-json): marketplace.json plugins[0].version is 2.63.0",
-    '"version": "2.63.0"' in _s71_marketplace_json,
-    "marketplace.json plugins[0].version must be 2.63.0 (matched with plugin.json)",
+    _s59_ver_tuple(json.loads(_s71_marketplace_json).get("plugins", [{}])[0].get("version", "0.0.0")) >= (2, 63, 0),
+    "marketplace.json plugins[0].version must be 2.63.0 or later (matched with plugin.json)",
 )
 check(
     "suite71(g3-claude-version): CLAUDE.md §3 version is 2.63.0",
-    "2.63.0" in _s71_claude,
-    "CLAUDE.md §3 Current version must show 2.63.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s71_claude) or "0.0.0") >= (2, 63, 0),
+    "CLAUDE.md §3 Current version must show 2.63.0 or later",
 )
 check(
     "suite71(g4-changelog-version): CHANGELOG.md contains the 2.63.0 release section",

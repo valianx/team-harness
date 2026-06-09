@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.63.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.64.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -164,7 +164,7 @@ All commands run from the repo root.
 - **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Dev mode — default-on, top-level orchestrator.** Default as of v2.56.0: `/th:setup`/`/th:update` write `~/.claude/.dev-mode-active` (`dev_mode: true`) unless `dev_mode_choice: "off"` in `.team-harness.json`. Top-level agent adopts orchestrator role, dispatches via Task. Inline orchestration permitted ONLY when marker present; without it, prohibited. `/dev-mode off` removes marker + persists opt-out; `/dev-mode on` re-activates. Outward actions gated by `dev-guard.sh`. `developer-mode` output style is the optional strong floor (`keep-coding-instructions: false`). `force-for-plugin` NOT set (decouples gate; removes escape hatch). Security floors non-waivable. See `docs/dev-mode.md`.
 - **Obsidian interlinking.** Step 11.6 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`. Plan consolidation (no forks, 3h): `agents/_shared/plan-consolidation.md`.
-- **Milestone-build continuity (one build = one workspace).** `type: plan` milestones nest as child steps under the plan workspace; detect-and-continue by identity slug (date-agnostic); `{YYYY-MM-DD}` prefix is UTC/display-only. See `agents/ref-special-flows.md § Milestone-Build Flow`.
+- **Milestone standard.** Milestones = commits, NOT PRs and NOT deliverables. One task = one workspace = one PR (after ALL milestones). Stage files are FLAT, whole-task documents (no per-milestone subsections; `-m{N}` suffixed files and `{NN}_{milestone}/` folders PROHIBITED). Milestone breakdown with dependency annotations lives ONLY in `01-plan.md`. Independent milestones PARALLELIZED (reuse #285 concurrent-`Task`); dependent serialize; one commit per milestone on the single feature branch. See `agents/ref-special-flows.md § Milestone-Build Flow`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
