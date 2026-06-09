@@ -928,7 +928,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | definir criterios, define AC, "qué debería cumplir" | `define-ac` | read-only |
    | validar (implementación), validate, "verificar implementación" | `validate` | read-only |
    | revisar/auditar plan, "revisa el plan", review/audit my plan, "is my plan compliant?" | `plan-review` | read-only |
-   | revisar este PR, "revisa el PR #N", review this PR, review PR #N, @th:orchestrator review PR, "review pull request" | `/th:review-pr` skill flow | read-only |
+   | review PR | `/th:review-pr` | read-only |
    | planificar, plan, "desglosar en tareas", breakdown | `plan` | read-only |
    | spike, exploración rápida, prototype, PoC | `spike` | write |
    | documentar, documenta, document, "write docs", "genera documentación", "documenta en obsidian", "create documentation" | `docs` | write |
