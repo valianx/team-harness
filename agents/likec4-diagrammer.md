@@ -131,6 +131,49 @@ Build the `.c4` file one pass at a time:
 
 ---
 
+## Obsidian Output Mode
+
+When the resolved output path is inside an Obsidian vault (i.e., `logs-mode: obsidian` is active and `docs_root` points to a vault workspace folder), follow this contract INSTEAD OF writing only the source. The local-mode path (source + summary in `workspaces/`) is unchanged.
+
+### Render step (mandatory in obsidian mode)
+
+After validating `diagram.c4`, export PNG views into the vault folder:
+
+```bash
+npx likec4 export png -o "{docs_root}"
+```
+
+The `-o` flag is a **directory**. LikeC4 writes one `diagram_<viewId>.png` file per view into that directory. PNG is LikeC4's documented export format; this step requires Playwright (LikeC4 installs it automatically via `npx`).
+
+**Path quoting:** `{docs_root}` is double-quoted. Obsidian vault paths commonly contain spaces (e.g. `…/Obsidian Vault/…`); unquoted paths break the command on those systems. The `viewId`-derived embed filenames are discovered by globbing `{docs_root}/diagram_*.png` after export completes — they are never interpolated into a shell command.
+
+### Embed step
+
+After the PNG files are written, append one embed per exported PNG to `{docs_root}/05-diagram.md`. Discover the exported files by globbing `{docs_root}/diagram_*.png` after the export command completes:
+
+```markdown
+## Rendered Diagrams
+![[diagram_<viewId>.png]]
+```
+
+One `![[...]]` line per exported PNG. This causes Obsidian to display each view inline when the note is opened.
+
+### CLI-absent degradation
+
+When `npx likec4` is not available (e.g., Node.js not installed, network unavailable), do NOT hard-fail. The `.c4` source is still the authoritative deliverable.
+
+In obsidian mode, append this marker to `{docs_root}/05-diagram.md` in place of the embeds:
+
+```markdown
+## Rendered Diagrams
+> Images not rendered — `npx likec4` is not available. Install Node.js and re-run to embed the diagrams.
+> Source: `diagram.c4`
+```
+
+Status remains `success` when the source was produced and validated. Add `render: skipped` to the status block so the orchestrator/operator can see the degradation explicitly.
+
+---
+
 ## Phase 2 — Validation (MANDATORY)
 
 ### Step 1 — CLI validation
@@ -241,6 +284,7 @@ agent: likec4-diagrammer
 status: success | failed | blocked
 output: workspaces/{feature}/diagram.c4
 views: {list of view names}
+render: done | skipped   # obsidian mode only; omit in local mode
 validation_cycles: {N}/3
 summary: {1-2 sentences: pattern used, views created, what's shown}
 context7_consult: hit:N miss:N skipped:N

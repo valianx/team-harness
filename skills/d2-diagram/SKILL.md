@@ -430,6 +430,44 @@ The `.d2` file is the authoritative output. It is readable, diffable, and can be
 
 ---
 
+## Obsidian Output Mode
+
+When `logs-mode: obsidian` is active (resolved from `~/.claude/.team-harness.json`), the diagrammer agent follows this extended contract so the diagram displays INLINE in Obsidian. Local mode behavior is unchanged.
+
+### What the agent does in obsidian mode
+
+1. **Render:** After generating and formatting `diagram.d2`, compile an SVG into the vault workspace folder (`docs_root`):
+   ```bash
+   d2 "{docs_root}/diagram.d2" "{docs_root}/diagram.svg"
+   ```
+   SVG is D2's native default export — no extra dependency beyond the `d2` CLI.
+
+2. **Embed:** Append the following block to `{docs_root}/05-diagram.md` so the diagram displays inline:
+   ```markdown
+   ## Rendered Diagram
+   ![[diagram.svg]]
+   ```
+
+3. **Output:** Both `diagram.d2` (source, re-editable) and `diagram.svg` (vault-visible image) are written to `docs_root`. Obsidian renders `![[diagram.svg]]` inline when the note is opened.
+
+### CLI-absent degradation
+
+When the `d2` CLI is not installed, the agent does NOT hard-fail. Instead it writes the source (`diagram.d2`) and appends this marker to `05-diagram.md`:
+
+```markdown
+## Rendered Diagram
+> Image not rendered — the `d2` CLI is not installed. Install it and re-run to embed the diagram.
+> Source: `diagram.d2`
+```
+
+Status remains `success` (source produced); the status block adds `render: skipped`.
+
+To install `d2`:
+- macOS/Linux: `curl -fsSL https://d2lang.com/install.sh | sh -s --`
+- Windows (winget): `winget install terrastruct.d2`
+
+---
+
 ## CLI Reference
 
 ```bash

@@ -167,6 +167,8 @@ Present output file path, view names, and how to render:
 - Preview: `npx likec4 start`
 - Export: `npx likec4 export png`
 
+In obsidian mode, the agent appends one `![[diagram_<viewId>.png]]` embed per exported view to `{docs_root}/05-diagram.md`. Report the embed count and note that the diagrams display inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but images could not be rendered.
+
 ---
 
 ## D2 Diagram Mode
@@ -208,6 +210,8 @@ Present source file path, SVG output path, and re-render options:
 - Dark theme: `d2 --theme 300 diagram.d2 dark.svg`
 - Hand-drawn: `d2 --sketch diagram.d2 sketch.svg`
 - Better routing: `d2 --layout elk diagram.d2 elk.svg`
+
+In obsidian mode, the agent appends a `![[diagram.svg]]` embed to `{docs_root}/05-diagram.md`. Report the SVG path and note that the diagram displays inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but the image could not be rendered.
 
 ---
 

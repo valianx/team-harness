@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.67.0] - 2026-06-09
+
+### Added
+- `agents/d2-diagrammer.md` — Obsidian Output Mode section: when `logs-mode: obsidian` is active, the agent renders `diagram.svg` via the `d2` CLI into the vault workspace and appends a `![[diagram.svg]]` Obsidian embed to `05-diagram.md` so the diagram displays inline. CLI-absent degradation writes source + a "not rendered — install `d2`" marker; status remains `success` with `render: skipped`.
+- `agents/likec4-diagrammer.md` — Obsidian Output Mode section: when `logs-mode: obsidian` is active, the agent exports PNG views via `npx likec4 export png -o <out>` into the vault workspace and appends one `![[diagram_<viewId>.png]]` embed per exported view to `05-diagram.md`. CLI-absent degradation writes source + a "not rendered — install Node.js" marker; status remains `success` with `render: skipped`.
+- `skills/d2-diagram/SKILL.md` — Obsidian Output Mode section mirroring the agent contract: SVG render + `![[diagram.svg]]` embed + CLI-absent degradation, so standalone `/th:d2-diagram` invocations follow the same contract.
+- `skills/likec4-diagram/SKILL.md` — Obsidian Output Mode section mirroring the agent contract: PNG export + per-view `![[diagram_<viewId>.png]]` embeds + CLI-absent degradation.
+- `agents/ref-direct-modes.md` — D2 and LikeC4 Diagram Mode Step 3 now notes the obsidian-mode embed appended to `05-diagram.md` and the `render: skipped` degradation report.
+
+### Changed
+- Plugin version bumped 2.66.0 → 2.67.0.
+
 ## [2.66.0] - 2026-06-09
 
 ### Fixed

@@ -379,6 +379,48 @@ The `.c4` file is the authoritative output. It is readable, diffable, and can be
 
 ---
 
+## Obsidian Output Mode
+
+When `logs-mode: obsidian` is active (resolved from `~/.claude/.team-harness.json`), the diagrammer agent follows this extended contract so the diagrams display INLINE in Obsidian. Local mode behavior is unchanged.
+
+### What the agent does in obsidian mode
+
+1. **Render:** After validating `diagram.c4`, export PNG views into the vault workspace folder (`docs_root`):
+   ```bash
+   npx likec4 export png -o "{docs_root}"
+   ```
+   The `-o` flag is a **directory**. LikeC4 writes one `diagram_<viewId>.png` per view. PNG is LikeC4's documented export format; the export requires Playwright (LikeC4 installs it automatically via `npx`).
+
+2. **Embed:** After the PNG files are written, glob `{docs_root}/diagram_*.png` and append one embed per PNG to `{docs_root}/05-diagram.md`:
+   ```markdown
+   ## Rendered Diagrams
+   ![[diagram_<viewId>.png]]
+   ```
+   One line per exported view. Obsidian renders each `![[...png]]` inline when the note is opened.
+
+3. **Output:** Both `diagram.c4` (source, re-editable) and `diagram_*.png` (vault-visible images) are written to `docs_root`. The `.c4` source is kept alongside for re-editing.
+
+### CLI-absent degradation
+
+When `npx likec4` is not available (Node.js not installed, network unavailable), the agent does NOT hard-fail. Instead it writes the source (`diagram.c4`) and appends this marker to `05-diagram.md`:
+
+```markdown
+## Rendered Diagrams
+> Images not rendered — `npx likec4` is not available. Install Node.js and re-run to embed the diagrams.
+> Source: `diagram.c4`
+```
+
+Status remains `success` (source produced); the status block adds `render: skipped`.
+
+To install LikeC4:
+```bash
+npm install -g likec4
+# or use npx (no install required)
+npx likec4 validate
+```
+
+---
+
 ## CLI Reference
 
 ```bash
