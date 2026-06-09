@@ -31,3 +31,4 @@ Analyze the input: $ARGUMENTS
 - The orchestrator will route to the `delivery` agent
 - Requires existing workspaces with implementation and validation docs
 - Output: feature branch, docs, changelog, version bump, commit, push, PR
+- After opening the PR, delivery verifies and reports the PR's merge state and CI conclusion (`mergeable_state: clean | conflicting | undetermined`); a conflicting or non-green PR is reported explicitly in the delivery summary and status block, never as a clean delivery. When gh is unavailable, the check is skipped gracefully (`mergeable_state: not-verified: gh-unavailable`).
