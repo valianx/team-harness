@@ -9618,38 +9618,44 @@ check(
 
 
 # ---------------------------------------------------------------------------
-# Suite 45 -- pr-th-update-backup-prune (AC-1, AC-2, AC-3, AC-4, AC-5)
+# Suite 45 -- pr-th-update-backup-prune (AC-1, AC-2, AC-3, AC-4, AC-7)
 # ---------------------------------------------------------------------------
-# Regression assertions that FAIL against the current source state (before the
-# implementer inserts the bounded backup-prune into both per-OS blocks of
-# skills/update/SKILL.md step 6).
+# Regression assertions for the sandbox-guard fix (issue #278).
+# REWRITTEN IN PLACE (Phase 2.0, tester) — previously asserted PRESENCE of the
+# last-3 prune; now asserts ABSENCE of sandbox-tripping tokens and PRESENCE of
+# the guard-safe replacement state.
 #
-# Root cause: step 6 creates a backup (CLAUDE.md.bak-<ts>) on every run but
-# never prunes older backups, so they accumulate monotonically.
+# Root cause: Step 6's per-OS blocks are statically rejected by Claude Code's
+# protected-path sandbox before any command runs.  Two constructs trip the scan:
+#   (a) backup-retention prune: Remove-Item -Force (PS) / xargs -r rm -f (bash)
+#   (b) -Force copies / New-Item -Force on the protected /dev-mode skill path.
 #
-# Fix model: insert a bounded prune immediately after the backup creation in
-# EACH per-OS block, keeping the most recent 3 backups:
-#   PowerShell: Get-ChildItem "$claudeMd.bak-*" | Sort-Object LastWriteTime
-#               | Select-Object -SkipLast 3 | Remove-Item -Force
-#   bash:       ls -1t "$CLAUDE_MD".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f
-# Also add one line of prose documenting the rolling retention of 3.
+# Fix model: remove-free + -Force-free on /dev-mode:
+#   - Single rolling Copy-Item $claudeMd "$claudeMd.bak"  (PS, no timestamp/prune)
+#   - Single rolling cp "$CLAUDE_MD" "$CLAUDE_MD.bak"     (bash, no timestamp/prune)
+#   - Skip-if-identical writes (Get-Content -Raw compare / cmp -s) replace -Force copies
+#   - Test-Path / [ -d ] guards replace New-Item -Force dir creation
 #
 # Anti-false-green guarantee (mirrors Suite 43/44 idiom):
 #   - _slice_section returns "" when its anchor is absent
-#     => token-in-slice assertions fail when the anchor section is missing.
-#   - All key tokens are absent from the current SKILL.md (no prune exists today)
-#     => every content assertion is False against current main.
+#     => bool(slice) guard on every negative assertion prevents vacuous True.
+#   - All tripping tokens ARE present in current main (Remove-Item -Force,
+#     xargs -r rm -f, Copy-Item ... -Force, New-Item -ItemType Directory -Force,
+#     "only the last 3 ... backups" prose)
+#     => every new assertion is False against current main => failing-first proof.
 #
 # AC coverage:
-#   AC-1 : PowerShell block contains SkipLast 3 + .bak-* glob + Remove-Item
-#   AC-2 : bash block contains tail -n +4 + .bak-* glob + rm
-#   AC-3 : prose of step 6 documents retention (keep last 3 / rolling / keep)
-#   AC-4 : Suite 45 in docs/testing.md; this file contains Suite 45
-#   AC-5 : NEITHER block deletes a broad path (no bare Remove-Item * / rm -rf $HOME);
-#          both prune lines reference the .bak- bounded glob
+#   AC-1 : PS block: no Remove-Item; no .bak- timestamp glob; single .bak present
+#   AC-2 : bash block: no xargs -r rm; no tail -n +4; no .bak- timestamp glob;
+#          single .bak present
+#   AC-3 : neither block: no Copy-Item ... -Force; no New-Item -ItemType Directory -Force;
+#          skip-if-identical (Get-Content -Raw, cmp -s) present
+#   AC-4 : prose: no "last 3"; "CLAUDE.md.bak" (single rolling) named
+#   AC-7 : Suite 45 in docs/testing.md; this file contains Suite 45 + _slice_section;
+#          CLAUDE.md does NOT contain "Suite 45" (hygiene)
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 45: pr-th-update-backup-prune — bounded last-3 backup prune ===")
+print("=== Suite 45: pr-th-update-backup-prune — sandbox-guard (remove-free + -Force-free) ===")
 
 # ---- file reads (suite-local) ----------------------------------------------
 _s45_update_text = read(SKILLS_DIR / "update" / "SKILL.md")
@@ -9658,110 +9664,169 @@ _s45_claude_md   = read(REPO_ROOT / "CLAUDE.md")
 _s45_self        = Path(__file__).read_text(encoding="utf-8")
 
 # ---- section anchors -------------------------------------------------------
-# The two per-OS command blocks are identified by their header comments as
-# written in SKILL.md today.  _slice_section returns "" when absent, so every
-# token assertion inside an empty slice is False => no false-greens possible.
+# The two per-OS command blocks are identified by their verbatim header lines.
+# _slice_section returns "" when absent, so every token check inside an empty
+# slice is False — no false-greens possible.
+# Note: the PS anchor slice extends to the next ## heading (## Error handling),
+# which overlaps the bash block.  Negative assertions on PS-only tokens
+# (Remove-Item, New-Item, Copy-Item -Force) are safe because bash does not use
+# those cmdlets.  Bash-only negative assertions use _s45_bash_slice.
 _S45_PS_ANCHOR   = "Windows (PowerShell) — run this block verbatim on Windows:"
 _S45_BASH_ANCHOR = "Unix/macOS (bash) — run this block verbatim on Linux/macOS:"
 
 _s45_ps_slice   = _slice_section(_s45_update_text, _S45_PS_ANCHOR)
 _s45_bash_slice = _slice_section(_s45_update_text, _S45_BASH_ANCHOR)
 
-# ---- (1) PowerShell block — AC-1 ------------------------------------------
-# Assert the bounded prune is present: SkipLast 3 + bak-* glob + Remove-Item.
+# ---- (0) Anchor-presence guards (preconditions for all checks below) ------
 check(
-    "backup-prune(1a/ac-1): PowerShell block contains 'SkipLast 3' (keep-last-3 retention)",
-    "SkipLast 3" in _s45_ps_slice,
-    f"PowerShell block (anchor: '{_S45_PS_ANCHOR}') does not contain 'SkipLast 3'; "
-    "implementer must add: Select-Object -SkipLast 3 | Remove-Item -Force after Copy-Item backup line",
+    "sandbox-guard(0a): PS block anchor present (anti-false-green precondition)",
+    bool(_s45_ps_slice),
+    f"anchor '{_S45_PS_ANCHOR}' not found in skills/update/SKILL.md — "
+    "all PS-block checks will report vacuously; implementer must preserve the anchor line",
 )
 check(
-    "backup-prune(1b/ac-1): PowerShell block operates on 'bak-' bounded glob",
-    ".bak-" in _s45_ps_slice and "bak-*" in _s45_ps_slice,
-    f"PowerShell block does not reference the bounded glob '.bak-*'; "
-    "the prune must anchor on '$claudeMd.bak-*' — never a bare wildcard",
-)
-check(
-    "backup-prune(1c/ac-1): PowerShell block contains 'Remove-Item' (delete cmdlet)",
-    "Remove-Item" in _s45_ps_slice,
-    f"PowerShell block does not contain 'Remove-Item'; "
-    "the prune pipeline must end with '| Remove-Item -Force'",
+    "sandbox-guard(0b): bash block anchor present (anti-false-green precondition)",
+    bool(_s45_bash_slice),
+    f"anchor '{_S45_BASH_ANCHOR}' not found in skills/update/SKILL.md — "
+    "all bash-block checks will report vacuously; implementer must preserve the anchor line",
 )
 
-# ---- (2) bash block — AC-2 -------------------------------------------------
-# Assert the bounded prune is present: tail -n +4 + bak-* glob + rm.
+# ---- (1) PowerShell block — AC-1: remove-free backup ----------------------
+# After the fix: single rolling Copy-Item $claudeMd "$claudeMd.bak" — no prune.
 check(
-    "backup-prune(2a/ac-2): bash block contains 'tail -n +4' (keep-last-3 retention)",
-    "tail -n +4" in _s45_bash_slice,
-    f"bash block (anchor: '{_S45_BASH_ANCHOR}') does not contain 'tail -n +4'; "
-    "implementer must add: ls -1t \"$CLAUDE_MD\".bak-* 2>/dev/null | tail -n +4 | xargs -r rm -f",
+    "sandbox-guard(1a/ac-1): PowerShell block does NOT contain 'Remove-Item'"
+    " (backup prune removed — sandbox trip cause 1)",
+    bool(_s45_ps_slice) and "Remove-Item" not in _s45_ps_slice,
+    "PowerShell block contains 'Remove-Item' — the backup-retention prune is still present; "
+    "implementer must replace the timestamped-backup+prune lines with a single "
+    "Copy-Item $claudeMd \"$claudeMd.bak\" (no Remove-Item anywhere in the block)",
 )
 check(
-    "backup-prune(2b/ac-2): bash block operates on 'bak-' bounded glob",
-    ".bak-" in _s45_bash_slice and "bak-*" in _s45_bash_slice,
-    f"bash block does not reference the bounded glob '.bak-*'; "
-    "the prune must anchor on '\"$CLAUDE_MD\".bak-*' — never a bare wildcard",
+    "sandbox-guard(1b/ac-1): PowerShell block does NOT reference '.bak-' timestamp glob"
+    " (single rolling backup, no timestamp accumulation)",
+    bool(_s45_ps_slice) and ".bak-" not in _s45_ps_slice,
+    "PowerShell block references '.bak-' (timestamped backup glob) — "
+    "the fix requires a single fixed rolling backup '$claudeMd.bak' with no timestamp suffix; "
+    "implementer must drop the $ts variable and the .bak-$ts pattern",
 )
 check(
-    "backup-prune(2c/ac-2): bash block contains 'rm' (delete command)",
-    " rm " in _s45_bash_slice or "xargs -r rm" in _s45_bash_slice or "rm -f" in _s45_bash_slice,
-    f"bash block does not contain an 'rm' invocation; "
-    "the prune pipeline must end with '| xargs -r rm -f'",
+    "sandbox-guard(1c/ac-1): PowerShell block contains single rolling backup"
+    " 'Copy-Item $claudeMd \"$claudeMd.bak\"' (fixed filename, no timestamp)",
+    bool(_s45_ps_slice) and 'Copy-Item $claudeMd "$claudeMd.bak"' in _s45_ps_slice,
+    "PowerShell block does not contain the single rolling backup line "
+    "Copy-Item $claudeMd \"$claudeMd.bak\"; "
+    "implementer must add this as the sole backup operation (no .bak-$ts, no prune)",
 )
 
-# ---- (3) Prose documentation — AC-3 ----------------------------------------
-# The prose of step 6 must mention the rolling retention of 3 backups.
-# Acceptable tokens: 'last 3', 'rolling', or 'keep' near the backup bullet.
-# We check the whole SKILL.md text because the prose sits outside the code
-# fences (and _slice_section would stop at the next heading before the fences).
-_S45_RETENTION_DOCUMENTED = (
-    "last 3" in _s45_update_text
-    or "rolling" in _s45_update_text
-    or ("keep" in _s45_update_text and "bak" in _s45_update_text)
+# ---- (2) bash block — AC-2: remove-free backup ----------------------------
+# After the fix: single rolling cp "$CLAUDE_MD" "$CLAUDE_MD.bak" — no prune.
+check(
+    "sandbox-guard(2a/ac-2): bash block does NOT contain 'xargs -r rm'"
+    " (backup prune removed — sandbox trip cause 1)",
+    bool(_s45_bash_slice) and "xargs -r rm" not in _s45_bash_slice,
+    "bash block contains 'xargs -r rm' — the backup-retention prune is still present; "
+    "implementer must replace the timestamped-backup+prune lines with a single "
+    "cp \"$CLAUDE_MD\" \"$CLAUDE_MD.bak\" (no xargs rm anywhere in the block)",
 )
 check(
-    "backup-prune(3/ac-3): SKILL.md prose documents rolling retention"
-    " ('last 3' or 'rolling' or 'keep'+'bak' present)",
-    _S45_RETENTION_DOCUMENTED,
-    "skills/update/SKILL.md step 6 prose does not document the rolling retention of 3 backups; "
-    "implementer must add a one-line note: e.g. 'pruned to the last 3 rolling backups'",
+    "sandbox-guard(2b/ac-2): bash block does NOT contain 'tail -n +4'"
+    " (keep-last-3 skip-offset removed)",
+    bool(_s45_bash_slice) and "tail -n +4" not in _s45_bash_slice,
+    "bash block contains 'tail -n +4' — the last-3 retention logic is still present; "
+    "implementer must remove the tail -n +4 | xargs -r rm -f pipeline entirely",
+)
+check(
+    "sandbox-guard(2c/ac-2): bash block does NOT reference '.bak-' timestamp glob"
+    " (single rolling backup, no timestamp accumulation)",
+    bool(_s45_bash_slice) and ".bak-" not in _s45_bash_slice,
+    "bash block references '.bak-' (timestamped backup glob) — "
+    "the fix requires a single fixed rolling backup '$CLAUDE_MD.bak' with no timestamp suffix; "
+    "implementer must drop the TS variable and the .bak-$TS pattern",
+)
+check(
+    "sandbox-guard(2d/ac-2): bash block contains single rolling backup"
+    " 'cp \"$CLAUDE_MD\" \"$CLAUDE_MD.bak\"' (fixed filename, no timestamp)",
+    bool(_s45_bash_slice) and 'cp "$CLAUDE_MD" "$CLAUDE_MD.bak"' in _s45_bash_slice,
+    "bash block does not contain the single rolling backup line "
+    "cp \"$CLAUDE_MD\" \"$CLAUDE_MD.bak\"; "
+    "implementer must add this as the sole backup operation (no .bak-$TS, no prune)",
 )
 
-# ---- (4) Bounded-delete safety — AC-5 -------------------------------------
-# Negative assertions: NEITHER per-OS block must use an unbounded delete path.
-# PowerShell: "Remove-Item *" (bare wildcard) must not appear in the PS slice.
-# bash: "rm -rf $HOME" must not appear in the bash slice.
-# Positive: the prune lines in each slice reference ".bak-" (bounded glob marker).
+# ---- (3) Neither block — AC-3: -Force-free on /dev-mode + output-style ----
+# After the fix: no Copy-Item ... -Force, no New-Item -ItemType Directory -Force.
+# PS slice includes bash content (extends to ## Error handling) — safe because
+# bash uses neither Copy-Item nor New-Item; the combined slice assertion is correct.
 check(
-    "backup-prune(4a/ac-5): PowerShell block does NOT contain bare 'Remove-Item *' (unbounded delete guard)",
-    "Remove-Item *" not in _s45_ps_slice,
-    "PowerShell block contains 'Remove-Item *' — this is an unbounded delete and violates AC-5; "
-    "the prune must be scoped to '$claudeMd.bak-*' exclusively",
+    "sandbox-guard(3a/ac-3): neither per-OS block contains"
+    " 'New-Item -ItemType Directory -Force' (sandbox trip cause 2 — dir creation guard)",
+    bool(_s45_ps_slice) and "New-Item -ItemType Directory -Force" not in _s45_ps_slice,
+    "PS block (or combined PS+bash slice) contains 'New-Item -ItemType Directory -Force' — "
+    "this trips the sandbox on the /dev-mode and output-style paths; "
+    "implementer must replace with Test-Path-guarded New-Item (no -Force): "
+    "if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }",
 )
 check(
-    "backup-prune(4b/ac-5): bash block does NOT contain 'rm -rf $HOME' (unbounded delete guard)",
-    "rm -rf $HOME" not in _s45_bash_slice,
-    "bash block contains 'rm -rf $HOME' — this is an unbounded destructive delete and violates AC-5",
+    "sandbox-guard(3b/ac-3): neither per-OS block contains"
+    " 'Copy-Item $outputStyleSrc $outputStyleDst -Force' (unconditional -Force copy removed)",
+    bool(_s45_ps_slice) and "Copy-Item $outputStyleSrc $outputStyleDst -Force" not in _s45_ps_slice,
+    "PS block contains 'Copy-Item $outputStyleSrc $outputStyleDst -Force' — "
+    "this unconditional -Force copy trips the sandbox; "
+    "implementer must replace with skip-if-identical write "
+    "(Get-Content -Raw compare -> Set-Content -NoNewline only if different)",
 )
 check(
-    "backup-prune(4c/ac-5): PowerShell prune line references '.bak-' bounded glob (scope guard)",
-    ".bak-" in _s45_ps_slice,
-    "PowerShell prune line does not reference '.bak-' — the delete is not bounded to the backup glob; "
-    "the prune must operate exclusively on '$claudeMd.bak-*'",
+    "sandbox-guard(3c/ac-3): neither per-OS block contains"
+    " 'Copy-Item $devModeSkillSrc $devModeSkillDst -Force' (unconditional -Force copy removed)",
+    bool(_s45_ps_slice) and "Copy-Item $devModeSkillSrc $devModeSkillDst -Force" not in _s45_ps_slice,
+    "PS block contains 'Copy-Item $devModeSkillSrc $devModeSkillDst -Force' — "
+    "this unconditional -Force copy to the protected /dev-mode path trips the sandbox; "
+    "implementer must replace with skip-if-identical write "
+    "(Get-Content -Raw compare -> Set-Content -NoNewline only if different)",
 )
 check(
-    "backup-prune(4d/ac-5): bash prune line references '.bak-' bounded glob (scope guard)",
-    ".bak-" in _s45_bash_slice,
-    "bash prune line does not reference '.bak-' — the delete is not bounded to the backup glob; "
-    "the prune must operate exclusively on '\"$CLAUDE_MD\".bak-*'",
+    "sandbox-guard(3d/ac-3): PowerShell block contains skip-if-identical compare"
+    " 'Get-Content $outputStyleDst -Raw' (write-if-different guard, output-style)",
+    bool(_s45_ps_slice) and "Get-Content $outputStyleDst -Raw" in _s45_ps_slice,
+    "PS block does not contain 'Get-Content $outputStyleDst -Raw' — "
+    "the skip-if-identical write for the output-style is missing; "
+    "implementer must add: $srcContent = Get-Content $outputStyleSrc -Raw; "
+    "if (-not (Test-Path $outputStyleDst) -or (Get-Content $outputStyleDst -Raw) -ne $srcContent) { Set-Content ... }",
+)
+check(
+    "sandbox-guard(3e/ac-3): bash block contains 'cmp -s' skip-if-identical guard"
+    " (write-if-different for output-style and /dev-mode)",
+    bool(_s45_bash_slice) and "cmp -s" in _s45_bash_slice,
+    "bash block does not contain 'cmp -s' — "
+    "the skip-if-identical write guard for output-style / /dev-mode is missing; "
+    "implementer must replace unconditional cp with: cmp -s SRC DST || cp SRC DST",
 )
 
-# ---- (5) Self-referential guard — AC-4 ------------------------------------
+# ---- (4) Prose — AC-4: no "last 3"; single rolling CLAUDE.md.bak named ----
+# The Step 6 prose bullet (line ~85) must describe the single rolling backup.
+# We scan the whole SKILL.md text — prose sits outside the code fences.
+check(
+    "sandbox-guard(4a/ac-4): SKILL.md prose does NOT contain 'last 3'"
+    " (last-3 retention wording removed)",
+    "last 3" not in _s45_update_text,
+    "skills/update/SKILL.md still contains 'last 3' — the old retention prose is present; "
+    "implementer must replace 'Retention: only the last 3 CLAUDE.md.bak-* backups...' "
+    "with single-rolling-backup prose (no 'last 3', no 'pruned')",
+)
+check(
+    "sandbox-guard(4b/ac-4): SKILL.md prose names 'CLAUDE.md.bak' (single rolling backup)"
+    " — fixed filename present in file",
+    "CLAUDE.md.bak" in _s45_update_text,
+    "skills/update/SKILL.md does not contain 'CLAUDE.md.bak' — "
+    "the single-rolling-backup filename is absent from the prose; "
+    "implementer must update the Step 6 backup bullet to name the fixed file ~/.claude/CLAUDE.md.bak",
+)
+
+# ---- (5) Self-referential guard — AC-7 ------------------------------------
 # Suite 45 must be registered in docs/testing.md (NOT CLAUDE.md §11).
 # This file must contain the literal "Suite 45" and "pr-th-update-backup-prune".
 # CLAUDE.md §11 must NOT contain "Suite 45" (hygiene contract, same as Suites 43/44).
 check(
-    "backup-prune(5/ac-4): docs/testing.md canonical registry names 'Suite 45'"
+    "sandbox-guard(5/ac-7): docs/testing.md canonical registry names 'Suite 45'"
     " and 'pr-th-update-backup-prune'; this file contains 'Suite 45' and '_slice_section';"
     " CLAUDE.md does NOT contain 'Suite 45' (hygiene contract)",
     "Suite 45" in _s45_testing_md
@@ -9778,7 +9843,7 @@ check(
     f" docs/testing.md has pr-th-update-backup-prune: {'pr-th-update-backup-prune' in _s45_testing_md};"
     f" this file has Suite 45: {'Suite 45' in _s45_self};"
     f" CLAUDE.md has Suite 45 (must be False): {'Suite 45' in _s45_claude_md}"
-    " — implementer must register in docs/testing.md; tester must not add Suite 45 to CLAUDE.md",
+    " — implementer must update docs/testing.md registry; tester must not add Suite 45 to CLAUDE.md",
 )
 
 
@@ -15970,16 +16035,18 @@ check(
     "Parallel Multi-Project Dispatch" in _s69_claude or "parallel multi-project dispatch" in _s69_claude.lower() or "parallel" in _s69_claude and "fan-out" in _s69_claude,
     "CLAUDE.md §5 must contain a bullet referencing the parallel multi-project dispatch contract",
 )
-_s69_changelog_path = REPO_ROOT / "changelog.d" / "parallel-multi-project-dispatch.md"
+# The changelog.d fragment is assembled into CHANGELOG.md and DELETED at delivery,
+# so assert the DURABLE CHANGELOG.md [2.61.0] entry, not the transient fragment.
+_s69_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
-    "suite69(ac9-changelog-fragment): changelog.d/parallel-multi-project-dispatch.md exists",
-    _s69_changelog_path.exists(),
-    "changelog.d/parallel-multi-project-dispatch.md must exist with a ### Added entry",
+    "suite69(ac9-changelog-version): CHANGELOG.md contains the 2.61.0 release section",
+    "## [2.61.0]" in _s69_changelog,
+    "CHANGELOG.md must contain a '## [2.61.0]' release section (fragment assembled at delivery)",
 )
 check(
-    "suite69(ac9-changelog-added): changelog fragment contains ### Added entry",
-    "### Added" in _s69_changelog_path.read_text(encoding="utf-8") if _s69_changelog_path.exists() else False,
-    "changelog.d/parallel-multi-project-dispatch.md must contain a ### Added subsection",
+    "suite69(ac9-changelog-added): CHANGELOG.md 2.61.0 section documents parallel multi-project dispatch",
+    "parallel multi-project dispatch" in _s69_changelog.lower(),
+    "CHANGELOG.md must document the parallel multi-project dispatch feature",
 )
 _s69_this_file = read(Path(__file__))
 check(
