@@ -16302,7 +16302,9 @@ check(
 # CHANGELOG fragment at changelog.d/fix-plan-execution-workspace-continuity.md.
 # ---------------------------------------------------------------------------
 
-_s70_changelog_d = REPO_ROOT / "changelog.d" / "fix-plan-execution-workspace-continuity.md"
+# The changelog.d fragment is assembled into CHANGELOG.md and DELETED at delivery,
+# so assert the DURABLE CHANGELOG.md [2.62.0] entry, not the transient fragment.
+_s70_changelog = read(REPO_ROOT / "CHANGELOG.md")
 check(
     "suite70(f1-plugin-json): plugin.json version is 2.62.0",
     '"version": "2.62.0"' in _s70_plugin_json,
@@ -16319,9 +16321,14 @@ check(
     "CLAUDE.md §3 Current version must show 2.62.0",
 )
 check(
-    "suite70(f4-changelog-fragment): changelog.d/fix-plan-execution-workspace-continuity.md exists",
-    _s70_changelog_d.exists(),
-    "changelog.d/fix-plan-execution-workspace-continuity.md must exist (Keep-a-Changelog fragment for this PR)",
+    "suite70(f4-changelog-version): CHANGELOG.md contains the 2.62.0 release section",
+    "## [2.62.0]" in _s70_changelog,
+    "CHANGELOG.md must contain a '## [2.62.0]' release section (fragment assembled at delivery)",
+)
+check(
+    "suite70(f4-changelog-entry): CHANGELOG.md 2.62.0 section documents the workspace-continuity fix",
+    "workspace" in _s70_changelog.lower() and "2.62.0" in _s70_changelog,
+    "CHANGELOG.md must document the one-build-one-workspace continuity fix",
 )
 
 # Marker: fix-plan-execution-workspace-continuity
