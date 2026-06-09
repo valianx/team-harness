@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.64.0] - 2026-06-09
+
+### Fixed
+- Milestone-build flow corrected to the FINAL standard: one consolidated workspace with FLAT whole-task stage files (`02-implementation.md`/`03-testing.md`/`04-security.md`/`04-validation.md` — no per-milestone subsections); per-milestone-suffixed filenames (`-m{N}`) and `{NN}_{milestone}/` child folders are explicitly PROHIBITED; milestones are NOT deliverables and NOT PRs — each maps to ONE COMMIT on the single feature branch; independent milestones are PARALLELIZED (reusing the #285 concurrent-`Task` mechanism at milestone granularity within ONE workspace; worktree isolation per lane → ordered commit application); ONE PR opened only when ALL milestones complete; STAGE-GATE-1 and STAGE-GATE-3 each fire ONCE. Milestone Index `PR` column replaced with `Commit` column; single build-level PR recorded once at the end. Revises #286 (v2.62.0) which incorrectly modeled each milestone as a child workspace with its own STAGE-GATE-3 and PR.
+
+### Changed
+- `agents/ref-special-flows.md` § Milestone-Build Flow rewritten to the FINAL standard (flat workspace, commit-per-milestone, parallelized-independent-milestones, single PR).
+- `agents/orchestrator.md` Step 1d detect-and-continue resolves to the SAME plan workspace as `docs_root` (no `{NN}_{milestone-slug}/` sub-folder); Milestone Index template updated to `Commit` column; milestone parallelization at milestone granularity documented.
+- `CLAUDE.md` §5 milestone-standard bullet updated to the FINAL standard.
+- Plugin version bumped 2.63.0 → 2.64.0.
+
 ## [2.63.0] - 2026-06-09
 
 ### Added
