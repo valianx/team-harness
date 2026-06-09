@@ -1082,6 +1082,8 @@ If the row for this project does not exist in the `## Projects` table, append a 
 
 **On-completion final reconcile:** after writing this project's row, re-read all rows in the `## Projects` table. If every row now shows status `delivered`, perform a final reconcile: update the frontmatter `updated:` to today's date and add a completion signal (e.g. `status: complete`), then finalize `## Functional Description` to reflect shipped reality by re-reading all sibling `01-plan.md` files. Write the whole document back.
 
+**Concurrency compatibility (parallel multi-project dispatch).** When the initiative uses parallel fan-out (see `agents/orchestrator.md § Parallel Multi-Project Dispatch`), each per-lane delivery run executes this step independently for its own project row. The `## Projects` rows are keyed per-project, so concurrent per-lane writes touch different rows and are safe under concurrency. The on-completion final-reconcile fires independently in each lane's delivery; the reconcile-ordering rule (parent serializes its own `overview.md` read-modify-writes; lane completions processed in arrival order) is enforced at the orchestrator level. Delivery's responsibility is unchanged: operate per-lane, write only this project's row, remain best-effort.
+
 **Status line (add to delivery status block):**
 ```
 initiative_overview: updated | skipped: no-initiative | skipped: overview-not-found | failed: {error}

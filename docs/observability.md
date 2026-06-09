@@ -107,6 +107,33 @@ by the delivery agent at Step 11.7.
 
 Full template and section-ownership map: `agents/orchestrator.md § overview.md Template`.
 
+## Initiative-level fan-out trace (parallel multi-project dispatch)
+
+When the orchestrator fans out 2+ projects concurrently (see `agents/orchestrator.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
+
+**Location:**
+- Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md`
+- Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/00-execution-events.jsonl`
+
+**Fan-out lifecycle events** (written by the orchestrator into the initiative-level file):
+
+| Event | Fields | When emitted |
+|-------|--------|--------------|
+| `fanout.start` | `initiative`, `eligible_projects[]`, `cap` | Before the first concurrent Task dispatch |
+| `fanout.lane.start` | `project`, `initiative` | When a lane's Stage-2 Task call is dispatched |
+| `fanout.lane.end` | `project`, `initiative`, `status` (success/failed/iterating) | When a lane's Stage-2 work completes or is blocked |
+| `fanout.converge` | `initiative`, `lanes[]` (project + status per lane) | When all lanes have reached the re-convergence barrier |
+
+Each event carries a `project` key so `/trace` can group events by lane and render the parallel region side-by-side.
+
+**Per-project traces are unchanged.** Each project continues writing its own `{project}/00-execution-events.*` file with its per-phase `phase.start` / `phase.end` / `gate.*` events exactly as today. The initiative-level file is additive — it carries only fan-out lifecycle events, not per-phase detail.
+
+**`/th:pipelines` rendering:** when an initiative has a live fan-out, `/th:pipelines` shows the initiative as a parent row with each concurrent project as a child lane row (Stage / Phase columns per lane). This reuses the Stage/Phase surfacing exception already documented for `/th:pipelines`.
+
+**`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps) and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure.
+
+**Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when a fan-out is actually dispatched. Single-project runs (`initiative: null`) and serial multi-project runs do not produce this file. The file is mandatory for any run where `fanout.start` fires — a fan-out that emits no initiative-level trace violates the observability contract.
+
 ## kg_write event
 
 `kg_write` is a **sibling event** (peer of `phase.*` / `gate.*` / `operation.*`) emitted by the orchestrator after each Knowledge Graph write batch. Unlike `operation.*`, which models a single discrete operation, a KG write site may attempt multiple writes in one batch; `kg_write` carries per-batch counters (`attempted`, `succeeded`) and a per-write `writes[]` array so `/th:trace` can aggregate across all three write sites.
