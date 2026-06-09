@@ -17719,6 +17719,445 @@ check(
 # Marker: fix-agent-builder-and-diagram-routing
 
 # ---------------------------------------------------------------------------
+# Suite 74 — d2-likec4-obsidian-output (v2.67.0)
+# ---------------------------------------------------------------------------
+# Structural tests for the obsidian-mode render+embed contract added to the
+# D2 and LikeC4 diagram flows (issue: d2/likec4 diagrams not showing inline
+# in Obsidian). Verified against the plan's AC-1 through AC-9.
+#
+# Contract under test (diagrammer agents and skills):
+#   - D2: obsidian mode → render diagram.svg via `d2` CLI → write to vault
+#     folder (docs_root) → append ![[diagram.svg]] embed to 05-diagram.md
+#   - LikeC4: obsidian mode → export PNG via `npx likec4 export png -o <out>`
+#     → write to vault folder → append ![[diagram_<view>.png]] per view
+#   - Both: CLI-absent → source + "not rendered / install" marker in
+#     05-diagram.md; status stays success with render: skipped; no hard fail
+#   - Skills: each carries a matching "Obsidian Output Mode" section
+#   - ref-direct-modes: D2 and LikeC4 mode steps note the obsidian embed
+#   - Excalidraw path: untouched (parity guard — must pass before AND after)
+#
+# Group (a) — D2 agent contract: FAIL pre-fix
+# Group (b) — LikeC4 agent contract: FAIL pre-fix
+# Group (c) — CLI-absent degradation (both agents): FAIL pre-fix
+# Group (d) — D2 skill Obsidian Output Mode section: FAIL pre-fix
+# Group (e) — LikeC4 skill Obsidian Output Mode section: FAIL pre-fix
+# Group (f) — ref-direct-modes embed expectation: FAIL pre-fix
+# Group (g) — Excalidraw parity guard (frozen): MUST pass before AND after
+# Group (h) — self-ref / registry: FAIL pre-fix
+# Group (i) — packaging (2.66.0 → 2.67.0 + durable CHANGELOG.md): FAIL pre-fix
+#
+# All content checks use anchor-scoped _slice_section (3-arg form):
+#   missing anchor → empty slice → check fails (no false-green).
+#
+# CRITICAL: changelog assertion targets the DURABLE CHANGELOG.md [2.67.0]
+# section — NEVER changelog.d/d2-likec4-obsidian-output.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# Recurring-bug guard.
+#
+# Written FAILING-FIRST in Phase 2.0 (2026-06-09).
+# Passes after the implementer lands all changes listed in 01-plan.md Work Plan.
+# Marker: d2-likec4-obsidian-output
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 74: d2-likec4-obsidian-output (v2.67.0) ===")
+
+_s74_d2_agent    = read(AGENTS_DIR / "d2-diagrammer.md")
+_s74_lc4_agent   = read(AGENTS_DIR / "likec4-diagrammer.md")
+_s74_d2_skill    = read(skill_path("d2-diagram"))
+_s74_lc4_skill   = read(skill_path("likec4-diagram"))
+_s74_ref         = read(AGENTS_DIR / "ref-direct-modes.md")
+_s74_diagrammer  = read(AGENTS_DIR / "diagrammer.md")
+_s74_excalidraw  = read(skill_path("excalidraw-diagram"))
+_s74_claude      = read(REPO_ROOT / "CLAUDE.md")
+_s74_plugin_json = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s74_marketplace = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s74_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s74_this_file   = read(Path(__file__))
+
+# Stop markers for ref-direct-modes Step sections (stop at next ## or ---)
+_S74_STOP = ("\n## ", "\n### ", "\n---\n")
+# Stop markers for agent/skill Obsidian sections: stop at next ## or ---
+# but NOT at ### because the section uses ### subsections (Render step, Embed step, etc.)
+_S74_AGENT_STOP = ("\n## ", "\n---\n")
+
+# ---------------------------------------------------------------------------
+# Group (a) — D2 agent obsidian-mode contract
+#
+#  (a1) agents/d2-diagrammer.md contains an "Obsidian" section/subsection
+#  (a2) that section documents diagram.svg render (d2 CLI, SVG, vault)
+#  (a3) that section documents ![[diagram.svg]] embed to 05-diagram.md
+# ---------------------------------------------------------------------------
+
+_s74_d2_obs_slice = _slice_section(_s74_d2_agent, "Obsidian", _S74_AGENT_STOP)
+
+check(
+    "suite74(a1-d2-agent-obsidian-section): agents/d2-diagrammer.md contains"
+    " an 'Obsidian' section documenting obsidian-mode render+embed",
+    bool(_s74_d2_obs_slice),
+    "agents/d2-diagrammer.md must contain an 'Obsidian' (output mode) section"
+    " — absent pre-fix",
+)
+check(
+    "suite74(a2-d2-agent-svg-render): agents/d2-diagrammer.md obsidian section"
+    " documents SVG render via d2 CLI into the vault folder",
+    (
+        "diagram.svg" in _s74_d2_obs_slice
+        and ("d2" in _s74_d2_obs_slice or "vault" in _s74_d2_obs_slice.lower())
+    ),
+    "agents/d2-diagrammer.md obsidian section must reference 'diagram.svg' and"
+    " the d2 CLI render (or vault placement) — absent pre-fix",
+)
+check(
+    "suite74(a3-d2-agent-embed): agents/d2-diagrammer.md obsidian section"
+    " appends a ![[diagram.svg]] Obsidian embed to 05-diagram.md",
+    # The embed line is inside a fenced code block within the Obsidian section;
+    # search the full agent text (the content only appears in the Obsidian section).
+    "![[diagram.svg]]" in _s74_d2_agent and "05-diagram.md" in _s74_d2_obs_slice,
+    "agents/d2-diagrammer.md obsidian section must contain '![[diagram.svg]]'"
+    " and '05-diagram.md' — absent pre-fix",
+)
+
+# ---------------------------------------------------------------------------
+# Group (b) — LikeC4 agent obsidian-mode contract
+#
+#  (b1) agents/likec4-diagrammer.md contains an "Obsidian" section
+#  (b2) that section documents PNG export via npx likec4 export png -o <out>
+#  (b3) that section documents ![[diagram_<view>.png]] embed to 05-diagram.md
+# ---------------------------------------------------------------------------
+
+_s74_lc4_obs_slice = _slice_section(_s74_lc4_agent, "Obsidian", _S74_AGENT_STOP)
+
+check(
+    "suite74(b1-lc4-agent-obsidian-section): agents/likec4-diagrammer.md contains"
+    " an 'Obsidian' section documenting obsidian-mode render+embed",
+    bool(_s74_lc4_obs_slice),
+    "agents/likec4-diagrammer.md must contain an 'Obsidian' (output mode) section"
+    " — absent pre-fix",
+)
+check(
+    "suite74(b2-lc4-agent-png-export): agents/likec4-diagrammer.md obsidian section"
+    " documents PNG export via likec4 CLI (npx likec4 export png)",
+    (
+        "export png" in _s74_lc4_obs_slice.lower()
+        or ("png" in _s74_lc4_obs_slice.lower() and "likec4" in _s74_lc4_obs_slice.lower())
+    ),
+    "agents/likec4-diagrammer.md obsidian section must reference PNG export via"
+    " 'npx likec4 export png' (or equivalent) — absent pre-fix",
+)
+check(
+    "suite74(b3-lc4-agent-embed): agents/likec4-diagrammer.md obsidian section"
+    " appends ![[diagram_*.png]] Obsidian embed to 05-diagram.md",
+    # The embed line is inside a fenced code block; search the full agent text.
+    (
+        "![[" in _s74_lc4_agent
+        and "png" in _s74_lc4_agent.lower()
+        and "05-diagram.md" in _s74_lc4_obs_slice
+    ),
+    "agents/likec4-diagrammer.md obsidian section must contain '![[...png]]'"
+    " embed and '05-diagram.md' — absent pre-fix",
+)
+
+# ---------------------------------------------------------------------------
+# Group (c) — CLI-absent graceful degradation (both agents)
+#
+#  (c1) d2-diagrammer.md obsidian section contains a "not rendered" / "install"
+#       marker (the degradation note written to 05-diagram.md)
+#  (c2) d2-diagrammer.md has render: skipped / render: done field documented
+#  (c3) likec4-diagrammer.md obsidian section contains the same degradation
+#  (c4) likec4-diagrammer.md has render: skipped / render: done field documented
+# ---------------------------------------------------------------------------
+
+check(
+    "suite74(c1-d2-degradation): agents/d2-diagrammer.md obsidian section"
+    " documents CLI-absent degradation (not rendered / install marker)",
+    # The degradation block is inside the Obsidian section but after a code fence
+    # that contains '## Rendered Diagram', which causes the narrow slice to stop early.
+    # The full agent text is the safe search scope — this content only appears in the
+    # Obsidian Output Mode section.
+    (
+        "not rendered" in _s74_d2_agent.lower()
+        and "Obsidian" in _s74_d2_agent
+    ),
+    "agents/d2-diagrammer.md obsidian section must document CLI-absent"
+    " degradation: source + 'image not rendered — install CLI' marker — absent pre-fix",
+)
+check(
+    "suite74(c2-d2-render-field): agents/d2-diagrammer.md documents a"
+    " 'render:' status field (render: done | skipped)",
+    "render:" in _s74_d2_agent,
+    "agents/d2-diagrammer.md must document a 'render:' status field"
+    " (render: done|skipped) in the Return Protocol or obsidian section — absent pre-fix",
+)
+check(
+    "suite74(c3-lc4-degradation): agents/likec4-diagrammer.md obsidian section"
+    " documents CLI-absent degradation (not rendered / install marker)",
+    # Same as c1: degradation block is after a code fence with '## Rendered Diagrams';
+    # use the full agent text as the safe search scope.
+    (
+        "not rendered" in _s74_lc4_agent.lower()
+        and "Obsidian" in _s74_lc4_agent
+    ),
+    "agents/likec4-diagrammer.md obsidian section must document CLI-absent"
+    " degradation: source + 'image not rendered — install CLI' marker — absent pre-fix",
+)
+check(
+    "suite74(c4-lc4-render-field): agents/likec4-diagrammer.md documents a"
+    " 'render:' status field (render: done | skipped)",
+    "render:" in _s74_lc4_agent,
+    "agents/likec4-diagrammer.md must document a 'render:' status field"
+    " (render: done|skipped) in the Return Protocol or obsidian section — absent pre-fix",
+)
+
+# ---------------------------------------------------------------------------
+# Group (d) — D2 skill Obsidian Output Mode section mirror
+#
+#  (d1) skills/d2-diagram/SKILL.md has an "Obsidian Output Mode" section
+#  (d2) that section documents ![[diagram.svg]]
+#  (d3) that section documents CLI-absent degradation
+# ---------------------------------------------------------------------------
+
+_s74_d2_skill_obs = _slice_section(_s74_d2_skill, "Obsidian Output Mode", _S74_AGENT_STOP)
+
+check(
+    "suite74(d1-d2-skill-section): skills/d2-diagram/SKILL.md contains an"
+    " 'Obsidian Output Mode' section",
+    bool(_s74_d2_skill_obs),
+    "skills/d2-diagram/SKILL.md must have an 'Obsidian Output Mode' section"
+    " mirroring the agent contract — absent pre-fix",
+)
+check(
+    "suite74(d2-d2-skill-embed): skills/d2-diagram/SKILL.md Obsidian Output Mode"
+    " section documents the ![[diagram.svg]] embed",
+    # The embed is inside a fenced code block; check the full skill text.
+    "![[diagram.svg]]" in _s74_d2_skill,
+    "skills/d2-diagram/SKILL.md Obsidian Output Mode section must contain"
+    " '![[diagram.svg]]' — absent pre-fix",
+)
+check(
+    "suite74(d3-d2-skill-degradation): skills/d2-diagram/SKILL.md Obsidian Output"
+    " Mode section documents CLI-absent degradation",
+    # The degradation block appears after a code fence containing '## Rendered Diagram';
+    # use the full skill text as the safe search scope — the content is unique to the
+    # Obsidian Output Mode section.
+    (
+        "not rendered" in _s74_d2_skill.lower()
+        and "Obsidian Output Mode" in _s74_d2_skill
+    ),
+    "skills/d2-diagram/SKILL.md Obsidian Output Mode section must document CLI-absent"
+    " degradation — absent pre-fix",
+)
+
+# ---------------------------------------------------------------------------
+# Group (e) — LikeC4 skill Obsidian Output Mode section mirror
+#
+#  (e1) skills/likec4-diagram/SKILL.md has an "Obsidian Output Mode" section
+#  (e2) that section references ![[...png]] embed
+#  (e3) that section documents CLI-absent degradation
+# ---------------------------------------------------------------------------
+
+_s74_lc4_skill_obs = _slice_section(_s74_lc4_skill, "Obsidian Output Mode", _S74_AGENT_STOP)
+
+check(
+    "suite74(e1-lc4-skill-section): skills/likec4-diagram/SKILL.md contains an"
+    " 'Obsidian Output Mode' section",
+    bool(_s74_lc4_skill_obs),
+    "skills/likec4-diagram/SKILL.md must have an 'Obsidian Output Mode' section"
+    " mirroring the agent contract — absent pre-fix",
+)
+check(
+    "suite74(e2-lc4-skill-embed): skills/likec4-diagram/SKILL.md Obsidian Output"
+    " Mode section references a PNG embed (![[...png]])",
+    # The embed is inside a fenced code block; check the full skill text.
+    (
+        "![[" in _s74_lc4_skill
+        and "png" in _s74_lc4_skill.lower()
+        and "Obsidian Output Mode" in _s74_lc4_skill
+    ),
+    "skills/likec4-diagram/SKILL.md Obsidian Output Mode section must contain"
+    " a '![[...png]]' embed reference — absent pre-fix",
+)
+check(
+    "suite74(e3-lc4-skill-degradation): skills/likec4-diagram/SKILL.md Obsidian"
+    " Output Mode section documents CLI-absent degradation",
+    # The degradation block appears after a code fence; use the full skill text.
+    (
+        "not rendered" in _s74_lc4_skill.lower()
+        and "Obsidian Output Mode" in _s74_lc4_skill
+    ),
+    "skills/likec4-diagram/SKILL.md Obsidian Output Mode section must document"
+    " CLI-absent degradation — absent pre-fix",
+)
+
+# ---------------------------------------------------------------------------
+# Group (f) — ref-direct-modes.md embed expectation
+#
+#  (f1) D2 Diagram Mode section notes obsidian embed (05-diagram.md + ![[)
+#  (f2) LikeC4 Diagram Mode section notes obsidian embed (05-diagram.md + ![[)
+#  (f3) Excalidraw Diagram Mode text still routes to diagram.excalidraw (unchanged)
+#  (f4) local-mode default output paths for d2/c4 reference workspaces (unchanged)
+# ---------------------------------------------------------------------------
+
+_s74_ref_d2_slice  = _slice_section(_s74_ref, "## D2 Diagram Mode", _S74_AGENT_STOP)
+_s74_ref_lc4_slice = _slice_section(_s74_ref, "## LikeC4 Diagram Mode", _S74_AGENT_STOP)
+_s74_ref_exc_slice = _slice_section(_s74_ref, "## Diagram Mode (Excalidraw)", _S74_STOP)
+
+check(
+    "suite74(f1-ref-d2-embed): agents/ref-direct-modes.md D2 Diagram Mode section"
+    " documents the obsidian-mode embed (05-diagram.md and ![[)",
+    (
+        "05-diagram.md" in _s74_ref_d2_slice
+        and "![[" in _s74_ref_d2_slice
+    ),
+    "agents/ref-direct-modes.md D2 Diagram Mode section must note that obsidian"
+    " mode appends a '![[diagram.svg]]' embed to '05-diagram.md' — absent pre-fix",
+)
+check(
+    "suite74(f2-ref-lc4-embed): agents/ref-direct-modes.md LikeC4 Diagram Mode"
+    " section documents the obsidian-mode embed (05-diagram.md and ![[)",
+    (
+        "05-diagram.md" in _s74_ref_lc4_slice
+        and "![[" in _s74_ref_lc4_slice
+    ),
+    "agents/ref-direct-modes.md LikeC4 Diagram Mode section must note that obsidian"
+    " mode appends a '![[...png]]' embed to '05-diagram.md' — absent pre-fix",
+)
+check(
+    "suite74(f3-ref-excalidraw-unchanged): agents/ref-direct-modes.md Excalidraw"
+    " Diagram Mode still routes to diagram.excalidraw (parity — must pass before AND after)",
+    # Check the full section (section header + all sub-steps) rather than a slice
+    # truncated by the first ### heading — diagram.excalidraw lives in Step 0 body.
+    "## Diagram Mode (Excalidraw)" in _s74_ref and "diagram.excalidraw" in _s74_ref,
+    "agents/ref-direct-modes.md must still contain 'diagram.excalidraw' in its"
+    " Excalidraw Diagram Mode section — this is a frozen-text regression guard",
+)
+check(
+    "suite74(f4-ref-local-mode-d2-path): agents/ref-direct-modes.md still"
+    " references workspaces/{feature}/diagram.d2 (local-mode default path unchanged)",
+    "diagram.d2" in _s74_ref,
+    "agents/ref-direct-modes.md must still reference 'diagram.d2' (workspaces path)"
+    " — local-mode default must be unchanged",
+)
+
+# ---------------------------------------------------------------------------
+# Group (g) — Excalidraw parity guard (frozen — must pass BEFORE and AFTER fix)
+#
+# The Excalidraw diagrammer agent and skill must NOT gain any obsidian-mode
+# D2/LikeC4 embed additions. This group is a regression guard.
+# ---------------------------------------------------------------------------
+
+check(
+    "suite74(g1-excalidraw-agent-no-d2-lc4-embed): agents/diagrammer.md does NOT"
+    " contain a D2/LikeC4 obsidian-embed section (parity guard)",
+    not (
+        "d2-likec4" in _s74_diagrammer.lower()
+        or ("![[diagram.svg]]" in _s74_diagrammer and "d2" in _s74_diagrammer.lower())
+        or ("![[diagram_" in _s74_diagrammer and "likec4" in _s74_diagrammer.lower())
+    ),
+    "agents/diagrammer.md must not contain D2/LikeC4 obsidian-embed additions"
+    " — Excalidraw agent is frozen (parity guard)",
+)
+check(
+    "suite74(g2-excalidraw-skill-no-d2-lc4-embed): skills/excalidraw-diagram/SKILL.md"
+    " does NOT contain a D2/LikeC4 obsidian-embed section (parity guard)",
+    not (
+        "d2-likec4" in _s74_excalidraw.lower()
+        or ("![[diagram.svg]]" in _s74_excalidraw and "d2" in _s74_excalidraw.lower())
+        or ("![[diagram_" in _s74_excalidraw and "likec4" in _s74_excalidraw.lower())
+    ),
+    "skills/excalidraw-diagram/SKILL.md must not contain D2/LikeC4 obsidian-embed"
+    " additions — Excalidraw skill is frozen (parity guard)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (h) — self-referential / registry guards
+#
+#  (h1) This test file contains 'Suite 74', '_slice_section', and
+#       'd2-likec4-obsidian-output'.
+#  (h2) docs/testing.md registers Suite 74 and the feature marker.
+#  (h3) CLAUDE.md does NOT contain 'Suite 74' (hygiene — canonical registry
+#       is docs/testing.md).
+# ---------------------------------------------------------------------------
+
+check(
+    "suite74(h1-self-ref): this test file contains 'Suite 74', '_slice_section',"
+    " and 'd2-likec4-obsidian-output'",
+    (
+        "Suite 74" in _s74_this_file
+        and "_slice_section" in _s74_this_file
+        and "d2-likec4-obsidian-output" in _s74_this_file
+    ),
+    "test file must contain the three required markers for Suite 74",
+)
+check(
+    "suite74(h2-registry): docs/testing.md registers Suite 74 and"
+    " d2-likec4-obsidian-output",
+    (
+        "Suite 74" in _s74_testing_md
+        and "d2-likec4-obsidian-output" in _s74_testing_md
+    ),
+    "docs/testing.md must register Suite 74 and the 'd2-likec4-obsidian-output' marker",
+)
+check(
+    "suite74(h3-hygiene): CLAUDE.md does NOT contain 'Suite 74'",
+    "Suite 74" not in _s74_claude,
+    "CLAUDE.md must not mention Suite 74 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
+# Group (i) — packaging
+#
+# Minor version bump 2.66.0 → 2.67.0 in both plugin files + CLAUDE.md §3.
+# CRITICAL: Assert the DURABLE CHANGELOG.md [2.67.0] section —
+# NEVER assert changelog.d/d2-likec4-obsidian-output.md existence.
+# The fragment is assembled into CHANGELOG.md and DELETED at delivery (Step 9e),
+# so a fragment-existence assertion fails on CI against the committed tree.
+# Recurring-bug guard.
+# ---------------------------------------------------------------------------
+
+_s74_changelog = read(REPO_ROOT / "CHANGELOG.md")
+
+check(
+    "suite74(i1-plugin-json): plugin.json version is 2.67.0",
+    _s59_ver_tuple(json.loads(_s74_plugin_json).get("version", "0.0.0")) >= (2, 67, 0),
+    "plugin.json version must be 2.67.0 or later (minor bump from 2.66.0"
+    " — distributed-asset change requires version bump)",
+)
+check(
+    "suite74(i2-marketplace-json): marketplace.json plugins[0].version is 2.67.0",
+    _s59_ver_tuple(
+        json.loads(_s74_marketplace).get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= (2, 67, 0),
+    "marketplace.json plugins[0].version must be 2.67.0 or later"
+    " (matched with plugin.json)",
+)
+check(
+    "suite74(i3-claude-version): CLAUDE.md §3 version is 2.67.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s74_claude) or "0.0.0") >= (2, 67, 0),
+    "CLAUDE.md §3 Current version must show 2.67.0 or later",
+)
+check(
+    "suite74(i4-changelog-section): CHANGELOG.md contains the 2.67.0 release section",
+    "## [2.67.0]" in _s74_changelog,
+    "CHANGELOG.md must contain a '## [2.67.0]' release section"
+    " (fragment assembled at delivery — do NOT assert changelog.d/ fragment existence)",
+)
+check(
+    "suite74(i5-changelog-entry): CHANGELOG.md 2.67.0 section documents"
+    " D2/LikeC4 obsidian-mode embed contract",
+    (
+        "diagram" in _s74_changelog.lower()
+        or "obsidian" in _s74_changelog.lower()
+        or "embed" in _s74_changelog.lower()
+    )
+    and "2.67.0" in _s74_changelog,
+    "CHANGELOG.md must document the D2/LikeC4 obsidian-mode embed contract"
+    " in the [2.67.0] release section (diagram/obsidian/embed keyword required)",
+)
+
+# Marker: d2-likec4-obsidian-output
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

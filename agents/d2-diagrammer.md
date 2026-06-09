@@ -135,6 +135,49 @@ Build the `.d2` file one pass at a time:
 
 ---
 
+## Obsidian Output Mode
+
+When the resolved output path is inside an Obsidian vault (i.e., `logs-mode: obsidian` is active and `docs_root` points to a vault workspace folder), follow this contract INSTEAD OF writing only the source. The local-mode path (source + summary in `workspaces/`) is unchanged.
+
+### Render step (mandatory in obsidian mode)
+
+After generating and formatting `diagram.d2`, compile the SVG into the vault folder:
+
+```bash
+d2 "{docs_root}/diagram.d2" "{docs_root}/diagram.svg"
+```
+
+This is D2's native default export — no extra dependency beyond the `d2` CLI.
+
+**Path quoting:** all `{docs_root}`-derived arguments are double-quoted. Obsidian vault paths commonly contain spaces (e.g. `…/Obsidian Vault/…`); unquoted paths break the command on those systems.
+
+### Embed step
+
+After the SVG is written, append the following block to `{docs_root}/05-diagram.md`:
+
+```markdown
+## Rendered Diagram
+![[diagram.svg]]
+```
+
+This embed causes Obsidian to display the diagram inline when the note is opened.
+
+### CLI-absent degradation
+
+When the `d2` CLI is not installed, do NOT hard-fail. The `.d2` source is still the authoritative deliverable.
+
+In obsidian mode, append this marker to `{docs_root}/05-diagram.md` in place of the embed:
+
+```markdown
+## Rendered Diagram
+> Image not rendered — the `d2` CLI is not installed. Install it and re-run to embed the diagram.
+> Source: `diagram.d2`
+```
+
+Status remains `success` when the source was produced and validated. Add `render: skipped` to the status block so the orchestrator/operator can see the degradation explicitly.
+
+---
+
 ## Phase 2 — Validation (MANDATORY)
 
 ### Step 1 — Format and validate syntax
@@ -250,6 +293,7 @@ agent: d2-diagrammer
 status: success | failed | blocked
 output: workspaces/{feature}/diagram.d2
 svg: workspaces/{feature}/diagram.svg
+render: done | skipped   # obsidian mode only; omit in local mode
 diagram_type: {architecture|sequence|ER|class|flowchart}
 node_count: {N}
 validation_cycles: {N}/3

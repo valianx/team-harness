@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.66.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.67.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -128,13 +128,13 @@ All commands run from the repo root.
 | Install plugin | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
 | Build installer from source (contributors) | `go run ./cmd/install` |
 | Validate agents/skills health | `/th:lint` inside Claude Code |
-| Run the free verification suite (policy-block + structure + YAML frontmatter) | `bash tests/run-all.sh` |
-| Run only the policy-block functional tests | `bash tests/test_policy_block.sh` |
-| Run only the agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |
-| Run only the agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
-| Run the behavioral suite (dispatches orchestrator via `claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
+| Run free verification suite (policy-block + structure + frontmatter) | `bash tests/run-all.sh` |
+| Run policy-block functional tests | `bash tests/test_policy_block.sh` |
+| Run agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |
+| Run agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
+| Run behavioral suite (`claude -p`, ~$1/run) | `bash tests/run-behavioral.sh` |
 
-**Not applicable to this repo:** typecheck, unit test of agent prompt behaviour, integration test of the live pipeline, e2e, build, dev server, migrations, deploy. The repo ships declarative assets, an installer, and one MCP server — no code pipeline. See `docs/testing.md` for the full test-suite registry and scope.
+**Not applicable:** typecheck, unit test of agent prompt behaviour, e2e, build, dev server, migrations, deploy. See `docs/testing.md` for the full suite registry and scope.
 
 ---
 
@@ -154,7 +154,7 @@ All commands run from the repo root.
 - **Single config file — `~/.claude/.team-harness.json`.** All Team Harness settings in one file: `logs-mode`/`logs-path`/`logs-subfolder`, installer manifest, version metadata, skill-specific keys (e.g. ClickUp under `clickup`). Skills MUST NOT create their own config files in `~/.claude/` — use namespaced keys inside `.team-harness.json`. Every write is a merge (read full doc, replace only owned key, write whole doc back); never partial payload. Exception: `~/.claude/settings.json` (Claude Code's own file, owned by the harness).
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux. Avoid Unix-only tools or shell-specific syntax in agent prompts.
 - **KG content is technical-only.** The knowledge graph must never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
-- **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per successfully-completed task (Step 11.5 of its workflow). The insight is synthesised from workspaces + the CHANGELOG entry and describes what was learned that future tasks can reuse — not what changed (that's the CHANGELOG). The call is best-effort: if the Memory MCP server is unreachable or the task has no reusable learning, the step logs and skips. This builds team knowledge automatically without operator curation.
+- **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per completed task (Step 11.5) — synthesised from workspaces + CHANGELOG, describes reusable learning, not what changed. Best-effort: unreachable MCP or no learning → log and skip.
 - **Delivery post-create check (Step 11.4).** After `gh pr create`, queries merge state + CI with bounded backoff; `CONFLICTING`/failing-CI reported explicitly (never as clean); graceful skip when `gh` absent.
 - **Pipeline observability is mandatory.** Every pipeline run produces `00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode) and `00-pipeline-summary.md`. Writing events is mandatory, not best-effort. **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Every decision involving a third-party library's API or configuration syntax must be verified against context7 before code is generated. Training-snapshot knowledge is treated as potentially stale. Mandatory triggers per agent are documented in `docs/context7-usage.md` §2 (architect, implementer, tester, security, translator); `init` is a light reference. Every consulting agent emits `context7_consult: hit:N miss:N skipped:M` in its status block — even when all counts are zero, the line's presence signals the agent considered freshness. Absence of context7 ≠ excuse to ignore the check: fall back to training knowledge and document the fallback in the workspace doc's `## Documentation Consulted` section.
@@ -164,6 +164,7 @@ All commands run from the repo root.
 - **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Dev mode — default-on, top-level orchestrator.** Default as of v2.56.0: `/th:setup`/`/th:update` write `~/.claude/.dev-mode-active` (`dev_mode: true`) unless `dev_mode_choice: "off"` in `.team-harness.json`. Top-level agent adopts orchestrator role, dispatches via Task. Inline orchestration permitted ONLY when marker present; without it, prohibited. `/dev-mode off` removes marker + persists opt-out; `/dev-mode on` re-activates. Outward actions gated by `dev-guard.sh`. `developer-mode` output style is the optional strong floor (`keep-coding-instructions: false`). `force-for-plugin` NOT set (decouples gate; removes escape hatch). Security floors non-waivable. See `docs/dev-mode.md`.
 - **Obsidian interlinking.** Step 11.6 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`. Plan consolidation (no forks, 3h): `agents/_shared/plan-consolidation.md`.
+- **Obsidian-mode diagram embed.** In `logs-mode: obsidian`, D2 (SVG via `d2`) and LikeC4 (PNG via `npx likec4 export png`) render into the vault workspace and append `![[…]]` embed(s) to `05-diagram.md`. CLI absent → source + not-rendered marker (`render: skipped`). Local mode and Excalidraw path unchanged.
 - **Milestone standard.** Milestones = commits, NOT PRs and NOT deliverables. One task = one workspace = one PR (after ALL milestones). Stage files are FLAT, whole-task documents (no per-milestone subsections; `-m{N}` suffixed files and `{NN}_{milestone}/` folders PROHIBITED). Milestone breakdown with dependency annotations lives ONLY in `01-plan.md`. Independent milestones PARALLELIZED (reuse #285 concurrent-`Task`); dependent serialize; one commit per milestone on the single feature branch. See `agents/ref-special-flows.md § Milestone-Build Flow`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
