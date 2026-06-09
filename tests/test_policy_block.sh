@@ -121,6 +121,157 @@ assert_allow ".env.template" '{"tool_name":"Write","tool_input":{"file_path":"/h
 assert_allow "regular source file" '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app/main.py"}}'
 
 echo
+echo "=== Secret scanner: Write content — high-confidence deny (DENY) ==="
+
+# AWS access key ID (exact 20-char format AKIA[0-9A-Z]{16})
+assert_deny "Write: AWS access key AKIA1234567890ABCDEF" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/config.py","content":"AWS_ACCESS_KEY_ID = \"AKIA1234567890ABCDEF\""}}'
+
+# GitHub personal access token (classic) ghp_ + 36 alphanum
+assert_deny "Write: GitHub PAT ghp_" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/deploy.sh","content":"TOKEN=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh12"}}'
+
+# GitHub fine-grained PAT github_pat_
+assert_deny "Write: GitHub fine-grained PAT github_pat_" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/ci.sh","content":"export GH_TOKEN=github_pat_11AABBCCDD0012345678901234567890abcd"}}'
+
+# PEM private key header
+assert_deny "Write: private key header BEGIN RSA PRIVATE KEY" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/key.txt","content":"-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"}}'
+
+# OpenAI-style sk- token
+assert_deny "Write: OpenAI sk- secret key" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/openai.py","content":"api_key = \"sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef12345678\""}}'
+
+# Slack bot token xoxb-
+# Note: token string is split across a variable to prevent static-scanner false positives on the
+# test file itself; the assembled payload exercises the hook's runtime detection correctly.
+_SLACK_TOK="xoxb"-"1234567890-abcdefghijklmnop"
+assert_deny "Write: Slack xoxb- bot token" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/slack.py","content":"SLACK_TOKEN=\"'"${_SLACK_TOK}"'\""}}'
+
+# SEC-001: modern OpenAI project key (sk-proj-…)
+assert_deny "Write: OpenAI sk-proj- project key" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/openai.py","content":"api_key = \"sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef\""}}'
+
+# SEC-001: modern OpenAI service-account key (sk-svcacct-…)
+assert_deny "Write: OpenAI sk-svcacct- service-account key" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/openai.py","content":"api_key = \"sk-svcacct-ABCDEFGHIJKLMNOPQRSTUVWX12345\""}}'
+
+# SEC-002: Google API key (AIza…) — AIza + 35 chars = 39 chars total (canonical Google format)
+assert_deny "Write: Google API key AIza" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/gcp.py","content":"GOOGLE_KEY=\"AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ0123456\""}}'
+
+# SEC-002: Stripe live secret key (sk_live_…)
+# Note: key string is split across a variable to prevent static-scanner false positives on the
+# test file itself; the assembled payload exercises the hook's runtime detection correctly.
+_STRIPE_SK="sk_live_"ABCDEFGHIJKLMNOPQRSTUVWXYZ
+assert_deny "Write: Stripe sk_live_ secret key" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/stripe.py","content":"stripe.api_key = \"'"${_STRIPE_SK}"'\""}}'
+
+# SEC-002: Stripe live restricted key (rk_live_…)
+# Note: key string is split across a variable to prevent static-scanner false positives on the
+# test file itself; the assembled payload exercises the hook's runtime detection correctly.
+_STRIPE_RK="rk_live_"ABCDEFGHIJKLMNOPQRSTUVWXY"Zabc"
+assert_deny "Write: Stripe rk_live_ restricted key" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/stripe.py","content":"STRIPE_KEY=\"'"${_STRIPE_RK}"'\""}}'
+
+# SEC-002: GitLab personal access token (glpat-…)
+assert_deny "Write: GitLab glpat- personal access token" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/gitlab.py","content":"GL_TOKEN=\"glpat-ABCDEFGHIJKLMNOPQRST\""}}'
+
+# SEC-002: GitHub server-to-server token (ghs_…)
+assert_deny "Write: GitHub ghs_ server token" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/gh.py","content":"GH_TOKEN=\"ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh12\""}}'
+
+# SEC-002: GitHub OAuth app token (gho_…)
+assert_deny "Write: GitHub gho_ OAuth token" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/gh.py","content":"OAUTH_TOKEN=\"gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh12\""}}'
+
+echo
+echo "=== Secret scanner: Edit new_string — high-confidence deny (DENY) ==="
+
+# Edit new_string containing an AWS key (exercises the Edit content-scan branch per qa-plan note 1)
+assert_deny "Edit new_string: AWS access key AKIA" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/home/u/config.py","old_string":"AWS_KEY = \"\"","new_string":"AWS_KEY = \"AKIA9876543210ZYXWVU\""}}'
+
+# Edit new_string containing a GitHub PAT
+assert_deny "Edit new_string: GitHub PAT ghp_ in new_string" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/home/u/env.sh","old_string":"TOKEN=","new_string":"TOKEN=ghp_XYZABCDEFGHIJKLMNOPQRSTUVWXYZxyz1234"}}'
+
+echo
+echo "=== Secret scanner: commit-Bash — high-confidence deny (DENY) ==="
+
+# git commit -m with an inline AWS key
+assert_deny "git commit -m with AWS key inline" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"add key AKIA1234567890ABCDEF\""}}'
+
+# git commit -m with a GitHub PAT inline
+assert_deny "git commit -m with GitHub PAT inline" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"configure token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh12\""}}'
+
+echo
+echo "=== Secret scanner: medium-confidence ask (ASK) ==="
+
+assert_ask() {
+    local name="$1"
+    local payload="$2"
+    local out
+    out=$(echo "$payload" | bash "$HOOK" 2>&1)
+    if echo "$out" | grep -q '"permissionDecision": "ask"'; then
+        PASS=$((PASS + 1))
+        echo "  [PASS] ASK: $name"
+    else
+        FAIL=$((FAIL + 1))
+        FAILURES+=("ASK expected but got other: $name | output: ${out:-<empty>}")
+        echo "  [FAIL] ASK: $name (got: ${out:-<empty>})"
+    fi
+}
+
+# High-entropy TOKEN= assignment (≥20 char, entropy ≥3.5)
+assert_ask "Write: high-entropy TOKEN= assignment" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app.py","content":"API_TOKEN=\"aB3xK9mZ7qP2wL5nR8tV4cF1\""}}'
+
+# High-entropy SECRET= assignment
+assert_ask "Write: high-entropy SECRET= assignment" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app.py","content":"MY_SECRET=\"xR7pQ2mN9kL4wJ6tH8vB3zC1\""}}'
+
+# High-entropy PASSWORD= assignment
+assert_ask "Write: high-entropy PASSWORD= assignment" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app.py","content":"PASSWORD=\"Xy9kLmNpQrStUvWxYz12345A\""}}'
+
+# High-entropy API_KEY= assignment
+assert_ask "Write: high-entropy API_KEY= assignment" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app.py","content":"API_KEY=\"aBcDeFgHiJkLmNoPqRsTuVwX\""}}'
+
+echo
+echo "=== Secret scanner: allowlist and low-entropy — allow (ALLOW) ==="
+
+# .env.example containing a high-confidence key shape — allowlist short-circuits
+assert_allow ".env.example with AWS key shape (allowlist)" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/.env.example","content":"AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF"}}'
+
+# .env.sample containing a token shape — allowlist short-circuits
+assert_allow ".env.sample with token shape (allowlist)" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/.env.sample","content":"API_TOKEN=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh12"}}'
+
+# Low-entropy placeholder TOKEN=changeme — entropy floor not met
+assert_allow "Write: low-entropy TOKEN=changeme (no scan fire)" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app.py","content":"TOKEN=changeme"}}'
+
+# Low-entropy placeholder PASSWORD=your-password-here
+assert_allow "Write: low-entropy PASSWORD=your-password-here" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app.py","content":"PASSWORD=your-password-here"}}'
+
+# Regular source file with no secrets
+assert_allow "Write: ordinary source file with no secrets" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/home/u/app/main.py","content":"def hello():\n    return \"world\""}}'
+
+# Bash git commit with no secret
+assert_allow "git commit without secret in message" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fix bug in parser\""}}'
+
+echo
 echo "=== Other tools (ALLOW — hook only inspects Bash/Write/Edit/NotebookEdit) ==="
 assert_allow "Read on .env (read-only is fine)" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env"}}'
 assert_allow "Glob" '{"tool_name":"Glob","tool_input":{"pattern":"**/*.py"}}'
