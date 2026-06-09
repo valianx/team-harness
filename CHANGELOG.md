@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.60.1] - 2026-06-08
+
+### Fixed
+
+- `skills/update/SKILL.md`: Step 6 sync blocks made sandbox-safe — single rolling `CLAUDE.md.bak` backup (no `Remove-Item`/`rm -f`/prune), skip-if-identical writes for `/dev-mode` skill and `developer-mode` output-style (no `-Force` copies), `Test-Path`/`[ -d ]`-guarded directory creation (no `New-Item -Force`); the blocks now execute to completion on all supported platforms (#278).
+
 ## [2.60.0] - 2026-06-08
 
 ### Fixed
