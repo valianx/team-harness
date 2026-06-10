@@ -41,7 +41,7 @@ The architect records a bounded **classification block** of yes/no facts in `00-
 Current State` (the verifier's authority) and mirrors it in `01-plan.md § Review Summary →
 ### Classification block` (the human-facing mirror).
 
-### The seven booleans
+### The eight booleans
 
 | Boolean | Meaning |
 |---------|---------|
@@ -52,6 +52,7 @@ Current State` (the verifier's authority) and mirrors it in `01-plan.md § Revie
 | `touches_public_lib_api` | The task adds or changes a public function, method, or type signature exposed to callers |
 | `touches_async_messaging` | The task adds or changes event, message, or queue payloads |
 | `destructive` | The task involves data migration, deletion, or irreversible schema change |
+| `spans_multiple_services` | The task involves a synchronous service-to-service call flow across ≥2 services (one service calls another's endpoint as part of the delivered behavior) |
 
 **Recording format (in `00-state.md § Current State`):**
 
@@ -63,6 +64,7 @@ Current State` (the verifier's authority) and mirrors it in `01-plan.md § Revie
 - touches_public_lib_api: true|false
 - touches_async_messaging: true|false
 - destructive: true|false
+- spans_multiple_services: true|false
 ```
 
 The verifier reads these with strict line-token parsing (same as `checkpoint-guard.sh:97-102`).
@@ -96,10 +98,13 @@ so no standalone `01-sketch-*.md` files are needed for the always-pair.
 | Public API surface | `touches_public_lib_api` | signatures + one usage example | none | changed signatures only | fenced code block | `01-sketch-public-api.md` |
 | Event/message contract | `touches_async_messaging` | example payload (JSON/YAML) + field table + topic/queue | none | one example payload, not the full schema | fenced + markdown table | `01-sketch-event-contract.md` |
 | Data migration plan | `touches_data_model` AND `destructive` | forward steps + rollback note | none | steps + rollback; no scripts | markdown table/list | `01-sketch-data-migration.md` |
+| Service interaction | `spans_multiple_services` | Mermaid `sequenceDiagram`, changed call paths only | **Mermaid** (native Obsidian render) | changed call paths only; low-fidelity | inline ` ```mermaid ` fence | `01-sketch-service-interaction.md` |
 
 ---
 
-## 4. Layout — Flat `01-sketch-*.md` Prefix
+## 4. Layout
+
+### Single-project layout — Flat `01-sketch-*.md` Prefix
 
 ```
 workspace/{feature}/
@@ -111,6 +116,7 @@ workspace/{feature}/
   01-sketch-public-api.md
   01-sketch-event-contract.md
   01-sketch-data-migration.md
+  01-sketch-service-interaction.md ← only when spans_multiple_services: true
   01-sketches.md  (optional)       ← index that embeds the others with ![[...]] for one Obsidian view
 ```
 
@@ -121,6 +127,31 @@ workspace/{feature}/
 - **Only triggered sketches are created** — if no boolean is true, no conditional
   `01-sketch-*.md` files are produced. This is a valid, normal outcome (e.g., a docs-only
   task or a task that triggers only the always-pair).
+
+### Multi-project consolidated layout
+
+When a multi-project initiative is active (`initiative != null`, parent `overview.md` exists at the initiative root), sketch files consolidate into a shared `sketches/` folder at the overview root:
+
+```
+{YYYY-MM-DD}_{initiative}/
+  overview.md
+  sketches/                                            ← consolidated folder, overview root
+    payment-gateway-01-sketch-api-contract.md          ← project-prefixed per-project sketch
+    payment-gateway-01-sketch-data-model.md
+    transactions-01-sketch-api-contract.md
+    transactions-01-sketch-data-model.md
+    backoffice-01-sketch-ui-wireframe.md
+    service-interaction.md                             ← shared cross-project sketch, NOT prefixed
+  payment-gateway/   00-state.md  01-plan.md ...
+  transactions/      00-state.md  01-plan.md ...
+  backoffice/        00-state.md  01-plan.md ...
+```
+
+**Rules for the consolidated layout:**
+- Per-project conditional sketches use the `{project}-` prefix to disambiguate when multiple projects trigger the same sketch type.
+- The shared `service-interaction.md` is un-prefixed — it describes a cross-project call flow that belongs to no single project.
+- `00-state.md` and `01-plan.md` remain in each project's own folder (unchanged from `docs/discover-phase.md § 11`). Only the sketch files consolidate.
+- `hooks/sketch-guard.sh` detects the consolidated layout by checking for a parent `overview.md`. When found, it resolves sketch paths to `{overview_root}/sketches/{project}-{sketch_file}` (and `{overview_root}/sketches/service-interaction.md` for the shared sketch). Absent `overview.md` → flat single-project path (current behavior). Ambiguity → flat path + concerns, never fail.
 
 ---
 
@@ -151,14 +182,16 @@ also see the classification block and the diff signal. The check is `concerns`-s
 
 | Phase | Who | Action |
 |-------|-----|--------|
-| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block; produces exactly the manifest-required `01-sketch-*.md` files |
+| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `01-sketch-*.md` files |
 | Phase 1.5 (Plan Ratification) | qa-plan | Checks sketch↔AC consistency (functional-acceptance sketch matches `§ Task List` AC) |
-| Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness (shape-only, fail-OPEN parity) |
+| Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness per-project (shape-only, fail-OPEN parity); each project's block audited independently in multi-project dispatch |
 | STAGE-GATE-1 | orchestrator | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
-| Stage 2 Implementation | implementer | Builds TO the sketches |
-| Stage 2 Test Authoring | tester | Derives tests from the AC sketch and non-functional notes |
-| Phase 3.6 (Acceptance Check) | acceptance-checker | Diffs the delivered surface against each sketch (delivered API vs `01-sketch-api-contract.md`, etc.) |
-| Direct-entry skills | `/th:review-pr`, `/th:deliver`, `/th:validate` | Run `sketch-guard.sh` as a prerequisite probe when entering mid-pipeline |
+| Stage 2 Implementation | implementer | **Required reading:** reads every triggered `01-sketch-*.md` file (or consolidated `sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
+| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `01-sketch-*.md` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-PR AC; emits `sketches_read` in status block |
+| Phase 3 Validation | qa | **Required reading:** reads the triggered `01-sketch-*.md` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
+| Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `01-sketch-*.md` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
+| Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `01-sketch-*.md` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `sketches/` paths in multi-project workspaces |
+| Direct-entry skills | `/th:review-pr`, `/th:validate` | Run `sketch-guard.sh` as a prerequisite probe; **required reading:** reads the triggered sketch files when entering mid-pipeline before the consuming pass begins |
 
 ---
 

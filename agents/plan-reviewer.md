@@ -399,12 +399,15 @@ for pr in PRs:
 
 **Gating:** Rule 11 fires for `type: feature | refactor | enhancement`. For `type: fix` Tier 2-4 it fires only when the architect declared non-all-false booleans. For `type: fix` Tier 0 / `docs` Tier 0 this rule is a no-op (no workspace, no sketches).
 
+**Multi-project dispatch:** In a multi-project initiative, Rule 11 runs per-project — once for each project's `01-plan.md`. Each project's classification block is audited independently; a missing block in one project is its own `concerns` finding and is surfaced at THAT project's STAGE-GATE-1. The per-project findings are never aggregated away or suppressed at re-convergence.
+
 **What to check:**
 
-1. Locate `### Classification block` in `01-plan.md § Review Summary`. If absent or if all seven booleans are omitted: finding `"Rule 11: Classification block missing from 01-plan.md § Review Summary"` with severity `concerns`.
-2. For each boolean that is `true`, verify the corresponding `01-sketch-*.md` file exists in the workspace (same directory as `01-plan.md`). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but 01-sketch-{name}.md is absent"` with severity `concerns`.
+1. Locate `### Classification block` in `01-plan.md § Review Summary`. If absent or if all eight booleans are omitted: finding `"Rule 11: Classification block missing from 01-plan.md § Review Summary"` with severity `concerns`. **Note:** if the plan's `Files:` list contains contract-surface paths (routes, controllers, handlers, endpoints, openapi, schema, migration, model, component) and the block is absent, name the skipped surface explicitly: `"Rule 11: Classification block missing — plan Files: contain contract-surface paths (e.g., {path}) — classification may have been skipped"`.
+2. For each boolean that is `true`, verify the corresponding `01-sketch-*.md` file exists in the workspace (same directory as `01-plan.md`, or under the consolidated `{overview_root}/sketches/` path in a multi-project workspace). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but 01-sketch-{name}.md is absent"` with severity `concerns`.
 3. For `touches_data_model: true` AND `destructive: true`, also require `01-sketch-data-migration.md`. Missing → finding `"Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent"` with severity `concerns`.
-4. For each present `01-sketch-*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: 01-sketch-{name}.md appears empty (header-only)"` with severity `concerns`.
+4. For `spans_multiple_services: true`, require `01-sketch-service-interaction.md`. Missing → finding `"Rule 11: spans_multiple_services is true but 01-sketch-service-interaction.md is absent"` with severity `concerns`.
+5. For each present `01-sketch-*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: 01-sketch-{name}.md appears empty (header-only)"` with severity `concerns`.
 
 **Severity is always `concerns` — never `fail`.** Rule 11 mirrors the fail-OPEN pattern of `hooks/sketch-guard.sh`. The human at STAGE-GATE-1 and the `sketch-guard.sh` verdict are the definitive backstops. The plan-reviewer surfaces sketch shape to the human; it does not block the gate.
 
@@ -413,7 +416,11 @@ for pr in PRs:
 ```
 classification = parse_classification_block(plan_review_summary)
 if classification is None:
-    findings.append(("Rule 11: Classification block missing from 01-plan.md § Review Summary", CONCERNS))
+    # Check for contract-surface keyword hint
+    if plan_files_contain_contract_surface_keywords(plan):
+        findings.append(("Rule 11: Classification block missing — plan Files: contain contract-surface paths — classification may have been skipped", CONCERNS))
+    else:
+        findings.append(("Rule 11: Classification block missing from 01-plan.md § Review Summary", CONCERNS))
     return  # cannot continue sketch check without classification
 
 SKETCH_MAP = {
@@ -423,6 +430,7 @@ SKETCH_MAP = {
     "touches_cli": "01-sketch-cli-surface.md",
     "touches_public_lib_api": "01-sketch-public-api.md",
     "touches_async_messaging": "01-sketch-event-contract.md",
+    "spans_multiple_services": "01-sketch-service-interaction.md",
 }
 for boolean, sketch_file in SKETCH_MAP.items():
     if classification.get(boolean) is True:
