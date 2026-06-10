@@ -34,7 +34,7 @@ name: review-pr
 
 ## Prerequisite probe — sketch-guard check (mid-pipeline entry)
 
-When entering mid-pipeline (i.e., a workspace folder for this feature already exists in `workspaces/`), run `hooks/sketch-guard.sh` as a best-effort prerequisite probe before proceeding to Phase 1. This surfaces any missing sketch artifacts to the operator before the review begins.
+When entering mid-pipeline (i.e., a workspace folder for this feature already exists in `workspaces/`), run `hooks/sketch-guard.sh` as a best-effort prerequisite probe before the review begins. This surfaces any missing sketch artifacts to the operator before the gather step executes.
 
 ```bash
 # Locate the workspace for this feature (if a local workspace exists)
@@ -42,7 +42,7 @@ When entering mid-pipeline (i.e., a workspace folder for this feature already ex
 bash hooks/sketch-guard.sh "${WORKSPACE_PATH}" 2>/dev/null
 ```
 
-Parse the JSON output. If `verdict: concerns`, show a one-line banner before Phase 1:
+Parse the JSON output. If `verdict: concerns`, show a one-line banner before the gather step begins:
 ```
 Note: sketch-guard found concerns for this workspace — {concerns[0]}. Proceeding with review.
 ```
