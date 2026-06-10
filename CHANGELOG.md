@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.71.0] - 2026-06-09
+
+### Added
+- `skills/interactive-presentation/` — new `/th:interactive-presentation` skill: generates interactive web presentations using React Flow (graph layouts), GSAP animations, and SVG; supports three modes: `new` (full scaffold), `add-scene` (append to existing presentation), and `from-ppt` (convert a slide deck description to an interactive format). Scaffold is Vite + React + TypeScript + Tailwind CSS + GSAP (free plugins only).
+
+### Changed
+- `skills/excalidraw-diagram/references/uv.lock` — committed lockfile for the already-tracked `pyproject.toml` for reproducible render-script Python dependency resolution.
+- Plugin version bumped 2.70.0 → 2.71.0.
+
 ## [2.70.0] - 2026-06-09
 
 ### Added
