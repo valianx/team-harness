@@ -108,6 +108,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 - `reviewability`, `pr too large`, `easier to review`. Reviewability is solved with commit granularity inside the PR, not by multiplying PRs.
 - `cleaner this way`, `team convention`, `we always do it this way`, or any subjective taste.
 - `different teams will review different parts`, `internal review structure`. Team structure does not justify split PRs.
+- `pure transport migration`, `transport-only sweep`, `zero behavioral change`, `http standardization sweep`, or any transport/encoding-migration reason. A transport-only change has no independent deploy cadence — it ships as commits in the same PR. This is a Rule 1 finding.
 - Anything else not in the closed list.
 
 **Detection algorithm:**
@@ -408,6 +409,7 @@ for pr in PRs:
 3. For `touches_data_model: true` AND `destructive: true`, also require `01-sketch-data-migration.md`. Missing → finding `"Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent"` with severity `concerns`.
 4. For `spans_multiple_services: true`, require `01-sketch-service-interaction.md`. Missing → finding `"Rule 11: spans_multiple_services is true but 01-sketch-service-interaction.md is absent"` with severity `concerns`.
 5. For each present `01-sketch-*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: 01-sketch-{name}.md appears empty (header-only)"` with severity `concerns`.
+6. **api-contract completeness sub-check (when `01-sketch-api-contract.md` is present):** if the sketch models a single action-style path (e.g., `/sync`, `/process`) AND the plan's ACs reference more than one distinct CRUD operation (e.g., create and update), emit finding `"Rule 11: api-contract sketch models a single action-style endpoint but the ACs describe multiple distinct operations — confirm completeness/convention or justify the action endpoint in the sketch's ## Notes"` with severity `concerns`. This sub-check is shape-adjacent and fail-OPEN: it surfaces a potential completeness gap for the human at STAGE-GATE-1; it does not hard-code a verdict on any specific endpoint name.
 
 **Severity is always `concerns` — never `fail`.** Rule 11 mirrors the fail-OPEN pattern of `hooks/sketch-guard.sh`. The human at STAGE-GATE-1 and the `sketch-guard.sh` verdict are the definitive backstops. The plan-reviewer surfaces sketch shape to the human; it does not block the gate.
 
@@ -442,6 +444,16 @@ for boolean, sketch_file in SKETCH_MAP.items():
 if classification.get("touches_data_model") and classification.get("destructive"):
     if not exists(workspace / "01-sketch-data-migration.md"):
         findings.append(("Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent", CONCERNS))
+
+# api-contract completeness sub-check
+api_sketch_path = workspace / "01-sketch-api-contract.md"
+if exists(api_sketch_path) and not is_trivially_empty(api_sketch_path):
+    api_sketch_content = read(api_sketch_path)
+    plan_acs = extract_ac_text(plan)
+    has_action_endpoint = matches_action_path_pattern(api_sketch_content)  # /sync, /process, /doStuff etc.
+    has_multiple_crud_ops = references_multiple_crud_ops(plan_acs)  # create AND update, or create AND delete
+    if has_action_endpoint and has_multiple_crud_ops:
+        findings.append(("Rule 11: api-contract sketch models a single action-style endpoint but the ACs describe multiple distinct operations — confirm completeness/convention or justify the action endpoint in the sketch's ## Notes", CONCERNS))
 ```
 
 **Override:** the architect may NOT override Rule 11 to `fail`. The maximum severity is `concerns` by design; the override escape hatch does not apply.

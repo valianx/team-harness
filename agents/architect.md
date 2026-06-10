@@ -106,6 +106,8 @@ You MUST write a single `01-plan.md` file that contains both the architecture pr
 
 #### Default: one PR per service
 
+**The pipeline never divides one task's plan or implementation.** One task = one plan = one implementation = one approved PR set. If scope looks too large for one task/PR, SURFACE it to the operator as a `### Decisions for human review` item — never split a plan or implementation on your own authority. Splitting scope into multiple workspaces is the operator's call. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
+
 **Situation → correct PR shape:**
 
 | Situation | Correct PR shape |
@@ -128,6 +130,7 @@ The following are NOT valid split reasons (the plan-reviewer rejects them):
 - "Reviewability" or "PR too large" — fix with commit granularity inside the PR, not by splitting PRs.
 - "Cleaner this way", subjective taste, "we always do it this way".
 - Internal team review structure.
+- "Pure transport migration", "transport-only sweep", "zero behavioral change", "HTTP standardization sweep". A change that only migrates transport or encoding with no behavioral change is STILL the same service's work — it ships as commits in the one PR, not as a separate PR. Transport-only is not an independent deploy cadence.
 
 If you find yourself wanting to split for a non-valid reason, default to one PR with per-concern commits. The reviewer reads commit-by-commit — this is the documented reviewability strategy in `agents/implementer.md` and `agents/reviewer.md`.
 
@@ -754,6 +757,9 @@ Use the trigger table below to determine which `01-sketch-*.md` files to create 
 Use these as starting points; fill in the actual content from the design:
 
 **`01-sketch-api-contract.md`**
+
+**Quality bar (api-contract):** resource-oriented paths + HTTP verbs map to operations; model EVERY distinct operation the change introduces as its own endpoint (do not collapse create+update into one multiplexing endpoint). An action/RPC endpoint (`/sync`) is allowed ONLY as a deliberate, stated design — justify it in `## Notes`. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
+
 ```markdown
 # API Contract Sketch — {feature-name}
 
@@ -779,6 +785,7 @@ paths:
 
 ## Notes
 - {any auth, rate-limit, or versioning notes}
+- {justify any action/RPC-style endpoint here if used}
 ```
 
 **`01-sketch-ui-wireframe.md`**
@@ -847,6 +854,9 @@ th cmd --flag value
 ```
 
 **`01-sketch-public-api.md`**
+
+**Quality note:** model the complete changed surface; follow the language's API conventions (see `docs/plan-sketches.md §3 → Sketch quality bar`).
+
 ```markdown
 # Public API Surface Sketch — {feature-name}
 
@@ -867,6 +877,9 @@ const result = example({ field: "value" })
 ```
 
 **`01-sketch-event-contract.md`**
+
+**Quality note:** model the complete changed surface; follow the messaging platform's naming conventions (see `docs/plan-sketches.md §3 → Sketch quality bar`).
+
 ```markdown
 # Event / Message Contract Sketch — {feature-name}
 
