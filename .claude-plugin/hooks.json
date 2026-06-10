@@ -1,5 +1,5 @@
 {
-  "_comment": "Plugin-mode hooks (loaded by Claude Code plugin runtime). Uses ${CLAUDE_PLUGIN_ROOT} — a plugin runtime variable that resolves to the plugin's install cache directory. For Go installer mode, use hooks/config.json instead (uses ~/.claude/hooks/ paths). SessionStart (matcher startup|resume|clear) auto-loads developer mode into context when the ~/.claude/.dev-mode-active marker is present (inert otherwise) and injects the configured default language directive from ~/.claude/.team-harness.json when a valid language key is present; UserPromptSubmit re-asserts the configured language as a terse per-turn reminder adjacent to each operator message; policy gate (PreToolUse Bash|Write|Edit|NotebookEdit) fires on every write/exec tool; reasoning-checkpoint guard (PreToolUse Task) gates phase dispatch; notification (Notification) fires only on idle_prompt.",
+  "_comment": "Plugin-mode hooks (loaded by Claude Code plugin runtime). Uses ${CLAUDE_PLUGIN_ROOT} — a plugin runtime variable that resolves to the plugin's install cache directory. For Go installer mode, use hooks/config.json instead (uses ~/.claude/hooks/ paths). SessionStart (matcher startup|resume|clear) auto-loads developer mode into context when the ~/.claude/.dev-mode-active marker is present (inert otherwise) and injects the configured default language directive from ~/.claude/.team-harness.json when a valid language key is present; UserPromptSubmit re-asserts the configured language as a terse per-turn reminder adjacent to each operator message; policy gate (PreToolUse Bash|Write|Edit|NotebookEdit) fires on every write/exec tool to secret-scan content; outward-action gate (PreToolUse Bash) gates dev-mode outward actions — separate entry from policy-block so dev-guard never fires on Edit/Write/NotebookEdit; reasoning-checkpoint guard (PreToolUse Task) gates phase dispatch; notification (Notification) fires only on idle_prompt.",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -37,7 +37,12 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/policy-block.sh",
             "timeout": 5
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/dev-guard.sh",
