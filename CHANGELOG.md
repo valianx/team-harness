@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.74.0] - 2026-06-10
+
+### Added
+
+- `docs/plan-sketches.md § Sketch quality bar`: api-contract sketch quality bar — requires OpenAPI/REST conventions (HTTP verbs, status codes, path params, auth), a complete operation set (all endpoints implied by the plan, no silent omissions), and body-shape specificity (bare `type:object` on a changed field is PROHIBITED; all fields must be named and typed).
+- Architect, qa-plan, and plan-reviewer agents enforce the api-contract quality bar at plan-stage: architect generates api-contract sketches to the bar; qa-plan ratifies compliance; plan-reviewer Rule 11 flags deficiencies as a FAIL verdict.
+- Suite 82 structural assertions (24 checks) covering the api-contract quality bar across `docs/plan-sketches.md`, `agents/architect.md`, `agents/qa-plan.md`, and `agents/plan-reviewer.md`.
+- `docs/setup-update-model.md`: documents the setup/update working model — division of labour (`/th:setup` owns operator keys, `/th:update` owns files + flows), the cache-vs-fixed-path propagation model, the self-healing idempotent re-sync property, the author maintenance invariant for new fixed-path artifacts, and the residual seam for newly-introduced operator keys.
+- Delivery Step 11.6: forward-only three-tier Obsidian work-log MOC scaffolding — feature-index note named after its folder (`{feature_dir}/{feature_dir}.md`), repo MOC (`_MOC-{repo}.md`), top MOC (`_MOC-work-logs.md`) — with knowledge-only allowlist (`00-research`, `01-plan`, `01-root-cause`), H1-derived link labels, idempotent whole-tree regeneration, path sanitization, and alias escaping; local-mode and Tier-0 are no-ops. Full spec: `docs/obsidian-linking.md`.
+- `agents/_shared/plan-consolidation.md`: shared invariant snippet establishing that `01-plan.md` is the final reconciled snapshot; each canonical field (base branch, version bump) appears exactly once; superseded values overwritten in place; no forked `01-plan-*.md` siblings; section-ownership map; referenced by five plan-writer/auditor agents.
+
+### Changed
+
+- `agents/ref-special-flows.md § Milestone-Build Flow`: ALL stage-file suffixes are now explicitly PROHIBITED — including the second-cycle case (`02b-implementation.md`, "second delivery cycle"), `-m{N}` per-milestone suffixes, and `{NN}_{milestone}/` child folders. Inventing an undocumented file-naming convention is itself a defect. The Operator-authority invariant makes explicit that the pipeline never divides a task on its own authority; scope division into multiple workspaces is an operator decision only.
+- `agents/orchestrator.md`: one-line guard referencing the Operator-authority invariant; post-approval-division re-gate trigger — any suffixed/second-cycle stage file or unapproved PR appearing after STAGE-GATE-1 routes back to architect + re-runs Phase 1.6 + re-surfaces STAGE-GATE-1.
+- `agents/architect.md`: transport-only migration explicitly named as an INVALID split reason; one-line operator-authority guard referencing `ref-special-flows.md`.
+- `agents/plan-reviewer.md`: Rule 1 updated to name transport-only as an invalid Split reason; Rule 11 updated with api-contract completeness and no-opaque-object sub-checks.
+- `agents/implementer.md` + `agents/delivery.md`: one-line guards against second-cycle stage files and unapproved PRs.
+- Suite 70 extended with GAP1 no-task-division assertions (9 checks): second-cycle suffix prohibition, operator-authority invariant, transport-only invalid reason, post-approval re-gate, implementer/delivery guards.
+- `CLAUDE.md §5` Milestone-standard bullet updated to reflect the extended stage-file-suffix prohibition (all suffixes, not just `-m{N}`).
+- `CLAUDE.md §14` tightened to concise pointer form; verbose How-to-enter-dev-mode paragraph removed (content lives in §5 Dev mode bullet + `docs/dev-mode.md`).
+- ClickUp comments now require an explicit operator preview-and-approval gate before posting; the gate is non-waivable in autonomous runs (issue #259).
+
+### Fixed
+
+- Plan consolidation by accretion: architect, plan-reviewer, qa-plan, qa, and orchestrator now each carry an explicit reconcile-don't-accrete clause — later-stage inputs overwrite superseded canonical fields rather than appending a second value. Previously a plan could simultaneously carry contradictory base-branch or version values.
+- plan-reviewer Rule 3 extended with pattern 3h: collects distinct values of each canonical field (base branch, version bump) across `## Review Summary`, `### Work Plan`, and `## Task List`; emits a `concerns`-severity finding when one field holds more than one mutually-exclusive value.
+- qa validate mode now folds a `## Validation Outcome` section into `01-plan.md` (final verdict + reference to `04-validation.md`) in addition to the existing per-AC checkbox mirror, making the plan a complete snapshot without requiring `04-validation.md` for the verdict.
+- orchestrator STAGE-GATE-1 reconciles canonical fields in `01-plan.md` when the operator's decision changes base, version, or scope — superseded values are overwritten so only the operator's final values remain.
+- Delivery agent Step 9b now gates DoD on the recorded Phase 3 verify outcome instead of unconditionally re-running the full test suite; re-runs only when no green record exists, the record is stale, or delivery itself modified test-relevant files. Fixes #266.
+- Delivery agent Step 11.2 now omits the `Closes/Fixes #N` line entirely when Step 2 finds no linked GitHub issue; never synthesizes a number. Fixes #266.
+- Delivery agent Step 9.0 version-site table reconciled to the correct 3-site mandatory set for plugin-asset changes (`plugin.json` + `marketplace.json` + `CLAUDE.md §3`); `cmd/install/main.go` annotated as a legacy-installer anchor updated only on installer releases. Fixes #266.
+- `docs/install.md` § Updating: replaced the incomplete plugin-update instructions (which omitted `claude plugin update` and the fixed-path sync) with the real `/th:update` three-step flow (refresh catalog → download → reload) and a pointer to `docs/setup-update-model.md`.
+- The configured `language` default was not honored across turns in a session — the agent drifted to the operator's per-message language because a single SessionStart injection lacked recency parity against repeated per-message signals. A new `UserPromptSubmit` hook (`hooks/language-user-prompt.sh`) now re-asserts the configured language directive adjacent to every operator message, restoring consistent language behavior regardless of per-message input language. Fixes #268.
+- `skills/setup/SKILL.md`: added version-staleness guard (Step 0) that refreshes the marketplace catalog, compares installed vs latest `th` version, and warns the operator if running on a stale plugin before any configuration — advisory only, never hard-blocks. Mirrors `/th:update` Steps 1–4 (#272).
+
 ## [2.73.0] - 2026-06-10
 
 ### Added

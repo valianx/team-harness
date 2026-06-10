@@ -16494,7 +16494,270 @@ check(
     "The old 'nest as child steps' wording must be replaced with the FINAL standard.",
 )
 
+# ---------------------------------------------------------------------------
+# Suite 70 — GAP1 additions (M1.6): no-task-division guards (plan-output-quality-guards)
+#
+# c7b — ref-special-flows.md § Milestone-Build Flow prohibits ALL stage-file
+#        suffixes, explicitly names the second-cycle case (02b-implementation.md /
+#        "second delivery cycle"), and states that inventing an undocumented
+#        file-naming convention is itself a defect. (AC-1)
+#
+# c7c — NO agent doc TEACHES a -b/second-cycle convention. The tokens
+#        "02b", "second-cycle", "second delivery cycle" appear ONLY inside
+#        prohibition/guard context (ref-special-flows, orchestrator, implementer).
+#        Assertion is scoped so the prohibition text itself does not trip it:
+#        only files that contain the tokens WITHOUT also containing a prohibition
+#        keyword nearby would be flagged. (AC-1/AC-6 anti-gaming)
+#
+# c7d — Operator-authority invariant in ref-special-flows.md + referenced by a
+#        one-line guard in BOTH architect.md AND orchestrator.md. (AC-2/AC-3)
+#
+# AC-4 — transport-only named as INVALID in architect.md AND plan-reviewer.md Rule 1.
+# AC-5 — orchestrator.md post-approval-division re-gate trigger present.
+# AC-6 — implementer.md + delivery.md one-line guards present.
+#
+# All checks anchor-scoped (anti-false-green: missing anchor → empty slice → fail).
+# Marker: no-task-division-guards
+# ---------------------------------------------------------------------------
+
+print()
+print("=== Suite 70 GAP1 additions: no-task-division guards ===")
+
+_s70g_flows     = _s70_flows        # already read above: agents/ref-special-flows.md
+_s70g_arch      = read(AGENTS_DIR / "architect.md")
+_s70g_orch      = _s70_orch         # already read above: agents/orchestrator.md
+_s70g_impl      = read(AGENTS_DIR / "implementer.md")
+_s70g_deliv     = read(AGENTS_DIR / "delivery.md")
+_s70g_pr        = read(AGENTS_DIR / "plan-reviewer.md")
+
+# ---------------------------------------------------------------------------
+# c7b — second-cycle prohibition in ref-special-flows.md § Milestone-Build Flow
+#
+# The prohibition paragraph (line 107 in the file) must:
+#   (i)  name "02b-implementation.md" (the concrete second-cycle example)
+#   (ii) name "second delivery cycle" (the concept)
+#   (iii) state inventing an undocumented file-naming convention is a defect
+# We slice the Milestone-Build Flow section for anchor-scoped coverage.
+# ---------------------------------------------------------------------------
+_S70G_FLOWS_ANCHOR = "## Milestone-Build Flow"
+_S70G_STOP         = ("\n## ", "\n---\n")
+
+_s70g_milestone_slice = _slice_section(_s70g_flows, _S70G_FLOWS_ANCHOR, _S70G_STOP)
+
+check(
+    "suite70(c7b-i): ref-special-flows.md § Milestone-Build Flow names"
+    " '02b-implementation.md' as a prohibited second-cycle suffix",
+    "02b-implementation.md" in _s70g_milestone_slice,
+    "ref-special-flows.md § Milestone-Build Flow must explicitly name '02b-implementation.md'"
+    " as a PROHIBITED second-cycle stage file (AC-1: generalize suffix prohibition to ALL suffixes)",
+)
+check(
+    "suite70(c7b-ii): ref-special-flows.md § Milestone-Build Flow names"
+    " 'second delivery cycle' as a prohibited concept",
+    "second delivery cycle" in _s70g_milestone_slice,
+    "ref-special-flows.md § Milestone-Build Flow must explicitly name 'second delivery cycle'"
+    " as a prohibited concept alongside the second-cycle suffix prohibition (AC-1)",
+)
+check(
+    "suite70(c7b-iii): ref-special-flows.md § Milestone-Build Flow states"
+    " inventing an undocumented file-naming convention is itself a defect",
+    "undocumented" in _s70g_milestone_slice and "defect" in _s70g_milestone_slice,
+    "ref-special-flows.md § Milestone-Build Flow must state that inventing an undocumented"
+    " file-naming convention is a defect (AC-1: prohibition-by-principle, not only by example)",
+)
+
+# ---------------------------------------------------------------------------
+# c7c — no agent doc TEACHES a -b/second-cycle convention
+#
+# Every agent file that contains "02b" or "second-cycle" or "second delivery cycle"
+# must ALSO contain a prohibition/guard keyword in the same file
+# (e.g., "PROHIBITED", "never create", "no such convention", "plan drift").
+# This is scoped so the prohibition text itself does not trip it:
+# any file containing the token is expected to ALSO contain a guard word,
+# meaning the token only appears to FORBID it.
+# ---------------------------------------------------------------------------
+_GUARD_KEYWORDS = [
+    "PROHIBITED", "never create", "no such convention", "plan drift",
+    "NEVER", "prohibited", "guard", "forbid", "defect",
+]
+
+def _has_guard(text: str) -> bool:
+    return any(kw in text for kw in _GUARD_KEYWORDS)
+
+_SECOND_CYCLE_TOKENS = ["02b", "second-cycle", "second delivery cycle"]
+
+_taught_without_guard = []
+for _fname in sorted(os.listdir(AGENTS_DIR)):
+    if not _fname.endswith(".md"):
+        continue
+    _fpath = AGENTS_DIR / _fname
+    _fcontent = read(_fpath)
+    for _tok in _SECOND_CYCLE_TOKENS:
+        if _tok in _fcontent:
+            if not _has_guard(_fcontent):
+                _taught_without_guard.append(f"{_fname} contains '{_tok}' without a prohibition keyword")
+
+check(
+    "suite70(c7c): no agent doc teaches a second-cycle convention without a prohibition guard"
+    " — '02b'/'second-cycle'/'second delivery cycle' only appear in prohibition/guard context",
+    len(_taught_without_guard) == 0,
+    "Every agent file containing '02b', 'second-cycle', or 'second delivery cycle'"
+    f" must also contain a prohibition/guard keyword. Violations: {_taught_without_guard}",
+)
+
+# ---------------------------------------------------------------------------
+# c7d — operator-authority invariant present in ref-special-flows + referenced
+#        by one-line guards in BOTH architect.md AND orchestrator.md
+# ---------------------------------------------------------------------------
+_S70G_OA_TOKEN_FLOWS  = "Operator-authority invariant"
+_S70G_OA_TOKEN_ARCH   = "ref-special-flows.md"      # architect guard references canonical source
+_S70G_OA_TOKEN_ORCH   = "Operator-authority invariant"  # orchestrator guard references canonical
+
+# (i) ref-special-flows.md contains the Operator-authority invariant paragraph
+check(
+    "suite70(c7d-i): ref-special-flows.md § Milestone-Build Flow contains"
+    " the Operator-authority invariant — pipeline never divides a task",
+    _S70G_OA_TOKEN_FLOWS in _s70g_milestone_slice,
+    "ref-special-flows.md § Milestone-Build Flow must contain the 'Operator-authority invariant'"
+    " paragraph stating the pipeline never divides a task on its own authority (AC-2)",
+)
+
+# (ii) architect.md carries a one-line guard referencing the operator-authority invariant
+_S70G_ARCH_GUARD_ANCHOR = "#### Default: one PR per service"
+_S70G_ARCH_STOP         = ("\n## ", "\n### ", "\n#### ", "\n---\n")
+_s70g_arch_pr_slice = _slice_section(_s70g_arch, _S70G_ARCH_GUARD_ANCHOR, _S70G_ARCH_STOP)
+
+check(
+    "suite70(c7d-ii): architect.md carries a one-line operator-authority guard"
+    " referencing ref-special-flows.md (canonical source)",
+    (
+        "never split" in _s70g_arch_pr_slice or "never divides" in _s70g_arch_pr_slice
+        or "pipeline never divides" in _s70g_arch_pr_slice
+    ) and "ref-special-flows.md" in _s70g_arch_pr_slice,
+    "architect.md '#### Default: one PR per service' slice must contain a one-line guard"
+    " stating the pipeline never splits on its own authority, referencing ref-special-flows.md (AC-3)",
+)
+
+# (iii) orchestrator.md carries a one-line guard referencing the operator-authority invariant
+# The guard text is near the Task List freeze block — anchor on the invariant text directly
+_S70G_ORCH_GUARD_ANCHOR = "The orchestrator never divides one task"
+check(
+    "suite70(c7d-iii): orchestrator.md carries a guard text"
+    " 'The orchestrator never divides one task' referencing the operator-authority invariant",
+    _S70G_ORCH_GUARD_ANCHOR in _s70g_orch,
+    "orchestrator.md must contain 'The orchestrator never divides one task'"
+    " as a one-line guard referencing the operator-authority invariant (AC-3)",
+)
+
+# ---------------------------------------------------------------------------
+# AC-4 — transport-only named as INVALID split reason in BOTH architect.md
+#         AND plan-reviewer.md Rule 1
+# ---------------------------------------------------------------------------
+_S70G_ARCH_INVALID_ANCHOR = "The following are NOT valid split reasons"
+_s70g_arch_invalid_slice  = _slice_section(
+    _s70g_arch, _S70G_ARCH_INVALID_ANCHOR, _S70G_ARCH_STOP
+)
+
+check(
+    "suite70(ac4-arch): architect.md invalid-split-reasons list names the transport-only case",
+    (
+        "transport" in _s70g_arch_invalid_slice.lower()
+        and (
+            "Pure transport migration" in _s70g_arch_invalid_slice
+            or "transport-only" in _s70g_arch_invalid_slice
+            or "zero behavioral change" in _s70g_arch_invalid_slice
+            or "HTTP standardization sweep" in _s70g_arch_invalid_slice
+        )
+    ),
+    "architect.md 'The following are NOT valid split reasons' must name the transport-only case"
+    " (e.g., 'Pure transport migration', 'transport-only sweep', 'zero behavioral change'). (AC-4)",
+)
+
+_S70G_PR_RULE1_ANCHOR = "### Rule 1"
+_s70g_pr_rule1_slice  = _slice_section(_s70g_pr, _S70G_PR_RULE1_ANCHOR, _S70G_ARCH_STOP)
+
+check(
+    "suite70(ac4-plan-reviewer): plan-reviewer.md Rule 1 names the transport-only case"
+    " as an invalid Split reason",
+    (
+        "transport" in _s70g_pr_rule1_slice.lower()
+        and (
+            "pure transport migration" in _s70g_pr_rule1_slice.lower()
+            or "transport-only" in _s70g_pr_rule1_slice.lower()
+            or "zero behavioral change" in _s70g_pr_rule1_slice.lower()
+            or "http standardization sweep" in _s70g_pr_rule1_slice.lower()
+        )
+    ),
+    "plan-reviewer.md Rule 1 must name the transport-only case as an invalid Split reason. (AC-4)",
+)
+
+# ---------------------------------------------------------------------------
+# AC-5 — orchestrator.md post-approval-division re-gate trigger
+#
+# After STAGE-GATE-1 approval, a second PR not in the approved Task List OR
+# any suffixed/second-cycle stage file must trigger architect re-run +
+# Phase 1.6 + STAGE-GATE-1 re-confirmation.
+# ---------------------------------------------------------------------------
+_S70G_ORCH_REDATE_ANCHOR = "Post-approval division is a hard re-gate trigger"
+check(
+    "suite70(ac5-orch-redate): orchestrator.md contains the post-approval-division re-gate trigger",
+    _S70G_ORCH_REDATE_ANCHOR in _s70g_orch,
+    "orchestrator.md must contain 'Post-approval division is a hard re-gate trigger'"
+    " paragraph (AC-5: mid-workspace unapproved PR or suffixed stage file routes back to architect"
+    " + re-runs Phase 1.6 + re-surfaces STAGE-GATE-1)",
+)
+
+_S70G_ORCH_REDATE_STOP = ("\n## ", "\n---\n")
+_s70g_orch_redate_slice = _slice_section(
+    _s70g_orch, _S70G_ORCH_REDATE_ANCHOR, _S70G_ORCH_REDATE_STOP
+)
+
+check(
+    "suite70(ac5-orch-redate-detail): post-approval re-gate trigger routes back to architect,"
+    " re-runs Phase 1.6, and re-surfaces STAGE-GATE-1",
+    (
+        "architect" in _s70g_orch_redate_slice
+        and "Phase 1.6" in _s70g_orch_redate_slice
+        and ("STAGE-GATE-1" in _s70g_orch_redate_slice or "STAGE-GATE" in _s70g_orch_redate_slice)
+    ),
+    "orchestrator.md post-approval re-gate trigger must mention architect re-run, Phase 1.6,"
+    " and STAGE-GATE-1 re-confirmation (AC-5)",
+)
+
+# ---------------------------------------------------------------------------
+# AC-6 — implementer.md + delivery.md one-line guards
+#
+# implementer: never create a suffixed/second-cycle stage file
+# delivery:    never open a PR not in the approved Task List on own authority
+# ---------------------------------------------------------------------------
+check(
+    "suite70(ac6-implementer): implementer.md carries a one-line guard against"
+    " suffixed/second-cycle stage files",
+    (
+        "02b-implementation.md" in _s70g_impl or "second-cycle stage file" in _s70g_impl
+        or ("no such convention exists" in _s70g_impl and "02b" in _s70g_impl)
+    ),
+    "implementer.md must contain a one-line guard stating never to create"
+    " '02b-implementation.md' or any suffixed/second-cycle stage file (AC-6)",
+)
+
+check(
+    "suite70(ac6-delivery): delivery.md carries a one-line guard against"
+    " opening a PR not in the approved Task List on own authority",
+    (
+        "approved" in _s70g_deliv and "Task List" in _s70g_deliv
+        and (
+            "own authority" in _s70g_deliv
+            or "on your own authority" in _s70g_deliv
+            or "not in the approved" in _s70g_deliv
+        )
+    ),
+    "delivery.md must contain a one-line guard: never open a PR not in the approved"
+    " Task List on own authority (AC-6: plan-drift requires architect re-run + operator confirmation)",
+)
+
 # Marker: fix-plan-execution-workspace-continuity
+# Marker: no-task-division-guards
 
 # ---------------------------------------------------------------------------
 # Suite 71 — delivery-pr-mergeability-check (v2.63.0)
@@ -18742,7 +19005,206 @@ check(
     "CLAUDE.md must not mention Suite 82 — only docs/testing.md is the canonical registry",
 )
 
+# ---------------------------------------------------------------------------
+# Suite 82 — quality-bar-api-contract (M2.3: plan-output-quality-guards)
+#
+# Asserts that the api-contract sketch quality bar (AC-7/AC-8) is structurally
+# present across all four surfaces:
+#
+#   (1) docs/plan-sketches.md §3 has '### Sketch quality bar' heading covering:
+#       (i)  OpenAPI/REST conventions clause
+#       (ii) Completeness clause (complete operation set)
+#       (iii) Body-shape specificity clause (bare type:object PROHIBITED)
+#
+#   (2) agents/architect.md api-contract skeleton references the quality bar
+#       (conventions + completeness + body-shape / no-opaque-object)
+#
+#   (3) agents/qa-plan.md api-contract quality clause covers operation
+#       completeness, unjustified action endpoint, AND no-opaque-object check
+#
+#   (4) agents/plan-reviewer.md Rule 11 sub-check (step 6) covers operation
+#       completeness AND bare-type:object-on-changed-field
+#
+# All checks anchor-scoped (anti-false-green).
+# Marker: quality-bar-api-contract
+# ---------------------------------------------------------------------------
+
+print()
+print("=== Suite 82 quality-bar-api-contract (M2.3) ===")
+
+# Reuse already-read file variables from Suite 82
+# _s82_docs_sketches, _s82_architect, _s82_qa_plan, _s82_plan_reviewer
+
+_s82_qa_plan        = read(AGENTS_DIR / "qa-plan.md")
+
+_S82Q_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ---------------------------------------------------------------------------
+# (1) docs/plan-sketches.md §3 — ### Sketch quality bar section
+# ---------------------------------------------------------------------------
+_S82Q_QUALITY_BAR_ANCHOR = "### Sketch quality bar"
+_s82q_quality_bar_slice  = _slice_section(
+    _s82_docs_sketches, _S82Q_QUALITY_BAR_ANCHOR, _S82Q_STOP
+)
+
+check(
+    "suite82(quality-bar-api-contract-1a): docs/plan-sketches.md §3 contains"
+    " '### Sketch quality bar' heading",
+    bool(_s82q_quality_bar_slice),
+    "docs/plan-sketches.md §3 must contain a '### Sketch quality bar' subsection"
+    " (AC-7: api-contract quality bar — heading absent or anchor not found)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-1b-openapi-rest): docs/plan-sketches.md"
+    " § Sketch quality bar covers OpenAPI/REST conventions clause",
+    (
+        "OpenAPI" in _s82q_quality_bar_slice or "REST" in _s82q_quality_bar_slice
+        or "resource-oriented" in _s82q_quality_bar_slice
+        or "HTTP verbs" in _s82q_quality_bar_slice
+    ),
+    "docs/plan-sketches.md § Sketch quality bar must cover OpenAPI/REST conventions"
+    " (resource-oriented paths, HTTP verbs → operations). (AC-7 clause i)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-1c-completeness): docs/plan-sketches.md"
+    " § Sketch quality bar covers completeness clause (complete operation set)",
+    (
+        "Completeness" in _s82q_quality_bar_slice
+        or "EVERY distinct operation" in _s82q_quality_bar_slice
+        or "complete" in _s82q_quality_bar_slice.lower()
+    ) and (
+        "multiplexing" in _s82q_quality_bar_slice
+        or "distinct" in _s82q_quality_bar_slice
+    ),
+    "docs/plan-sketches.md § Sketch quality bar must cover the completeness clause"
+    " — model EVERY distinct operation; do not collapse into one multiplexing endpoint. (AC-7 clause ii)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-1d-body-shape): docs/plan-sketches.md"
+    " § Sketch quality bar covers body-shape specificity clause"
+    " — bare type:object on a changed field is PROHIBITED",
+    (
+        "bare" in _s82q_quality_bar_slice or "type: object" in _s82q_quality_bar_slice
+        or "opaque" in _s82q_quality_bar_slice
+        or "Body-shape" in _s82q_quality_bar_slice
+        or "body-shape" in _s82q_quality_bar_slice.lower()
+    ) and (
+        "PROHIBITED" in _s82q_quality_bar_slice
+        or "prohibited" in _s82q_quality_bar_slice.lower()
+    ),
+    "docs/plan-sketches.md § Sketch quality bar must cover body-shape specificity:"
+    " a bare 'type: object' with no 'properties' on a changed field is PROHIBITED. (AC-7 clause iii)",
+)
+
+# ---------------------------------------------------------------------------
+# (2) agents/architect.md api-contract skeleton quality bar reference
+# ---------------------------------------------------------------------------
+_S82Q_ARCH_ANCHOR = "**`01-sketch-api-contract.md`**"
+_S82Q_ARCH_STOP   = ("\n---\n", "\n**`01-sketch-")
+
+_s82q_arch_api_slice = _slice_section(
+    _s82_architect, _S82Q_ARCH_ANCHOR, _S82Q_ARCH_STOP
+)
+
+check(
+    "suite82(quality-bar-api-contract-2a-arch-quality-bar): agents/architect.md"
+    " api-contract skeleton directive references the quality bar",
+    (
+        "quality bar" in _s82q_arch_api_slice.lower()
+        or "Quality bar" in _s82q_arch_api_slice
+    ),
+    "agents/architect.md '01-sketch-api-contract.md' skeleton must include a Quality bar"
+    " directive referencing docs/plan-sketches.md §3. (AC-8)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-2b-arch-no-opaque): agents/architect.md"
+    " api-contract quality bar directive covers the no-opaque-object rule",
+    (
+        "bare" in _s82q_arch_api_slice or "type: object" in _s82q_arch_api_slice
+        or "PROHIBITED" in _s82q_arch_api_slice
+        or "no `properties`" in _s82q_arch_api_slice
+    ),
+    "agents/architect.md api-contract quality bar directive must state that a bare"
+    " 'type: object' with no 'properties' on a changed field is PROHIBITED. (AC-8)",
+)
+
+# ---------------------------------------------------------------------------
+# (3) agents/qa-plan.md — api-contract quality clause (no-opaque-object check)
+# ---------------------------------------------------------------------------
+_S82Q_QA_ANCHOR = "api-contract quality clause"
+_S82Q_QA_STOP   = ("\n\n", "\n6. ", "\n**Append")
+
+_s82q_qa_slice = _slice_section(_s82_qa_plan, _S82Q_QA_ANCHOR, _S82Q_QA_STOP)
+
+check(
+    "suite82(quality-bar-api-contract-3a-qa-plan-clause): agents/qa-plan.md"
+    " Phase 1.5 ratify check includes the api-contract quality clause",
+    bool(_s82q_qa_slice),
+    "agents/qa-plan.md must contain an 'api-contract quality clause' sub-bullet"
+    " in the Phase 1.5 sketch ↔ AC consistency check. (AC-8)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-3b-qa-plan-completeness): agents/qa-plan.md"
+    " quality clause covers operation completeness",
+    (
+        "complete" in _s82q_qa_slice.lower()
+        or "distinct" in _s82q_qa_slice
+        or "operation" in _s82q_qa_slice
+    ),
+    "agents/qa-plan.md api-contract quality clause must cover operation-completeness check. (AC-8)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-3c-qa-plan-no-opaque): agents/qa-plan.md"
+    " quality clause covers bare type:object no-opaque-object check",
+    (
+        "bare" in _s82q_qa_slice or "type: object" in _s82q_qa_slice
+        or "opaque" in _s82q_qa_slice
+        or "body-shape" in _s82q_qa_slice.lower()
+        or "properties" in _s82q_qa_slice
+    ),
+    "agents/qa-plan.md api-contract quality clause must cover the no-opaque-object check:"
+    " bare 'type: object' on a changed field is a body-shape specificity gap. (AC-8)",
+)
+
+# ---------------------------------------------------------------------------
+# (4) agents/plan-reviewer.md Rule 11 step 6 — api-contract sub-check
+# ---------------------------------------------------------------------------
+_S82Q_PR_RULE11_ANCHOR = "### Rule 11"
+_S82Q_PR_STOP          = ("\n### ", "\n## ", "\n---\n")
+_s82q_pr_rule11_slice  = _slice_section(_s82_plan_reviewer, _S82Q_PR_RULE11_ANCHOR, _S82Q_PR_STOP)
+
+check(
+    "suite82(quality-bar-api-contract-4a-plan-reviewer-rule11-step6): agents/plan-reviewer.md"
+    " Rule 11 contains an api-contract completeness sub-check (step 6)",
+    (
+        "api-contract completeness" in _s82q_pr_rule11_slice.lower()
+        or "operation completeness" in _s82q_pr_rule11_slice.lower()
+        or ("api-contract" in _s82q_pr_rule11_slice.lower() and "completeness" in _s82q_pr_rule11_slice.lower())
+    ),
+    "agents/plan-reviewer.md Rule 11 must contain an api-contract completeness sub-check"
+    " (step 6). (AC-8)",
+)
+
+check(
+    "suite82(quality-bar-api-contract-4b-plan-reviewer-no-opaque): agents/plan-reviewer.md"
+    " Rule 11 api-contract sub-check covers bare type:object-on-changed-field",
+    (
+        "bare" in _s82q_pr_rule11_slice and "type: object" in _s82q_pr_rule11_slice
+        or "has_bare_type_object_on_changed_field" in _s82q_pr_rule11_slice
+        or "body-shape" in _s82q_pr_rule11_slice.lower()
+    ),
+    "agents/plan-reviewer.md Rule 11 api-contract sub-check must cover the bare"
+    " 'type: object' on a changed field case (no-opaque-object check). (AC-8)",
+)
+
 # Marker: plan-sketches
+# Marker: quality-bar-api-contract
 
 # ---------------------------------------------------------------------------
 # Suite 84 — isolated-hook-env-harness (v2.7x.0)

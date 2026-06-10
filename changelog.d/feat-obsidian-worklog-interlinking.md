@@ -1,9 +1,0 @@
-### Added
-- Delivery Step 11.6: forward-only three-tier Obsidian work-log MOC scaffolding — feature-index note named after its folder (`{feature_dir}/{feature_dir}.md`), repo MOC (`_MOC-{repo}.md`), top MOC (`_MOC-work-logs.md`) — with knowledge-only allowlist (`00-research`, `01-plan`, `01-root-cause`), H1-derived link labels, idempotent whole-tree regeneration, path sanitization, and alias escaping; local-mode and Tier-0 are no-ops. Full spec: `docs/obsidian-linking.md`.
-- `agents/_shared/plan-consolidation.md`: shared invariant snippet establishing that `01-plan.md` is the final reconciled snapshot; each canonical field (base branch, version bump) appears exactly once; superseded values overwritten in place; no forked `01-plan-*.md` siblings; section-ownership map; referenced by five plan-writer/auditor agents.
-
-### Fixed
-- Plan consolidation by accretion: architect, plan-reviewer, qa-plan, qa, and orchestrator now each carry an explicit reconcile-don't-accrete clause — later-stage inputs overwrite superseded canonical fields rather than appending a second value. Previously a plan could simultaneously carry contradictory base-branch or version values.
-- plan-reviewer Rule 3 extended with pattern 3h: collects distinct values of each canonical field (base branch, version bump) across `## Review Summary`, `### Work Plan`, and `## Task List`; emits a `concerns`-severity finding when one field holds more than one mutually-exclusive value.
-- qa validate mode now folds a `## Validation Outcome` section into `01-plan.md` (final verdict + reference to `04-validation.md`) in addition to the existing per-AC checkbox mirror, making the plan a complete snapshot without requiring `04-validation.md` for the verdict.
-- orchestrator STAGE-GATE-1 reconciles canonical fields in `01-plan.md` when the operator's decision changes base, version, or scope — superseded values are overwritten so only the operator's final values remain.

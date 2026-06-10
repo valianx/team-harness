@@ -599,6 +599,8 @@ Do NOT stage unrelated files.
 
 **Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For multi-PR plans, follow the serial-merge contract: open PR-N+1 only after PR-N is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
 
+**One approved Task List = one PR set.** Open only the PR(s) declared in the approved `01-plan.md § Task List`. Never open an additional PR that is not in the approved set (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orchestrator post-approval-division rule).
+
 **Step 11.0 — Check for existing PR:**
 
 **PR body — issue reference rule:** When a GitHub issue was detected in Step 2, include `Closes #N` or `Fixes #N` in the PR body (Step 11.2). When there is **no linked issue** (Step 2 found none), OMIT the `Closes #N` / `Fixes #N` line entirely — never synthesize a number.

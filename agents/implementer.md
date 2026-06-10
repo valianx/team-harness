@@ -152,6 +152,8 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 
    **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
+   **One workspace = one set of flat stage files.** Write only `02-implementation.md` (whole-task, no suffix). Never create `02b-implementation.md` or any suffixed/second-cycle stage file — no such convention exists. If your work seems to need a second PR or a second cycle, that is a plan-drift signal: stop and surface it to the orchestrator, do not invent a file-naming convention.
+
 3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
 3. **Ensure `.gitignore` includes `workspaces`** — check and add `/workspaces` if missing.
