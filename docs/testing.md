@@ -2,6 +2,25 @@
 
 > This file is the single source of truth for named structural test suites. `CLAUDE.md §11` points here; it does not maintain a per-suite inventory. Add each new suite's one-liner here when the suite is introduced.
 
+## Testing principles
+
+These two principles are normative for every agent that authors a test in this repo (primarily `tester`, also `qa` and `security`). They were codified after issue #298 (a permission-widening bug in `hooks/dev-guard.sh` that shipped despite a green suite).
+
+### (i) The oracle is the spec, not the implementation output
+
+The expected value in an assertion must be derived from the contract / specification / documented intent — NEVER from running the code under test and recording what it emits. A test whose expected value is "what the code currently does" is a snapshot of present behaviour: it cannot catch a defect that is already present when the snapshot is taken, and it turns red when the defect is later fixed — so it actively defends the bug.
+
+**#298 case study.** `tests/test_dev_guard.sh` asserted `assert_allow` on exactly the buggy default paths of `hooks/dev-guard.sh`. The oracle was "the script outputs `allow`", which was true and which was the bug. The correct oracle is the permission-gate contract: a guard hook's non-covered default is *defer / no-decision* (exit 0, empty stdout), so the assertion must be `assert_nodecision`. The Suite-83 fix flipped those assertions; this principle prevents the class from recurring.
+
+### (ii) Hook / permission / gate behaviour is validated in an isolated environment
+
+A test that exercises a `PreToolUse` hook, a permission gate, or any config-dependent security control MUST run in a clean environment that contains ONLY the plugin's own hooks and wiring — never the developer's personal `~/.claude` config. Two masks make personal-config testing unsafe for this class:
+
+- **Config bleed** — the developer's own `settings.json`, permission mode, and dev-mode marker can mask a plugin-level bug whose symptom depends on environment.
+- **Perceptual mask** — in dev mode, dialog-free operation on Edit/Write/benign-Bash is the *expected feel*; a bug that auto-approves those actions produces exactly the experience the operator already expects, so there is no symptom to notice. (This is precisely how #298 escaped its author.)
+
+`tests/test_isolated_hook_env.sh` (Suite 84) implements this: it builds a throwaway `HOME` wired with only the plugin's hooks (read from `.claude-plugin/hooks.json`), drives the chain with controlled tool payloads, and asserts the emitted decision comes solely from the installed hooks. It proves the hook *defers*; it cannot prove the GUI dialog renders (headless CI cannot observe Claude Code's real dialog — that boundary is stated in the suite scope note).
+
 ## Test files — scope and coverage
 
 - **`tests/test_policy_block.sh`** — functional tests for `hooks/policy-block.sh`. Each case feeds a tool-call JSON payload and asserts the output (deny → JSON with `permissionDecision: "deny"`; allow → empty stdout). ~48 cases: `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), git destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL DROP/TRUNCATE, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
@@ -134,6 +153,24 @@
 ### Suite 75 — hooks-secretscan-checkpoint-b2b3
 
 9 checks. Structural assertions for the hooks-secretscan-checkpoint-b2b3 feature (v2.68.0, issue #289). Group (a) Facet A — secret-scanner in `hooks/policy-block.sh` (2 checks): (a1) `hooks/policy-block.sh` references the `AKIA` AWS-key high-confidence pattern (presence of secret-scan tier); (a2) `hooks/policy-block.sh` emits `ask` as a `permissionDecision` (medium-confidence tier + `ask()` helper added). Group (b) Facet B — B2/B3 boundary-keyed gate in `hooks/checkpoint-guard.sh` (2 checks): (b1) `hooks/checkpoint-guard.sh` references `research-next` (B2 boundary value); (b2) `hooks/checkpoint-guard.sh` references `postverify-next` (B3 boundary value). Group (c) packaging (4 checks): `plugin.json` version `2.68.0`; `marketplace.json` `plugins[0].version` `2.68.0`; `CLAUDE.md §3` mentions `2.68.0`; `CHANGELOG.md` contains `## [2.68.0]` section (durable — NEVER assert `changelog.d/feat-hooks-secretscan-checkpoint-b2b3.md` existence; fragment is assembled+deleted at delivery; recurring-bug guard). Group (d) self-referential / registry (3 checks): test file contains `Suite 75` + `hooks-secretscan-checkpoint-b2b3`; `docs/testing.md` registers Suite 75; `CLAUDE.md` does NOT contain `Suite 75` (hygiene contract). All checks use direct string search (hook files are not markdown; no anchor scoping needed — pattern presence is the anti-false-green for hook checks; `_s59_ver_tuple` helper reused for version comparisons). Written FAILING-FIRST in Phase 2.0 (2026-06-09). Marker: `hooks-secretscan-checkpoint-b2b3`.
+
+### Suite 83 — dev-guard-default-nodecision
+
+16 cases (8 flipped + 8 new failing-first). Functional behavioral tests for the `hooks/dev-guard.sh` default-path fix (issue #298, v2.71.x). File: `tests/test_dev_guard.sh`. The suite is wired as "Suite 5" in `tests/run-all.sh` (run-all numbering space is separate from this named-suite registry; Suite 5 in `test_agent_structure.py` refers to the Reconcile Mode qa-plan check — see below).
+
+**ANTI-FALSE-GREEN NOTE:** The default/fail-safe terminal paths assert **no permissionDecision** (`assert_nodecision` — exit 0, empty stdout, defer to normal permission flow), NOT `"allow"`. On current (unfixed) code every `assert_nodecision` case emits `permissionDecision: "allow"` and **FAILS**. Green on these assertions comes ONLY after the implementer replaces the four default `allow()` calls with `nodecision()` (exit 0, empty stdout) in `hooks/dev-guard.sh`.
+
+**Flipped cases (were `assert_allow`, now `assert_nodecision`):** (1) no-marker block — gh pr merge / git push / gh pr review / curl with no marker (4 cases, line :151 `allow()` bug); (2) Case 12 — `git status` innocent with marker (line :235 `allow()` bug); (3) Case 13 — anti-spoof `dev_mode: false # was true` marker (line :137 `allow()` bug); (4) Case 15 — `ls -la` innocent with marker (line :235 `allow()` bug); (5) Case 20 — marker present with `dev_mode: false` explicit (line :137 `allow()` bug).
+
+**New failing-first cases (AC-1 / AC-2 / AC-3 for #298):** (6-7) Edit-shaped payload `{"tool_name":"Edit","tool_input":{...}}` with marker present and with no marker → `assert_nodecision` (worst path: line :111 `allow()` fires before marker is read; dev-mode-independent auto-approval of every file edit); (8-9) Write-shaped payload `{"tool_name":"Write","tool_input":{...}}` with and without marker → `assert_nodecision`; (10-11) benign Bash `git status` / `ls -la` with no marker → `assert_nodecision`; (12) benign Bash `git status` with marker → `assert_nodecision`; (13) `dev_mode: false` marker + `git log` → `assert_nodecision`.
+
+**Preserved-behavior cases (pass on current AND fixed code):** outward-action cases (git push, gh pr merge/review/comment, gh api, curl — Cases 1-11) → `assert_ask`; activation-write cases (Cases 16, 17, 19: `echo/printf 'dev_mode: true' > marker`) → `assert_allow`; fail-CLOSED case (Case 14: marker present-but-empty + `git push`) → `assert_ask`; sentinel-bypass case (Case 18: marker present + `dev_mode_choice: "off"` in config + `git push`) → `assert_ask`.
+
+**Suite-5 number collision note:** `tests/run-all.sh` labels `test_dev_guard.sh` as "Suite 5" in its banner (shell run-all local numbering). The structural `test_agent_structure.py` internal Suite 5 refers to the Reconcile Mode check in `qa-plan.md`. These are two independent numbering spaces. This named-suite registry resolves the ambiguity by registering the dev-guard functional tests under **Suite 83** with the `dev-guard-default-nodecision` marker. Written FAILING-FIRST Phase 2.0 (2026-06-10). Marker: `dev-guard-default-nodecision`.
+
+### Suite 84 — isolated-hook-env-harness
+
+11 checks. Clean-environment functional harness for the plugin's PreToolUse hook chain (issue #298 reinforcement, v2.7x.0). File: `tests/test_isolated_hook_env.sh`. Wired into `tests/run-all.sh`. SCOPE — the distinct value vs Suite 83 (`test_dev_guard.sh`, which drives the hook script directly) is ISOLATION: this harness constructs a throwaway `HOME` whose `.claude/` directory wires ONLY the plugin's hooks (parsed from `.claude-plugin/hooks.json`), with NO bleed from the developer's personal config, then drives the chain (`dev-guard.sh` + `policy-block.sh`) and asserts the emitted `permissionDecision` comes solely from the installed hooks. KEY PROPERTY (the #298 signal): in a clean env with dev mode OFF, an Edit-shaped payload (no `command` field) must NOT be auto-approved — the chain must emit NO `permissionDecision` (defer). Scenarios cover dev mode ON and OFF × {Edit payload, Write payload, benign Bash, covered outward action, destructive Bash}. CAN PROVE: the hook chain defers on non-covered paths and asks on covered outward actions, in isolation from personal config. CANNOT PROVE: that Claude Code's real GUI permission dialog renders (headless CI has no dialog surface — asserted only on the hook's deterministic emitted decision). Design property: would have FAILED on pre-#298 `dev-guard.sh` (default `allow`) and PASSES on the fixed (≥v2.71.x) code. Self-referential guard: `Suite 84` + `isolated-hook-env-harness` in `docs/testing.md` (canonical registry) and in the test file; `Suite 84` NOT in `CLAUDE.md §11` (hygiene contract). Marker: `isolated-hook-env-harness`.
 
 ### Suite 82 — plan-sketches
 

@@ -3,9 +3,10 @@
 # PreToolUse hook — deterministic outward-action gate for dev mode.
 #
 # Wired via hooks/config.json (Go installer) and .claude-plugin/hooks.json
-# (plugin runtime) as a PreToolUse hook with matcher:"Bash", alongside
-# policy-block.sh. Reads tool_input from stdin; intercepts outward/mutating
-# actions when dev mode is active.
+# (plugin runtime) as its OWN PreToolUse entry with matcher:"Bash".
+# policy-block.sh is wired separately with matcher:"Bash|Write|Edit|NotebookEdit"
+# so it continues to secret-scan write/edit content. Reads tool_input from
+# stdin; intercepts outward/mutating actions when dev mode is active.
 #
 # Contract: docs/dev-mode.md § Outward-Action Gate
 #
@@ -34,7 +35,11 @@
 #   dev-guard.sh (this hook): FAIL-CLOSED for covered actions — the worst case
 #     is an unauthorised merge/push to main. Any uncertainty about the marker
 #     state + covered action -> ask (or deny for auto-manipulation).
-#   Fail-safe (allow) is reserved EXCLUSIVELY for marker demonstrably absent.
+#   DEFAULT (non-covered calls): no-decision — exit 0, empty stdout; defers to
+#     the operator's normal permission flow (prompts in normal mode; honors the
+#     allowlist). ask/deny are EXCLUSIVELY for covered outward actions and
+#     marker manipulation. allow is EXCLUSIVELY for the activation-write
+#     (dev_mode: true) path — arming more gating is always the safe direction.
 #
 # AUTHORISATION MODEL:
 #   permissionDecision:"ask" — the runtime prompts the OPERATOR interactively
@@ -57,8 +62,10 @@
 # Generic: no tokens, no private endpoints, no personal config. CLAUDE.md §12.
 #
 # Exit behaviour (Claude Code hook contract):
-#   exit 0 + JSON -> Claude processes the JSON (ask, deny, or allow).
-#   Other exit    -> undefined; do not use.
+#   exit 0 + JSON                -> Claude processes the JSON (ask, deny, or allow).
+#   exit 0 + empty stdout        -> no decision; Claude defers to the operator's
+#                                   normal permission flow (this hook's default).
+#   Other exit                   -> undefined; do not use.
 
 set -euo pipefail
 
@@ -70,6 +77,15 @@ DEV_MODE_MARKER="${HOME}/.claude/.dev-mode-active"
 
 allow() {
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
+    exit 0
+}
+
+nodecision() {
+    # No decision: exit 0 with empty stdout. Claude Code defers to the
+    # operator's normal permission flow (prompts in normal mode; honors the
+    # allowlist). Reserved for every default/fail-safe path — ask/deny are
+    # EXCLUSIVELY for covered outward actions and marker manipulation;
+    # allow is EXCLUSIVELY for the activation-write (dev_mode: true) path.
     exit 0
 }
 
@@ -107,9 +123,11 @@ else
         | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)"/\1/' 2>/dev/null || true)
 fi
 
-# If we cannot extract a command, fail-safe: allow (we have no basis to deny).
+# If we cannot extract a command (e.g. Edit/Write payloads carry no command
+# field), emit no decision — defer to the operator's normal permission flow.
+# fix(dev-guard): default to no-decision instead of allow (#298)
 if [ -z "$cmd" ]; then
-    allow
+    nodecision
 fi
 
 # ---------------------------------------------------------------------------
@@ -133,8 +151,8 @@ if [ -f "$DEV_MODE_MARKER" ]; then
             # File contains strict "dev_mode: true" token.
             dev_mode_active=true
         elif printf '%s\n' "$marker_content" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*false[[:space:]]*" 2>/dev/null; then
-            # File explicitly says dev_mode: false -> not active.
-            allow
+            # File explicitly says dev_mode: false -> not active; no decision.
+            nodecision
         else
             # File exists but content is not clearly parseable as active or inactive.
             # Fail-CLOSED: treat as active.
@@ -146,9 +164,18 @@ if [ -f "$DEV_MODE_MARKER" ]; then
     fi
 fi
 
-# If dev mode is demonstrably absent, this gate does not apply.
+# If dev mode is demonstrably absent, allow activation writes through before
+# exiting. An activation write (setting dev_mode: true) arms MORE gating — it
+# is safe and must not require a prompt even on a marker-absent machine. This
+# is the path /th:setup and /th:update use on a fresh install. We check the
+# write pattern and the dev_mode: true payload together.
 if [ "$dev_mode_active" = "false" ]; then
-    allow
+    MARKER_PATH_PATTERN_EARLY='\.claude/\.dev-mode-active'
+    if printf '%s' "$cmd" | grep -qE "(>|>>|tee)\s.*${MARKER_PATH_PATTERN_EARLY}" 2>/dev/null \
+        && printf '%s' "$cmd" | grep -qE "dev_mode:[[:space:]]*true" 2>/dev/null; then
+        allow
+    fi
+    nodecision
 fi
 
 # Dev mode is active. Evaluate whether the command is a covered outward action.
@@ -230,6 +257,6 @@ if printf '%s' "$cmd" | grep -qE "(>|>>|tee)\s.*${MARKER_PATH_PATTERN}" 2>/dev/n
 fi
 
 # ---------------------------------------------------------------------------
-# Step 5 — No covered action detected; allow.
+# Step 5 — No covered action detected; no decision (defer to normal flow).
 # ---------------------------------------------------------------------------
-allow
+nodecision

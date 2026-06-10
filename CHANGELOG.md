@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.73.0] - 2026-06-10
+
+### Added
+
+- Isolated-environment hook-chain test harness (`tests/test_isolated_hook_env.sh`, Suite 84) that drives the plugin hook chain in a clean throwaway HOME, validating PreToolUse permission behaviour without depending on personal config — would have caught #298 before ship.
+- Test-oracle and isolated-environment testing principles encoded in `agents/tester.md` and `agents/security.md` Core Philosophy sections: expected values come from the spec, not current output; hook/permission/gate tests run in an isolated environment.
+- `docs/testing.md § Testing principles` section with two subsections ((i) spec-not-implementation oracle, (ii) isolated-environment requirement for hook/permission/gate tests) naming issue #298 as the case study.
+- Suite 84 entry in `docs/testing.md` suite registry with CAN-prove / CANNOT-prove boundaries distinguishing it from Suite 83.
+- Suite 84 hygiene assertions in `tests/test_agent_structure.py` (self-ref literals, registry entry, CLAUDE.md does NOT contain "Suite 84").
+- Suite 9 banner block in `tests/run-all.sh` wiring Suite 84 into the full free-suite run.
+
+### Changed
+
+- `docs/knowledge.md`: added two `[pattern]` bullets for the test-oracle lesson and isolated-env testing pattern, each naming issue #298 as the case study.
+
+## [2.72.0] - 2026-06-10
+
+### Fixed
+
+- `hooks/dev-guard.sh`: replace the four default `allow()` exits with `nodecision()` (exit 0, empty stdout) so the hook defers to the operator's normal permission flow instead of actively auto-approving non-covered calls. The worst path (Edit/Write payloads carrying no `command` field) was auto-approving every file edit before reading the dev-mode marker, silently suppressing the operator's edit-confirmation dialog regardless of dev mode state (closes #298).
+- Scope `dev-guard.sh` to a dedicated `Bash`-only PreToolUse entry in `.claude-plugin/hooks.json` and all three OS blocks of `hooks/config.json`; `policy-block.sh` keeps the `Bash|Write|Edit|NotebookEdit` matcher for secret-scanning. Defense-in-depth: dev-guard can no longer run on Edit/Write/NotebookEdit payloads at all.
+- Correct stale comment in `hooks/dev-guard.sh` header (matcher claim, fail-mode prose, exit-behaviour table).
+- Update `docs/dev-mode.md` Outward-Action Gate: add no-decision default row to the gate table, rewrite fail-mode prose, correct matcher wording.
+
+## [2.71.0] - 2026-06-09
+
+### Added
+- `skills/interactive-presentation/` — new `/th:interactive-presentation` skill: generates interactive web presentations using React Flow (graph layouts), GSAP animations, and SVG; supports three modes: `new` (full scaffold), `add-scene` (append to existing presentation), and `from-ppt` (convert a slide deck description to an interactive format). Scaffold is Vite + React + TypeScript + Tailwind CSS + GSAP (free plugins only).
+
+### Changed
+- `skills/excalidraw-diagram/references/uv.lock` — committed lockfile for the already-tracked `pyproject.toml` for reproducible render-script Python dependency resolution.
+- Plugin version bumped 2.70.0 → 2.71.0.
+
 ## [2.70.0] - 2026-06-09
 
 ### Added
