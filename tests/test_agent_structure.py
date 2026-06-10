@@ -19228,6 +19228,34 @@ check(
     " 'type: object' on a changed field case (no-opaque-object check). (AC-8)",
 )
 
+# ---------------------------------------------------------------------------
+# Group (j) — Residual old-name guard (added post-#296 to prevent recurrence)
+#
+# Asserts that NO file under agents/ or skills/ still carries the pre-rename
+# literal `01-sketch-` (the new naming is `sketches/`).  docs/ is excluded so
+# the single deliberate historical-note line in docs/plan-sketches.md (~line 139)
+# does not trigger a false failure.
+# ---------------------------------------------------------------------------
+
+_s82j_agents_files  = list(AGENTS_DIR.glob("*.md"))
+_s82j_skills_files  = (
+    list(SKILLS_DIR.glob("*.md"))
+    + list(SKILLS_DIR.glob("*/SKILL.md"))
+)
+_s82j_all_files     = _s82j_agents_files + _s82j_skills_files
+_s82j_stale_hits    = [
+    str(p) for p in _s82j_all_files
+    if "01-sketch-" in p.read_text(encoding="utf-8", errors="replace")
+]
+
+check(
+    "suite82(j1-residual-name-guard): no agents/*.md or skills/**/SKILL.md contains"
+    " the stale literal '01-sketch-' (new naming is 'sketches/')",
+    len(_s82j_stale_hits) == 0,
+    f"stale '01-sketch-' refs found in: {_s82j_stale_hits}"
+    if _s82j_stale_hits else "",
+)
+
 # Marker: plan-sketches
 # Marker: quality-bar-api-contract
 

@@ -3,7 +3,7 @@
 # Functional tests for hooks/sketch-guard.sh
 #
 # Each test case creates a temporary workspace with a synthetic 00-state.md
-# (and optionally a 01-sketch-*.md file or 01-plan.md), runs the guard script,
+# (and optionally a sketches/*.md file or 01-plan.md), runs the guard script,
 # and asserts the expected JSON verdict field.
 #
 # Usage:
