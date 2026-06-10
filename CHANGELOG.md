@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.69.0] - 2026-06-09
+
+### Added
+- `docs/plan-sketches.md` — canonical manifest for deterministic plan-stage sketches: 9 sketches (2 always-pair collapsed into existing plan surfaces + 7 conditional), classification schema (7 booleans recorded in `00-state.md § Current State` and mirrored in `01-plan.md § Review Summary → ### Classification block`), fidelity and representation ceilings (Mermaid-only render library for ER diagrams; no Excalidraw/D2/LikeC4 in sketches), per-type applicability table, sketch-vs-spec-seed reconciliation rule, and manifest-consistency guard note.
+- `hooks/sketch-guard.sh` — fail-OPEN orchestrator-invoked gate script (NOT a PreToolUse hook): reads the 7-boolean classification block from `00-state.md`, determines the required `01-sketch-*.md` set, checks presence and fidelity (≥4 bytes), runs an anti-gaming check via python3/grep (File paths vs booleans), and emits JSON `{verdict, required, missing, concerns}`. Worst verdict is `concerns` — never `fail`. Cross-platform (Git Bash on Windows + native bash).
+- `tests/test_sketch_guard.sh` — 14 test cases / 21 assertions for `sketch-guard.sh` covering fail-open paths, all-false pass, presence/absence concerns, migration sketch dual-boolean trigger, anti-gaming, and the completeness-not-security invariant (verdict never `fail`).
+- `tests/test_agent_structure.py` Suite 82 — 28 structural assertions for the plan-sketches feature: manifest drift guard (docs/plan-sketches.md ↔ architect.md ↔ sketch-guard.sh), sketch-guard.sh structural properties, 3 separate agent-contract checks (plan-reviewer Rule 11, qa-plan sketch consistency, acceptance-checker Step 3.6), orchestrator integration (workspace inventory, STAGE-GATE-1 invocation), per-type flows, 3 skill checks, CLAUDE.md §5 bullet, packaging checks (plugin.json/marketplace.json/CLAUDE.md §3/CHANGELOG.md durable section). Written FAILING-FIRST per Phase 2.0 contract.
+
+### Changed
+- `agents/architect.md` — Phase 2 Plan Sketches section added: classification block recording instructions, agent-readable trigger table (7 booleans → sketch files), 7 skeleton templates, and `### Classification block` added to the `01-plan.md` schema template in `## Review Summary`.
+- `agents/plan-reviewer.md` — Rule 11 (sketch completeness, shape-only, fail-OPEN parity) added; Verdict Calibration updated to include Rule 11 as `concerns`-only; tie-breaker updated.
+- `agents/qa-plan.md` — Ratify-Plan Mode step 5: sketch↔AC consistency check when `01-sketch-*.md` files are present; `### Sketch consistency` subsection added to ratification output template.
+- `agents/acceptance-checker.md` — Step 3.6 added: delivered surface vs plan sketches diff; concerns-level for field rename, fail for missing feature surface; skip note when no sketches present.
+- `agents/orchestrator.md` — workspace doc inventory includes all 7 conditional `01-sketch-*.md` files; artifact verification table updated for architect design mode; STAGE-GATE-1 now invokes `sketch-guard.sh` before emitting the STOP block; STOP block template shows sketch artifacts and sketch-guard concerns.
+- `agents/ref-special-flows.md` — Plan Sketches per-type applicability section added (feature/refactor/enhancement, fix Tier 2-4, fix Tier 1/hotfix, fix Tier 0/docs Tier 0 exempt, docs flow, research/spike); recording contract for self-authored plans documented.
+- `skills/review-pr/SKILL.md`, `skills/deliver/SKILL.md`, `skills/validate/SKILL.md` — prerequisite probe: each skill now runs `sketch-guard.sh` as a fail-open informational probe when entering mid-pipeline; `verdict: concerns` → one-line banner before routing to orchestrator.
+- `tests/run-all.sh` — Suite 8 registered for `test_sketch_guard.sh`.
+- `docs/knowledge.md` — `[pattern]` bullet added for v2.69.0 plan-sketches system.
+- Plugin version bumped 2.68.0 → 2.69.0.
+
 ## [2.68.0] - 2026-06-09
 
 ### Added

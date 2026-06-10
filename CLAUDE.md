@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.68.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.69.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -167,6 +167,7 @@ All commands run from the repo root.
 - **Obsidian-mode diagram embed.** In `logs-mode: obsidian`, D2 (SVG via `d2`) and LikeC4 (PNG via `npx likec4 export png`) render into the vault workspace and append `![[…]]` embed(s) to `05-diagram.md`. CLI absent → source + not-rendered marker (`render: skipped`). Local mode and Excalidraw path unchanged.
 - **Milestone standard.** Milestones = commits, NOT PRs and NOT deliverables. One task = one workspace = one PR (after ALL milestones). Stage files are FLAT, whole-task documents (no per-milestone subsections; `-m{N}` suffixed files and `{NN}_{milestone}/` folders PROHIBITED). Milestone breakdown with dependency annotations lives ONLY in `01-plan.md`. Independent milestones PARALLELIZED (reuse #285 concurrent-`Task`); dependent serialize; one commit per milestone on the single feature branch. See `agents/ref-special-flows.md § Milestone-Build Flow`.
 - **Hook enforcement floors.** `policy-block.sh` secret-scans write content + commit-`Bash` (deny high-confidence, ask medium+entropy; `.env.example` allowlisted; codifies §6.5). `checkpoint-guard.sh` covers B1/B2/B3 (B1: `th:architect`; B2/B3: boundary-keyed). See `docs/reasoning-checkpoint.md`.
+- **Plan-stage sketches.** See `docs/plan-sketches.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
