@@ -395,21 +395,66 @@ for pr in PRs:
 
 **Override:** the architect may add `Plan-reviewer override: Rule 10 — {one-line justification}` on the PR to degrade a `concerns` finding. Override is not available to escape a `fail` escalation (production-code fusion). Rule 1 and Rule 9 have no such escape; Rule 10's `fail` escalation does not either.
 
+### Rule 11 — Sketch completeness (shape-only, fail-OPEN parity)
+
+**Gating:** Rule 11 fires for `type: feature | refactor | enhancement`. For `type: fix` Tier 2-4 it fires only when the architect declared non-all-false booleans. For `type: fix` Tier 0 / `docs` Tier 0 this rule is a no-op (no workspace, no sketches).
+
+**What to check:**
+
+1. Locate `### Classification block` in `01-plan.md § Review Summary`. If absent or if all seven booleans are omitted: finding `"Rule 11: Classification block missing from 01-plan.md § Review Summary"` with severity `concerns`.
+2. For each boolean that is `true`, verify the corresponding `01-sketch-*.md` file exists in the workspace (same directory as `01-plan.md`). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but 01-sketch-{name}.md is absent"` with severity `concerns`.
+3. For `touches_data_model: true` AND `destructive: true`, also require `01-sketch-data-migration.md`. Missing → finding `"Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent"` with severity `concerns`.
+4. For each present `01-sketch-*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: 01-sketch-{name}.md appears empty (header-only)"` with severity `concerns`.
+
+**Severity is always `concerns` — never `fail`.** Rule 11 mirrors the fail-OPEN pattern of `hooks/sketch-guard.sh`. The human at STAGE-GATE-1 and the `sketch-guard.sh` verdict are the definitive backstops. The plan-reviewer surfaces sketch shape to the human; it does not block the gate.
+
+**Detection algorithm:**
+
+```
+classification = parse_classification_block(plan_review_summary)
+if classification is None:
+    findings.append(("Rule 11: Classification block missing from 01-plan.md § Review Summary", CONCERNS))
+    return  # cannot continue sketch check without classification
+
+SKETCH_MAP = {
+    "touches_http_api": "01-sketch-api-contract.md",
+    "touches_ui": "01-sketch-ui-wireframe.md",
+    "touches_data_model": "01-sketch-data-model.md",
+    "touches_cli": "01-sketch-cli-surface.md",
+    "touches_public_lib_api": "01-sketch-public-api.md",
+    "touches_async_messaging": "01-sketch-event-contract.md",
+}
+for boolean, sketch_file in SKETCH_MAP.items():
+    if classification.get(boolean) is True:
+        if not exists(workspace / sketch_file):
+            findings.append((f"Rule 11: {boolean} is true but {sketch_file} is absent", CONCERNS))
+        elif is_trivially_empty(workspace / sketch_file):
+            findings.append((f"Rule 11: {sketch_file} appears empty (header-only)", CONCERNS))
+
+if classification.get("touches_data_model") and classification.get("destructive"):
+    if not exists(workspace / "01-sketch-data-migration.md"):
+        findings.append(("Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent", CONCERNS))
+```
+
+**Override:** the architect may NOT override Rule 11 to `fail`. The maximum severity is `concerns` by design; the override escape hatch does not apply.
+
 ---
 
 ## Verdict Calibration
 
 | Verdict | When |
 |---|---|
-| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`). |
-| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
+| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`; Rule 11 when applicable type). |
+| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, rule 11 sketch completeness (always `concerns`, never `fail`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
 | `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` PR), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
 
-**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, and rule 10 `concerns` are not.
+**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, 10 `concerns`, and rule 11 are not.
 
 **Rules 7 and 8 are no-ops for non-bug-fix types.** When the task payload declares `type: feature | refactor | enhancement | research | spike`, Rules 7 and 8 do not fire (zero findings, no severity assigned). The plan-reviewer determines applicability from the `type` field passed in the task payload (sourced from `00-state.md`).
 
 **Rule 10 is a no-op when no PR declares `Consolidates:`.** The rule fires only when explicitly triggered by the architect's field declaration; a plan without `Consolidates:` is governed solely by Rules 1-9.
+
+**Rule 11 is always `concerns`-severity.** It mirrors the fail-OPEN design of `sketch-guard.sh`. Rule 11 never causes a `fail` verdict; the worst outcome is `concerns` escalating the combined verdict to `concerns` (not `fail`).
 
 ---
 

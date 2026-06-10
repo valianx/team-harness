@@ -134,6 +134,22 @@ The original description rarely lists non-functional requirements as AC, but the
 
 Scan `01-plan.md` § Review Summary for `[CONSTRAINT-DISCOVERED: ...]` tags that may have been left by architect or implementer. The orchestrator is supposed to reconcile them in Phase 2→3, but if any survived to delivery time, that's a hard finding.
 
+#### 3.6 — Delivered surface vs plan sketches
+
+When `01-sketch-*.md` files are present in the workspace, perform a surface-diff between the sketch contract and the delivered implementation. Check each triggered sketch:
+
+- **`01-sketch-api-contract.md`** — does the delivered `02-implementation.md` (§ Files Created/Modified) cover the endpoints declared in the sketch? If an endpoint in the sketch has no corresponding created/modified controller file, flag as finding.
+- **`01-sketch-ui-wireframe.md`** — does the delivered implementation reference the components declared in the sketch? Check `02-implementation.md` for the component paths.
+- **`01-sketch-data-model.md`** — does the delivered implementation include the entity/table changes shown in the erDiagram? Look for the relevant model/migration files in `02-implementation.md`.
+- **`01-sketch-cli-surface.md`** — does the delivered implementation include the commands and flags declared?
+- **`01-sketch-public-api.md`** — does the delivered implementation expose the signatures declared?
+- **`01-sketch-event-contract.md`** — does the delivered implementation publish/consume the payload fields declared?
+- **`01-sketch-data-migration.md`** — are the forward steps covered by a migration file in `02-implementation.md`?
+
+**Severity:** mismatch between sketch and delivery is a `concerns`-level finding (not `fail`). The sketch is a low-fidelity, plan-stage artifact — it describes WHAT was intended, not the exact implementation contract. A field renamed during implementation is not a `fail`. An entirely missing feature surface (e.g., the sketch declares `POST /orders` but no controller was created) is a `fail`.
+
+If no `01-sketch-*.md` files are present, skip this step and note "Sketch diff: no 01-sketch-*.md files — step skipped" in the findings.
+
 ---
 
 ## Verdict Calibration
