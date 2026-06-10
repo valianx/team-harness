@@ -1,9 +1,23 @@
 #!/bin/bash
 # tests/test_dev_guard.sh
 # Behavioral tests for hooks/dev-guard.sh
-# Each case feeds a Bash tool-call JSON payload to the hook together with
+# Suite 83 — dev-guard-default-nodecision
+#
+# Each case feeds a tool-call JSON payload to the hook together with
 # a synthetic dev-mode marker (or no marker), then asserts whether the hook
-# emits permissionDecision:"ask", "deny", or "allow".
+# emits permissionDecision:"ask", "deny", "allow", or NO permissionDecision
+# (no-decision — defer to the operator's normal permission flow).
+#
+# ANTI-FALSE-GREEN NOTE (Suite 83):
+#   The default/fail-safe paths assert NO permissionDecision (assert_nodecision),
+#   NOT "allow". Current (unfixed) code emits "allow" on these paths — those
+#   assertions FAIL on current code by design (failing-first regression for #298).
+#   Green on these assertions comes ONLY after the implementer's fix lands.
+#
+# Cases that STILL assert ask/allow on CURRENT code:
+#   - Outward-action cases (git push, gh pr merge/review/comment) -> assert_ask
+#   - Activation-write cases (printf/echo dev_mode: true > marker) -> assert_allow
+#   - Marker-manipulation cases (rm <marker>) -> assert_ask
 #
 # Usage:
 #   ./tests/test_dev_guard.sh
@@ -116,6 +130,27 @@ assert_allow() {
     fi
 }
 
+# assert_nodecision — PASS when the hook emits NO permissionDecision.
+# This is the "defer to normal permission flow" contract (exit 0, empty stdout).
+# Failing-first: current (unfixed) code emits "allow" on default paths, so these
+# assertions FAIL until the implementer replaces the 4 default allow() calls with
+# nodecision() (exit 0, empty stdout). See issue #298.
+assert_nodecision() {
+    local name="$1"
+    local fake_home="$2"
+    local payload="$3"
+    local out
+    out=$(run_hook "$fake_home" "$payload")
+    if [ -z "$out" ] || ! echo "$out" | grep -q '"permissionDecision"'; then
+        PASS=$((PASS + 1))
+        echo "  [PASS] NODECISION: $name"
+    else
+        FAIL=$((FAIL + 1))
+        FAILURES+=("NODECISION expected but got: $name | $out")
+        echo "  [FAIL] NODECISION: $name (got: $out)"
+    fi
+}
+
 # ---------------------------------------------------------------------------
 # Cases WITH marker (dev mode active)
 # ---------------------------------------------------------------------------
@@ -206,44 +241,51 @@ assert_ask "anti-forge: echo auth-file; gh pr merge" "$TMP" "$(make_payload 'ech
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# Cases WITHOUT marker (dev mode absent — all ALLOW)
+# Cases WITHOUT marker (dev mode absent)
+# FLIPPED from assert_allow to assert_nodecision (regression fix for #298).
+# Current code: emits "allow" on all these paths (the bug — line :151 allow()).
+# After fix: emits no permissionDecision (no-decision, defer to normal flow).
 # ---------------------------------------------------------------------------
 
 echo
-echo "=== ALLOW all: no marker (dev mode absent) ==="
+echo "=== NODECISION all: no marker (dev mode absent) ==="
 
 TMP=$(make_tmp_no_marker)
-assert_allow "gh pr merge (no marker)" "$TMP" "$(make_payload 'gh pr merge 123 --squash')"
+assert_nodecision "gh pr merge (no marker)" "$TMP" "$(make_payload 'gh pr merge 123 --squash')"
 rm -rf "$TMP"
 
 TMP=$(make_tmp_no_marker)
-assert_allow "git push (no marker)" "$TMP" "$(make_payload 'git push origin main')"
+assert_nodecision "git push (no marker)" "$TMP" "$(make_payload 'git push origin main')"
 rm -rf "$TMP"
 
 TMP=$(make_tmp_no_marker)
-assert_allow "gh pr review (no marker)" "$TMP" "$(make_payload 'gh pr review 42 --approve')"
+assert_nodecision "gh pr review (no marker)" "$TMP" "$(make_payload 'gh pr review 42 --approve')"
 rm -rf "$TMP"
 
 TMP=$(make_tmp_no_marker)
-assert_allow "curl api.github.com -X POST (no marker)" "$TMP" "$(make_payload 'curl -X POST https://api.github.com/repos/o/r/pulls/1/reviews -d "{}"')"
+assert_nodecision "curl api.github.com -X POST (no marker)" "$TMP" "$(make_payload 'curl -X POST https://api.github.com/repos/o/r/pulls/1/reviews -d "{}"')"
 rm -rf "$TMP"
 
-# Case 12 — ALLOW: innocent command with marker (git status)
+# Case 12 — NODECISION: innocent command with marker (git status)
+# FLIPPED from assert_allow. Current code: emits "allow" at line :235.
+# After fix: emits no permissionDecision (no-decision).
 echo
-echo "=== ALLOW: git status (innocent, with marker) ==="
+echo "=== NODECISION: git status (innocent, with marker) ==="
 TMP=$(make_tmp_with_marker)
-assert_allow "git status (with marker)" "$TMP" "$(make_payload 'git status')"
+assert_nodecision "git status (with marker)" "$TMP" "$(make_payload 'git status')"
 rm -rf "$TMP"
 
 # Case 13 — ANTI-SPOOF: marker with commented value must NOT be parsed as active
 # A line "dev_mode: true # was false" — strict parse should match true (passes).
 # A line "dev_mode: false # was true" — strict parse must NOT parse as active.
+# FLIPPED from assert_allow. Current code: emits "allow" at line :137.
+# After fix: emits no permissionDecision (marker content = dev_mode: false -> no-decision).
 echo
-echo "=== ALLOW: marker with 'dev_mode: false # was true' (anti-spoof, NOT active) ==="
+echo "=== NODECISION: marker with 'dev_mode: false # was true' (anti-spoof, NOT active) ==="
 TMP="$(mktemp -d)"
 mkdir -p "$TMP/.claude"
 printf 'dev_mode: false # was true\n' > "$TMP/.claude/.dev-mode-active"
-assert_allow "anti-spoof: dev_mode: false # was true" "$TMP" "$(make_payload 'gh pr merge 123')"
+assert_nodecision "anti-spoof: dev_mode: false # was true" "$TMP" "$(make_payload 'gh pr merge 123')"
 rm -rf "$TMP"
 
 # Case 14 — ASK: marker present-but-empty (treat as active, fail-CLOSED)
@@ -255,11 +297,13 @@ printf '' > "$TMP/.claude/.dev-mode-active"
 assert_ask "marker present but empty (fail-CLOSED)" "$TMP" "$(make_payload 'git push origin main')"
 rm -rf "$TMP"
 
-# Case 15 — ALLOW: innocent command (ls) with marker
+# Case 15 — NODECISION: innocent command (ls) with marker
+# FLIPPED from assert_allow. Current code: emits "allow" at line :235.
+# After fix: emits no permissionDecision (no-decision).
 echo
-echo "=== ALLOW: ls (innocent, with marker) ==="
+echo "=== NODECISION: ls (innocent, with marker) ==="
 TMP=$(make_tmp_with_marker)
-assert_allow "ls (innocent, with marker)" "$TMP" "$(make_payload 'ls -la /tmp')"
+assert_nodecision "ls (innocent, with marker)" "$TMP" "$(make_payload 'ls -la /tmp')"
 rm -rf "$TMP"
 
 # Case 16 — ALLOW: activation write (echo 'dev_mode: true' > marker) with marker present.
@@ -267,6 +311,7 @@ rm -rf "$TMP"
 # /dev-mode (re)activation reliable and friction-free. Regression guard: a previous
 # version asked on any marker write, which could leave the marker unwritten on
 # re-activation so new sessions silently lost dev mode.
+# UNCHANGED — activation write STAYS allow.
 echo
 echo "=== ALLOW: echo 'dev_mode: true' > marker (activation write, with marker) ==="
 TMP=$(make_tmp_with_marker)
@@ -274,6 +319,7 @@ assert_allow "activation write: echo dev_mode: true > marker" "$TMP" "$(make_pay
 rm -rf "$TMP"
 
 # Case 17 — ALLOW: the exact /dev-mode skill activation command (printf 'dev_mode: true\n' > marker).
+# UNCHANGED — activation write STAYS allow.
 echo
 echo "=== ALLOW: printf 'dev_mode: true' > marker (skill activation command, with marker) ==="
 TMP=$(make_tmp_with_marker)
@@ -301,20 +347,91 @@ rm -rf "$TMP"
 # Case 19 — ALLOW: activation write on marker-absent machine (default-on setup/update path)
 # /th:setup and /th:update write the marker via printf when dev_mode_choice != "off".
 # This is the exact activation command that the update skill runs; it must be allowed.
+# UNCHANGED — activation write STAYS allow.
 echo
 echo "=== ALLOW: activation write on marker-absent machine (default-on setup/update path) ==="
 TMP=$(make_tmp_no_marker)
 assert_allow "activation write on absent-marker (default-on install path)" "$TMP" "$(make_payload "printf 'dev_mode: true\n' > $TMP/.claude/.dev-mode-active")"
 rm -rf "$TMP"
 
-# Case 20 — ALLOW: dev_mode: false in marker file (inactive, regardless of sentinel)
+# Case 20 — NODECISION: dev_mode: false in marker file (inactive, regardless of sentinel)
 # A marker that explicitly says dev_mode: false is treated as inactive.
+# FLIPPED from assert_allow. Current code: emits "allow" at line :137.
+# After fix: emits no permissionDecision (marker inactive -> no-decision).
 echo
-echo "=== ALLOW: marker present with dev_mode: false (explicit false -> inactive) ==="
+echo "=== NODECISION: marker present with dev_mode: false (explicit false -> inactive) ==="
 TMP="$(mktemp -d)"
 mkdir -p "$TMP/.claude"
 printf 'dev_mode: false\n' > "$TMP/.claude/.dev-mode-active"
-assert_allow "marker present with dev_mode: false (inactive)" "$TMP" "$(make_payload 'gh pr merge 123')"
+assert_nodecision "marker present with dev_mode: false (inactive)" "$TMP" "$(make_payload 'gh pr merge 123')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Failing-first regression cases for issue #298 (Suite 83)
+# These cases reproduce the bug explicitly. They FAIL on current (unfixed)
+# code and PASS only after the implementer's fix lands.
+# ---------------------------------------------------------------------------
+
+echo
+echo "=== [#298 REGRESSION] Edit-shaped payload (no command field) -> NODECISION ==="
+
+# AC-1: Edit-shaped payload with marker present — worst, dev-mode-independent path.
+# Current code: cmd="" -> allow() at line :111-113. The hook auto-approves every
+# file edit before it reads the marker, on every machine with the plugin installed.
+TMP=$(make_tmp_with_marker)
+assert_nodecision "#298 AC-1: Edit payload (no command), marker present" "$TMP" \
+    '{"tool_name":"Edit","tool_input":{"file_path":"/tmp/app.py","old_string":"a","new_string":"b"}}'
+rm -rf "$TMP"
+
+# AC-1: Edit-shaped payload with no marker — same empty-cmd path, still fires.
+TMP=$(make_tmp_no_marker)
+assert_nodecision "#298 AC-1: Edit payload (no command), no marker" "$TMP" \
+    '{"tool_name":"Edit","tool_input":{"file_path":"/tmp/app.py","old_string":"a","new_string":"b"}}'
+rm -rf "$TMP"
+
+echo
+echo "=== [#298 REGRESSION] Write-shaped payload (no command field) -> NODECISION ==="
+
+# AC-1: Write-shaped payload (no command field) — same empty-cmd path.
+TMP=$(make_tmp_with_marker)
+assert_nodecision "#298 AC-1: Write payload (no command), marker present" "$TMP" \
+    '{"tool_name":"Write","tool_input":{"file_path":"/tmp/output.py","content":"print(1)"}}'
+rm -rf "$TMP"
+
+TMP=$(make_tmp_no_marker)
+assert_nodecision "#298 AC-1: Write payload (no command), no marker" "$TMP" \
+    '{"tool_name":"Write","tool_input":{"file_path":"/tmp/output.py","content":"print(1)"}}'
+rm -rf "$TMP"
+
+echo
+echo "=== [#298 REGRESSION] Benign Bash, dev mode OFF (no marker) -> NODECISION ==="
+
+# AC-2: Benign Bash, dev mode OFF (no marker).
+# Current code: cmd non-empty -> reads marker -> absent -> allow() at line :151.
+TMP=$(make_tmp_no_marker)
+assert_nodecision "#298 AC-2: git status, no marker" "$TMP" "$(make_payload 'git status')"
+rm -rf "$TMP"
+
+TMP=$(make_tmp_no_marker)
+assert_nodecision "#298 AC-2: ls -la, no marker" "$TMP" "$(make_payload 'ls -la /tmp')"
+rm -rf "$TMP"
+
+echo
+echo "=== [#298 REGRESSION] Benign Bash, dev mode ON (marker present) -> NODECISION ==="
+
+# AC-3: Benign Bash, dev mode ON, no outward action — falls through to line :235 allow().
+TMP=$(make_tmp_with_marker)
+assert_nodecision "#298 AC-3: git status, marker present" "$TMP" "$(make_payload 'git status')"
+rm -rf "$TMP"
+
+echo
+echo "=== [#298 REGRESSION] dev_mode: false in marker + benign Bash -> NODECISION ==="
+
+# dev_mode: false marker + benign Bash — current code: allow() at line :137.
+TMP="$(mktemp -d)"
+mkdir -p "$TMP/.claude"
+printf 'dev_mode: false\n' > "$TMP/.claude/.dev-mode-active"
+assert_nodecision "#298 dev_mode:false marker + git log" "$TMP" "$(make_payload 'git log --oneline -5')"
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
