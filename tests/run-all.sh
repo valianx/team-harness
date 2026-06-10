@@ -87,6 +87,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 8: hooks/sketch-guard.sh — functional tests"
+echo "############################################################"
+if bash "$TESTS_DIR/test_sketch_guard.sh"; then
+    echo "sketch-guard: PASS"
+else
+    echo "sketch-guard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
