@@ -18745,6 +18745,55 @@ check(
 # Marker: plan-sketches
 
 # ---------------------------------------------------------------------------
+# Suite 84 — isolated-hook-env-harness (v2.7x.0)
+# AC-10 hygiene structural assertions.
+# Written by tester (verify-run mode, 2026-06-10). Marker: isolated-hook-env-harness
+#
+# Asserts:
+#   (h1) tests/test_isolated_hook_env.sh contains the self-referential literals
+#        'Suite 84' and 'isolated-hook-env-harness' (AC-10 harness self-ref guard).
+#   (h2) docs/testing.md registers Suite 84 and the isolated-hook-env-harness marker
+#        (canonical registry — same precedent as Suites 73/74/82).
+#   (h3) CLAUDE.md does NOT contain 'Suite 84' (hygiene contract: §11 stays a
+#        2-line pointer to docs/testing.md; per-suite inventory belongs only there).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 84: isolated-hook-env-harness hygiene (AC-10) ===")
+
+_s84_harness   = read(REPO_ROOT / "tests" / "test_isolated_hook_env.sh")
+_s84_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s84_claude    = read(REPO_ROOT / "CLAUDE.md")
+
+# (h1) self-referential: harness file contains 'Suite 84' + 'isolated-hook-env-harness'
+check(
+    "suite84(h1-self-ref): tests/test_isolated_hook_env.sh contains 'Suite 84'"
+    " and 'isolated-hook-env-harness'",
+    "Suite 84" in _s84_harness and "isolated-hook-env-harness" in _s84_harness,
+    "tests/test_isolated_hook_env.sh must contain the literals 'Suite 84' and"
+    " 'isolated-hook-env-harness' (AC-10 self-referential guard)",
+)
+
+# (h2) docs/testing.md canonical registry registers Suite 84 + feature marker
+check(
+    "suite84(h2-registry): docs/testing.md registers 'Suite 84'"
+    " and 'isolated-hook-env-harness'",
+    "Suite 84" in _s84_testing_md and "isolated-hook-env-harness" in _s84_testing_md,
+    "docs/testing.md must name Suite 84 and the isolated-hook-env-harness marker"
+    " (canonical suite registry)",
+)
+
+# (h3) CLAUDE.md hygiene: §11 must NOT contain 'Suite 84'
+# The section + suite register in docs/testing.md; §11 stays a pointer.
+check(
+    "suite84(h3-hygiene): CLAUDE.md does NOT contain 'Suite 84'",
+    "Suite 84" not in _s84_claude,
+    "CLAUDE.md must not mention Suite 84 — only docs/testing.md is the canonical"
+    " registry (§11 hygiene contract)",
+)
+
+# Marker: isolated-hook-env-harness
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

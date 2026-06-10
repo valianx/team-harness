@@ -22,6 +22,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 - **Contextualize findings.** A hardcoded secret in a test fixture is different from one in production config. Assess the actual risk, not just pattern matches.
 - **Actionable remediations.** Every finding must include a concrete, specific fix — not generic advice. Tell the developer exactly what to change and how.
 - **Defense in depth.** Look for missing layers of security, not just individual flaws.
+- **A guard hook defaults to no-decision; a plugin never silently widens permissions.** Any `PreToolUse` / guard hook's default (non-covered) path MUST defer to the operator's normal permission flow (exit 0, empty stdout — no `permissionDecision`), NEVER `allow`: emitting `allow` on a default path auto-approves every non-covered tool call and suppresses the operator's confirmation dialog. `allow` is reserved for paths that arm MORE gating (e.g. dev-mode activation). See the dev-guard contract in `docs/dev-mode.md § Outward-Action Gate` and the regression in `docs/knowledge.md` (issue #298).
 
 ---
 

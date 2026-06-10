@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.73.0] - 2026-06-10
+
+### Added
+
+- Isolated-environment hook-chain test harness (`tests/test_isolated_hook_env.sh`, Suite 84) that drives the plugin hook chain in a clean throwaway HOME, validating PreToolUse permission behaviour without depending on personal config — would have caught #298 before ship.
+- Test-oracle and isolated-environment testing principles encoded in `agents/tester.md` and `agents/security.md` Core Philosophy sections: expected values come from the spec, not current output; hook/permission/gate tests run in an isolated environment.
+- `docs/testing.md § Testing principles` section with two subsections ((i) spec-not-implementation oracle, (ii) isolated-environment requirement for hook/permission/gate tests) naming issue #298 as the case study.
+- Suite 84 entry in `docs/testing.md` suite registry with CAN-prove / CANNOT-prove boundaries distinguishing it from Suite 83.
+- Suite 84 hygiene assertions in `tests/test_agent_structure.py` (self-ref literals, registry entry, CLAUDE.md does NOT contain "Suite 84").
+- Suite 9 banner block in `tests/run-all.sh` wiring Suite 84 into the full free-suite run.
+
+### Changed
+
+- `docs/knowledge.md`: added two `[pattern]` bullets for the test-oracle lesson and isolated-env testing pattern, each naming issue #298 as the case study.
+
 ## [2.72.0] - 2026-06-10
 
 ### Fixed
