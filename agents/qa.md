@@ -316,7 +316,7 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 1. **Read project context** — CLAUDE.md, existing validation patterns, DTOs/schemas, component structure
 2. **Detect project type** — backend, frontend, or fullstack (from CLAUDE.md, package.json, or directory structure)
-3. **Read the triggered sketch files (required reading before validating)** — for every `01-sketch-*.md` present in the workspace, read it before evaluating any AC. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-01-sketch-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). When validating an AC against the delivered surface, cross-check the delivered API, data model, UI layout, or call flow against the corresponding sketch contract; a delivered surface that contradicts the sketch is a validation finding. Record the list of sketch files read in the `sketches_read` field of your status block.
+3. **Read the triggered sketch files (required reading before validating)** — for every `sketches/*.md` present in the workspace, read it before evaluating any AC. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). When validating an AC against the delivered surface, cross-check the delivered API, data model, UI layout, or call flow against the corresponding sketch contract; a delivered surface that contradicts the sketch is a validation finding. Record the list of sketch files read in the `sketches_read` field of your status block.
 
 ---
 
@@ -485,7 +485,7 @@ mode: validate | pr-review-qa | docs-validation | review
 status: success | failed | blocked
 output: workspaces/{feature-name}/04-validation.md
 summary: {1-2 sentences: N/N AC passed, any critical findings}
-sketches_read: [01-sketch-api-contract.md, ...]  # list every 01-sketch-*.md read; [] when none present
+sketches_read: [sketches/api-contract.md, ...]  # list every sketches/*.md read; [] when none present
 context7_consult: hit:N miss:N skipped:N
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]

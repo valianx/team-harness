@@ -405,13 +405,13 @@ for pr in PRs:
 **What to check:**
 
 1. Locate `### Classification block` in `01-plan.md § Review Summary`. If absent or if all eight booleans are omitted: finding `"Rule 11: Classification block missing from 01-plan.md § Review Summary"` with severity `concerns`. **Note:** if the plan's `Files:` list contains contract-surface paths (routes, controllers, handlers, endpoints, openapi, schema, migration, model, component) and the block is absent, name the skipped surface explicitly: `"Rule 11: Classification block missing — plan Files: contain contract-surface paths (e.g., {path}) — classification may have been skipped"`.
-2. For each boolean that is `true`, verify the corresponding `01-sketch-*.md` file exists in the workspace (same directory as `01-plan.md`, or under the consolidated `{overview_root}/sketches/` path in a multi-project workspace). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but 01-sketch-{name}.md is absent"` with severity `concerns`.
-3. For `touches_data_model: true` AND `destructive: true`, also require `01-sketch-data-migration.md`. Missing → finding `"Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent"` with severity `concerns`.
-4. For `spans_multiple_services: true`, require `01-sketch-service-interaction.md`. Missing → finding `"Rule 11: spans_multiple_services is true but 01-sketch-service-interaction.md is absent"` with severity `concerns`.
-5. For each present `01-sketch-*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: 01-sketch-{name}.md appears empty (header-only)"` with severity `concerns`.
-6. **api-contract completeness and body-shape sub-check (when `01-sketch-api-contract.md` is present):** two shape-adjacent checks, both `concerns`-severity and fail-OPEN:
-   - **Operation completeness:** if the sketch models a single action-style path (e.g., `/sync`, `/process`) AND the plan's ACs reference more than one distinct CRUD operation (e.g., create and update), emit finding `"Rule 11: api-contract sketch models a single action-style endpoint but the ACs describe multiple distinct operations — confirm completeness/convention or justify the action endpoint in the sketch's ## Notes"`.
-   - **Body-shape specificity:** if the sketch declares any field that the change introduces or modifies as `type: object` with no `properties`, emit finding `"Rule 11: api-contract sketch contains a bare 'type: object' with no properties on a changed field — define the field's shape (properties, type, enum, or $ref); a contract that leaves a changed field as an opaque object conveys no contract"`. Changed fields without `properties` are the target; unchanged nested DTOs referenced by `$ref` or left unexpanded are not a finding.
+2. For each boolean that is `true`, verify the corresponding `sketches/{type}.md` file exists in the workspace (under the `sketches/` subfolder in the same directory as `01-plan.md`, or under the consolidated `{overview_root}/sketches/` path in a multi-project workspace). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but sketches/{name}.md is absent"` with severity `concerns`.
+3. For `touches_data_model: true` AND `destructive: true`, also require `sketches/data-migration.md`. Missing → finding `"Rule 11: touches_data_model AND destructive are both true but sketches/data-migration.md is absent"` with severity `concerns`.
+4. For `spans_multiple_services: true`, require `sketches/service-interaction.md`. Missing → finding `"Rule 11: spans_multiple_services is true but sketches/service-interaction.md is absent"` with severity `concerns`.
+5. For each present `sketches/*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: sketches/{name}.md appears empty (header-only)"` with severity `concerns`.
+6. **api-contract completeness and body-shape sub-check (when `sketches/api-contract.md` is present):** two shape-adjacent checks, both `concerns`-severity and fail-OPEN:
+   - **Operation completeness:** if the sketch models a single action-style path (e.g., `/sync`, `/process`) — detectable by scanning the `METHOD /path` header lines — AND the plan's ACs reference more than one distinct CRUD operation (e.g., create and update), emit finding `"Rule 11: api-contract sketch models a single action-style endpoint but the ACs describe multiple distinct operations — confirm completeness/convention or justify the action endpoint in the sketch's ## Notes"`.
+   - **Body-shape specificity:** if the sketch shows any object the change introduces or modifies as an opaque `{}` or a `"...": "object"` placeholder (with no actual nested fields shown), emit finding `"Rule 11: api-contract sketch contains an opaque {} or placeholder on a changed field — show the field's actual nested fields with real example values; a contract that leaves a changed field opaque conveys no contract"`. Changed objects left opaque are the target; unchanged nested DTOs abbreviated or referenced by name are not a finding.
 
 **Severity is always `concerns` — never `fail`.** Rule 11 mirrors the fail-OPEN pattern of `hooks/sketch-guard.sh`. The human at STAGE-GATE-1 and the `sketch-guard.sh` verdict are the definitive backstops. The plan-reviewer surfaces sketch shape to the human; it does not block the gate.
 
@@ -428,13 +428,13 @@ if classification is None:
     return  # cannot continue sketch check without classification
 
 SKETCH_MAP = {
-    "touches_http_api": "01-sketch-api-contract.md",
-    "touches_ui": "01-sketch-ui-wireframe.md",
-    "touches_data_model": "01-sketch-data-model.md",
-    "touches_cli": "01-sketch-cli-surface.md",
-    "touches_public_lib_api": "01-sketch-public-api.md",
-    "touches_async_messaging": "01-sketch-event-contract.md",
-    "spans_multiple_services": "01-sketch-service-interaction.md",
+    "touches_http_api": "sketches/api-contract.md",
+    "touches_ui": "sketches/ui-wireframe.md",
+    "touches_data_model": "sketches/data-model.md",
+    "touches_cli": "sketches/cli-surface.md",
+    "touches_public_lib_api": "sketches/public-api.md",
+    "touches_async_messaging": "sketches/event-contract.md",
+    "spans_multiple_services": "sketches/service-interaction.md",
 }
 for boolean, sketch_file in SKETCH_MAP.items():
     if classification.get(boolean) is True:
@@ -444,21 +444,21 @@ for boolean, sketch_file in SKETCH_MAP.items():
             findings.append((f"Rule 11: {sketch_file} appears empty (header-only)", CONCERNS))
 
 if classification.get("touches_data_model") and classification.get("destructive"):
-    if not exists(workspace / "01-sketch-data-migration.md"):
-        findings.append(("Rule 11: touches_data_model AND destructive are both true but 01-sketch-data-migration.md is absent", CONCERNS))
+    if not exists(workspace / "sketches" / "data-migration.md"):
+        findings.append(("Rule 11: touches_data_model AND destructive are both true but sketches/data-migration.md is absent", CONCERNS))
 
 # api-contract completeness and body-shape sub-check
-api_sketch_path = workspace / "01-sketch-api-contract.md"
+api_sketch_path = workspace / "sketches" / "api-contract.md"
 if exists(api_sketch_path) and not is_trivially_empty(api_sketch_path):
     api_sketch_content = read(api_sketch_path)
     plan_acs = extract_ac_text(plan)
-    has_action_endpoint = matches_action_path_pattern(api_sketch_content)  # /sync, /process, /doStuff etc.
+    has_action_endpoint = matches_action_path_pattern(api_sketch_content)  # /sync, /process, /doStuff etc. — scan METHOD /path header lines
     has_multiple_crud_ops = references_multiple_crud_ops(plan_acs)  # create AND update, or create AND delete
     if has_action_endpoint and has_multiple_crud_ops:
         findings.append(("Rule 11: api-contract sketch models a single action-style endpoint but the ACs describe multiple distinct operations — confirm completeness/convention or justify the action endpoint in the sketch's ## Notes", CONCERNS))
-    # body-shape specificity: bare type:object with no properties on a changed field
-    if has_bare_type_object_on_changed_field(api_sketch_content):  # type: object without properties: block
-        findings.append(("Rule 11: api-contract sketch contains a bare 'type: object' with no properties on a changed field — define the field's shape (properties, type, enum, or $ref); a contract that leaves a changed field as an opaque object conveys no contract", CONCERNS))
+    # body-shape specificity: opaque {} or "...": "object" placeholder on a changed field
+    if has_opaque_object_on_changed_field(api_sketch_content):  # {} or "...": "object" with no actual nested fields shown
+        findings.append(("Rule 11: api-contract sketch contains an opaque {} or placeholder on a changed field — show the field's actual nested fields with real example values; a contract that leaves a changed field opaque conveys no contract", CONCERNS))
 ```
 
 **Override:** the architect may NOT override Rule 11 to `fail`. The maximum severity is `concerns` by design; the override escape hatch does not apply.

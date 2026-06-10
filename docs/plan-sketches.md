@@ -88,7 +88,7 @@ STAGE-GATE-1 and `plan-reviewer` Rule 11 can audit consistency.
 
 The two always-sketches collapse into existing surfaces and are NOT separate files.
 Every plan has a `§ Task List` AC block and a `§ Architecture` Security/Performance section,
-so no standalone `01-sketch-*.md` files are needed for the always-pair.
+so no standalone `sketches/*.md` files are needed for the always-pair.
 
 ### Conditional (on classification booleans)
 

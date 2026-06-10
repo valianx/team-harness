@@ -204,13 +204,13 @@ workspaces/{feature-name}/
   00-audit.md              ← architect (audit mode)
   00-acceptance-criteria.md ← qa-plan (define-ac mode)
   01-plan.md               ← architect (spec + architecture + tasks + plan-review appended by plan-reviewer)
-  01-sketch-api-contract.md    ← architect (when touches_http_api: true)
-  01-sketch-ui-wireframe.md    ← architect (when touches_ui: true)
-  01-sketch-data-model.md      ← architect (when touches_data_model: true)
-  01-sketch-cli-surface.md     ← architect (when touches_cli: true)
-  01-sketch-public-api.md      ← architect (when touches_public_lib_api: true)
-  01-sketch-event-contract.md  ← architect (when touches_async_messaging: true)
-  01-sketch-data-migration.md  ← architect (when touches_data_model AND destructive: true)
+  sketches/api-contract.md     ← architect (when touches_http_api: true)
+  sketches/ui-wireframe.md     ← architect (when touches_ui: true)
+  sketches/data-model.md       ← architect (when touches_data_model: true)
+  sketches/cli-surface.md      ← architect (when touches_cli: true)
+  sketches/public-api.md       ← architect (when touches_public_lib_api: true)
+  sketches/event-contract.md   ← architect (when touches_async_messaging: true)
+  sketches/data-migration.md   ← architect (when touches_data_model AND destructive: true)
   01-planning.md           ← architect (planning mode — multi-task batch breakdown)
   02-implementation.md     ← implementer
   03-testing.md            ← tester
@@ -460,7 +460,7 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 
 | Agent | Phase | Expected artifact |
 |-------|-------|-------------------|
-| `architect` | 1 (design mode) | `01-plan.md` + any triggered `01-sketch-*.md` (classification-dependent) |
+| `architect` | 1 (design mode) | `01-plan.md` + any triggered `sketches/*.md` (classification-dependent) |
 | `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
 | `architect` | 1 (docs-flow research mode) | `00-research.md` |
 | `implementer` | 2 | `02-implementation.md` |
@@ -1691,11 +1691,11 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
  {if concerns or fail:}
  Concerns to review:
    - {one-line per concern, citing file:line}
-   - {sketch-guard concerns if any, e.g.: "touches_http_api=true but 01-sketch-api-contract.md is missing"}
+   - {sketch-guard concerns if any, e.g.: "touches_http_api=true but sketches/api-contract.md is missing"}
 
  Artifacts written:
    - workspaces/{feature-name}/01-plan.md             (architecture + task list + plan-review appended)
-   - workspaces/{feature-name}/01-sketch-*.md         (triggered sketches, if any)
+   - workspaces/{feature-name}/sketches/*.md           (triggered sketches, if any)
 
  Reply with:
    - "approve"            → proceed to Stage 2 (per-round stops at STAGE-GATE-2)
@@ -3726,7 +3726,7 @@ Offer to clean completed worktrees. Do NOT auto-remove failed worktrees — user
 
 Each eligible project runs its full Stage 1 independently and serially: Design → plan-review → its OWN STAGE-GATE-1 (one plan at a time, no batched plan cognition). A project becomes fan-out-eligible only after it has cleared its own STAGE-GATE-1 and has ready, independent Stage-2 work.
 
-**Per-project Stage-1 deliverables (classification block is required for every project).** The classification block (`touches_http_api`, `touches_ui`, … `spans_multiple_services`) is a REQUIRED deliverable for each project's Stage 1 — it must appear in that project's `{project}/00-state.md` and be mirrored in that project's `{project}/01-plan.md § Review Summary → ### Classification block`. A project whose booleans are all false still records an all-false block — its presence is the signal that classification happened. When the orchestrator self-authors a project plan within an initiative (e.g., for a Tier-1 hotfix lane), it records an all-false block in that project's `00-state.md`. `plan-reviewer` Rule 11 audits each project's classification block independently — its `concerns` finding for a missing block must be surfaced to the human at THAT project's STAGE-GATE-1, never aggregated away. The workspace doc list for a project includes `00-state.md` (classification block + status), `01-plan.md` (work plan + mirrored classification), any triggered `01-sketch-*.md` files, and, when `spans_multiple_services: true` in any project, `{overview_root}/sketches/service-interaction.md` (shared across projects). Per-project conditional sketches go in `{overview_root}/sketches/{project}-01-sketch-{name}.md` (consolidated layout); single-project workspaces use the standard flat `01-sketch-*.md` layout.
+**Per-project Stage-1 deliverables (classification block is required for every project).** The classification block (`touches_http_api`, `touches_ui`, … `spans_multiple_services`) is a REQUIRED deliverable for each project's Stage 1 — it must appear in that project's `{project}/00-state.md` and be mirrored in that project's `{project}/01-plan.md § Review Summary → ### Classification block`. A project whose booleans are all false still records an all-false block — its presence is the signal that classification happened. When the orchestrator self-authors a project plan within an initiative (e.g., for a Tier-1 hotfix lane), it records an all-false block in that project's `00-state.md`. `plan-reviewer` Rule 11 audits each project's classification block independently — its `concerns` finding for a missing block must be surfaced to the human at THAT project's STAGE-GATE-1, never aggregated away. The workspace doc list for a project includes `00-state.md` (classification block + status), `01-plan.md` (work plan + mirrored classification), any triggered `sketches/*.md` files, and, when `spans_multiple_services: true` in any project, `{overview_root}/sketches/service-interaction.md` (shared across projects). Per-project conditional sketches go in `{overview_root}/sketches/{project}-{name}.md` (consolidated layout); single-project workspaces use the `sketches/{type}.md` layout.
 
 Once ≥2 projects are eligible and the fan-out confirm gate is approved, the orchestrator **fans out the Stage-2 implement+verify work concurrently** — one lane per project. Each lane is an isolated implement→verify loop dispatched via concurrent `Task` calls in the parent session, exactly the in-message mechanism already live in Phase 3 for a single project's `tester+qa+security` trio. Sibling lanes run simultaneously and independently. No Workflow tool is needed; no nested-dispatch is required — the feature stays entirely within the dev-mode top-level Task-parallelism capability.
 
