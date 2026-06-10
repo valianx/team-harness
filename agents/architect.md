@@ -709,7 +709,7 @@ After writing `01-plan.md` and before emitting the status block, produce the cla
 
 ### Step 1 — Record the classification block
 
-Analyze the task scope (Work Plan files, AC surface) and set each of the seven booleans. Record in **two** places:
+Analyze the task scope (Work Plan files, AC surface) and set each of the eight booleans. Record in **two** places:
 
 **In `00-state.md § Current State`** (verifier's authority):
 ```
@@ -720,10 +720,13 @@ Analyze the task scope (Work Plan files, AC surface) and set each of the seven b
 - touches_public_lib_api: true|false
 - touches_async_messaging: true|false
 - destructive: true|false
+- spans_multiple_services: true|false
 ```
 
 **In `01-plan.md § Review Summary` (add a `### Classification block` subsection)**:
-Mirror the same seven values so the human sees them at STAGE-GATE-1 and the plan-reviewer can audit consistency without reading `00-state.md`.
+Mirror the same eight values so the human sees them at STAGE-GATE-1 and the plan-reviewer can audit consistency without reading `00-state.md`.
+
+**Multi-project clause:** When dispatched for one project of a multi-project initiative (i.e., the workspace path is `{initiative}/{project}/`), write the classification block into THAT project's `{project}/00-state.md` and mirror it in THAT project's `{project}/01-plan.md § Review Summary`. The block is a required Stage-1 deliverable for every project in the initiative. A project whose booleans are all false still records an all-false block — its presence is the signal that classification happened for that project.
 
 ### Step 2 — Produce the required sketch files
 
@@ -740,6 +743,7 @@ Use the trigger table below to determine which `01-sketch-*.md` files to create 
 | `touches_public_lib_api: true` | `01-sketch-public-api.md` | changed signatures + one usage example, fenced code block |
 | `touches_async_messaging: true` | `01-sketch-event-contract.md` | example payload (JSON/YAML) + field table + topic/queue, fenced + table |
 | `touches_data_model: true` AND `destructive: true` | `01-sketch-data-migration.md` | forward steps + rollback note, markdown table/list |
+| `spans_multiple_services: true` | `01-sketch-service-interaction.md` | Mermaid `sequenceDiagram`, changed call paths only, inline fenced block |
 
 **Always-sketches (no standalone file):** the functional-acceptance AC (Given/When/Then) and the non-functional notes (bullets: auth, perf, rate-limit, errors, a11y if frontend) collapse into `01-plan.md § Task List` AC block and `§ Architecture` Security/Performance sections respectively. Do NOT create standalone files for these.
 
@@ -905,6 +909,31 @@ const result = example({ field: "value" })
 ## Risk Notes
 - {data volume, downtime window, lock behavior}
 ```
+
+**`01-sketch-service-interaction.md`**
+```markdown
+# Service Interaction Sketch — {feature-name}
+
+## Changed Call Paths
+
+```mermaid
+sequenceDiagram
+    participant ServiceA
+    participant ServiceB
+    ServiceA->>ServiceB: POST /example-endpoint
+    ServiceB-->>ServiceA: 200 OK { result }
+```
+
+## Notes
+- {any auth, retry, or error-path notes for the changed call flows}
+```
+
+**Multi-project layout note:** In a multi-project initiative the sketch files for each project are written into a shared `{overview_root}/sketches/` folder with a project prefix:
+- Per-project conditional sketches: `{overview_root}/sketches/{project}-01-sketch-{name}.md`
+  (example: `payment-gateway-01-sketch-api-contract.md`)
+- Shared service-interaction sketch: `{overview_root}/sketches/service-interaction.md` (un-prefixed — it belongs to no single project)
+
+In a single-project workspace, all sketches use the flat `01-sketch-*.md` naming in the workspace root (unchanged).
 
 ---
 
