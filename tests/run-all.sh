@@ -98,6 +98,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 9: hooks isolated-env harness (Suite 84)"
+echo "############################################################"
+if bash "$TESTS_DIR/test_isolated_hook_env.sh"; then
+    echo "isolated-hook-env: PASS"
+else
+    echo "isolated-hook-env: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
