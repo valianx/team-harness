@@ -53,7 +53,7 @@ This distinction is load-bearing:
 - **What is NOT discarded:** The model's harm-rejection and safety layer ("what Claude knows" — Anthropic's constitutional training). An output style adjusts the system prompt; it does NOT disarm the model's refusal to produce harmful outputs, exfiltrate data, or follow malicious instructions. That layer does not live in the "software engineering instructions" block.
 - **Security floors are PROMPT-INDEPENDENT (hooks, not prompt):** the security guarantees of this harness are PreToolUse hooks wired by matcher — they fire regardless of which system prompt is active:
   - `hooks/policy-block.sh` — matcher `Bash|Write|Edit|NotebookEdit`. Blocks `rm -rf / ~ $HOME`, `git push --force`, `git reset --hard`, `git clean -f`, `--no-verify`, destructive SQL, and writes to sensitive file paths (`.env`, `.pem`, `.ssh/`, credentials). Survives the output-style swap intact.
-  - `hooks/dev-guard.sh` — matcher `Bash`. Gates outward/mutating actions in dev mode (see § Outward-Action Gate). Survives intact.
+  - `hooks/dev-guard.sh` — dedicated `Bash`-only PreToolUse entry. Gates outward/mutating actions in dev mode (see § Outward-Action Gate). Survives intact.
   - `hooks/checkpoint-guard.sh` — matcher `Task`. Gates phase dispatch at reasoning-checkpoint boundaries. Survives intact.
 
 **Conclusion:** `keep-coding-instructions: false` is safe for this harness because the security floors are hooks, not prompt. No security-relevant default lives exclusively in the discarded SWE instructions that the orchestrator contract + hooks do not re-establish.
@@ -82,7 +82,7 @@ The marker is the observable signal that (a) dev mode is active for the session 
 
 ## Outward-Action Gate (`dev-guard.sh`)
 
-The deterministic security layer is the PreToolUse hook `hooks/dev-guard.sh`, wired to matcher `Bash` in both `hooks/config.json` (Go installer, 3 OS) and `.claude-plugin/hooks.json` (plugin runtime). This is the GUARANTEE — not the disposition.
+The deterministic security layer is the PreToolUse hook `hooks/dev-guard.sh`, wired in its own dedicated `Bash`-only PreToolUse entry in both `hooks/config.json` (Go installer, 3 OS) and `.claude-plugin/hooks.json` (plugin runtime). `policy-block.sh` is in a separate entry with matcher `Bash|Write|Edit|NotebookEdit` so it continues to secret-scan write/edit content — dev-guard never fires on Edit/Write/NotebookEdit. This is the GUARANTEE — not the disposition.
 
 **What it gates (by DESTINATION, not by binary):**
 
@@ -96,10 +96,13 @@ The deterministic security layer is the PreToolUse hook `hooks/dev-guard.sh`, wi
 | `curl`/`wget` with mutating method against `api.github.com` | `ask` | Covers binary-level bypass |
 | Activation write (`>`/`>>`/`tee`) setting `dev_mode: true` | `allow` | Arming MORE gating is safe; enables `/dev-mode` (re)activation without friction |
 | Remove/move/other-write to `~/.claude/.dev-mode-active` (`rm`/`mv`/`cp`, or write not setting `dev_mode: true`) | `ask` | Disabling the gate requires operator confirmation — `/dev-mode off` relies on this |
+| Any non-covered call (Edit/Write/NotebookEdit payloads; benign Bash; dev mode OFF or `dev_mode: false`) | no decision (exit 0, empty stdout) | Defer to the operator's normal permission flow — the gate has no basis to act on non-covered calls |
 
 **What `ask` means:** `permissionDecision: "ask"` causes the Claude Code runtime to prompt the OPERATOR interactively for that specific call. The agent CANNOT auto-approve an `ask`. There is NO authorisation marker file — the authorisation is human out-of-band. A legitimate delivery push at STAGE-GATE-3 proceeds through this same operator approval, mirroring the preview-and-confirm contract of review-mode (#251/#252).
 
-**Fail-CLOSED for covered actions:** the only allow-path for a covered action is the dev-mode marker being demonstrably ABSENT. If the marker is present (including present-but-empty or present-but-unreadable), the hook treats it as active and issues `ask`. This is the intentional fail-mode: the consequences of an unauthorised merge to main are irreversible; the consequences of an over-zealous `ask` are a minor friction.
+**Fail-CLOSED for covered actions:** when dev mode is active (marker present, including present-but-empty or present-but-unreadable), the hook issues `ask` for every covered outward action. This is the intentional fail-mode: the consequences of an unauthorised merge to main are irreversible; the consequences of an over-zealous `ask` are a minor friction.
+
+**Default → no-decision for non-covered calls:** when the command is not a covered outward action (benign Bash, or any call when dev mode is OFF / `dev_mode: false` / marker absent), the hook emits **no permissionDecision** — exit 0, empty stdout — and defers to the operator's normal permission flow. This is the correct default: a permission gate must never widen permissions on its fail-safe path. The only `allow` in the gate is the activation-write path (`dev_mode: true`), which arms MORE gating.
 
 **No authorisation file.** A file that the agent can write with `echo authorized > ...` is forjable by the same subject the gate protects — it is not a control. The authorisation is `ask` (human), not a file.
 
