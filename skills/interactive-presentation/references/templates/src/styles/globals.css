@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-scene-bg text-scene-text font-sans m-0 p-0;
+    overflow: hidden;
+  }
+
+  #root {
+    width: 100vw;
+    height: 100vh;
+  }
+}
+
+@layer components {
+  /* React Flow overrides for dark theme */
+  .react-flow__background {
+    background-color: theme("colors.scene.bg") !important;
+  }
+
+  .react-flow__node {
+    @apply rounded-lg border border-scene-border bg-scene-surface text-scene-text shadow-lg;
+    font-family: theme("fontFamily.sans");
+  }
+
+  .react-flow__node.highlighted {
+    @apply border-scene-accent ring-2 ring-scene-accent/30;
+    transition: all 0.3s ease;
+  }
+
+  .react-flow__edge-path {
+    stroke: theme("colors.scene.muted");
+    stroke-width: 2;
+  }
+
+  .react-flow__edge.animated .react-flow__edge-path {
+    stroke: theme("colors.scene.accent");
+    stroke-dasharray: 5;
+    animation: dash 1s linear infinite;
+  }
+
+  @keyframes dash {
+    to {
+      stroke-dashoffset: -10;
+    }
+  }
+
+  /* Navigation dots */
+  .nav-dot {
+    @apply w-2.5 h-2.5 rounded-full bg-scene-muted/40 transition-all duration-300 cursor-pointer;
+  }
+
+  .nav-dot.active {
+    @apply bg-scene-accent w-8 rounded-full;
+  }
+
+  /* Scene transition */
+  .scene-enter {
+    @apply animate-fade-in;
+  }
+}
