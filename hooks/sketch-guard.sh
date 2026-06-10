@@ -51,6 +51,7 @@ SKETCH_MAP=(
     "touches_cli:01-sketch-cli-surface.md"
     "touches_public_lib_api:01-sketch-public-api.md"
     "touches_async_messaging:01-sketch-event-contract.md"
+    "spans_multiple_services:01-sketch-service-interaction.md"
 )
 
 # The data-migration sketch requires BOTH touches_data_model AND destructive.
@@ -171,12 +172,66 @@ fi
 
 # ---------------------------------------------------------------------------
 # Step 3 — Check for classification block
-# If the block is absent, fail-OPEN (Tier 1/hotfix all-false, or docs flow)
+# If the block is absent, run the missing-block anti-gaming scan first, then
+# emit pass (block absent is fail-OPEN per the completeness-gate contract).
+# Anti-gaming: if the plan's Files: contain contract-surface keywords, that is
+# a visible reliability concern — emit concerns (exit 0), never fail.
 # ---------------------------------------------------------------------------
 
 if ! has_classification_block "$STATE_FILE"; then
-    # No classification block → empty required set → pass (fail-open)
-    pass_verdict
+    PLAN_FILE_EARLY="${DOCS_ROOT}/01-plan.md"
+    early_concerns=()
+
+    if [ -f "$PLAN_FILE_EARLY" ]; then
+        # Contract-surface keywords that suggest a boolean may have been skipped
+        CONTRACT_KEYWORDS=(
+            "route" "controller" "handler" "endpoint" "openapi"
+            "schema" "migration" "model" "component"
+        )
+        plan_paths_text=""
+        if command -v python3 >/dev/null 2>&1; then
+            plan_paths_text=$(python3 - <<'PYEOF' "$PLAN_FILE_EARLY" 2>/dev/null || true
+import sys, re
+path_re = re.compile(r'`([^`]+\.[a-zA-Z][^`]*)`')
+results = []
+with open(sys.argv[1], encoding='utf-8', errors='replace') as f:
+    in_files = False
+    for line in f:
+        if '**Files:**' in line or line.strip().startswith('- **Files:**'):
+            in_files = True
+            continue
+        if in_files:
+            if re.match(r'\s*-\s+\*\*\w', line) and '**Files:**' not in line:
+                in_files = False
+            for m in path_re.finditer(line):
+                results.append(m.group(1).lower())
+for r in results:
+    print(r)
+PYEOF
+            )
+        else
+            plan_paths_text=$(grep -A50 '\*\*Files:\*\*' "$PLAN_FILE_EARLY" 2>/dev/null \
+                | grep -o '`[^`]*`' | tr -d '`' | tr '[:upper:]' '[:lower:]' \
+                || true)
+        fi
+
+        if [ -n "$plan_paths_text" ]; then
+            for kw in "${CONTRACT_KEYWORDS[@]}"; do
+                if echo "$plan_paths_text" | grep -q "$kw" 2>/dev/null; then
+                    early_concerns+=("Classification block absent but plan Files: contain '${kw}' paths — classification may have been skipped (concerns only, not a block)")
+                    break  # one concern is enough; avoid flooding
+                fi
+            done
+        fi
+    fi
+
+    if [ ${#early_concerns[@]} -gt 0 ]; then
+        con_json=$(json_array "${early_concerns[@]}")
+        concerns_verdict "[]" "[]" "$con_json"
+    else
+        # No contract-surface keywords found — normal fail-open pass
+        pass_verdict
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -190,6 +245,7 @@ touches_cli=false
 touches_public_lib_api=false
 touches_async_messaging=false
 destructive=false
+spans_multiple_services=false
 
 if read_bool_field "touches_http_api" "$STATE_FILE"; then touches_http_api=true; fi
 if read_bool_field "touches_ui" "$STATE_FILE"; then touches_ui=true; fi
@@ -198,6 +254,7 @@ if read_bool_field "touches_cli" "$STATE_FILE"; then touches_cli=true; fi
 if read_bool_field "touches_public_lib_api" "$STATE_FILE"; then touches_public_lib_api=true; fi
 if read_bool_field "touches_async_messaging" "$STATE_FILE"; then touches_async_messaging=true; fi
 if read_bool_field "destructive" "$STATE_FILE"; then destructive=true; fi
+if read_bool_field "spans_multiple_services" "$STATE_FILE"; then spans_multiple_services=true; fi
 
 # ---------------------------------------------------------------------------
 # Step 5 — Compute required sketch set
@@ -219,11 +276,47 @@ eval_map "$touches_data_model"      "01-sketch-data-model.md"
 eval_map "$touches_cli"             "01-sketch-cli-surface.md"
 eval_map "$touches_public_lib_api"  "01-sketch-public-api.md"
 eval_map "$touches_async_messaging" "01-sketch-event-contract.md"
+eval_map "$spans_multiple_services" "01-sketch-service-interaction.md"
 
 # Data-migration sketch requires BOTH touches_data_model AND destructive
 if [ "$touches_data_model" = "true" ] && [ "$destructive" = "true" ]; then
     required_files+=("$MIGRATION_SKETCH")
 fi
+
+# ---------------------------------------------------------------------------
+# Step 5b — Resolve consolidated sketches/ path (multi-project detection)
+# When a parent overview.md exists at the parent of DOCS_ROOT, this is a
+# project folder within a multi-project initiative. Required sketch files
+# resolve to {overview_root}/sketches/{project}-{sketch_file} for per-project
+# sketches, and {overview_root}/sketches/service-interaction.md for the
+# shared service-interaction sketch (un-prefixed, cross-project).
+# When no overview.md parent is found, use the flat single-project path.
+# Ambiguity → flat path + concerns, never fail. Always fail-OPEN.
+# ---------------------------------------------------------------------------
+
+OVERVIEW_ROOT=""
+PROJECT_PREFIX=""
+
+parent_dir=$(dirname "$DOCS_ROOT")
+if [ -f "${parent_dir}/overview.md" ]; then
+    OVERVIEW_ROOT="$parent_dir"
+    # Project name is the basename of DOCS_ROOT (the project folder name)
+    PROJECT_PREFIX=$(basename "$DOCS_ROOT")
+fi
+
+resolve_sketch_path() {
+    local sketch_file="$1"
+    # The shared service-interaction sketch is un-prefixed in the sketches/ folder
+    if [ -n "$OVERVIEW_ROOT" ]; then
+        if [ "$sketch_file" = "01-sketch-service-interaction.md" ]; then
+            printf '%s/sketches/service-interaction.md' "$OVERVIEW_ROOT"
+        else
+            printf '%s/sketches/%s-%s' "$OVERVIEW_ROOT" "$PROJECT_PREFIX" "$sketch_file"
+        fi
+    else
+        printf '%s/%s' "$DOCS_ROOT" "$sketch_file"
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Step 6 — Check presence of each required sketch (fidelity heuristic)
@@ -233,10 +326,18 @@ missing_files=()
 concerns=()
 
 for sketch_file in "${required_files[@]}"; do
-    full_path="${DOCS_ROOT}/${sketch_file}"
+    full_path=$(resolve_sketch_path "$sketch_file")
     if [ ! -f "$full_path" ]; then
-        missing_files+=("$sketch_file")
-        concerns+=("Missing required sketch: ${sketch_file} (triggered by classification block)")
+        # Also check the flat single-project path as a fallback when in
+        # multi-project mode (architect may have written there during transition)
+        flat_path="${DOCS_ROOT}/${sketch_file}"
+        if [ -n "$OVERVIEW_ROOT" ] && [ -f "$flat_path" ]; then
+            # Found at flat path in multi-project workspace — surface as concern
+            concerns+=("Sketch ${sketch_file} found at flat path ${flat_path} instead of consolidated path ${full_path} — consider moving to sketches/ folder")
+        else
+            missing_files+=("$sketch_file")
+            concerns+=("Missing required sketch: ${sketch_file} (triggered by classification block)")
+        fi
     else
         # Fidelity heuristic: file must be non-empty and have a heading
         local_size=$(wc -c < "$full_path" 2>/dev/null || echo 0)

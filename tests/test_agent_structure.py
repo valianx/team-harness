@@ -18281,16 +18281,18 @@ check(
 # Marker: hooks-secretscan-checkpoint-b2b3
 
 # ---------------------------------------------------------------------------
-# Suite 82 — plan-sketches (v2.69.0)
+# Suite 82 — plan-sketches (v2.69.0 → v2.70.0)
 # Written FAILING-FIRST Phase 2.0 (2026-06-09). Marker: plan-sketches
-# Asserts: manifest drift guard (AC-9), sketch-guard.sh structure (AC-7),
-# 3 agent-contract checks (AC-12), orchestrator integration (AC-11),
-# packaging (AC-13), skills + CLAUDE.md §5 (AC-14), self-referential (AC-15).
+# Asserts: manifest drift guard (AC-9 / AC-5 / AC-8), sketch-guard.sh structure
+# (AC-4 / AC-7), 3 agent-contract checks (AC-12), orchestrator integration
+# (AC-11), packaging (AC-13), skills + CLAUDE.md §5 (AC-14), self-referential
+# (AC-15), service-interaction + consolidated-layout + anti-gaming + consumption
+# clauses (AC-8 extension — Milestone 5).
 # Recurring-bug guard: changelog assertions target durable CHANGELOG.md [2.69.0],
 # NEVER the changelog.d/ fragment (fragment is assembled+deleted at delivery).
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 82: plan-sketches (v2.69.0) ===")
+print("=== Suite 82: plan-sketches (v2.69.0 → v2.70.0) ===")
 
 _s82_docs_sketches      = read(REPO_ROOT / "docs" / "plan-sketches.md")
 _s82_sketch_guard       = read(HOOKS_DIR / "sketch-guard.sh")
@@ -18300,6 +18302,10 @@ _s82_qa_plan            = read(AGENTS_DIR / "qa-plan.md")
 _s82_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
 _s82_orchestrator       = read(AGENTS_DIR / "orchestrator.md")
 _s82_ref_special_flows  = read(AGENTS_DIR / "ref-special-flows.md")
+_s82_implementer        = read(AGENTS_DIR / "implementer.md")
+_s82_tester             = read(AGENTS_DIR / "tester.md")
+_s82_qa                 = read(AGENTS_DIR / "qa.md")
+_s82_reviewer           = read(AGENTS_DIR / "reviewer.md")
 _s82_skill_review_pr    = read(skill_path("review-pr"))
 _s82_skill_deliver      = read(skill_path("deliver"))
 _s82_skill_validate     = read(skill_path("validate"))
@@ -18317,7 +18323,7 @@ _s82_this_file          = read(Path(__file__))
 # docs/plan-sketches.md, and the agent-readable table in agents/architect.md.
 # ---------------------------------------------------------------------------
 
-# Expected canonical trigger→sketch pairs (7 conditional sketches)
+# Expected canonical trigger→sketch pairs (8 conditional sketches: 7 standard + service-interaction)
 _S82_EXPECTED_PAIRS = [
     ("touches_http_api",         "01-sketch-api-contract.md"),
     ("touches_ui",               "01-sketch-ui-wireframe.md"),
@@ -18325,19 +18331,20 @@ _S82_EXPECTED_PAIRS = [
     ("touches_cli",              "01-sketch-cli-surface.md"),
     ("touches_public_lib_api",   "01-sketch-public-api.md"),
     ("touches_async_messaging",  "01-sketch-event-contract.md"),
+    ("spans_multiple_services",  "01-sketch-service-interaction.md"),
 ]
 _S82_MIGRATION_PAIR  = ("touches_data_model", "touches_destructive", "01-sketch-data-migration.md")
 
-# (a1) docs/plan-sketches.md — canonical table carries all 6 standard triggers
+# (a1) docs/plan-sketches.md — canonical table carries all 7 standard triggers
 _s82_docs_all_triggers = all(
     trigger in _s82_docs_sketches and sketch in _s82_docs_sketches
     for trigger, sketch in _S82_EXPECTED_PAIRS
 )
 check(
-    "suite82(a1-docs-manifest): docs/plan-sketches.md carries all 6 trigger→sketch pairs",
+    "suite82(a1-docs-manifest): docs/plan-sketches.md carries all 7 trigger→sketch pairs",
     _s82_docs_all_triggers,
-    "docs/plan-sketches.md must contain all 6 trigger booleans and their sketch filenames"
-    " — canonical manifest (one of the three representations)",
+    "docs/plan-sketches.md must contain all 7 trigger booleans and their sketch filenames"
+    " (including spans_multiple_services) — canonical manifest (one of the three representations)",
 )
 
 # (a2) docs/plan-sketches.md — migration sketch (data_model + destructive)
@@ -18348,16 +18355,16 @@ check(
     " triggered by touches_data_model AND destructive",
 )
 
-# (a3) hooks/sketch-guard.sh SKETCH_MAP — carries all 6 standard trigger→sketch pairs
+# (a3) hooks/sketch-guard.sh SKETCH_MAP — carries all 7 standard trigger→sketch pairs
 _s82_guard_all_triggers = all(
     trigger in _s82_sketch_guard and sketch in _s82_sketch_guard
     for trigger, sketch in _S82_EXPECTED_PAIRS
 )
 check(
-    "suite82(a3-guard-manifest): hooks/sketch-guard.sh SKETCH_MAP carries all 6 pairs",
+    "suite82(a3-guard-manifest): hooks/sketch-guard.sh SKETCH_MAP carries all 7 pairs",
     _s82_guard_all_triggers,
-    "hooks/sketch-guard.sh must contain all 6 trigger booleans and sketch filenames"
-    " in its SKETCH_MAP constant (hardcoded manifest representation)",
+    "hooks/sketch-guard.sh must contain all 7 trigger booleans and sketch filenames"
+    " (including spans_multiple_services) in its SKETCH_MAP constant (hardcoded manifest representation)",
 )
 
 # (a4) hooks/sketch-guard.sh — migration sketch handled
@@ -18369,16 +18376,16 @@ check(
     " (triggered by touches_data_model AND destructive)",
 )
 
-# (a5) agents/architect.md — agent-readable table carries all 6 standard triggers
+# (a5) agents/architect.md — agent-readable table carries all 7 standard triggers
 _s82_arch_all_triggers = all(
     trigger in _s82_architect and sketch in _s82_architect
     for trigger, sketch in _S82_EXPECTED_PAIRS
 )
 check(
-    "suite82(a5-architect-manifest): agents/architect.md agent-readable table carries all 6 pairs",
+    "suite82(a5-architect-manifest): agents/architect.md agent-readable table carries all 7 pairs",
     _s82_arch_all_triggers,
-    "agents/architect.md must contain all 6 trigger booleans and sketch filenames"
-    " in its agent-readable trigger table (third representation of the manifest)",
+    "agents/architect.md must contain all 7 trigger booleans and sketch filenames"
+    " (including spans_multiple_services) in its agent-readable trigger table (third representation of the manifest)",
 )
 
 # (a6) agents/architect.md — migration sketch present in the table
@@ -18544,27 +18551,28 @@ check(
 # NEVER changelog.d/ fragment (fragment is assembled+deleted at delivery).
 # ---------------------------------------------------------------------------
 
-# (g1) plugin.json version 2.69.0
+# (g1) plugin.json version 2.70.0 (bumped for service-interaction + consumption contract)
 check(
-    "suite82(g1-plugin-json): plugin.json version is 2.69.0",
-    _s59_ver_tuple(json.loads(_s82_plugin_json).get("version", "0.0.0")) >= (2, 69, 0),
-    "plugin.json version must be 2.69.0 or later (distributed-asset bump for plan-sketches)",
+    "suite82(g1-plugin-json): plugin.json version is 2.70.0",
+    _s59_ver_tuple(json.loads(_s82_plugin_json).get("version", "0.0.0")) >= (2, 70, 0),
+    "plugin.json version must be 2.70.0 or later (distributed-asset bump for"
+    " service-interaction sketch + consumption contract)",
 )
 
-# (g2) marketplace.json version 2.69.0
+# (g2) marketplace.json version 2.70.0
 check(
-    "suite82(g2-marketplace-json): marketplace.json plugins[0].version is 2.69.0",
+    "suite82(g2-marketplace-json): marketplace.json plugins[0].version is 2.70.0",
     _s59_ver_tuple(
         json.loads(_s82_marketplace).get("plugins", [{}])[0].get("version", "0.0.0")
-    ) >= (2, 69, 0),
-    "marketplace.json plugins[0].version must be 2.69.0 or later",
+    ) >= (2, 70, 0),
+    "marketplace.json plugins[0].version must be 2.70.0 or later",
 )
 
-# (g3) CLAUDE.md §3 current-version 2.69.0
+# (g3) CLAUDE.md §3 current-version 2.70.0
 check(
-    "suite82(g3-claude-version): CLAUDE.md §3 current version is 2.69.0",
-    _s59_ver_tuple(_s59_claude_current_version(_s82_claude) or "0.0.0") >= (2, 69, 0),
-    "CLAUDE.md §3 Current version must show 2.69.0 or later",
+    "suite82(g3-claude-version): CLAUDE.md §3 current version is 2.70.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s82_claude) or "0.0.0") >= (2, 70, 0),
+    "CLAUDE.md §3 Current version must show 2.70.0 or later",
 )
 
 # (g4) CHANGELOG.md [2.69.0] section present (DURABLE — NEVER assert changelog.d/ fragment)
@@ -18574,6 +18582,138 @@ check(
     "CHANGELOG.md must contain a '## [2.69.0]' release section"
     " (fragment assembled at delivery — do NOT assert changelog.d/ fragment existence;"
     " fragment is deleted by Step 9e: recurring-bug guard)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (i) — Milestone 5 extensions: service-interaction, consolidated layout,
+#             anti-gaming signal, consumption clauses (AC-8)
+# ---------------------------------------------------------------------------
+
+# (i1) service-interaction sketch row in docs/plan-sketches.md §3 — Mermaid
+#      sequenceDiagram representation ceiling and changed-call-paths fidelity ceiling
+check(
+    "suite82(i1-docs-service-interaction-row): docs/plan-sketches.md §3 documents"
+    " service-interaction sketch with sequenceDiagram and changed call paths",
+    "sequenceDiagram" in _s82_docs_sketches
+    and "changed call paths only" in _s82_docs_sketches
+    and "01-sketch-service-interaction.md" in _s82_docs_sketches,
+    "docs/plan-sketches.md §3 must include a service-interaction row with"
+    " Mermaid sequenceDiagram representation ceiling and changed-call-paths fidelity ceiling",
+)
+
+# (i2) service-interaction pair present across all THREE representations:
+#      docs/plan-sketches.md, agents/architect.md, hooks/sketch-guard.sh
+check(
+    "suite82(i2-service-interaction-three-reps): spans_multiple_services→01-sketch-service-interaction.md"
+    " present in all three manifest representations",
+    "spans_multiple_services" in _s82_docs_sketches
+    and "01-sketch-service-interaction.md" in _s82_docs_sketches
+    and "spans_multiple_services" in _s82_architect
+    and "01-sketch-service-interaction.md" in _s82_architect
+    and "spans_multiple_services" in _s82_sketch_guard
+    and "01-sketch-service-interaction.md" in _s82_sketch_guard,
+    "spans_multiple_services→01-sketch-service-interaction.md must appear in"
+    " docs/plan-sketches.md, agents/architect.md, AND hooks/sketch-guard.sh SKETCH_MAP",
+)
+
+# (i3) consolidated multi-project layout in docs/plan-sketches.md §4:
+#      sketches/ folder, project-prefixed per-project sketches, un-prefixed shared service-interaction
+check(
+    "suite82(i3-consolidated-layout): docs/plan-sketches.md §4 documents consolidated"
+    " sketches/ layout with project-prefixed and un-prefixed service-interaction",
+    "sketches/" in _s82_docs_sketches
+    and "service-interaction.md" in _s82_docs_sketches
+    and "overview.md" in _s82_docs_sketches
+    and "un-prefixed" in _s82_docs_sketches,
+    "docs/plan-sketches.md §4 must document the {overview_root}/sketches/ consolidated layout,"
+    " project-prefixed per-project sketches, and un-prefixed shared service-interaction.md",
+)
+
+# (i4) consolidated layout path resolution in hooks/sketch-guard.sh (Step 5b):
+#      detects overview.md, resolves to sketches/ folder, falls back to flat path
+check(
+    "suite82(i4-guard-consolidated-path): hooks/sketch-guard.sh resolves consolidated"
+    " sketches/ path when parent overview.md exists",
+    "overview.md" in _s82_sketch_guard
+    and "sketches/" in _s82_sketch_guard
+    and "service-interaction.md" in _s82_sketch_guard,
+    "hooks/sketch-guard.sh must detect a parent overview.md and resolve sketch paths"
+    " to the consolidated sketches/ folder (Step 5b)",
+)
+
+# (i5) anti-gaming missing-block signal in hooks/sketch-guard.sh (Step 3):
+#      when block absent + contract-surface keywords present → verdict:concerns (not pass, not fail)
+check(
+    "suite82(i5-guard-antigaming-signal): hooks/sketch-guard.sh emits concerns (not pass) when"
+    " block absent and contract-surface keywords present in 01-plan.md Files:",
+    "concerns_verdict" in _s82_sketch_guard
+    and "CONTRACT_KEYWORDS" in _s82_sketch_guard
+    and '"verdict":"concerns"' in _s82_sketch_guard,
+    "hooks/sketch-guard.sh Step 3 must emit concerns_verdict (not pass_verdict) when"
+    " the classification block is absent but contract-surface keywords are in Files:",
+)
+
+# (i6) anti-gaming: b1 and b3 still hold after adding the anti-gaming signal —
+#      every branch in sketch-guard.sh reaches exit 0 (no verdict:fail path)
+# b1 already checked above; re-verify the specific concerns branch from Step 3 reaches exit 0
+check(
+    "suite82(i6-guard-antigaming-exit0): hooks/sketch-guard.sh anti-gaming concerns branch"
+    " exits 0 (fail-OPEN preserved)",
+    "concerns_verdict" in _s82_sketch_guard
+    and '"verdict":"fail"' not in _s82_sketch_guard,
+    "hooks/sketch-guard.sh anti-gaming branch must use concerns_verdict (exit 0);"
+    " verdict:fail must never appear (fail-OPEN contract)",
+)
+
+# (i7) consumption clauses — implementer named required-reading + sketches_read field
+check(
+    "suite82(i7-implementer-sketches-read): agents/implementer.md contains required-reading"
+    " clause for sketch files and sketches_read status field",
+    "01-sketch" in _s82_implementer
+    and "sketches_read" in _s82_implementer,
+    "agents/implementer.md must reference triggered 01-sketch-*.md files as required reading"
+    " and include sketches_read in its status block",
+)
+
+# (i8) consumption clauses — tester named required-reading + sketches_read field
+check(
+    "suite82(i8-tester-sketches-read): agents/tester.md contains required-reading"
+    " clause for sketch files and sketches_read status field",
+    "01-sketch" in _s82_tester
+    and "sketches_read" in _s82_tester,
+    "agents/tester.md must reference triggered 01-sketch-*.md files as required reading"
+    " and include sketches_read in its status block",
+)
+
+# (i9) consumption clauses — qa named required-reading + sketches_read field
+check(
+    "suite82(i9-qa-sketches-read): agents/qa.md contains required-reading"
+    " clause for sketch files and sketches_read status field",
+    "01-sketch" in _s82_qa
+    and "sketches_read" in _s82_qa,
+    "agents/qa.md must reference triggered 01-sketch-*.md files as required reading"
+    " and include sketches_read in its status block",
+)
+
+# (i10) consumption clauses — acceptance-checker service-interaction diff row
+#       (spans_multiple_services: true → sequenceDiagram call-hop diff row)
+check(
+    "suite82(i10-acceptance-checker-service-interaction-row): agents/acceptance-checker.md"
+    " Phase 3.6 includes service-interaction diff row for spans_multiple_services",
+    "service-interaction" in _s82_acceptance_checker
+    and "spans_multiple_services" in _s82_acceptance_checker,
+    "agents/acceptance-checker.md Phase 3.6 must include an explicit service-interaction"
+    " diff row covering the spans_multiple_services: true case",
+)
+
+# (i11) consumption clauses — reviewer required-reading clause (no sketches_read field required)
+check(
+    "suite82(i11-reviewer-sketch-reading): agents/reviewer.md contains required-reading"
+    " clause for sketch files (no sketches_read field required)",
+    "01-sketch" in _s82_reviewer
+    and "sketch" in _s82_reviewer.lower(),
+    "agents/reviewer.md must reference the triggered 01-sketch-*.md files as required reading"
+    " (confirm diff matches sketch contracts, flag sketch-contract-divergence findings)",
 )
 
 # ---------------------------------------------------------------------------
