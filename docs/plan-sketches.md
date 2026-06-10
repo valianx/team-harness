@@ -104,9 +104,10 @@ so no standalone `01-sketch-*.md` files are needed for the always-pair.
 
 Fidelity and representation ceilings cap *effort and format*; the quality bar caps *contract correctness*. A sketch that is low-fidelity is still wrong if it models the wrong shape.
 
-**api-contract sketch — two quality requirements:**
+**api-contract sketch — three quality requirements:**
 1. **Conform to OpenAPI/REST conventions.** Paths are resource-oriented (`POST /transactions`, `PUT /transactions/{id}`); HTTP verbs map to operations (POST=create, PUT/PATCH=update, DELETE=delete, GET=read). Avoid action/RPC-style endpoints (`/sync`, `/process`, `/doStuff`) UNLESS an action endpoint is the deliberate, stated design (note it explicitly in `## Notes`).
 2. **Completeness within the changed surface.** Model EVERY distinct operation the change introduces as its own endpoint. Do not collapse distinct CRUD operations (create + update, or create + delete) into a single multiplexing endpoint that switches on a discriminator field. Create and update are distinct operations — each gets its own modeled endpoint — unless a single endpoint genuinely IS the design (stated, not implied).
+3. **Body-shape specificity for the changed surface.** A contract that types its request/response bodies as bare `object` is not a contract. For every field the change introduces or modifies, define `properties` (with `type`, `enum`, or `$ref` as appropriate). A bare `type: object` with no `properties` on a changed field is PROHIBITED — it conveys no contract to the implementer, tester, or reviewer. Respect the fidelity ceiling: fully type the fields the change introduces or touches; unchanged nested DTOs MAY be referenced by name or `$ref` rather than re-expanded, but a changed field is never left as an opaque `object`.
 
 **Cross-cutting (all contract sketches):** model the COMPLETE changed surface and follow the domain's conventions. The same logic applies to the event-contract sketch (model every distinct event the change introduces; follow the messaging platform's naming) and the public-api sketch (model every distinct changed signature; follow the language's API conventions). State a deliberate departure from convention explicitly; never let it be the silent default.
 

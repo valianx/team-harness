@@ -758,7 +758,7 @@ Use these as starting points; fill in the actual content from the design:
 
 **`01-sketch-api-contract.md`**
 
-**Quality bar (api-contract):** resource-oriented paths + HTTP verbs map to operations; model EVERY distinct operation the change introduces as its own endpoint (do not collapse create+update into one multiplexing endpoint). An action/RPC endpoint (`/sync`) is allowed ONLY as a deliberate, stated design — justify it in `## Notes`. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
+**Quality bar (api-contract):** resource-oriented paths + HTTP verbs map to operations; model EVERY distinct operation the change introduces as its own endpoint (do not collapse create+update into one multiplexing endpoint); define `properties` (with `type`, `enum`, or `$ref`) for every field the change introduces or modifies — a bare `type: object` with no `properties` on a changed field is PROHIBITED. An action/RPC endpoint (`/sync`) is allowed ONLY as a deliberate, stated design — justify it in `## Notes`. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
 
 ```markdown
 # API Contract Sketch — {feature-name}
