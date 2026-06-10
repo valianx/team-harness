@@ -183,6 +183,15 @@ The plan opens with `## Review Summary` so the human can scan PRs, decisions, an
 ### Trade-offs
 - {trade-off 1}
 
+### Classification block
+- touches_http_api: true|false
+- touches_ui: true|false
+- touches_data_model: true|false
+- touches_cli: true|false
+- touches_public_lib_api: true|false
+- touches_async_messaging: true|false
+- destructive: true|false
+
 ## Architecture
 
 ### Current State
@@ -691,6 +700,211 @@ When the feature aggregates monetary values that may span multiple countries or 
 - The API contract should return `totals` as an **array, one entry per currency**, plus a per-row `currency` field. The frontend formats every monetary value with the currency from the payload, never with a hardcoded base currency.
 - A `total.currency = null` (or omitted) must explicitly mean "heterogeneous, do not aggregate"; UIs should render the breakdown instead of a sum.
 - Document the contract in `01-plan.md`: "API rejects single-object totals when the result spans multiple currencies." This anti-pattern is one of the most common bug sources in multi-country admin dashboards.
+
+---
+
+## Phase 2 — Plan Sketches (Design Mode)
+
+After writing `01-plan.md` and before emitting the status block, produce the classification block and the required sketch files. This is mandatory for `feature`, `refactor`, `enhancement`, and `fix` Tier 2-4. Tier 0 / docs Tier 0 are exempt (no workspace exists). Full per-type applicability: `docs/plan-sketches.md § 7`.
+
+### Step 1 — Record the classification block
+
+Analyze the task scope (Work Plan files, AC surface) and set each of the seven booleans. Record in **two** places:
+
+**In `00-state.md § Current State`** (verifier's authority):
+```
+- touches_http_api: true|false
+- touches_ui: true|false
+- touches_data_model: true|false
+- touches_cli: true|false
+- touches_public_lib_api: true|false
+- touches_async_messaging: true|false
+- destructive: true|false
+```
+
+**In `01-plan.md § Review Summary` (add a `### Classification block` subsection)**:
+Mirror the same seven values so the human sees them at STAGE-GATE-1 and the plan-reviewer can audit consistency without reading `00-state.md`.
+
+### Step 2 — Produce the required sketch files
+
+Use the trigger table below to determine which `01-sketch-*.md` files to create in `workspaces/{feature-name}/`. Create ONLY the triggered files; if no boolean is true, no conditional sketch files are produced (valid outcome).
+
+**Trigger table (agent-readable):**
+
+| Boolean | Required sketch file | Format |
+|---------|---------------------|--------|
+| `touches_http_api: true` | `01-sketch-api-contract.md` | OpenAPI YAML fragment (changed endpoints only), inline fenced code block |
+| `touches_ui: true` | `01-sketch-ui-wireframe.md` | ASCII layout + component legend + states, monospace fenced block |
+| `touches_data_model: true` | `01-sketch-data-model.md` | Mermaid `erDiagram` (touched tables only), inline fenced block |
+| `touches_cli: true` | `01-sketch-cli-surface.md` | command/flag table + example invocations, markdown table |
+| `touches_public_lib_api: true` | `01-sketch-public-api.md` | changed signatures + one usage example, fenced code block |
+| `touches_async_messaging: true` | `01-sketch-event-contract.md` | example payload (JSON/YAML) + field table + topic/queue, fenced + table |
+| `touches_data_model: true` AND `destructive: true` | `01-sketch-data-migration.md` | forward steps + rollback note, markdown table/list |
+
+**Always-sketches (no standalone file):** the functional-acceptance AC (Given/When/Then) and the non-functional notes (bullets: auth, perf, rate-limit, errors, a11y if frontend) collapse into `01-plan.md § Task List` AC block and `§ Architecture` Security/Performance sections respectively. Do NOT create standalone files for these.
+
+**Representation ceiling:** token-cheap text that renders in Obsidian with zero dependency. Mermaid is the ONLY render library (data-model ER only). No Excalidraw, D2, or LikeC4 in sketches.
+
+### Skeleton templates
+
+Use these as starting points; fill in the actual content from the design:
+
+**`01-sketch-api-contract.md`**
+```markdown
+# API Contract Sketch — {feature-name}
+
+## Changed Endpoints
+
+```yaml
+openapi: "3.0.0"
+paths:
+  /example:
+    post:
+      summary: {one-line description}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                field: { type: string }
+      responses:
+        "200":
+          description: {result}
+```
+
+## Notes
+- {any auth, rate-limit, or versioning notes}
+```
+
+**`01-sketch-ui-wireframe.md`**
+```markdown
+# UI Wireframe Sketch — {feature-name}
+
+## Layout
+
+```
++----------------------------------+
+| {Component}                      |
+|  [ field label ]  [_________]    |
+|  [ button ]                      |
++----------------------------------+
+```
+
+## Component Legend
+| Component | Description | States |
+|-----------|-------------|--------|
+| {name}    | {what}      | default, loading, error |
+
+## Interaction Notes
+- {keyboard nav, focus order, empty state behavior}
+```
+
+**`01-sketch-data-model.md`**
+```markdown
+# Data Model Sketch — {feature-name}
+
+## Entity Diagram (touched tables only)
+
+```mermaid
+erDiagram
+    ENTITY_A {
+        uuid id PK
+        string field
+        timestamp created_at
+    }
+    ENTITY_B {
+        uuid id PK
+        uuid entity_a_id FK
+    }
+    ENTITY_A ||--o{ ENTITY_B : "has"
+```
+
+## Notes
+- {any index, constraint, or migration notes}
+```
+
+**`01-sketch-cli-surface.md`**
+```markdown
+# CLI Surface Sketch — {feature-name}
+
+## Changed Commands / Flags
+
+| Command | Flag | Type | Default | Description |
+|---------|------|------|---------|-------------|
+| `th cmd` | `--flag` | string | — | {what it does} |
+
+## Example Invocations
+
+```
+th cmd --flag value
+# Output: {expected output}
+```
+```
+
+**`01-sketch-public-api.md`**
+```markdown
+# Public API Surface Sketch — {feature-name}
+
+## Changed Signatures
+
+```typescript
+/**
+ * {one-line description}
+ */
+export function example(param: ParamType): ReturnType
+
+// Usage example:
+const result = example({ field: "value" })
+```
+
+## Notes
+- {breaking change note if applicable}
+```
+
+**`01-sketch-event-contract.md`**
+```markdown
+# Event / Message Contract Sketch — {feature-name}
+
+## Topic / Queue
+- **Name:** `{topic-name}`
+- **Direction:** publish | subscribe
+
+## Example Payload
+
+```json
+{
+  "eventType": "{type}",
+  "payload": {
+    "field": "value"
+  }
+}
+```
+
+## Field Table
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| eventType | string | yes | {enum values} |
+| payload.field | string | yes | {meaning} |
+```
+
+**`01-sketch-data-migration.md`**
+```markdown
+# Data Migration Plan Sketch — {feature-name}
+
+## Forward Steps
+| # | Step | Table | Operation | Notes |
+|---|------|-------|-----------|-------|
+| 1 | {description} | {table} | ADD COLUMN / CREATE TABLE / etc. | {why} |
+
+## Rollback Plan
+| # | Step | Reverses step |
+|---|------|--------------|
+| 1 | DROP COLUMN {name} | Step 1 |
+
+## Risk Notes
+- {data volume, downtime window, lock behavior}
+```
 
 ---
 

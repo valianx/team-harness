@@ -1022,3 +1022,22 @@ Every special flow that skips phases must explicitly document which artifact ver
 - **Artifact verification runs for:** `implementer` → `02-implementation.md`; `tester` → `03-testing.md`; `delivery` (Phase 4). The orchestrator verifies each exists after the agent returns.
 - **Artifact verification skipped for:** `architect` (not dispatched — one-sentence prose plan in `01-plan.md` instead), `qa` (not dispatched), `security` (not dispatched, unless the sensitive-path override fires).
 - **Phase 3.75 (Build Verification):** runs — the change must still build and the suite must pass.
+
+---
+
+## Plan Sketches — Per-Type Applicability
+
+This section defines which task types and tiers produce a classification block and `01-sketch-*.md` files. The canonical reference is `docs/plan-sketches.md § 7`.
+
+| Type / Tier | Classification block? | Always-sketches (collapsed surfaces) | Conditional sketches (`01-sketch-*.md`) | sketch-guard.sh invoked? |
+|-------------|----------------------|-------------------------------------|----------------------------------------|--------------------------|
+| `feature` / `refactor` / `enhancement` | Yes — architect records in `00-state.md` and mirrors in `01-plan.md § Review Summary → ### Classification block` | Yes — functional-acceptance AC in `§ Task List`; non-functional notes in `§ Architecture` | Per booleans: the architect produces every triggered file | Yes, at STAGE-GATE-1 |
+| `fix` Tier 2-4 | Yes — architect root-cause mode records in `00-state.md`; defaults false unless fix touches a contract surface | Yes (minimum AC in `§ Task List`) | Rare — only if the fix modifies a contract surface (e.g., the fix adds an endpoint); booleans default false | Yes — no-op pass when all-false |
+| `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | Yes (minimum 4-line AC) | None (all-false by orchestrator self-author) | Yes — no-op pass (empty required set) |
+| `fix` Tier 0 / `docs` Tier 0 | **Exempt** — no workspace (CLAUDE.md §5 observability exemption) | n/a | n/a | Not invoked (no `00-state.md`) |
+| `docs` flow (Tier ≥1) | Architect docs-research mode → orchestrator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
+| Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-PR AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
+
+**Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md`, it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
+
+**Fast Mode:** the architect is not dispatched — the orchestrator writes a one-sentence prose plan. Classification block: all-false (same as self-authored path above). Sketch-guard: invoked as a no-op pass. `01-sketch-*.md`: none produced.

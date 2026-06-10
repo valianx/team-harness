@@ -18281,6 +18281,330 @@ check(
 # Marker: hooks-secretscan-checkpoint-b2b3
 
 # ---------------------------------------------------------------------------
+# Suite 82 — plan-sketches (v2.69.0)
+# Written FAILING-FIRST Phase 2.0 (2026-06-09). Marker: plan-sketches
+# Asserts: manifest drift guard (AC-9), sketch-guard.sh structure (AC-7),
+# 3 agent-contract checks (AC-12), orchestrator integration (AC-11),
+# packaging (AC-13), skills + CLAUDE.md §5 (AC-14), self-referential (AC-15).
+# Recurring-bug guard: changelog assertions target durable CHANGELOG.md [2.69.0],
+# NEVER the changelog.d/ fragment (fragment is assembled+deleted at delivery).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 82: plan-sketches (v2.69.0) ===")
+
+_s82_docs_sketches      = read(REPO_ROOT / "docs" / "plan-sketches.md")
+_s82_sketch_guard       = read(HOOKS_DIR / "sketch-guard.sh")
+_s82_architect          = read(AGENTS_DIR / "architect.md")
+_s82_plan_reviewer      = read(AGENTS_DIR / "plan-reviewer.md")
+_s82_qa_plan            = read(AGENTS_DIR / "qa-plan.md")
+_s82_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+_s82_orchestrator       = read(AGENTS_DIR / "orchestrator.md")
+_s82_ref_special_flows  = read(AGENTS_DIR / "ref-special-flows.md")
+_s82_skill_review_pr    = read(skill_path("review-pr"))
+_s82_skill_deliver      = read(skill_path("deliver"))
+_s82_skill_validate     = read(skill_path("validate"))
+_s82_plugin_json        = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
+_s82_marketplace        = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
+_s82_claude             = read(REPO_ROOT / "CLAUDE.md")
+_s82_changelog          = read(REPO_ROOT / "CHANGELOG.md")
+_s82_testing_md         = read(REPO_ROOT / "docs" / "testing.md")
+_s82_this_file          = read(Path(__file__))
+
+# ---------------------------------------------------------------------------
+# Group (a) — Manifest drift guard (AC-9)
+# All three representations must carry the same 7 trigger→sketch mappings.
+# We parse the SKETCH_MAP lines from sketch-guard.sh, the trigger column from
+# docs/plan-sketches.md, and the agent-readable table in agents/architect.md.
+# ---------------------------------------------------------------------------
+
+# Expected canonical trigger→sketch pairs (7 conditional sketches)
+_S82_EXPECTED_PAIRS = [
+    ("touches_http_api",         "01-sketch-api-contract.md"),
+    ("touches_ui",               "01-sketch-ui-wireframe.md"),
+    ("touches_data_model",       "01-sketch-data-model.md"),
+    ("touches_cli",              "01-sketch-cli-surface.md"),
+    ("touches_public_lib_api",   "01-sketch-public-api.md"),
+    ("touches_async_messaging",  "01-sketch-event-contract.md"),
+]
+_S82_MIGRATION_PAIR  = ("touches_data_model", "touches_destructive", "01-sketch-data-migration.md")
+
+# (a1) docs/plan-sketches.md — canonical table carries all 6 standard triggers
+_s82_docs_all_triggers = all(
+    trigger in _s82_docs_sketches and sketch in _s82_docs_sketches
+    for trigger, sketch in _S82_EXPECTED_PAIRS
+)
+check(
+    "suite82(a1-docs-manifest): docs/plan-sketches.md carries all 6 trigger→sketch pairs",
+    _s82_docs_all_triggers,
+    "docs/plan-sketches.md must contain all 6 trigger booleans and their sketch filenames"
+    " — canonical manifest (one of the three representations)",
+)
+
+# (a2) docs/plan-sketches.md — migration sketch (data_model + destructive)
+check(
+    "suite82(a2-docs-migration): docs/plan-sketches.md carries the data-migration pair",
+    "01-sketch-data-migration.md" in _s82_docs_sketches and "destructive" in _s82_docs_sketches,
+    "docs/plan-sketches.md must document the data-migration sketch"
+    " triggered by touches_data_model AND destructive",
+)
+
+# (a3) hooks/sketch-guard.sh SKETCH_MAP — carries all 6 standard trigger→sketch pairs
+_s82_guard_all_triggers = all(
+    trigger in _s82_sketch_guard and sketch in _s82_sketch_guard
+    for trigger, sketch in _S82_EXPECTED_PAIRS
+)
+check(
+    "suite82(a3-guard-manifest): hooks/sketch-guard.sh SKETCH_MAP carries all 6 pairs",
+    _s82_guard_all_triggers,
+    "hooks/sketch-guard.sh must contain all 6 trigger booleans and sketch filenames"
+    " in its SKETCH_MAP constant (hardcoded manifest representation)",
+)
+
+# (a4) hooks/sketch-guard.sh — migration sketch handled
+check(
+    "suite82(a4-guard-migration): hooks/sketch-guard.sh handles the data-migration sketch",
+    "01-sketch-data-migration.md" in _s82_sketch_guard
+    and "destructive" in _s82_sketch_guard,
+    "hooks/sketch-guard.sh must handle the data-migration sketch"
+    " (triggered by touches_data_model AND destructive)",
+)
+
+# (a5) agents/architect.md — agent-readable table carries all 6 standard triggers
+_s82_arch_all_triggers = all(
+    trigger in _s82_architect and sketch in _s82_architect
+    for trigger, sketch in _S82_EXPECTED_PAIRS
+)
+check(
+    "suite82(a5-architect-manifest): agents/architect.md agent-readable table carries all 6 pairs",
+    _s82_arch_all_triggers,
+    "agents/architect.md must contain all 6 trigger booleans and sketch filenames"
+    " in its agent-readable trigger table (third representation of the manifest)",
+)
+
+# (a6) agents/architect.md — migration sketch present in the table
+check(
+    "suite82(a6-architect-migration): agents/architect.md includes the data-migration sketch",
+    "01-sketch-data-migration.md" in _s82_architect and "destructive" in _s82_architect,
+    "agents/architect.md must document the data-migration sketch"
+    " (touches_data_model AND destructive → 01-sketch-data-migration.md)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (b) — hooks/sketch-guard.sh structural properties (AC-7)
+# ---------------------------------------------------------------------------
+
+# (b1) sketch-guard.sh is fail-OPEN: all early exits emit verdict=pass
+check(
+    "suite82(b1-guard-fail-open): hooks/sketch-guard.sh emits pass on early exits",
+    'verdict":"pass' in _s82_sketch_guard or '"verdict":"pass"' in _s82_sketch_guard
+    or "verdict.*pass" in _s82_sketch_guard,
+    "hooks/sketch-guard.sh must emit a pass verdict on early-exit (fail-open) paths",
+)
+
+# (b2) sketch-guard.sh uses python3 (preferred) with grep fallback
+check(
+    "suite82(b2-guard-python3): hooks/sketch-guard.sh uses python3 with grep fallback",
+    "python3" in _s82_sketch_guard and "grep" in _s82_sketch_guard,
+    "hooks/sketch-guard.sh must prefer python3 with grep as fallback (cross-platform, "
+    "same pattern as checkpoint-guard.sh)",
+)
+
+# (b3) sketch-guard.sh NEVER emits verdict=fail (completeness gate, not security gate)
+check(
+    "suite82(b3-guard-no-fail-verdict): hooks/sketch-guard.sh never produces verdict=fail",
+    '"verdict":"fail"' not in _s82_sketch_guard
+    and "verdict.*fail" not in _s82_sketch_guard.replace("verdict.*pass", ""),
+    "hooks/sketch-guard.sh must NEVER emit verdict=fail — it is a completeness gate,"
+    " not a security gate; worst is concerns",
+)
+
+# (b4) sketch-guard.sh outputs JSON with verdict, required, missing, concerns fields
+check(
+    "suite82(b4-guard-json-shape): hooks/sketch-guard.sh output JSON has required fields",
+    '"verdict"' in _s82_sketch_guard
+    and '"required"' in _s82_sketch_guard
+    and '"missing"' in _s82_sketch_guard
+    and '"concerns"' in _s82_sketch_guard,
+    "hooks/sketch-guard.sh must emit a JSON object with verdict/required/missing/concerns",
+)
+
+# ---------------------------------------------------------------------------
+# Group (c) — Agent contract checks (AC-12): 3 separate anchored assertions
+# ---------------------------------------------------------------------------
+
+# (c1) plan-reviewer.md — Rule 11 sketch completeness added
+_s82_reviewer_rule11 = _slice_section(
+    _s82_plan_reviewer, "Rule 11", ("## ", "---")
+)
+check(
+    "suite82(c1-plan-reviewer-rule11): agents/plan-reviewer.md contains Rule 11"
+    " (sketch completeness)",
+    bool(_s82_reviewer_rule11) and "sketch" in _s82_reviewer_rule11.lower(),
+    "agents/plan-reviewer.md must contain a 'Rule 11' section that addresses"
+    " sketch completeness (shape-only, fail-OPEN parity) — absent pre-implementation",
+)
+
+# (c2) qa-plan.md — sketch↔AC consistency check in Ratify-Plan Mode
+check(
+    "suite82(c2-qa-plan-sketch): agents/qa-plan.md Ratify-Plan Mode checks sketch/AC consistency",
+    "sketch" in _s82_qa_plan.lower() and "01-sketch" in _s82_qa_plan,
+    "agents/qa-plan.md must reference sketch consistency checking in Ratify-Plan Mode"
+    " — absent pre-implementation",
+)
+
+# (c3) acceptance-checker.md — sketch diff in Phase 3.6 step
+check(
+    "suite82(c3-acceptance-checker-sketch): agents/acceptance-checker.md diffs delivered"
+    " surface vs sketches",
+    "01-sketch" in _s82_acceptance_checker and "sketch" in _s82_acceptance_checker.lower(),
+    "agents/acceptance-checker.md must reference the 01-sketch-*.md files"
+    " when checking delivered surface in Phase 3.6 — absent pre-implementation",
+)
+
+# ---------------------------------------------------------------------------
+# Group (d) — orchestrator.md integration (AC-11)
+# ---------------------------------------------------------------------------
+
+# (d1) orchestrator.md workspace doc list includes 01-sketch-*.md
+check(
+    "suite82(d1-orchestrator-artifact-list): agents/orchestrator.md workspace doc list"
+    " includes 01-sketch-*.md",
+    "01-sketch" in _s82_orchestrator,
+    "agents/orchestrator.md must list 01-sketch-*.md in its workspace document inventory"
+    " — absent pre-implementation",
+)
+
+# (d2) orchestrator.md invokes sketch-guard.sh at STAGE-GATE-1
+check(
+    "suite82(d2-orchestrator-gate-invoke): agents/orchestrator.md invokes sketch-guard.sh"
+    " at STAGE-GATE-1",
+    "sketch-guard.sh" in _s82_orchestrator,
+    "agents/orchestrator.md must reference sketch-guard.sh invocation at STAGE-GATE-1"
+    " — absent pre-implementation",
+)
+
+# (d3) sketch-guard.sh is NOT listed as a PreToolUse hook in sketch-guard or config.json
+_s82_hooks_config = read(HOOKS_DIR / "config.json")
+check(
+    "suite82(d3-not-pretooluse-hook): sketch-guard.sh is NOT in hooks/config.json"
+    " (not a PreToolUse hook)",
+    "sketch-guard" not in _s82_hooks_config,
+    "hooks/config.json must NOT contain sketch-guard — it is an orchestrator-invoked gate"
+    " script, not a PreToolUse event hook",
+)
+
+# ---------------------------------------------------------------------------
+# Group (e) — ref-special-flows.md per-type applicability (AC-10)
+# ---------------------------------------------------------------------------
+
+check(
+    "suite82(e1-ref-special-flows-sketch): agents/ref-special-flows.md documents"
+    " per-type sketch applicability",
+    "sketch" in _s82_ref_special_flows.lower() and "01-sketch" in _s82_ref_special_flows,
+    "agents/ref-special-flows.md must document which task types/tiers get sketch treatment"
+    " (fix Tier 0 exempt, etc.) — absent pre-implementation",
+)
+
+# ---------------------------------------------------------------------------
+# Group (f) — Direct-entry skills (AC-14): 3 skills run sketch-guard.sh
+# ---------------------------------------------------------------------------
+
+check(
+    "suite82(f1-skill-review-pr-sketch-guard): skills/review-pr references sketch-guard.sh",
+    "sketch-guard" in _s82_skill_review_pr or "sketch-guard.sh" in _s82_skill_review_pr,
+    "skills/review-pr/SKILL.md must reference sketch-guard.sh as a prerequisite probe"
+    " — absent pre-implementation",
+)
+
+check(
+    "suite82(f2-skill-deliver-sketch-guard): skills/deliver references sketch-guard.sh",
+    "sketch-guard" in _s82_skill_deliver or "sketch-guard.sh" in _s82_skill_deliver,
+    "skills/deliver/SKILL.md must reference sketch-guard.sh as a prerequisite probe"
+    " — absent pre-implementation",
+)
+
+check(
+    "suite82(f3-skill-validate-sketch-guard): skills/validate references sketch-guard.sh",
+    "sketch-guard" in _s82_skill_validate or "sketch-guard.sh" in _s82_skill_validate,
+    "skills/validate/SKILL.md must reference sketch-guard.sh as a prerequisite probe"
+    " — absent pre-implementation",
+)
+
+# (f4) CLAUDE.md §5 Architectural Conventions has the plan-sketches bullet
+check(
+    "suite82(f4-claude-md-s5-bullet): CLAUDE.md §5 contains plan-sketches convention bullet",
+    "plan-sketches" in _s82_claude and "docs/plan-sketches.md" in _s82_claude,
+    "CLAUDE.md §5 Architectural Conventions must include a bullet pointing to"
+    " docs/plan-sketches.md — absent pre-implementation",
+)
+
+# ---------------------------------------------------------------------------
+# Group (g) — Packaging (AC-13)
+# Recurring-bug guard: CHANGELOG assertions target durable CHANGELOG.md [2.69.0],
+# NEVER changelog.d/ fragment (fragment is assembled+deleted at delivery).
+# ---------------------------------------------------------------------------
+
+# (g1) plugin.json version 2.69.0
+check(
+    "suite82(g1-plugin-json): plugin.json version is 2.69.0",
+    _s59_ver_tuple(json.loads(_s82_plugin_json).get("version", "0.0.0")) >= (2, 69, 0),
+    "plugin.json version must be 2.69.0 or later (distributed-asset bump for plan-sketches)",
+)
+
+# (g2) marketplace.json version 2.69.0
+check(
+    "suite82(g2-marketplace-json): marketplace.json plugins[0].version is 2.69.0",
+    _s59_ver_tuple(
+        json.loads(_s82_marketplace).get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= (2, 69, 0),
+    "marketplace.json plugins[0].version must be 2.69.0 or later",
+)
+
+# (g3) CLAUDE.md §3 current-version 2.69.0
+check(
+    "suite82(g3-claude-version): CLAUDE.md §3 current version is 2.69.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s82_claude) or "0.0.0") >= (2, 69, 0),
+    "CLAUDE.md §3 Current version must show 2.69.0 or later",
+)
+
+# (g4) CHANGELOG.md [2.69.0] section present (DURABLE — NEVER assert changelog.d/ fragment)
+check(
+    "suite82(g4-changelog-section): CHANGELOG.md contains the 2.69.0 release section",
+    "## [2.69.0]" in _s82_changelog,
+    "CHANGELOG.md must contain a '## [2.69.0]' release section"
+    " (fragment assembled at delivery — do NOT assert changelog.d/ fragment existence;"
+    " fragment is deleted by Step 9e: recurring-bug guard)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (h) — Self-referential / registry
+# ---------------------------------------------------------------------------
+
+# (h1) self-referential: this test file contains Suite 82 + plan-sketches markers
+check(
+    "suite82(h1-self-ref): this test file contains 'Suite 82' and 'plan-sketches'",
+    "Suite 82" in _s82_this_file and "plan-sketches" in _s82_this_file,
+    "test file must carry its own suite number and feature marker (self-referential guard)",
+)
+
+# (h2) docs/testing.md registers Suite 82 + plan-sketches marker
+check(
+    "suite82(h2-testing-md-registry): docs/testing.md registers 'Suite 82' and 'plan-sketches'",
+    "Suite 82" in _s82_testing_md and "plan-sketches" in _s82_testing_md,
+    "docs/testing.md must name Suite 82 and the plan-sketches feature marker"
+    " (canonical suite registry)",
+)
+
+# (h3) CLAUDE.md hygiene: must NOT contain 'Suite 82' (only docs/testing.md is the registry)
+check(
+    "suite82(h3-hygiene): CLAUDE.md does NOT contain 'Suite 82'",
+    "Suite 82" not in _s82_claude,
+    "CLAUDE.md must not mention Suite 82 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: plan-sketches
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

@@ -77,7 +77,8 @@ Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the a
    - AC-2 → step 4 (auth.controller.ts: 401 on invalid) — **covered**
    - AC-3 → no step covers this — **gap**
 4. If every AC is covered → `verdict: pass`. If any AC has no covering step → `verdict: fail` with the list of uncovered AC.
-5. **Do NOT** validate code, run tests, check implementation quality — there is no code yet. **Do NOT** propose new AC or rewrite existing AC. **Do NOT** suggest implementation details. Your only job is plan-vs-AC coverage.
+5. **Sketch ↔ AC consistency check (when sketches exist):** if `01-sketch-*.md` files are present in the workspace, read the functional-acceptance AC block in `01-plan.md § Task List` and cross-check: does the per-PR AC text align with the sketch shape (e.g., if `01-sketch-api-contract.md` declares a `POST /orders` endpoint, is there an AC that validates that endpoint)? Note mismatches as a `concerns`-level finding. This check is informational — it does not change the `pass | fail` verdict but surfaces alignment gaps the architect should confirm. Also emit a `### Sketch consistency` subsection in the ratification block listing checked sketches and any discrepancies found (or "consistent" if none). Skip this step if no `01-sketch-*.md` files are present.
+6. **Do NOT** validate code, run tests, check implementation quality — there is no code yet. **Do NOT** propose new AC or rewrite existing AC. **Do NOT** suggest implementation details. Your only job is plan-vs-AC coverage (and sketch consistency when sketches exist).
 
 **Append to `01-plan.md`:**
 
@@ -92,6 +93,12 @@ Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the a
 | AC-1 | Step 2 (auth.service.ts) | direct |
 | AC-2 | Step 4 (auth.controller.ts) | direct |
 | AC-3 | — | **GAP** — no step addresses "soft-delete on DELETE /users/:id"
+
+### Sketch consistency
+| Sketch | Status | Notes |
+|--------|--------|-------|
+| 01-sketch-api-contract.md | consistent | POST /orders endpoint covered by AC-2 |
+| (or "No 01-sketch-*.md files present — sketch check skipped") |
 
 ### Uncovered AC (fail only)
 - AC-3 — needs a Work Plan step in `users.service.ts` to set `deletedAt` on delete

@@ -204,6 +204,13 @@ workspaces/{feature-name}/
   00-audit.md              ← architect (audit mode)
   00-acceptance-criteria.md ← qa-plan (define-ac mode)
   01-plan.md               ← architect (spec + architecture + tasks + plan-review appended by plan-reviewer)
+  01-sketch-api-contract.md    ← architect (when touches_http_api: true)
+  01-sketch-ui-wireframe.md    ← architect (when touches_ui: true)
+  01-sketch-data-model.md      ← architect (when touches_data_model: true)
+  01-sketch-cli-surface.md     ← architect (when touches_cli: true)
+  01-sketch-public-api.md      ← architect (when touches_public_lib_api: true)
+  01-sketch-event-contract.md  ← architect (when touches_async_messaging: true)
+  01-sketch-data-migration.md  ← architect (when touches_data_model AND destructive: true)
   01-planning.md           ← architect (planning mode — multi-task batch breakdown)
   02-implementation.md     ← implementer
   03-testing.md            ← tester
@@ -453,7 +460,7 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 
 | Agent | Phase | Expected artifact |
 |-------|-------|-------------------|
-| `architect` | 1 (design mode) | `01-plan.md` |
+| `architect` | 1 (design mode) | `01-plan.md` + any triggered `01-sketch-*.md` (classification-dependent) |
 | `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
 | `architect` | 1 (docs-flow research mode) | `00-research.md` |
 | `implementer` | 2 | `02-implementation.md` |
@@ -1655,6 +1662,14 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 - `## Task List` — the minimum 4-line task list (reproduce, regression test, fix, verify) with a `§ Task List` section.
 This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above, Tier 1 row). For hotfix, the same orchestrator-self-authored approach applies. The resulting `01-plan.md` is what Phase 1.6 (plan-reviewer) audits and what the STOP block displays verbatim below.
 
+**Sketch-guard invocation (before emitting STOP block).** Before assembling the STOP block, invoke `hooks/sketch-guard.sh` with the workspace path as the argument:
+
+```bash
+bash hooks/sketch-guard.sh "{docs_root}"
+```
+
+Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concerns` → fold the `concerns` array into the "Concerns to review" section of the STOP block. The sketch-guard verdict contributes to the combined verdict as follows: if sketch-guard returns `concerns` and the plan-reviewer returned `pass`, the combined verdict becomes `concerns`. If sketch-guard returns `pass`, it does not change the plan-reviewer verdict. The sketch-guard NEVER produces `verdict: fail` (it is a fail-OPEN completeness gate). If the script exits non-zero or produces unparseable output, log a warning and continue — the guard is fail-open by design.
+
 **STOP block emitted to the user.** The orchestrator copies the `## Review Summary` section from `01-plan.md` verbatim into the block, plus the `### Summary` table from `01-plan.md` (§ Task List). This is the only place where the orchestrator does a small Read from workspaces on the happy path — the rest of the gating uses status blocks. The intent: the human reviews from the gate, not by opening the file. The plan-reviewer (Phase 1.6, Rule 6) enforces that all required sections exist before this gate fires.
 
 ```
@@ -1676,9 +1691,11 @@ This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above
  {if concerns or fail:}
  Concerns to review:
    - {one-line per concern, citing file:line}
+   - {sketch-guard concerns if any, e.g.: "touches_http_api=true but 01-sketch-api-contract.md is missing"}
 
  Artifacts written:
    - workspaces/{feature-name}/01-plan.md             (architecture + task list + plan-review appended)
+   - workspaces/{feature-name}/01-sketch-*.md         (triggered sketches, if any)
 
  Reply with:
    - "approve"            → proceed to Stage 2 (per-round stops at STAGE-GATE-2)
