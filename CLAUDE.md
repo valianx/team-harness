@@ -109,7 +109,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.73.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.74.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -327,11 +327,9 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
-**Inline orchestration at top level — observable-flag gate (SEC-DR-2):** executing the orchestrator role inline at top level is PERMITTED ONLY when `~/.claude/.dev-mode-active` contains `dev_mode: true`. In that case the top-level agent IS the orchestrator — it has `Task` available and dispatches leaf agents directly without a `dispatch_handoff`. Without the marker present, executing orchestration inline — including reading `agents/orchestrator.md` "as reference" — is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED. The discriminant is the filesystem marker, not a subjective judgment about which output style is active. In dev mode, outward/irreversible actions (git push to a remote, gh pr merge/review/comment, and equivalent API calls via any binary) are gated by the deterministic hook `dev-guard.sh`; they are escalated to operator approval (`ask`) and CANNOT be executed inline by rationalisation. For dev mode details and the security floor non-waivability invariant, see `docs/dev-mode.md`.
+**Inline orchestration at top level — observable-flag gate (SEC-DR-2):** executing the orchestrator role inline at top level is PERMITTED ONLY when `~/.claude/.dev-mode-active` contains `dev_mode: true`. Without the marker present, executing orchestration inline is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED. Outward actions are gated by `dev-guard.sh`. See `docs/dev-mode.md`.
 
-**How to enter dev mode:** run `/dev-mode` — it starts developer mode in the current session immediately (writes the marker `~/.claude/.dev-mode-active` containing `dev_mode: true`, shows the `DEVELOPER MODE ACTIVE` banner, adopts the orchestrator contract), no `/clear` required. While the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) auto-resumes dev mode in every new session and surfaces the banner instantly via `systemMessage`. `/dev-mode off` removes the marker (operator-confirmed) and returns to normal mode. A persistent alternative is the `developer-mode` output style via `/config` -> Output style -> `developer-mode`, which replaces the built-in SWE instructions on reload; the marker remains the observable flag either way.
-
-**FALLBACK — nested-handoff/takeover:** when dev mode is not active, the canonical invocation is `Agent(subagent_type='th:orchestrator', ...)`. When that invocation is nested and the `Task` tool is stripped, the orchestrator emits a `dispatch_handoff` directive; top-level Claude takes over automatically. This nested-handoff/takeover machinery is the safety net for invocations WITHOUT dev mode — it is not the primary path. Full protocol in `docs/subagent-orchestration.md`.
+**FALLBACK — nested-handoff/takeover:** when dev mode is not active, the canonical invocation is `Agent(subagent_type='th:orchestrator', ...)`. When nested and the `Task` tool is stripped, the orchestrator emits a `dispatch_handoff` directive. This nested-handoff/takeover machinery is the safety net — not the primary path. Full protocol in `docs/subagent-orchestration.md`.
 
 **Universal rule — auto-takeover on `blocked-no-dispatch`:** when the orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. Parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. This is not a user-decision point. Full takeover protocol (8 steps), handoff JSON schema, and `blocked-manual-push` handling are in `docs/subagent-orchestration.md`.
 
