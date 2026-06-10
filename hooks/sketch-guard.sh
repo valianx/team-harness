@@ -43,20 +43,21 @@ set -euo pipefail
 # Special: touches_data_model+destructive → data-migration (both must be true)
 # ---------------------------------------------------------------------------
 
-# Standard boolean→file mappings (single boolean trigger)
+# Standard boolean→file mappings (single boolean trigger).
+# Values are bare type filenames; resolve_sketch_path composes the sketches/ prefix.
 SKETCH_MAP=(
-    "touches_http_api:01-sketch-api-contract.md"
-    "touches_ui:01-sketch-ui-wireframe.md"
-    "touches_data_model:01-sketch-data-model.md"
-    "touches_cli:01-sketch-cli-surface.md"
-    "touches_public_lib_api:01-sketch-public-api.md"
-    "touches_async_messaging:01-sketch-event-contract.md"
-    "spans_multiple_services:01-sketch-service-interaction.md"
+    "touches_http_api:api-contract.md"
+    "touches_ui:ui-wireframe.md"
+    "touches_data_model:data-model.md"
+    "touches_cli:cli-surface.md"
+    "touches_public_lib_api:public-api.md"
+    "touches_async_messaging:event-contract.md"
+    "spans_multiple_services:service-interaction.md"
 )
 
 # The data-migration sketch requires BOTH touches_data_model AND destructive.
 # Handled separately below.
-MIGRATION_SKETCH="01-sketch-data-migration.md"
+MIGRATION_SKETCH="data-migration.md"
 
 # Anti-gaming keyword table: these patterns in Files: paths suggest a boolean
 # that should be true but may be false.
@@ -270,13 +271,13 @@ eval_map() {
     fi
 }
 
-eval_map "$touches_http_api"        "01-sketch-api-contract.md"
-eval_map "$touches_ui"              "01-sketch-ui-wireframe.md"
-eval_map "$touches_data_model"      "01-sketch-data-model.md"
-eval_map "$touches_cli"             "01-sketch-cli-surface.md"
-eval_map "$touches_public_lib_api"  "01-sketch-public-api.md"
-eval_map "$touches_async_messaging" "01-sketch-event-contract.md"
-eval_map "$spans_multiple_services" "01-sketch-service-interaction.md"
+eval_map "$touches_http_api"        "api-contract.md"
+eval_map "$touches_ui"              "ui-wireframe.md"
+eval_map "$touches_data_model"      "data-model.md"
+eval_map "$touches_cli"             "cli-surface.md"
+eval_map "$touches_public_lib_api"  "public-api.md"
+eval_map "$touches_async_messaging" "event-contract.md"
+eval_map "$spans_multiple_services" "service-interaction.md"
 
 # Data-migration sketch requires BOTH touches_data_model AND destructive
 if [ "$touches_data_model" = "true" ] && [ "$destructive" = "true" ]; then
@@ -305,16 +306,16 @@ if [ -f "${parent_dir}/overview.md" ]; then
 fi
 
 resolve_sketch_path() {
-    local sketch_file="$1"
+    local sketch_file="$1"   # bare type filename, e.g. api-contract.md
     # The shared service-interaction sketch is un-prefixed in the sketches/ folder
     if [ -n "$OVERVIEW_ROOT" ]; then
-        if [ "$sketch_file" = "01-sketch-service-interaction.md" ]; then
+        if [ "$sketch_file" = "service-interaction.md" ]; then
             printf '%s/sketches/service-interaction.md' "$OVERVIEW_ROOT"
         else
             printf '%s/sketches/%s-%s' "$OVERVIEW_ROOT" "$PROJECT_PREFIX" "$sketch_file"
         fi
     else
-        printf '%s/%s' "$DOCS_ROOT" "$sketch_file"
+        printf '%s/sketches/%s' "$DOCS_ROOT" "$sketch_file"
     fi
 }
 
@@ -328,8 +329,8 @@ concerns=()
 for sketch_file in "${required_files[@]}"; do
     full_path=$(resolve_sketch_path "$sketch_file")
     if [ ! -f "$full_path" ]; then
-        # Also check the flat single-project path as a fallback when in
-        # multi-project mode (architect may have written there during transition)
+        # Also check the flat single-project path (no sketches/ subfolder) as a
+        # transitional safety net when in multi-project mode.
         flat_path="${DOCS_ROOT}/${sketch_file}"
         if [ -n "$OVERVIEW_ROOT" ] && [ -f "$flat_path" ]; then
             # Found at flat path in multi-project workspace — surface as concern

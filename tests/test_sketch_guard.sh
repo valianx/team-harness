@@ -3,7 +3,7 @@
 # Functional tests for hooks/sketch-guard.sh
 #
 # Each test case creates a temporary workspace with a synthetic 00-state.md
-# (and optionally a 01-sketch-*.md file or 01-plan.md), runs the guard script,
+# (and optionally a sketches/*.md file or 01-plan.md), runs the guard script,
 # and asserts the expected JSON verdict field.
 #
 # Usage:
@@ -153,7 +153,8 @@ make_state "$TMP6" "## Current State
 - touches_public_lib_api: false
 - touches_async_messaging: false
 - destructive: false"
-echo "# API Contract sketch content" > "$TMP6/01-sketch-api-contract.md"
+mkdir -p "$TMP6/sketches"
+echo "# API Contract sketch content" > "$TMP6/sketches/api-contract.md"
 OUT6=$(run_guard "$TMP6")
 assert_verdict "http_api=true, sketch present: pass" "$OUT6" "pass"
 rm -rf "$TMP6"
@@ -170,7 +171,7 @@ make_state "$TMP7" "## Current State
 - destructive: false"
 OUT7=$(run_guard "$TMP7")
 assert_verdict "http_api=true, sketch missing: concerns" "$OUT7" "concerns"
-assert_contains "missing sketch named in concerns" "$OUT7" "01-sketch-api-contract.md"
+assert_contains "missing sketch named in concerns" "$OUT7" "api-contract.md"
 rm -rf "$TMP7"
 
 # --- Case 8: touches_ui=true, sketch MISSING → concerns ---
@@ -185,7 +186,7 @@ make_state "$TMP8" "## Current State
 - destructive: false"
 OUT8=$(run_guard "$TMP8")
 assert_verdict "ui=true, sketch missing: concerns" "$OUT8" "concerns"
-assert_contains "ui wireframe missing in concerns" "$OUT8" "01-sketch-ui-wireframe.md"
+assert_contains "ui wireframe missing in concerns" "$OUT8" "ui-wireframe.md"
 rm -rf "$TMP8"
 
 # --- Case 9: touches_data_model=true + destructive=true, BOTH sketches needed ---
@@ -200,8 +201,8 @@ make_state "$TMP9" "## Current State
 - destructive: true"
 OUT9=$(run_guard "$TMP9")
 assert_verdict "data_model+destructive, both missing: concerns" "$OUT9" "concerns"
-assert_contains "data-model sketch missing" "$OUT9" "01-sketch-data-model.md"
-assert_contains "data-migration sketch missing" "$OUT9" "01-sketch-data-migration.md"
+assert_contains "data-model sketch missing" "$OUT9" "data-model.md"
+assert_contains "data-migration sketch missing" "$OUT9" "data-migration.md"
 rm -rf "$TMP9"
 
 # --- Case 10: touches_data_model=true + destructive=true, BOTH present → pass ---
@@ -214,8 +215,9 @@ make_state "$TMP10" "## Current State
 - touches_public_lib_api: false
 - touches_async_messaging: false
 - destructive: true"
-echo "# Data Model" > "$TMP10/01-sketch-data-model.md"
-echo "# Data Migration" > "$TMP10/01-sketch-data-migration.md"
+mkdir -p "$TMP10/sketches"
+echo "# Data Model" > "$TMP10/sketches/data-model.md"
+echo "# Data Migration" > "$TMP10/sketches/data-migration.md"
 OUT10=$(run_guard "$TMP10")
 assert_verdict "data_model+destructive, both present: pass" "$OUT10" "pass"
 rm -rf "$TMP10"
@@ -230,10 +232,11 @@ make_state "$TMP11" "## Current State
 - touches_public_lib_api: false
 - touches_async_messaging: false
 - destructive: false"
-echo "# Data Model" > "$TMP11/01-sketch-data-model.md"
+mkdir -p "$TMP11/sketches"
+echo "# Data Model" > "$TMP11/sketches/data-model.md"
 OUT11=$(run_guard "$TMP11")
 assert_verdict "data_model only (no destructive): pass with sketch present" "$OUT11" "pass"
-assert_not_contains "data-migration NOT required" "$OUT11" "01-sketch-data-migration.md"
+assert_not_contains "data-migration NOT required" "$OUT11" "data-migration.md"
 rm -rf "$TMP11"
 
 # --- Case 12: Anti-gaming — route file in plan but touches_http_api=false → concerns ---
@@ -267,13 +270,14 @@ make_state "$TMP13" "## Current State
 - touches_public_lib_api: true
 - touches_async_messaging: true
 - destructive: true"
-echo "# API" > "$TMP13/01-sketch-api-contract.md"
-echo "# UI" > "$TMP13/01-sketch-ui-wireframe.md"
-echo "# Data Model" > "$TMP13/01-sketch-data-model.md"
-echo "# CLI" > "$TMP13/01-sketch-cli-surface.md"
-echo "# Public API" > "$TMP13/01-sketch-public-api.md"
-echo "# Event" > "$TMP13/01-sketch-event-contract.md"
-echo "# Migration" > "$TMP13/01-sketch-data-migration.md"
+mkdir -p "$TMP13/sketches"
+echo "# API" > "$TMP13/sketches/api-contract.md"
+echo "# UI" > "$TMP13/sketches/ui-wireframe.md"
+echo "# Data Model" > "$TMP13/sketches/data-model.md"
+echo "# CLI" > "$TMP13/sketches/cli-surface.md"
+echo "# Public API" > "$TMP13/sketches/public-api.md"
+echo "# Event" > "$TMP13/sketches/event-contract.md"
+echo "# Migration" > "$TMP13/sketches/data-migration.md"
 OUT13=$(run_guard "$TMP13")
 assert_verdict "all-true, all sketches present: pass" "$OUT13" "pass"
 rm -rf "$TMP13"

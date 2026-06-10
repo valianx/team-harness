@@ -18,7 +18,7 @@ system. Three representations reference this document:
 ## 1. Purpose
 
 The plan stage declares a **result-defining sketch set** — lightweight, plan-resident
-documents (`01-sketch-*.md`) that show WHAT will be delivered (functional + non-functional)
+documents (`sketches/{type}.md`) that show WHAT will be delivered (functional + non-functional)
 so the final result is determinable before a line is implemented. The goal is **contract
 determinism, not content determinism**: the same input type produces a predictable,
 verifiable SET of artifacts in a fixed shape. LLM prose varies; the envelope (what exists,
@@ -28,10 +28,13 @@ what fields, what passed) is deterministic.
 changed-surface-only. They are throwaway decision aids, not production polish.
 
 **Representation ceiling (global):** token-cheap text that renders in Obsidian with zero
-dependency — OpenAPI-YAML / Mermaid / ASCII / markdown tables / fenced code. **No verbose
-JSON formats. Mermaid is the ONLY render library** (data-model ER only; native Obsidian +
-GitHub render, no CLI). **Excalidraw / D2 / LikeC4 are NOT in the sketch set** — they stay
-in the durable `/th:docs` lane (post-completion, never gated into development).
+dependency — Mermaid / ASCII / markdown tables / fenced code. **No verbose machine-JSON
+formats (Excalidraw / D2 / LikeC4 graph JSON).** Concise JSON example payloads ARE
+permitted for the api-contract and event-contract sketches (fenced ` ```json ` block, body +
+headers only — not the full machine schema). **Mermaid is the ONLY render library**
+(data-model ER only; native Obsidian + GitHub render, no CLI); JSON examples are fenced
+text, not a render library. **Excalidraw / D2 / LikeC4 are NOT in the sketch set** — they
+stay in the durable `/th:docs` lane (post-completion, never gated into development).
 
 ---
 
@@ -85,29 +88,29 @@ STAGE-GATE-1 and `plan-reviewer` Rule 11 can audit consistency.
 
 The two always-sketches collapse into existing surfaces and are NOT separate files.
 Every plan has a `§ Task List` AC block and a `§ Architecture` Security/Performance section,
-so no standalone `01-sketch-*.md` files are needed for the always-pair.
+so no standalone `sketches/*.md` files are needed for the always-pair.
 
 ### Conditional (on classification booleans)
 
 | Sketch | Trigger boolean | Format | Tool | Fidelity ceiling | Representation ceiling | File |
 |--------|----------------|--------|------|-----------------|----------------------|------|
-| API contract | `touches_http_api` | OpenAPI fragment, changed endpoints only | OpenAPI (YAML, inline fence) | changed paths only; no full spec | inline ` ```yaml ` fence — no external `.yaml` | `01-sketch-api-contract.md` |
-| UI wireframe | `touches_ui` | ASCII layout + component legend + states | none | layout+components+states; NO styling | monospace fence in `.md` | `01-sketch-ui-wireframe.md` |
-| Data model sketch | `touches_data_model` | `erDiagram`, touched tables only | **Mermaid** (native Obsidian render) | touched tables only; no full schema | inline ` ```mermaid ` fence | `01-sketch-data-model.md` |
-| CLI surface | `touches_cli` | command/flag table + example invocations | none | changed commands only | markdown table | `01-sketch-cli-surface.md` |
-| Public API surface | `touches_public_lib_api` | signatures + one usage example | none | changed signatures only | fenced code block | `01-sketch-public-api.md` |
-| Event/message contract | `touches_async_messaging` | example payload (JSON/YAML) + field table + topic/queue | none | one example payload, not the full schema | fenced + markdown table | `01-sketch-event-contract.md` |
-| Data migration plan | `touches_data_model` AND `destructive` | forward steps + rollback note | none | steps + rollback; no scripts | markdown table/list | `01-sketch-data-migration.md` |
-| Service interaction | `spans_multiple_services` | Mermaid `sequenceDiagram`, changed call paths only | **Mermaid** (native Obsidian render) | changed call paths only; low-fidelity | inline ` ```mermaid ` fence | `01-sketch-service-interaction.md` |
+| API contract | `touches_http_api` | `METHOD /path` header + JSON request/response body examples + optional field-notes table | none | changed endpoints only; body + headers only | fenced ` ```json ` examples — no machine schema | `sketches/api-contract.md` |
+| UI wireframe | `touches_ui` | ASCII layout + component legend + states | none | layout+components+states; NO styling | monospace fence in `.md` | `sketches/ui-wireframe.md` |
+| Data model sketch | `touches_data_model` | `erDiagram`, touched tables only | **Mermaid** (native Obsidian render) | touched tables only; no full schema | inline ` ```mermaid ` fence | `sketches/data-model.md` |
+| CLI surface | `touches_cli` | command/flag table + example invocations | none | changed commands only | markdown table | `sketches/cli-surface.md` |
+| Public API surface | `touches_public_lib_api` | signatures + one usage example | none | changed signatures only | fenced code block | `sketches/public-api.md` |
+| Event/message contract | `touches_async_messaging` | example payload (JSON/YAML) + field table + topic/queue | none | one example payload, not the full schema | fenced + markdown table | `sketches/event-contract.md` |
+| Data migration plan | `touches_data_model` AND `destructive` | forward steps + rollback note | none | steps + rollback; no scripts | markdown table/list | `sketches/data-migration.md` |
+| Service interaction | `spans_multiple_services` | Mermaid `sequenceDiagram`, changed call paths only | **Mermaid** (native Obsidian render) | changed call paths only; low-fidelity | inline ` ```mermaid ` fence | `sketches/service-interaction.md` |
 
 ### Sketch quality bar
 
 Fidelity and representation ceilings cap *effort and format*; the quality bar caps *contract correctness*. A sketch that is low-fidelity is still wrong if it models the wrong shape.
 
 **api-contract sketch — three quality requirements:**
-1. **Conform to OpenAPI/REST conventions.** Paths are resource-oriented (`POST /transactions`, `PUT /transactions/{id}`); HTTP verbs map to operations (POST=create, PUT/PATCH=update, DELETE=delete, GET=read). Avoid action/RPC-style endpoints (`/sync`, `/process`, `/doStuff`) UNLESS an action endpoint is the deliberate, stated design (note it explicitly in `## Notes`).
-2. **Completeness within the changed surface.** Model EVERY distinct operation the change introduces as its own endpoint. Do not collapse distinct CRUD operations (create + update, or create + delete) into a single multiplexing endpoint that switches on a discriminator field. Create and update are distinct operations — each gets its own modeled endpoint — unless a single endpoint genuinely IS the design (stated, not implied).
-3. **Body-shape specificity for the changed surface.** A contract that types its request/response bodies as bare `object` is not a contract. For every field the change introduces or modifies, define `properties` (with `type`, `enum`, or `$ref` as appropriate). A bare `type: object` with no `properties` on a changed field is PROHIBITED — it conveys no contract to the implementer, tester, or reviewer. Respect the fidelity ceiling: fully type the fields the change introduces or touches; unchanged nested DTOs MAY be referenced by name or `$ref` rather than re-expanded, but a changed field is never left as an opaque `object`.
+1. **Conform to REST conventions.** Each changed endpoint is headed `METHOD /resource/path` (resource-oriented: `POST /transactions`, `PUT /transactions/{id}`); HTTP verbs map to operations (POST=create, PUT/PATCH=update, DELETE=delete, GET=read). Avoid action/RPC-style endpoints (`/sync`, `/process`, `/doStuff`) UNLESS an action endpoint is the deliberate, stated design (note it explicitly in `## Notes`).
+2. **Completeness within the changed surface.** Model EVERY distinct operation the change introduces as its own `METHOD /path` block. Do not collapse distinct CRUD operations (create + update, or create + delete) into a single multiplexing endpoint that switches on a discriminator field. Create and update are distinct operations — each gets its own modeled block — unless a single endpoint genuinely IS the design (stated, not implied).
+3. **Body-shape specificity for the changed surface.** A contract that shows its changed request/response bodies as an opaque placeholder is not a contract. Every object the change introduces or modifies must show its actual nested fields with real example values in the JSON example. An opaque `{}` or a `"...": "object"` placeholder on a changed field is PROHIBITED — it conveys no contract to the implementer, tester, or reviewer. Respect the fidelity ceiling: show the fields the change introduces or touches with concrete example values; unchanged nested DTOs MAY be shown abbreviated or referenced by name rather than fully expanded, but a changed field is never left opaque.
 
 **Cross-cutting (all contract sketches):** model the COMPLETE changed surface and follow the domain's conventions. The same logic applies to the event-contract sketch (model every distinct event the change introduces; follow the messaging platform's naming) and the public-api sketch (model every distinct changed signature; follow the language's API conventions). State a deliberate departure from convention explicitly; never let it be the silent default.
 
@@ -115,28 +118,29 @@ Fidelity and representation ceilings cap *effort and format*; the quality bar ca
 
 ## 4. Layout
 
-### Single-project layout — Flat `01-sketch-*.md` Prefix
+### Single-project layout — `sketches/` folder
 
 ```
 workspace/{feature}/
-  01-plan.md                       ← work plan (HOW), milestones
-  01-sketch-api-contract.md        ← only triggered sketches created (WHAT)
-  01-sketch-ui-wireframe.md
-  01-sketch-data-model.md
-  01-sketch-cli-surface.md
-  01-sketch-public-api.md
-  01-sketch-event-contract.md
-  01-sketch-data-migration.md
-  01-sketch-service-interaction.md ← only when spans_multiple_services: true
-  01-sketches.md  (optional)       ← index that embeds the others with ![[...]] for one Obsidian view
+  01-plan.md                             ← work plan (HOW), milestones
+  sketches/                              ← only triggered sketches created (WHAT)
+    api-contract.md
+    ui-wireframe.md
+    data-model.md
+    cli-surface.md
+    public-api.md
+    event-contract.md
+    data-migration.md
+    service-interaction.md               ← only when spans_multiple_services: true
+    index.md  (optional)                 ← index that embeds the others with ![[sketches/...]] for one Obsidian view
 ```
 
-- **One document per sketch**, flat prefix `01-sketch-*.md`. The repo milestone standard
-  prohibits stage subfolders — the flat prefix is the confirmed layout.
-- **Optional `01-sketches.md` index** uses Obsidian embeds (`![[01-sketch-api-contract]]`) to
+- **One document per sketch**, inside a `sketches/` subfolder. The folder name carries the
+  "sketch" context; no `01-sketch-` prefix needed.
+- **Optional `sketches/index.md`** uses Obsidian embeds (`![[sketches/api-contract]]`) to
   transclude all triggered sketches into one scrollable note (operator-optional).
 - **Only triggered sketches are created** — if no boolean is true, no conditional
-  `01-sketch-*.md` files are produced. This is a valid, normal outcome (e.g., a docs-only
+  `sketches/*.md` files are produced. This is a valid, normal outcome (e.g., a docs-only
   task or a task that triggers only the always-pair).
 
 ### Multi-project consolidated layout
@@ -146,23 +150,23 @@ When a multi-project initiative is active (`initiative != null`, parent `overvie
 ```
 {YYYY-MM-DD}_{initiative}/
   overview.md
-  sketches/                                            ← consolidated folder, overview root
-    payment-gateway-01-sketch-api-contract.md          ← project-prefixed per-project sketch
-    payment-gateway-01-sketch-data-model.md
-    transactions-01-sketch-api-contract.md
-    transactions-01-sketch-data-model.md
-    backoffice-01-sketch-ui-wireframe.md
-    service-interaction.md                             ← shared cross-project sketch, NOT prefixed
+  sketches/                                   ← consolidated folder, overview root
+    payment-gateway-api-contract.md           ← project-prefixed per-project sketch
+    payment-gateway-data-model.md
+    transactions-api-contract.md
+    transactions-data-model.md
+    backoffice-ui-wireframe.md
+    service-interaction.md                    ← shared cross-project sketch, NOT prefixed
   payment-gateway/   00-state.md  01-plan.md ...
   transactions/      00-state.md  01-plan.md ...
   backoffice/        00-state.md  01-plan.md ...
 ```
 
 **Rules for the consolidated layout:**
-- Per-project conditional sketches use the `{project}-` prefix to disambiguate when multiple projects trigger the same sketch type.
+- Per-project conditional sketches use the `{project}-` prefix to disambiguate when multiple projects trigger the same sketch type (e.g., `payment-gateway-api-contract.md`).
 - The shared `service-interaction.md` is un-prefixed — it describes a cross-project call flow that belongs to no single project.
 - `00-state.md` and `01-plan.md` remain in each project's own folder (unchanged from `docs/discover-phase.md § 11`). Only the sketch files consolidate.
-- `hooks/sketch-guard.sh` detects the consolidated layout by checking for a parent `overview.md`. When found, it resolves sketch paths to `{overview_root}/sketches/{project}-{sketch_file}` (and `{overview_root}/sketches/service-interaction.md` for the shared sketch). Absent `overview.md` → flat single-project path (current behavior). Ambiguity → flat path + concerns, never fail.
+- `hooks/sketch-guard.sh` detects the consolidated layout by checking for a parent `overview.md`. When found, it resolves sketch paths to `{overview_root}/sketches/{project}-{sketch_file}` (and `{overview_root}/sketches/service-interaction.md` for the shared sketch). Absent `overview.md` → `sketches/` subfolder within the single-project workspace. Ambiguity → `sketches/` path + concerns, never fail.
 
 ---
 
@@ -193,15 +197,15 @@ also see the classification block and the diff signal. The check is `concerns`-s
 
 | Phase | Who | Action |
 |-------|-----|--------|
-| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `01-sketch-*.md` files |
+| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `sketches/*.md` files |
 | Phase 1.5 (Plan Ratification) | qa-plan | Checks sketch↔AC consistency (functional-acceptance sketch matches `§ Task List` AC) |
 | Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness per-project (shape-only, fail-OPEN parity); each project's block audited independently in multi-project dispatch |
 | STAGE-GATE-1 | orchestrator | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
-| Stage 2 Implementation | implementer | **Required reading:** reads every triggered `01-sketch-*.md` file (or consolidated `sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
-| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `01-sketch-*.md` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-PR AC; emits `sketches_read` in status block |
-| Phase 3 Validation | qa | **Required reading:** reads the triggered `01-sketch-*.md` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
-| Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `01-sketch-*.md` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
-| Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `01-sketch-*.md` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `sketches/` paths in multi-project workspaces |
+| Stage 2 Implementation | implementer | **Required reading:** reads every triggered `sketches/*.md` file (or consolidated `{overview_root}/sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
+| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*.md` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-PR AC; emits `sketches_read` in status block |
+| Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*.md` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
+| Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `sketches/*.md` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
+| Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `sketches/*.md` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `{overview_root}/sketches/` paths in multi-project workspaces |
 | Direct-entry skills | `/th:review-pr`, `/th:validate` | Run `sketch-guard.sh` as a prerequisite probe; **required reading:** reads the triggered sketch files when entering mid-pipeline before the consuming pass begins |
 
 ---
@@ -223,7 +227,7 @@ also see the classification block and the diff signal. The check is `concerns`-s
 | Artifact | Carries | Lifecycle | Handoff rule |
 |----------|---------|-----------|-------------|
 | `00-spec-seed.md` | Functional INTENT from E2 co-authoring (developer's settled intent, dissent record) | Produced pre-Design; a strong prior | The functional-acceptance sketch (per-PR AC) DERIVES from the spec-seed's functional surface when a seed exists |
-| `01-sketch-*.md` | Result CONTRACTS (checkable: what API, what tables, what payload) | Produced by architect in Design, alongside `01-plan.md` | Conditional sketches (API/UI/data/...) have NO spec-seed counterpart; they stand alone. No duplication: the seed states intent in prose, the sketch states the contract in a fixed shape. |
+| `sketches/*.md` | Result CONTRACTS (checkable: what API, what tables, what payload) | Produced by architect in Design, alongside `01-plan.md` | Conditional sketches (API/UI/data/...) have NO spec-seed counterpart; they stand alone. No duplication: the seed states intent in prose, the sketch states the contract in a fixed shape. |
 
 **When a spec-seed exists**, the architect adds a one-line provenance note to the
 functional-acceptance AC block: `Provenance: derived from 00-spec-seed.md § <section>`.

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.75.0] - 2026-06-10
+
+### Changed
+
+- Plan-sketches files now live in a `sketches/` folder: `sketches/{type}.md` (single-project) and `{project}-{type}.md` under a shared `sketches/` folder (multi-project), dropping the flat `01-sketch-` prefix; the folder carries the context.
+- The api-contract sketch is now a concrete JSON example scoped to request/response body + headers (one `METHOD /path` header, a Headers line, fenced `json` request and response bodies, and an optional field-notes table); the formal `openapi.yml` remains the end deliverable in the durable `/th:docs` lane.
+- Representation ceiling updated: concise JSON example payloads are permitted for api-contract and event-contract sketches (fenced `json` block, body + headers only — not the full machine schema); Mermaid remains the only render library; JSON examples are fenced text, not a render library.
+- Body-shape quality bar (clause iii) re-expressed in JSON terms: an opaque `{}` or `"...": "object"` placeholder on a changed field is PROHIBITED across `docs/plan-sketches.md` §3, `agents/qa-plan.md` ratify clause, and `agents/plan-reviewer.md` Rule 11 step-6.
+- `hooks/sketch-guard.sh` SKETCH_MAP now holds bare type names (`api-contract.md`, etc.); `resolve_sketch_path` composes the `sketches/` prefix for single-project and the `{project}-` join for multi-project; fail-OPEN preserved.
+- Suite 82 literals, anchors, and guard-pair constants updated for `sketches/`-prefixed naming + JSON-example quality bar; `test_sketch_guard.sh` fixtures migrated to `{TMP}/sketches/{type}.md`; `docs/testing.md` Suite 82 registry updated; residual-name guard (group j) added — scans `agents/` + `skills/` for stale `01-sketch-` literals.
+
 ## [2.74.0] - 2026-06-10
 
 ### Added
