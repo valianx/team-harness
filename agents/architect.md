@@ -733,20 +733,20 @@ Mirror the same eight values so the human sees them at STAGE-GATE-1 and the plan
 
 ### Step 2 — Produce the required sketch files
 
-Use the trigger table below to determine which `01-sketch-*.md` files to create in `workspaces/{feature-name}/`. Create ONLY the triggered files; if no boolean is true, no conditional sketch files are produced (valid outcome).
+Use the trigger table below to determine which `sketches/{type}.md` files to create in `workspaces/{feature-name}/sketches/`. Create ONLY the triggered files; if no boolean is true, no conditional sketch files are produced (valid outcome).
 
 **Trigger table (agent-readable):**
 
 | Boolean | Required sketch file | Format |
 |---------|---------------------|--------|
-| `touches_http_api: true` | `01-sketch-api-contract.md` | OpenAPI YAML fragment (changed endpoints only), inline fenced code block |
-| `touches_ui: true` | `01-sketch-ui-wireframe.md` | ASCII layout + component legend + states, monospace fenced block |
-| `touches_data_model: true` | `01-sketch-data-model.md` | Mermaid `erDiagram` (touched tables only), inline fenced block |
-| `touches_cli: true` | `01-sketch-cli-surface.md` | command/flag table + example invocations, markdown table |
-| `touches_public_lib_api: true` | `01-sketch-public-api.md` | changed signatures + one usage example, fenced code block |
-| `touches_async_messaging: true` | `01-sketch-event-contract.md` | example payload (JSON/YAML) + field table + topic/queue, fenced + table |
-| `touches_data_model: true` AND `destructive: true` | `01-sketch-data-migration.md` | forward steps + rollback note, markdown table/list |
-| `spans_multiple_services: true` | `01-sketch-service-interaction.md` | Mermaid `sequenceDiagram`, changed call paths only, inline fenced block |
+| `touches_http_api: true` | `sketches/api-contract.md` | `METHOD /path` header + JSON request/response body examples + optional field-notes table |
+| `touches_ui: true` | `sketches/ui-wireframe.md` | ASCII layout + component legend + states, monospace fenced block |
+| `touches_data_model: true` | `sketches/data-model.md` | Mermaid `erDiagram` (touched tables only), inline fenced block |
+| `touches_cli: true` | `sketches/cli-surface.md` | command/flag table + example invocations, markdown table |
+| `touches_public_lib_api: true` | `sketches/public-api.md` | changed signatures + one usage example, fenced code block |
+| `touches_async_messaging: true` | `sketches/event-contract.md` | example payload (JSON/YAML) + field table + topic/queue, fenced + table |
+| `touches_data_model: true` AND `destructive: true` | `sketches/data-migration.md` | forward steps + rollback note, markdown table/list |
+| `spans_multiple_services: true` | `sketches/service-interaction.md` | Mermaid `sequenceDiagram`, changed call paths only, inline fenced block |
 
 **Always-sketches (no standalone file):** the functional-acceptance AC (Given/When/Then) and the non-functional notes (bullets: auth, perf, rate-limit, errors, a11y if frontend) collapse into `01-plan.md § Task List` AC block and `§ Architecture` Security/Performance sections respectively. Do NOT create standalone files for these.
 
@@ -756,39 +756,53 @@ Use the trigger table below to determine which `01-sketch-*.md` files to create 
 
 Use these as starting points; fill in the actual content from the design:
 
-**`01-sketch-api-contract.md`**
+**`sketches/api-contract.md`**
 
-**Quality bar (api-contract):** resource-oriented paths + HTTP verbs map to operations; model EVERY distinct operation the change introduces as its own endpoint (do not collapse create+update into one multiplexing endpoint); define `properties` (with `type`, `enum`, or `$ref`) for every field the change introduces or modifies — a bare `type: object` with no `properties` on a changed field is PROHIBITED. An action/RPC endpoint (`/sync`) is allowed ONLY as a deliberate, stated design — justify it in `## Notes`. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
+**Quality bar (api-contract):** resource-oriented paths + HTTP verbs map to operations; model EVERY distinct operation the change introduces as its own `METHOD /path` block (do not collapse create+update into one multiplexing endpoint); show actual nested fields with real example values for every object the change introduces or modifies — an opaque `{}` or `"...": "object"` placeholder on a changed field is PROHIBITED. An action/RPC endpoint (`/sync`) is allowed ONLY as a deliberate, stated design — justify it in `## Notes`. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
 
 ```markdown
 # API Contract Sketch — {feature-name}
 
 ## Changed Endpoints
 
-```yaml
-openapi: "3.0.0"
-paths:
-  /example:
-    post:
-      summary: {one-line description}
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                field: { type: string }
-      responses:
-        "200":
-          description: {result}
+### POST /resource/path
+
+**Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+(or "none beyond standard")
+
+**Request body:**
+```json
+{
+  "amount": 1500,
+  "currency": "USD",
+  "merchantId": "mer_8f2a",
+  "metadata": { "orderRef": "ORD-7781", "channel": "web" }
+}
 ```
 
+**Response body:**
+```json
+{
+  "id": "txn_4c9b",
+  "status": "pending",
+  "amount": 1500,
+  "currency": "USD",
+  "createdAt": "2026-06-10T14:22:00Z"
+}
+```
+
+**Field notes** (only where a bare example can't convey it):
+| Field | Type / constraint |
+|-------|-------------------|
+| `status` | enum: `pending` \| `settled` \| `failed` |
+| `currency` | ISO 4217, required |
+
 ## Notes
-- {any auth, rate-limit, or versioning notes}
+- {auth, idempotency, or versioning notes}
 - {justify any action/RPC-style endpoint here if used}
 ```
 
-**`01-sketch-ui-wireframe.md`**
+**`sketches/ui-wireframe.md`**
 ```markdown
 # UI Wireframe Sketch — {feature-name}
 
@@ -811,7 +825,7 @@ paths:
 - {keyboard nav, focus order, empty state behavior}
 ```
 
-**`01-sketch-data-model.md`**
+**`sketches/data-model.md`**
 ```markdown
 # Data Model Sketch — {feature-name}
 
@@ -835,7 +849,7 @@ erDiagram
 - {any index, constraint, or migration notes}
 ```
 
-**`01-sketch-cli-surface.md`**
+**`sketches/cli-surface.md`**
 ```markdown
 # CLI Surface Sketch — {feature-name}
 
@@ -853,7 +867,7 @@ th cmd --flag value
 ```
 ```
 
-**`01-sketch-public-api.md`**
+**`sketches/public-api.md`**
 
 **Quality note:** model the complete changed surface; follow the language's API conventions (see `docs/plan-sketches.md §3 → Sketch quality bar`).
 
@@ -876,7 +890,7 @@ const result = example({ field: "value" })
 - {breaking change note if applicable}
 ```
 
-**`01-sketch-event-contract.md`**
+**`sketches/event-contract.md`**
 
 **Quality note:** model the complete changed surface; follow the messaging platform's naming conventions (see `docs/plan-sketches.md §3 → Sketch quality bar`).
 
@@ -905,7 +919,7 @@ const result = example({ field: "value" })
 | payload.field | string | yes | {meaning} |
 ```
 
-**`01-sketch-data-migration.md`**
+**`sketches/data-migration.md`**
 ```markdown
 # Data Migration Plan Sketch — {feature-name}
 
@@ -923,7 +937,7 @@ const result = example({ field: "value" })
 - {data volume, downtime window, lock behavior}
 ```
 
-**`01-sketch-service-interaction.md`**
+**`sketches/service-interaction.md`**
 ```markdown
 # Service Interaction Sketch — {feature-name}
 
@@ -942,11 +956,11 @@ sequenceDiagram
 ```
 
 **Multi-project layout note:** In a multi-project initiative the sketch files for each project are written into a shared `{overview_root}/sketches/` folder with a project prefix:
-- Per-project conditional sketches: `{overview_root}/sketches/{project}-01-sketch-{name}.md`
-  (example: `payment-gateway-01-sketch-api-contract.md`)
+- Per-project conditional sketches: `{overview_root}/sketches/{project}-{name}.md`
+  (example: `sketches/payment-gateway-api-contract.md`)
 - Shared service-interaction sketch: `{overview_root}/sketches/service-interaction.md` (un-prefixed — it belongs to no single project)
 
-In a single-project workspace, all sketches use the flat `01-sketch-*.md` naming in the workspace root (unchanged).
+In a single-project workspace, all sketches live under `sketches/{type}.md` in the workspace root (e.g., `workspaces/{feature}/sketches/api-contract.md`).
 
 ---
 
