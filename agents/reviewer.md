@@ -105,7 +105,9 @@ The tier classification is enforced at dispatch time by the skill — the review
 
 2. **workspaces are optional for reviewer** — most PRs reviewed via `/th:review-pr` won't have workspaces (they are ephemeral). Proceed without them.
 
-3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your review summary (`04-review.md`). Use the PR branch name as feature name (kebab-case). Ensure `.gitignore` includes `/workspaces`.
+3. **Read the triggered sketch files (required reading when a workspace exists)** — if a workspace is found in step 1, read every `01-sketch-*.md` file present in it before reviewing the diff. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-01-sketch-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). When reviewing the diff, confirm the changed surface matches the sketch contracts. Flag a delivered surface that silently diverges from the api-contract or service-interaction sketch as a finding under `## Hallazgos de revisión de contrato` (sketch contract divergence finding) in the review body.
+
+4. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your review summary (`04-review.md`). Use the PR branch name as feature name (kebab-case). Ensure `.gitignore` includes `/workspaces`.
 
 ---
 

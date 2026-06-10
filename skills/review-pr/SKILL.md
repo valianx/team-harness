@@ -47,6 +47,8 @@ Parse the JSON output. If `verdict: concerns`, show a one-line banner before the
 Note: sketch-guard found concerns for this workspace — {concerns[0]}. Proceeding with review.
 ```
 
+**Required sketch reading (mid-pipeline entry):** after the guard probe, read every triggered `01-sketch-*.md` file from the workspace (or `{overview_root}/sketches/` in a multi-project initiative) before the reviewer agent begins its pass. These sketch files are required reading — they define the contract the diff is being reviewed against.
+
 **Fail-open:** if `sketch-guard.sh` is absent, exits non-zero, or the workspace cannot be located, skip this probe silently and continue. The probe is informational only — it never blocks the review flow.
 
 ---

@@ -136,7 +136,9 @@ Scan `01-plan.md` § Review Summary for `[CONSTRAINT-DISCOVERED: ...]` tags that
 
 #### 3.6 — Delivered surface vs plan sketches
 
-When `01-sketch-*.md` files are present in the workspace, perform a surface-diff between the sketch contract and the delivered implementation. Check each triggered sketch:
+**Required reading (not optional):** Before evaluating the surface diff, read every triggered `01-sketch-*.md` file. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-01-sketch-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Do not rely solely on `02-implementation.md`'s description — read the sketch files directly.
+
+Perform a surface-diff between each sketch contract and the delivered implementation:
 
 - **`01-sketch-api-contract.md`** — does the delivered `02-implementation.md` (§ Files Created/Modified) cover the endpoints declared in the sketch? If an endpoint in the sketch has no corresponding created/modified controller file, flag as finding.
 - **`01-sketch-ui-wireframe.md`** — does the delivered implementation reference the components declared in the sketch? Check `02-implementation.md` for the component paths.
@@ -145,10 +147,11 @@ When `01-sketch-*.md` files are present in the workspace, perform a surface-diff
 - **`01-sketch-public-api.md`** — does the delivered implementation expose the signatures declared?
 - **`01-sketch-event-contract.md`** — does the delivered implementation publish/consume the payload fields declared?
 - **`01-sketch-data-migration.md`** — are the forward steps covered by a migration file in `02-implementation.md`?
+- **`01-sketch-service-interaction.md`** (or consolidated `sketches/service-interaction.md`) — when `spans_multiple_services: true`, does the delivered implementation wire the call flow declared in the sequenceDiagram? Check that each call hop (service A → service B, endpoint path, method) has a corresponding implementation artifact in `02-implementation.md` (HTTP client call, controller entry, route config). A call hop with no implementation artifact is a `fail`; a call hop with a slightly different path is `concerns`.
 
 **Severity:** mismatch between sketch and delivery is a `concerns`-level finding (not `fail`). The sketch is a low-fidelity, plan-stage artifact — it describes WHAT was intended, not the exact implementation contract. A field renamed during implementation is not a `fail`. An entirely missing feature surface (e.g., the sketch declares `POST /orders` but no controller was created) is a `fail`.
 
-If no `01-sketch-*.md` files are present, skip this step and note "Sketch diff: no 01-sketch-*.md files — step skipped" in the findings.
+If no `01-sketch-*.md` files are present (and no consolidated `sketches/` folder for multi-project workspaces), skip this step and note "Sketch diff: no 01-sketch-*.md files — step skipped" in the findings.
 
 ---
 
