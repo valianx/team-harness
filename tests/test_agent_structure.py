@@ -18582,21 +18582,38 @@ _s82_this_file          = read(Path(__file__))
 # ---------------------------------------------------------------------------
 # Group (a) — Manifest drift guard (AC-9)
 # All three representations must carry the same 7 trigger→sketch mappings.
-# We parse the SKETCH_MAP lines from sketch-guard.sh, the trigger column from
-# docs/plan-sketches.md, and the agent-readable table in agents/architect.md.
+# Each rep uses its own native form:
+#   - hooks/sketch-guard.sh SKETCH_MAP: bare type filenames (api-contract.md)
+#     — resolve_sketch_path composes the sketches/ prefix at runtime.
+#   - docs/plan-sketches.md and agents/architect.md: sketches/-prefixed filenames
+#     (sketches/api-contract.md).
+# Suite 82 asserts each rep in its own native form so the drift guard catches a
+# mismatch without requiring all three to use the same string.
 # ---------------------------------------------------------------------------
 
-# Expected canonical trigger→sketch pairs (8 conditional sketches: 7 standard + service-interaction)
+# docs/plan-sketches.md and agents/architect.md use the sketches/-prefixed form.
 _S82_EXPECTED_PAIRS = [
-    ("touches_http_api",         "01-sketch-api-contract.md"),
-    ("touches_ui",               "01-sketch-ui-wireframe.md"),
-    ("touches_data_model",       "01-sketch-data-model.md"),
-    ("touches_cli",              "01-sketch-cli-surface.md"),
-    ("touches_public_lib_api",   "01-sketch-public-api.md"),
-    ("touches_async_messaging",  "01-sketch-event-contract.md"),
-    ("spans_multiple_services",  "01-sketch-service-interaction.md"),
+    ("touches_http_api",         "sketches/api-contract.md"),
+    ("touches_ui",               "sketches/ui-wireframe.md"),
+    ("touches_data_model",       "sketches/data-model.md"),
+    ("touches_cli",              "sketches/cli-surface.md"),
+    ("touches_public_lib_api",   "sketches/public-api.md"),
+    ("touches_async_messaging",  "sketches/event-contract.md"),
+    ("spans_multiple_services",  "sketches/service-interaction.md"),
 ]
-_S82_MIGRATION_PAIR  = ("touches_data_model", "touches_destructive", "01-sketch-data-migration.md")
+# hooks/sketch-guard.sh SKETCH_MAP uses bare type filenames (sketches/ prefix composed by resolver).
+_S82_GUARD_PAIRS = [
+    ("touches_http_api",         "api-contract.md"),
+    ("touches_ui",               "ui-wireframe.md"),
+    ("touches_data_model",       "data-model.md"),
+    ("touches_cli",              "cli-surface.md"),
+    ("touches_public_lib_api",   "public-api.md"),
+    ("touches_async_messaging",  "event-contract.md"),
+    ("spans_multiple_services",  "service-interaction.md"),
+]
+# Migration sketch: docs/architect use sketches/-prefixed; guard uses bare name.
+_S82_MIGRATION_PAIR       = ("touches_data_model", "touches_destructive", "sketches/data-migration.md")
+_S82_MIGRATION_PAIR_GUARD = ("touches_data_model", "touches_destructive", "data-migration.md")
 
 # (a1) docs/plan-sketches.md — canonical table carries all 7 standard triggers
 _s82_docs_all_triggers = all(
@@ -18607,35 +18624,38 @@ check(
     "suite82(a1-docs-manifest): docs/plan-sketches.md carries all 7 trigger→sketch pairs",
     _s82_docs_all_triggers,
     "docs/plan-sketches.md must contain all 7 trigger booleans and their sketch filenames"
-    " (including spans_multiple_services) — canonical manifest (one of the three representations)",
+    " in sketches/-prefixed form (e.g. sketches/api-contract.md),"
+    " including spans_multiple_services — canonical manifest (one of the three representations)",
 )
 
 # (a2) docs/plan-sketches.md — migration sketch (data_model + destructive)
 check(
     "suite82(a2-docs-migration): docs/plan-sketches.md carries the data-migration pair",
-    "01-sketch-data-migration.md" in _s82_docs_sketches and "destructive" in _s82_docs_sketches,
-    "docs/plan-sketches.md must document the data-migration sketch"
+    "sketches/data-migration.md" in _s82_docs_sketches and "destructive" in _s82_docs_sketches,
+    "docs/plan-sketches.md must document the data-migration sketch as sketches/data-migration.md"
     " triggered by touches_data_model AND destructive",
 )
 
 # (a3) hooks/sketch-guard.sh SKETCH_MAP — carries all 7 standard trigger→sketch pairs
+# Guard holds bare type filenames; resolve_sketch_path composes the sketches/ prefix.
 _s82_guard_all_triggers = all(
     trigger in _s82_sketch_guard and sketch in _s82_sketch_guard
-    for trigger, sketch in _S82_EXPECTED_PAIRS
+    for trigger, sketch in _S82_GUARD_PAIRS
 )
 check(
     "suite82(a3-guard-manifest): hooks/sketch-guard.sh SKETCH_MAP carries all 7 pairs",
     _s82_guard_all_triggers,
-    "hooks/sketch-guard.sh must contain all 7 trigger booleans and sketch filenames"
-    " (including spans_multiple_services) in its SKETCH_MAP constant (hardcoded manifest representation)",
+    "hooks/sketch-guard.sh must contain all 7 trigger booleans and bare sketch filenames"
+    " (e.g. api-contract.md — without sketches/ prefix; resolver composes the prefix)"
+    " including spans_multiple_services in its SKETCH_MAP constant",
 )
 
-# (a4) hooks/sketch-guard.sh — migration sketch handled
+# (a4) hooks/sketch-guard.sh — migration sketch handled (bare name)
 check(
     "suite82(a4-guard-migration): hooks/sketch-guard.sh handles the data-migration sketch",
-    "01-sketch-data-migration.md" in _s82_sketch_guard
+    "data-migration.md" in _s82_sketch_guard
     and "destructive" in _s82_sketch_guard,
-    "hooks/sketch-guard.sh must handle the data-migration sketch"
+    "hooks/sketch-guard.sh must handle the data-migration sketch as bare data-migration.md"
     " (triggered by touches_data_model AND destructive)",
 )
 
@@ -18648,15 +18668,16 @@ check(
     "suite82(a5-architect-manifest): agents/architect.md agent-readable table carries all 7 pairs",
     _s82_arch_all_triggers,
     "agents/architect.md must contain all 7 trigger booleans and sketch filenames"
-    " (including spans_multiple_services) in its agent-readable trigger table (third representation of the manifest)",
+    " in sketches/-prefixed form (e.g. sketches/api-contract.md),"
+    " including spans_multiple_services in its agent-readable trigger table (third representation of the manifest)",
 )
 
 # (a6) agents/architect.md — migration sketch present in the table
 check(
     "suite82(a6-architect-migration): agents/architect.md includes the data-migration sketch",
-    "01-sketch-data-migration.md" in _s82_architect and "destructive" in _s82_architect,
-    "agents/architect.md must document the data-migration sketch"
-    " (touches_data_model AND destructive → 01-sketch-data-migration.md)",
+    "sketches/data-migration.md" in _s82_architect and "destructive" in _s82_architect,
+    "agents/architect.md must document the data-migration sketch as sketches/data-migration.md"
+    " (touches_data_model AND destructive → sketches/data-migration.md)",
 )
 
 # ---------------------------------------------------------------------------
@@ -18717,31 +18738,31 @@ check(
 # (c2) qa-plan.md — sketch↔AC consistency check in Ratify-Plan Mode
 check(
     "suite82(c2-qa-plan-sketch): agents/qa-plan.md Ratify-Plan Mode checks sketch/AC consistency",
-    "sketch" in _s82_qa_plan.lower() and "01-sketch" in _s82_qa_plan,
-    "agents/qa-plan.md must reference sketch consistency checking in Ratify-Plan Mode"
-    " — absent pre-implementation",
+    "sketch" in _s82_qa_plan.lower() and "sketches/" in _s82_qa_plan,
+    "agents/qa-plan.md must reference sketch consistency checking (sketches/*.md paths)"
+    " in Ratify-Plan Mode",
 )
 
 # (c3) acceptance-checker.md — sketch diff in Phase 3.6 step
 check(
     "suite82(c3-acceptance-checker-sketch): agents/acceptance-checker.md diffs delivered"
     " surface vs sketches",
-    "01-sketch" in _s82_acceptance_checker and "sketch" in _s82_acceptance_checker.lower(),
-    "agents/acceptance-checker.md must reference the 01-sketch-*.md files"
-    " when checking delivered surface in Phase 3.6 — absent pre-implementation",
+    "sketches/" in _s82_acceptance_checker and "sketch" in _s82_acceptance_checker.lower(),
+    "agents/acceptance-checker.md must reference the sketches/*.md files (new naming)"
+    " when checking delivered surface in Phase 3.6",
 )
 
 # ---------------------------------------------------------------------------
 # Group (d) — orchestrator.md integration (AC-11)
 # ---------------------------------------------------------------------------
 
-# (d1) orchestrator.md workspace doc list includes 01-sketch-*.md
+# (d1) orchestrator.md workspace doc list includes sketches/*.md (new naming)
 check(
     "suite82(d1-orchestrator-artifact-list): agents/orchestrator.md workspace doc list"
-    " includes 01-sketch-*.md",
-    "01-sketch" in _s82_orchestrator,
-    "agents/orchestrator.md must list 01-sketch-*.md in its workspace document inventory"
-    " — absent pre-implementation",
+    " includes sketches/*.md",
+    "sketches/" in _s82_orchestrator,
+    "agents/orchestrator.md must list sketches/*.md (new naming) in its workspace"
+    " document inventory",
 )
 
 # (d2) orchestrator.md invokes sketch-guard.sh at STAGE-GATE-1
@@ -18770,9 +18791,9 @@ check(
 check(
     "suite82(e1-ref-special-flows-sketch): agents/ref-special-flows.md documents"
     " per-type sketch applicability",
-    "sketch" in _s82_ref_special_flows.lower() and "01-sketch" in _s82_ref_special_flows,
+    "sketch" in _s82_ref_special_flows.lower() and "sketches/" in _s82_ref_special_flows,
     "agents/ref-special-flows.md must document which task types/tiers get sketch treatment"
-    " (fix Tier 0 exempt, etc.) — absent pre-implementation",
+    " (fix Tier 0 exempt, etc.) using the new sketches/*.md naming",
 )
 
 # ---------------------------------------------------------------------------
@@ -18859,24 +18880,28 @@ check(
     " service-interaction sketch with sequenceDiagram and changed call paths",
     "sequenceDiagram" in _s82_docs_sketches
     and "changed call paths only" in _s82_docs_sketches
-    and "01-sketch-service-interaction.md" in _s82_docs_sketches,
+    and "sketches/service-interaction.md" in _s82_docs_sketches,
     "docs/plan-sketches.md §3 must include a service-interaction row with"
-    " Mermaid sequenceDiagram representation ceiling and changed-call-paths fidelity ceiling",
+    " Mermaid sequenceDiagram representation ceiling, changed-call-paths fidelity ceiling,"
+    " and the new sketches/service-interaction.md filename",
 )
 
-# (i2) service-interaction pair present across all THREE representations:
-#      docs/plan-sketches.md, agents/architect.md, hooks/sketch-guard.sh
+# (i2) service-interaction pair present across all THREE representations.
+# Each rep uses its native form:
+#   - docs/plan-sketches.md and agents/architect.md: sketches/service-interaction.md
+#   - hooks/sketch-guard.sh SKETCH_MAP: bare service-interaction.md (prefix composed by resolver)
 check(
-    "suite82(i2-service-interaction-three-reps): spans_multiple_services→01-sketch-service-interaction.md"
-    " present in all three manifest representations",
+    "suite82(i2-service-interaction-three-reps): spans_multiple_services→service-interaction.md"
+    " present in all three manifest representations (each in its native form)",
     "spans_multiple_services" in _s82_docs_sketches
-    and "01-sketch-service-interaction.md" in _s82_docs_sketches
+    and "sketches/service-interaction.md" in _s82_docs_sketches
     and "spans_multiple_services" in _s82_architect
-    and "01-sketch-service-interaction.md" in _s82_architect
+    and "sketches/service-interaction.md" in _s82_architect
     and "spans_multiple_services" in _s82_sketch_guard
-    and "01-sketch-service-interaction.md" in _s82_sketch_guard,
-    "spans_multiple_services→01-sketch-service-interaction.md must appear in"
-    " docs/plan-sketches.md, agents/architect.md, AND hooks/sketch-guard.sh SKETCH_MAP",
+    and "service-interaction.md" in _s82_sketch_guard,
+    "spans_multiple_services→service-interaction.md must appear in all three representations:"
+    " docs/plan-sketches.md and agents/architect.md use sketches/-prefixed form;"
+    " hooks/sketch-guard.sh SKETCH_MAP uses bare form (resolver composes the prefix)",
 )
 
 # (i3) consolidated multi-project layout in docs/plan-sketches.md §4:
@@ -18932,30 +18957,30 @@ check(
 check(
     "suite82(i7-implementer-sketches-read): agents/implementer.md contains required-reading"
     " clause for sketch files and sketches_read status field",
-    "01-sketch" in _s82_implementer
+    "sketches/" in _s82_implementer
     and "sketches_read" in _s82_implementer,
-    "agents/implementer.md must reference triggered 01-sketch-*.md files as required reading"
-    " and include sketches_read in its status block",
+    "agents/implementer.md must reference triggered sketches/*.md files as required reading"
+    " (new naming) and include sketches_read in its status block",
 )
 
 # (i8) consumption clauses — tester named required-reading + sketches_read field
 check(
     "suite82(i8-tester-sketches-read): agents/tester.md contains required-reading"
     " clause for sketch files and sketches_read status field",
-    "01-sketch" in _s82_tester
+    "sketches/" in _s82_tester
     and "sketches_read" in _s82_tester,
-    "agents/tester.md must reference triggered 01-sketch-*.md files as required reading"
-    " and include sketches_read in its status block",
+    "agents/tester.md must reference triggered sketches/*.md files as required reading"
+    " (new naming) and include sketches_read in its status block",
 )
 
 # (i9) consumption clauses — qa named required-reading + sketches_read field
 check(
     "suite82(i9-qa-sketches-read): agents/qa.md contains required-reading"
     " clause for sketch files and sketches_read status field",
-    "01-sketch" in _s82_qa
+    "sketches/" in _s82_qa
     and "sketches_read" in _s82_qa,
-    "agents/qa.md must reference triggered 01-sketch-*.md files as required reading"
-    " and include sketches_read in its status block",
+    "agents/qa.md must reference triggered sketches/*.md files as required reading"
+    " (new naming) and include sketches_read in its status block",
 )
 
 # (i10) consumption clauses — acceptance-checker service-interaction diff row
@@ -18973,10 +18998,10 @@ check(
 check(
     "suite82(i11-reviewer-sketch-reading): agents/reviewer.md contains required-reading"
     " clause for sketch files (no sketches_read field required)",
-    "01-sketch" in _s82_reviewer
+    "sketches/" in _s82_reviewer
     and "sketch" in _s82_reviewer.lower(),
-    "agents/reviewer.md must reference the triggered 01-sketch-*.md files as required reading"
-    " (confirm diff matches sketch contracts, flag sketch-contract-divergence findings)",
+    "agents/reviewer.md must reference the triggered sketches/*.md files as required reading"
+    " (new naming; confirm diff matches sketch contracts, flag sketch-contract-divergence findings)",
 )
 
 # ---------------------------------------------------------------------------
@@ -19102,8 +19127,8 @@ check(
 # ---------------------------------------------------------------------------
 # (2) agents/architect.md api-contract skeleton quality bar reference
 # ---------------------------------------------------------------------------
-_S82Q_ARCH_ANCHOR = "**`01-sketch-api-contract.md`**"
-_S82Q_ARCH_STOP   = ("\n---\n", "\n**`01-sketch-")
+_S82Q_ARCH_ANCHOR = "**`sketches/api-contract.md`**"
+_S82Q_ARCH_STOP   = ("\n---\n", "\n**`sketches/")
 
 _s82q_arch_api_slice = _slice_section(
     _s82_architect, _S82Q_ARCH_ANCHOR, _S82Q_ARCH_STOP
@@ -19116,7 +19141,7 @@ check(
         "quality bar" in _s82q_arch_api_slice.lower()
         or "Quality bar" in _s82q_arch_api_slice
     ),
-    "agents/architect.md '01-sketch-api-contract.md' skeleton must include a Quality bar"
+    "agents/architect.md 'sketches/api-contract.md' skeleton must include a Quality bar"
     " directive referencing docs/plan-sketches.md §3. (AC-8)",
 )
 
