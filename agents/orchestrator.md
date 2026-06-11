@@ -605,6 +605,9 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - functional_clarity_artifact: {<short functional statement> | null}  # confirmed functional statement ("what we are building, functionally"); null until dev-confirmed
 - functional_clarity_confirmed: {true | false}         # true when the operator confirmed the functional clarity artifact
 - initiative: {slug | null}                            # operator-confirmed initiative slug (kebab-case [a-z0-9-], max 60 chars) or null. null = no initiative — today's behaviour exactly; every path expression and every new behaviour below is gated on this field being non-null.
+- gate1_release: {approved | approved-autonomous | rejected | edit | null}   # last STAGE-GATE-1 release decision; null until gate-1 fires. Set by the gate-1 release handler. Used by recover to determine gate-cleared status (approved/approved-autonomous only).
+- gate2_release_last: {next | next-autonomous | stop | redo | null}          # last STAGE-GATE-2 release decision for the most recent round; null until gate-2 fires. Updated each round by the gate-2 release handler. Used by recover (next/next-autonomous clears; stop/redo does not).
+- gate3_release: {ship | amend | abort | null}                               # last STAGE-GATE-3 release decision; null until gate-3 fires. Set by the gate-3 release handler. Used by recover (ship only clears).
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -669,7 +672,7 @@ If reading this after context compaction:
 6. **Reasoning checkpoint fields:** `checkpoint_boundary` indicates which boundary (B1 intake-plan, B2 research-next, B3 postverify-next) is currently armed, or null if none. `checkpoint_advance_fresh: false` means the advance signal was not a fresh response to the checkpoint prompt — do not dispatch the gated agent until a fresh response is received. `functional_clarity_confirmed: false` means the operator has not yet confirmed a functional clarity artifact — surface the confirmation prompt before advancing. Both must be true to cross any checkpoint boundary.
 
 **Recover safety contract (mandatory — applies on every resume, including via `/th:recover`):**
-- **Re-emit any un-cleared STAGE-GATE.** Before resuming any pipeline work, determine whether the current or next step is a STAGE-GATE. A STAGE-GATE is cleared ONLY when a `stage.gate.release` event appears in `{events_file}` AND the corresponding flag is set in `00-state.md § Current State`. Do not infer gate-cleared status from prose — never infer approval from `next_action`, Hot Context, or any other prose field. The structural signal (00-state.md + events trace) is the only valid source. If the structural signal does not confirm the gate was released, re-emit the STOP block and halt. STAGE-GATE-3 (the human push/PR gate) must never be bypassed on recovery.
+- **Re-emit any un-cleared STAGE-GATE.** Before resuming any pipeline work, determine whether the current or next step is a STAGE-GATE. A STAGE-GATE is cleared ONLY when BOTH conditions hold: (a) a `stage.gate.release` event appears in `{events_file}` AND (b) the per-gate release field in `00-state.md § Current State` is set to an allowlist value. The per-gate allowlists are: STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`; STAGE-GATE-2: `gate2_release_last ∈ {next, next-autonomous}` (for the relevant `after_round`); STAGE-GATE-3: `gate3_release = ship`. Any other decision value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`) or a null/missing field means the gate is NOT cleared — re-emit the STOP block and halt. Do not infer gate-cleared status from prose — never infer approval from `next_action`, Hot Context, or any other prose field. STAGE-GATE-3 (the human push/PR gate) must never be bypassed on recovery.
 - **Skip completed phases (idempotency).** The `## Phase Checklist` is the authoritative record of progress. Phases marked `[x]` MUST be skipped — do not re-dispatch them. To de-dup `phase.*`/`kg_write` appends, use a structural lookup (JSON parse of `{events_file}`, not regex) to detect already-emitted events before appending.
 ```
 
@@ -1738,10 +1741,10 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
 
 | Reply | Action |
 |---|---|
-| `approve` | Set `autonomous: false` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 fires between PRs. |
-| `approve autonomous` | Set `autonomous: true` and `autonomous_granted_at: STAGE-GATE-1` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved-autonomous`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 is silently skipped between PRs. |
-| `reject {reason}` | Route back to architect with the user's reason. Re-run Phase 1 → 1.5 → 1.6 → STAGE-GATE-1. Iteration counts toward the architect's max-3 budget. |
-| `edit` | Pause. Wait for the user to edit `01-plan.md` manually. On the user's next `approve`, re-run Phase 1.6 (plan-reviewer) before re-emitting STAGE-GATE-1 (the user's edits could violate the rules). |
+| `approve` | Set `autonomous: false` and `gate1_release: approved` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 fires between PRs. |
+| `approve autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, and `gate1_release: approved-autonomous` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved-autonomous`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 is silently skipped between PRs. |
+| `reject {reason}` | Set `gate1_release: rejected` in `00-state.md`. Route back to architect with the user's reason. Re-run Phase 1 → 1.5 → 1.6 → STAGE-GATE-1. Iteration counts toward the architect's max-3 budget. |
+| `edit` | Set `gate1_release: edit` in `00-state.md`. Pause. Wait for the user to edit `01-plan.md` manually. On the user's next `approve`, re-run Phase 1.6 (plan-reviewer) before re-emitting STAGE-GATE-1 (the user's edits could violate the rules). |
 
 **Canonical-field reconciliation at STAGE-GATE-1.** When the operator's `edit` or `reject + re-submit` decision changes a canonical field (base branch, version bump, scope — as defined in `agents/_shared/plan-consolidation.md` § "Canonical-field set"), the orchestrator reconciles `01-plan.md` so only the operator's final values remain across all sections — `## Review Summary`, `### Work Plan`, and `## Task List` are the in-place consolidation targets. The superseded values are overwritten, not appended. No `01-plan-*.md` sibling is created. Phase 1.6 (which now also runs Rule 3h — the canonical-field contradiction scan) re-validates after the reconciliation.
 
@@ -2388,10 +2391,10 @@ fi
 
 | Reply | Action |
 |---|---|
-| `next` | Append `stage.gate.release` with `stage: 2, decision: next, after_round: R{R}`. Schedule round R+1 in parallel. |
-| `next autonomous` | Set `autonomous: true` and `autonomous_granted_at: STAGE-GATE-2-after-round-R{R}` in `00-state.md`. Append `stage.gate.release` with `decision: next-autonomous`. Schedule round R+1; subsequent STAGE-GATE-2 events are silently skipped. |
-| `stop` | Mark pipeline `status: paused` in `00-state.md`. Append `stage.gate.release` with `decision: stop`. Exit. User can resume with `/th:recover`. |
-| `redo PR-{i}` | Route back to implementer for PR-{i} only. Sibling PRs from round R{R} remain in their completed state. Re-run Phase 2 → 3.6 for PR-{i}; on success, re-emit STAGE-GATE-2 for round R{R}. |
+| `next` | Set `gate2_release_last: next` in `00-state.md`. Append `stage.gate.release` with `stage: 2, decision: next, after_round: R{R}`. Schedule round R+1 in parallel. |
+| `next autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-2-after-round-R{R}`, and `gate2_release_last: next-autonomous` in `00-state.md`. Append `stage.gate.release` with `decision: next-autonomous`. Schedule round R+1; subsequent STAGE-GATE-2 events are silently skipped. |
+| `stop` | Set `gate2_release_last: stop` in `00-state.md`. Mark pipeline `status: paused`. Append `stage.gate.release` with `decision: stop`. Exit. User can resume with `/th:recover`. |
+| `redo PR-{i}` | Set `gate2_release_last: redo` in `00-state.md`. Route back to implementer for PR-{i} only. Sibling PRs from round R{R} remain in their completed state. Re-run Phase 2 → 3.6 for PR-{i}; on success, re-emit STAGE-GATE-2 for round R{R}. |
 
 **Partial-round failure handling.** If any PR in round R{R} fails after exhausting its iteration budget, the orchestrator does NOT close the round. Sibling PRs in flight are allowed to complete (no cancellation — preserves their work). After all in-flight PRs settle, the orchestrator emits a `stage.gate` event with `stage: 2, verdict: partial-fail`, lists the failing PR(s) and the completed sibling(s), and escalates to the user (same escalation pattern as Iteration Rules). Subsequent rounds wait until the failed PR is resolved.
 
@@ -2552,9 +2555,9 @@ fi
 
 | Reply | Action |
 |---|---|
-| `ship` | Append `stage.gate.release` event with `stage: 3, decision: ship`. Proceed to Phase 5 (GitHub Update) and then Phase 6 (KG Save). |
-| `amend` | Pause. Mark `status: paused_for_amend` in `00-state.md`. The user pushes any fixes locally. On the user's next `ship` reply, re-fetch the diff, optionally re-run Phase 4.5 if the diff changed meaningfully, and re-emit STAGE-GATE-3. |
-| `abort` | Mark pipeline `status: blocked` in `00-state.md`. Append `stage.gate.release` with `decision: abort`. Do NOT push to GitHub. Do NOT run Phase 6. Exit. |
+| `ship` | Set `gate3_release: ship` in `00-state.md`. Append `stage.gate.release` event with `stage: 3, decision: ship`. Proceed to Phase 5 (GitHub Update) and then Phase 6 (KG Save). |
+| `amend` | Set `gate3_release: amend` in `00-state.md`. Mark `status: paused_for_amend`. The user pushes any fixes locally. On the user's next `ship` reply, re-fetch the diff, optionally re-run Phase 4.5 if the diff changed meaningfully, and re-emit STAGE-GATE-3 (which updates `gate3_release: ship` on release). |
+| `abort` | Set `gate3_release: abort` in `00-state.md`. Mark pipeline `status: blocked`. Append `stage.gate.release` with `decision: abort`. Do NOT push to GitHub. Do NOT run Phase 6. Exit. |
 
 **JSONL trace:** append `stage.gate` event with `stage: 3` when the gate fires; append `stage.gate.release` with `stage: 3, decision: {ship|amend|abort}` on user reply.
 
