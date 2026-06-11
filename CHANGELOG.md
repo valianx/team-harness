@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.0] - 2026-06-11
+
+### Added
+
+- `agents/gcp-infra.md`: new `gcp-infra` agent (opus/high/green) that manages GCP infrastructure via generated `gcloud` bash scripts using a strict create → validate → apply flow; read-and-plan by default; all mutating operations gated behind an explicit operator STOP-block confirmation; destructive operations require an extra acknowledgement with blast-radius statement; no direct mutation without operator approval.
+- `skills/gcp-infra/SKILL.md`: thin `/th:gcp-infra` skill that routes to the orchestrator with `--project`, `--plan-only`, and `--apply` flag support; mirrors the existing `gcp-costs` dispatch pattern.
+- `hooks/gcp-guard.sh`: PreToolUse Bash hook that classifies every `gcloud` verb in any Bash command (read-only → nodecision; mutating → `permissionDecision: ask`; destructive → `permissionDecision: ask` with irreversibility reason; catastrophic denylist → `permissionDecision: deny`); fail-CLOSED on parse failure; no agent-writable self-approval marker; wired additively in all three OS blocks of `hooks/config.json` and in `.claude-plugin/hooks.json`.
+- `docs/gcp-infra.md`: canonical reference for the create→validate→apply flow phases, verb classification table, honest gcloud-no-dry-run constraint, STOP-block contract, and `gcp-guard.sh` fail-mode.
+
 ## [2.77.0] - 2026-06-11
 
 ### Fixed
