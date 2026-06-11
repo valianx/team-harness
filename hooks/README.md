@@ -22,7 +22,7 @@ All scripts are Bash and cross-platform:
 Each script reads the Claude Code hook payload from stdin (JSON), extracts `last_assistant_message` and `cwd`, and fires an OS-native notification. Scripts exit silently on errors so they never block Claude Code.
 
 **Required runtime dependencies:**
-- `python3` — used to parse the JSON payload (preinstalled on macOS and most Linux distros; on Windows + Git Bash, requires a Python install).
+- `python3` — used by `policy-block.sh` for the full gate (DENIED_BASH + SENSITIVE_PATHS + HIGH_CONFIDENCE_SECRETS + medium-confidence entropy scan). Preinstalled on macOS and most Linux distros; on Windows + Git Bash, requires a Python install. When python3 is absent, `policy-block.sh` falls back to a bash-native degraded gate that still enforces the DENIED_BASH, SENSITIVE_PATHS, and HIGH_CONFIDENCE_SECRETS floors; the entropy scan is the single degraded-mode coverage gap. Run `/th:setup` or `/th:update` for guided python3 install.
 - Windows: `powershell.exe` (included in Windows).
 - macOS: `osascript` (built-in).
 - Linux: `notify-send` (package `libnotify-bin` on Debian/Ubuntu).
@@ -181,7 +181,7 @@ The `PreToolUse` hook routes through `policy-block.sh`. It reads the tool call J
 
 **Bypassing for a specific case.** If you genuinely need a denied command (e.g., a one-off cleanup script), run it manually outside Claude. Editing `policy-block.sh` to scope an exception is also fine, but commit the exception so the rest of the team sees it.
 
-**Performance.** The script runs in single-digit milliseconds (one Python process, regex match). Timeout is 5s.
+**Performance.** python3 path: single-digit milliseconds (one Python process, regex match). Bash degraded path: sub-millisecond (pure grep/sed). Timeout is 5s in both cases.
 
 ## Opt-in: notify when Claude finishes a turn
 
