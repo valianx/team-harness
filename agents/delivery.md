@@ -335,8 +335,10 @@ The fragment is a standard Keep-a-Changelog subsection block (examples below).
 
 ### Step 8 — Update OpenAPI (backend only, if applicable)
 
+**Format-preservation guard:** preserve the existing format, filename, and structure of the repository's OpenAPI spec (`openapi/openapi.{yaml,yml,json}`). Never restructure the spec or change its filename to match a workspace sketch. The JSON api-contract sketch is a workspace decision aid; the repository's own OpenAPI file keeps its existing format. (Canonical: `docs/plan-sketches.md §10`.)
+
 If the feature adds or modifies HTTP endpoints:
-- Read existing `openapi/openapi.yaml`. If it doesn't exist, create `openapi/` directory and a new OpenAPI 3.0 spec.
+- Read existing `openapi/openapi.yaml` (or `openapi.yml` / `openapi.json` — use whichever filename exists). If no spec exists, create `openapi/` directory and a new OpenAPI 3.0 spec.
 - Add/update path definitions, request/response schemas, parameters, security requirements, and tags.
 - Use DTOs from the codebase for accurate schemas.
 - **Skip** if the feature doesn't involve HTTP endpoints.

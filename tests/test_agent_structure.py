@@ -19309,6 +19309,202 @@ check(
 # Marker: isolated-hook-env-harness
 
 # ---------------------------------------------------------------------------
+# Suite 86 — workspace-repo-boundary (v2.77.0)
+# AC-5 regression test (failing-first, Phase 2.0, 2026-06-11).
+# Marker: workspace-repo-boundary
+#
+# Asserts that the workspace↔repository boundary guards exist in the four
+# anchored files and that no anchored file instructs converting a repo spec
+# to a different format (negative guard).
+#
+# All assertions FAIL on the pre-fix tree (guards absent); PASS after the
+# implementer adds the canonical boundary invariant + three short guards.
+#
+# Anchor substrings contract (implementer must include these in prose):
+#   docs/plan-sketches.md     : 'workspace', 'repository', 'openapi', 'format'
+#   agents/implementer.md     : 'openapi', ('preserve' OR 'keeps its existing'), 'format'
+#   agents/delivery.md Step 8 : 'openapi', ('preserve' OR 'keeps its existing'), 'format'
+#   agents/architect.md       : 'workspace' (near api-contract skeleton; workspace-scoping note)
+#   Negative (all four files) : no co-presence of 'convert' + 'openapi' + 'json' in 200-char window
+#
+# (r1) docs/plan-sketches.md canonical boundary invariant (4-token co-presence)
+# (r2) agents/implementer.md repo-spec format-preservation guard (anchor-scoped to Step 3b)
+# (r3) agents/delivery.md Step 8 preservation guard (anchor-scoped; empty slice → FAIL)
+# (r4) agents/architect.md api-contract skeleton workspace-scoping note (anchor-scoped)
+# (r5) negative no-conversion guard — no file contains 'convert'+'openapi'+'json' in 200 chars
+# (h1) self-referential: this test file contains 'Suite 86' + 'workspace-repo-boundary'
+# (h2) docs/testing.md registers 'Suite 86' + 'workspace-repo-boundary'
+# (h3) CLAUDE.md does NOT contain 'Suite 86' (hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 86: workspace-repo-boundary (AC-5) ===")
+
+_s86_plan_sketches  = read(REPO_ROOT / "docs" / "plan-sketches.md")
+_s86_implementer    = read(REPO_ROOT / "agents" / "implementer.md")
+_s86_delivery       = read(REPO_ROOT / "agents" / "delivery.md")
+_s86_architect      = read(REPO_ROOT / "agents" / "architect.md")
+_s86_testing_md     = read(REPO_ROOT / "docs" / "testing.md")
+_s86_claude         = read(REPO_ROOT / "CLAUDE.md")
+_s86_this_file      = read(Path(__file__))
+
+# (r1) docs/plan-sketches.md canonical boundary invariant:
+#   must contain 'workspace', 'repository', 'openapi', and 'format' —
+#   the four stable anchors of the boundary rule (format-agnostic wording).
+check(
+    "suite86(r1-plan-sketches-boundary-invariant): docs/plan-sketches.md"
+    " contains canonical workspace-repo boundary invariant"
+    " ('workspace', 'repository', 'openapi', 'format')",
+    (
+        "workspace" in _s86_plan_sketches
+        and "repository" in _s86_plan_sketches
+        and "openapi" in _s86_plan_sketches.lower()
+        and "format" in _s86_plan_sketches
+    ),
+    "docs/plan-sketches.md must state the boundary invariant: sketch conventions"
+    " are workspace-only; repo files keep their own format/filename/structure."
+    " Missing one or more of the anchor substrings: 'workspace', 'repository',"
+    " 'openapi', 'format'. (AC-5 / AC-1)",
+)
+
+# (r2) agents/implementer.md repo-spec format-preservation guard:
+#   Slice the Step 3b section (anchor: '3b.') to scope the assertion
+#   to the sketch-reading step — anti-false-green.
+#   Assert co-presence of 'openapi' + a preservation verb + 'format'.
+_S86_IMPL_ANCHOR = "3b."
+_S86_IMPL_STOPS  = ("\n4.", "\n### ", "\n## ", "\n---\n")
+_s86_impl_3b_slice = _slice_section(_s86_implementer, _S86_IMPL_ANCHOR, _S86_IMPL_STOPS)
+
+check(
+    "suite86(r2-implementer-format-guard): agents/implementer.md Step 3b"
+    " contains repo-spec format-preservation guard"
+    " ('openapi' + preservation verb + 'format')",
+    (
+        "openapi" in _s86_impl_3b_slice.lower()
+        and (
+            "preserve" in _s86_impl_3b_slice.lower()
+            or "keeps its existing" in _s86_impl_3b_slice.lower()
+        )
+        and "format" in _s86_impl_3b_slice.lower()
+    ),
+    "agents/implementer.md Step 3b slice must contain a repo-spec"
+    " format-preservation guard with 'openapi', a preservation verb"
+    " ('preserve' or 'keeps its existing'), and 'format'. (AC-5 / AC-2)",
+)
+
+# (r3) agents/delivery.md Step 8 preservation guard:
+#   Slice from '### Step 8' to the next section — empty slice means
+#   the anchor is missing → assertion fails (anti-false-green).
+#   Assert co-presence of 'openapi' + a preservation verb + 'format'.
+_S86_DELIV_ANCHOR = "### Step 8"
+_S86_DELIV_STOPS  = ("\n### Step 9", "\n### Step 10", "\n## ", "\n---\n")
+_s86_deliv_step8_slice = _slice_section(_s86_delivery, _S86_DELIV_ANCHOR, _S86_DELIV_STOPS)
+
+check(
+    "suite86(r3-delivery-step8-format-guard): agents/delivery.md Step 8"
+    " contains format/filename-preservation guard"
+    " ('openapi' + preservation verb + 'format')",
+    (
+        len(_s86_deliv_step8_slice) > 0
+        and "openapi" in _s86_deliv_step8_slice.lower()
+        and (
+            "preserve" in _s86_deliv_step8_slice.lower()
+            or "keeps its existing" in _s86_deliv_step8_slice.lower()
+        )
+        and "format" in _s86_deliv_step8_slice.lower()
+    ),
+    "agents/delivery.md Step 8 slice must contain a format/filename-preservation"
+    " guard with 'openapi', a preservation verb ('preserve' or 'keeps its"
+    " existing'), and 'format'. Empty slice means anchor '### Step 8' is"
+    " missing (anti-false-green). (AC-5 / AC-3)",
+)
+
+# (r4) agents/architect.md api-contract skeleton workspace-scoping note:
+#   Slice from the api-contract skeleton anchor to the next section.
+#   Assert 'workspace' is present in the slice — the implementer must add
+#   a note that the sketch is workspace-only and never a template for a
+#   repository's own OpenAPI file.
+_S86_ARCH_ANCHOR = "**`sketches/api-contract.md`**"
+_S86_ARCH_STOPS  = ("\n### ", "\n## ", "\n---\n")
+_s86_arch_apicontract_slice = _slice_section(_s86_architect, _S86_ARCH_ANCHOR, _S86_ARCH_STOPS)
+
+check(
+    "suite86(r4-architect-api-contract-workspace-scoping): agents/architect.md"
+    " api-contract skeleton contains workspace-scoping note ('workspace')",
+    (
+        len(_s86_arch_apicontract_slice) > 0
+        and "workspace" in _s86_arch_apicontract_slice.lower()
+    ),
+    "agents/architect.md api-contract skeleton slice (from"
+    " '**`sketches/api-contract.md`**') must contain a workspace-scoping note"
+    " — the sketch is workspace-only and never a template for a repo's own"
+    " OpenAPI file. Missing anchor or missing 'workspace'. (AC-5 / AC-4)",
+)
+
+# (r5) Negative no-conversion guard:
+#   None of the four anchored agent/doc files should instruct converting a
+#   repo spec format — assert that no file contains 'convert', 'openapi', and
+#   'json' all within a 200-character window.  This assertion pins the
+#   format-agnostic intent: it asserts *absence of a conversion instruction*,
+#   NOT a "must be YAML" requirement.
+def _has_conversion_instruction(text: str) -> bool:
+    """Return True if 'convert', 'openapi', and 'json' all appear within
+    any 200-character sliding window in the lowercased text."""
+    lower = text.lower()
+    for i in range(len(lower)):
+        window = lower[i:i + 200]
+        if "convert" in window and "openapi" in window and "json" in window:
+            return True
+    return False
+
+_s86_neg_hits = [
+    path_label
+    for path_label, content in [
+        ("docs/plan-sketches.md",   _s86_plan_sketches),
+        ("agents/implementer.md",   _s86_implementer),
+        ("agents/delivery.md",      _s86_delivery),
+        ("agents/architect.md",     _s86_architect),
+    ]
+    if _has_conversion_instruction(content)
+]
+
+check(
+    "suite86(r5-no-conversion-instruction): no anchored file contains"
+    " 'convert'+'openapi'+'json' in a 200-char window (no format-conversion instruction)",
+    len(_s86_neg_hits) == 0,
+    f"Conversion instruction detected in: {_s86_neg_hits}. "
+    "No anchored file must instruct converting a repo openapi spec format. (AC-5)",
+)
+
+# (h1) self-referential: this test file contains 'Suite 86' + 'workspace-repo-boundary'
+check(
+    "suite86(h1-self-ref): this test file contains 'Suite 86'"
+    " and 'workspace-repo-boundary'",
+    "Suite 86" in _s86_this_file and "workspace-repo-boundary" in _s86_this_file,
+    "test file must carry its own suite number and feature marker"
+    " (self-referential guard)",
+)
+
+# (h2) docs/testing.md canonical registry registers Suite 86 + feature marker
+check(
+    "suite86(h2-registry): docs/testing.md registers 'Suite 86'"
+    " and 'workspace-repo-boundary'",
+    "Suite 86" in _s86_testing_md and "workspace-repo-boundary" in _s86_testing_md,
+    "docs/testing.md must name Suite 86 and the workspace-repo-boundary marker"
+    " (canonical suite registry)",
+)
+
+# (h3) CLAUDE.md hygiene: §11 must NOT contain 'Suite 86'
+# Per hygiene contract: suite inventory belongs in docs/testing.md only.
+check(
+    "suite86(h3-hygiene): CLAUDE.md does NOT contain 'Suite 86'",
+    "Suite 86" not in _s86_claude,
+    "CLAUDE.md must not mention Suite 86 — only docs/testing.md is the canonical"
+    " registry (§11 hygiene contract)",
+)
+
+# Marker: workspace-repo-boundary
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
