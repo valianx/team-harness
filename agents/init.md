@@ -150,7 +150,7 @@ Use Bash, Read, Grep, and Glob to systematically identify the stack.
 
 context7 may be consulted to learn framework-specific conventions for the detected stack. **Init is exploratory** — failure to consult context7 is acceptable and the agent never halts on context7 absence. The mandatory triggers in `docs/context7-usage.md` §2 apply to downstream agents (architect / implementer / tester / security / translator), not to init itself.
 
-If consulted, follow the playbook (resolve-library-id → get-library-docs) — but do not block the bootstrap on it.
+If consulted, follow the playbook (resolve-library-id → query-docs) — but do not block the bootstrap on it.
 
 ---
 

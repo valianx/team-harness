@@ -52,19 +52,19 @@ Two tools, used in order:
 
 1. **`mcp__context7__resolve-library-id`** — pass a free-text library name. Returns the canonical context7 identifier. Always call this first when you don't already have the ID. A library may be ambiguous (`next-auth` vs `@auth/next-auth-adapter`); only the canonical ID guarantees you fetch the right docs.
 
-2. **`mcp__context7__get-library-docs`** (or the equivalent docs-fetch tool exposed by your runtime) — pass the canonical ID plus an optional `topic`. Topic should be granular: `"middleware"` returns better signal than `"Next.js"`. Keep topic to 1-3 words.
+2. **`mcp__context7__query-docs`** — pass the canonical ID plus a natural-language `query` — a full question, e.g. `"how do I configure middleware in this version"`. A specific question returns better signal than a keyword.
 
-**Topic patterns that work:**
-- `"middleware"`, `"server components"`, `"data fetching"` (frontend frameworks)
-- `"prepared statements"`, `"connection pool"`, `"migrations"` (ORMs / DB clients)
-- `"coverage config"`, `"mock factories"`, `"fake timers"` (test runners)
-- `"jwt verify"`, `"session middleware"`, `"csrf"` (auth libraries)
-- `"OWASP Top 10 latest version"`, `"CWE Top 25 latest year"` (security baselines)
+**Query patterns that work:**
+- `"how do I configure middleware in Next.js app router?"` (frontend frameworks)
+- `"how do I use prepared statements with connection pooling?"` (ORMs / DB clients)
+- `"how do I configure coverage thresholds in Vitest v2?"` (test runners)
+- `"how do I verify a JWT with session middleware?"` (auth libraries)
+- `"what is the latest OWASP Top 10 version and year?"`, `"what is the latest CWE Top 25 year?"` (security baselines)
 
-**Topic patterns that don't work** (too broad, too noisy):
+**Query patterns that don't work** (too broad, too noisy):
 - The framework name alone (`"Next.js"`, `"Django"`)
-- Concepts the framework didn't invent (`"authentication"` returns generic prose)
-- Questions phrased as English (`"how do I configure X"`)
+- Single keywords without context (`"authentication"` returns generic prose)
+- Vague prompts without a specific version or use-case (`"how does X work"`)
 
 ---
 
@@ -116,7 +116,7 @@ context7 can fail in three ways. Handle each, never let the agent halt:
 |---|---|---|
 | MCP unreachable | Tool call returns an error / 404 / timeout. | Log `context7: unavailable` in the workspace doc's `## Documentation Consulted`. Increment `skipped` for all libraries that needed verification. Continue. |
 | `resolve-library-id` returns no match | Library is not on context7. | Log it once in `## Documentation Consulted`. Do not retry. Count as `n/a` (folds into `skipped`). |
-| `get-library-docs` returns empty | Topic was too broad or the library has no docs for that area. | Retry once with a different topic per §3. If still empty, fall back and document. |
+| `query-docs` returns empty | Query was too broad/narrow or the library has no docs for that area. | Retry once with a different query per §3. If still empty, fall back and document. |
 
 The MCP is a nice-to-have, never a blocker. The pipeline must keep moving.
 

@@ -4,7 +4,7 @@ description: Performs comprehensive security audits on backend and frontend proj
 model: opus
 effort: max
 color: orange
-tools: Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+tools: Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 You are a senior application security engineer specializing in both backend and frontend security audits. You perform deep, evidence-based security assessments on real codebases, identifying vulnerabilities with precise file references and actionable remediation guidance.
@@ -166,7 +166,7 @@ issues: {critical and high finding titles, or "none"}
 
 ## Security Standards Reference
 
-**Dynamic version check (Phase 0 — mandatory):** At the start of every audit, use context7 MCP to verify the latest OWASP Top 10 and CWE Top 25 versions. Follow `docs/context7-usage.md` — call `mcp__context7__resolve-library-id` (queries: `"OWASP Top 10 latest version"`, `"CWE Top 25 latest year"`) then `mcp__context7__get-library-docs` with a focused topic. If a newer version than the one below is found, use the updated list and note it in the report header: "Standards: OWASP Top 10 {year} (updated via context7)". If context7 is unavailable or returns no results, use the hardcoded reference below — it is still valid as a baseline (count as `skipped` in the status block per §5 of the playbook).
+**Dynamic version check (Phase 0 — mandatory):** At the start of every audit, use context7 MCP to verify the latest OWASP Top 10 and CWE Top 25 versions. Follow `docs/context7-usage.md` — call `mcp__context7__resolve-library-id` (queries: `"OWASP Top 10 latest version"`, `"CWE Top 25 latest year"`) then `mcp__context7__query-docs` with a focused `query`. If a newer version than the one below is found, use the updated list and note it in the report header: "Standards: OWASP Top 10 {year} (updated via context7)". If context7 is unavailable or returns no results, use the hardcoded reference below — it is still valid as a baseline (count as `skipped` in the status block per §5 of the playbook).
 
 ### OWASP Top 10 2025 (baseline — verify via context7)
 
