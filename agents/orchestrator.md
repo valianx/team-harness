@@ -426,7 +426,7 @@ and is NOT duplicated into any per-project 01-plan.md.
 
 ## Phase Checkpointing
 
-After EVERY phase transition, update `{docs_root}/00-state.md`. This is your persistent memory — if context compacts, this file tells you exactly where you are. `docs_root` is the fully resolved workspaces path stored in `## Current State`.
+After EVERY phase transition, update `{docs_root}/00-state.md`. This is your persistent memory — if context compacts, this file tells you exactly where you are. `docs_root` is the fully resolved workspaces path stored in the `§ Current State` section.
 
 ### Phase Transition Protocol (atomic — execute all 3 steps, never partial)
 
@@ -444,7 +444,7 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
      - `tokens_estimated: true` — **REQUIRED when the value is estimated** (not extracted from real metadata). Absent means the value was measured. This lets downstream tooling (`/trace`, Phase B rollup) distinguish measured from estimated with a trivial `jq` filter.
    - **Takeover-specific fallback.** When top-level Claude dispatches via `Task()` during a takeover (see `docs/subagent-orchestration.md § Takeover Protocol`), `total_tokens` is not exposed in the result. Apply the heuristic (`duration_min × 1500` opus / `× 800` sonnet), emit `tokens: <estimated>` and `tokens_estimated: true`. Do NOT write `tokens: 0`.
 
-2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `## Current State` fields (including resolved override fields such as `clickup_workspace_id` — the resolved ClickUp workspace id from the session-scoped override, precedence `override > persistent`), mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
+2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `§ Current State` fields (including resolved override fields such as `clickup_workspace_id` — the resolved ClickUp workspace id from the session-scoped override, precedence `override > persistent`), mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
 
 3. **Proceed to next dispatch** — only after steps 1 and 2 are done.
 

@@ -99,11 +99,13 @@ if [ -f "$_th_config" ]; then
     _logs_mode=""
     _logs_path=""
     _logs_sub=""
-    if command -v python3 >/dev/null 2>&1; then
+    if command -v python3 >/dev/null 2>&1 && python3 -c '' 2>/dev/null; then
+        # Pass the config content via stdin to avoid bash-vs-python HOME path mismatch
+        # on Windows (bash HOME = /c/Users/x; python3 HOME = C:\Users\x).
         _vault_parse=$(python3 -c "
 import json, sys
 try:
-    data = json.load(open('$_th_config'))
+    data = json.loads(sys.stdin.read())
     mode = data.get('logs-mode','')
     path = data.get('logs-path','')
     sub  = data.get('logs-subfolder','work-logs')
@@ -114,7 +116,7 @@ except Exception:
     print('')
     print('')
     print('')
-" 2>/dev/null || printf '\n\n\n')
+" < "$_th_config" 2>/dev/null || printf '\n\n\n')
         _logs_mode=$(printf '%s' "$_vault_parse" | sed -n '1p')
         _logs_path=$(printf '%s' "$_vault_parse" | sed -n '2p')
         _logs_sub=$(printf '%s' "$_vault_parse" | sed -n '3p')
