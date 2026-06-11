@@ -133,8 +133,10 @@ else
         | sed 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
 fi
 
-# ClickUp write pattern: mcp__ + any server segment + __clickup_(write verbs)
-_clickup_write_pattern='mcp__[^_][^_]*__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
+# ClickUp write pattern: mcp__ + any server segment (including underscores, for multi-word
+# MCP server names that Claude Code normalizes spaces-to-underscores) + __clickup_(write verbs).
+# fix(dev-guard): SEC-001 — mirror wiring semantics (.+) so multi-word servers match (#304)
+_clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
 if printf '%s' "$_tool_name" | grep -qE "^${_clickup_write_pattern}" 2>/dev/null; then
     # ClickUp MCP outward write detected. Check dev mode marker.
     if [ -f "$DEV_MODE_MARKER" ]; then
