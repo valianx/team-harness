@@ -42,6 +42,7 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | `qa` | sonnet | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Post-code validation: validate (Phase 3), pr-review-qa, docs-validation, cross-repo review. **No Bash** (read-only on system). KG read-only for AC-pattern lookup. |
 | `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own workspace doc). |
 | `gcp-cost-analyzer` | opus | `high` | Read, Bash, Glob, Grep, Write | GCP cost / resource inventory reports. Bash limited to `gcloud`/`bq` reads. |
+| `gcp-infra` | opus | `high` | Read, Bash, Glob, Grep, Write | GCP infrastructure changes via generated `gcloud` scripts (create → validate → apply). Read-and-plan default; mutation hard-gated at a STOP block; destructive needs extra ack. |
 | `init` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | Bootstrap `CLAUDE.md` in any repo. |
 | `implementer` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, NotebookEdit | Production code following the architect's Work Plan. |
 | `tester` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Test suites with factory mocks. KG read-only for test-pattern lookup. |
@@ -92,6 +93,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `qa` | sonnet | high | sonnet | high | Post-code AC validation; effort high retained — drives merge decision at STAGE-GATE-2/3. |
 | `plan-reviewer` | sonnet | medium | sonnet | medium | No change — already at the floor; gate role is inviolable. |
 | `gcp-cost-analyzer` | opus | high | sonnet | medium | Non-blocking advisory report; human decides on all output. |
+| `gcp-infra` | opus | high | sonnet | medium | Mutation hard-gated at the STOP block + `gcp-guard.sh` hook (model-independent); human approves every apply. |
 | `init` | sonnet | medium | sonnet | medium | One-shot bootstrap; human edits output before first commit. |
 | `implementer` | sonnet | high | sonnet | medium | Model stays sonnet; effort drops to medium (more iteration loops via tester+qa). |
 | `tester` | sonnet | high | sonnet | medium | Effort high in standard; drops to medium in low-cost. |
