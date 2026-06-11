@@ -4,9 +4,10 @@
 # PreToolUse hook — deterministic outward-action gate for dev mode.
 #
 # Wired via hooks/config.json (Go installer) and .claude-plugin/hooks.json
-# (plugin runtime) as its OWN PreToolUse entry with matcher:"Bash".
-# policy-block.sh is wired separately with matcher:"Bash|Write|Edit|NotebookEdit"
-# so it continues to secret-scan write/edit content. Reads tool_input from
+# (plugin runtime) as its OWN PreToolUse entry with matcher:"Bash" (outward Bash
+# actions) AND a second entry with matcher:"mcp__.*__clickup_..." (ClickUp MCP
+# outward writes). policy-block.sh is wired separately with
+# matcher:"Bash|Write|Edit|NotebookEdit" for secret-scan. Reads tool_input from
 # stdin; intercepts outward/mutating actions when dev mode is active.
 #
 # Contract: docs/dev-mode.md § Outward-Action Gate
@@ -106,6 +107,56 @@ deny() {
 # Step 1 — Read tool_input from stdin
 # ---------------------------------------------------------------------------
 input="$(cat)"
+
+# ---------------------------------------------------------------------------
+# Step 1a — Detect ClickUp MCP outward-write tool calls (D1, F-008).
+# The matcher mcp__.*__clickup_(update_task|create_task|...) fires for any
+# registered ClickUp MCP server (server segment is registration-dependent and
+# must not be hard-coded). We extract tool_name and, if it matches the ClickUp
+# write pattern, issue ask when dev mode is active.
+# This branch runs before the Bash cmd-extraction path — ClickUp payloads have
+# no "command" field and would otherwise produce an empty cmd and nodecision.
+# ---------------------------------------------------------------------------
+_tool_name=""
+if command -v python3 >/dev/null 2>&1; then
+    _tool_name=$(python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    print(data.get('tool_name', ''))
+except Exception:
+    print('')
+" <<< "$input" 2>/dev/null || true)
+else
+    _tool_name=$(printf '%s' "$input" \
+        | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
+        | sed 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
+fi
+
+# ClickUp write pattern: mcp__ + any server segment + __clickup_(write verbs)
+_clickup_write_pattern='mcp__[^_][^_]*__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
+if printf '%s' "$_tool_name" | grep -qE "^${_clickup_write_pattern}" 2>/dev/null; then
+    # ClickUp MCP outward write detected. Check dev mode marker.
+    if [ -f "$DEV_MODE_MARKER" ]; then
+        _marker_check=""
+        _marker_check=$(cat "$DEV_MODE_MARKER" 2>/dev/null || true)
+        _marker_active=false
+        if [ -z "$_marker_check" ]; then
+            _marker_active=true
+        elif printf '%s\n' "$_marker_check" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*true[[:space:]]*$" 2>/dev/null; then
+            _marker_active=true
+        elif printf '%s\n' "$_marker_check" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*false[[:space:]]*" 2>/dev/null; then
+            _marker_active=false
+        else
+            _marker_active=true  # corrupt/unreadable — fail-CLOSED
+        fi
+        if [ "$_marker_active" = "true" ]; then
+            ask "dev mode active — ClickUp MCP outward write ($_tool_name) requires explicit operator approval; preview the change before confirming (dev-guard.sh D1; see docs/dev-mode.md)"
+        fi
+    fi
+    # Marker absent or dev mode inactive — no decision (defer to normal flow).
+    nodecision
+fi
 
 # Resolve _json-extract.sh shared helper via the same 3-tier chain as sketch-guard
 # (plugin cache -> ~/.claude/hooks/ -> ./hooks/). Sourcing it gives us the

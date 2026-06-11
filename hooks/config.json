@@ -4,7 +4,7 @@
   "windows": {
     "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
     "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh, language-user-prompt.sh",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; checkpoint-guard: Task) + Notification (idle_prompt only)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -62,6 +62,16 @@
               "type": "command",
               "command": "bash ~/.claude/hooks/checkpoint-guard.sh",
               "timeout": 10
+            }
+          ]
+        },
+        {
+          "matcher": "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
+              "timeout": 5
             }
           ]
         }
@@ -84,7 +94,7 @@
   "macos": {
     "_requires": "osascript (included in macOS) + python3",
     "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh, language-user-prompt.sh",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; checkpoint-guard: Task) + Notification (idle_prompt only)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -142,6 +152,16 @@
               "type": "command",
               "command": "bash ~/.claude/hooks/checkpoint-guard.sh",
               "timeout": 10
+            }
+          ]
+        },
+        {
+          "matcher": "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
+              "timeout": 5
             }
           ]
         }
@@ -164,7 +184,7 @@
   "linux": {
     "_requires": "libnotify (notify-send) + python3",
     "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, dev-mode-session-start.sh, language-session-start.sh, language-user-prompt.sh",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; checkpoint-guard: Task) + Notification (idle_prompt only)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -222,6 +242,16 @@
               "type": "command",
               "command": "bash ~/.claude/hooks/checkpoint-guard.sh",
               "timeout": 10
+            }
+          ]
+        },
+        {
+          "matcher": "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
+              "timeout": 5
             }
           ]
         }
