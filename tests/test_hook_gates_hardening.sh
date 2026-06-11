@@ -381,7 +381,11 @@ printf '{"logs-mode":"obsidian","logs-path":"%s","logs-subfolder":"%s"}\n' \
     "$VAULT_BASE" "$VAULT_SUBFOLDER" \
     > "$TMP_HOME_F010/.claude/.team-harness.json"
 
-TMP_EMPTY_CWD=$(make_tmp)
+# CWD basename must equal the repo slug: the hook scopes its obsidian search to
+# {logs-path}/{logs-subfolder}/{basename of CWD}/ (the repo's own work-logs subtree),
+# never the whole vault. In production CWD is the repo root (basename team-harness).
+TMP_EMPTY_CWD="$(make_tmp)/${REPO_SLUG}"
+mkdir -p "$TMP_EMPTY_CWD"
 OUT_F010_1=$(CWD="$TMP_EMPTY_CWD" HOME="$TMP_HOME_F010" bash "$CHECKPOINT_HOOK" <<< "$TASK_PAYLOAD" 2>/dev/null || true)
 assert_exact_deny_checkpoint "F010-1: armed obsidian vault state (outside CWD) -> deny" "$OUT_F010_1"
 
@@ -405,7 +409,8 @@ printf '{"logs-mode":"obsidian","logs-path":"%s","logs-subfolder":"%s"}\n' \
     "$VAULT_BASE_B" "$VAULT_SUBFOLDER" \
     > "$TMP_HOME_F010B/.claude/.team-harness.json"
 
-TMP_EMPTY_CWD2=$(make_tmp)
+TMP_EMPTY_CWD2="$(make_tmp)/${REPO_SLUG}"
+mkdir -p "$TMP_EMPTY_CWD2"
 OUT_F010_2=$(CWD="$TMP_EMPTY_CWD2" HOME="$TMP_HOME_F010B" bash "$CHECKPOINT_HOOK" <<< "$TASK_PAYLOAD" 2>/dev/null || true)
 # Pre-fix: allows (fail-open, nothing found). Post-fix: allows (vault found, state satisfied).
 # This is a regression guard that stays green both before and after the fix — what matters is F010-1.
@@ -416,6 +421,57 @@ else
     FAIL=$((FAIL + 1))
     FAILURES+=("ALLOW expected: F010-2: satisfied obsidian vault state | got: ${OUT_F010_2:-<empty>}")
     echo "  [FAIL] ALLOW: F010-2: satisfied obsidian vault state (got: ${OUT_F010_2:-<empty>})"
+fi
+
+# Case F010-3: vault scoping — the hook searches ONLY this repo's work-logs subtree,
+# not the entire vault. A vault-wide find traverses thousands of unrelated notes on every
+# Task dispatch (multi-second latency degrading to a hang) and would gate on a foreign
+# repo's workspace. SPEC: an armed (would-deny) workspace under a DIFFERENT repo's subtree,
+# written LATER (newer mtime), must be IGNORED; only this repo's satisfied state is seen -> ALLOW.
+# PRE-FIX (vault-wide) STATE: the newer foreign armed state is the newest-mtime candidate
+# across the vault -> hook denies (wrong) and pays the full-vault traversal cost.
+echo
+echo "=== F-010-3 (scoping): foreign-repo armed state (newer) is ignored; own satisfied state -> ALLOW ==="
+TMP_HOME_F010C=$(make_tmp)
+mkdir -p "$TMP_HOME_F010C/.claude"
+VAULT_BASE_C="$TMP_HOME_F010C/vault"
+# Own repo: satisfied (would allow)
+OWN_DIR="${VAULT_BASE_C}/${VAULT_SUBFOLDER}/${REPO_SLUG}/2026-06-10_own_active"
+mkdir -p "$OWN_DIR"
+cat > "$OWN_DIR/00-state.md" << 'STATEOF'
+## Current State
+- status: in-progress
+- type: fix
+- checkpoint_boundary: intake-plan
+- checkpoint_advance_fresh: true
+- functional_clarity_confirmed: true
+STATEOF
+# Foreign repo: armed + unsatisfied (would deny if wrongly in scope), written LATER -> newer mtime
+FOREIGN_DIR="${VAULT_BASE_C}/${VAULT_SUBFOLDER}/other-repo/2026-06-11_intruder"
+mkdir -p "$FOREIGN_DIR"
+cat > "$FOREIGN_DIR/00-state.md" << 'STATEOF'
+## Current State
+- status: in-progress
+- type: fix
+- checkpoint_boundary: intake-plan
+- checkpoint_advance_fresh: false
+- functional_clarity_confirmed: false
+STATEOF
+# Guarantee the foreign state is strictly newer than the own state.
+touch "$FOREIGN_DIR/00-state.md"
+printf '{"logs-mode":"obsidian","logs-path":"%s","logs-subfolder":"%s"}\n' \
+    "$VAULT_BASE_C" "$VAULT_SUBFOLDER" \
+    > "$TMP_HOME_F010C/.claude/.team-harness.json"
+TMP_OWN_CWD="$(make_tmp)/${REPO_SLUG}"
+mkdir -p "$TMP_OWN_CWD"
+OUT_F010_3=$(CWD="$TMP_OWN_CWD" HOME="$TMP_HOME_F010C" bash "$CHECKPOINT_HOOK" <<< "$TASK_PAYLOAD" 2>/dev/null || true)
+if echo "$OUT_F010_3" | grep -q '"permissionDecision":[[:space:]]*"allow"'; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] SCOPING: F010-3: foreign-repo armed state ignored; own satisfied state -> allow"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("SCOPING: F010-3: hook gated on foreign-repo or vault-wide state | got: ${OUT_F010_3:-<empty>}")
+    echo "  [FAIL] SCOPING: F010-3: vault-wide/foreign state leaked into the gate (got: ${OUT_F010_3:-<empty>})"
 fi
 
 

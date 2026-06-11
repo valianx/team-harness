@@ -131,14 +131,27 @@ except Exception:
     fi
 
     if [ "$_logs_mode" = "obsidian" ] && [ -n "$_logs_path" ]; then
-        # Search {logs-path}/{logs-subfolder}/<repo>/<feature>/00-state.md.
-        # We search 4 levels under logs-path to cover both
-        # {logs-path}/{logs-subfolder}/{repo}/{feature}/00-state.md (3 dirs deep)
-        # and initiative-layout variants one level deeper.
-        _vault_root="${_logs_path}/${_logs_sub}"
-        while IFS= read -r f; do
-            raw_candidates+=("$f")
-        done < <(find "$_vault_root" -maxdepth 4 -name "00-state.md" 2>/dev/null || true)
+        # Scope the search to THIS repo's work-logs subtree — never the whole vault.
+        # Layout: {logs-path}/{logs-subfolder}/{repo}/{date}_{feature}/00-state.md, plus the
+        # initiative variant {repo}/{date}_{initiative}/{project}/00-state.md (one level deeper).
+        # The repo is the basename of the search root (the repo root in production).
+        #
+        # Why scoped, not vault-wide: a find over {logs-path}/{logs-subfolder} traverses the
+        # operator's ENTIRE Obsidian vault (potentially thousands of unrelated notes) on every
+        # single Task dispatch. That is multi-second latency in the common case and degrades to
+        # an unbounded hang on a large vault — observed blocking the dispatch with no output.
+        # Scoping to the repo keeps the find O(this repo's pipelines).
+        #
+        # `timeout` is intentionally NOT used to bound the find: it is absent on stock macOS
+        # (BSD userland ships gtimeout only via coreutils), and this hook must stay portable
+        # across Git Bash / macOS / Linux. Correct scoping removes the need for a wall-clock bound.
+        _repo_name=$(basename "$search_root" 2>/dev/null || true)
+        if [ -n "$_repo_name" ]; then
+            _vault_root="${_logs_path}/${_logs_sub}/${_repo_name}"
+            while IFS= read -r f; do
+                raw_candidates+=("$f")
+            done < <(find "$_vault_root" -maxdepth 3 -name "00-state.md" 2>/dev/null || true)
+        fi
     fi
 fi
 
@@ -153,11 +166,32 @@ fi
 # A terminal workspace is done; it must not gate a new dispatch even if it is
 # the alphabetically-first or most-recently-written candidate.
 # ---------------------------------------------------------------------------
-active_candidates=()
-for candidate in "${raw_candidates[@]}"; do
-    if [ ! -f "$candidate" ]; then
-        continue
-    fi
+# Order ALL candidates newest-first with a SINGLE ls -t (one subprocess), then walk
+# the list and select the first NON-terminal workspace — the active pipeline, normally
+# the newest-mtime file. This stops at the live workspace instead of status-checking
+# every historical one.
+#
+# Why this shape: a vault accumulates dozens of past 00-state.md files, most left at a
+# non-"complete" status. The previous "status-check ALL candidates, then sort" path
+# spawned ~5 subprocesses (grep+head+printf+sed+sed) PER candidate. On Windows Git Bash,
+# where fork is expensive, dozens of stale workspaces turned a single Task dispatch into a
+# multi-second-to-hanging operation with no output (the spin is mid-loop, before any echo).
+# Newest-first + early-break is O(1) status checks in the common case (the newest file is
+# the live pipeline) and is bounded by the number of trailing just-completed workspaces
+# otherwise. The selection result is identical to the old code: the newest non-terminal
+# candidate. ls -t is POSIX (Git Bash / macOS / Linux), no GNU find -printf.
+ordered_candidates=()
+if [ ${#raw_candidates[@]} -eq 1 ]; then
+    ordered_candidates=("${raw_candidates[0]}")
+else
+    while IFS= read -r f; do
+        [ -n "$f" ] && ordered_candidates+=("$f")
+    done < <(ls -t "${raw_candidates[@]}" 2>/dev/null || printf '%s\n' "${raw_candidates[@]}")
+fi
+
+STATE_FILE=""
+for candidate in "${ordered_candidates[@]}"; do
+    [ -f "$candidate" ] || continue
     # Extract the status value from the candidate file.
     _status_line=$(grep "^[[:space:]]*-[[:space:]]*status:" "$candidate" 2>/dev/null | head -1 || true)
     _status_val=$(printf '%s' "$_status_line" \
@@ -165,33 +199,13 @@ for candidate in "${raw_candidates[@]}"; do
         | sed 's/[[:space:]]*$//' \
         || true)
     case "$_status_val" in
-        complete|blocked-*) continue ;;   # terminal — skip
-        *) active_candidates+=("$candidate") ;;
+        complete|blocked-*) continue ;;          # terminal — skip to the next-newest
+        *) STATE_FILE="$candidate"; break ;;     # first active (newest) workspace — done
     esac
 done
 
-if [ ${#active_candidates[@]} -eq 0 ]; then
-    # All candidates are terminal — no active boundary to enforce.
-    allow
-fi
-
-# ---------------------------------------------------------------------------
-# Select the newest-mtime active candidate (portable — no find -printf).
-# Strategy: use ls -t on the candidate list to get newest-first ordering,
-# then take the first result.  ls -t is POSIX and available on Git Bash,
-# macOS, and Linux without GNU extensions.
-# Fallback for single candidate: no sorting needed.
-# ---------------------------------------------------------------------------
-
-if [ ${#active_candidates[@]} -eq 1 ]; then
-    STATE_FILE="${active_candidates[0]}"
-else
-    # ls -t sorts by modification time, newest first.
-    # We pass all candidates as arguments; ls picks the newest.
-    STATE_FILE=$(ls -t "${active_candidates[@]}" 2>/dev/null | head -1 || echo "${active_candidates[0]}")
-fi
-
 if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
+    # No active (non-terminal) workspace anywhere — nothing to gate. Fail-open.
     allow
 fi
 
