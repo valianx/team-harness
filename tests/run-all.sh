@@ -109,6 +109,28 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 10: hook-gates-hardening behavioral (Suite 85)"
+echo "############################################################"
+if bash "$TESTS_DIR/test_hook_gates_hardening.sh"; then
+    echo "hook-gates-hardening: PASS"
+else
+    echo "hook-gates-hardening: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 11: hook-gates-hardening structural (Suite 85-py)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_agent_structure_hardening.py"; then
+    echo "hook-gates-hardening-structural: PASS"
+else
+    echo "hook-gates-hardening-structural: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
