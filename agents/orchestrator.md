@@ -1662,10 +1662,32 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 - `## Task List` — the minimum 4-line task list (reproduce, regression test, fix, verify) with a `§ Task List` section.
 This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above, Tier 1 row). For hotfix, the same orchestrator-self-authored approach applies. The resulting `01-plan.md` is what Phase 1.6 (plan-reviewer) audits and what the STOP block displays verbatim below.
 
-**Sketch-guard invocation (before emitting STOP block).** Before assembling the STOP block, invoke `hooks/sketch-guard.sh` with the workspace path as the argument:
+**Sketch-guard invocation (before emitting STOP block).** Before assembling the STOP block, invoke `hooks/sketch-guard.sh` with the workspace path as the argument. Resolve the script through the 3-tier chain (plugin cache → `~/.claude/hooks/` → `./hooks/`):
 
 ```bash
-bash hooks/sketch-guard.sh "{docs_root}"
+# 3-tier resolution: plugin cache -> ~/.claude/hooks/ -> ./hooks/
+PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
+SKETCH_GUARD=""
+if [ -d "$PLUGIN_BASE" ]; then
+  LATEST=$(ls -1 "$PLUGIN_BASE" 2>/dev/null | sort -V | tail -1)
+  if [ -n "$LATEST" ] && [ -f "$PLUGIN_BASE/$LATEST/hooks/sketch-guard.sh" ]; then
+    SKETCH_GUARD="$PLUGIN_BASE/$LATEST/hooks/sketch-guard.sh"
+  fi
+fi
+if [ -z "$SKETCH_GUARD" ] && [ -f "${HOME}/.claude/hooks/sketch-guard.sh" ]; then
+  SKETCH_GUARD="${HOME}/.claude/hooks/sketch-guard.sh"
+fi
+if [ -z "$SKETCH_GUARD" ] && [ -f "./hooks/sketch-guard.sh" ]; then
+  SKETCH_GUARD="./hooks/sketch-guard.sh"
+fi
+
+if [ -n "$SKETCH_GUARD" ]; then
+  bash "$SKETCH_GUARD" "{docs_root}"
+else
+  echo "sketch-guard probe unavailable — skipping"
+  # Append a *.skipped event to the execution-events JSONL (mirroring the
+  # notify-stage reason:wrapper-missing convention at orchestrator.md:1611-1617)
+fi
 ```
 
 Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concerns` → fold the `concerns` array into the "Concerns to review" section of the STOP block. The sketch-guard verdict contributes to the combined verdict as follows: if sketch-guard returns `concerns` and the plan-reviewer returned `pass`, the combined verdict becomes `concerns`. If sketch-guard returns `pass`, it does not change the plan-reviewer verdict. The sketch-guard NEVER produces `verdict: fail` (it is a fail-OPEN completeness gate). If the script exits non-zero or produces unparseable output, log a warning and continue — the guard is fail-open by design.

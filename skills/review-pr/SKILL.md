@@ -36,10 +36,31 @@ name: review-pr
 
 When entering mid-pipeline (i.e., a workspace folder for this feature already exists in `workspaces/`), run `hooks/sketch-guard.sh` as a best-effort prerequisite probe before the review begins. This surfaces any missing sketch artifacts to the operator before the gather step executes.
 
+Resolve the script through the documented 3-tier chain before invoking:
+
 ```bash
-# Locate the workspace for this feature (if a local workspace exists)
-# WORKSPACE_PATH = resolved docs_root for the feature (from 00-state.md if present)
-bash hooks/sketch-guard.sh "${WORKSPACE_PATH}" 2>/dev/null
+# 3-tier resolution: plugin cache -> ~/.claude/hooks/ -> ./hooks/
+PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
+SKETCH_GUARD=""
+if [ -d "$PLUGIN_BASE" ]; then
+  LATEST=$(ls -1 "$PLUGIN_BASE" 2>/dev/null | sort -V | tail -1)
+  if [ -n "$LATEST" ] && [ -f "$PLUGIN_BASE/$LATEST/hooks/sketch-guard.sh" ]; then
+    SKETCH_GUARD="$PLUGIN_BASE/$LATEST/hooks/sketch-guard.sh"
+  fi
+fi
+if [ -z "$SKETCH_GUARD" ] && [ -f "${HOME}/.claude/hooks/sketch-guard.sh" ]; then
+  SKETCH_GUARD="${HOME}/.claude/hooks/sketch-guard.sh"
+fi
+if [ -z "$SKETCH_GUARD" ] && [ -f "./hooks/sketch-guard.sh" ]; then
+  SKETCH_GUARD="./hooks/sketch-guard.sh"
+fi
+
+if [ -n "$SKETCH_GUARD" ]; then
+  bash "$SKETCH_GUARD" "${WORKSPACE_PATH}" 2>/dev/null
+else
+  echo "sketch-guard probe unavailable — skipping"
+  # In pipeline context: append a *.skipped event to the execution-events JSONL
+fi
 ```
 
 Parse the JSON output. If `verdict: concerns`, show a one-line banner before the gather step begins:
@@ -49,7 +70,7 @@ Note: sketch-guard found concerns for this workspace — {concerns[0]}. Proceedi
 
 **Required sketch reading (mid-pipeline entry):** after the guard probe, read every `sketches/*.md` file present in the workspace before the reviewer agent begins its pass. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). These sketch files are required reading — they define the contract the diff is being reviewed against.
 
-**Fail-open:** if `sketch-guard.sh` is absent, exits non-zero, or the workspace cannot be located, skip this probe silently and continue. The probe is informational only — it never blocks the review flow.
+**Fail-open:** if the script exits non-zero or the workspace cannot be located, continue. The probe is informational only — it never blocks the review flow.
 
 ---
 name: review-pr
