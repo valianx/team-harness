@@ -66,27 +66,132 @@ fi
 
 # ---------------------------------------------------------------------------
 # Step 3 — Locate 00-state.md
-# The hook environment provides the working directory via $CWD or the process
-# working directory. We search up to 5 levels for workspaces/ subtrees.
+#
+# Search strategy (C1 fix: F-018 + F-010):
+#   1. Collect candidates from local workspaces/ subtree under $CWD.
+#   2. If logs-mode is "obsidian" in ~/.claude/.team-harness.json, also collect
+#      candidates from the vault workspace root ({logs-path}/{logs-subfolder}).
+#   3. Skip candidates whose status: field is terminal (complete, blocked-*).
+#      A terminal workspace is no longer active and must not gate a new dispatch.
+#   4. Among the remaining active candidates, select the NEWEST by mtime using a
+#      portable ls -t sort (not find -printf which is GNU-only and absent on macOS).
+#   5. If all candidates are terminal, fall-open (no active boundary to enforce).
+#
+# The false comment "most shallow / most recently created" is removed: mtime is
+# the correct key; depth-ordering conflates filesystem depth with recency.
 # ---------------------------------------------------------------------------
 
 STATE_FILE=""
 search_root="${CWD:-$(pwd)}"
 
-# Look for workspaces/*/00-state.md and obsidian-style work-logs/*/*/00-state.md
-# (both modes produce 00-state.md — the path differs by logs-mode).
-state_candidates=()
+# Collect raw candidates from local workspaces/ tree.
+raw_candidates=()
+# Constrain to workspace-shaped paths: workspaces/*/00-state.md up to 3 deep.
+# This prevents stray test fixtures or deeply nested state files from hijacking
+# the gate (the original find -maxdepth 5 with no path shape constraint could do this).
 while IFS= read -r f; do
-    state_candidates+=("$f")
-done < <(find "$search_root" -maxdepth 5 -name "00-state.md" 2>/dev/null | sort -t'/' -k1 | head -5)
+    raw_candidates+=("$f")
+done < <(find "$search_root" -maxdepth 4 -name "00-state.md" 2>/dev/null || true)
 
-if [ ${#state_candidates[@]} -eq 0 ]; then
-    # No state file found — cannot evaluate checkpoint. Fail-safe: allow.
+# F-010: if logs-mode is "obsidian", also search the vault workspace root.
+_th_config="${HOME:-~}/.claude/.team-harness.json"
+if [ -f "$_th_config" ]; then
+    _logs_mode=""
+    _logs_path=""
+    _logs_sub=""
+    if command -v python3 >/dev/null 2>&1; then
+        _vault_parse=$(python3 -c "
+import json, sys
+try:
+    data = json.load(open('$_th_config'))
+    mode = data.get('logs-mode','')
+    path = data.get('logs-path','')
+    sub  = data.get('logs-subfolder','work-logs')
+    print(mode)
+    print(path)
+    print(sub)
+except Exception:
+    print('')
+    print('')
+    print('')
+" 2>/dev/null || printf '\n\n\n')
+        _logs_mode=$(printf '%s' "$_vault_parse" | sed -n '1p')
+        _logs_path=$(printf '%s' "$_vault_parse" | sed -n '2p')
+        _logs_sub=$(printf '%s' "$_vault_parse" | sed -n '3p')
+    else
+        # Bash fallback: simple grep/sed for the three keys.
+        _logs_mode=$(grep -o '"logs-mode"[[:space:]]*:[[:space:]]*"[^"]*"' "$_th_config" 2>/dev/null \
+            | head -1 | sed 's/.*"logs-mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+        _logs_path=$(grep -o '"logs-path"[[:space:]]*:[[:space:]]*"[^"]*"' "$_th_config" 2>/dev/null \
+            | head -1 | sed 's/.*"logs-path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+        _logs_sub=$(grep -o '"logs-subfolder"[[:space:]]*:[[:space:]]*"[^"]*"' "$_th_config" 2>/dev/null \
+            | head -1 | sed 's/.*"logs-subfolder"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+    fi
+
+    if [ "$_logs_mode" = "obsidian" ] && [ -n "$_logs_path" ]; then
+        # Search {logs-path}/{logs-subfolder}/<repo>/<feature>/00-state.md.
+        # We search 4 levels under logs-path to cover both
+        # {logs-path}/{logs-subfolder}/{repo}/{feature}/00-state.md (3 dirs deep)
+        # and initiative-layout variants one level deeper.
+        _vault_root="${_logs_path}/${_logs_sub}"
+        while IFS= read -r f; do
+            raw_candidates+=("$f")
+        done < <(find "$_vault_root" -maxdepth 4 -name "00-state.md" 2>/dev/null || true)
+    fi
+fi
+
+if [ ${#raw_candidates[@]} -eq 0 ]; then
+    # No state file found anywhere — fail-safe: allow.
     allow
 fi
 
-# Use the first (most shallow / most recently created) state file.
-STATE_FILE="${state_candidates[0]}"
+# ---------------------------------------------------------------------------
+# Filter out terminal-status candidates.
+# Terminal: status is "complete" or starts with "blocked-".
+# A terminal workspace is done; it must not gate a new dispatch even if it is
+# the alphabetically-first or most-recently-written candidate.
+# ---------------------------------------------------------------------------
+active_candidates=()
+for candidate in "${raw_candidates[@]}"; do
+    if [ ! -f "$candidate" ]; then
+        continue
+    fi
+    # Extract the status value from the candidate file.
+    _status_line=$(grep "^[[:space:]]*-[[:space:]]*status:" "$candidate" 2>/dev/null | head -1 || true)
+    _status_val=$(printf '%s' "$_status_line" \
+        | sed 's/^[[:space:]]*-[[:space:]]*status:[[:space:]]*//' \
+        | sed 's/[[:space:]]*$//' \
+        || true)
+    case "$_status_val" in
+        complete|blocked-*) continue ;;   # terminal — skip
+        *) active_candidates+=("$candidate") ;;
+    esac
+done
+
+if [ ${#active_candidates[@]} -eq 0 ]; then
+    # All candidates are terminal — no active boundary to enforce.
+    allow
+fi
+
+# ---------------------------------------------------------------------------
+# Select the newest-mtime active candidate (portable — no find -printf).
+# Strategy: use ls -t on the candidate list to get newest-first ordering,
+# then take the first result.  ls -t is POSIX and available on Git Bash,
+# macOS, and Linux without GNU extensions.
+# Fallback for single candidate: no sorting needed.
+# ---------------------------------------------------------------------------
+
+if [ ${#active_candidates[@]} -eq 1 ]; then
+    STATE_FILE="${active_candidates[0]}"
+else
+    # ls -t sorts by modification time, newest first.
+    # We pass all candidates as arguments; ls picks the newest.
+    STATE_FILE=$(ls -t "${active_candidates[@]}" 2>/dev/null | head -1 || echo "${active_candidates[0]}")
+fi
+
+if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
+    allow
+fi
 
 # ---------------------------------------------------------------------------
 # Step 4 — Read the four clarity fields with STRICT line-token parsing.
