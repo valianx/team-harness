@@ -257,6 +257,59 @@ Test each MCP server:
 
 If a server fails, show the error and suggest troubleshooting steps (check URL, check API key, check network).
 
+### 6b. Runtime probe — python3 presence
+
+After MCP config, run one python3 presence probe and act on the result. This step is advisory — setup always completes regardless of the outcome.
+
+Run: `command -v python3`
+
+**If python3 is available:** continue silently (no output for this step; the summary row will show `python3: available`).
+
+**If python3 is absent:**
+
+Report the degraded-mode advisory:
+```
+python3 not found on PATH.
+  The policy gate (hooks/policy-block.sh) will run in degraded mode:
+    - Bash denylist and sensitive-path checks still enforced (bash fallback active)
+    - HIGH_CONFIDENCE_SECRETS scan still enforced (bash fallback active)
+    - Medium-confidence entropy scan NOT available (requires python3)
+  For full coverage, install python3.
+```
+
+Then recommend installing python3 with the rationale and offer an explicit Y/n prompt:
+
+```
+Install python3 now for full secret/entropy scan coverage? [Y/n]
+```
+
+**On `n` (decline or no input):** print the above degraded-mode advisory summary and continue to Step 7. No install attempted. Setup completes normally.
+
+**On `Y` (consent):** run the OS-appropriate install command:
+
+## python3
+
+- **Windows:** run `winget install -e --id Python.Python.3.12`
+  - If `winget` is absent: print `winget not found. Install python3 manually: https://www.python.org/downloads/` and continue.
+  - If the command exits non-zero: print the error and the manual URL, then continue.
+- **macOS:** run `brew install python3`
+  - If `brew` is absent: print `brew not found. Install python3 manually: https://www.python.org/downloads/` and continue.
+  - If the command exits non-zero: print the error and continue.
+- **Linux:** detect the available manager in order (`apt-get` → `dnf` → `pacman`):
+  - `apt-get`: run `sudo apt-get install -y python3`
+  - `dnf`: run `sudo dnf install -y python3`
+  - `pacman`: run `sudo pacman -S --noconfirm python`
+  - The skill never escalates privileges itself. If `sudo` elevation fails, print the exact command for the operator to run manually and continue.
+  - If no manager is found: print manual install instructions and continue.
+
+**Post-install re-probe:** after a consented install, run `command -v python3` again.
+- If python3 is now on PATH: report `python3 installed — full secret/entropy scan now active.`
+- If python3 is still absent (re-probe fails): **Windows caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, report `python3 installed — restart the terminal for PATH refresh` (not an error). On other platforms: report the degraded-mode advisory and continue.
+
+**Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. The bash fallback floor (hooks/policy-block.sh bash path) remains the enforcement guarantee. This path changes nothing in the hook's runtime behaviour.
+
+---
+
 ### 7. Show summary
 
 Display a structured summary:
