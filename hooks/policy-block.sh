@@ -36,7 +36,15 @@ _bash_ask() {
 # ---------------------------------------------------------------------------
 # Path 1 — python3-preferred (full gate including entropy scan)
 # ---------------------------------------------------------------------------
-if command -v python3 >/dev/null 2>&1; then
+# Test that python3 is functional, not merely present as a file on PATH.
+# A shim that exits 127 (the "absent python3 simulation" in the test harness)
+# must be treated as absent so the bash degraded path runs.
+_python3_ok=false
+if command -v python3 >/dev/null 2>&1 && python3 -c '' 2>/dev/null; then
+    _python3_ok=true
+fi
+
+if [ "$_python3_ok" = "true" ]; then
     PAYLOAD="$PAYLOAD" python3 - <<'PYEOF'
 import json
 import math
