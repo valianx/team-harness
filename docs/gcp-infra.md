@@ -6,20 +6,34 @@ When the classification here and elsewhere differ, this file wins.
 
 ---
 
+## Generated vs. Run distinction (load-bearing)
+
+A **generated** script is a plan artifact produced by the agent for review and audit. A **run** script is one that has been executed. The full package — essential artifacts + executable script(s) + `02-runbook.md` — is the standard deliverable of a change-intent request.
+
+- A change-intent plan (explicitly asks to provision/configure/apply) standardly produces: essential artifacts (resource/DB structures + env inventory + change-map) + `02-apply.sh` (executable script) + `02-runbook.md` (ordered steps, inter-step checks, success criteria, rollback).
+- These deliverables are GENERATED, VALIDATED (Phase 3), and REVIEWED (Phase 3.5) but NEVER RUN without the Phase 4 STOP gate.
+- A purely read-only/inspection request still emits NO script.
+
+---
+
 ## Flow: Create → Validate → Apply
 
-The `gcp-infra` agent always follows this five-phase sequence. No phase may be skipped.
+The `gcp-infra` agent always follows this sequence. No phase may be skipped.
 
-### Phase 0 — Environment Validation
+### Phase 0 — Pre-Flight Checklist
 
 ```
+Tool availability verification (gcloud, bq, psql as needed)
 gcloud auth list
-gcloud config get project
-gcloud config get account
+Explicit --project confirmation (STOP if not pinned)
+API enablement states
+Required IAM enumeration
+Environment inventory (describe-before baseline)
+Reference Router (load on-demand reference if task is CDC/Datastream)
 ```
 
-STOP if no active account is found or no project is set (and no `--project` was supplied).
-This is the only safe-abort exit before any resource read.
+STOP if no active account is found, no project is pinned, or any required tool is absent.
+Never run against the ambient default project. Never leave hung background processes.
 
 ### Phase 1 — Read-Only Plan Baseline
 
@@ -27,7 +41,16 @@ Run `describe` / `list` against the resources named in the request. Capture the 
 state as the plan baseline. This is also the complete surface for read-only requests —
 no script is generated and no gate is presented.
 
-### Phase 2 — Script Generation
+### Phase 2 — Script Generation (Change-Intent only)
+
+Emit `02-apply.sh` to the workspace with the mandatory safety header. Also emit
+`02-runbook.md` (ordered steps, inter-step checks, success criteria, rollback per step).
+
+The plan report (`02-gcp-infra.md`) for a change-intent request must include:
+- **Assumptions and pending decisions** — listed early
+- **Alternatives** — 2–3 approaches meeting the objective, with cost/latency/complexity trade-offs and a recommendation
+- **Cost estimate** — cost drivers + order-of-magnitude estimate for new infrastructure
+- **Essential artifacts** — resource/DB structures, environment inventory, change-map
 
 Emit `02-apply.sh` to the workspace with the mandatory safety header:
 
@@ -76,6 +99,20 @@ Where no preview exists, the agent states this explicitly in the plan:
 
 Never imply a safety that does not exist.
 
+### Phase 3.5 — Automated QA / Security Review (Apply mode only)
+
+Applies after Phase 3 validation completes. Skipped for read-only / inspection requests (no script generated).
+
+The orchestrator dispatches two subagents in sequence, writing results to `02-gcp-review.md`:
+
+1. **`th:security`** — audits `02-apply.sh` for: injected secrets, ambient-project reliance, variable-interpolated verbs (contract violation), missing `--project` flags, dangerous patterns (`--recursive`/`--all` without explicit scope), over-privileged IAM bindings, and any deviation from CRITICAL RULES in `agents/gcp-infra.md`.
+
+2. **`th:qa`** — audits `02-apply.sh` and `02-runbook.md` for: idempotency violations, missing error-handling (missing `set -euo pipefail`, unguarded destructive commands), gap between plan blast-radius statement and actual script, steps in `02-runbook.md` that reference resources not in the script or vice-versa, and whether rollback steps are actionable.
+
+Both agents append their findings to `02-gcp-review.md` (a single shared audit file). Findings are rated: `CRITICAL` (blocks Phase 4), `WARNING` (surfaced in Phase 4 gate), `INFO` (informational only). At least one `CRITICAL` finding blocks the gate.
+
+The Phase 4 STOP block carries the review verdict: `02-gcp-review.md — PASS (no CRITICAL findings)` or `02-gcp-review.md — BLOCKED (N CRITICAL findings; list)`.
+
 ### Phase 4 — Operator Gate (STOP Block)
 
 ```
@@ -83,6 +120,7 @@ Never imply a safety that does not exist.
 Project: <project>           Scope: <resources>
 Operation class: READ-ONLY | MUTATING | DESTRUCTIVE
 Script: workspaces/.../02-apply.sh (validated: bash -n PASS, shellcheck <PASS|skipped>)
+QA/Security review: 02-gcp-review.md — PASS (no CRITICAL findings) | BLOCKED (N CRITICAL: <list>)
 Plan / diff (what WOULD change):
   <describe-before → intended → describe-after, per resource>
 Blast radius:
@@ -92,6 +130,7 @@ Preview availability:
 Approval required:
   MUTATING  → reply "apply" to proceed.
   DESTRUCTIVE → reply "apply destructive: <resource>" to proceed (explicit ack).
+  BLOCKED    → review must be cleared before any approval is accepted.
 No apply happens until you reply. Default action is to STOP.
 ```
 

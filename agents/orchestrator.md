@@ -227,6 +227,8 @@ workspaces/{feature-name}/
   00-gcp-costs.md          ← gcp-cost-analyzer (cost report)
   02-gcp-infra.md          ← gcp-infra (plan/apply report)
   02-apply.sh              ← gcp-infra (generated gcloud script — gated, never auto-run)
+  02-runbook.md            ← gcp-infra (ordered steps + rollback — change-intent requests only)
+  02-gcp-review.md         ← th:security + th:qa (QA/security audit of 02-apply.sh — Apply mode only)
 ```
 
 **Step 0 — workspaces base path (already resolved at boot).**
@@ -3941,7 +3943,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | translate | `translator` | none | see `ref-direct-modes.md` § Translate Mode |
 | docs | `architect` (research) → `documenter` → `diagrammer` (conditional) → `qa` | none | see `ref-special-flows.md` § Documentation Flow |
 | gcp-costs | `gcp-cost-analyzer` | gcloud auth | create workspaces → invoke → present `00-gcp-costs.md` |
-| gcp-infra | `gcp-infra` | gcloud auth | create workspaces → invoke → present `02-gcp-infra.md`; STOP gate before any apply |
+| gcp-infra | `gcp-infra` → (Apply mode only) `th:security` + `th:qa` | gcloud auth | create workspaces → invoke gcp-infra → if `02-apply.sh` present: dispatch `th:security` then `th:qa` to audit into `02-gcp-review.md`; then present Phase 4 STOP gate carrying review verdict; gate required before any apply |
 
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:
 

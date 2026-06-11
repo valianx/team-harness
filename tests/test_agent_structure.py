@@ -77,7 +77,7 @@ print("=== Suite 1: Tool allowlist per agent ===")
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
-    "qa", "qa-plan", "gcp-cost-analyzer", "init", "implementer", "tester",
+    "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery",
 ]
@@ -2298,7 +2298,7 @@ check(
 # decommission time (2026-06-02). Agents added after decommission (qa-plan, ux-reviewer)
 # are excluded from this check — modes.go is a frozen artifact; new agents go in
 # the README low-cost matrix (vestigial, for documentation only).
-MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer"}
+MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra"}
 for agent_name in EXPECTED_AGENTS:
     if agent_name in MODES_GO_EXCLUDED:
         continue
@@ -19552,6 +19552,155 @@ check(
 )
 
 # Marker: gcp-guard-hook-behavior
+
+# ---------------------------------------------------------------------------
+# Suite 88 — gcp-infra-refs-on-demand (v2.80.0)
+# Structural assertions for the gcp-infra agent on-demand reference system.
+# Written by implementer (2026-06-11). Marker: gcp-infra-refs-on-demand
+#
+# Mirrors Suite 67 (tester-lean-core-testing-refs) for the gcp-infra agent.
+# Asserts:
+#   (1) gcp-infra.md contains a Reference Router section with required tokens
+#   (2) agents/gcp-infra-refs/_index.md exists and lists the datastream kind
+#   (3) agents/gcp-infra-refs/datastream-cloudsql-bigquery.md exists
+#   (4) The playbook file has NO YAML frontmatter (reference, not an agent)
+#   (5) The playbook covers required sections (slot risk, VPC connectivity, cost)
+#   (6) gcp-infra.md is the single gcp-infra agent (no variants)
+#   (h) docs/testing.md registers Suite 88 + marker; CLAUDE.md does NOT
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 88: gcp-infra-refs-on-demand structural assertions (v2.80.0) ===")
+
+_s88_gcp_infra     = read(AGENTS_DIR / "gcp-infra.md")
+_s88_refs_dir      = AGENTS_DIR / "gcp-infra-refs"
+_s88_index_path    = _s88_refs_dir / "_index.md"
+_s88_playbook_path = _s88_refs_dir / "datastream-cloudsql-bigquery.md"
+_s88_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s88_claude        = read(REPO_ROOT / "CLAUDE.md")
+_S88_STOP          = ("\n## ", "\n### ", "\n---\n")
+
+# (1) Reference Router section exists in gcp-infra.md with required tokens
+_s88_router = _slice_section(_s88_gcp_infra, "## Reference Router", _S88_STOP)
+check(
+    "suite88(1a): gcp-infra.md contains ## Reference Router section",
+    len(_s88_router) > 0,
+    "gcp-infra.md must contain a ## Reference Router section",
+)
+check(
+    "suite88(1b): Reference Router contains '_index.md'",
+    "_index.md" in _s88_router,
+    "## Reference Router must reference '_index.md' (the manifest)",
+)
+check(
+    "suite88(1c): Reference Router contains 'datastream' trigger keyword",
+    "Datastream" in _s88_router or "datastream" in _s88_router,
+    "## Reference Router must list 'Datastream' as a trigger keyword",
+)
+check(
+    "suite88(1d): Reference Router contains fallback / degrade token",
+    "unavailable" in _s88_router.lower() or "degrade" in _s88_router.lower() or "fabricate" in _s88_router.lower(),
+    "## Reference Router must declare graceful-degradation / never-fabricate fallback",
+)
+check(
+    "suite88(1e): Reference Router contains 'reference_loaded' status field token",
+    "reference_loaded" in _s88_router,
+    "## Reference Router must reference the 'reference_loaded' status field",
+)
+
+# (1f)/(1g) WebSearch and WebFetch are granted to gcp-infra (AC-10 security-sensitive grant)
+_s88_fm = parse_frontmatter(_s88_gcp_infra)
+_s88_tools = [t.strip() for t in _s88_fm.get("tools", "").split(",")]
+check(
+    "suite88(1f): gcp-infra.md frontmatter tools includes WebSearch (AC-10 grant)",
+    "WebSearch" in _s88_tools,
+    "agents/gcp-infra.md must grant WebSearch in frontmatter tools (AC-10 security-sensitive doc-verification grant)",
+)
+check(
+    "suite88(1g): gcp-infra.md frontmatter tools includes WebFetch (AC-10 grant)",
+    "WebFetch" in _s88_tools,
+    "agents/gcp-infra.md must grant WebFetch in frontmatter tools (AC-10 security-sensitive doc-verification grant)",
+)
+
+# (2) _index.md exists and lists the datastream kind
+check(
+    "suite88(2a): agents/gcp-infra-refs/_index.md exists",
+    _s88_index_path.exists(),
+    "agents/gcp-infra-refs/_index.md must exist (Reference Router manifest)",
+)
+_s88_index_text = read(_s88_index_path) if _s88_index_path.exists() else ""
+check(
+    "suite88(2b): _index.md lists 'datastream-cloudsql-bigquery' kind",
+    "datastream-cloudsql-bigquery" in _s88_index_text,
+    "agents/gcp-infra-refs/_index.md must list the 'datastream-cloudsql-bigquery' kind",
+)
+check(
+    "suite88(2c): _index.md lists path convention",
+    "agents/gcp-infra-refs/" in _s88_index_text,
+    "agents/gcp-infra-refs/_index.md must document the path convention",
+)
+check(
+    "suite88(2d): _index.md documents fallback behavior",
+    "unavailable" in _s88_index_text.lower() or "fallback" in _s88_index_text.lower(),
+    "agents/gcp-infra-refs/_index.md must document fallback behavior when a kind file is absent",
+)
+
+# (3) Playbook file exists on disk
+check(
+    "suite88(3): agents/gcp-infra-refs/datastream-cloudsql-bigquery.md exists",
+    _s88_playbook_path.exists(),
+    "agents/gcp-infra-refs/datastream-cloudsql-bigquery.md must exist (listed in manifest, must be present on disk)",
+)
+
+# (4) Playbook has NO YAML frontmatter (reference file, not an agent)
+_s88_playbook_text = read(_s88_playbook_path) if _s88_playbook_path.exists() else ""
+check(
+    "suite88(4): datastream-cloudsql-bigquery.md has NO YAML frontmatter",
+    not _s88_playbook_text.startswith("---"),
+    "agents/gcp-infra-refs/datastream-cloudsql-bigquery.md must NOT have YAML frontmatter (reference files are not agents)",
+)
+
+# (5) Playbook covers required sections
+_s88_required_topics = [
+    ("slot", "replication slot risk"),
+    ("VPC", "VPC connectivity / peering"),
+    ("cost", "cost drivers"),
+    ("replica", "REPLICA IDENTITY"),
+    ("partition", "partitioned tables / publish_via_partition_root"),
+]
+for _token, _desc in _s88_required_topics:
+    check(
+        f"suite88(5): playbook covers '{_desc}' (token: '{_token}')",
+        _token.lower() in _s88_playbook_text.lower(),
+        f"datastream-cloudsql-bigquery.md must cover {_desc} — token '{_token}' not found",
+    )
+
+# (6) gcp-infra stays a single agent (no variants added)
+check(
+    "suite88(6a): EXPECTED_AGENTS lists 'gcp-infra' exactly once",
+    EXPECTED_AGENTS.count("gcp-infra") == 1,
+    "EXPECTED_AGENTS must list 'gcp-infra' exactly once — no gcp-infra variant was added",
+)
+check(
+    "suite88(6b): no gcp-infra-cdc.md or gcp-infra-datastream.md in agents/",
+    not (AGENTS_DIR / "gcp-infra-cdc.md").exists() and not (AGENTS_DIR / "gcp-infra-datastream.md").exists(),
+    "no gcp-infra variant agent file may exist — single gcp-infra agent only",
+)
+
+# (h1) docs/testing.md registers Suite 88 + marker
+check(
+    "suite88(h1-registry): docs/testing.md registers 'Suite 88' and 'gcp-infra-refs-on-demand'",
+    "Suite 88" in _s88_testing_md and "gcp-infra-refs-on-demand" in _s88_testing_md,
+    "docs/testing.md must name Suite 88 and the gcp-infra-refs-on-demand marker (canonical suite registry)",
+)
+
+# (h2) CLAUDE.md hygiene: §11 must NOT contain 'Suite 88'
+check(
+    "suite88(h2-hygiene): CLAUDE.md does NOT contain 'Suite 88'",
+    "Suite 88" not in _s88_claude,
+    "CLAUDE.md must not mention Suite 88 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: gcp-infra-refs-on-demand
 
 # ---------------------------------------------------------------------------
 # Summary
