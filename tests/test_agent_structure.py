@@ -19505,6 +19505,55 @@ check(
 # Marker: workspace-repo-boundary
 
 # ---------------------------------------------------------------------------
+# Suite 87 — gcp-guard-hook-behavior (v2.78.0)
+# AC-5 hygiene structural assertions.
+# Written by tester (authoring mode, 2026-06-11). Marker: gcp-guard-hook-behavior
+#
+# Asserts:
+#   (h1) tests/test_gcp_guard.sh contains the self-referential literals
+#        'Suite 87' and 'gcp-guard-hook-behavior'.
+#   (h2) docs/testing.md registers Suite 87 and the gcp-guard-hook-behavior marker
+#        (canonical registry — same precedent as Suites 84/86).
+#   (h3) CLAUDE.md does NOT contain 'Suite 87' (hygiene contract: §11 stays a
+#        2-line pointer to docs/testing.md; per-suite inventory belongs only there).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 87: gcp-guard-hook-behavior hygiene (AC-5) ===")
+
+_s87_shell_suite = read(REPO_ROOT / "tests" / "test_gcp_guard.sh")
+_s87_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s87_claude      = read(REPO_ROOT / "CLAUDE.md")
+
+# (h1) self-referential: shell test contains 'Suite 87' + 'gcp-guard-hook-behavior'
+check(
+    "suite87(h1-self-ref): tests/test_gcp_guard.sh contains 'Suite 87'"
+    " and 'gcp-guard-hook-behavior'",
+    "Suite 87" in _s87_shell_suite and "gcp-guard-hook-behavior" in _s87_shell_suite,
+    "tests/test_gcp_guard.sh must contain the literals 'Suite 87' and"
+    " 'gcp-guard-hook-behavior' (AC-5 self-referential guard)",
+)
+
+# (h2) docs/testing.md canonical registry registers Suite 87 + feature marker
+check(
+    "suite87(h2-registry): docs/testing.md registers 'Suite 87'"
+    " and 'gcp-guard-hook-behavior'",
+    "Suite 87" in _s87_testing_md and "gcp-guard-hook-behavior" in _s87_testing_md,
+    "docs/testing.md must name Suite 87 and the gcp-guard-hook-behavior marker"
+    " (canonical suite registry)",
+)
+
+# (h3) CLAUDE.md hygiene: §11 must NOT contain 'Suite 87'
+# The section + suite register in docs/testing.md; §11 stays a pointer.
+check(
+    "suite87(h3-hygiene): CLAUDE.md does NOT contain 'Suite 87'",
+    "Suite 87" not in _s87_claude,
+    "CLAUDE.md must not mention Suite 87 — only docs/testing.md is the canonical"
+    " registry (§11 hygiene contract)",
+)
+
+# Marker: gcp-guard-hook-behavior
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
