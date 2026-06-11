@@ -1668,7 +1668,7 @@ This is an extension of the Tier-1-fix authoring pattern (see `## Phase 1` above
 **Sketch-guard invocation (before emitting STOP block).** Before assembling the STOP block, invoke `hooks/sketch-guard.sh` with the workspace path as the argument. Resolve the script through the 3-tier chain (plugin cache → `~/.claude/hooks/` → `./hooks/`):
 
 ```bash
-# 3-tier resolution: plugin cache -> ~/.claude/hooks/ -> ./hooks/
+#3-tier resolution: plugin cache -> ~/.claude/hooks/ -> ./hooks/
 PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
 SKETCH_GUARD=""
 if [ -d "$PLUGIN_BASE" ]; then
