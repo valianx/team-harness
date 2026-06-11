@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes (research, design, test, validate, deliver, review, init, define-ac, diagram, d2-diagram, test-pipeline, translate, gcp-costs, docs) from standalone skills. Manages workspaces as the shared board between agents.
+description: Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes (research, design, test, validate, deliver, review, init, define-ac, diagram, d2-diagram, test-pipeline, translate, gcp-costs, gcp-infra, docs) from standalone skills. Manages workspaces as the shared board between agents.
 model: opus
 effort: high
 color: cyan
@@ -146,6 +146,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `ux-reviewer` | Reviews frontend tasks for UI/UX quality — accessibility, responsiveness, component reuse | No | `01-ux-review.md` (enrich), `04-ux-validation.md` (validate) |
 | `diagrammer` | Generates Excalidraw diagrams from architect analysis | No | `05-diagram.md` |
 | `gcp-cost-analyzer` | Analyzes GCP costs, inventories resources, fetches recommendations, produces optimization report | No | `00-gcp-costs.md` |
+| `gcp-infra` | Manages GCP infrastructure via gated gcloud create→validate→apply scripts; read+plan default, mutation hard-gated behind operator confirmation | No | `02-gcp-infra.md` |
 
 > **Standalone agents** (not in pipeline, invoked directly by the user or via dedicated skills — never by the orchestrator): `translator`, `reviewer`, `agent-builder`. The `reviewer` agent is never bare-dispatched by the orchestrator. When the operator expresses a PR-review intent ("review this PR", "revisa el PR #N"), the orchestrator routes that intent to the `/th:review-pr` skill flow — the canonical pipeline for PR reviews — which internally uses the reviewer panel. This satisfies the dev-mode "review → pipeline" disposition without contradicting the standalone rule: the orchestrator routes to the skill flow, not to the agent directly. Similarly, the `agent-builder` agent is never bare-dispatched by the orchestrator. When the operator expresses an agent/skill-building intent ("create an agent", "design a skill", "improve an agent"), the orchestrator routes that intent to the `/th:agent-builder` skill flow — the canonical pipeline for agent/skill creation — routing the INTENT to the flow, not dispatching the agent directly. **Residual limit:** Claude Code's native agent-description selector can dispatch `th:agent-builder` by its description before the orchestrator sees the turn (host-layer bypass). No hook can intercept native agent selection. The Step 6a route therefore covers only orchestrator-mediated requests; the host native auto-selection bypass is outside TH's control surface and is not claimed as fixed by this route.
 
@@ -224,6 +225,8 @@ workspaces/{feature-name}/
   diagram.excalidraw       ← diagrammer (output)
   00-translation.md        ← translator (glossary + report)
   00-gcp-costs.md          ← gcp-cost-analyzer (cost report)
+  02-gcp-infra.md          ← gcp-infra (plan/apply report)
+  02-apply.sh              ← gcp-infra (generated gcloud script — gated, never auto-run)
 ```
 
 **Step 0 — workspaces base path (already resolved at boot).**
@@ -3938,6 +3941,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | translate | `translator` | none | see `ref-direct-modes.md` § Translate Mode |
 | docs | `architect` (research) → `documenter` → `diagrammer` (conditional) → `qa` | none | see `ref-special-flows.md` § Documentation Flow |
 | gcp-costs | `gcp-cost-analyzer` | gcloud auth | create workspaces → invoke → present `00-gcp-costs.md` |
+| gcp-infra | `gcp-infra` | gcloud auth | create workspaces → invoke → present `02-gcp-infra.md`; STOP gate before any apply |
 
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:
 
