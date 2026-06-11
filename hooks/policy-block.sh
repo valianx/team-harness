@@ -179,6 +179,9 @@ if tool == "Bash":
     if re.search(r"\bgit\s+commit\b", cmd):
         scan_for_secrets(cmd)
 elif tool in ("Write", "Edit", "NotebookEdit"):
+    # F-015: normalise Windows backslash separators before SENSITIVE_PATHS matching.
+    # The (^|/) anchors in SENSITIVE_PATHS only fire on forward-slash paths;
+    # a raw Windows path like "C:\Users\x\.ssh\id_rsa" passes through without this.
     path = tool_input.get("file_path", "").replace("\\", "/")
     if path.endswith((".env.example", ".env.sample", ".env.template")):
         sys.exit(0)
