@@ -277,7 +277,9 @@ python3 not found on PATH.
   For full coverage, install python3.
 ```
 
-Then recommend installing python3 with the rationale and offer an explicit Y/n prompt:
+Then offer an explicit consent prompt:
+
+## python3
 
 ```
 Install python3 now for full secret/entropy scan coverage? [Y/n]
@@ -286,8 +288,6 @@ Install python3 now for full secret/entropy scan coverage? [Y/n]
 **On `n` (decline or no input):** print the above degraded-mode advisory summary and continue to Step 7. No install attempted. Setup completes normally.
 
 **On `Y` (consent):** run the OS-appropriate install command:
-
-## python3
 
 - **Windows:** run `winget install -e --id Python.Python.3.12`
   - If `winget` is absent: print `winget not found. Install python3 manually: https://www.python.org/downloads/` and continue.

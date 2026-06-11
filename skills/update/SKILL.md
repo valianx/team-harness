@@ -246,7 +246,11 @@ except Exception:
 
 6b. **Runtime probe — python3 presence (advisory).** After the managed-block sync, run `command -v python3`. This step is advisory — update always completes regardless of the outcome. If python3 is available, record `python3: available` for the final report (Step 7) and continue silently.
 
-If python3 is absent: record `python3: WARN: absent — policy gate running degraded` for the final report, then recommend installing python3 with the rationale and offer a Y/n prompt. Because Step 6's output discipline requires a single final report, the Y/n prompt for python3 install is the ONLY inline message permitted by this step (all other progress is silent). Present:
+If python3 is absent: record `python3: WARN: absent — policy gate running degraded` for the final report, then recommend installing python3 with the rationale and offer a Y/n prompt. Because Step 6's output discipline requires a single final report, the Y/n prompt for python3 install is the ONLY inline message permitted by this step (all other progress is silent).
+
+## python3
+
+Present:
 
 ```
 python3 not found on PATH — policy gate running in degraded mode.
@@ -258,8 +262,6 @@ Install python3 now for full coverage? [Y/n]
 **On `n` (decline):** continue to Step 7. Print nothing further for this step; the degraded status appears in the `python3` row of the final report.
 
 **On `Y` (consent):** run the OS-appropriate install command:
-
-## python3
 
 - **Windows:** run `winget install -e --id Python.Python.3.12`
   - If `winget` is absent: print `winget not found — install manually: https://www.python.org/downloads/` and continue.
