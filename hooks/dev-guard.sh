@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # hooks/dev-guard.sh
+# fix(dev-guard): escape-aware command extraction in bash fallback (F-016, #304)
 # PreToolUse hook — deterministic outward-action gate for dev mode.
 #
 # Wired via hooks/config.json (Go installer) and .claude-plugin/hooks.json
@@ -106,7 +107,35 @@ deny() {
 # ---------------------------------------------------------------------------
 input="$(cat)"
 
+# Resolve _json-extract.sh shared helper via the same 3-tier chain as sketch-guard
+# (plugin cache -> ~/.claude/hooks/ -> ./hooks/). Sourcing it gives us the
+# extract_json_string_field function that uses the F-016-safe [\\] bracket form.
+# If the helper is not found on any path, fall back to the inline pattern below.
+_JSON_EXTRACT_HELPER=""
+_PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
+if [ -d "$_PLUGIN_BASE" ]; then
+    _LATEST=$(ls -1 "$_PLUGIN_BASE" 2>/dev/null | sort -V | tail -1)
+    if [ -n "$_LATEST" ] && [ -f "$_PLUGIN_BASE/$_LATEST/hooks/_json-extract.sh" ]; then
+        _JSON_EXTRACT_HELPER="$_PLUGIN_BASE/$_LATEST/hooks/_json-extract.sh"
+    fi
+fi
+if [ -z "$_JSON_EXTRACT_HELPER" ] && [ -f "${HOME}/.claude/hooks/_json-extract.sh" ]; then
+    _JSON_EXTRACT_HELPER="${HOME}/.claude/hooks/_json-extract.sh"
+fi
+if [ -z "$_JSON_EXTRACT_HELPER" ]; then
+    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+    if [ -f "${_SCRIPT_DIR}/_json-extract.sh" ]; then
+        _JSON_EXTRACT_HELPER="${_SCRIPT_DIR}/_json-extract.sh"
+    fi
+fi
+if [ -n "$_JSON_EXTRACT_HELPER" ]; then
+    # shellcheck source=hooks/_json-extract.sh
+    . "$_JSON_EXTRACT_HELPER"
+fi
+
 # Extract command from JSON payload. Two paths: python3 (preferred) or grep fallback.
+# The grep fallback uses the F-016-safe bracket form [\\] for escape sequences;
+# when the shared helper is loaded, its extract_json_string_field is used instead.
 cmd=""
 if command -v python3 >/dev/null 2>&1; then
     cmd=$(python3 -c "
@@ -118,9 +147,25 @@ try:
 except Exception:
     print('')
 " <<< "$input" 2>/dev/null || true)
+elif type extract_json_string_field >/dev/null 2>&1; then
+    # Shared helper available — use the F-016-safe extractor.
+    cmd=$(extract_json_string_field "command" "$input")
 else
-    cmd=$(printf '%s' "$input" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
-        | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)"/\1/' 2>/dev/null || true)
+    # Inline F-016-safe fallback: bracket form [\\] for the backslash (escape sequences).
+    # The conventional \\.  ERE escape silently fails on GNU grep 3.0 (Git for Windows).
+    cmd=$(printf '%s' "$input" \
+        | grep -oE '"command"[[:space:]]*:[[:space:]]*"([\\].|[^"\\])*"' | head -1 \
+        | sed -E 's/^"command"[[:space:]]*:[[:space:]]*"(.*)"$/\1/' \
+        2>/dev/null || true)
+fi
+
+# Defence-in-depth (F-016): if extraction yields empty or a trailing-backslash value on
+# a Bash payload, scan the raw JSON for covered destination patterns and ask.
+# An extra ask is the fail-safe direction (never converts ask -> allow on error).
+if [ -z "$cmd" ] && printf '%s' "$input" | grep -q '"tool_name"[[:space:]]*:[[:space:]]*"Bash"' 2>/dev/null; then
+    if printf '%s' "$input" | grep -qE '(git\s+push|gh\s+pr\s+merge|gh\s+pr\s+review|gh\s+pr\s+comment|gh\s+api.*pulls|api\.github\.com)' 2>/dev/null; then
+        ask "dev mode active — outward action detected in raw payload (escape-aware extraction fallback; requires explicit operator approval)"
+    fi
 fi
 
 # If we cannot extract a command (e.g. Edit/Write payloads carry no command
