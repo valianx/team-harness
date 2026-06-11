@@ -252,3 +252,27 @@ or via the full suite:
 ```
 bash tests/run-all.sh
 ```
+
+---
+
+## 10. Workspace–Repository Boundary
+
+**Sketch conventions govern only the workspace.** Sketches (`sketches/*.md`) are throwaway
+decision aids produced for a single pipeline run. Their format, layout, and naming
+conventions are workspace-internal and do not carry forward into the repository.
+
+**Repository files follow the repository's own conventions.** When an agent writes or
+updates a repository file — source code, configuration, or an existing spec — it follows
+the repository's established format, filename, and structure for that file.
+
+**OpenAPI spec format is preserved as-is.** A repository's own `openapi/openapi.{yaml,yml,json}`
+keeps its existing format, filename, and structure. An agent must preserve the existing
+format when reading and updating the spec. The JSON api-contract sketch (`sketches/api-contract.md`)
+is a workspace decision aid; it is never a template that dictates the format or filename
+of a repository's own OpenAPI file. A repository whose spec is `openapi.json` keeps `.json`;
+a repository whose spec is `openapi.yaml` or `openapi.yml` keeps `.yaml`/`.yml`.
+
+This boundary invariant is referenced by format-preservation guards in:
+- `agents/implementer.md` — Phase 0 Step 3b
+- `agents/delivery.md` — Step 8 (Update OpenAPI)
+- `agents/architect.md` — api-contract skeleton quality note

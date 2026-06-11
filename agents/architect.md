@@ -758,6 +758,8 @@ Use these as starting points; fill in the actual content from the design:
 
 **`sketches/api-contract.md`**
 
+**Workspace-only note:** this JSON sketch is a workspace decision aid — it is never a template for a repository's own OpenAPI file, which keeps its existing format and filename. (Canonical: `docs/plan-sketches.md §10`.)
+
 **Quality bar (api-contract):** resource-oriented paths + HTTP verbs map to operations; model EVERY distinct operation the change introduces as its own `METHOD /path` block (do not collapse create+update into one multiplexing endpoint); show actual nested fields with real example values for every object the change introduces or modifies — an opaque `{}` or `"...": "object"` placeholder on a changed field is PROHIBITED. An action/RPC endpoint (`/sync`) is allowed ONLY as a deliberate, stated design — justify it in `## Notes`. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
 
 ```markdown

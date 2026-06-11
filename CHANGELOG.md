@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.77.0] - 2026-06-11
+
+### Fixed
+
+- Scoped sketch conventions (format, layout, naming) to the workspace; a repository's own `openapi/openapi.{yaml,yml,json}` now keeps its existing format, filename, and structure — agents no longer restructure repo specs to match a workspace api-contract sketch. Canonical boundary invariant added to `docs/plan-sketches.md §10` and referenced by format-preservation guards in `agents/implementer.md`, `agents/delivery.md`, and `agents/architect.md`.
+
 ## [2.75.0] - 2026-06-10
 
 ### Changed
