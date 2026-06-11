@@ -152,6 +152,31 @@ Result:
 ---
 name: lint
 
+## Check 8 — Hook runtime health
+
+Verify that each wired hook script is healthy and that the runtime environment supports the full gate coverage.
+
+1. **python3 probe:** run `command -v python3`. If absent:
+   - Report `[WARN] policy gate running degraded — install python3 for the full secret/entropy scan; the bash fallback still enforces the high-confidence floor`
+   - Note: `hooks/dev-guard.sh` is also affected (grep fallback active)
+2. **Wired-script-resolves-on-disk:** for each hook script referenced in `.claude-plugin/hooks.json` (and/or `~/.claude/settings.json` when readable), verify the script path resolves on disk via the documented chain:
+   - `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/hooks/<script>` (plugin installs)
+   - `~/.claude/hooks/<script>` (Go-installer installs)
+   - `./hooks/<script>` (team-harness clone)
+   For each script that does not resolve via any chain path:
+   - Report `[FAIL] <hook-script> wired but not found on disk — gate is dead`
+3. **Obsidian checkpoint coverage:** read `~/.claude/.team-harness.json`. If `logs-mode: obsidian`:
+   - Report `[INFO] obsidian mode: checkpoint-guard resolves vault state from ${logs-path}/${logs-subfolder} (F-010 fix applied)` if the fix is in place
+   - Report `[WARN] obsidian mode active — checkpoint-guard may not cover vault-resident state (upgrade to fix F-010)` if coverage cannot be confirmed
+
+Result:
+- **PASS** if python3 is available and all wired hook scripts resolve on disk
+- **WARN** if python3 is absent (degraded mode — bash fallback enforces the high-confidence floor; entropy scan unavailable) or obsidian coverage is partial
+- **FAIL** if any wired hook script does not resolve on disk (gate is dead)
+
+---
+name: lint
+
 ## Check 7 — Model + effort matrix (canonical)
 
 Enforce the canonical `model` + `effort` assignment from the Roster table in `agents/README.md`. Drift between any agent's frontmatter and the README table fails the check.
@@ -268,8 +293,14 @@ Agents checked: {N} | {N matched} | {mismatches or "all canonical"}
 {for each mismatch: "  {agent}: model {actual}→{expected}, effort {actual}→{expected}"}
 {if any effort: low found: "  {agent}: effort 'low' is forbidden — floor is 'medium'"}
 
+--- Check 8: Hook runtime health ---
+Status: {PASS|WARN|FAIL}
+python3:  {available | WARN: absent — policy gate running degraded}
+wired-scripts: {N resolved on disk | FAIL: <script> wired but not found on disk — gate is dead}
+obsidian: {coverage confirmed | WARN: obsidian mode — verify F-010 fix | N/A (local mode)}
+
 ====================================
-  Result: {X} / 7 checks passed
+  Result: {X} / 8 checks passed
 ====================================
 {if --fix applied: "\n--- Auto-fix applied ---\n{list of fixes}"}
 ```

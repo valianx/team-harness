@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # hooks/dev-guard.sh
+# fix(dev-guard): escape-aware command extraction in bash fallback (F-016, #304)
 # PreToolUse hook — deterministic outward-action gate for dev mode.
 #
 # Wired via hooks/config.json (Go installer) and .claude-plugin/hooks.json
-# (plugin runtime) as its OWN PreToolUse entry with matcher:"Bash".
-# policy-block.sh is wired separately with matcher:"Bash|Write|Edit|NotebookEdit"
-# so it continues to secret-scan write/edit content. Reads tool_input from
+# (plugin runtime) as its OWN PreToolUse entry with matcher:"Bash" (outward Bash
+# actions) AND a second entry with matcher:"mcp__.*__clickup_..." (ClickUp MCP
+# outward writes). policy-block.sh is wired separately with
+# matcher:"Bash|Write|Edit|NotebookEdit" for secret-scan. Reads tool_input from
 # stdin; intercepts outward/mutating actions when dev mode is active.
 #
 # Contract: docs/dev-mode.md § Outward-Action Gate
@@ -106,7 +108,87 @@ deny() {
 # ---------------------------------------------------------------------------
 input="$(cat)"
 
+# ---------------------------------------------------------------------------
+# Step 1a — Detect ClickUp MCP outward-write tool calls (D1, F-008).
+# The matcher mcp__.*__clickup_(update_task|create_task|...) fires for any
+# registered ClickUp MCP server (server segment is registration-dependent and
+# must not be hard-coded). We extract tool_name and, if it matches the ClickUp
+# write pattern, issue ask when dev mode is active.
+# This branch runs before the Bash cmd-extraction path — ClickUp payloads have
+# no "command" field and would otherwise produce an empty cmd and nodecision.
+# ---------------------------------------------------------------------------
+_tool_name=""
+if command -v python3 >/dev/null 2>&1; then
+    _tool_name=$(python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    print(data.get('tool_name', ''))
+except Exception:
+    print('')
+" <<< "$input" 2>/dev/null || true)
+else
+    _tool_name=$(printf '%s' "$input" \
+        | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
+        | sed 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
+fi
+
+# ClickUp write pattern: mcp__ + any server segment (including underscores, for multi-word
+# MCP server names that Claude Code normalizes spaces-to-underscores) + __clickup_(write verbs).
+# fix(dev-guard): SEC-001 — mirror wiring semantics (.+) so multi-word servers match (#304)
+_clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
+if printf '%s' "$_tool_name" | grep -qE "^${_clickup_write_pattern}" 2>/dev/null; then
+    # ClickUp MCP outward write detected. Check dev mode marker.
+    if [ -f "$DEV_MODE_MARKER" ]; then
+        _marker_check=""
+        _marker_check=$(cat "$DEV_MODE_MARKER" 2>/dev/null || true)
+        _marker_active=false
+        if [ -z "$_marker_check" ]; then
+            _marker_active=true
+        elif printf '%s\n' "$_marker_check" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*true[[:space:]]*$" 2>/dev/null; then
+            _marker_active=true
+        elif printf '%s\n' "$_marker_check" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*false[[:space:]]*" 2>/dev/null; then
+            _marker_active=false
+        else
+            _marker_active=true  # corrupt/unreadable — fail-CLOSED
+        fi
+        if [ "$_marker_active" = "true" ]; then
+            ask "dev mode active — ClickUp MCP outward write ($_tool_name) requires explicit operator approval; preview the change before confirming (dev-guard.sh D1; see docs/dev-mode.md)"
+        fi
+    fi
+    # Marker absent or dev mode inactive — no decision (defer to normal flow).
+    nodecision
+fi
+
+# Resolve _json-extract.sh shared helper via the same 3-tier chain as sketch-guard
+# (plugin cache -> ~/.claude/hooks/ -> ./hooks/). Sourcing it gives us the
+# extract_json_string_field function that uses the F-016-safe [\\] bracket form.
+# If the helper is not found on any path, fall back to the inline pattern below.
+_JSON_EXTRACT_HELPER=""
+_PLUGIN_BASE="${HOME}/.claude/plugins/cache/team-harness-marketplace/th"
+if [ -d "$_PLUGIN_BASE" ]; then
+    _LATEST=$(ls -1 "$_PLUGIN_BASE" 2>/dev/null | sort -V | tail -1)
+    if [ -n "$_LATEST" ] && [ -f "$_PLUGIN_BASE/$_LATEST/hooks/_json-extract.sh" ]; then
+        _JSON_EXTRACT_HELPER="$_PLUGIN_BASE/$_LATEST/hooks/_json-extract.sh"
+    fi
+fi
+if [ -z "$_JSON_EXTRACT_HELPER" ] && [ -f "${HOME}/.claude/hooks/_json-extract.sh" ]; then
+    _JSON_EXTRACT_HELPER="${HOME}/.claude/hooks/_json-extract.sh"
+fi
+if [ -z "$_JSON_EXTRACT_HELPER" ]; then
+    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+    if [ -f "${_SCRIPT_DIR}/_json-extract.sh" ]; then
+        _JSON_EXTRACT_HELPER="${_SCRIPT_DIR}/_json-extract.sh"
+    fi
+fi
+if [ -n "$_JSON_EXTRACT_HELPER" ]; then
+    # shellcheck source=hooks/_json-extract.sh
+    . "$_JSON_EXTRACT_HELPER"
+fi
+
 # Extract command from JSON payload. Two paths: python3 (preferred) or grep fallback.
+# The grep fallback uses the F-016-safe bracket form [\\] for escape sequences;
+# when the shared helper is loaded, its extract_json_string_field is used instead.
 cmd=""
 if command -v python3 >/dev/null 2>&1; then
     cmd=$(python3 -c "
@@ -118,9 +200,25 @@ try:
 except Exception:
     print('')
 " <<< "$input" 2>/dev/null || true)
+elif type extract_json_string_field >/dev/null 2>&1; then
+    # Shared helper available — use the F-016-safe extractor.
+    cmd=$(extract_json_string_field "command" "$input")
 else
-    cmd=$(printf '%s' "$input" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
-        | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)"/\1/' 2>/dev/null || true)
+    # Inline F-016-safe fallback: bracket form [\\] for the backslash (escape sequences).
+    # The conventional \\.  ERE escape silently fails on GNU grep 3.0 (Git for Windows).
+    cmd=$(printf '%s' "$input" \
+        | grep -oE '"command"[[:space:]]*:[[:space:]]*"([\\].|[^"\\])*"' | head -1 \
+        | sed -E 's/^"command"[[:space:]]*:[[:space:]]*"(.*)"$/\1/' \
+        2>/dev/null || true)
+fi
+
+# Defence-in-depth (F-016): if extraction yields empty or a trailing-backslash value on
+# a Bash payload, scan the raw JSON for covered destination patterns and ask.
+# An extra ask is the fail-safe direction (never converts ask -> allow on error).
+if [ -z "$cmd" ] && printf '%s' "$input" | grep -q '"tool_name"[[:space:]]*:[[:space:]]*"Bash"' 2>/dev/null; then
+    if printf '%s' "$input" | grep -qE '(git\s+push|gh\s+pr\s+merge|gh\s+pr\s+review|gh\s+pr\s+comment|gh\s+api.*pulls|api\.github\.com)' 2>/dev/null; then
+        ask "dev mode active — outward action detected in raw payload (escape-aware extraction fallback; requires explicit operator approval)"
+    fi
 fi
 
 # If we cannot extract a command (e.g. Edit/Write payloads carry no command

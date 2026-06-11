@@ -18,7 +18,15 @@ Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"
 **These rules are mandatory and override any `next_action` prose in `00-state.md`.**
 
 **Rule 1 — Re-emit any un-cleared STAGE-GATE (fail-closed).**
-Before resuming any pipeline work, check whether the current or next step is a STAGE-GATE. A STAGE-GATE is considered cleared ONLY when a `stage.gate.release` event is present in the events trace (`00-execution-events.{md,jsonl}`) AND the corresponding flag is set in `00-state.md § Current State`. Do not infer approval from `next_action` prose — never infer gate-cleared status from `next_action`, `hot_context`, or any other prose field. The gate-cleared determination is structural (checklist + events trace), not prose. If the STAGE-GATE is not recorded as cleared by these structural signals, re-emit the STOP block for that STAGE-GATE to the operator and halt. STAGE-GATE-3 (the human push/PR gate) is especially critical: it must never be bypassed on recovery.
+Before resuming any pipeline work, check whether the current or next step is a STAGE-GATE. A STAGE-GATE is considered cleared ONLY when BOTH structural conditions hold:
+
+(a) A `stage.gate.release` event is present in the events trace (`00-execution-events.{md,jsonl}`), AND
+(b) The per-gate release field in `00-state.md § Current State` is set to a value in the gate's clear-allowlist:
+  - STAGE-GATE-1: `gate1_release ∈ {approved, approved-autonomous}`
+  - STAGE-GATE-2: `gate2_release_last ∈ {next, next-autonomous}` (for the relevant `after_round`)
+  - STAGE-GATE-3: `gate3_release = ship`
+
+Any other decision value (`rejected`, `edit`, `stop`, `redo`, `amend`, `abort`), a null field, or a missing field means the gate is NOT cleared. In that case re-emit the STOP block for that STAGE-GATE to the operator and halt. Do not infer approval from `next_action` prose — never infer gate-cleared status from `next_action`, `hot_context`, or any other prose field. The gate-cleared determination is structural (per-gate release field + events trace), not prose. STAGE-GATE-3 (the human push/PR gate) is especially critical: it must never be bypassed on recovery.
 
 **Rule 2 — Idempotency: skip completed phases; de-dup events structurally.**
 The Phase Checklist (`## Phase Checklist` in `00-state.md`) is the authoritative record of progress. Phases already marked `[x]` MUST be skipped — do not re-dispatch a completed phase. To de-dup `phase.*`/`kg_write` appends on resume, use a structural lookup (JSON parse of the events trace, not regex) to detect already-emitted events before appending new ones. This prevents duplicate events and double-persisted KG nodes.

@@ -244,6 +244,44 @@ except Exception:
    fi
    ```
 
+6b. **Runtime probe — python3 presence (advisory).** After the managed-block sync, run `command -v python3`. This step is advisory — update always completes regardless of the outcome. If python3 is available, record `python3: available` for the final report (Step 7) and continue silently.
+
+If python3 is absent: record `python3: WARN: absent — policy gate running degraded` for the final report, then recommend installing python3 with the rationale and offer a Y/n prompt. Because Step 6's output discipline requires a single final report, the Y/n prompt for python3 install is the ONLY inline message permitted by this step (all other progress is silent).
+
+## python3
+
+Present:
+
+```
+python3 not found on PATH — policy gate running in degraded mode.
+  Bash denylist, sensitive-path, and HIGH_CONFIDENCE_SECRETS checks remain active (bash fallback).
+  Medium-confidence entropy scan requires python3.
+Install python3 now for full coverage? [Y/n]
+```
+
+**On `n` (decline):** continue to Step 7. Print nothing further for this step; the degraded status appears in the `python3` row of the final report.
+
+**On `Y` (consent):** run the OS-appropriate install command:
+
+- **Windows:** run `winget install -e --id Python.Python.3.12`
+  - If `winget` is absent: print `winget not found — install manually: https://www.python.org/downloads/` and continue.
+  - If the command exits non-zero: print the error and the manual URL, then continue.
+- **macOS:** run `brew install python3`
+  - If `brew` is absent: print `brew not found — install manually: https://www.python.org/downloads/` and continue.
+  - If the command exits non-zero: print the error and continue.
+- **Linux:** detect the available manager in order (`apt-get` → `dnf` → `pacman`):
+  - `apt-get`: run `sudo apt-get install -y python3`
+  - `dnf`: run `sudo dnf install -y python3`
+  - `pacman`: run `sudo pacman -S --noconfirm python`
+  - The skill never escalates privileges itself. If `sudo` elevation fails, print the exact command for the operator to run manually and continue.
+  - If no manager is found: print manual install instructions and continue.
+
+**Post-install re-probe:** run `command -v python3` after a consented install.
+- If available: update the `python3` row to `python3 installed — full coverage active`.
+- If still absent: **Windows PATH caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, update the row to `python3 installed — restart the terminal for PATH refresh`. On other platforms: record the degraded advisory and continue.
+
+**Failed install / declined / unavailable manager:** record the degraded status in the `python3` row and continue. The bash fallback floor remains the enforcement guarantee.
+
 7. **Emit the final report** — the single operator-facing message. Use the matching template below verbatim in structure (a fenced status block), filling the values from the run. Align the values into one column. Keep the labels lowercase as shown. Render the closing line outside the fence.
 
    **(a) A new version was downloaded** (step 5 ran):
@@ -255,6 +293,7 @@ except Exception:
      downloaded version  <Y>
      managed blocks      <per-block outcome, e.g. "synced (orchestrator-dispatch-rule updated)" or "in sync (3/3)">
      dev mode            <"marker written (default-on)" | "marker not written (opt-out: off)">
+     python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `Next: /reload-plugins (or restart Claude Code) to activate <Y>.`
 
@@ -267,6 +306,7 @@ except Exception:
      latest version      <X>
      managed blocks      <e.g. "in sync (3/3)" or "synced (nested-dispatch-takeover updated)">
      dev mode            <"marker written (default-on)" | "marker not written (opt-out: off)">
+     python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `No action required.`
 

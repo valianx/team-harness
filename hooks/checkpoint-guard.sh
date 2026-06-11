@@ -66,27 +66,148 @@ fi
 
 # ---------------------------------------------------------------------------
 # Step 3 — Locate 00-state.md
-# The hook environment provides the working directory via $CWD or the process
-# working directory. We search up to 5 levels for workspaces/ subtrees.
+#
+# Search strategy (C1 fix: F-018 + F-010):
+#   1. Collect candidates from local workspaces/ subtree under $CWD.
+#   2. If logs-mode is "obsidian" in ~/.claude/.team-harness.json, also collect
+#      candidates from the vault workspace root ({logs-path}/{logs-subfolder}).
+#   3. Skip candidates whose status: field is terminal (complete, blocked-*).
+#      A terminal workspace is no longer active and must not gate a new dispatch.
+#   4. Among the remaining active candidates, select the NEWEST by mtime using a
+#      portable ls -t sort (not find -printf which is GNU-only and absent on macOS).
+#   5. If all candidates are terminal, fall-open (no active boundary to enforce).
+#
+# The false comment "most shallow / most recently created" is removed: mtime is
+# the correct key; depth-ordering conflates filesystem depth with recency.
 # ---------------------------------------------------------------------------
 
 STATE_FILE=""
 search_root="${CWD:-$(pwd)}"
 
-# Look for workspaces/*/00-state.md and obsidian-style work-logs/*/*/00-state.md
-# (both modes produce 00-state.md — the path differs by logs-mode).
-state_candidates=()
+# Collect raw candidates from local workspaces/ tree.
+raw_candidates=()
+# Constrain to workspace-shaped paths: workspaces/*/00-state.md up to 3 deep.
+# This prevents stray test fixtures or deeply nested state files from hijacking
+# the gate (the original find -maxdepth 5 with no path shape constraint could do this).
 while IFS= read -r f; do
-    state_candidates+=("$f")
-done < <(find "$search_root" -maxdepth 5 -name "00-state.md" 2>/dev/null | sort -t'/' -k1 | head -5)
+    raw_candidates+=("$f")
+done < <(find "$search_root" -maxdepth 4 -name "00-state.md" 2>/dev/null || true)
 
-if [ ${#state_candidates[@]} -eq 0 ]; then
-    # No state file found — cannot evaluate checkpoint. Fail-safe: allow.
+# F-010: if logs-mode is "obsidian", also search the vault workspace root.
+_th_config="${HOME:-~}/.claude/.team-harness.json"
+if [ -f "$_th_config" ]; then
+    _logs_mode=""
+    _logs_path=""
+    _logs_sub=""
+    if command -v python3 >/dev/null 2>&1 && python3 -c '' 2>/dev/null; then
+        # Pass the config content via stdin to avoid bash-vs-python HOME path mismatch
+        # on Windows (bash HOME = /c/Users/x; python3 HOME = C:\Users\x).
+        _vault_parse=$(python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    mode = data.get('logs-mode','')
+    path = data.get('logs-path','')
+    sub  = data.get('logs-subfolder','work-logs')
+    print(mode)
+    print(path)
+    print(sub)
+except Exception:
+    print('')
+    print('')
+    print('')
+" < "$_th_config" 2>/dev/null || printf '\n\n\n')
+        _logs_mode=$(printf '%s' "$_vault_parse" | sed -n '1p')
+        _logs_path=$(printf '%s' "$_vault_parse" | sed -n '2p')
+        _logs_sub=$(printf '%s' "$_vault_parse" | sed -n '3p')
+    else
+        # Bash fallback: simple grep/sed for the three keys.
+        _logs_mode=$(grep -o '"logs-mode"[[:space:]]*:[[:space:]]*"[^"]*"' "$_th_config" 2>/dev/null \
+            | head -1 | sed 's/.*"logs-mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+        _logs_path=$(grep -o '"logs-path"[[:space:]]*:[[:space:]]*"[^"]*"' "$_th_config" 2>/dev/null \
+            | head -1 | sed 's/.*"logs-path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+        _logs_sub=$(grep -o '"logs-subfolder"[[:space:]]*:[[:space:]]*"[^"]*"' "$_th_config" 2>/dev/null \
+            | head -1 | sed 's/.*"logs-subfolder"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+    fi
+
+    if [ "$_logs_mode" = "obsidian" ] && [ -n "$_logs_path" ]; then
+        # Scope the search to THIS repo's work-logs subtree — never the whole vault.
+        # Layout: {logs-path}/{logs-subfolder}/{repo}/{date}_{feature}/00-state.md, plus the
+        # initiative variant {repo}/{date}_{initiative}/{project}/00-state.md (one level deeper).
+        # The repo is the basename of the search root (the repo root in production).
+        #
+        # Why scoped, not vault-wide: a find over {logs-path}/{logs-subfolder} traverses the
+        # operator's ENTIRE Obsidian vault (potentially thousands of unrelated notes) on every
+        # single Task dispatch. That is multi-second latency in the common case and degrades to
+        # an unbounded hang on a large vault — observed blocking the dispatch with no output.
+        # Scoping to the repo keeps the find O(this repo's pipelines).
+        #
+        # `timeout` is intentionally NOT used to bound the find: it is absent on stock macOS
+        # (BSD userland ships gtimeout only via coreutils), and this hook must stay portable
+        # across Git Bash / macOS / Linux. Correct scoping removes the need for a wall-clock bound.
+        _repo_name=$(basename "$search_root" 2>/dev/null || true)
+        if [ -n "$_repo_name" ]; then
+            _vault_root="${_logs_path}/${_logs_sub}/${_repo_name}"
+            while IFS= read -r f; do
+                raw_candidates+=("$f")
+            done < <(find "$_vault_root" -maxdepth 3 -name "00-state.md" 2>/dev/null || true)
+        fi
+    fi
+fi
+
+if [ ${#raw_candidates[@]} -eq 0 ]; then
+    # No state file found anywhere — fail-safe: allow.
     allow
 fi
 
-# Use the first (most shallow / most recently created) state file.
-STATE_FILE="${state_candidates[0]}"
+# ---------------------------------------------------------------------------
+# Filter out terminal-status candidates.
+# Terminal: status is "complete" or starts with "blocked-".
+# A terminal workspace is done; it must not gate a new dispatch even if it is
+# the alphabetically-first or most-recently-written candidate.
+# ---------------------------------------------------------------------------
+# Order ALL candidates newest-first with a SINGLE ls -t (one subprocess), then walk
+# the list and select the first NON-terminal workspace — the active pipeline, normally
+# the newest-mtime file. This stops at the live workspace instead of status-checking
+# every historical one.
+#
+# Why this shape: a vault accumulates dozens of past 00-state.md files, most left at a
+# non-"complete" status. The previous "status-check ALL candidates, then sort" path
+# spawned ~5 subprocesses (grep+head+printf+sed+sed) PER candidate. On Windows Git Bash,
+# where fork is expensive, dozens of stale workspaces turned a single Task dispatch into a
+# multi-second-to-hanging operation with no output (the spin is mid-loop, before any echo).
+# Newest-first + early-break is O(1) status checks in the common case (the newest file is
+# the live pipeline) and is bounded by the number of trailing just-completed workspaces
+# otherwise. The selection result is identical to the old code: the newest non-terminal
+# candidate. ls -t is POSIX (Git Bash / macOS / Linux), no GNU find -printf.
+ordered_candidates=()
+if [ ${#raw_candidates[@]} -eq 1 ]; then
+    ordered_candidates=("${raw_candidates[0]}")
+else
+    while IFS= read -r f; do
+        [ -n "$f" ] && ordered_candidates+=("$f")
+    done < <(ls -t "${raw_candidates[@]}" 2>/dev/null || printf '%s\n' "${raw_candidates[@]}")
+fi
+
+STATE_FILE=""
+for candidate in "${ordered_candidates[@]}"; do
+    [ -f "$candidate" ] || continue
+    # Extract the status value from the candidate file.
+    _status_line=$(grep "^[[:space:]]*-[[:space:]]*status:" "$candidate" 2>/dev/null | head -1 || true)
+    _status_val=$(printf '%s' "$_status_line" \
+        | sed 's/^[[:space:]]*-[[:space:]]*status:[[:space:]]*//' \
+        | sed 's/[[:space:]]*$//' \
+        || true)
+    case "$_status_val" in
+        complete|blocked-*) continue ;;          # terminal — skip to the next-newest
+        *) STATE_FILE="$candidate"; break ;;     # first active (newest) workspace — done
+    esac
+done
+
+if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
+    # No active (non-terminal) workspace anywhere — nothing to gate. Fail-open.
+    allow
+fi
 
 # ---------------------------------------------------------------------------
 # Step 4 — Read the four clarity fields with STRICT line-token parsing.
