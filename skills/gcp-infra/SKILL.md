@@ -47,13 +47,26 @@ Examples: `/th:gcp-infra --apply "resize web-1 to e2-medium in proj-x"`, `/th:gc
    - Feature: gcp-infra
    ```
 
+## Apply mode — review pipeline
+
+When `--apply` is passed and the `gcp-infra` agent produces `02-apply.sh`, the orchestrator runs an independent review stage before presenting the operator gate:
+
+1. `th:security` audits the script for secret exposure, ambient-project reliance, over-privileged IAM bindings, and CRITICAL RULES violations.
+2. `th:qa` audits the script and `02-runbook.md` for idempotency, error-handling, and runbook completeness.
+
+Both agents write findings to `02-gcp-review.md` (rated CRITICAL / WARNING / INFO). CRITICAL findings block the gate. The Phase 4 STOP block carries the review verdict so the operator sees it before approving.
+
 ## Important
 
 - Always invoke the `orchestrator` agent — do NOT invoke the `gcp-infra` agent directly
-- The orchestrator will route to the `gcp-infra` agent
+- The orchestrator will route to the `gcp-infra` agent and the review pipeline (Apply mode)
 - `--apply` is intent only, NOT authorization — the STOP gate is the sole authorization path; destructive verbs require an extra explicit acknowledgement
 - Read-and-plan is the default; the agent never mutates GCP without operator approval at the gate
-- Output: `workspaces/{feature-name}/02-gcp-infra.md` (plus a workspace-only `02-apply.sh` in Apply mode)
+- Outputs:
+  - `workspaces/{feature-name}/02-gcp-infra.md` — plan/apply report (all modes)
+  - `workspaces/{feature-name}/02-apply.sh` — generated gcloud script (change-intent requests only)
+  - `workspaces/{feature-name}/02-runbook.md` — ordered steps + rollback (change-intent requests only)
+  - `workspaces/{feature-name}/02-gcp-review.md` — QA/security audit verdict (Apply mode only)
 - The flow + verb-classification contract is documented in `docs/gcp-infra.md`
 - **Prerequisites:** user must have `gcloud` installed and authenticated (`gcloud auth login` / `gcloud auth application-default login`)
 - **Required IAM roles:** a viewer role on the target project for read/plan; for an apply, the operator must hold the **write IAM role** for whatever they ask to change (e.g. `roles/compute.instanceAdmin.v1`, `roles/storage.admin`, `roles/cloudsql.admin`, `roles/resourcemanager.projectIamAdmin`). The agent does not grant or assume roles.

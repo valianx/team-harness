@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.80.0] - 2026-06-11
+
+### Added
+
+- `agents/gcp-infra-refs/` on-demand reference folder mirroring the `testing-refs` pattern: `_index.md` manifest + `datastream-cloudsql-bigquery.md` playbook (10 sections covering replication-slot risk, non-transitive VPC peering / reverse-proxy pattern, `publish_via_partition_root` irreversibility, HA-failover slot durability, DDL handling, REPLICA IDENTITY check, cost drivers, pre-flight specifics, official doc anchors). Generic — no project-specific values.
+- Phase 3.5 automated QA / security review in the Apply flow: after the `gcp-infra` agent generates `02-apply.sh`, the orchestrator dispatches `th:security` + `th:qa` to audit the script and `02-runbook.md` into `02-gcp-review.md` (CRITICAL / WARNING / INFO findings); CRITICAL findings block the Phase 4 STOP gate. The STOP gate carries the review verdict.
+- Suite 88 (`gcp-infra-refs-on-demand`) in `tests/test_agent_structure.py` — 19 structural checks for the on-demand reference system. Registered in `docs/testing.md`.
+
+### Changed
+
+- `agents/gcp-infra.md`: new "Ask, don't assume (high stakes)" Core Philosophy principle; Phase 0 rewritten as a 7-part pre-flight checklist (tool availability, auth, pinned `--project` guard, API enablement, IAM enumeration, environment inventory, Reference Router); Documentation Research upgraded with context7 + WebSearch/WebFetch fallback (generic-query-only security rule); Operating Modes updated with generated-vs-run distinction and full-package output specification for change-intent requests; `02-runbook.md` template added to Session Documentation; `websearch_consult:` and `reference_loaded:` fields added to Return Protocol. `WebSearch` and `WebFetch` granted in frontmatter tools.
+- `docs/gcp-infra.md`: documented generated-vs-run distinction; Phase 0 updated to reflect pre-flight checklist; Phase 3.5 (QA / security review) inserted between Phase 3 (Validation) and Phase 4 (Operator Gate); Phase 4 STOP block template carries `02-gcp-review.md` verdict line; plan report mandatory sections documented (assumptions, alternatives, cost estimate, essential artifacts). `gcp-guard.sh` section and Verb Classification Table unchanged.
+- `agents/orchestrator.md`: gcp-infra dispatch row extended — after `02-apply.sh` present, dispatch `th:security` + `th:qa` to write `02-gcp-review.md`, then present Phase 4 STOP gate; `02-runbook.md` and `02-gcp-review.md` added to workspace-files list.
+- `skills/gcp-infra/SKILL.md`: Apply mode review pipeline documented; outputs list updated to include `02-runbook.md` and `02-gcp-review.md`.
+
 ## [2.79.0] - 2026-06-11
 
 ### Fixed
