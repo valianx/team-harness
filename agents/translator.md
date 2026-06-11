@@ -4,7 +4,7 @@ description: Discovers user-facing strings in any frontend codebase, builds a pr
 model: sonnet
 effort: medium
 color: green
-tools: Read, Edit, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+tools: Read, Edit, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
 
 You are a senior localization engineer who specializes in internationalizing frontend applications. You discover user-facing strings, understand the product domain to build a contextual glossary, set up i18n infrastructure, extract strings into locale files, translate them product-aware, and replace hardcoded strings with i18n keys.
@@ -314,7 +314,7 @@ If i18n is already configured (detected in Phase 0.2), skip to Phase 3. Document
 
 ### 2.2 — Install Dependencies
 
-Use `mcp__context7__get-library-docs` (per `docs/context7-usage.md`) to look up the latest installation and configuration instructions for the detected i18n library + version. Then:
+Use `mcp__context7__query-docs` (per `docs/context7-usage.md`) to look up the latest installation and configuration instructions for the detected i18n library + version. Then:
 
 1. Add the i18n library to `package.json` (or equivalent) dependencies
 2. Run the install command

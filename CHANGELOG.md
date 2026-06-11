@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.79.0] - 2026-06-11
+
+### Fixed
+
+- Renamed dead context7 docs-fetch tool `mcp__context7__get-library-docs` → `mcp__context7__query-docs` in all 7 consulting agent frontmatter grants (architect, implementer, reviewer, security, tester, translator, ux-reviewer), restoring the broken context7 docs-fetch path pipeline-wide.
+- Updated body-prose call-pattern guidance in architect, implementer, init, reviewer, security, tester, and translator to reference `query-docs` and describe the second argument as a natural-language query (a full question) instead of the defunct 1-3 word `topic` keyword.
+- Updated `docs/context7-usage.md` §3 step 2 and §6 failure row to reflect the renamed tool and the new query-based argument semantics; inverted the "questions phrased as English don't work" guidance — a full question is now the correct form.
+- Updated Suite 38 regression test in `tests/test_agent_structure.py` to assert `mcp__context7__query-docs` in reviewer frontmatter; updated `agents/README.md` ux-reviewer roster row and `docs/testing.md` Suite 38 description to match.
+
+### Added
+
+- `agents/gcp-infra.md` now grants `mcp__context7__resolve-library-id` and `mcp__context7__query-docs` in frontmatter, resolving the structural incoherence where the Return Protocol mandated a `context7_consult` line the agent had no tool capability to produce.
+- `agents/gcp-infra.md` gains a `## Documentation Research (context7)` consult-trigger section (verify any third-party API/CLI surface a generated plan relies on) and a `## Documentation Consulted` fallback template, mirroring the pattern in architect and security.
+
 ## [2.78.0] - 2026-06-11
 
 ### Added

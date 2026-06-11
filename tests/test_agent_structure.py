@@ -7444,9 +7444,9 @@ _s38_reviewer_fm = parse_frontmatter(_s38_reviewer_text)
 _s38_reviewer_tools = [t.strip() for t in _s38_reviewer_fm.get("tools", "").split(",")]
 check(
     "review-guardrails(6/ac-5): agents/reviewer.md frontmatter grants"
-    " mcp__context7__resolve-library-id and mcp__context7__get-library-docs",
+    " mcp__context7__resolve-library-id and mcp__context7__query-docs",
     "mcp__context7__resolve-library-id" in _s38_reviewer_tools
-    and "mcp__context7__get-library-docs" in _s38_reviewer_tools,
+    and "mcp__context7__query-docs" in _s38_reviewer_tools,
     "reviewer.md frontmatter missing one or both context7 tools",
 )
 
