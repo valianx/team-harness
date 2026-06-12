@@ -55,6 +55,7 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | `ux-reviewer` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | UI/UX review for frontend tasks — accessibility, responsiveness, component reuse. Dispatched when `frontend-scope: true`. |
 | `delivery` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep | Docs, changelog, version, branch, commit, PR. |
 | `reviewer-consolidator` | opus | `high` | Read, Edit, Write, Glob, Grep | Merges 2-3 focused review drafts (security/architecture/style) into a single unified review. De-duplicates findings, surfaces contradictions, determines verdict. Invoked by orchestrator after parallel focused reviewer passes in multi-reviewer mode. |
+| `mentor` | opus | `high` | Read, Glob, Grep, WebSearch, WebFetch, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs`, Write (teaching-pack files only) | Teaches the operator (codebase/library/language/concept). Read-only on code; produces a layered, diagram-rich teaching pack with one Mermaid concept-map per layer and holds a multi-turn tutoring dialogue. |
 
 Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`) loaded on-demand by the orchestrator. They are not invocable subagents — their `model` field is vestigial and not enforced by `/th:lint`.
 
@@ -104,8 +105,9 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `d2-diagrammer` | sonnet | medium | sonnet | medium | No change — DSL validation catches errors. |
 | `translator` | sonnet | medium | sonnet | medium | No change — glossary is the contextual anchor; human reviews diff at PR time. |
 | `delivery` | sonnet | medium | sonnet | medium | No change — mechanical; reviewer audits at Phase 4.5; human approves PR. |
+| `mentor` | opus | high | sonnet | high | Teaching is analysis + synthesis; effort high preserves layered-pack depth. Human reads the pack before the tutoring session. |
 
-**Tally (standard mode):** 6 agents on `opus` (orchestrator, architect, agent-builder, security, reviewer-consolidator, qa-plan), remainder on `sonnet`. In low-cost mode, all on `sonnet`. No `max`, no `low`, no `haiku`.
+**Tally (standard mode):** 7 agents on `opus` (orchestrator, architect, agent-builder, security, reviewer-consolidator, qa-plan, mentor), remainder on `sonnet`. In low-cost mode, all on `sonnet`. No `max`, no `low`, no `haiku`.
 
 ## Adding or modifying an agent
 

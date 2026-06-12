@@ -67,6 +67,14 @@ After install, open Claude Code. The entry points are:
 @th:orchestrator recover <feature>
 ```
 
+Learn mode (explain a codebase, library, or concept with a layered teaching pack):
+
+```
+/th:learn explain how React hooks work
+/th:learn how does the auth layer work in this project
+/th:learn how does the LLM work in this ADK project --resume
+```
+
 > **The orchestrator is the canonical entry point.** Skills like `/th:design`, `/th:deliver`, `/th:recover` are optional shortcuts that route to the same agent under the hood.
 
 ---

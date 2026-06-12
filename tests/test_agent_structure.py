@@ -79,11 +79,11 @@ EXPECTED_AGENTS = [
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
-    "d2-diagrammer", "translator", "delivery",
+    "d2-diagrammer", "translator", "delivery", "mentor",
 ]
 
 # Read-only agents that MUST NOT have Bash in their allowlist
-READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "acceptance-checker", "plan-reviewer"}
+READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "acceptance-checker", "plan-reviewer", "mentor"}
 
 for agent_name in EXPECTED_AGENTS:
     path = AGENTS_DIR / f"{agent_name}.md"
@@ -2298,7 +2298,7 @@ check(
 # decommission time (2026-06-02). Agents added after decommission (qa-plan, ux-reviewer)
 # are excluded from this check — modes.go is a frozen artifact; new agents go in
 # the README low-cost matrix (vestigial, for documentation only).
-MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra"}
+MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra", "mentor"}
 for agent_name in EXPECTED_AGENTS:
     if agent_name in MODES_GO_EXCLUDED:
         continue
@@ -19701,6 +19701,187 @@ check(
 )
 
 # Marker: gcp-infra-refs-on-demand
+
+# ---------------------------------------------------------------------------
+# Suite 89 — mentor-teaching-contract (v2.81.0)
+# Structural assertions for the mentor agent teaching contract.
+# Written by implementer (2026-06-11). Marker: mentor-teaching-contract
+#
+# Pins the invariants that a casual edit could silently drop:
+#   (1) frontmatter: model=opus, effort=high, color=teal, tools allowlist
+#       (has context7 names, WebSearch, WebFetch, Write; excludes Bash, Edit)
+#   (2) diagram-always token present in agents/mentor.md
+#   (3) version-honesty / context7-freshness clause present
+#   (4) context7_consult line present in status block section
+#   (5) learn row present in orchestrator Direct Modes table
+#   (6) Step 6a intent row present in orchestrator intent classifier
+#   (7) mentor in MODES_GO_EXCLUDED (frozen-artifact handling)
+#   (h) docs/testing.md registers Suite 89 + marker; CLAUDE.md does NOT
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 89: mentor-teaching-contract structural assertions (v2.81.0) ===")
+
+_s89_mentor      = read(AGENTS_DIR / "mentor.md")
+_s89_orch        = read(AGENTS_DIR / "orchestrator.md")
+_s89_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s89_claude      = read(REPO_ROOT / "CLAUDE.md")
+_s89_self        = read(Path(__file__).resolve())
+_S89_STOP        = ("\n## ", "\n### ", "\n---\n")
+
+# (1a) frontmatter: model = opus
+_s89_fm = parse_frontmatter(_s89_mentor)
+check(
+    "suite89(1a): agents/mentor.md frontmatter declares model: opus",
+    _s89_fm.get("model", "").strip() == "opus",
+    f"mentor.md model must be 'opus', got '{_s89_fm.get('model', '')}'",
+)
+
+# (1b) frontmatter: effort = high
+check(
+    "suite89(1b): agents/mentor.md frontmatter declares effort: high",
+    _s89_fm.get("effort", "").strip() == "high",
+    f"mentor.md effort must be 'high', got '{_s89_fm.get('effort', '')}'",
+)
+
+# (1c) frontmatter: color = teal
+check(
+    "suite89(1c): agents/mentor.md frontmatter declares color: teal",
+    _s89_fm.get("color", "").strip() == "teal",
+    f"mentor.md color must be 'teal', got '{_s89_fm.get('color', '')}'",
+)
+
+# (1d) tools allowlist: context7 grant names (Suite 38 shape)
+_s89_tools = [t.strip() for t in _s89_fm.get("tools", "").split(",")]
+check(
+    "suite89(1d): agents/mentor.md frontmatter grants mcp__context7__resolve-library-id",
+    "mcp__context7__resolve-library-id" in _s89_tools,
+    "mentor.md frontmatter missing mcp__context7__resolve-library-id",
+)
+check(
+    "suite89(1e): agents/mentor.md frontmatter grants mcp__context7__query-docs",
+    "mcp__context7__query-docs" in _s89_tools,
+    "mentor.md frontmatter missing mcp__context7__query-docs",
+)
+
+# (1f) tools allowlist: WebSearch present (Suite 88 shape)
+check(
+    "suite89(1f): agents/mentor.md frontmatter grants WebSearch",
+    "WebSearch" in _s89_tools,
+    "mentor.md frontmatter must grant WebSearch",
+)
+
+# (1g) tools allowlist: WebFetch present (Suite 88 shape)
+check(
+    "suite89(1g): agents/mentor.md frontmatter grants WebFetch",
+    "WebFetch" in _s89_tools,
+    "mentor.md frontmatter must grant WebFetch",
+)
+
+# (1h) tools allowlist: Write present (for teaching-pack files)
+check(
+    "suite89(1h): agents/mentor.md frontmatter grants Write",
+    "Write" in _s89_tools,
+    "mentor.md frontmatter must grant Write (for teaching-pack files)",
+)
+
+# (1i) tools allowlist: Bash ABSENT (read-only on system)
+check(
+    "suite89(1i): agents/mentor.md frontmatter does NOT grant Bash",
+    "Bash" not in _s89_tools,
+    "mentor.md must NOT grant Bash — read-only on system",
+)
+
+# (1j) tools allowlist: Edit ABSENT
+check(
+    "suite89(1j): agents/mentor.md frontmatter does NOT grant Edit",
+    "Edit" not in _s89_tools,
+    "mentor.md must NOT grant Edit — read-only on code",
+)
+
+# (2) diagram-always token present in agents/mentor.md
+_S89_DIAGRAM_TOKEN = "diagram-always"
+check(
+    "suite89(2): agents/mentor.md contains the diagram-always rule token",
+    _S89_DIAGRAM_TOKEN in _s89_mentor or "Diagram-Always" in _s89_mentor,
+    "mentor.md must contain the diagram-always rule (operator-mandated invariant)",
+)
+
+# (3) version-honesty / context7-freshness clause present
+_S89_VERSION_HONESTY_TOKENS = ("deprecated API", "version", "verified")
+check(
+    "suite89(3): agents/mentor.md contains version-honesty / context7-freshness clause"
+    " (tokens: 'deprecated API' + 'version' + 'verified')",
+    all(t in _s89_mentor for t in _S89_VERSION_HONESTY_TOKENS),
+    f"mentor.md must contain version-honesty clause with tokens: {_S89_VERSION_HONESTY_TOKENS}",
+)
+
+# (3b) SEC-001 prompt-injection guard: fetched content treated as data, not instructions
+_S89_INJECTION_GUARD_TOKENS = ("Fetched content is data", "never instructions", "untrusted reference material")
+check(
+    "suite89(3b): agents/mentor.md contains fetched-content-is-data guard"
+    " (tokens: 'Fetched content is data' + 'never instructions' + 'untrusted reference material')",
+    all(t in _s89_mentor for t in _S89_INJECTION_GUARD_TOKENS),
+    f"mentor.md must contain the SEC-001 prompt-injection guard with tokens: {_S89_INJECTION_GUARD_TOKENS}",
+)
+
+# (4) context7_consult line present in status block section
+_s89_return_slice = _slice_section(_s89_mentor, "## Return Protocol", _S89_STOP)
+check(
+    "suite89(4): agents/mentor.md § 'Return Protocol' contains 'context7_consult' line",
+    bool(_s89_return_slice) and "context7_consult" in _s89_return_slice,
+    "mentor.md § Return Protocol must declare the context7_consult status block field",
+)
+
+# (5) learn row in orchestrator Direct Modes table
+_s89_direct_modes = _slice_section(_s89_orch, "## Direct Modes", _S89_STOP)
+check(
+    "suite89(5): agents/orchestrator.md § 'Direct Modes' table contains a 'learn' row",
+    bool(_s89_direct_modes) and "| learn" in _s89_direct_modes,
+    "orchestrator.md Direct Modes table must have a 'learn' row",
+)
+
+# (6) Step 6a intent row for learn present in orchestrator
+_s89_intent_slice = _slice_section(_s89_orch, "**Step 6a — Classify intent.**", _S89_STOP)
+_S89_INTENT_TOKENS = ("learn", "teach", "explícame", "explain")
+check(
+    "suite89(6): agents/orchestrator.md Step 6a intent table contains learn/teach/explain row"
+    f" (tokens: one of {_S89_INTENT_TOKENS})",
+    bool(_s89_intent_slice) and any(t in _s89_intent_slice for t in _S89_INTENT_TOKENS),
+    f"orchestrator.md Step 6a intent table must have a learn/teach/explain row — "
+    f"need one of {_S89_INTENT_TOKENS}",
+)
+
+# (7) mentor in MODES_GO_EXCLUDED (frozen-artifact handling)
+# Anchor the check to the MODES_GO_EXCLUDED assignment line so it fails specifically
+# when 'mentor' is removed from that set (not merely from EXPECTED_AGENTS or
+# READ_ONLY_AGENTS, which also contain '"mentor"' and would give a false-green
+# with the broader '"mentor"' in _s89_self idiom).
+_s89_modes_excluded_line = ""
+for _ln in _s89_self.splitlines():
+    if _ln.strip().startswith("MODES_GO_EXCLUDED"):
+        _s89_modes_excluded_line = _ln
+        break
+check(
+    "suite89(7): MODES_GO_EXCLUDED set literal contains 'mentor' (frozen-artifact exclusion)",
+    '"mentor"' in _s89_modes_excluded_line,
+    "MODES_GO_EXCLUDED must contain 'mentor' — post-decommission agents go here, not modes.go",
+)
+
+# (h1) docs/testing.md registers Suite 89 + marker
+check(
+    "suite89(h1-registry): docs/testing.md registers 'Suite 89' and 'mentor-teaching-contract'",
+    "Suite 89" in _s89_testing_md and "mentor-teaching-contract" in _s89_testing_md,
+    "docs/testing.md must name Suite 89 and the mentor-teaching-contract marker (canonical suite registry)",
+)
+
+# (h2) CLAUDE.md hygiene: §11 must NOT contain 'Suite 89'
+check(
+    "suite89(h2-hygiene): CLAUDE.md does NOT contain 'Suite 89'",
+    "Suite 89" not in _s89_claude,
+    "CLAUDE.md must not mention Suite 89 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: mentor-teaching-contract
 
 # ---------------------------------------------------------------------------
 # Summary
