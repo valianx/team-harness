@@ -103,6 +103,8 @@ Fast pass focused on idle resources and top Recommender findings only. No BigQue
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand task scope.
 
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
 3. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.

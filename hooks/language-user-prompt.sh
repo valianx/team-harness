@@ -7,7 +7,7 @@
 # recency-competitive against per-message language signals.
 #
 # Runs on every submitted operator prompt, independent of dev mode.
-# Coexists with language-session-start.sh — the SessionStart hook carries the
+# Coexists with session-start.sh — the unified SessionStart hook carries the
 # full precedence/override semantics once; this hook delivers a short reminder
 # per turn.
 #

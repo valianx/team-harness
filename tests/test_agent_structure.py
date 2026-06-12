@@ -13847,53 +13847,113 @@ check(
     "skills/dev-mode/SKILL.md must start developer mode in the current session: write/remove the ~/.claude/.dev-mode-active marker, print the DEVELOPER MODE ACTIVE banner, and adopt the orchestrator role — it does NOT configure the outputStyle setting (that is the /config output-style path, not the skill's job)",
 )
 
-# AC — SessionStart hook: auto-load dev mode at session start, silently.
-_s59_ss_hook_path = HOOKS_DIR / "dev-mode-session-start.sh"
+# AC — SessionStart hook: unified session-start.sh loads dev-mode, language, and workspace-mode
+# (v2.81.0: consolidated from dev-mode-session-start.sh + language-session-start.sh)
+_s59_ss_hook_path = HOOKS_DIR / "session-start.sh"
 _s59_ss_hook = read(_s59_ss_hook_path) if _s59_ss_hook_path.exists() else ""
 check(
-    "dev-mode(sessionstart-hook-exists): hooks/dev-mode-session-start.sh exists",
+    "dev-mode(sessionstart-hook-exists): hooks/session-start.sh exists",
     _s59_ss_hook_path.exists(),
-    "Create hooks/dev-mode-session-start.sh — the SessionStart hook that loads dev mode into context at session start when the marker is present",
+    "Create hooks/session-start.sh — the unified SessionStart hook that loads dev-mode, language, and workspace-mode into context at session start",
 )
 check(
     "dev-mode(sessionstart-hook-marker-gated): hook gates on .dev-mode-active (dev_mode: true) — inert in normal mode",
     ".dev-mode-active" in _s59_ss_hook and "dev_mode: true" in _s59_ss_hook,
-    "hooks/dev-mode-session-start.sh must gate on the ~/.claude/.dev-mode-active marker so it injects nothing in normal mode",
+    "hooks/session-start.sh must gate dev-mode load on the ~/.claude/.dev-mode-active marker so it injects nothing in normal mode",
 )
 check(
     "dev-mode(sessionstart-hook-injects-context): hook emits SessionStart additionalContext",
     "additionalContext" in _s59_ss_hook and "SessionStart" in _s59_ss_hook,
-    "hooks/dev-mode-session-start.sh must emit hookSpecificOutput.additionalContext for the SessionStart event",
+    "hooks/session-start.sh must emit hookSpecificOutput.additionalContext for the SessionStart event",
 )
 check(
     "dev-mode(sessionstart-hook-silent): injected context forbids narrating the determination and re-inspecting the marker",
     "SILENT" in _s59_ss_hook and "re-verify" in _s59_ss_hook,
-    "hooks/dev-mode-session-start.sh injected context must instruct the agent to keep the dev-mode determination SILENT and never re-verify the marker mid-session",
+    "hooks/session-start.sh injected context must instruct the agent to keep the dev-mode determination SILENT and never re-verify the marker mid-session",
 )
 check(
     "dev-mode(sessionstart-hook-systemmessage): hook emits an instant app-rendered systemMessage banner",
     "systemMessage" in _s59_ss_hook and "DEVELOPER MODE ACTIVE" in _s59_ss_hook,
-    "hooks/dev-mode-session-start.sh must emit a systemMessage carrying the DEVELOPER MODE banner — app-rendered and instant — instead of instructing the model to render slow ASCII art",
+    "hooks/session-start.sh must emit a systemMessage carrying the DEVELOPER MODE banner — app-rendered and instant — instead of instructing the model to render slow ASCII art",
 )
 check(
     "dev-mode(sessionstart-hook-no-model-banner): injected context tells the model NOT to print a banner itself",
     "do NOT print any banner" in _s59_ss_hook,
-    "hooks/dev-mode-session-start.sh additionalContext must instruct the model not to render its own banner (the systemMessage already shows it)",
+    "hooks/session-start.sh additionalContext must instruct the model not to render its own banner (the systemMessage already shows it)",
+)
+# Old hook filenames must be absent — they were merged into session-start.sh
+check(
+    "dev-mode(sessionstart-old-hooks-absent): hooks/dev-mode-session-start.sh removed (merged into session-start.sh)",
+    not (HOOKS_DIR / "dev-mode-session-start.sh").exists(),
+    "hooks/dev-mode-session-start.sh must be deleted — its functionality is now in hooks/session-start.sh",
+)
+check(
+    "dev-mode(sessionstart-old-lang-hook-absent): hooks/language-session-start.sh removed (merged into session-start.sh)",
+    not (HOOKS_DIR / "language-session-start.sh").exists(),
+    "hooks/language-session-start.sh must be deleted — its functionality is now in hooks/session-start.sh",
 )
 for _os_key in ("windows", "macos", "linux"):
     _ss = cfg.get(_os_key, {}).get("hooks", {}).get("SessionStart", [])
-    _ss_cmd = (_ss[0].get("hooks", [{}])[0]).get("command", "") if _ss else ""
-    _ss_matcher = _ss[0].get("matcher", "") if _ss else ""
+    # Find the session-start.sh entry (there should be exactly one)
+    _ss_entries_count = len(_ss)
+    _ss_cmd = ""
+    _ss_matcher = ""
+    for _entry in _ss:
+        _cmd = (_entry.get("hooks", [{}])[0]).get("command", "") if _entry.get("hooks") else ""
+        if "session-start.sh" in _cmd:
+            _ss_cmd = _cmd
+            _ss_matcher = _entry.get("matcher", "")
+            break
     check(
-        f"dev-mode(sessionstart-wired-{_os_key}): config.json[{_os_key}] wires SessionStart -> dev-mode-session-start.sh",
-        len(_ss) > 0 and "dev-mode-session-start.sh" in _ss_cmd,
-        f"hooks/config.json[{_os_key}] must wire a SessionStart hook invoking dev-mode-session-start.sh",
+        f"dev-mode(sessionstart-wired-{_os_key}): config.json[{_os_key}] wires SessionStart -> session-start.sh",
+        "session-start.sh" in _ss_cmd,
+        f"hooks/config.json[{_os_key}] must wire a SessionStart hook invoking session-start.sh (the unified hook)",
+    )
+    check(
+        f"dev-mode(sessionstart-single-entry-{_os_key}): config.json[{_os_key}] has exactly one SessionStart entry (consolidated)",
+        _ss_entries_count == 1,
+        f"hooks/config.json[{_os_key}] SessionStart must have exactly one entry — the old two-entry pattern (dev-mode + language) is now consolidated into session-start.sh",
     )
     check(
         f"dev-mode(sessionstart-matcher-{_os_key}): config.json[{_os_key}] SessionStart entry declares a 'startup' matcher",
         "startup" in _ss_matcher,
         f"hooks/config.json[{_os_key}] SessionStart entry MUST declare a matcher (e.g. 'startup|resume|clear') — a SessionStart entry without a matcher is silently ignored by Claude Code",
     )
+    # Old hook filenames must not appear in any SessionStart entry command
+    _all_ss_cmds = " ".join(
+        (_e.get("hooks", [{}])[0]).get("command", "") for _e in _ss if _e.get("hooks")
+    )
+    check(
+        f"dev-mode(sessionstart-no-old-hooks-{_os_key}): config.json[{_os_key}] SessionStart references no old hook filenames",
+        "dev-mode-session-start.sh" not in _all_ss_cmds and "language-session-start.sh" not in _all_ss_cmds,
+        f"hooks/config.json[{_os_key}] SessionStart must not reference dev-mode-session-start.sh or language-session-start.sh — both are replaced by session-start.sh",
+    )
+
+# AC-12 — .claude-plugin/hooks.json: plugin-path SessionStart wiring (active path for all plugin installs)
+_plugin_hooks_path = REPO_ROOT / ".claude-plugin" / "hooks.json"
+_plugin_hooks = json.loads(read(_plugin_hooks_path)) if _plugin_hooks_path.exists() else {}
+_ph_ss = _plugin_hooks.get("hooks", {}).get("SessionStart", [])
+_ph_ss_cmd = ((_ph_ss[0].get("hooks", [{}])[0]).get("command", "")) if _ph_ss else ""
+check(
+    "dev-mode(plugin-hooks-sessionstart-single): .claude-plugin/hooks.json has exactly one SessionStart entry",
+    len(_ph_ss) == 1,
+    ".claude-plugin/hooks.json SessionStart must have exactly one entry (consolidated session-start.sh) — a second entry would mean old hooks were reintroduced",
+)
+check(
+    "dev-mode(plugin-hooks-sessionstart-wired): .claude-plugin/hooks.json wires session-start.sh",
+    "session-start.sh" in _ph_ss_cmd,
+    ".claude-plugin/hooks.json must wire hooks/session-start.sh for SessionStart — the consolidated hook that loads dev-mode, language, and workspace-mode",
+)
+check(
+    "dev-mode(plugin-hooks-sessionstart-matcher): .claude-plugin/hooks.json SessionStart has startup matcher",
+    "startup" in (_ph_ss[0].get("matcher", "") if _ph_ss else ""),
+    ".claude-plugin/hooks.json SessionStart entry must declare a matcher containing 'startup' (e.g. 'startup|resume|clear') — a matcherless entry is silently ignored by Claude Code",
+)
+check(
+    "dev-mode(plugin-hooks-no-old-hooks): .claude-plugin/hooks.json SessionStart has no old hook filenames",
+    "dev-mode-session-start.sh" not in _ph_ss_cmd and "language-session-start.sh" not in _ph_ss_cmd,
+    ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into session-start.sh",
+)
 
 # ---------------------------------------------------------------------------
 # AC-8 / AC-13 — docs/dev-mode.md: gate + disposition mechanism + reconciliation
