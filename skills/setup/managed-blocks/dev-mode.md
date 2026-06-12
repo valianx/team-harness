@@ -5,7 +5,7 @@
 
 **Start it (in-session, no reload):** run `/dev-mode`. The skill writes the marker `~/.claude/.dev-mode-active` (`dev_mode: true`), prints the DEVELOPER MODE banner, adopts the orchestrator operating contract, and persists `dev_mode_choice: "on"` in `~/.claude/.team-harness.json`. No `/clear` is required.
 
-**Auto-resume on new sessions:** while the marker is present, the `SessionStart` hook (`hooks/dev-mode-session-start.sh`) loads the disposition into context at the start of every new session, so each chat opens in developer mode and shows the banner on its first reply. The marker is the single source of truth. The determination is loaded silently — the agent never narrates it or re-inspects the marker.
+**Auto-resume on new sessions:** while the marker is present, the unified `SessionStart` hook (`hooks/session-start.sh`) loads the disposition into context at the start of every new session, so each chat opens in developer mode and shows the banner on its first reply. The marker is the single source of truth. The determination is loaded silently — the agent never narrates it or re-inspects the marker.
 
 **Stop it:** run `/dev-mode off`. The skill removes the marker (`dev-guard.sh` intercepts the removal with `permissionDecision: "ask"` — the operator confirms), returns to normal mode, and persists `dev_mode_choice: "off"` in `~/.claude/.team-harness.json` so future `/th:update` runs respect the opt-out.
 

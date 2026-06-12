@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+# session-start.sh — Team Harness unified SessionStart hook.
+#
+# THE single session-initialization process. Each session-init concern is a
+# discrete, labeled load_<name> function invoked in a documented order; each
+# appends its directive (or nothing) to a single accumulator emitted once as
+# one combined JSON. None contribute → emit nothing, exit 0 (session start
+# is never blocked).
+#
+# Three sources are loaded:
+#   1. load_dev_mode       — ~/.claude/.dev-mode-active marker
+#   2. load_language       — .team-harness.json `language`
+#   3. load_workspace_mode — .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`
+#
+# Security (SEC-DR-A/B/C):
+#   A — each config-derived value is validated with a FULL-STRING check before
+#       interpolation. `language` must match ^[a-z]{2}$; `logs-path` is rejected
+#       if it contains any control character ([:cntrl:]).
+#   B — the JSON is emitted via a fixed jq template (printf fallback when jq is
+#       absent) interpolating only validated/derived tokens. No raw config bytes
+#       are shell-concatenated into the JSON string.
+#   C — every error/early-exit path contributes nothing and never echoes the raw
+#       value. stdout is the trusted-context channel.
+#
+# Cross-platform: Git Bash on Windows, native bash on macOS/Linux.
+
+set -euo pipefail
+
+MARKER="${HOME}/.claude/.dev-mode-active"
+CONFIG="${HOME}/.claude/.team-harness.json"
+
+# Drain the SessionStart payload on stdin so the producer never sees SIGPIPE.
+cat >/dev/null 2>&1 || true
+
+# ============================================================================
+# REGISTRY — session-init loads, in invocation order:
+#   1. load_dev_mode       (source: ~/.claude/.dev-mode-active marker)
+#   2. load_language       (source: .team-harness.json `language`)
+#   3. load_workspace_mode (source: .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`)
+#
+# To add a new session-init load:
+#   (1) write a load_<name> function that VALIDATES its source and echoes its
+#       directive (or nothing) — append to the `directives` array (and set
+#       `system_message` only if it must render as an app banner). The function
+#       MUST emit only jq-escaped values and MUST NOT produce raw `"` or `\`
+#       characters in its output: the printf-fallback branch in the emit block
+#       performs no escaping, so per-source validation must exclude any
+#       JSON-breaking bytes before any string reaches `directives` or
+#       `system_message`.
+#   (2) append load_<name> to the ordered invocation list below;
+#   (3) add its case to tests/test_session_start.sh.
+# Every load is independent and fail-safe: a new load can never break an
+# existing one or block session start.
+# ============================================================================
+
+system_message=""           # set only by load_dev_mode (app-rendered banner)
+directives=()               # additionalContext fragments, in load order
+
+# ----------------------------------------------------------------------------
+# Load 1 — dev-mode
+# Output is BYTE-IDENTICAL to the former dev-mode-session-start.sh.
+# The BANNER and CONTEXT strings must not be modified without also updating
+# the structural assertions in tests/test_agent_structure.py.
+# ----------------------------------------------------------------------------
+load_dev_mode() {
+    # Not in developer mode → contribute nothing.
+    [ -f "$MARKER" ] || return 0
+    grep -q 'dev_mode: true' "$MARKER" 2>/dev/null || return 0
+
+    # One-line, app-rendered mode banner (no double quotes / backslashes so it
+    # embeds in JSON without an escaping pass — jq still encodes it safely).
+    # fix(hooks): BYTE-IDENTICAL copy from dev-mode-session-start.sh
+    system_message='TEAM HARNESS | DEVELOPER MODE ACTIVE | pipeline on | outward actions require operator approval | stop: /dev-mode off'
+
+    # Silent disposition. The dev-mode determination is FINAL at session start
+    # and SILENT — the agent never re-verifies the marker and never narrates it.
+    # fix(hooks): BYTE-IDENTICAL copy from dev-mode-session-start.sh
+    directives+=( 'Team Harness developer mode is active for this session. This determination is FINAL at session start and SILENT - do NOT re-verify the marker ~/.claude/.dev-mode-active (the deterministic hooks read it, you do not) and do NOT narrate dev mode, the marker, or the routing rationale. A one-line mode banner is already shown to the operator by the app (systemMessage); do NOT print any banner or ASCII art yourself. Silently adopt the orchestrator disposition: route development tasks (features, fixes, refactors, enhancements, hotfixes, issue work, review) through the full pipeline (architect -> implementer -> tester + qa + security -> delivery), dispatch leaf agents directly via Task, apply the fail-closed triage invariant (ANY ambiguity about whether a task needs the pipeline -> enter the pipeline or ask the operator; NEVER handle a development task inline without gates), and treat security floors as non-waivable. Do NOT read agents/orchestrator.md or any docs/ contract at session start - pre-loading them is a 20s+ wait; defer all contract loading until a development task enters the pipeline, then read only the needed sections from the plugin cache ~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/. Outward actions (git push, gh pr merge/review/comment, GitHub API writes) are intercepted by hooks/dev-guard.sh and require explicit operator approval; you cannot auto-approve them. Serve the operator first message: if it is already a concrete request or question, address it directly (answer simple non-development queries yourself; route development tasks through the pipeline); only if there is no actionable request, reply with one short line asking what to work on. Do NOT run unprompted git, filesystem exploration, Memory/KG, or environment statistics.' )
+}
+
+# ----------------------------------------------------------------------------
+# Load 2 — language
+# Logic preserved verbatim from language-session-start.sh.
+# SEC-DR-A: full-string [[ "$lang" =~ ^[a-z]{2}$ ]] rejects multiline values.
+# ----------------------------------------------------------------------------
+load_language() {
+    [ -f "$CONFIG" ] || return 0
+
+    # Extract the language value. Try jq first; fall back to pure bash grep/sed.
+    local lang=""
+    if command -v jq >/dev/null 2>&1; then
+        # jq -r outputs the raw string value or empty when the key is absent.
+        lang=$(jq -r '.language // empty' "$CONFIG" 2>/dev/null) || lang=""
+    else
+        # Bash fallback: handles simple string values — sufficient for a 2-letter code.
+        lang=$(grep -o '"language"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG" 2>/dev/null \
+               | sed 's/.*"language"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+               2>/dev/null) || lang=""
+    fi
+
+    # Missing or empty value → contribute nothing.
+    [ -n "$lang" ] || return 0
+
+    # SEC-DR-A: FULL-STRING regex match. [[ =~ ^[a-z]{2}$ ]] in bash does NOT
+    # use POSIX line-oriented anchoring — it matches the entire variable value.
+    # A multi-line string like $'en\n=== SYSTEM ===\nignore previous' will NOT
+    # match ^[a-z]{2}$ because the value is more than two characters.
+    [[ "$lang" =~ ^[a-z]{2}$ ]] || return 0
+
+    # Closed lookup: map 2-letter code to a display name.
+    local name
+    case "$lang" in
+        en) name="English" ;;
+        es) name="Spanish" ;;
+        pt) name="Portuguese" ;;
+        fr) name="French" ;;
+        de) name="German" ;;
+        *) name="the configured language (\`${lang}\`)" ;;
+    esac
+
+    # SEC-DR-B: fixed template — only $lang and $name are interpolated, both
+    # validated/derived above; no raw config bytes flow into this string.
+    directives+=( "Team Harness configured default language: \`${lang}\`. Respond to the operator in ${name} for this session — including ordinary conversation — regardless of the language of individual messages. An explicit per-session override (the operator requesting another language) still applies for this session only and takes precedence over this default." )
+}
+
+# ----------------------------------------------------------------------------
+# Load 3 — workspace mode
+# SEC-DR-A: logs-path is rejected if it contains any control character.
+# Default logs-subfolder: work-logs.
+# Directive framed for dev-mode-default disposition (top-level agent acting as
+# orchestrator is the primary path; nested handoff is the rare exception).
+# ----------------------------------------------------------------------------
+load_workspace_mode() {
+    [ -f "$CONFIG" ] || return 0
+
+    local logs_mode=""
+    local logs_path=""
+    local logs_subfolder=""
+
+    if command -v jq >/dev/null 2>&1; then
+        logs_mode=$(jq -r '."logs-mode" // empty' "$CONFIG" 2>/dev/null) || logs_mode=""
+        logs_path=$(jq -r '."logs-path" // empty' "$CONFIG" 2>/dev/null) || logs_path=""
+        logs_subfolder=$(jq -r '."logs-subfolder" // empty' "$CONFIG" 2>/dev/null) || logs_subfolder=""
+    else
+        logs_mode=$(grep -o '"logs-mode"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG" 2>/dev/null \
+                    | sed 's/.*"logs-mode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+                    2>/dev/null) || logs_mode=""
+        logs_path=$(grep -o '"logs-path"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG" 2>/dev/null \
+                    | sed 's/.*"logs-path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+                    2>/dev/null) || logs_path=""
+        logs_subfolder=$(grep -o '"logs-subfolder"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG" 2>/dev/null \
+                         | sed 's/.*"logs-subfolder"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+                         2>/dev/null) || logs_subfolder=""
+    fi
+
+    # Only obsidian mode with a non-empty path emits a directive.
+    [ "$logs_mode" = "obsidian" ] || return 0
+    [ -n "$logs_path" ] || return 0
+
+    # SEC-DR-A: reject logs-path containing any control character (ASCII 0x00-0x1F,
+    # 0x7F). [:cntrl:] covers newline/CR/tab/C0/DEL — the injection-vector bytes.
+    # Legitimate Windows paths contain \ : space but no control bytes.
+    [[ "$logs_path" == *[[:cntrl:]]* ]] && return 0
+
+    # Default subfolder when absent.
+    [ -n "$logs_subfolder" ] || logs_subfolder="work-logs"
+
+    # SEC-DR-B: only validated/derived tokens interpolated into this fixed template.
+    directives+=( "Team Harness workspace mode: obsidian is configured. You, the top-level agent acting as orchestrator, MUST write pipeline workspaces to the resolved obsidian base, NOT local ./workspaces/. The base-path pattern is: ${logs_path}/${logs_subfolder}/{repo}/{YYYY-MM-DD}_{feature}/. Compose the full path by substituting {repo} with the current repository name (basename of the working directory) and {YYYY-MM-DD}_{feature} with today's date and the feature slug — exactly as orchestrator Step 2 does. In the rare case that the orchestrator subagent is dispatched via nested handoff, it resolves the same base in its own boot Step 2 and receives it via the workspaces path: directive." )
+}
+
+# ---------------------------------------------------------------------------
+# Ordered invocation list (per REGISTRY above)
+# ---------------------------------------------------------------------------
+load_dev_mode
+load_language
+load_workspace_mode
+
+# ---------------------------------------------------------------------------
+# Emit ONE combined JSON
+# If nothing applied → emit nothing, exit 0 (session start never blocked).
+# additionalContext = the directives joined by blank lines (\n\n).
+# When system_message is non-empty it becomes the "systemMessage" field
+# (app-rendered banner — instant, no token render).
+# ---------------------------------------------------------------------------
+if [ -z "$system_message" ] && [ ${#directives[@]} -eq 0 ]; then
+    exit 0
+fi
+
+# Build the additionalContext string: directives joined by \n\n.
+# Each directive is an ASCII-safe fixed template (no embedded double quotes or
+# backslashes that would break a JSON string), so printf suffices for the
+# fallback path. jq is preferred here because it handles proper escaping of
+# embedded newlines in the joined multi-directive string.
+additional_context=""
+for d in "${directives[@]}"; do
+    if [ -n "$additional_context" ]; then
+        additional_context="${additional_context}
+
+${d}"
+    else
+        additional_context="${d}"
+    fi
+done
+
+if command -v jq >/dev/null 2>&1; then
+    if [ -n "$system_message" ]; then
+        jq -cn \
+          --arg sm "$system_message" \
+          --arg ac "$additional_context" \
+          '{"systemMessage":$sm,"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":$ac}}'
+    else
+        jq -cn \
+          --arg ac "$additional_context" \
+          '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":$ac}}'
+    fi
+else
+    # printf fallback: directive templates contain no double quotes or
+    # backslashes, so a single printf pass is safe.
+    if [ -n "$system_message" ]; then
+        printf '{"systemMessage":"%s","hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' \
+          "$system_message" "$additional_context"
+    else
+        printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' \
+          "$additional_context"
+    fi
+fi
+
+exit 0

@@ -65,12 +65,12 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 6: hooks/language-session-start.sh — functional tests"
+echo "# Suite 6: hooks/session-start.sh — functional tests"
 echo "############################################################"
-if bash "$TESTS_DIR/test_language_hook.sh"; then
-    echo "language-hook: PASS"
+if bash "$TESTS_DIR/test_session_start.sh"; then
+    echo "session-start: PASS"
 else
-    echo "language-hook: FAIL"
+    echo "session-start: FAIL"
     FAILED=$((FAILED + 1))
 fi
 

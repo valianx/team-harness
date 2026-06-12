@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.82.0] - 2026-06-11
+
+### Added
+
+- `hooks/session-start.sh`: unified SessionStart hook consolidating `dev-mode-session-start.sh` and `language-session-start.sh` into a single ordered-load architecture with a REGISTRY extension point (`load_dev_mode` → `load_language` → `load_workspace_mode`)
+- `load_workspace_mode` function: surfaces `logs-mode: obsidian` + `logs-path` at session start so direct-skill dispatches (bypassing orchestrator Step 2) write to the configured vault instead of repo-local `workspaces/`
+- Path override clause added to four Group-B agents (`gcp-infra`, `gcp-cost-analyzer`, `translator`, `init`) so obsidian-mode dispatches resolve the correct workspace base
+- Suite 89 (`tests/test_session_start.sh`): 37 functional regression tests covering all three loads, combined output, REGISTRY structure (AC-13), and security floors (SEC-DR-A/B/C/D)
+
+### Fixed
+
+- Lazy-obsidian gap: no SessionStart hook previously surfaced `logs-mode: obsidian`, so direct-skill workflows wrote workspace documents to the repo-local `workspaces/` directory even when the operator had configured obsidian mode
+
+### Removed
+
+- `hooks/dev-mode-session-start.sh` — consolidated into `hooks/session-start.sh`
+- `hooks/language-session-start.sh` — consolidated into `hooks/session-start.sh`
+
 ## [2.80.0] - 2026-06-11
 
 ### Added

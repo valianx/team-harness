@@ -46,6 +46,8 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If invoked as part of a pipeline (auto-init from orchestrator), workspaces may exist.
 
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+
 2. **Create workspaces folder if needed** — create `workspaces/{feature-name}/` for your init report (`00-init.md`). Use `init` as feature name when standalone, or the pipeline's feature name when auto-init.
 
 3. **Ensure `.gitignore` includes `workspaces`** — this is part of init's Phase 4 responsibilities.

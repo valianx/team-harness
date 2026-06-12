@@ -96,6 +96,8 @@ The `dispatch_handoff` JSON block follows the canonical schema defined in `docs/
 4. Resolve `events_file`: obsidian → `00-execution-events.md`, local → `00-execution-events.jsonl`.
 5. Store `base_path`, `logs_mode`, `events_file`, and `initiative` for all subsequent path construction. `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}` is composed at Phase 0a Step 1d (unchanged in both modes). **Exception:** when `initiative` is set, the per-project `docs_root = {base_path}/{project}` — no `{date}_{feature}` leaf.
 
+**Resolve-before-dispatch invariant.** The obsidian base MUST be fully resolved here, in Step 2, BEFORE ANY agent dispatch — including dispatches on direct-skill paths that bypass the pipeline. `hooks/session-start.sh` (the unified SessionStart hook) surfaces `logs-mode`/`logs-path`/`logs-subfolder` at session start so the disposition is available before the first dispatch even when Step 2 is the first code that runs; Step 2 re-reads the same config to compose `base_path`. The two reinforce each other: the session-start directive provides early awareness; Step 2 is the definitive resolution that gates all path construction.
+
 Proceed to intake / recovery / direct-mode handling. No boot acknowledgment line.
 
 ### Session-scoped config override
@@ -802,7 +804,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    2. **Config default** — if `~/.claude/.team-harness.json` contains a `language` key with a valid 2-letter ISO 639-1 code (`[a-z]{2}`), use that value. Already read in boot Step 2; no extra I/O required. Edge cases:
       - Key **absent**: fall to level 3, no warning.
       - Key **present but malformed** (not a 2-letter lowercase code): emit one-line WARN (`config language "<value>" is not a valid ISO 639-1 code — falling back to detection`) and fall to level 3. Never abort the pipeline.
-      - **Note:** the same config key is also consumed by `hooks/language-session-start.sh` (a SessionStart hook, independent of dev mode) to inject a one-time language directive into every session — including non-pipeline sessions. A `00-state.md` session override (level 1) still takes precedence over the hook directive for that session.
+      - **Note:** the same config key is also consumed by `hooks/session-start.sh` (the unified SessionStart hook, independent of dev mode) to inject a one-time language directive into every session — including non-pipeline sessions. A `00-state.md` session override (level 1) still takes precedence over the hook directive for that session.
    3. **Detection** — infer the language from the operator's message text (the original request, not a skill payload). If the message is ambiguous or too short to determine (e.g., "fix auth bug"), fall to level 4.
    4. **Default** — `en`.
 
