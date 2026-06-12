@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Ask the mentor to teach you — explain a codebase, library, framework, language, or concept. Produces a layered, diagram-rich teaching pack in the workspace.
+description: Ask the mentor to explain a codebase, library, framework, language, or concept. Answers in chat with short inline diagrams; the teaching-pack file is an optional end-of-session artifact.
 ---
 
 Analyze the input: $ARGUMENTS
@@ -35,6 +35,6 @@ Ask the operator: "What would you like to learn? You can ask about a concept, a 
 ## Important
 
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly.
-- The orchestrator will classify `learn` as a read-only direct mode and dispatch the `mentor` agent.
-- Output: `workspaces/{topic-slug}/00-teaching-pack-{topic-slug}.md`
+- The orchestrator will classify `learn` as a read-only direct mode and dispatch the `mentor` agent only for the optional teaching-pack or deep background research.
+- Output: the answer in chat with a short inline diagram. The teaching-pack file (`workspaces/{topic-slug}/00-teaching-pack-{topic-slug}.md`) is an optional end-of-session artifact — not the default deliverable.
 - The `--resume` flag resumes an existing teaching pack without re-covering already-taught layers.
