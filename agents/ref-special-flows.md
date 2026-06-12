@@ -1045,3 +1045,56 @@ This section defines which task types and tiers produce a classification block a
 **Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md`, it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
 
 **Fast Mode:** the architect is not dispatched — the orchestrator writes a one-sentence prose plan. Classification block: all-false (same as self-authored path above). Sketch-guard: invoked as a no-op pass. `sketches/*.md`: none produced.
+
+---
+
+## Learn (Teaching) Flow
+
+When the operator asks to learn, understand, or have something explained (trigger: `/th:learn`, `learn` direct mode, or the Step 6a intent patterns for teach/explain):
+
+### Flow summary
+
+1. **Intake** — classify as `learn` (read-only direct mode)
+2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If the Knowledge Graph MCP fails, log "KG: unavailable" and continue.
+3. **Resolve workspace path** — use the `docs_root` / `logs_mode` from `00-state.md`. The mentor is mode-unaware; pass the resolved path in the dispatch.
+4. **Invoke `mentor`** — dispatch with: topic, scope hints (if provided), resume flag (if `--resume`), and workspace path.
+5. **Mentor produces `00-teaching-pack-{topic-slug}.md`** in the workspace — a layered syllabus (concept → framework → your-code) with one Mermaid concept-map per layer.
+6. **Top-level agent teaches from the pack** — the orchestrator (or top-level agent in dev mode) holds the multi-turn tutoring conversation from the pack's content. It answers follow-up questions, clarifies layers, and uses the pack as the source of truth.
+7. **Re-dispatch the mentor for drill-downs** — when the operator asks about something not covered in the existing pack, re-invoke the mentor with the drill-down question and `Resume: true`. The mentor appends a new layer or sub-section to the existing pack and returns.
+
+### Scope-set detection (mentor responsibility)
+
+The mentor classifies each request into a SET from `{concept, library/framework, codebase}` and sources each element:
+- `codebase` → Read/Glob/Grep + context7 for discovered deps
+- `library/framework` → context7 with WebSearch/WebFetch fallback
+- `concept` / language → WebSearch/WebFetch (official docs, specs)
+
+Auto-detects the framework from project dependencies even when unnamed.
+
+### Teaching-pack file convention
+
+- File: `00-teaching-pack-{topic-slug}.md` in the workspace (obsidian or local, resolved via `logs_mode`)
+- One pack per topic; resumable across sessions
+- On resume, the mentor reads the existing pack and continues from the last completed layer — never overwrites prior content
+
+**Resume flag:** pass `Resume: true` in the dispatch payload to trigger pack continuation.
+
+### Multi-turn top-level-tutor loop
+
+```
+operator asks question
+  → orchestrator/top-level reads from the pack and explains
+  → operator follows up
+     → if covered in pack: explain from pack
+     → if NOT covered in pack: re-dispatch mentor (with Resume: true, drill-down topic)
+        → mentor appends to pack
+        → top-level teaches from the new section
+```
+
+This loop continues for the duration of the session. The pack grows incrementally; each dispatch adds only the uncovered material.
+
+### v1 exclusions
+
+- The mentor NEVER dispatches a `diagrammer`, `d2-diagrammer`, or `likec4-diagrammer` agent. It MAY suggest `/th:diagram` or `/th:d2-diagram` when a richer rendered diagram would help — but the invocation is operator-initiated, not mentor-initiated.
+- No comprehension quizzes or exercises (v2 candidate).
+- No learning-progress KG nodes (v2 candidate — must respect `docs/kg-content-policy.md` if added).
