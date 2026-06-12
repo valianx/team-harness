@@ -1057,10 +1057,12 @@ When the operator asks to learn, understand, or have something explained (trigge
 1. **Intake** — classify as `learn` (read-only direct mode)
 2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If the Knowledge Graph MCP fails, log "KG: unavailable" and continue.
 3. **Resolve workspace path** — use the `docs_root` / `logs_mode` from `00-state.md`. The mentor is mode-unaware; pass the resolved path in the dispatch.
-4. **Invoke `mentor`** — dispatch with: topic, scope hints (if provided), resume flag (if `--resume`), and workspace path.
-5. **Mentor produces `00-teaching-pack-{topic-slug}.md`** in the workspace — a layered syllabus (concept → framework → your-code) with one Mermaid concept-map per layer.
-6. **Top-level agent teaches from the pack** — the orchestrator (or top-level agent in dev mode) holds the multi-turn tutoring conversation from the pack's content. It answers follow-up questions, clarifies layers, and uses the pack as the source of truth.
-7. **Re-dispatch the mentor for drill-downs** — when the operator asks about something not covered in the existing pack, re-invoke the mentor with the drill-down question and `Resume: true`. The mentor appends a new layer or sub-section to the existing pack and returns.
+4. **Answer in chat conversationally** — the top-level agent (in dev mode) acts as the conversational tutor: answer at the altitude asked, include a short inline Mermaid diagram, apply progressive disclosure (answer what was asked, then offer the next layer). No document is produced. No routing narration in chat.
+5. **Research only when needed** — code-answerable questions: Read/Glob/Grep the repo, zero web. Web or context7 fires only on a genuine knowledge gap that blocks the answer. Prefer background or parallel research to avoid freezing the dialogue.
+6. **Dispatch `mentor` ONLY for (a) or (b):**
+   - **(a) Optional end-of-session pack** — when the operator accepts the offer "want this saved as a pack?", dispatch the mentor with the topic and workspace path. The mentor writes `00-teaching-pack-{topic-slug}.md`.
+   - **(b) Genuinely deep or background research** — when the topic requires extended multi-source research that would freeze the chat, dispatch the mentor to do the research in the background and return a summary.
+7. **Re-dispatch the mentor for drill-downs** — when the operator asks about a topic not already covered, re-invoke the mentor with the drill-down question and `Resume: true`. The mentor appends a new layer or sub-section to the existing pack and returns.
 
 ### Scope-set detection (mentor responsibility)
 
@@ -1079,19 +1081,20 @@ Auto-detects the framework from project dependencies even when unnamed.
 
 **Resume flag:** pass `Resume: true` in the dispatch payload to trigger pack continuation.
 
-### Multi-turn top-level-tutor loop
+### Multi-turn conversational loop
 
 ```
 operator asks question
-  → orchestrator/top-level reads from the pack and explains
+  → top-level answers in chat with short inline diagram (no dispatch, no document)
   → operator follows up
-     → if covered in pack: explain from pack
-     → if NOT covered in pack: re-dispatch mentor (with Resume: true, drill-down topic)
-        → mentor appends to pack
-        → top-level teaches from the new section
+     → answer follow-up in chat
+     → if operator accepts pack offer: dispatch mentor → mentor writes pack
+     → if drill-down not answerable inline: re-dispatch mentor (Resume: true, drill-down topic)
+        → mentor appends to pack or returns summary
+        → top-level continues in chat from returned content
 ```
 
-This loop continues for the duration of the session. The pack grows incrementally; each dispatch adds only the uncovered material.
+The common path never dispatches the leaf agent. The pack grows only when the operator explicitly accepts the end-of-session offer, or when a drill-down requires extended background research.
 
 ### v1 exclusions
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.83.0] - 2026-06-12
+
+### Changed
+
+- `/th:learn` (mentor mode) repositioned from a documentation generator into a live
+  conversational unblocking mode: answers in chat with short inline diagrams, at the
+  altitude asked; the teaching-pack file is now an optional end-of-session offer rather
+  than the default deliverable; research fires only when a genuine gap blocks the answer
+  (code-answerable questions skip web entirely); quiet operation (no routing narration in
+  chat). The SEC-001 data-not-instructions guard and the version-honesty / context7
+  contract are preserved.
+
 ## [2.82.1] - 2026-06-11
 
 ### Fixed

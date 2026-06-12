@@ -19941,6 +19941,38 @@ check(
     "CLAUDE.md must not mention Suite 89 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
 )
 
+# (8) no-document-by-default: the mode does not produce a document by default
+_S89_NO_DOC_DEFAULT_TOKENS = ("end-of-session offer", "not the default deliverable")
+check(
+    "suite89(8-no-document-by-default): mentor.md contains no-document-by-default contract",
+    all(t in _s89_mentor for t in _S89_NO_DOC_DEFAULT_TOKENS),
+    f"mentor.md must contain the no-document-by-default contract with tokens: {_S89_NO_DOC_DEFAULT_TOKENS}",
+)
+
+# (9) quiet-operation: no routing / internal-reasoning narration in chat
+_S89_QUIET_OPERATION_TOKENS = ("Quiet Operation", "No routing")
+check(
+    "suite89(9-quiet-operation): mentor.md contains quiet-operation rule",
+    all(t in _s89_mentor for t in _S89_QUIET_OPERATION_TOKENS),
+    f"mentor.md must contain the quiet-operation rule with tokens: {_S89_QUIET_OPERATION_TOKENS}",
+)
+
+# (10) research-only-when-needed: research fires only on a genuine blocking gap
+_S89_RESEARCH_GATING_TOKENS = ("Research Only When Needed", "code-answerable")
+check(
+    "suite89(10-research-only-when-needed): mentor.md contains research-gating rule",
+    all(t in _s89_mentor for t in _S89_RESEARCH_GATING_TOKENS),
+    f"mentor.md must contain the research-gating rule with tokens: {_S89_RESEARCH_GATING_TOKENS}",
+)
+
+# (11) conversational-first: default output is the answer in chat
+_S89_CONVERSATIONAL_FIRST_TOKENS = ("conversational unblocking", "altitude asked")
+check(
+    "suite89(11-conversational-first): mentor.md contains conversational-first contract",
+    all(t in _s89_mentor for t in _S89_CONVERSATIONAL_FIRST_TOKENS),
+    f"mentor.md must contain the conversational-first contract with tokens: {_S89_CONVERSATIONAL_FIRST_TOKENS}",
+)
+
 # Marker: mentor-teaching-contract
 
 # ---------------------------------------------------------------------------
