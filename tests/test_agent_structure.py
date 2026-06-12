@@ -19944,6 +19944,56 @@ check(
 # Marker: mentor-teaching-contract
 
 # ---------------------------------------------------------------------------
+# Suite 91 — obsidian-path-override-fleetwide (v2.82.1)
+# Fleet-wide structural guard: every agent file that contains the
+# "Path override:" clause MUST also contain the obsidian-aware sentence
+# ("never the repo-local default").  Pins the invariant established by
+# PR #317 (4 agents) + this fix (12 agents) so a future agent that adds
+# the clause without the sentence fails this suite immediately.
+# Written by implementer (2026-06-11).  Marker: obsidian-path-override-fleetwide
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 91: obsidian-path-override-fleetwide structural guard (v2.82.1) ===")
+
+_s91_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s91_claude     = read(REPO_ROOT / "CLAUDE.md")
+_S91_CLAUSE_TOKEN   = "Path override:"
+_S91_OBSIDIAN_TOKEN = "never the repo-local default"
+
+_s91_agents_with_clause = [
+    p for p in AGENTS_DIR.glob("*.md")
+    if _S91_CLAUSE_TOKEN in p.read_text(encoding="utf-8")
+]
+
+for _s91_path in sorted(_s91_agents_with_clause):
+    _s91_text = _s91_path.read_text(encoding="utf-8")
+    check(
+        f"suite91: agents/{_s91_path.name} — Path-override clause includes obsidian-aware sentence",
+        _S91_OBSIDIAN_TOKEN in _s91_text,
+        f"agents/{_s91_path.name} has 'Path override:' but missing '{_S91_OBSIDIAN_TOKEN}'",
+    )
+
+check(
+    "suite91: at least 16 agent files carry the Path-override clause (fleet coverage floor)",
+    len(_s91_agents_with_clause) >= 16,
+    f"expected >=16 agent files with the clause, found {len(_s91_agents_with_clause)}",
+)
+
+# Self-referential guards
+check(
+    "suite91(h1-registry): docs/testing.md registers 'Suite 91' and 'obsidian-path-override-fleetwide'",
+    "Suite 91" in _s91_testing_md and "obsidian-path-override-fleetwide" in _s91_testing_md,
+    "docs/testing.md must name Suite 91 and the obsidian-path-override-fleetwide marker",
+)
+check(
+    "suite91(h2-hygiene): CLAUDE.md does NOT contain 'Suite 91'",
+    "Suite 91" not in _s91_claude,
+    "CLAUDE.md must not mention Suite 91 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: obsidian-path-override-fleetwide
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

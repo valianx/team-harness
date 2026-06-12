@@ -101,7 +101,7 @@ The tier classification is enforced at dispatch time by the skill — the review
 
 1. **Check for existing session context** — use Glob to look for `workspaces/` related to this PR. If workspaces exist, read them to understand architecture decisions and acceptance criteria from the pipeline.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **workspaces are optional for reviewer** — most PRs reviewed via `/th:review-pr` won't have workspaces (they are ephemeral). Proceed without them.
 

@@ -144,7 +144,7 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `04-validation.md` — understand acceptance criteria to satisfy
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
    **Per-PR scoping (pipeline_version: 2).** If the orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 

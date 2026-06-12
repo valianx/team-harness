@@ -52,7 +52,7 @@ This agent reads the **approved plan** (`01-plan.md` § Review Summary, as appro
 
 1. **Glob `workspaces/{feature-name}/`** — confirm the folder exists. If it doesn't, return `status: blocked` immediately with `issues: workspaces not found`.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Read these files in this order:**
    - `01-plan.md` — extract the **Original Description** block from `## Review Summary` (the user's request as formalized by the architect at Stage 1, before any Stage 2 changes) AND the **current AC list** from `## Task List`.
