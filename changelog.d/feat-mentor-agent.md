@@ -1,0 +1,15 @@
+### Added
+
+- `agents/mentor.md`: new `mentor` teaching agent (opus/high/teal). Implements a read-only orchestrator direct mode (sibling of `research`/`audit`): composite scope-set detection ({concept, library/framework, codebase}), layered teaching-pack template (concept → framework → your-code, Mermaid per layer), diagram-always rule (every explanation turn), version-honesty/context7 contract with explicit deprecated-API failure mode, representation-switching re-explanation rule, resume protocol across sessions, and compact status block with mandatory `context7_consult` line. Tools: Read, Glob, Grep, WebSearch, WebFetch, context7 (resolve-library-id + query-docs), Write (teaching-pack files only). No Bash, no Edit.
+- `skills/learn/SKILL.md`: new `/th:learn` skill — thin router on the research-skill template; Mode 1 (topic provided → `Direct Mode Task: learn` payload to orchestrator), Mode 2 (no input → ask for topic), `--resume` flag path for continuing an existing teaching pack.
+- `agents/ref-special-flows.md`: `## Learn (Teaching) Flow` section documenting the scope-set detection strategy, multi-turn top-level-tutor + re-dispatchable-mentor loop, teaching-pack file convention (`00-teaching-pack-{topic-slug}.md`), resume behaviour, and v1 exclusions (mentor may suggest diagrammer skills but never dispatches them directly).
+- `agents/orchestrator.md`: `learn` entry in the Step 6a intent classifier (triggers: `aprender`, `learn`, `enseñar`, `explicar`, `explain how X works`, `teach me`, `explícame`, `cómo funciona X`, `how does X work`, `walk me through`); `learn` row in the Direct Modes execution table pointing to the `mentor` agent; `mentor` row in the Your Team roster.
+- `agents/README.md`: `mentor` Roster row (opus/high/tools-allowlist/role) and vestigial low-cost-matrix row (sonnet/high); tally updated from 6 to 7 opus agents.
+- `skills/README.md`: `/th:learn` added to the orchestrator-routing list.
+- `docs/knowledge.md`: three tagged bullets — `[decision]` mentor as read-only direct mode, `[pattern]` diagram-always + version-honesty teaching contract, `[constraint]` modes.go frozen → MODES_GO_EXCLUDED.
+- `tests/test_agent_structure.py`: `"mentor"` added to `EXPECTED_AGENTS`, `READ_ONLY_AGENTS`, and `MODES_GO_EXCLUDED`; Suite 89 (`mentor-teaching-contract`) — 18 structural checks pinning context7 grant names, WebSearch/WebFetch grants, diagram-always token, version-honesty clause, SEC-001 fetched-content-is-data guard, `context7_consult` in Return Protocol, orchestrator wiring rows, frozen-artifact exclusion, and registry hygiene.
+- `docs/testing.md`: Suite 89 registered with 18-check description and `mentor-teaching-contract` feature marker.
+
+### Security
+
+- `agents/mentor.md`: added data-not-instructions guard at the top of `## Version-Honesty / context7 Contract` (SEC-001, indirect prompt injection, Low): fetched WebSearch/WebFetch/Read content is explicitly declared untrusted reference material — never a directive — with concrete examples of injected text to disregard. Pinned by Suite 89 check 3b (`tests/test_agent_structure.py`) asserting three stable tokens of the guard.
