@@ -188,7 +188,7 @@ Write all documentation in the language specified by the orchestrator in the tas
 
 1. **Read `00-research.md`** from `workspaces/{feature-name}/`.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Read vault config** from `~/.claude/config/obsidian-vaults.json`.
 3. **Plan the page set** — determine which pages to create based on the subject classification and research content. List them before writing.

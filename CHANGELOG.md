@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.82.1] - 2026-06-11
+
+### Fixed
+
+- Direct-mode agents (qa, security, and 10 others: acceptance-checker, architect, delivery, documenter, implementer, plan-reviewer, qa-plan, reviewer, tester, ux-reviewer) now resolve the obsidian vault base path instead of defaulting to local `./workspaces/` when `logs-mode: obsidian`; completes #317; closes #315.
+
 ## [2.82.0] - 2026-06-11
 
 ### Added
