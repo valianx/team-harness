@@ -114,7 +114,7 @@ team-harness/
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
 - `standard` (default) — copies agent files byte-identical to the source-repo `agents/*.md`. Canonical quality contract; recommended for operators on Anthropic Max or Team plans.
-- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all agents run on `sonnet`. Suitable for Free/Pro plan operators. Note: the Go installer's low-cost matrix is frozen pre-haiku; haiku-tier agents (`researcher`, `init`, `acceptance-checker`, `translator`) are not included in the matrix — see the Installer row note above and [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the tally.
+- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all agents run on `sonnet`. Suitable for Free/Pro plan operators. Note: the Go installer's low-cost matrix is frozen pre-haiku — the three agents flipped to `haiku` in v2.85.0 (`init`, `acceptance-checker`, `translator`) remain in the matrix mapped to `sonnet` (the correct haiku→sonnet upgrade for low-cost), while the newer `researcher`/`research-consolidator` agents are not tracked by it at all. See the Installer row note above and [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the tally.
 
 **Dependencies.** TUI: `charm.land/huh/v2` (bubbletea v2, lipgloss v2, bubbles v2 transitive). Binary size: 7.9–8.5 MB. No build step beyond `go build`.
 
