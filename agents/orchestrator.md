@@ -616,6 +616,9 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - gate1_release: {approved | approved-autonomous | rejected | edit | null}   # last STAGE-GATE-1 release decision; null until gate-1 fires. Set by the gate-1 release handler. Used by recover to determine gate-cleared status (approved/approved-autonomous only).
 - gate2_release_last: {next | next-autonomous | stop | redo | null}          # last STAGE-GATE-2 release decision for the most recent round; null until gate-2 fires. Updated each round by the gate-2 release handler. Used by recover (next/next-autonomous clears; stop/redo does not).
 - gate3_release: {ship | amend | abort | null}                               # last STAGE-GATE-3 release decision; null until gate-3 fires. Set by the gate-3 release handler. Used by recover (ship only clears).
+- worktree: {absolute path | null}             # worktree path for this task; null when running branch-in-place. Set at Phase 0a when a worktree is created. Teardown in delivery reads this field directly — no filesystem search needed.
+- worktree_branch: {branch name | null}        # branch checked out in the worktree; null when worktree is null
+- worktree_base: {origin/main | <dep-branch> | null}  # the ref the worktree branch was cut from; null when worktree is null
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -3563,6 +3566,22 @@ Using dispatch labels and the dependency graph:
 
 #### 4b. Launch parallel instances with completion hooks
 
+**Pre-launch collision check (rule 2 — no silent reuse, #51596).** Before running `git worktree add` for any task, verify that neither the target worktree path nor the target branch already exists:
+
+```bash
+git worktree list                         # check for existing worktree at target path
+git branch --list feat/{task-name}        # check for existing branch with the target name
+```
+
+If either check finds a match: **STOP**. Do not silently reuse or overwrite. Ask the operator:
+```
+STOP: a worktree or branch for '{task-name}' already exists.
+  Worktrees: {output of git worktree list}
+  Branch: {output of git branch --list}
+Options: (A) resume the existing worktree; (B) tear it down and start fresh (run teardown protocol first); (C) rename this task to avoid the collision.
+```
+Never proceed past this check without explicit operator confirmation.
+
 Determine how many tasks to launch: `launch_count = min(tasks_in_round, 5)`. Queue the rest.
 
 For each task being launched, spawn a worktree with a `Stop` hook that writes the result to a shared directory:
@@ -3757,10 +3776,11 @@ Wait for user's choice before merging anything.
 
 ```bash
 rm -rf /tmp/batch-results/                    # clean results
-git worktree remove {path}                    # per completed worktree
 ```
 
-Offer to clean completed worktrees. Do NOT auto-remove failed worktrees — user may want to inspect.
+**Worktree teardown is NOT performed here.** Worktrees stay alive through delivery and PR review — the teardown trigger is PR merge, not task-verified. The `delivery` agent runs the hardened teardown sequence (clean → `git worktree remove` + `git worktree prune` + verify-absent in `git worktree list`; dirty → STOP) after the PR is confirmed merged. The worktree path is recorded in `00-state.md § Current State` (`worktree:` field) so delivery can look it up deterministically.
+
+Offer to report completed and failed worktree paths from `batch-progress.md`. Do NOT auto-remove any worktree here — not even completed ones. Failed worktrees in particular should remain for inspection.
 
 ### Rules
 

@@ -83,17 +83,60 @@ When invoked via the `review` direct mode (not `/th:review-pr`), the orchestrato
 
 ---
 
-## Worktree Context
+## Worktree Lifecycle for PR Reviews
 
-When invoked via `/th:review-pr`, the dispatch includes a `Worktree:` field with the path to a temporary git worktree checked out at the PR's head SHA (e.g., `/tmp/team-harness-pr-review-45`). This worktree matches the exact state of the code being reviewed.
+Every PR review materializes the PR branch in an isolated git worktree in the same repository. This prevents the review checkout from moving the shared working tree's HEAD and colliding with concurrent work.
 
-**Read files relative to the worktree path, not the operator's current checkout:**
-- CORRECT: `Read("/tmp/team-harness-pr-review-45/src/auth/token.ts")`
+### Creating the review worktree (start of review)
+
+Before creating, apply the no-silent-reuse check (Rule 2 of `docs/worktree-discipline.md`): run `git worktree list` and `git branch --list <pr-head-branch>`. If a worktree path or branch of that name already exists, **STOP and ask the operator** — never silently reuse.
+
+Use a sibling path under `.claude/worktrees/` (e.g., `.claude/worktrees/pr-review-<number>`). Do NOT check out the PR branch in the shared main tree.
+
+```bash
+# Preferred — if gh supports the --worktree flag:
+gh pr checkout <number> --worktree .claude/worktrees/pr-review-<number>
+
+# Fallback — manual:
+git fetch origin
+git worktree add .claude/worktrees/pr-review-<number> origin/pull/<number>/head
+# or, if the PR head branch is available locally:
+git worktree add .claude/worktrees/pr-review-<number> <pr-head-branch>
+```
+
+### During the review
+
+Read all files relative to the worktree path, not the operator's current checkout:
+
+- CORRECT: `Read(".claude/worktrees/pr-review-45/src/auth/token.ts")`
 - INCORRECT: `Read("D:/projects/my-repo/src/auth/token.ts")` (operator's checkout, wrong state)
 
-When `Worktree:` is absent (standalone mode or internal review), read from the current working directory as before.
+Compare the PR branch against its base with `git -C <worktree-path> diff <base-branch>...HEAD` for a clean before/after view. The existing `gh`-based diff reading, Spanish comment posting, and APPROVE/REQUEST_CHANGES verdict mechanics are unchanged.
 
-The tier classification is enforced at dispatch time by the skill — the reviewer does not need to re-classify. Focus on the analysis appropriate to the dispatch context.
+When `Worktree:` is absent in the dispatch (standalone mode or internal review), read from the current working directory as before.
+
+The tier classification is enforced at dispatch time by the skill — the reviewer does not need to re-classify.
+
+### Removing the review worktree (end of review)
+
+**Teardown trigger: review complete** — the verdict is posted (or the review body is returned to the skill/orchestrator for publishing). This is distinct from the implement worktree's teardown trigger (PR merge).
+
+If the worktree is clean (no uncommitted changes — expected for a review-only worktree):
+
+```bash
+git worktree remove .claude/worktrees/pr-review-<number>
+git worktree prune
+git worktree list   # verify: the path must NOT appear in the output
+```
+
+If the worktree is dirty (unexpected — should never happen during a read-only review):
+
+```
+STOP: review worktree <path> has uncommitted changes — teardown blocked.
+Surface to the operator for manual inspection before removing.
+```
+
+Do not force-remove a dirty worktree without operator instruction.
 
 ## Session Context Protocol
 
@@ -533,6 +576,7 @@ review_body: |
 
   ### Fuera de alcance
   {Problemas pre-existentes observados — informativos, no afectan el veredicto. Omitir si vacío.}
+worktree_teardown: removed | skipped-no-worktree | blocked-dirty
 issues: {lista de problemas criticos, o "ninguno"}
 ```
 
@@ -603,6 +647,7 @@ issues: {list of criticals if any, or "none"}
 
 **All modes:**
 - `mode` field is mandatory — always declare which mode produced this output.
+- `worktree_teardown` is mandatory in fresh and update-body modes when a `Worktree:` path was provided in the dispatch. Values: `removed` (teardown completed cleanly), `skipped-no-worktree` (no worktree was created — standalone or internal mode), `blocked-dirty` (worktree has uncommitted changes; operator surfaced). Omit in reply and internal modes.
 
 **Fresh mode:**
 - `inline_findings` contains ONLY critical findings, each with `path`, `line`, and `body`. If no criticals, omit the field or use empty array.

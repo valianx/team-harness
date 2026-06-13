@@ -3,8 +3,8 @@
 
   "windows": {
     "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
-    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, session-start.sh, language-user-prompt.sh",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
+    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh, session-start.sh, language-user-prompt.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -56,6 +56,16 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/gcp-guard.sh",
+              "timeout": 5
+            }
+          ]
+        },
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/worktree-guard.sh",
               "timeout": 5
             }
           ]
@@ -98,8 +108,8 @@
 
   "macos": {
     "_requires": "osascript (included in macOS) + python3",
-    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, session-start.sh, language-user-prompt.sh",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
+    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh, session-start.sh, language-user-prompt.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -151,6 +161,16 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/gcp-guard.sh",
+              "timeout": 5
+            }
+          ]
+        },
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/worktree-guard.sh",
               "timeout": 5
             }
           ]
@@ -193,8 +213,8 @@
 
   "linux": {
     "_requires": "libnotify (notify-send) + python3",
-    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, session-start.sh, language-user-prompt.sh",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
+    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh, session-start.sh, language-user-prompt.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -246,6 +266,16 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/gcp-guard.sh",
+              "timeout": 5
+            }
+          ]
+        },
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash ~/.claude/hooks/worktree-guard.sh",
               "timeout": 5
             }
           ]

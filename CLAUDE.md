@@ -169,6 +169,7 @@ All commands run from the repo root.
 - **Milestone standard.** Milestones = commits, NOT PRs and NOT deliverables. One task = one workspace = one PR (after ALL milestones). Stage files are FLAT, whole-task documents (no per-milestone subsections; ALL stage-file suffixes PROHIBITED — `-m{N}`, `{NN}_{milestone}/` folders, `-b`/second-cycle `02b-*.md`). Milestone breakdown with dependency annotations lives ONLY in `01-plan.md`. Independent milestones PARALLELIZED (reuse #285 concurrent-`Task`); dependent serialize; one commit per milestone on the single feature branch. See `agents/ref-special-flows.md § Milestone-Build Flow`.
 - **Hook enforcement floors.** `policy-block.sh` secret-scans write content + commit-`Bash` (deny high-confidence, ask medium+entropy; `.env.example` allowlisted; codifies §6.5). `checkpoint-guard.sh` covers B1/B2/B3 (B1: `th:architect`; B2/B3: boundary-keyed). See `docs/reasoning-checkpoint.md`.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
+- **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Start-gate: clean+main → branch in place; dirty or non-main → worktree. Always fetch + base from `origin/main`. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
@@ -242,18 +243,9 @@ See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
 ### 7.1.1 Internal chatter — IN/OUT table
 
-The table below defines which operations are silent vs operator-facing. Extended
-examples and edge cases are in `docs/voice-guide.md`.
+> Full table and extended examples: see `docs/voice-guide.md § Internal Chatter — IN/OUT table (§7.1.1 full)`.
 
-| Category | On success | On failure | Rationale |
-|----------|-----------|------------|-----------|
-| Config load (read `.team-harness.json`, resolve paths) | SILENT — log `operation.*` event | one-line error + suggestion | The operator does not need to see each config read |
-| MCP verify (memory / context7 connectivity probe) | SILENT — log `operation.*` event | one-line error + suggestion | Connectivity OK is noise; failure is actionable |
-| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the orchestrator boot |
-| Phase-transition status blocks | PERMITTED (operator-facing) | PERMITTED | The operator needs to know which stage is active |
-| Tool error (any tool call fails) | n/a | SURFACE one-line summary + next-step; full output → events | Errors are always reported — never raw dumps |
-
-**Internal chatter** = mechanical progress on steps the operator did not ask to see (config, connectivity, init). **Operator-facing** = decisions, plans, results, STOP blocks, and stage transitions. When uncertain: output that answers something the operator asked is operator-facing; output that narrates how the system reaches that answer is Internal chatter.
+**Rule:** Config load, MCP verify, and Initialization / boot sequence are **SILENT** on success (log `operation.*` event only); one-line error + suggestion on failure. Phase-transition status blocks and all decisions, results, and STOP blocks are **PERMITTED** and always operator-facing. Tool errors always surface a one-line summary + next-step (never a raw dump). When uncertain: output that answers what the operator asked is operator-facing; output that narrates internal mechanics is **Internal chatter**.
 
 ### 7.2 Vocabulary — dev-natural verbs at the operator surface
 

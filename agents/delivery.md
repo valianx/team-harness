@@ -808,6 +808,66 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 ---
 
+### Step 11.4b — Worktree teardown (post-merge, rule 4; conditional)
+
+**Gate:** run only when ALL of the following are true:
+1. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
+2. `worktree:` in `00-state.md § Current State` is non-null (the task ran in a worktree, not branch-in-place).
+
+When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skipped: branch-in-place` and continue.
+
+**Worktree teardown is re-anchored to PR merge (rule 3).** The worktree lives through review — review-fix commits go into the same worktree on the same branch. Do NOT tear down earlier than this step.
+
+**Teardown protocol:**
+
+Read the `worktree:` field from `00-state.md § Current State` to get `<path>`.
+
+**1. Check for uncommitted changes:**
+
+```bash
+git -C <path> status --porcelain
+```
+
+If any output exists (dirty worktree): **STOP**. Do not remove. Surface to the operator:
+```
+STOP: worktree <path> has uncommitted changes — teardown blocked.
+Inspect with: cd <path> && git status
+Options: (A) commit or stash, then re-run teardown; (B) discard with `git -C <path> checkout .`, then teardown; (C) keep for inspection and remove manually.
+```
+Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proceed.
+
+**2. Remove the worktree (clean path only):**
+
+```bash
+git worktree remove <path>
+git worktree prune
+```
+
+**3. Verify removal:**
+
+```bash
+git worktree list
+```
+
+Check that `<path>` no longer appears in the output. If it still appears, the removal failed (common on Windows due to file-lock issue #57767). Repair:
+
+```bash
+git worktree prune
+git worktree remove --force <path>
+git worktree list   # verify again
+```
+
+If `<path>` still appears after `--force`, log `worktree_teardown: failed: path-still-present` and surface to the operator. Do NOT continue silently.
+
+**4. Log the outcome:**
+
+Add one line to the delivery status block:
+```
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
+```
+
+---
+
 ### Step 11.5 — Persist a process-insight to the knowledge graph (passive capture)
 
 **Best-effort** — if the Memory MCP server is unavailable, log the skip and continue. Never fail the delivery on KG errors.
@@ -1226,6 +1286,7 @@ gh_account: <login> | unknown | n/a (has_gh=false)
 dod: {pass | no gates discovered | failed: <command>}
 mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
 ci_state: passing | failing | pending | none | not-verified
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}

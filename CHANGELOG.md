@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.88.0] - 2026-06-13
+
+### Added
+- `docs/worktree-discipline.md` — full 5-rule worktree discipline for parallel task isolation: start-gate (clean+on-main → branch in place; dirty or non-main → worktree), no-silent-reuse STOP, finished-means-PR-merged, hardened teardown (clean → remove + prune + verify-gone; dirty → STOP), and plan-declares-worktree. Includes the U1 boundary statement (human own-terminal ops unreachable by any hook), Windows #57767 file-lock caveat with prune/remove-force repair, and #60588 baseRef distrust caveat.
+- `hooks/worktree-guard.sh` — advisory fail-open `PreToolUse` Bash hook that emits a start-gate reminder when an agent issues `git checkout -b`, `git switch -c`, or `git worktree add`. Modeled on `gcp-guard.sh`; cannot cover human own-terminal ops (stated in hook reason-string). Registered in all three OS blocks of `hooks/config.json` and `.claude-plugin/hooks.json`.
+- `worktree:`, `worktree_branch:`, and `worktree_base:` fields added to `00-state.md § Current State` schema in `agents/orchestrator.md` — makes teardown a deterministic path lookup.
+- `worktree:` declaration block added to the `01-plan.md` PR output template in `agents/architect.md` (rule 5: plan declares the worktree).
+
+### Changed
+- `agents/orchestrator.md § Multi-Task Orchestration Step 4b` — added pre-launch collision check (rule 2): before `git worktree add`, verify no worktree path or branch of the target name exists; STOP and ask the operator on collision (never silently reuse, #51596).
+- `agents/orchestrator.md § Multi-Task Orchestration Step 6 Cleanup` — worktree teardown removed from this step; re-anchored to PR merge in `delivery.md` (rule 3: finished means PR merged; worktree lives through review).
+- `agents/delivery.md` — added Step 11.4b: post-merge worktree teardown (rules 3+4). Reads `worktree:` from `00-state.md`; clean → `git worktree remove` + `git worktree prune` + verify-absent in `git worktree list`; dirty → STOP. `worktree_teardown:` added to the delivery status block.
+- `agents/reviewer.md` — PR reviews now use an isolated worktree (create on review start → compare against base → remove on review completion); `worktree_teardown:` field added to the fresh-review status block; teardown trigger (review complete) documented alongside the implement worktree's trigger (PR merge) in `docs/worktree-discipline.md § Reviewing a PR`.
+- `CLAUDE.md §5` — added a tight pointer bullet for the worktree discipline with the start-gate decision, the U1 boundary statement, and a link to `docs/worktree-discipline.md`.
+
 ## [2.87.0] - 2026-06-13
 
 ### Added
