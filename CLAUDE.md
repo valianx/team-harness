@@ -99,7 +99,7 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | **Legacy.** Go 1.23+ (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). Agents, skills, and hooks are embedded at compile time via `//go:embed all:agents skills hooks` in `assets.go` (repo root) — the binary is self-contained and requires no repo clone at runtime. The `all:` prefix includes `agents/_shared/` which holds cross-cutting snippets. TUI powered by `charm.land/huh/v2` (bubbletea, lipgloss transitive). Deprecated as canonical install path since v2.33.0; use the plugin for new installs. |
+| Installer | **Legacy.** Go 1.23+ (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). Agents, skills, and hooks are embedded at compile time via `//go:embed all:agents skills hooks` in `assets.go` (repo root) — the binary is self-contained and requires no repo clone at runtime. The `all:` prefix includes `agents/_shared/` which holds cross-cutting snippets. TUI powered by `charm.land/huh/v2` (bubbletea, lipgloss transitive). Deprecated as canonical install path since v2.33.0; use the plugin for new installs. **Go installer excluded from fleet model-allocation changes:** `cmd/install/` (including `modes.go::lowCostMatrix` and its tests) is NOT modified when fleet agents are added or reassigned — the Go installer is roadmapped as the **opencode agents installer** and fleet model-allocation changes are exclusive to the plugin path. The haiku tier (`researcher`, `research-consolidator`) ships via the plugin only. Do NOT touch `cmd/install/` for fleet agent or model changes. |
 | Bootstrap scripts | **Legacy.** Bash (`install.sh`) + PowerShell (`install.ps1`) + cmd.exe (`install.cmd`) — detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call). Served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via a GitHub Pages workflow. Zero Python, zero `uv` required. See `bin/README.md`. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
@@ -109,12 +109,12 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.83.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.84.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
 - `standard` (default) — copies agent files byte-identical to the source-repo `agents/*.md`. Canonical quality contract; recommended for operators on Anthropic Max or Team plans.
-- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all 17 agents run on `sonnet`. Suitable for Free/Pro plan operators. See [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
+- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all agents run on `sonnet`. Suitable for Free/Pro plan operators. Note: the Go installer's low-cost matrix is frozen pre-haiku; new haiku-tier agents (`researcher`) are not included in the matrix — see the Installer row note above and [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the tally.
 
 **Dependencies.** TUI: `charm.land/huh/v2` (bubbletea v2, lipgloss v2, bubbles v2 transitive). Binary size: 7.9–8.5 MB. No build step beyond `go build`.
 

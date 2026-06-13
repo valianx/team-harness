@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.84.0] - 2026-06-13
+
+### Added
+
+- `agents/researcher.md`: new haiku leaf agent (map role) for parallel web research. Receives one narrow search angle, runs WebSearch + WebFetch, and returns structured evidence-only findings (`claim` + `source_url` + `verbatim_excerpt` + `confidence`). Never concludes or recommends — mechanical evidence collection only.
+- `agents/research-consolidator.md`: new sonnet reduce agent. Reads per-lane `researcher` findings, deduplicates claims, surfaces conflicting sources explicitly under a `### Conflicting sources` section (never silently picks a winner), re-weighs source quality, and produces consolidated cited findings for `00-research.md` or Discover warm-findings files.
+- Parallel haiku research fan-out in `agents/ref-special-flows.md` § Research Flow: the orchestrator now dispatches N `researcher` lanes in parallel (default N=3, hard cap 5) before invoking the architect; fail-open lane handling with `research.lane.skipped` events for dead/zero-finding lanes.
+- Same fan-out wired into docs-flow Phase 1 research in `agents/ref-special-flows.md` § Phase 1 — Research: library/product subjects use the researcher fan-out + consolidator before the architect; codebase-only subjects skip the web lanes.
+- Discover background sweep in `agents/orchestrator.md` Step 6d and `docs/discover-phase.md` § 12: non-blocking research fan-out during intake when a genuine external knowledge gap exists; never auto-advances, not an advance signal, findings warm for the architect at Phase 1.
+- Haiku eligibility criteria in `agents/README.md` § "Earn the model": three-criteria policy replaces the blanket "no haiku" floor — haiku is eligible only when the task is mechanical with structured output, requires no judgment, and failures are cheap and detectable downstream.
+
+### Changed
+
+- `agents/architect.md` § Research Mode — Process § Step 2: when consolidated findings are present, the architect reads pre-digested evidence instead of running raw WebSearch passes; may still spot-fetch to fill consolidator-flagged gaps.
+- `skills/research/SKILL.md`: updated contract description to reflect the new fan-out flow (parallel haiku researchers + consolidator + architect).
+- `agents/README.md`: roster updated with `researcher` (haiku/medium) and `research-consolidator` (sonnet/high) rows; tally line updated to "7 opus, 1 haiku, remainder sonnet"; low-cost frozen-legacy note added.
+- `CLAUDE.md` §3 Installer row: added Go installer exclusion note — `cmd/install/` (including `lowCostMatrix`) is excluded from fleet model-allocation changes; roadmapped as opencode agents installer; haiku tier ships via plugin only.
+- `CLAUDE.md` §3 current version: bumped to 2.84.0.
+- Artifact verification in `agents/ref-special-flows.md` § Artifact Verification in Special Flows: updated Research Flow entry to include researcher lane files and consolidator output.
+
 ## [2.83.0] - 2026-06-12
 
 ### Changed

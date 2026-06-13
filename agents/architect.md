@@ -980,7 +980,9 @@ Clarify what needs to be investigated:
 
 ### Step 2 — Gather evidence
 
-Use all available sources:
+**When consolidated findings are present (primary path):** When the orchestrator provides a consolidated findings file (e.g., `workspaces/{feature}/00-research.md` or `research-findings-consolidated.md` written by `research-consolidator`), read that file as the primary evidence base. The parallel haiku research lanes have already done the bulk of web search. You MAY spot-fetch with `WebFetch` to fill specific gaps the consolidator flagged under `## Coverage gaps`, but do NOT re-run broad `WebSearch` passes over already-covered angles.
+
+**When no consolidated findings are present (fallback path):** Use all available sources directly:
 - **context7 MCP** — fetch documentation for each technology being compared
 - **WebSearch** — look for benchmarks, migration guides, community adoption, known issues
 - **Codebase analysis** — understand current stack, dependencies, integration points, migration effort

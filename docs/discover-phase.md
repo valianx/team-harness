@@ -300,3 +300,40 @@ The join is idempotent: running the same project's pipeline twice updates its si
 - **Backward-compatible.** `initiative == null` produces byte-identical behaviour to any pre-initiative run.
 - **Best-effort overview writes.** A write failure on `overview.md` logs a WARN and continues. The per-project pipeline never fails on an overview error.
 - **Local-mode per-project workspace unchanged.** In local mode, `base_path = "workspaces"` is not re-prefixed when an initiative is set. Only the overview location changes (common parent of sibling repos under a date-prefixed `{YYYY-MM-DD}_{initiative}/` folder).
+
+---
+
+## 12. Background research sweep (non-blocking, narrow trigger)
+
+The orchestrator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the `Step 6d-background-sweep` in `agents/orchestrator.md`.
+
+### 12.1 Trigger conditions (ALL must hold)
+
+The background sweep fires only when ALL of the following are true:
+
+1. **External knowledge gap exists.** The task involves a library, framework, migration, or external tool whose facts are NOT available from the repo itself (no relevant `docs/knowledge.md` entry, no existing spec or migration guide in the codebase).
+2. **The gap is a factual external question.** Examples that qualify: "does library X support tree-shaking as of v3?", "what is the migration path from Express v4 to v5?", "are there known security issues in package Y at this version?". Examples that do NOT qualify: "where is the auth module?", "what does the orchestrator do at Phase 3?", "how is feature X implemented?" — those are codebase-answerable questions.
+3. **The gap is material.** The architect would spend non-trivial time on raw WebSearch at Phase 1 without the pre-digested findings.
+
+### 12.2 What fires
+
+When the trigger conditions hold:
+- N `researcher` (haiku) agents are dispatched in parallel (default N=3, hard cap 5) with distinct search angles for the topic.
+- Each lane writes a per-angle `research-findings-{angle}.md` to the workspace.
+- Dead or empty lanes record a `research.lane.skipped` event (fail-open — never blocks the intake conversation).
+- After all lanes complete, `research-consolidator` (sonnet) merges findings into `workspaces/{feature}/research-findings-discover.md`.
+- A `research.background_sweep.complete` event is recorded in `{events_file}`.
+
+### 12.3 What does NOT fire
+
+- The sweep NEVER modifies `discover_state`, `checkpoint_advance_fresh`, or `functional_clarity_confirmed`. Discover continues independently.
+- The sweep is NOT an advance signal and never auto-advances the pipeline.
+- The sweep NEVER runs for code-location questions or any question answerable from the codebase.
+- The sweep NEVER blocks the dialogue. If the fan-out is slow, the orchestrator continues the conversation; the findings are opportunistically available at Phase 1.
+
+### 12.4 Availability at Phase 1
+
+When the advance signal fires and the architect is dispatched for Phase 1, the orchestrator checks for `research.background_sweep.complete: true` in `{events_file}`. When found:
+- The architect dispatch prompt includes the path `workspaces/{feature}/research-findings-discover.md`.
+- The architect reads the pre-digested findings as its primary external evidence base (same as the primary research flow path per `agents/architect.md § Research Mode — Process § Step 2`).
+- The architect may spot-fetch to fill specific gaps the consolidator flagged but does not re-run broad WebSearch passes over already-covered angles.

@@ -56,6 +56,8 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | `delivery` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep | Docs, changelog, version, branch, commit, PR. |
 | `reviewer-consolidator` | opus | `high` | Read, Edit, Write, Glob, Grep | Merges 2-3 focused review drafts (security/architecture/style) into a single unified review. De-duplicates findings, surfaces contradictions, determines verdict. Invoked by orchestrator after parallel focused reviewer passes in multi-reviewer mode. |
 | `mentor` | opus | `high` | Read, Glob, Grep, WebSearch, WebFetch, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs`, Write (teaching-pack files only) | Teaches the operator (codebase/library/language/concept). Read-only on code; produces a layered, diagram-rich teaching pack with one Mermaid concept-map per layer and holds a multi-turn tutoring dialogue. |
+| `researcher` | haiku | `medium` | Read, Glob, Grep, WebFetch, WebSearch | Parallel web research map agent. Receives one narrow search angle, runs WebSearch + WebFetch, returns structured evidence-only findings (`claim` + `source_url` + `verbatim_excerpt` + `confidence`). Never concludes, never recommends — evidence collection only. Dispatched by the orchestrator as N parallel lanes (default 3, cap 5). |
+| `research-consolidator` | sonnet | `high` | Read, Glob, Grep, Edit, Write | Parallel web research reduce agent. Reads per-lane findings files, deduplicates claims, surfaces conflicting sources under `### Conflicting sources` (never silently picks a winner), re-weighs source quality, and produces consolidated cited findings for `00-research.md` or a Discover warm-findings file. |
 
 Plus reference files (`ref-direct-modes.md`, `ref-special-flows.md`) loaded on-demand by the orchestrator. They are not invocable subagents — their `model` field is vestigial and not enforced by `/th:lint`.
 
@@ -68,9 +70,19 @@ Plus two cross-cutting snippets in `_shared/` (not invocable agents), installed 
 
 Three principles drive the matrix above:
 
-1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa-plan, gcp-cost-analyzer, agent-builder, orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers, translator) or **high-volume post-code auditing** (qa, documenter, init) run on `sonnet` — the heavy thinking has already been done upstream.
+1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa-plan, gcp-cost-analyzer, agent-builder, orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers, translator) or **high-volume post-code auditing** (qa, documenter, init) run on `sonnet` — the heavy thinking has already been done upstream. Agents that do **mechanical high-volume work with structured output** (`researcher`) run on `haiku` — see the eligibility criteria below.
 2. **Effort by depth of judgement required.** `max` for irreversible analysis (security audits, PR reviews, agent design). `high` for solid analytical work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan, tester authoring regression tests). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`.
 3. **Tools by capability boundary.** The `tools` field is the **agency boundary** — what the agent literally cannot do regardless of what its prompt instructs. Read-only auditors (`architect`, `security`, `qa`, `qa-plan`, `acceptance-checker`) lose `Bash` so they cannot mutate the host even by accident. Builders (`implementer`, `tester`, `delivery`, diagrammers, `translator`, `init`, `agent-builder`) keep `Bash` but the harness gates destructive commands at `PreToolUse` (see `hooks/config.json`). Permission surface = agency boundary; tighten one and the prompt becomes a softer guardrail backed by a hard one.
+
+### Haiku eligibility criteria
+
+`haiku` is eligible for an agent role ONLY when **ALL three** of the following hold:
+
+1. **The task is mechanical with structured output.** No synthesis, no design judgment, no architectural decisions. Examples: search-and-extract, classification, pattern matching, format conversion.
+2. **The task requires no judgment or synthesis.** The agent follows a deterministic procedure and emits structured data. A wrong output is cheap: it is caught by the gate (consolidator, qa, human review) without cascading.
+3. **Failures are cheap and detectable downstream.** A dead or empty-result lane is handled fail-open. A gate or consolidator downstream re-weighs quality and surfaces problems explicitly.
+
+When any condition does not hold, `sonnet` is the minimum floor. Use `opus` when the work involves analysis, coordination, or irreversible decisions.
 
 ## Low-cost mode
 
@@ -106,8 +118,12 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `translator` | sonnet | medium | sonnet | medium | No change — glossary is the contextual anchor; human reviews diff at PR time. |
 | `delivery` | sonnet | medium | sonnet | medium | No change — mechanical; reviewer audits at Phase 4.5; human approves PR. |
 | `mentor` | opus | high | sonnet | high | Teaching is analysis + synthesis; effort high preserves layered-pack depth. Human reads the pack before the tutoring session. |
+| `researcher` | haiku | medium | sonnet | medium | Post-decommission agent — not in Go installer lowCostMatrix. In low-cost mode, runs on sonnet (haiku→sonnet upgrade; mechanical role is still suitable). |
+| `research-consolidator` | sonnet | high | sonnet | medium | Post-decommission agent — not in Go installer lowCostMatrix. Effort drops to medium in low-cost; consolidation quality is reduced but the fail-open fail-safe applies. |
 
-**Tally (standard mode):** 7 agents on `opus` (orchestrator, architect, agent-builder, security, reviewer-consolidator, qa-plan, mentor), remainder on `sonnet`. In low-cost mode, all on `sonnet`. No `max`, no `low`, no `haiku`.
+**Tally (standard mode):** 7 agents on `opus` (orchestrator, architect, agent-builder, security, reviewer-consolidator, qa-plan, mentor), 1 agent on `haiku` (`researcher`), remainder on `sonnet`. In low-cost mode, all on `sonnet`. No `max`, no `low`.
+
+**Low-cost mode and the haiku tier:** the low-cost matrix (legacy Go installer, `cmd/install/modes.go::lowCostMatrix`) is frozen pre-haiku and does NOT track the `researcher` or `research-consolidator` agents. The Go installer is roadmapped as the **opencode agents installer** — fleet model-allocation changes no longer propagate to it. Plugin install (`/plugin install th`) is the canonical path and receives the correct `model: haiku` assignment. See `CLAUDE.md §3` for the full exclusion rationale.
 
 ## Adding or modifying an agent
 
