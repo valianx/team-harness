@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.87.0] - 2026-06-13
+
+### Added
+- `/th:research` flow now runs a bounded self-looping gap-closure mechanism: after each consolidation+synthesis round, the orchestrator evaluates a gate (`material:true AND web_closeable:true` in the structured `gaps` block) and auto-dispatches a follow-up `researcher` fan-out for each gate-passing gap, re-consolidates and re-synthesizes into the SAME `00-research.md` in place (reconcile-don't-accrete). Hard bounds: max 3 rounds total (round 1 + at most 2 gap-closure rounds — the cost bound); per-round lane cap ≤ 5 demand-allocated (one lane per gate-passing gap). On termination, a mandatory `## Residual Gaps` section names exactly one of three distinguishable reasons (`no-material-closeable-gaps`, `round-cap-reached`, `all-gaps-closed`). The Discover background sweep remains single-pass and never inherits the loop. Structural signals: `research_round` in `00-state.md`; `research.round.start`, `research.gap.gate`, `research.round.skipped`, and `research.loop.terminated` events in the trace.
+
 ## [2.85.0] - 2026-06-13
 
 ### Changed
