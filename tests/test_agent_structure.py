@@ -19998,6 +19998,32 @@ check(
     f"mentor.md must mandate the codebase-scope diagram standard with tokens: {_S89_CODE_DIAGRAM_TOKENS}",
 )
 
+# (13) R1: optional Predict/Run front-step present AND framed as offered-never-a-gate
+_S89_PREDICT_RUN_TOKENS = (
+    "Optional Predict/Run front-step",
+    "offered, never a gate",
+    "Predict/Run NEVER delays or blocks the answer",
+)
+check(
+    "suite89(13-predict-run): mentor.md contains the optional Predict/Run front-step framed as offered-never-a-gate"
+    f" (tokens: {_S89_PREDICT_RUN_TOKENS})",
+    all(t in _s89_mentor for t in _S89_PREDICT_RUN_TOKENS),
+    f"mentor.md must contain the optional Predict/Run front-step (R1) with tokens: {_S89_PREDICT_RUN_TOKENS}",
+)
+
+# (14) R9: operational-artifact is a first-class scope element AND taught with Show-the-Code discipline
+_S89_OPS_ARTIFACT_TOKENS = (
+    "operational-artifact",
+    "read the REAL artifact and SHOW it",
+    "Show-the-Code discipline applies to ops artifacts",
+)
+check(
+    "suite89(14-ops-artifact): mentor.md names operational-artifact as a scope element taught with Show-the-Code discipline"
+    f" (tokens: {_S89_OPS_ARTIFACT_TOKENS})",
+    all(t in _s89_mentor for t in _S89_OPS_ARTIFACT_TOKENS),
+    f"mentor.md must contain the operational-artifact scope/source (R9) with tokens: {_S89_OPS_ARTIFACT_TOKENS}",
+)
+
 # Marker: mentor-teaching-contract
 
 # ---------------------------------------------------------------------------

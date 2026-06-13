@@ -1,0 +1,6 @@
+### Added
+- `agents/mentor.md` (`/th:learn`): an optional **Predict/Run front-step** for codebase scope — for learning-oriented questions the mentor MAY invite the operator to predict what a function/path does (and offer to run or trace it), then explain the real code against that prediction (PRIMM Predict→Run→Investigate). It is an invitation, never a gate: a straight "how does this work / just tell me" is still answered by Show-the-Code by default with zero delay. Composes with — never overrides — conversational-first and the #324 Show-the-Code-by-default invariant.
+- `agents/mentor.md` (`/th:learn`): **operational-artifact** added as a first-class scope element and source — runbooks, dashboards, CI/CD pipeline definitions, IaC/Terraform, and Kubernetes manifests are now taught with the SAME Show-the-Code discipline as source code (read the REAL artifact, show it, walk it in deploy/stage/apply order). Extends Scope-set Detection, the source-strategy table, and the Show-the-Code/Diagram-Always scope wording.
+
+### Changed
+- Suite 89 (`mentor-teaching-contract`) +2 checks (26 → 28): token-pinned regression protection for the optional Predict/Run front-step (R1) and the operational-artifact scope/source (R9). docs/testing.md registry count updated to match.
