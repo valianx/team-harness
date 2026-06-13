@@ -57,7 +57,7 @@ Read the following in order:
 1. `workspaces/{feature-name}/01-plan.md` § Review Summary — Bug Report block (Reported behaviour / Expected behaviour / Reproduction steps / Observed result / Environment / AC).
 2. `workspaces/{feature-name}/01-root-cause.md` — `## Regression Test Approach` section (Test layer / Test scaffold / Failing assertion). For `type: hotfix` there is no `01-root-cause.md`; use the orchestrator's one-sentence prose plan from the STAGE-GATE-1 record (passed in the task payload).
 
-The `Test layer:` field tells you which layer reproduces the bug deterministically — unit, integration, or e2e. The `Failing assertion:` field tells you the specific assertion that fails today.
+The `Test layer:` field tells you which layer reproduces the bug deterministically — unit, integration, or e2e, or any warranted type from Phase 0 step 3b (browser-mode, ui-component, visual, a11y). The `Failing assertion:` field tells you the specific assertion that fails today.
 
 #### Step 2 — Discover the test framework (reuse Phase 0 discovery)
 
@@ -94,7 +94,7 @@ If existing tests fail because of the new test, your test is leaking state. Fix 
 ## Test File
 - **Path:** `{path/to/test.spec.ts}` (relative to repo root)
 - **Framework:** {jest | vitest | pytest | go test | ...}
-- **Test layer:** unit | integration | e2e
+- **Test layer:** unit | integration | e2e | or any warranted type from Phase 0 step 3b (browser-mode, ui-component, visual, a11y)
 
 ## Tests Added
 | Test name | Asserts | Fails today because |
@@ -153,7 +153,7 @@ issues: {blockers — e.g., "bug-not-reproducible" — or "none"}
 Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current PR BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
 
 - **Trigger:** orchestrator invokes with `mode: authoring` (or dispatch instruction specifies "authoring mode, Phase 2.7")
-- **Flow:** Phase 0 (discovery) → read AC from `01-plan.md` § Task List (per-PR AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
+- **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → read AC from `01-plan.md` § Task List (per-PR AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
 **This mode does NOT validate AC verdicts.** Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
@@ -189,7 +189,7 @@ issues: {list of blockers or "none"}
 Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-only mode: you execute the frozen test suite (authored in Phase 2.7), confirm there are no regressions, and map each AC to the existing tests. You do NOT author new AC tests — authoring is complete.
 
 - **Trigger:** orchestrator invokes with `mode: verify-run` (or dispatch instruction specifies "run-only mode, Phase 3")
-- **Flow:** Phase 0 (discovery) → run the full suite → confirm no regressions → map AC to existing tests → write or update `03-testing.md` (verify section)
+- **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → run the full suite → confirm no regressions → map AC to existing tests → write or update `03-testing.md` (verify section)
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
 **This mode does NOT write new AC tests.** The AC tests already exist from Phase 2.7. Writing new tests in this mode would break the immutable-artifact invariant that allows `qa` and `security` to parallelize safely. If a test is missing for an AC, report it as a finding — do NOT write the missing test; that is a Phase 2.7 failure that must be corrected before verify can succeed.
@@ -327,12 +327,13 @@ For each business rule provided in the context:
 Before writing any test:
 
 1. **Read CLAUDE.md** to understand project conventions and test commands
-2. **Detect the test framework and stack** from config files and dependencies (jest.config, vitest.config, pytest.ini, playwright.config, etc.). Also detect the application stack for Reference Router resolution:
+2. **Gate A — frontend stack detection.** Detect the test framework and stack from config files and dependencies (jest.config, vitest.config, pytest.ini, playwright.config, etc.). Also detect the application stack for Reference Router resolution:
    - `next.config.*` + `app/` directory → `react-nextjs`
    - `nest-cli.json` or `@nestjs/*` in `package.json` → `nestjs`
    - `go.mod` → `go`
    - `pyproject.toml` / `pytest.ini` → `python`
-   Record the detected stack token.
+   - `vite.config.*` + react dep → `vite-react`; `nuxt.config.*` → `nuxt`; `svelte.config.*` → `svelte`
+   Record the detected stack token. When a frontend stack is detected but browser-mode is n/a for it (currently non-react stacks: vue / nuxt / svelte / etc. — `browser-mode.md` targets react-nextjs), do NOT silently degrade: record in the decision log `"frontend stack {detected}: browser-mode n/a, scoping browser-real assertions to e2e (Playwright)"` so the gap is visible to the operator.
 3. **Explore existing tests** — use Glob and Read to find test files and understand the project's patterns:
    - Directory structure (colocated vs centralized `/tests` directory)
    - Naming conventions (`.test.ts`, `.spec.ts`, `_test.go`, `_test.py`)
@@ -346,7 +347,44 @@ Before writing any test:
    - AC about a visual/snapshot/theme diff → `visual`
    - Changed pure function / hook / util / reducer → `unit`
    - Changed file that composes multiple units/services with mocked network → `integration`
-   Record the warranted type tokens. The Reference Router (§ Reference Router) fires only on these.
+   - AC about layout/geometry, or any browser API from the canonical signal list (layout/`getBoundingClientRect`/`IntersectionObserver`/`ResizeObserver`/`matchMedia`/Web Animations/real CSS/viewport-conditional reflow), or a browser API outside those families that jsdom does not implement → `browser-mode` (full enumeration + catch-all: browser-test decision rule below)
+
+   **Responsive-intent check (Gate B) — run after the warranted-type list, before the browser-test decision rule.** Scan the touched components and config for deliberate responsive design evidence:
+   - Tailwind responsive prefixes (`sm:` / `md:` / `lg:` in any className in the changed files)
+   - `@media` queries in touched style files (including `@media` inside `.module.css` files)
+   - `matchMedia` usage in changed source
+   - Custom breakpoints in `tailwind.config.*`
+   - A `<meta name="viewport">` tag
+   - CSS-in-JS breakpoint patterns: styled-components / Emotion template literals referencing theme breakpoints (e.g., `${({ theme }) => theme.breakpoints.up('md')}`), MUI `sx` prop with responsive values (e.g., `sx={{ display: { xs: 'none', md: 'block' } }}`), MUI `useMediaQuery` hook, Chakra UI responsive-array props (e.g., `fontSize={['sm', 'md', 'lg']}`)
+   - An AC that explicitly requires responsive or viewport behavior
+
+   **Viewport-conditional browser-mode tests are warranted ONLY when Gate B finds at least one piece of evidence OR an AC demands responsive behavior.** A frontend with no responsive intent keeps all other warranted types (unit, integration, e2e, a11y, browser-mode for non-viewport browser APIs) unchanged — Gate B gates only the viewport/responsive branch.
+
+   **CSS-in-JS / UI-library confirmation rule:** When Gate A (step 2) detected a CSS-in-JS or component-library stack (styled-components, Emotion, MUI, Chakra, etc.) and Gate B finds NO evidence using the list above, a Gate-B-NEGATIVE (no responsive intent) requires explicit confirmation before being recorded — because these stacks express breakpoints in ways a quick scan of Tailwind prefixes or raw `@media` will miss. Prompt: `"No responsive-intent evidence found via standard patterns. The stack uses CSS-in-JS/UI-library breakpoints — please confirm: does this component have responsive behavior?" (y/n)`. Record the Gate B outcome only after the operator responds; if operator confirms no responsive intent, log `responsive testing: n/a (no responsive intent detected, CSS-in-JS stack confirmed)`; if operator confirms responsive intent, treat Gate B as PASS and warrant viewport tests accordingly.
+
+   Record the Gate B outcome in the decision log and in the project guide (R4): when negative, log `responsive testing: n/a (no responsive intent detected)`.
+
+   **Browser-test decision rule (disambiguator between `browser-mode`, `e2e`, `a11y`, and `unit` — mandatory — apply before recording warranted type tokens):** The rule is **first-match** in the order written. For ACs whose assertions span two branches (e.g., "error summary receives keyboard focus AND is announced"), split the assertions per branch or warrant BOTH types and apply each loaded file's boundary note — for this a11y-vs-browser-mode overlap specifically: warrant `a11y` for the announcement check (aria-live validity) and `browser-mode` for the focus assertion (document.activeElement-after-Tab).
+   - AC describes behavior of a RUNNING application (multi-page flow, auth, redirects, middleware, Server Actions, async RSC) → warrant type `e2e` (Playwright). **Precedence:** if the AC requires a running application AND contains viewport/layout vocabulary (e.g., 'no horizontal scroll at 375px on every page'), `e2e` still wins — use Playwright viewport emulation for the responsive assertion. `browser-mode` is only the correct choice when the component can be tested in isolation, without a running application.
+   - AC describes a component in isolation depending on REAL browser APIs (layout, `getBoundingClientRect`, `IntersectionObserver`, `ResizeObserver`, `matchMedia`, Web Animations, real CSS) → warrant type `browser-mode` (Vitest Browser Mode). Also applies to **viewport-conditional layout**: a fixed-pixel viewport (375px/768px/1024px), responsive reflow, breakpoint behavior, or 'no horizontal scroll' assertions imply `matchMedia` + real CSS → Browser Mode — but only when the assertion targets a component in isolation (not a multi-page journey).
+   - AC about **aria-live region validity or ARIA roles or color contrast** → `a11y` (real-browser axe: per-story via Storybook addon, via `@axe-core/playwright` at page level, or against a `vitest-browser-react` render — jsdom axe gives false results for these cases).
+   - AC about **focus-trap behavior or announcement sequencing** → `browser-mode` (or a story play function) with explicit `document.activeElement`-after-Tab / DOM-order assertions; use axe as a complement only. Rationale: axe cannot verify focus-trap correctness or announcement sequencing — those are interaction-order assertions, not static structure checks.
+   - AC about **CSS-animation end, drag-and-drop pointer sequences, or timer-driven UI with animation** → `browser-mode` (jsdom stubs Web Animations and layout, so assertions on these false-pass).
+   - AC about a **browser API outside the enumerated families above** (e.g., clipboard, geolocation, fullscreen, notifications, or any other API jsdom does not implement) → `browser-mode`; before authoring, verify the API is available and permission-grantable under the Playwright provider; record the per-API availability decision in the decision log.
+   - Pure logic with no browser-API dependency → `unit`/jsdom (existing path). Note: before choosing jsdom for timer-driven UI, verify it has no CSS-animation/Web-Animations dependency.
+
+   After applying the browser-test decision rule above, record the warranted type tokens. The Reference Router (§ Reference Router) fires only on these. The decision log is emitted for every type selection, including a deliberate unit/jsdom choice.
+
+   **Mandatory decision log (applies every time this rule selects a type, including unit/jsdom):** record the selected type, the AC facts that drove the choice, and the loaded reference paths. Emit the log during Phase 0, before any test planning or suite run. In `verify-run` mode, also compare the warranted types against the environments the frozen suite actually uses and report any mismatch (e.g., a jsdom-only suite for a browser-API AC) as a finding. The `Reason:` field MUST cite the AC id (or a quoted AC fragment) AND the matched rule branch — a vacuous "chosen per decision rule" is non-compliant. In authoring and verify-run modes the decision log lands in `03-testing.md § Test-Type Decisions`; in other modes, in the execution log. Expected shape:
+   ```
+   Selected test type: browser-mode
+   Reason: AC-3 ("error summary receives keyboard focus") — matched focus-trap/announcement-sequencing branch.
+   Loaded references: agents/testing-refs/browser-mode.md
+   ```
+
+   **Neither installed:** if the warranted type is `e2e` or `browser-mode` and the target project lacks the required tooling (`@playwright/test` / `vitest @vitest/browser-playwright`), propose the exact setup commands as a finding and report them in `03-testing.md`. Do NOT auto-install. Do NOT silently fall back to jsdom for a browser-API AC. Hard-block only if the AC explicitly requires browser-real testing AND the operator declines setup. This also covers **packages-present-but-browser-binaries-missing** (e.g., `npx playwright install` never ran in this environment or CI): same posture — propose the exact install command (`npx playwright install --with-deps`) as a finding, Do NOT auto-install, and in `verify-run` mode report missing binaries as a finding rather than letting the suite die on "Executable doesn't exist".
+
+   Canonical Frontend AC category → test type mapping: see `agents/testing-refs/_index.md`.
 4. **Verify the test runner + coverage tool via context7** (mandatory). Before generating tests that use Jest / Vitest / PyTest / Go test / c8 / istanbul / equivalent, confirm the runner's current API signatures and coverage-config syntax for the version pinned in this repo. Follow `docs/context7-usage.md` — §3 (resolve-library-id → query-docs with a natural-language query), §4 (score hit/miss/n/a, retry once on miss). If the change touches only fixtures with no runner-specific syntax, this step can be skipped (and counted as `skipped` in the status block).
 
 **Follow the project's existing conventions.** If tests are colocated with source files, keep them colocated. If there's a centralized `/tests` directory, use it. If neither exists, recommend a structure appropriate to the stack.
@@ -355,7 +393,7 @@ Before writing any test:
 
 ## Reference Router
 
-After Phase 0, the router loads only the reference sections that the warranted test types and detected stack require. It never bulk-loads all six type files.
+After Phase 0, the router loads only the reference sections that the warranted test types and detected stack require. It never bulk-loads all type files.
 
 **Load mechanism:**
 
@@ -367,6 +405,8 @@ After Phase 0, the router loads only the reference sections that the warranted t
 
 **AC-scoped invariant:** the router fires only on the warranted types from Phase 0 step 3b. A backend PR whose ACs are about a pure utility loads `unit.md#react-nextjs` (or the detected stack), not `ui-component.md`. The router NEVER expands scope beyond what an AC or a changed file warrants.
 
+**Conventions vs. reference precedence:** when the AC names a tool explicitly, or the repo's discovered test framework differs from the reference's tool choice (e.g., a Cypress repo detected via `cypress.config`), the **discovered repo framework wins**; the loaded reference applies as principles (selector strategy, assertion discipline), not as a tool mandate. Record the divergence in the decision log.
+
 **(type × stack) → file/section mapping:**
 
 | Test type | File | Section anchor |
@@ -377,10 +417,12 @@ After Phase 0, the router loads only the reference sections that the warranted t
 | ui-component | `agents/testing-refs/ui-component.md` | `## react-nextjs` (others stub) |
 | visual | `agents/testing-refs/visual.md` | `## react-nextjs` (others stub) |
 | a11y | `agents/testing-refs/a11y.md` | `## react-nextjs` (others stub) |
+| browser-mode | `agents/testing-refs/browser-mode.md` | `## react-nextjs` (others n/a — Browser Mode targets UI components) |
 
 **Fallback (degrade gracefully, never fabricate):**
 - If a `(type, stack)` section is absent or marked a stub: use the file's `## Principles` preamble for principles, then author from the repo's own existing test conventions (discovered in Phase 0), and **record a gap note** in `03-testing.md`:
   `Reference gap: {type} × {stack} has no seeded section; authored from repo conventions + context7.`
+- If a `(type, stack)` section is **marked n/a for the stack** (e.g., `browser-mode` on a backend stack): re-derive the warranted type via Phase 0 step 3b (the AC was mis-warranted). Do NOT author from repo conventions using the n/a file.
 - If `_index.md` is missing (corrupt install): log `testing-refs unavailable` and fall back entirely to the core's stack-agnostic prose + Phase-0-discovered conventions — degraded but functional.
 - context7 verification (Phase 0 step 4) remains mandatory before emitting any library-specific code, regardless of whether a reference was loaded.
 
@@ -399,7 +441,7 @@ Tests verify the **acceptance criteria** from the spec. They are **ordered by th
 5. **For each changed unit, define:**
    - Which AC it satisfies (reference by AC number)
    - Scenarios to test (happy path, error cases, edge cases)
-   - Test type (unit, integration, e2e)
+   - Test type (unit, integration, e2e, or any warranted type from Phase 0 step 3b (browser-mode, ui-component, visual, a11y))
    - Dependencies to mock (via factories)
    - Data fixtures needed
 6. **Present the ordered test plan to the user** before writing any test. Example:
@@ -531,11 +573,80 @@ Write your summary to `workspaces/{feature-name}/03-testing.md`:
 ## Test Results
 - Total: {X} | Passed: {Y} | Failed: {Z}
 
+## Test-Type Decisions
+| AC | Selected type | Reason (AC id / fragment + matched rule branch) | Loaded references |
+|----|--------------|------------------------------------------------|-------------------|
+| AC-1 | {type} | {AC-N: "quoted fragment" — matched {branch name} branch} | {agents/testing-refs/{type}.md} |
+
 ## Documentation Consulted
 - {Library}@{version}: {one-line summary of what was confirmed or changed by the docs}.
 - {Library}@{version}: context7 unavailable — used training knowledge as of model cutoff.
 (or "No third-party libraries verified — this change is pure {repo} code.")
 ```
+
+### TESTING.md project guide (R4)
+
+**When:** at the end of `authoring` mode and `verify-run` mode, when `frontend_scope: true` (received in the dispatch payload or self-detected via the Gate-A stack markers in Phase 0).
+
+**Where:** create or rewrite `TESTING.md` at the **target repo root** (the root of the repo being tested — resolved from the dispatch payload or workspace context, not the team-harness workspace or the team-harness repo root).
+
+**Team-harness repo guard:** before writing, check that the resolved target path is NOT the team-harness repo itself (identified by `agents/tester.md` or `agents/orchestrator.md` present at root). If the resolved target IS the team-harness repo (e.g., running inside a team-harness worktree with self-detected `frontend_scope`), skip generation entirely and note it in your status block: `testing_md_path: skipped (target is team-harness repo root)`.
+
+**Overwrite / redirect decision — stable machine sentinel:** The generated file MUST begin with the HTML comment `<!-- th:testing-guide v1 -->` on its very first line. On any subsequent run:
+- If `TESTING.md` already exists AND its first line is `<!-- th:testing-guide v1 -->` → overwrite in-place (consolidated rewrite, not a changelog).
+- If `TESTING.md` already exists AND its first line is anything else (hand-written or generated by another tool) → do NOT overwrite. Write `docs/testing-guide.md` instead (also starting with `<!-- th:testing-guide v1 -->`), and note the redirect in your status block (`testing_md_path: docs/testing-guide.md`).
+- If `TESTING.md` does not exist → create it with the sentinel as the first line.
+
+This is a consolidated rewrite-in-place — never append a changelog-style log.
+
+**Template:**
+
+```markdown
+<!-- th:testing-guide v1 -->
+# Testing Guide
+_Generated by tester agent — rewrite-in-place, not a changelog._
+
+## Stack & detection
+- Framework / router: {e.g. Next.js 13 Pages Router}
+- Test runners found: {e.g. Jest 29 + RTL (unit/jsdom), no Playwright, no Vitest Browser Mode}
+- Gate A (frontend?): {pass | n/a} — evidence: {e.g. next.config.js, react dep}
+- Gate B (responsive?): {pass | n/a (no responsive intent detected)} — evidence: {e.g. sm: prefix in CheckoutCard.tsx} or {none found}
+
+## Test map
+| AC | Description (summary) | Test file | Environment | Rule branch |
+|----|-----------------------|-----------|-------------|-------------|
+| AC-1 | {brief} | {path/to/file.test.tsx} | {jsdom \| browser-mode \| e2e \| a11y} | {e.g. unit — pure logic, no browser-API dep} |
+
+## How to run
+```bash
+# Existing runner (always first)
+npm test
+
+# Browser-mode layer (once tooling installed)
+npx vitest --project browser
+
+# E2E layer (once tooling + webServer ready)
+npx playwright test
+```
+
+## Latest results
+| Suite | Result | Tests | Date |
+|-------|--------|-------|------|
+| Jest (jsdom) | {pass \| fail} | {N passed / N failed} | {YYYY-MM-DD} |
+| Vitest Browser Mode | {pass \| fail \| pending-tooling} | {N} | {YYYY-MM-DD} |
+| Playwright E2E | {pass \| fail \| pending-tooling} | {N} | {YYYY-MM-DD} |
+
+## Actions & recommendations
+_Prioritized: setup proposals first, then CI gaps, then implementation gaps, then manual-only gaps._
+
+1. **[SETUP]** {exact install command} — required to run {browser-mode \| e2e} layer
+2. **[CI]** Add `npm test` step to {workflow file} — currently no test step runs in CI
+3. **[IMPL GAP]** {file:function} is module-private; extract/export to enable {AC-N} test
+4. **[MANUAL]** {scenario} requires human verification (e.g. screen-reader announcement timing)
+5. **[COEXISTENCE]** {note on runner isolation, e.g. Jest swallows *.browser.test.tsx — add testPathIgnorePatterns}
+```
+
+**Field guidance:** omit rows/items that do not apply; keep each entry to one line. The `## Actions & recommendations` section is the primary developer-facing output — keep it actionable and ordered by impact.
 
 ---
 
@@ -724,6 +835,7 @@ mode: default | pre-fix-regression | authoring | verify-run | review | coverage-
 status: success | failed | blocked
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}
+warranted_types: [browser-mode, a11y]   # final warranted type tokens from Phase 0 step 3b; [] when none apply
 tests_count: {N}
 tests_deleted: {N}
 tests_deleted_reason: {one-line justification if tests_deleted > 0; otherwise omit this field}

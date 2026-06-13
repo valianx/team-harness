@@ -21,6 +21,8 @@ The canonical component test surface is the **Storybook story**, executed by `@s
 
 RTL + jsdom is the fallback for non-story components (utilities with JSX, hooks tested via `renderHook`). See unit.md for that path.
 
+> **Boundary with browser-mode.md:** this file covers the Storybook path — story-level appearance and interaction assertions running in a real browser via `@storybook/addon-vitest`. When a component depends on a **raw browser API tested outside a story context** (e.g., asserting `getBoundingClientRect` return values, writing `IntersectionObserver` callback tests, or verifying `ResizeObserver`-driven state), use the `vitest-browser-react` locators path described in `browser-mode.md` instead. Both paths run on the same Vitest Browser Mode engine (`@vitest/browser-playwright`); the distinction is context: story = appearance + interaction, browser-mode = raw layout/observer assertions.
+
 ### Setup
 
 ```bash

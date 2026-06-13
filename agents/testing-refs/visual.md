@@ -22,7 +22,8 @@ Detect which visual approach the repo uses before writing any tests. Never insta
 
 1. **Chromatic** (hosted): present if `package.json` contains `chromatic` or the CI pipeline has a `chromatic` step.
 2. **Playwright `toHaveScreenshot`** (self-hosted): present if `playwright.config.ts` exists and the E2E suite already uses screenshot assertions, or if the `visual` scripts in `package.json` reference Playwright.
-3. **Neither**: document the gap in `03-testing.md` and let the operator decide which to adopt before writing visual tests.
+3. **Vitest Browser Mode component screenshots** (Vitest 4.0+): present if `vitest.config.ts` contains a project with `test.browser` enabled (look for `browser: { enabled: true }`). See Option C below.
+4. **Neither**: document the gap in `03-testing.md` and let the operator decide which to adopt before writing visual tests.
 
 ### Option A: Chromatic (hosted, story-based)
 
@@ -84,5 +85,33 @@ npx playwright test --grep @visual --update-snapshots
 ### Guidance notes
 
 - Use `maxDiffPixelRatio: 0.01` (1% pixel difference tolerance) as a starting point; tighten or loosen per component.
-- Store baseline PNGs in the repo under `tests/e2e/__snapshots__/` (Playwright default). Review them in PRs just as you would review code.
+- Store baseline PNGs in the repo. Playwright's default snapshot location is the `<spec-file>-snapshots/` directory adjacent to the spec file (configurable via `snapshotPathTemplate` in `playwright.config.ts`). Review them in PRs just as you would review code.
 - If the baseline does not exist yet, Playwright writes it on first run (`--update-snapshots`). Commit the initial baselines in a separate PR before enabling CI enforcement.
+
+### Option C: Vitest Browser Mode component screenshots (Vitest 4.0+)
+
+Use when the repo already has a Vitest browser project (`test.browser` enabled in `vitest.config.ts`) and you need component-level screenshot comparison without setting up Chromatic or a full Playwright visual suite.
+
+```typescript
+// src/components/PricingCard/PricingCard.browser.test.tsx
+import { it, expect } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { PricingCard } from './PricingCard'
+
+it('matches visual snapshot', async () => {
+  const screen = await render(<PricingCard tier="pro" price={49} />)
+  await expect(screen.getByRole('article')).toMatchScreenshot('pricing-card-pro')   // component screenshot vs stored reference
+})
+```
+
+Reference images are stored in `__screenshots__/` alongside the test file. Commit them to version control; CI fails when they drift.
+
+**Platform-suffix caveat:** Vitest embeds both browser and OS platform in baseline filenames (e.g. `pricing-card-pro-chromium-darwin.png` vs `pricing-card-pro-chromium-linux.png`). Baselines committed from a macOS or Windows dev machine do not exist for Linux CI — the first CI run fails on **missing references**, not drift. The remedy is the same as Option B: generate and update baselines inside the pinned CI environment (the version-matched container). See `browser-mode.md` § "Visual regression testing (Vitest 4.0+)" for the full setup.
+
+Update baselines after an intentional visual change:
+
+```bash
+vitest run --project browser --update
+```
+
+Use this option at component granularity; for full-page or multi-step flow screenshots, prefer Option B (Playwright).

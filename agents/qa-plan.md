@@ -301,6 +301,8 @@ Responsive Criteria:
 - Responsive behavior at key breakpoints
 - Form validation and submission
 
+**Browser-real signal hints:** when an AC depends on real browser behavior — layout geometry, `IntersectionObserver`/`ResizeObserver`, `matchMedia`/viewport breakpoints (375px/768px/1024px), Web Animations/CSS transitions, or computed CSS — state that dependency EXPLICITLY in the Then clause (example: `…Then content reflows without horizontal scroll at 375px (matchMedia/viewport)`). The tester routes such AC to browser-real environments; AC that omit the signal default to jsdom.
+
 ---
 
 ## Session Documentation
