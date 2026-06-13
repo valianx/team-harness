@@ -306,6 +306,8 @@ Per-suite scope, golden commands, and what the tests do NOT cover: see `docs/tes
 
 ## 12. Contribution Workflow (repo-specific)
 
+> **Outside contributors:** see [CONTRIBUTING.md](./CONTRIBUTING.md) for the fork → branch → PR-to-upstream flow. The section below documents the maintainer's internal authoring model; the binding rules for both are §6.
+
 This repo ships assets to other developers, so the contribution flow matters more than code-level conventions.
 
 - **Develop in `agents/`, `skills/`, `hooks/` directly.** Do not edit `~/.claude/` by hand for changes you intend to share — they'll get overwritten or drift.
