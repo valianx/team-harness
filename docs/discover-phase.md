@@ -330,6 +330,7 @@ When the trigger conditions hold:
 - The sweep is NOT an advance signal and never auto-advances the pipeline.
 - The sweep NEVER runs for code-location questions or any question answerable from the codebase.
 - The sweep NEVER blocks the dialogue. If the fan-out is slow, the orchestrator continues the conversation; the findings are opportunistically available at Phase 1.
+- **The sweep is single-pass.** The gap-closure loop (bounded multi-round follow-up dispatch governed by the round counter and gap gate in `agents/ref-special-flows.md § Research Flow`) applies ONLY to the primary `/th:research` flow, never to the background sweep. The sweep runs its researcher fan-out once, produces one `research-findings-discover.md`, and stops — no structured gaps block is evaluated, no follow-up rounds are dispatched, and no round counter is incremented.
 
 ### 12.4 Availability at Phase 1
 

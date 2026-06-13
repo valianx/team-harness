@@ -95,7 +95,19 @@ Write the output file using this structure:
 
 ## Coverage gaps
 
-{Brief note on angles that returned 0 findings or were skipped, so the architect knows what was not searched. If all lanes returned findings, write: "All research lanes returned findings."}
+Emit a fenced `gaps` block — one entry per gap. When no gaps exist, emit `- none`.
+
+```gaps
+- id: {g1}
+  material: {true|false}   # would closing this gap change the conclusions or recommendations?
+  web_closeable: {true|false}  # can a targeted web-research lane close it?
+  desc: "{what is missing}"
+  angle: "{narrow search angle for a follow-up lane, or 'n/a — not web-closeable'}"
+```
+
+**Gate-passing condition:** `material: true` AND `web_closeable: true`. Both flags are required. A non-material gap or a non-web-closeable gap does NOT trigger a follow-up lane.
+
+**Reconcile-don't-accrete:** in follow-up rounds, amend the SAME `00-research.md` in place — do NOT create `00-research-v2.md` or append a new sibling file. Merge new lane findings into `## Consolidated Findings` and update this `## Coverage gaps` block to reflect which gaps have now been addressed.
 
 ## Findings summary
 
@@ -140,5 +152,6 @@ summary: {1-2 sentences: N lanes consolidated, M findings, K conflicts}
 lanes_consolidated: {N}
 total_findings: {M}
 conflicts_detected: {K}
+material_closeable_gaps: {N}   # count of gaps with material:true AND web_closeable:true; 0 when none
 issues: {none | list of skipped lanes or tool errors}
 ```

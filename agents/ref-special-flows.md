@@ -36,7 +36,37 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
      e. **All gates are mandatory:** STAGE-GATE-1, Phase 3 (verify), STAGE-GATE-3. The Phase Gate Prerequisites (§ Phase Checkpointing in `orchestrator.md`) enforce this mechanically.
      f. If the architect produced a `01-plan.md` during the research session (e.g., the operator asked for a plan before deciding to implement), that plan enters the normal ratification flow (Phase 1.5 → 1.6 → STAGE-GATE-1). It does NOT bypass design review.
    - **Discard:** clean up workspaces, mark pipeline as `complete` with `summary: research discarded by operator`.
-   - **Investigate further:** re-invoke architect in research mode with the operator's refined scope. Append findings to existing `00-research.md` (new section, not overwrite).
+   - **Investigate further — bounded gap-closure loop (orchestrator-owned):** After each consolidation+synthesis round, the orchestrator reads the `## Coverage gaps` fenced block from `00-research.md` and evaluates the gate:
+
+     **Gate condition (ALL must hold):** `(≥1 gap with material:true AND web_closeable:true)` AND `research_round < 3`.
+
+     **On gate FIRE (dispatch a follow-up round):**
+     1. Increment `research_round` in `00-state.md § Current State` (starts at 1 after round 1).
+     2. Emit `research.round.start` event: `{"ts":"<ISO>","event":"research.round.start","round":<N>,"lanes":<K>}`.
+     3. Compose follow-up angles ONLY from gate-passing gaps (one lane per gap). Clamp to ≤ 5 lanes for the round (anti-runaway guard). If gate-passing gaps exceed 5, dispatch 5 lanes covering the most material gaps and emit `research.round.skipped` event: `{"ts":"<ISO>","event":"research.round.skipped","round":<N>,"skipped_gap_ids":[...]}`.
+     4. Dispatch `researcher` (haiku) lanes in parallel (fail-open: `research.lane.skipped` on dead lanes).
+     5. Re-dispatch `research-consolidator` to amend the SAME `00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
+     6. Re-dispatch `architect` in research mode to re-synthesize the SAME `00-research.md` in place.
+     7. After architect returns, emit `research.gap.gate` event and re-evaluate the gate. Repeat from step 1 if the gate fires again AND `research_round < 3`.
+
+     **On gate NO-FIRE (terminate loop):** Determine the termination reason:
+     - `no-material-closeable-gaps` — the gaps block has no entry with both `material:true` AND `web_closeable:true`.
+     - `round-cap-reached` — `research_round` has reached 3 (round 1 + at most 2 gap-closure rounds is the cost bound).
+     - `all-gaps-closed` — the gaps block is `- none`.
+
+     Emit `research.gap.gate` event: `{"ts":"<ISO>","event":"research.gap.gate","verdict":"stop","material_closeable_count":<N>,"round":<R>}`.
+     Emit `research.loop.terminated` event: `{"ts":"<ISO>","event":"research.loop.terminated","reason":"<termination-reason>","round":<R>}`.
+
+     The architect writes a mandatory `## Residual Gaps` section to `00-research.md` naming the termination reason and listing every still-open gap. The bounded stop is never silent.
+
+     **Structural signals (mandatory):**
+     - `research_round: N` in `00-state.md § Current State` (N = current round number; set to 1 at the start of the initial research flow).
+     - `research.round.start` event at each round start.
+     - `research.gap.gate` event at each gate evaluation (both `verdict: loop` on fire and `verdict: stop` on no-fire).
+     - `research.round.skipped` event when gate-passing gaps exceed the per-round lane cap of 5 (the dispatch is clamped and the event makes the clamp observable).
+     - `research.loop.terminated` event with the termination reason.
+
+     **Operator-initiated investigation:** if the operator asks to investigate further at any point after the loop has terminated, re-invoke architect in research mode with the operator's refined scope, amending the same `00-research.md` in place.
 
 ---
 
@@ -1008,8 +1038,9 @@ Every special flow that skips phases must explicitly document which artifact ver
 - **Phases skipped:** 2-5 (implementation, verify, delivery, GitHub update).
 - **Artifact verification runs for:**
   - `researcher` lanes (N parallel) → `workspaces/{feature}/research-findings-{angle}.md` per lane. The orchestrator gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
-  - `research-consolidator` → `workspaces/{feature}/00-research.md` (or `research-findings-consolidated.md` for docs-flow). The orchestrator verifies the consolidated findings file exists before dispatching the architect.
-  - `architect` → `00-research.md`. The orchestrator verifies `00-research.md` exists and is non-empty after the architect returns.
+  - `research-consolidator` → `workspaces/{feature}/00-research.md` (or `research-findings-consolidated.md` for docs-flow). The orchestrator verifies the consolidated findings file exists before dispatching the architect. Checks `material_closeable_gaps` in the consolidator status block for gate evaluation.
+  - `architect` → `00-research.md`. The orchestrator verifies `00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
+  - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `00-research.md`) → architect (re-synthesized `00-research.md`). The orchestrator also verifies the `## Coverage gaps` fenced block is present in `00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
 - **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
 - **Phase 3.6 and 4.5:** not applicable (Phases 3-4 skipped entirely).
 - **Phase 3.75 (build verification):** not applicable (no implementation to build).

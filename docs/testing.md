@@ -233,7 +233,7 @@ Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82
 
 ### Suite 92 — haiku-research-fanout
 
-35 checks. Structural assertions for the parallel haiku research fan-out feature and the v2.85.0 fleet rightsizing (init, acceptance-checker, translator → haiku; researcher Write allowlist fix; effort re-tune: architect/gcp-infra → xhigh, acceptance-checker → high). File: `tests/test_agent_structure.py`. Covers all 9 ACs of PR-1 (haiku-research-fanout) plus the v2.85.0 haiku-fleet-rightsizing assertions with the following check groups:
+57 checks. Structural assertions for the parallel haiku research fan-out feature (v2.84.0), the v2.85.0 fleet rightsizing (init, acceptance-checker, translator → haiku; researcher Write allowlist fix; effort re-tune: architect/gcp-infra → xhigh, acceptance-checker → high), and the v2.87.0 bounded gap-closure loop for `/th:research`. File: `tests/test_agent_structure.py`. Covers all 9 ACs of PR-1 (haiku-research-fanout) plus the v2.85.0 haiku-fleet-rightsizing assertions plus the v2.87.0 gap-loop checks (AC-1 through AC-7 of research-gap-closure-loop) with the following check groups:
 
 (AC-1, 7 checks) Multi-site fan-out contract — the `researcher` fan-out token is verified at all four research execution sites: (a1) `agents/ref-special-flows.md § Research Flow` anchor present; (a2) same section documents `researcher` parallel lanes with default N=3 and cap 5; (a3) `agents/ref-special-flows.md § Phase 1 — Research` (docs-flow) anchor present; (a4) same section documents the researcher fan-out; (a5) `skills/research/SKILL.md` documents researcher fan-out; (a6) `agents/architect.md` Research Mode documents consuming pre-digested consolidated findings; (a7) `agents/researcher.md` output contract declares all four findings fields (`claim`, `source_url`, `verbatim_excerpt`, `confidence`).
 
@@ -249,9 +249,21 @@ Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82
 
 (AC-8, 3 checks) Go-installer exclusion — (g1) `CLAUDE.md` documents opencode agents installer roadmap / Go installer exclusion; (g2) `cmd/install/modes.go` does NOT contain a `researcher` entry; (g3) `agents/README.md` low-cost section states frozen pre-haiku.
 
-(AC-9, 2 checks) Version sync — (h1) `.claude-plugin/plugin.json` version is `2.85.0`; (h2) `.claude-plugin/marketplace.json` `plugins[0].version` is `2.85.0`.
+(AC-9, 2 checks) Version sync — (h1) `.claude-plugin/plugin.json` version is `2.85.0` or later (forward-compatible floor); (h2) `.claude-plugin/marketplace.json` `plugins[0].version` is `2.85.0` or later.
 
-(Self-ref, 2 checks) Registry + hygiene — `Suite 92` and `haiku-research-fanout` in `docs/testing.md`; `Suite 92` NOT in `CLAUDE.md §11`. All content checks use anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Written by tester in Phase 2.7 authoring mode (2026-06-13); extended by implementer (haiku-fleet-rightsizing, effort re-tune) 2026-06-13. Marker: `haiku-research-fanout`.
+(Gap-loop AC-1, 5 checks) Consolidator gaps block + material_closeable_gaps — (gl-ac1-1) `research-consolidator.md § Coverage gaps` anchor present; (gl-ac1-2) fenced `gaps` block with `id`, `material`, `web_closeable`, `desc`, `angle` fields; (gl-ac1-3) gate-passing condition documented (material AND web_closeable); (gl-ac1-4) `material_closeable_gaps` in return protocol; (gl-ac1-5) reconcile-don't-accrete instruction (same `00-research.md`, no `00-research-v2.md`).
+
+(Gap-loop AC-2, 4 checks) Architect re-emit + Residual Gaps + three termination reasons — (gl-ac2-1) architect Step 4 instructs re-emit of gaps block reconciled against synthesis; (gl-ac2-2) mandatory `## Residual Gaps` section declared in Step 4 template; (gl-ac2-3) all three termination reasons present (`no-material-closeable-gaps`, `round-cap-reached`, `all-gaps-closed`); (gl-ac2-4) reconcile-don't-accrete in Step 4 (no `00-research-v2.md`).
+
+(Gap-loop AC-3, 5 checks) ref-special-flows loop + gate + round cap 3 + per-round lane cap 5 — (gl-ac3-1) `Investigate further — bounded gap-closure loop` anchor present; (gl-ac3-2) gate condition documents `material` AND `web_closeable` AND `research_round`; (gl-ac3-3) round cap 3 declared as cost bound; (gl-ac3-4) per-round lane cap ≤ 5 (demand-allocated); (gl-ac3-5) all three termination reasons in the loop section.
+
+(Gap-loop AC-4, 3 checks) Orchestrator round counter + events — (gl-ac4-1) `research_round` referenced in `orchestrator.md` research path; (gl-ac4-2) required trace events (`research.round.start`, `research.gap.gate`, `research.loop.terminated`) in `ref-special-flows.md`; (gl-ac4-3) `research.round.skipped` event documented.
+
+(Gap-loop AC-7, 2 checks) Discover sweep exclusion pins — (gl-ac7-1) `orchestrator.md Step 6d-background-sweep` declares sweep is single-pass and gap-closure loop never applies; (gl-ac7-2) `docs/discover-phase.md § 12.3` declares the same.
+
+(Gap-loop negatives, 3 checks) (neg-1) no loop-contract site declares a round cap exceeding 3; (neg-2) ref-special-flows § loop gate requires BOTH `material` AND `web_closeable` (AND condition documented); (neg-3) `docs/discover-phase.md § 12.3` does NOT reference `research_round` as an active counter for the sweep.
+
+(Self-ref, 2 checks) Registry + hygiene — `Suite 92` and `haiku-research-fanout` in `docs/testing.md`; `Suite 92` NOT in `CLAUDE.md §11`. All content checks use anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Written by tester in Phase 2.7 authoring mode (2026-06-13); extended by implementer (haiku-fleet-rightsizing, effort re-tune) 2026-06-13; extended by implementer (research-gap-closure-loop, v2.87.0) 2026-06-13. Marker: `haiku-research-fanout`.
 
 ### Suite 88 — gcp-infra-refs-on-demand
 

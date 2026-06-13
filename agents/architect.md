@@ -310,6 +310,8 @@ Used when the team needs to investigate a technology, compare alternatives, eval
 
 **Research mode does NOT produce an architecture proposal.** It produces a neutral, evidence-based report with options and a recommendation. The team decides what to do next based on the findings.
 
+**Gap re-emit and residual-gaps contract (for gap-closure follow-up rounds):** When the orchestrator re-dispatches you for a follow-up research round, re-synthesize the SAME `00-research.md` in place. Re-emit the `## Coverage gaps` fenced `gaps` block reconciled against the enriched evidence. On termination (no gate-passing gaps remain OR round cap reached), write a mandatory `## Residual Gaps` section naming exactly one of the three termination reasons: `no-material-closeable-gaps`, `round-cap-reached`, or `all-gaps-closed`. See `## Research Mode — Process § Step 4` for the full output template.
+
 ### Audit Mode
 
 Used when the team needs to assess the health of an existing architecture — identify technical debt, anti-patterns, missing abstractions, inconsistencies, and improvement opportunities.
@@ -999,7 +1001,7 @@ For each option, evaluate:
 
 ### Step 4 — Write research report
 
-Write to `workspaces/{feature-name}/00-research.md`:
+Write to `workspaces/{feature-name}/00-research.md`. In follow-up rounds (when the orchestrator re-dispatches you), amend the SAME `00-research.md` in place — do NOT create `00-research-v2.md` or a new sibling file. Re-synthesize `## Recommendation` and `## Next Steps` against the enriched evidence, update the `## Coverage gaps` block to reflect which gaps have been addressed, and write or overwrite `## Residual Gaps`.
 
 ```markdown
 # Research: {topic}
@@ -1015,6 +1017,28 @@ Per option: description, pros, cons, migration effort (low/med/high), risk, comp
 Table: options × criteria (performance, migration effort, community, learning curve, compatibility)
 ## Recommendation
 ## Next Steps
+
+## Coverage gaps
+
+Re-emit the SAME fenced `gaps` block shape here, reconciled against the synthesis. Adjust `material` flags where the synthesis changed the materiality judgment. When a gap has been addressed by a follow-up research lane, remove it from this block (or set `material: false` with a note). When no gaps remain, emit `- none`.
+
+```gaps
+- id: {g1}
+  material: {true|false}
+  web_closeable: {true|false}
+  desc: "{what is still missing}"
+  angle: "{narrow search angle, or 'n/a'}"
+```
+
+## Residual Gaps
+
+**Termination reason:** {one of: `no-material-closeable-gaps` | `round-cap-reached` | `all-gaps-closed`}
+
+List every gap that remains open at termination — gaps that are non-material, non-web-closeable, or could not be closed within the round cap. For each entry, note why it was not closed:
+
+- `{gap-id}`: {desc} — reason: {non-material | not-web-closeable | round-cap-reached}
+
+When all gaps are closed, write: "All coverage gaps were closed across research rounds." When no gaps existed from round 1, write: "No coverage gaps identified."
 ```
 
 ---

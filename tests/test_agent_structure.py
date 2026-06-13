@@ -20436,6 +20436,310 @@ check(
     f"marketplace.json plugins[0].version must be 2.85.0 or later, got '{_s92_marketplace_version}'",
 )
 
+# ---------------------------------------------------------------------------
+# Suite 92 extension — gap-closure loop (research-gap-closure-loop, v2.87.0)
+# AC-1 (consolidator gaps block + material_closeable_gaps)
+# AC-2 (architect re-emit + ## Residual Gaps + three termination reasons)
+# AC-3 (ref-special-flows gate + round cap 3 + per-round lane cap 5)
+# AC-4 (orchestrator round counter + events)
+# AC-7 (discover-phase exclusion pin)
+# neg-1: no site declares more than 3 rounds
+# neg-2: gate requires BOTH material AND web_closeable
+# neg-3: Discover sweep section does NOT reference research_round
+# ---------------------------------------------------------------------------
+
+# ---- AC-1 (gap-loop): consolidator emits gaps block + material_closeable_gaps ----
+_S92_CONSOL_GAP_ANCHOR = "## Coverage gaps"
+_S92_CONSOL_STOP = ("\n## ", "\n---\n")
+_s92_consolidator_gap_slice = _slice_section(
+    _s92_consolidator, _S92_CONSOL_GAP_ANCHOR, _S92_CONSOL_STOP
+)
+check(
+    "suite92(gl-ac1-consol-anchor): research-consolidator.md contains "
+    "'## Coverage gaps' section",
+    bool(_s92_consolidator_gap_slice),
+    "research-consolidator.md must contain '## Coverage gaps' section "
+    "with the fenced gaps block",
+)
+check(
+    "suite92(gl-ac1-consol-gaps-block): research-consolidator.md § Coverage gaps "
+    "emits a fenced 'gaps' block with required fields (id, material, web_closeable, desc, angle)",
+    bool(_s92_consolidator_gap_slice)
+    and "```gaps" in _s92_consolidator_gap_slice
+    and "id:" in _s92_consolidator_gap_slice
+    and "material:" in _s92_consolidator_gap_slice
+    and "web_closeable:" in _s92_consolidator_gap_slice
+    and "desc:" in _s92_consolidator_gap_slice
+    and "angle:" in _s92_consolidator_gap_slice,
+    "research-consolidator.md § Coverage gaps must emit a fenced 'gaps' block "
+    "with fields: id, material, web_closeable, desc, angle",
+)
+check(
+    "suite92(gl-ac1-consol-gate-condition): research-consolidator.md § Coverage gaps "
+    "documents the gate condition (material AND web_closeable)",
+    bool(_s92_consolidator_gap_slice)
+    and "material" in _s92_consolidator_gap_slice
+    and "web_closeable" in _s92_consolidator_gap_slice
+    and ("Gate-passing" in _s92_consolidator_gap_slice
+         or "gate-passing" in _s92_consolidator_gap_slice
+         or "Gate condition" in _s92_consolidator_gap_slice),
+    "research-consolidator.md § Coverage gaps must document the gate-passing condition "
+    "(material: true AND web_closeable: true)",
+)
+check(
+    "suite92(gl-ac1-consol-material-closeable-gaps): research-consolidator.md "
+    "return protocol includes 'material_closeable_gaps'",
+    "material_closeable_gaps" in _s92_consolidator,
+    "research-consolidator.md return protocol must include 'material_closeable_gaps: N' field",
+)
+check(
+    "suite92(gl-ac1-consol-reconcile): research-consolidator.md documents "
+    "reconcile-don't-accrete instruction (amend SAME 00-research.md in place)",
+    "00-research.md" in _s92_consolidator
+    and (
+        "reconcile" in _s92_consolidator.lower()
+        or "in place" in _s92_consolidator
+        or "same" in _s92_consolidator.lower()
+    )
+    and "00-research-v2.md" in _s92_consolidator,
+    "research-consolidator.md must document the reconcile-don't-accrete rule "
+    "(amend same 00-research.md, no 00-research-v2.md)",
+)
+
+# ---- AC-2 (gap-loop): architect re-emits gaps block + Residual Gaps + three reasons ----
+_S92_ARCH_RESID_ANCHOR = "## Residual Gaps"
+_s92_arch_step4_anchor = "### Step 4"
+_S92_ARCH_STOP = ("\n---\n", "\n## Consolidation Mode")
+_s92_architect_step4_slice = _slice_section(
+    _s92_architect, _s92_arch_step4_anchor, _S92_ARCH_STOP
+)
+check(
+    "suite92(gl-ac2-arch-gaps-re-emit): agents/architect.md Research Mode Step 4 "
+    "instructs architect to re-emit the gaps block reconciled against synthesis",
+    bool(_s92_architect_step4_slice)
+    and "gaps" in _s92_architect_step4_slice
+    and (
+        "re-emit" in _s92_architect_step4_slice
+        or "reconcil" in _s92_architect_step4_slice.lower()
+    ),
+    "agents/architect.md Research Mode Step 4 must instruct the architect to re-emit "
+    "the gaps block reconciled against its synthesis",
+)
+check(
+    "suite92(gl-ac2-arch-residual-gaps-section): agents/architect.md Research Mode "
+    "Step 4 declares mandatory '## Residual Gaps' section",
+    bool(_s92_architect_step4_slice)
+    and "## Residual Gaps" in _s92_architect_step4_slice,
+    "agents/architect.md Research Mode Step 4 must declare the mandatory "
+    "'## Residual Gaps' section",
+)
+_S92_TERMINATION_REASONS = (
+    "no-material-closeable-gaps",
+    "round-cap-reached",
+    "all-gaps-closed",
+)
+check(
+    "suite92(gl-ac2-arch-three-reasons): agents/architect.md documents all three "
+    "termination reasons (no-material-closeable-gaps, round-cap-reached, all-gaps-closed)",
+    all(reason in _s92_architect for reason in _S92_TERMINATION_REASONS),
+    f"agents/architect.md must document all three termination reasons: "
+    f"{_S92_TERMINATION_REASONS}",
+)
+check(
+    "suite92(gl-ac2-arch-reconcile): agents/architect.md Research Mode Step 4 "
+    "documents reconcile-don't-accrete for follow-up rounds (no 00-research-v2.md)",
+    bool(_s92_architect_step4_slice)
+    and "00-research-v2.md" in _s92_architect_step4_slice,
+    "agents/architect.md Research Mode Step 4 must explicitly forbid 00-research-v2.md "
+    "(reconcile-don't-accrete contract)",
+)
+
+# ---- AC-3 (gap-loop): ref-special-flows gate + round cap 3 + per-round lane cap 5 ----
+_S92_RF_STEP9_ANCHOR = "Investigate further — bounded gap-closure loop"
+_S92_RF_STEP9_STOP = ("\n---\n", "\n## Spike Flow")
+_s92_rf_gap_loop_slice = _slice_section(
+    _s92_ref_flows, _S92_RF_STEP9_ANCHOR, _S92_RF_STEP9_STOP
+)
+check(
+    "suite92(gl-ac3-rf-anchor): ref-special-flows.md Step 9 contains "
+    "'Investigate further — bounded gap-closure loop' sub-step",
+    bool(_s92_rf_gap_loop_slice),
+    "ref-special-flows.md Step 9 must contain the "
+    "'Investigate further — bounded gap-closure loop' sub-step anchor",
+)
+check(
+    "suite92(gl-ac3-rf-gate): ref-special-flows.md § bounded gap-closure loop "
+    "documents gate condition (material AND web_closeable AND round<3)",
+    bool(_s92_rf_gap_loop_slice)
+    and "material" in _s92_rf_gap_loop_slice
+    and "web_closeable" in _s92_rf_gap_loop_slice
+    and "research_round" in _s92_rf_gap_loop_slice,
+    "ref-special-flows.md § bounded gap-closure loop must document the gate condition "
+    "(material:true AND web_closeable:true AND research_round < 3)",
+)
+check(
+    "suite92(gl-ac3-rf-round-cap-3): ref-special-flows.md § bounded gap-closure loop "
+    "declares the round cap of 3 as the cost bound",
+    bool(_s92_rf_gap_loop_slice)
+    and (
+        "round cap" in _s92_rf_gap_loop_slice.lower()
+        or "round-cap-reached" in _s92_rf_gap_loop_slice
+        or "research_round < 3" in _s92_rf_gap_loop_slice
+        or "research_round` has reached 3" in _s92_rf_gap_loop_slice
+    ),
+    "ref-special-flows.md § bounded gap-closure loop must declare round cap 3 "
+    "as the cost bound",
+)
+check(
+    "suite92(gl-ac3-rf-per-round-lane-cap-5): ref-special-flows.md § bounded gap-closure "
+    "loop declares per-round lane cap of 5 (demand-allocated)",
+    bool(_s92_rf_gap_loop_slice)
+    and (
+        "≤ 5" in _s92_rf_gap_loop_slice
+        or "<= 5" in _s92_rf_gap_loop_slice
+        or "≤5" in _s92_rf_gap_loop_slice
+        or "capped at 5" in _s92_rf_gap_loop_slice
+        or "cap of 5" in _s92_rf_gap_loop_slice
+    ),
+    "ref-special-flows.md § bounded gap-closure loop must declare per-round lane cap ≤ 5 "
+    "(demand-allocated, one lane per gate-passing gap)",
+)
+check(
+    "suite92(gl-ac3-rf-termination-reasons): ref-special-flows.md § bounded gap-closure "
+    "loop documents all three termination reasons",
+    bool(_s92_rf_gap_loop_slice)
+    and all(reason in _s92_rf_gap_loop_slice for reason in _S92_TERMINATION_REASONS),
+    f"ref-special-flows.md § bounded gap-closure loop must document all three "
+    f"termination reasons: {_S92_TERMINATION_REASONS}",
+)
+
+# ---- AC-4 (gap-loop): orchestrator owns round counter + events ----
+_S92_ORCH_RESEARCH_DIRECT_ANCHOR = "| research |"
+_s92_orch_direct_slice = _slice_section(
+    _s92_orch, _S92_ORCH_RESEARCH_DIRECT_ANCHOR, ("\n| ", "\n\n")
+)
+check(
+    "suite92(gl-ac4-orch-research-round): agents/orchestrator.md research direct-mode row "
+    "references 'research_round' counter in 00-state.md",
+    "research_round" in _s92_orch,
+    "agents/orchestrator.md must reference 'research_round' counter in the research "
+    "dispatch path (00-state.md § Current State)",
+)
+_S92_TRACE_EVENTS = (
+    "research.round.start",
+    "research.gap.gate",
+    "research.loop.terminated",
+)
+check(
+    "suite92(gl-ac4-orch-trace-events): ref-special-flows.md documents all required "
+    "gap-loop trace events (research.round.start, research.gap.gate, research.loop.terminated)",
+    all(evt in _s92_ref_flows for evt in _S92_TRACE_EVENTS),
+    f"ref-special-flows.md must document all required gap-loop trace events: "
+    f"{_S92_TRACE_EVENTS}",
+)
+check(
+    "suite92(gl-ac4-orch-round-skipped-event): ref-special-flows.md documents "
+    "'research.round.skipped' event (fires when gate-passing gaps exceed per-round cap)",
+    "research.round.skipped" in _s92_ref_flows,
+    "ref-special-flows.md must document 'research.round.skipped' event "
+    "(fires when gate-passing gaps exceed the per-round lane cap of 5)",
+)
+
+# ---- AC-7 (gap-loop): Discover sweep exclusion pin at both sites ----
+_S92_SWEEP_EXCL_TOKENS = (
+    "single-pass",
+    "gap-closure loop",
+)
+_s92_orch_sweep_slice = _slice_section(
+    _s92_orch, _S92_BG_SWEEP_ANCHOR, _S92_ORCH_STOP
+)
+check(
+    "suite92(gl-ac7-orch-single-pass-pin): agents/orchestrator.md Step 6d-background-sweep "
+    "declares the sweep is single-pass and the gap-closure loop never applies to it",
+    bool(_s92_orch_sweep_slice)
+    and "single-pass" in _s92_orch_sweep_slice
+    and (
+        "gap-closure loop" in _s92_orch_sweep_slice
+        or "gap closure loop" in _s92_orch_sweep_slice
+    ),
+    "agents/orchestrator.md Step 6d-background-sweep must declare the sweep is "
+    "single-pass and the gap-closure loop never applies to it",
+)
+_S92_DISCOVER_EXCL_ANCHOR = "12.3 What does NOT fire"
+_S92_DISCOVER_STOP = ("\n### ", "\n## ", "\n---\n")
+_s92_discover_excl_slice = _slice_section(
+    _s92_discover, _S92_DISCOVER_EXCL_ANCHOR, _S92_DISCOVER_STOP
+)
+check(
+    "suite92(gl-ac7-discover-single-pass-pin): docs/discover-phase.md § 12.3 "
+    "declares the sweep is single-pass and the gap-closure loop never applies to it",
+    bool(_s92_discover_excl_slice)
+    and "single-pass" in _s92_discover_excl_slice
+    and (
+        "gap-closure loop" in _s92_discover_excl_slice
+        or "gap closure loop" in _s92_discover_excl_slice
+    ),
+    "docs/discover-phase.md § 12.3 must declare the sweep is single-pass and "
+    "the gap-closure loop never applies to it",
+)
+
+# ---- Negative assertions ----
+# neg-1: no site declares more than 3 rounds
+_S92_NEG1_FILES = {
+    "research-consolidator.md": _s92_consolidator,
+    "architect.md": _s92_architect,
+    "ref-special-flows.md": _s92_ref_flows,
+    "orchestrator.md": _s92_orch,
+    "discover-phase.md": _s92_discover,
+}
+_S92_MORE_THAN_3_PATTERNS = (
+    "max 4 rounds", "max 5 rounds", "max 6 rounds",
+    "4 rounds", "5 rounds", "6 rounds",
+    "research_round < 4", "research_round < 5", "research_round < 6",
+    "round_cap = 4", "round_cap = 5", "round_cap = 6",
+)
+check(
+    "suite92(gl-neg1-no-more-than-3-rounds): no loop-contract site declares a "
+    "round cap exceeding 3",
+    not any(
+        pat in text
+        for text in _S92_NEG1_FILES.values()
+        for pat in _S92_MORE_THAN_3_PATTERNS
+    ),
+    "No loop-contract site may declare a round cap greater than 3 "
+    "(max 3 rounds is the cost bound — round 1 + at most 2 gap-closure rounds)",
+)
+
+# neg-2: gate requires BOTH material AND web_closeable (never one alone)
+check(
+    "suite92(gl-neg2-gate-requires-both-flags): ref-special-flows.md § bounded gap-closure "
+    "loop requires BOTH material AND web_closeable for gate-firing (never one flag alone)",
+    bool(_s92_rf_gap_loop_slice)
+    and "material" in _s92_rf_gap_loop_slice
+    and "web_closeable" in _s92_rf_gap_loop_slice
+    and (
+        # gate text names both flags together
+        ("material" in _s92_rf_gap_loop_slice and "web_closeable" in _s92_rf_gap_loop_slice)
+    )
+    # confirm the gate is described as requiring BOTH (not just one)
+    and (
+        "AND" in _s92_rf_gap_loop_slice
+        or "both" in _s92_rf_gap_loop_slice.lower()
+    ),
+    "ref-special-flows.md § bounded gap-closure loop gate must require BOTH "
+    "material:true AND web_closeable:true — never fire on a single flag alone",
+)
+
+# neg-3: Discover sweep section does NOT reference research_round (never inherits the loop)
+check(
+    "suite92(gl-neg3-discover-no-research-round): docs/discover-phase.md § 12 (background "
+    "sweep) does NOT reference 'research_round' as an active counter for the sweep",
+    bool(_s92_discover_excl_slice)
+    and "research_round" not in _s92_discover_excl_slice,
+    "docs/discover-phase.md § 12.3 must NOT reference 'research_round' as an active "
+    "counter — the sweep is single-pass and never runs the gap-closure loop",
+)
+
 # Self-referential guards
 check(
     "suite92(h1-registry): docs/testing.md registers 'Suite 92' and "
