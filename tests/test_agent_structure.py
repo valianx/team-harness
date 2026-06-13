@@ -19974,6 +19974,30 @@ check(
     f"mentor.md must contain the conversational-first contract with tokens: {_S89_CONVERSATIONAL_FIRST_TOKENS}",
 )
 
+# (12) show-the-code: codebase-scoped answers show the actual code BY DEFAULT, in execution order
+_S89_SHOW_CODE_TOKENS = ("Show-the-Code", "by default, in the first reply", "execution / pipeline order")
+check(
+    "suite89(12-show-the-code): mentor.md contains the by-default Show-the-Code codebase invariant",
+    all(t in _s89_mentor for t in _S89_SHOW_CODE_TOKENS),
+    f"mentor.md must contain the by-default Show-the-Code invariant with tokens: {_S89_SHOW_CODE_TOKENS}",
+)
+
+# (12b) show-the-code is scoped to codebase + repo read access (does not reinflate to a document)
+_S89_SHOW_CODE_SCOPE_TOKENS = ("real entry points", "read access to the repository")
+check(
+    "suite89(12b-show-the-code-scope): mentor.md scopes Show-the-Code to codebase + repo access",
+    all(t in _s89_mentor for t in _S89_SHOW_CODE_SCOPE_TOKENS),
+    f"mentor.md must scope Show-the-Code with tokens: {_S89_SHOW_CODE_SCOPE_TOKENS}",
+)
+
+# (12c) codebase-scope diagram standard: a code-grounded data-flow pipeline of real code symbols
+_S89_CODE_DIAGRAM_TOKENS = ("code-grounded data-flow pipeline", "Nodes are the real code symbols")
+check(
+    "suite89(12c-codebase-diagram): mentor.md mandates the code-grounded data-flow pipeline for codebase scope",
+    all(t in _s89_mentor for t in _S89_CODE_DIAGRAM_TOKENS),
+    f"mentor.md must mandate the codebase-scope diagram standard with tokens: {_S89_CODE_DIAGRAM_TOKENS}",
+)
+
 # Marker: mentor-teaching-contract
 
 # ---------------------------------------------------------------------------
@@ -20365,11 +20389,14 @@ check(
     "pre-haiku and does not track the researcher agent (AC-8)",
 )
 
-# ---- AC-9: version 2.85.0 in both plugin manifests ----
+# ---- AC-9: version 2.85.0 (or later) in both plugin manifests ----
+# v2.85.0 was the initial ship of haiku-research-fanout; forward-compatible floor
+# check so future version bumps (e.g. v2.85.1) continue to satisfy this guard —
+# matches the documented Suite 69 ac9 convention (no exact-equality version pins).
 check(
-    "suite92(ac9-plugin-json): .claude-plugin/plugin.json version is '2.85.0'",
-    _s92_plugin_json.get("version", "") == "2.85.0",
-    f"expected plugin.json version='2.85.0', got '{_s92_plugin_json.get('version', '')}'",
+    "suite92(ac9-plugin-json): .claude-plugin/plugin.json version is 2.85.0 or later",
+    _s59_ver_tuple(_s92_plugin_json.get("version", "0.0.0")) >= (2, 85, 0),
+    f"plugin.json version must be 2.85.0 or later, got '{_s92_plugin_json.get('version', '')}'",
 )
 _s92_marketplace_version = (
     _s92_marketplace_json.get("plugins", [{}])[0].get("version", "")
@@ -20378,9 +20405,9 @@ _s92_marketplace_version = (
 )
 check(
     "suite92(ac9-marketplace-json): .claude-plugin/marketplace.json plugins[0].version "
-    "is '2.85.0'",
-    _s92_marketplace_version == "2.85.0",
-    f"expected marketplace.json plugins[0].version='2.85.0', got '{_s92_marketplace_version}'",
+    "is 2.85.0 or later",
+    _s59_ver_tuple(_s92_marketplace_version or "0.0.0") >= (2, 85, 0),
+    f"marketplace.json plugins[0].version must be 2.85.0 or later, got '{_s92_marketplace_version}'",
 )
 
 # Self-referential guards
