@@ -1023,6 +1023,29 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      - **Concise engagement / internal reasoning.** The reasoning-partner posture does NOT license over-explaining or surfacing the full internal reasoning chain. Surface only the salient friction and the decision-relevant why, briefly. Keep the rest of the reasoning internal. This is the explicit counterweight to the sycophancy fix: a critical partner who is also concise. Aligns with CLAUDE.md §7.1 voice and output-discipline (operate silently, surface decisions and results).
 
+     **Step 6d-background-sweep — Research fan-out during Discover (non-blocking, narrow trigger).**
+
+     When Discover is open (not bypassed) AND a genuine *external* knowledge gap is detected — specifically, a library/framework/migration fact that is NOT answerable from the codebase itself — the orchestrator MAY launch the research fan-out in the background while the intake conversation continues.
+
+     **Trigger conditions (ALL must hold):**
+     - The operator's task involves a library, framework, migration, or external tool the codebase has not already established as a known pattern.
+     - The gap is a factual external question (e.g., "does this library support X?", "what are the migration steps from v2 to v3?"), NOT a code-location question (e.g., "where is the auth module?" — answer that with codebase exploration, not web search).
+     - The gap is material enough that the architect would spend meaningful time on raw WebSearch at Phase 1 without it.
+
+     **What fires:**
+     - Dispatch N `researcher` (haiku) agents in parallel (default N=3, hard cap 5) using the fan-out semantics from `ref-special-flows.md § Research Flow` (compose angles, dispatch concurrently, fail-open on dead lanes with `research.lane.skipped` event).
+     - After researcher lanes complete, dispatch `research-consolidator` to produce `workspaces/{feature}/research-findings-discover.md`.
+     - Record `research.background_sweep.complete` event in `{events_file}` with `findings_file: research-findings-discover.md`.
+
+     **What does NOT fire:**
+     - The sweep NEVER auto-advances Discover. The intake conversation continues independently.
+     - The sweep is NOT an advance signal and does NOT modify `discover_state`, `checkpoint_advance_fresh`, or `functional_clarity_confirmed`.
+     - The sweep NEVER runs for code-location questions, "what files touch X?", or any question answerable by reading the repo.
+
+     **Availability at Phase 1:** when the advance signal fires and the architect is dispatched, include `research.background_sweep.complete: true` in the dispatch prompt and the path `workspaces/{feature}/research-findings-discover.md` so the architect reads the pre-digested findings instead of running raw web searches (same as the primary research flow path).
+
+     If no external knowledge gap is detected, this sub-step is a no-op — the intake conversation proceeds normally.
+
      **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
 
      **Purpose:** detect whether this task is part of a multi-project initiative and, only with explicit operator confirmation, set the `initiative` slug that gates the path-resolution branch and the `overview.md` lifecycle.

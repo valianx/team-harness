@@ -231,6 +231,28 @@ Self-referential guard: `Suite 90` + `workspace-mode-session-start` in `docs/tes
 
 Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82.1, closes #315). File: `tests/test_agent_structure.py`. For every `agents/*.md` file that contains the literal `Path override:`, asserts it also contains the token `never the repo-local default`. This pins the invariant established by PR #317 (4 agents: gcp-infra, gcp-cost-analyzer, translator, init) + this fix (12 agents: acceptance-checker, architect, delivery, documenter, implementer, plan-reviewer, qa-plan, qa, reviewer, security, tester, ux-reviewer) so a future agent that adds the Path-override clause without the obsidian-aware sentence fails this suite immediately. Also asserts a fleet coverage floor of ≥16 clause-bearing agent files. Self-referential guards: `Suite 91` + `obsidian-path-override-fleetwide` in `docs/testing.md` (canonical registry); `Suite 91` NOT in `CLAUDE.md §11` (hygiene contract). Written by implementer (2026-06-11). Marker: `obsidian-path-override-fleetwide`.
 
+### Suite 92 — haiku-research-fanout
+
+28 checks. Structural assertions for the parallel haiku research fan-out feature (v2.84.0). File: `tests/test_agent_structure.py`. Covers all 9 ACs of PR-1 (haiku-research-fanout) with the following check groups:
+
+(AC-1, 6 checks) Multi-site fan-out contract — the `researcher` fan-out token is verified at all four research execution sites: (a1) `agents/ref-special-flows.md § Research Flow` anchor present; (a2) same section documents `researcher` parallel lanes with default N=3 and cap 5; (a3) `agents/ref-special-flows.md § Phase 1 — Research` (docs-flow) anchor present; (a4) same section documents the researcher fan-out; (a5) `skills/research/SKILL.md` documents researcher fan-out; (a6) `agents/architect.md` Research Mode documents consuming pre-digested consolidated findings; (a7) `agents/researcher.md` output contract declares all four findings fields (`claim`, `source_url`, `verbatim_excerpt`, `confidence`).
+
+(AC-2, 4 checks) research-consolidator contract — (b1) frontmatter `model: sonnet`; (b2) deduplication rule documented; (b3) `### Conflicting sources` section with never-silently-picks-a-winner rule; (b4) references `00-research.md` as output target.
+
+(AC-3, 2 checks) Researcher evidence-only + haiku model — (c1) frontmatter `model: haiku`; (c2) evidence-only contract (no conclusions, no recommendations).
+
+(AC-4, 2 checks) Fail-open lane handling — (d1) fail-open documented in Research Flow slice; (d2) `research.lane.skipped` event documented in `ref-special-flows.md`.
+
+(AC-5, 3 checks) Background sweep — (e1) `Step 6d-background-sweep` anchor present in `orchestrator.md`; (e2) sweep states it is NOT an advance signal and does not auto-advance; (e3) `docs/discover-phase.md` documents background sweep with not-advance-signal constraint.
+
+(AC-6, 3 checks) Allocation policy — (f1) `## Earn the model` anchor in `agents/README.md`; (f2) three-criteria haiku eligibility policy tokens present (`mechanical`, `structured output`, `judgment`, `detectable`); (f3) tally line reflects 1 haiku agent.
+
+(AC-8, 3 checks) Go-installer exclusion — (g1) `CLAUDE.md` documents opencode agents installer roadmap / Go installer exclusion; (g2) `cmd/install/modes.go` does NOT contain a `researcher` entry; (g3) `agents/README.md` low-cost section states frozen pre-haiku.
+
+(AC-9, 2 checks) Version sync — (h1) `.claude-plugin/plugin.json` version is `2.84.0`; (h2) `.claude-plugin/marketplace.json` `plugins[0].version` is `2.84.0`.
+
+(Self-ref, 2 checks) Registry + hygiene — `Suite 92` and `haiku-research-fanout` in `docs/testing.md`; `Suite 92` NOT in `CLAUDE.md §11`. All content checks use anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Written by tester in Phase 2.7 authoring mode (2026-06-13). Marker: `haiku-research-fanout`.
+
 ### Suite 88 — gcp-infra-refs-on-demand
 
 19 checks. Structural assertions for the `gcp-infra` agent on-demand reference system (AC-6/AC-7, v2.80.0). File: `tests/test_agent_structure.py`. Mirrors Suite 67 (tester-lean-core-testing-refs) for the `gcp-infra` agent. Checks: (1a–e) `agents/gcp-infra.md` contains `## Reference Router` section with `_index.md` reference, `Datastream` trigger keyword, graceful-degradation / never-fabricate fallback, and `reference_loaded` status field token; (2a–d) `agents/gcp-infra-refs/_index.md` exists and lists `datastream-cloudsql-bigquery` kind, path convention, and fallback behavior; (3) `agents/gcp-infra-refs/datastream-cloudsql-bigquery.md` exists on disk; (4) playbook has NO YAML frontmatter (reference file, not an agent); (5) playbook covers required topics: replication slot risk, VPC connectivity, cost drivers, REPLICA IDENTITY, partitioned tables / `publish_via_partition_root` (5 token checks); (6a–b) single `gcp-infra` agent guard (no variants added); (h1) `docs/testing.md` registers Suite 88 + `gcp-infra-refs-on-demand` marker; (h2) `CLAUDE.md` does NOT contain `Suite 88` (§11 hygiene contract). Written by implementer (2026-06-11). Marker: `gcp-infra-refs-on-demand`.

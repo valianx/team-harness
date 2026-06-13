@@ -17,11 +17,17 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
 
 1. **Intake** — classify as `research`
 2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If the Knowledge Graph MCP fails, log "KG: unavailable" and continue.
-3. **Invoke `architect` in research mode** — explicitly instruct: "This is a research task, produce `00-research.md`"
-4. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
-5. **Present** the research report to the user
-6. **Ask** the user how to proceed (implement, discard, or investigate further)
-7. **Act on user's choice:**
+3. **Fan-out web research (parallel haiku lanes)** — dispatch N `researcher` (haiku) agents in parallel (default N=3, hard cap 5). Each lane receives a distinct search angle and the structured findings contract:
+   - Compose N distinct angles for the topic (e.g., `official-docs`, `benchmarks`, `known-issues`, `migration-guides`, `community-adoption`). Cap at 5.
+   - Dispatch each `researcher` with: `angle`, `topic`, `relevance_criteria`, and a per-lane `findings_file` path (`workspaces/{feature}/research-findings-{angle}.md`).
+   - Run all N lanes concurrently using the existing concurrent-`Task` pattern.
+   - **Fail-open lane handling:** gate on each lane's status block. If a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event in `{events_file}` and continue with the remaining lanes. The flow never blocks on a single dead lane.
+4. **Consolidate** — dispatch `research-consolidator` (sonnet) with the list of findings files, the topic, and output path `workspaces/{feature}/00-research.md`. The consolidator deduplicates claims, surfaces `### Conflicting sources` explicitly (never silently picks a winner), and produces consolidated cited findings.
+5. **Invoke `architect` in research mode** — explicitly instruct: "This is a research task. Pre-digested consolidated findings are in `workspaces/{feature}/00-research.md` — read that file as your primary evidence base instead of running raw web searches. You may spot-fetch to fill specific gaps the consolidator flagged, but the bulk of web search has already been done. Produce your research analysis report, appending your synthesis and recommendation to `00-research.md`."
+6. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
+7. **Present** the research report to the user
+8. **Ask** the user how to proceed (implement, discard, or investigate further)
+9. **Act on user's choice:**
    - **Implement:** reclassify the pipeline and re-enter the full pipeline with all gates:
      a. Determine the new type: `refactor` if the research identified structural changes to existing code; `feature` if it identified new functionality to build.
      b. Append reclassification event: `{"ts":"<ISO>","event":"pipeline.reclassify","from":"research","to":"<new_type>","reason":"operator chose implement"}`.
@@ -794,18 +800,28 @@ When the user asks to document a service, database, API, library, infrastructure
 
 ### Phase 1 — Research (per topic)
 
-Invoke `architect` in **research mode** with explicit scope per subject classification:
+**Step 1a — Fan-out web research (parallel haiku lanes).** When the subject classification indicates external knowledge is needed (library, product, or any subject where public documentation enriches the output), dispatch N `researcher` (haiku) agents in parallel (default N=3, hard cap 5) for external evidence:
+- Compose N distinct angles for the topic (e.g., `official-docs`, `known-issues`, `migration-guides`).
+- Dispatch each `researcher` with: `angle`, `topic`, `relevance_criteria`, and a per-lane `findings_file` path.
+- **Fail-open lane handling:** if a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event and continue.
+- After all lanes return, dispatch `research-consolidator` to merge and deduplicate findings into `workspaces/{feature}/research-findings-consolidated.md`.
+
+For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) where external web research adds little value, skip the fan-out and proceed directly to Step 1b.
+
+**Step 1b — Invoke `architect` in research mode** with explicit scope per subject classification:
 
 | Subject | Architect Research Scope |
 |---------|--------------------------|
 | `service` | Source code, CLAUDE.md, README, CHANGELOG, docs/, API endpoints, config, architecture |
 | `database` | Migrations, schema files, models/entities, ER relationships, indexes, access patterns |
 | `api` | Route definitions, OpenAPI spec, middleware, request/response types, auth, error handling |
-| `library` | Public API surface, exports, usage patterns in codebase, package metadata |
+| `library` | Public API surface, exports, usage patterns in codebase, package metadata; pre-digested web findings if fan-out ran |
 | `infrastructure` | Dockerfile, docker-compose, CI/CD workflows, deploy scripts, env vars, monitoring |
-| `product` | All of the above — full-scope investigation |
+| `product` | All of the above — full-scope investigation; pre-digested web findings if fan-out ran |
 
 Instruction to architect: "Research mode. Investigate {topic} for documentation purposes. Produce `00-research.md` covering architecture, components, data flows, configuration, and key decisions. The output will be consumed by the documenter agent — be thorough but structured."
+
+When consolidated web findings are present (`research-findings-consolidated.md` exists): "Pre-digested consolidated web findings are in `workspaces/{feature}/research-findings-consolidated.md` — read that file as your primary external evidence base. You may spot-fetch to fill specific gaps the consolidator flagged."
 
 **Multi-topic:** if 2+ topics, dispatch one architect research per topic in parallel (separate workspaces subfolders or sequential research rounds into the same `00-research.md` with clear section separation).
 
@@ -990,7 +1006,10 @@ Every special flow that skips phases must explicitly document which artifact ver
 ### Research Flow
 
 - **Phases skipped:** 2-5 (implementation, verify, delivery, GitHub update).
-- **Artifact verification runs for:** `architect` → `00-research.md`. The orchestrator verifies `00-research.md` exists after the architect returns.
+- **Artifact verification runs for:**
+  - `researcher` lanes (N parallel) → `workspaces/{feature}/research-findings-{angle}.md` per lane. The orchestrator gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
+  - `research-consolidator` → `workspaces/{feature}/00-research.md` (or `research-findings-consolidated.md` for docs-flow). The orchestrator verifies the consolidated findings file exists before dispatching the architect.
+  - `architect` → `00-research.md`. The orchestrator verifies `00-research.md` exists and is non-empty after the architect returns.
 - **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
 - **Phase 3.6 and 4.5:** not applicable (Phases 3-4 skipped entirely).
 - **Phase 3.75 (build verification):** not applicable (no implementation to build).
