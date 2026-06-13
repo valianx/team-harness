@@ -123,6 +123,14 @@ Full contract: docs/dev-mode.md.
 
 ---
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the
+fork-PR flow and the project's working agreements. By participating you agree to
+the [Code of Conduct](./CODE_OF_CONDUCT.md).
+
+---
+
 ## License
 
 [MIT](./LICENSE) © 2026 Mario Gutierrez.

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: th plugin problem (bug / feature / docs / question)
+    url: https://github.com/valianx/team-harness/blob/main/CONTRIBUTING.md#reporting-issues
+    about: >-
+      For problems with the th plugin from inside Claude Code, use
+      /th:report-issue <bug|feature|docs|question> "<summary>" — it builds the
+      issue with the right pattern and an environment block.
+  - name: Security vulnerability
+    url: https://github.com/valianx/team-harness/security/advisories/new
+    about: Report security issues privately via GitHub Private Vulnerability Reporting — do not open a public issue.

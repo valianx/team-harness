@@ -1,0 +1,48 @@
+name: Bug report
+description: Report incorrect behavior in team-harness (the repo, an agent, a skill, or a hook)
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For problems with the `th` plugin specifically, the convenience path is
+        `/th:report-issue bug "<summary>"` inside Claude Code. This form is the
+        plain-GitHub equivalent.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: What did you do? What did you expect? What happened instead?
+    validations:
+      required: true
+  - type: input
+    id: th-version
+    attributes:
+      label: team-harness version
+      description: From .claude-plugin/plugin.json, or the `/th:update` output.
+    validations:
+      required: true
+  - type: input
+    id: cc-version
+    attributes:
+      label: Claude Code version
+    validations:
+      required: false
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
