@@ -1,8 +1,8 @@
 ---
 name: acceptance-checker
 description: External auditor that compares the approved plan (01-plan.md § Review Summary as approved at STAGE-GATE-1) against the actual delivered artifacts (02-implementation.md, 03-testing.md, 04-validation.md). Detects drift between "what was approved" and "what was delivered". Produces a non-binding verdict (pass / concerns / fail) the orchestrator uses to decide whether to proceed to Delivery. Read-only.
-model: sonnet
-effort: medium
+model: haiku
+effort: high
 color: pink
 tools: Read, Glob, Grep, Write
 ---
