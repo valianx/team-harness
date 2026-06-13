@@ -20801,6 +20801,8 @@ _s93_claude         = read(REPO_ROOT / "CLAUDE.md")
 _s93_testing_md     = read(REPO_ROOT / "docs" / "testing.md")
 _s93_changelog_frag_path = REPO_ROOT / "changelog.d" / "feat-worktree-discipline.md"
 _s93_changelog_frag = read(_s93_changelog_frag_path) if _s93_changelog_frag_path.exists() else ""
+# Delivery assembles the fragment into CHANGELOG.md and deletes it; check the durable location.
+_s93_changelog_md = read(REPO_ROOT / "CHANGELOG.md")
 _s93_discipline_doc = REPO_ROOT / "docs" / "worktree-discipline.md"
 _s93_discipline     = read(_s93_discipline_doc) if _s93_discipline_doc.exists() else ""
 _s93_config_json_path = HOOKS_DIR / "config.json"
@@ -21358,16 +21360,18 @@ check(
     "current work (the 'always' + rationale contract)",
 )
 check(
-    "suite93(ac10i-changelog-review-lifecycle): changelog.d/feat-worktree-discipline.md "
+    "suite93(ac10i-changelog-review-lifecycle): CHANGELOG.md [2.88.0] "
     "references the review worktree lifecycle",
-    bool(_s93_changelog_frag)
+    # Delivery assembles changelog.d/ fragments into CHANGELOG.md and deletes them.
+    # Assert the durable location, not the transient fragment (see feedback_changelog-fragment-test-assertion).
+    "[2.88.0]" in _s93_changelog_md
     and (
-        "reviewer.md" in _s93_changelog_frag
-        or "review worktree" in _s93_changelog_frag.lower()
-        or "pr-review" in _s93_changelog_frag
-        or "worktree_teardown" in _s93_changelog_frag
+        "reviewer.md" in _s93_changelog_md
+        or "review worktree" in _s93_changelog_md.lower()
+        or "pr-review" in _s93_changelog_md
+        or "worktree_teardown" in _s93_changelog_md
     ),
-    "changelog.d/feat-worktree-discipline.md must reference the review worktree lifecycle "
+    "CHANGELOG.md must contain a [2.88.0] section referencing the review worktree lifecycle "
     "(reviewer.md change, worktree_teardown field, or pr-review path pattern)",
 )
 
