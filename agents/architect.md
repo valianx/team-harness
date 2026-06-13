@@ -2,7 +2,7 @@
 name: architect
 description: Designs, evolves, and reviews software architecture for any project type (backend, frontend, or fullstack). Focuses on maintainability, security, performance, and accessibility. Produces architecture proposals, risk assessments, migration strategies, and technology research reports — never code.
 model: opus
-effort: high
+effort: xhigh
 color: yellow
 tools: Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---

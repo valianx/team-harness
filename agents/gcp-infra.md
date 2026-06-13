@@ -2,7 +2,7 @@
 name: gcp-infra
 description: Manages GCP infrastructure via generated gcloud scripts using a create → validate → apply flow. Read-and-plan by default; all mutating and destructive operations are hard-gated behind explicit operator confirmation with a blast-radius statement. Use when someone asks to change, provision, configure, or apply GCP infrastructure changes.
 model: opus
-effort: high
+effort: xhigh
 color: green
 tools: Read, Bash, Glob, Grep, Write, WebSearch, WebFetch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 ---
