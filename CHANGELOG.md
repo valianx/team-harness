@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.85.0] - 2026-06-13
+
+### Changed
+
+- `agents/init.md`, `agents/acceptance-checker.md`, `agents/translator.md`: flip `model: sonnet` → `model: haiku`; each has light judgment absorbed by a named downstream safety net (operator edit-before-commit; non-binding Phase 3.6 verdict; glossary anchor + human i18n diff review). Low-cost matrix keeps these at `sonnet` (haiku→sonnet upgrade) so budget-tier installs are unaffected.
+- `agents/architect.md`, `agents/gcp-infra.md`: `effort: high` → `effort: xhigh` — deep per-agent audit found exhaustive mandate exceeds plain `high`; each is gated (STAGE-GATE-1 / `gcp-guard.sh` + STOP) so `max` is overkill. First applies the `xhigh` effort tier (first two users: architect, gcp-infra).
+- `agents/acceptance-checker.md`: `effort: medium` → `effort: high` — only agent catching intent drift between STAGE-GATE-1 approved spec and delivered artifacts; haiku model compensated by high effort.
+- `agents/README.md`: roster effort cells (architect/gcp-infra → `xhigh`, acceptance-checker → `high`); principle 2 prose extended to describe the `xhigh` tier and name its two users; low-cost matrix standard-effort column updated (low-cost effort cells unchanged: architect high, gcp-infra medium, acceptance-checker medium); row Notes updated with standard-effort rationale.
+- `agents/README.md`: roster rows, "Earn the model" prose, per-agent 3-criteria justification block, low-cost matrix standard-model column, and tally line updated to reflect 4 haiku agents (`researcher`, `init`, `acceptance-checker`, `translator`).
+- `CLAUDE.md §3/§5`: tally and frontmatter-driven-agents convention corrected to reflect the post-flip allocation (analysis/coordination tier on opus; haiku tier named explicitly; others sonnet).
+- `tests/test_agent_structure.py` Suite 92: `model: haiku` pin assertions added for `init`, `acceptance-checker`, `translator`; effort pins added for architect (`xhigh`), gcp-infra (`xhigh`), acceptance-checker (`high`); tally check updated from "1 haiku" to "4 haiku"; version literals updated to `2.85.0`.
+- `docs/testing.md` Suite 92 description: check count 28 → 35; tally updated to 4 haiku agents; version literals updated to `2.85.0`.
+
+### Fixed
+
+- `agents/researcher.md`: add `Write` to `tools:` allowlist — fan-out lanes write `research-findings-{angle}.md` but the PR #321 shipped frontmatter lacked `Write`, causing a silent tool-denied failure at runtime. `tests/test_agent_structure.py` Suite 92 gains a mandatory regression assertion (`suite92(ac3-researcher-tools)`) that fails on the pre-fix tree and passes on this PR.
+
 ## [2.84.0] - 2026-06-13
 
 ### Added

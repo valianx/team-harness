@@ -20027,26 +20027,30 @@ check(
 # Marker: obsidian-path-override-fleetwide
 
 # ---------------------------------------------------------------------------
-# Suite 92 — haiku-research-fanout (v2.84.0)
-# Structural assertions for the parallel haiku research fan-out feature:
+# Suite 92 — haiku-research-fanout (v2.85.0)
+# Structural assertions for the parallel haiku research fan-out feature and the
+# v2.85.0 fleet rightsizing (init/acceptance-checker/translator → haiku;
+# researcher Write allowlist fix):
 #   AC-1: fan-out token at all four research sites + bounded N + findings
 #          contract fields in researcher.md
 #   AC-2: research-consolidator contract (model:sonnet, dedup,
 #          ### Conflicting sources, feeds 00-research.md)
 #   AC-3: researcher evidence-only (no conclusions) + model:haiku
+#          + researcher tools allowlist includes Write, excludes Bash/Task
+#          + init/acceptance-checker/translator frontmatter model:haiku
 #   AC-4: fail-open + research.lane.skipped documented in Research Flow
 #   AC-5: background sweep in orchestrator Step 6d + docs/discover-phase.md;
 #          not an advance signal, never auto-advances
-#   AC-6: README 3-criteria haiku allocation policy; tally updated to 1 haiku
+#   AC-6: README 3-criteria haiku allocation policy; tally updated to 4 haiku
 #   AC-8: CLAUDE.md Go-installer exclusion + researcher absent from modes.go +
 #          README states frozen pre-haiku
-#   AC-9: version 2.84.0 matched in plugin.json and marketplace.json
+#   AC-9: version 2.85.0 matched in plugin.json and marketplace.json
 #
 # File: tests/test_agent_structure.py
 # Marker: haiku-research-fanout
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 92: haiku-research-fanout structural contract (v2.84.0) ===")
+print("=== Suite 92: haiku-research-fanout structural contract (v2.85.0) ===")
 
 _s92_researcher       = read(AGENTS_DIR / "researcher.md")
 _s92_consolidator     = read(AGENTS_DIR / "research-consolidator.md")
@@ -20167,6 +20171,65 @@ check(
     _s92_researcher_fm.get("model", "") == "haiku",
     f"expected model=haiku, got model={_s92_researcher_fm.get('model', '')}",
 )
+# Regression for PR #321 false-green: researcher.md shipped without Write in tools.
+# This check FAILS on v2.84.0 (pre-fix tree) and passes on v2.85.0 (post-fix tree).
+_s92_researcher_tools = _s92_researcher_fm.get("tools", "")
+check(
+    "suite92(ac3-researcher-tools): agents/researcher.md tools allowlist includes 'Write' "
+    "and excludes 'Bash', 'Task', and 'Edit'",
+    "Write" in _s92_researcher_tools
+    and "Bash" not in _s92_researcher_tools
+    and "Task" not in _s92_researcher_tools
+    and "Edit" not in _s92_researcher_tools,
+    f"researcher.md tools must include 'Write' and must NOT include 'Bash', 'Task', or 'Edit'; "
+    f"got tools='{_s92_researcher_tools}'",
+)
+# Haiku model-pin assertions for the three newly-flipped agents.
+# These checks FAIL on v2.84.0 (all three read model:sonnet) and pass on v2.85.0.
+_s92_init_fm            = parse_frontmatter(read(AGENTS_DIR / "init.md"))
+_s92_acc_checker_fm     = parse_frontmatter(read(AGENTS_DIR / "acceptance-checker.md"))
+_s92_translator_fm      = parse_frontmatter(read(AGENTS_DIR / "translator.md"))
+check(
+    "suite92(ac3-init-model-haiku): agents/init.md frontmatter model is 'haiku'",
+    _s92_init_fm.get("model", "") == "haiku",
+    f"expected model=haiku for init, got '{_s92_init_fm.get('model', '')}'",
+)
+check(
+    "suite92(ac3-acceptance-checker-model-haiku): agents/acceptance-checker.md "
+    "frontmatter model is 'haiku'",
+    _s92_acc_checker_fm.get("model", "") == "haiku",
+    f"expected model=haiku for acceptance-checker, "
+    f"got '{_s92_acc_checker_fm.get('model', '')}'",
+)
+check(
+    "suite92(ac3-translator-model-haiku): agents/translator.md frontmatter model is 'haiku'",
+    _s92_translator_fm.get("model", "") == "haiku",
+    f"expected model=haiku for translator, got '{_s92_translator_fm.get('model', '')}'",
+)
+
+# Effort regression pins for the three re-tuned agents (v2.85.0 effort re-tune, AC-7/AC-8).
+# These checks FAIL on the pre-change tree (architect/gcp-infra read high, acceptance-checker
+# reads medium) and pass on the post-change tree.
+_s92_architect_fm    = parse_frontmatter(read(AGENTS_DIR / "architect.md"))
+_s92_gcp_infra_fm    = parse_frontmatter(read(AGENTS_DIR / "gcp-infra.md"))
+check(
+    "suite92(ac7-architect-effort-xhigh): agents/architect.md frontmatter effort is 'xhigh'",
+    _s92_architect_fm.get("effort", "") == "xhigh",
+    f"expected effort=xhigh for architect, got '{_s92_architect_fm.get('effort', '')}'",
+)
+check(
+    "suite92(ac7-gcp-infra-effort-xhigh): agents/gcp-infra.md frontmatter effort is 'xhigh'",
+    _s92_gcp_infra_fm.get("effort", "") == "xhigh",
+    f"expected effort=xhigh for gcp-infra, got '{_s92_gcp_infra_fm.get('effort', '')}'",
+)
+check(
+    "suite92(ac7-acceptance-checker-effort-high): agents/acceptance-checker.md "
+    "frontmatter effort is 'high'",
+    _s92_acc_checker_fm.get("effort", "") == "high",
+    f"expected effort=high for acceptance-checker, "
+    f"got '{_s92_acc_checker_fm.get('effort', '')}'",
+)
+
 _S92_EVIDENCE_ONLY_TOKENS = (
     ("NEVER concludes", "never conclude", "NEVER conclude", "Never concludes",
      "no conclusions", "No conclusions", "no synthesis", "No synthesis"),
@@ -20262,11 +20325,18 @@ check(
     f"criteria tokens: {_S92_HAIKU_POLICY_TOKENS}",
 )
 check(
-    "suite92(ac6-tally): agents/README.md tally line reflects 1 haiku agent",
-    "1 haiku" in _s92_readme or "1 agent on `haiku`" in _s92_readme
-    or "haiku (`researcher`)" in _s92_readme
-    or ("haiku" in _s92_readme and "researcher" in _s92_readme and "1" in _s92_readme),
-    "agents/README.md tally line must reflect 1 haiku agent (researcher)",
+    "suite92(ac6-tally): agents/README.md tally line reflects 4 haiku agents",
+    "4 haiku" in _s92_readme or "4 agents on `haiku`" in _s92_readme
+    or (
+        "haiku" in _s92_readme
+        and "researcher" in _s92_readme
+        and "init" in _s92_readme
+        and "acceptance-checker" in _s92_readme
+        and "translator" in _s92_readme
+        and "4" in _s92_readme
+    ),
+    "agents/README.md tally line must reflect 4 haiku agents "
+    "(researcher, init, acceptance-checker, translator)",
 )
 
 # ---- AC-8: CLAUDE.md documents Go-installer exclusion; researcher absent from
@@ -20295,11 +20365,11 @@ check(
     "pre-haiku and does not track the researcher agent (AC-8)",
 )
 
-# ---- AC-9: version 2.84.0 in both plugin manifests ----
+# ---- AC-9: version 2.85.0 in both plugin manifests ----
 check(
-    "suite92(ac9-plugin-json): .claude-plugin/plugin.json version is '2.84.0'",
-    _s92_plugin_json.get("version", "") == "2.84.0",
-    f"expected plugin.json version='2.84.0', got '{_s92_plugin_json.get('version', '')}'",
+    "suite92(ac9-plugin-json): .claude-plugin/plugin.json version is '2.85.0'",
+    _s92_plugin_json.get("version", "") == "2.85.0",
+    f"expected plugin.json version='2.85.0', got '{_s92_plugin_json.get('version', '')}'",
 )
 _s92_marketplace_version = (
     _s92_marketplace_json.get("plugins", [{}])[0].get("version", "")
@@ -20308,9 +20378,9 @@ _s92_marketplace_version = (
 )
 check(
     "suite92(ac9-marketplace-json): .claude-plugin/marketplace.json plugins[0].version "
-    "is '2.84.0'",
-    _s92_marketplace_version == "2.84.0",
-    f"expected marketplace.json plugins[0].version='2.84.0', got '{_s92_marketplace_version}'",
+    "is '2.85.0'",
+    _s92_marketplace_version == "2.85.0",
+    f"expected marketplace.json plugins[0].version='2.85.0', got '{_s92_marketplace_version}'",
 )
 
 # Self-referential guards

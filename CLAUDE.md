@@ -109,12 +109,12 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.84.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.85.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
 - `standard` (default) — copies agent files byte-identical to the source-repo `agents/*.md`. Canonical quality contract; recommended for operators on Anthropic Max or Team plans.
-- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all agents run on `sonnet`. Suitable for Free/Pro plan operators. Note: the Go installer's low-cost matrix is frozen pre-haiku; new haiku-tier agents (`researcher`) are not included in the matrix — see the Installer row note above and [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the tally.
+- `low-cost` — rewrites `model:` and `effort:` frontmatter in-flight using the matrix in `cmd/install/modes.go`; all agents run on `sonnet`. Suitable for Free/Pro plan operators. Note: the Go installer's low-cost matrix is frozen pre-haiku — the three agents flipped to `haiku` in v2.85.0 (`init`, `acceptance-checker`, `translator`) remain in the matrix mapped to `sonnet` (the correct haiku→sonnet upgrade for low-cost), while the newer `researcher`/`research-consolidator` agents are not tracked by it at all. See the Installer row note above and [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the tally.
 
 **Dependencies.** TUI: `charm.land/huh/v2` (bubbletea v2, lipgloss v2, bubbles v2 transitive). Binary size: 7.9–8.5 MB. No build step beyond `go build`.
 
@@ -142,7 +142,7 @@ All commands run from the repo root.
 ## 5. Architectural Conventions
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
-- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`). `init`, `architect`, `agent-builder` use `opus`; others generally use `sonnet`.
+- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`). `architect`, `agent-builder`, and the analysis/coordination tier use `opus`; `init`, `acceptance-checker`, `translator`, and `researcher` run on `haiku`; others generally use `sonnet`.
 - **orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `orchestrator`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** A workspace is the shared working directory for a single pipeline session. Each pipeline run creates its own isolated workspace. Agents communicate through files in `workspaces/{feature-name}/` (each reads prior agents' output, writes its own); the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored.
 - **Dual-mode workspaces.** Output to local `./workspaces/` (default) or a configured Obsidian vault (`work-logs/{repo-name}/{date}_{feature}/`), via `logs-mode` in `~/.claude/.team-harness.json`. The orchestrator resolves the base path once at start and passes it to every agent. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent).

@@ -233,25 +233,25 @@ Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82
 
 ### Suite 92 — haiku-research-fanout
 
-28 checks. Structural assertions for the parallel haiku research fan-out feature (v2.84.0). File: `tests/test_agent_structure.py`. Covers all 9 ACs of PR-1 (haiku-research-fanout) with the following check groups:
+35 checks. Structural assertions for the parallel haiku research fan-out feature and the v2.85.0 fleet rightsizing (init, acceptance-checker, translator → haiku; researcher Write allowlist fix; effort re-tune: architect/gcp-infra → xhigh, acceptance-checker → high). File: `tests/test_agent_structure.py`. Covers all 9 ACs of PR-1 (haiku-research-fanout) plus the v2.85.0 haiku-fleet-rightsizing assertions with the following check groups:
 
-(AC-1, 6 checks) Multi-site fan-out contract — the `researcher` fan-out token is verified at all four research execution sites: (a1) `agents/ref-special-flows.md § Research Flow` anchor present; (a2) same section documents `researcher` parallel lanes with default N=3 and cap 5; (a3) `agents/ref-special-flows.md § Phase 1 — Research` (docs-flow) anchor present; (a4) same section documents the researcher fan-out; (a5) `skills/research/SKILL.md` documents researcher fan-out; (a6) `agents/architect.md` Research Mode documents consuming pre-digested consolidated findings; (a7) `agents/researcher.md` output contract declares all four findings fields (`claim`, `source_url`, `verbatim_excerpt`, `confidence`).
+(AC-1, 7 checks) Multi-site fan-out contract — the `researcher` fan-out token is verified at all four research execution sites: (a1) `agents/ref-special-flows.md § Research Flow` anchor present; (a2) same section documents `researcher` parallel lanes with default N=3 and cap 5; (a3) `agents/ref-special-flows.md § Phase 1 — Research` (docs-flow) anchor present; (a4) same section documents the researcher fan-out; (a5) `skills/research/SKILL.md` documents researcher fan-out; (a6) `agents/architect.md` Research Mode documents consuming pre-digested consolidated findings; (a7) `agents/researcher.md` output contract declares all four findings fields (`claim`, `source_url`, `verbatim_excerpt`, `confidence`).
 
 (AC-2, 4 checks) research-consolidator contract — (b1) frontmatter `model: sonnet`; (b2) deduplication rule documented; (b3) `### Conflicting sources` section with never-silently-picks-a-winner rule; (b4) references `00-research.md` as output target.
 
-(AC-3, 2 checks) Researcher evidence-only + haiku model — (c1) frontmatter `model: haiku`; (c2) evidence-only contract (no conclusions, no recommendations).
+(AC-3/AC-7, 9 checks) Researcher evidence-only + haiku model + allowlist fix + 3 model flips + 3 effort pins — (c1) `agents/researcher.md` frontmatter `model: haiku`; (c2) evidence-only contract (no conclusions, no recommendations); (c3) researcher tools allowlist includes `Write` and excludes `Bash`/`Task` (regression for PR #321 false-green — FAILS on v2.84.0, passes on v2.85.0); (c4) `agents/init.md` frontmatter `model: haiku` (FAILS on v2.84.0); (c5) `agents/acceptance-checker.md` frontmatter `model: haiku` (FAILS on v2.84.0); (c6) `agents/translator.md` frontmatter `model: haiku` (FAILS on v2.84.0); (c7) `agents/architect.md` frontmatter `effort: xhigh` (FAILS on pre-change tree); (c8) `agents/gcp-infra.md` frontmatter `effort: xhigh` (FAILS on pre-change tree); (c9) `agents/acceptance-checker.md` frontmatter `effort: high` (FAILS on pre-change tree).
 
 (AC-4, 2 checks) Fail-open lane handling — (d1) fail-open documented in Research Flow slice; (d2) `research.lane.skipped` event documented in `ref-special-flows.md`.
 
 (AC-5, 3 checks) Background sweep — (e1) `Step 6d-background-sweep` anchor present in `orchestrator.md`; (e2) sweep states it is NOT an advance signal and does not auto-advance; (e3) `docs/discover-phase.md` documents background sweep with not-advance-signal constraint.
 
-(AC-6, 3 checks) Allocation policy — (f1) `## Earn the model` anchor in `agents/README.md`; (f2) three-criteria haiku eligibility policy tokens present (`mechanical`, `structured output`, `judgment`, `detectable`); (f3) tally line reflects 1 haiku agent.
+(AC-6, 3 checks) Allocation policy — (f1) `## Earn the model` anchor in `agents/README.md`; (f2) three-criteria haiku eligibility policy tokens present (`mechanical`, `structured output`, `judgment`, `detectable`); (f3) tally line reflects 4 haiku agents.
 
 (AC-8, 3 checks) Go-installer exclusion — (g1) `CLAUDE.md` documents opencode agents installer roadmap / Go installer exclusion; (g2) `cmd/install/modes.go` does NOT contain a `researcher` entry; (g3) `agents/README.md` low-cost section states frozen pre-haiku.
 
-(AC-9, 2 checks) Version sync — (h1) `.claude-plugin/plugin.json` version is `2.84.0`; (h2) `.claude-plugin/marketplace.json` `plugins[0].version` is `2.84.0`.
+(AC-9, 2 checks) Version sync — (h1) `.claude-plugin/plugin.json` version is `2.85.0`; (h2) `.claude-plugin/marketplace.json` `plugins[0].version` is `2.85.0`.
 
-(Self-ref, 2 checks) Registry + hygiene — `Suite 92` and `haiku-research-fanout` in `docs/testing.md`; `Suite 92` NOT in `CLAUDE.md §11`. All content checks use anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Written by tester in Phase 2.7 authoring mode (2026-06-13). Marker: `haiku-research-fanout`.
+(Self-ref, 2 checks) Registry + hygiene — `Suite 92` and `haiku-research-fanout` in `docs/testing.md`; `Suite 92` NOT in `CLAUDE.md §11`. All content checks use anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Written by tester in Phase 2.7 authoring mode (2026-06-13); extended by implementer (haiku-fleet-rightsizing, effort re-tune) 2026-06-13. Marker: `haiku-research-fanout`.
 
 ### Suite 88 — gcp-infra-refs-on-demand
 
