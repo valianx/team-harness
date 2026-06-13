@@ -80,6 +80,7 @@ EXPECTED_AGENTS = [
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
+    "researcher", "research-consolidator",
 ]
 
 # Read-only agents that MUST NOT have Bash in their allowlist
@@ -2298,7 +2299,7 @@ check(
 # decommission time (2026-06-02). Agents added after decommission (qa-plan, ux-reviewer)
 # are excluded from this check — modes.go is a frozen artifact; new agents go in
 # the README low-cost matrix (vestigial, for documentation only).
-MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra", "mentor"}
+MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra", "mentor", "researcher", "research-consolidator"}
 for agent_name in EXPECTED_AGENTS:
     if agent_name in MODES_GO_EXCLUDED:
         continue
@@ -20024,6 +20025,310 @@ check(
 )
 
 # Marker: obsidian-path-override-fleetwide
+
+# ---------------------------------------------------------------------------
+# Suite 92 — haiku-research-fanout (v2.84.0)
+# Structural assertions for the parallel haiku research fan-out feature:
+#   AC-1: fan-out token at all four research sites + bounded N + findings
+#          contract fields in researcher.md
+#   AC-2: research-consolidator contract (model:sonnet, dedup,
+#          ### Conflicting sources, feeds 00-research.md)
+#   AC-3: researcher evidence-only (no conclusions) + model:haiku
+#   AC-4: fail-open + research.lane.skipped documented in Research Flow
+#   AC-5: background sweep in orchestrator Step 6d + docs/discover-phase.md;
+#          not an advance signal, never auto-advances
+#   AC-6: README 3-criteria haiku allocation policy; tally updated to 1 haiku
+#   AC-8: CLAUDE.md Go-installer exclusion + researcher absent from modes.go +
+#          README states frozen pre-haiku
+#   AC-9: version 2.84.0 matched in plugin.json and marketplace.json
+#
+# File: tests/test_agent_structure.py
+# Marker: haiku-research-fanout
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 92: haiku-research-fanout structural contract (v2.84.0) ===")
+
+_s92_researcher       = read(AGENTS_DIR / "researcher.md")
+_s92_consolidator     = read(AGENTS_DIR / "research-consolidator.md")
+_s92_ref_flows        = read(AGENTS_DIR / "ref-special-flows.md")
+_s92_architect        = read(AGENTS_DIR / "architect.md")
+_s92_skill_research   = read(skill_path("research"))
+_s92_orch             = read(AGENTS_DIR / "orchestrator.md")
+_s92_readme           = read(AGENTS_DIR / "README.md")
+_s92_claude           = read(REPO_ROOT / "CLAUDE.md")
+_s92_discover         = read(REPO_ROOT / "docs" / "discover-phase.md")
+_s92_modes_go         = read(REPO_ROOT / "cmd" / "install" / "modes.go")
+_s92_plugin_json      = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s92_marketplace_json = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s92_testing_md       = read(REPO_ROOT / "docs" / "testing.md")
+
+# ---- AC-1: fan-out documented at all four research execution sites ----
+# Site 1 — ref-special-flows.md § Research Flow
+_S92_RESEARCH_FLOW_ANCHOR = "## Research Flow"
+_S92_STOP = ("\n## ", "\n---\n")
+_s92_research_flow_slice = _slice_section(_s92_ref_flows, _S92_RESEARCH_FLOW_ANCHOR, _S92_STOP)
+check(
+    "suite92(ac1-site1-anchor): ref-special-flows.md contains '## Research Flow' anchor",
+    bool(_s92_research_flow_slice),
+    f"anchor '{_S92_RESEARCH_FLOW_ANCHOR}' not found in ref-special-flows.md — "
+    "all AC-1/site1 checks will fail",
+)
+check(
+    "suite92(ac1-site1-fanout): ref-special-flows.md § Research Flow documents "
+    "researcher fan-out (parallel haiku lanes, default N=3, cap 5)",
+    bool(_s92_research_flow_slice)
+    and "researcher" in _s92_research_flow_slice
+    and ("default" in _s92_research_flow_slice or "N=3" in _s92_research_flow_slice)
+    and ("cap 5" in _s92_research_flow_slice or "hard cap 5" in _s92_research_flow_slice),
+    "ref-special-flows.md § Research Flow must document 'researcher' fan-out with "
+    "default N=3 and cap 5",
+)
+
+# Site 2 — ref-special-flows.md docs-flow Phase 1 research
+_S92_DOCS_FLOW_ANCHOR = "### Phase 1 — Research"
+_s92_docs_flow_slice = _slice_section(_s92_ref_flows, _S92_DOCS_FLOW_ANCHOR, _S92_STOP)
+check(
+    "suite92(ac1-site2-anchor): ref-special-flows.md contains '### Phase 1 — Research' anchor",
+    bool(_s92_docs_flow_slice),
+    f"anchor '{_S92_DOCS_FLOW_ANCHOR}' not found in ref-special-flows.md — "
+    "site2 check will fail",
+)
+check(
+    "suite92(ac1-site2-fanout): ref-special-flows.md § Phase 1 — Research documents "
+    "researcher fan-out (parallel haiku lanes)",
+    bool(_s92_docs_flow_slice)
+    and "researcher" in _s92_docs_flow_slice
+    and ("haiku" in _s92_docs_flow_slice or "parallel" in _s92_docs_flow_slice),
+    "ref-special-flows.md § Phase 1 — Research must document the researcher fan-out",
+)
+
+# Site 3 — skills/research/SKILL.md
+check(
+    "suite92(ac1-site3-fanout): skills/research/SKILL.md documents researcher fan-out",
+    "researcher" in _s92_skill_research
+    and ("fan-out" in _s92_skill_research or "fan out" in _s92_skill_research
+         or "parallel" in _s92_skill_research),
+    "skills/research/SKILL.md must document the researcher fan-out flow",
+)
+
+# Site 4 — agents/architect.md § Research Mode Step 2
+_S92_ARCH_RESEARCH_ANCHOR = "When consolidated findings are present"
+check(
+    "suite92(ac1-site4-fanout): agents/architect.md Research Mode documents "
+    "consuming pre-digested consolidated findings (replaces raw WebSearch pass)",
+    _S92_ARCH_RESEARCH_ANCHOR in _s92_architect
+    or "consolidated findings" in _s92_architect
+    or "pre-digested" in _s92_architect,
+    "agents/architect.md Research Mode must state that when consolidated findings "
+    "are present the architect reads them instead of running raw WebSearch passes",
+)
+
+# Findings contract fields in researcher.md
+_S92_CONTRACT_FIELDS = ("claim", "source_url", "verbatim_excerpt", "confidence")
+check(
+    "suite92(ac1-findings-contract): agents/researcher.md output contract declares "
+    "all four findings fields (claim, source_url, verbatim_excerpt, confidence)",
+    all(field in _s92_researcher for field in _S92_CONTRACT_FIELDS),
+    f"agents/researcher.md must declare all four contract fields: {_S92_CONTRACT_FIELDS}",
+)
+
+# ---- AC-2: research-consolidator contract ----
+_s92_consolidator_fm = parse_frontmatter(_s92_consolidator)
+check(
+    "suite92(ac2-model): agents/research-consolidator.md frontmatter model is 'sonnet'",
+    _s92_consolidator_fm.get("model", "") == "sonnet",
+    f"expected model=sonnet, got model={_s92_consolidator_fm.get('model', '')}",
+)
+check(
+    "suite92(ac2-dedup): agents/research-consolidator.md documents deduplication rule",
+    "dedup" in _s92_consolidator.lower() or "de-duplication" in _s92_consolidator.lower()
+    or "deduplicate" in _s92_consolidator.lower(),
+    "agents/research-consolidator.md must document the deduplication rule",
+)
+check(
+    "suite92(ac2-conflicting-sources): agents/research-consolidator.md documents "
+    "'### Conflicting sources' section with never-silently-picks-a-winner rule",
+    "Conflicting sources" in _s92_consolidator
+    and ("never silently picks" in _s92_consolidator or "never silently pick" in _s92_consolidator),
+    "agents/research-consolidator.md must have a 'Conflicting sources' section "
+    "with the 'never silently picks a winner' rule",
+)
+check(
+    "suite92(ac2-00-research): agents/research-consolidator.md states it feeds "
+    "00-research.md (or warm-findings file for Discover)",
+    "00-research.md" in _s92_consolidator,
+    "agents/research-consolidator.md must reference '00-research.md' as the output target",
+)
+
+# ---- AC-3: researcher is evidence-only + model:haiku ----
+_s92_researcher_fm = parse_frontmatter(_s92_researcher)
+check(
+    "suite92(ac3-model-haiku): agents/researcher.md frontmatter model is 'haiku'",
+    _s92_researcher_fm.get("model", "") == "haiku",
+    f"expected model=haiku, got model={_s92_researcher_fm.get('model', '')}",
+)
+_S92_EVIDENCE_ONLY_TOKENS = (
+    ("NEVER concludes", "never conclude", "NEVER conclude", "Never concludes",
+     "no conclusions", "No conclusions", "no synthesis", "No synthesis"),
+    ("no recommendation", "No recommendation", "NEVER recommend", "never recommend",
+     "never recommends", "NEVER recommends"),
+)
+check(
+    "suite92(ac3-evidence-only): agents/researcher.md states evidence-only contract "
+    "(no conclusions, no recommendations)",
+    all(
+        any(t in _s92_researcher for t in token_group)
+        for token_group in _S92_EVIDENCE_ONLY_TOKENS
+    ),
+    "agents/researcher.md must state evidence-only output contract (no conclusions, "
+    "no recommendations) — map role enforced here, synthesis only in consolidator",
+)
+
+# ---- AC-4: fail-open + research.lane.skipped in Research Flow ----
+check(
+    "suite92(ac4-fail-open): ref-special-flows.md § Research Flow documents fail-open "
+    "lane handling",
+    bool(_s92_research_flow_slice)
+    and ("fail-open" in _s92_research_flow_slice or "fail open" in _s92_research_flow_slice
+         or "Fail-open" in _s92_research_flow_slice),
+    "ref-special-flows.md § Research Flow must document fail-open lane handling",
+)
+check(
+    "suite92(ac4-lane-skipped): ref-special-flows.md documents 'research.lane.skipped' "
+    "event for dead or zero-finding lanes",
+    "research.lane.skipped" in _s92_ref_flows,
+    "ref-special-flows.md must document the 'research.lane.skipped' event",
+)
+
+# ---- AC-5: background sweep — orchestrator Step 6d + discover-phase.md ----
+_S92_BG_SWEEP_ANCHOR = "Step 6d-background-sweep"
+_S92_ORCH_STOP = ("\n## ", "\n---\n", "\n**Step 6d-initiative")
+_s92_bg_sweep_slice = _slice_section(_s92_orch, _S92_BG_SWEEP_ANCHOR, _S92_ORCH_STOP)
+check(
+    "suite92(ac5-orch-anchor): agents/orchestrator.md contains "
+    "'Step 6d-background-sweep' sub-step",
+    bool(_s92_bg_sweep_slice),
+    f"anchor '{_S92_BG_SWEEP_ANCHOR}' not found in orchestrator.md — "
+    "AC-5 background-sweep checks will fail",
+)
+check(
+    "suite92(ac5-not-advance-signal): agents/orchestrator.md Step 6d-background-sweep "
+    "states the sweep is NOT an advance signal and does not auto-advance",
+    bool(_s92_bg_sweep_slice)
+    and "NOT an advance signal" in _s92_bg_sweep_slice
+    and (
+        "never auto-advances" in _s92_bg_sweep_slice
+        or "does not modify" in _s92_bg_sweep_slice
+        or "does NOT modify" in _s92_bg_sweep_slice
+    ),
+    "orchestrator.md Step 6d-background-sweep must state the sweep is NOT an advance "
+    "signal and does not auto-advance or modify discover_state",
+)
+check(
+    "suite92(ac5-discover-phase): docs/discover-phase.md documents background "
+    "research sweep with not-advance-signal constraint",
+    "background" in _s92_discover
+    and ("NOT an advance signal" in _s92_discover
+         or "not an advance signal" in _s92_discover
+         or "never auto-advances" in _s92_discover),
+    "docs/discover-phase.md must document the background research sweep and state "
+    "it is not an advance signal / never auto-advances",
+)
+
+# ---- AC-6: README criteria-based allocation policy; tally updated ----
+_S92_EARN_MODEL_ANCHOR = "## Earn the model"
+_S92_README_STOP = ("\n## ", "\n---\n")
+_s92_earn_model_slice = _slice_section(_s92_readme, _S92_EARN_MODEL_ANCHOR, _S92_README_STOP)
+check(
+    "suite92(ac6-allocation-anchor): agents/README.md contains '## Earn the model' "
+    "section for the haiku eligibility policy",
+    bool(_s92_earn_model_slice),
+    f"anchor '{_S92_EARN_MODEL_ANCHOR}' not found in agents/README.md — "
+    "AC-6 policy checks will fail",
+)
+_S92_HAIKU_POLICY_TOKENS = (
+    "mechanical",
+    "structured output",
+    "judgment",
+    "detectable",
+)
+check(
+    "suite92(ac6-haiku-policy): agents/README.md § Earn the model documents "
+    "three-criteria haiku eligibility policy "
+    "(mechanical, structured output, no judgment, cheap/detectable failures)",
+    bool(_s92_earn_model_slice)
+    and all(t in _s92_earn_model_slice for t in _S92_HAIKU_POLICY_TOKENS),
+    f"agents/README.md § Earn the model must contain all three haiku-eligibility "
+    f"criteria tokens: {_S92_HAIKU_POLICY_TOKENS}",
+)
+check(
+    "suite92(ac6-tally): agents/README.md tally line reflects 1 haiku agent",
+    "1 haiku" in _s92_readme or "1 agent on `haiku`" in _s92_readme
+    or "haiku (`researcher`)" in _s92_readme
+    or ("haiku" in _s92_readme and "researcher" in _s92_readme and "1" in _s92_readme),
+    "agents/README.md tally line must reflect 1 haiku agent (researcher)",
+)
+
+# ---- AC-8: CLAUDE.md documents Go-installer exclusion; researcher absent from
+#            modes.go; README states frozen pre-haiku ----
+check(
+    "suite92(ac8-claude-exclusion): CLAUDE.md documents Go installer exclusion "
+    "from fleet model-allocation changes (opencode roadmap)",
+    "opencode agents installer" in _s92_claude or "opencode" in _s92_claude,
+    "CLAUDE.md must document the Go installer exclusion — roadmapped as opencode "
+    "agents installer (AC-8)",
+)
+check(
+    "suite92(ac8-modes-go-clean): cmd/install/modes.go does NOT contain a 'researcher' "
+    "entry (Go installer is excluded from the haiku tier)",
+    '"researcher"' not in _s92_modes_go,
+    "cmd/install/modes.go must NOT contain a 'researcher' entry — the Go installer "
+    "is frozen pre-haiku by operator decision (AC-8)",
+)
+check(
+    "suite92(ac8-readme-frozen): agents/README.md low-cost section states the legacy "
+    "Go installer is frozen pre-haiku",
+    "frozen pre-haiku" in _s92_readme or "frozen" in _s92_readme
+    and "haiku" in _s92_readme
+    and ("Go installer" in _s92_readme or "lowCostMatrix" in _s92_readme),
+    "agents/README.md must state the low-cost matrix (Go installer) is frozen "
+    "pre-haiku and does not track the researcher agent (AC-8)",
+)
+
+# ---- AC-9: version 2.84.0 in both plugin manifests ----
+check(
+    "suite92(ac9-plugin-json): .claude-plugin/plugin.json version is '2.84.0'",
+    _s92_plugin_json.get("version", "") == "2.84.0",
+    f"expected plugin.json version='2.84.0', got '{_s92_plugin_json.get('version', '')}'",
+)
+_s92_marketplace_version = (
+    _s92_marketplace_json.get("plugins", [{}])[0].get("version", "")
+    if _s92_marketplace_json.get("plugins")
+    else ""
+)
+check(
+    "suite92(ac9-marketplace-json): .claude-plugin/marketplace.json plugins[0].version "
+    "is '2.84.0'",
+    _s92_marketplace_version == "2.84.0",
+    f"expected marketplace.json plugins[0].version='2.84.0', got '{_s92_marketplace_version}'",
+)
+
+# Self-referential guards
+check(
+    "suite92(h1-registry): docs/testing.md registers 'Suite 92' and "
+    "'haiku-research-fanout' marker",
+    "Suite 92" in _s92_testing_md and "haiku-research-fanout" in _s92_testing_md,
+    "docs/testing.md must name Suite 92 and the haiku-research-fanout marker "
+    "(canonical suite registry)",
+)
+check(
+    "suite92(h2-hygiene): CLAUDE.md does NOT contain 'Suite 92'",
+    "Suite 92" not in _s92_claude,
+    "CLAUDE.md must not mention Suite 92 — only docs/testing.md is the canonical "
+    "registry (§11 hygiene contract)",
+)
+
+# Marker: haiku-research-fanout
 
 # ---------------------------------------------------------------------------
 # Summary
