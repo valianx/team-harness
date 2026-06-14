@@ -252,6 +252,7 @@ Notes:
 - **Status:** pending
 - **Branch (suggested):** `feat/{kebab-case-name}`
 - **Base:** main
+- **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
 - **Files:**
   - `{path}` (new|modify)
   - `{path}` (new|modify)
@@ -1341,6 +1342,7 @@ Ordered implementation steps. The implementer follows this sequence.
 - **Title:** `{conventional-commit-style PR title}`
 - **Status:** pending
 - **Branch (suggested):** `feat/{kebab-case-name}`
+- **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
 - **Files:**
   - `{path}` (new|modify)
 - **Depends on:** {PR-N | none}

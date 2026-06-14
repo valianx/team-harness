@@ -3840,11 +3840,16 @@ check(
     "skills/review-pr.md Phase 5 must map all three event types",
 )
 
-# (6) agents/reviewer.md: Worktree Context section
+# (6) agents/reviewer.md: Worktree Lifecycle / Worktree Context section
+# Note: renamed from '## Worktree Context' to '## Worktree Lifecycle for PR Reviews'
+# in the worktree-discipline PR (v2.88.0) — the section now covers the full
+# create → compare → remove lifecycle, not just the file-read context.
 check(
     "agents/reviewer.md has Worktree Context section",
-    "## Worktree Context" in _reviewer_v28,
-    "agents/reviewer.md must document that file reads go via the $WORKTREE path",
+    "## Worktree Lifecycle for PR Reviews" in _reviewer_v28
+    or "## Worktree Context" in _reviewer_v28,
+    "agents/reviewer.md must document that file reads go via the worktree path "
+    "(section heading: '## Worktree Lifecycle for PR Reviews' or '## Worktree Context')",
 )
 check(
     "agents/reviewer.md Worktree Context distinguishes correct vs incorrect read path",
@@ -20756,6 +20761,636 @@ check(
 )
 
 # Marker: haiku-research-fanout
+
+# ---------------------------------------------------------------------------
+# Suite 93 — worktree-discipline (parallel-task-isolation, v2.88.0)
+#
+# Pins the 5-rule worktree discipline so none of its structural invariants
+# can silently regress. All checks are anchor-scoped (anti-false-green).
+#
+# AC coverage:
+#   AC-1 / AC-2  — docs/worktree-discipline.md: 5 rules, U1 boundary, teardown
+#                  caveat tokens (#57767, #60588)
+#   AC-3         — CLAUDE.md §5: pointer bullet + worktree-discipline.md link
+#   AC-4         — agents/orchestrator.md § Current State: worktree: / worktree_branch:
+#                  / worktree_base: fields
+#   AC-5         — agents/architect.md: Worktree: line in 01-plan.md PR template
+#   AC-6         — agents/orchestrator.md § Multi-Task Orchestration Step 4b:
+#                  pre-launch collision check (#51596, STOP, never silently reuse)
+#   AC-7         — agents/delivery.md § Step 11.4b: post-merge teardown; Suite 53
+#                  "never from the active local branch" preserved ≥2× in orchestrator.md
+#   AC-8         — plugin.json + marketplace.json both at v2.88.0 or later (floor pin)
+#   AC-9         — hooks/worktree-guard.sh exists, fail-open, registered in all 3 OS
+#                  blocks of hooks/config.json AND in .claude-plugin/hooks.json; reason-
+#                  string states hook cannot cover own-terminal ops
+#
+# Self-referential guards:
+#   h1 — docs/testing.md registers 'Suite 93' + 'worktree-discipline' marker
+#   h2 — CLAUDE.md does NOT contain 'Suite 93' (§11 hygiene contract)
+#
+# Marker: worktree-discipline
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 93: worktree-discipline structural contract (v2.88.0) ===")
+
+_s93_orchestrator   = read(AGENTS_DIR / "orchestrator.md")
+_s93_architect      = read(AGENTS_DIR / "architect.md")
+_s93_delivery       = read(AGENTS_DIR / "delivery.md")
+_s93_reviewer       = read(AGENTS_DIR / "reviewer.md")
+_s93_claude         = read(REPO_ROOT / "CLAUDE.md")
+_s93_testing_md     = read(REPO_ROOT / "docs" / "testing.md")
+_s93_changelog_frag_path = REPO_ROOT / "changelog.d" / "feat-worktree-discipline.md"
+_s93_changelog_frag = read(_s93_changelog_frag_path) if _s93_changelog_frag_path.exists() else ""
+# Delivery assembles the fragment into CHANGELOG.md and deletes it; check the durable location.
+_s93_changelog_md = read(REPO_ROOT / "CHANGELOG.md")
+_s93_discipline_doc = REPO_ROOT / "docs" / "worktree-discipline.md"
+_s93_discipline     = read(_s93_discipline_doc) if _s93_discipline_doc.exists() else ""
+_s93_config_json_path = HOOKS_DIR / "config.json"
+_s93_config_json    = read(_s93_config_json_path) if _s93_config_json_path.exists() else ""
+_s93_hooks_json_path  = REPO_ROOT / ".claude-plugin" / "hooks.json"
+_s93_hooks_json     = read(_s93_hooks_json_path) if _s93_hooks_json_path.exists() else ""
+_s93_guard_sh_path  = HOOKS_DIR / "worktree-guard.sh"
+_s93_guard_sh       = read(_s93_guard_sh_path) if _s93_guard_sh_path.exists() else ""
+_s93_plugin_json    = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s93_marketplace_json = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+
+# --- AC-1: docs/worktree-discipline.md exists and contains all 5 rules ----
+
+check(
+    "suite93(ac1-doc-exists): docs/worktree-discipline.md exists",
+    _s93_discipline_doc.exists(),
+    "docs/worktree-discipline.md must exist — it is the canonical 5-rule discipline reference",
+)
+check(
+    "suite93(ac1-five-rules): docs/worktree-discipline.md documents all 5 rules "
+    "(Rule 1 through Rule 5 headings present)",
+    all(f"Rule {n}" in _s93_discipline for n in range(1, 6)),
+    "docs/worktree-discipline.md must contain 'Rule 1' through 'Rule 5' headings",
+)
+check(
+    "suite93(ac1-start-gate-decision): docs/worktree-discipline.md Rule 1 documents "
+    "the start-gate decision (clean+on-main → branch in place; dirty/non-main → worktree)",
+    "Rule 1" in _s93_discipline
+    and "origin/main" in _s93_discipline
+    and ("dirty" in _s93_discipline or "non-main" in _s93_discipline)
+    and "worktree" in _s93_discipline,
+    "docs/worktree-discipline.md must document the start-gate decision "
+    "(clean+main → branch; dirty or non-main → worktree; always fetch + base from origin/main)",
+)
+check(
+    "suite93(ac1-u1-boundary): docs/worktree-discipline.md states the U1 boundary — "
+    "human own-terminal checkout cannot be intercepted by any hook",
+    "U1" in _s93_discipline
+    and ("cannot be intercepted" in _s93_discipline or "cannot intercept" in _s93_discipline
+         or "cannot cover" in _s93_discipline)
+    and ("own-terminal" in _s93_discipline or "own terminal" in _s93_discipline
+         or "separate terminal" in _s93_discipline),
+    "docs/worktree-discipline.md must contain the U1 boundary statement: "
+    "a human's own-terminal checkout cannot be intercepted by any hook",
+)
+
+# --- AC-2: worktree-discipline.md teardown rule — finished=PR merged, #57767, #60588 ---
+
+# Slice Rule 4 section for anchor-scoped teardown checks
+_S93_RULE4_ANCHOR = "Rule 4"
+_S93_RULE5_ANCHOR = "Rule 5"
+_s93_rule4_idx = _s93_discipline.find(_S93_RULE4_ANCHOR)
+_s93_rule5_idx = _s93_discipline.find(_S93_RULE5_ANCHOR)
+_s93_rule4_slice = (
+    _s93_discipline[_s93_rule4_idx:_s93_rule5_idx]
+    if _s93_rule4_idx != -1 and _s93_rule5_idx != -1 and _s93_rule4_idx < _s93_rule5_idx
+    else (_s93_discipline[_s93_rule4_idx:] if _s93_rule4_idx != -1 else "")
+)
+
+check(
+    "suite93(ac2-finished-pr-merged): docs/worktree-discipline.md Rule 3 states "
+    "finished means PR merged (not task-verified, not PR opened)",
+    "Rule 3" in _s93_discipline
+    and ("PR merged" in _s93_discipline or "merged" in _s93_discipline)
+    and ("PR merge" in _s93_discipline or "merge event" in _s93_discipline
+         or "merged to the base" in _s93_discipline or "merged" in _s93_discipline),
+    "docs/worktree-discipline.md must state 'finished means PR merged' in Rule 3",
+)
+check(
+    "suite93(ac2-teardown-sequence): docs/worktree-discipline.md Rule 4 specifies "
+    "clean→remove+prune+verify teardown sequence",
+    bool(_s93_rule4_slice)
+    and "git worktree remove" in _s93_rule4_slice
+    and "git worktree prune" in _s93_rule4_slice
+    and "git worktree list" in _s93_rule4_slice,
+    "docs/worktree-discipline.md Rule 4 must specify: "
+    "'git worktree remove' + 'git worktree prune' + 'git worktree list' (verify step)",
+)
+check(
+    "suite93(ac2-dirty-stop): docs/worktree-discipline.md Rule 4 states dirty worktree → STOP",
+    bool(_s93_rule4_slice)
+    and ("dirty" in _s93_rule4_slice or "uncommitted" in _s93_rule4_slice)
+    and "STOP" in _s93_rule4_slice,
+    "docs/worktree-discipline.md Rule 4 must state dirty worktree → STOP (do not remove)",
+)
+check(
+    "suite93(ac2-caveat-57767): docs/worktree-discipline.md documents Windows file-lock "
+    "caveat #57767 with prune+remove-force repair",
+    "#57767" in _s93_discipline
+    and ("remove --force" in _s93_discipline or "--force" in _s93_discipline)
+    and "prune" in _s93_discipline,
+    "docs/worktree-discipline.md must document the Windows file-lock caveat #57767 "
+    "with the 'git worktree prune' + 'remove --force' repair sequence",
+)
+check(
+    "suite93(ac2-caveat-60588): docs/worktree-discipline.md documents the "
+    "worktree.baseRef regression #60588",
+    "#60588" in _s93_discipline,
+    "docs/worktree-discipline.md must reference caveat #60588 "
+    "(worktree.baseRef:'fresh' regression distrust)",
+)
+
+# --- AC-3: CLAUDE.md §5 pointer bullet ---
+
+_S93_CLAUDE_WT_ANCHOR = "Worktree discipline"
+_s93_claude_wt_idx = _s93_claude.find(_S93_CLAUDE_WT_ANCHOR)
+_S93_CLAUDE_ARCH_CONV_ANCHOR = "Architectural changes must be reviewed"
+_s93_claude_arch_idx = _s93_claude.find(_S93_CLAUDE_ARCH_CONV_ANCHOR)
+_s93_claude_wt_slice = (
+    _s93_claude[_s93_claude_wt_idx:_s93_claude_arch_idx]
+    if _s93_claude_wt_idx != -1 and _s93_claude_arch_idx != -1 and _s93_claude_wt_idx < _s93_claude_arch_idx
+    else (_s93_claude[_s93_claude_wt_idx:_s93_claude_wt_idx + 500] if _s93_claude_wt_idx != -1 else "")
+)
+
+check(
+    "suite93(ac3-claude-pointer-anchor): CLAUDE.md §5 contains 'Worktree discipline' bullet",
+    _s93_claude_wt_idx != -1,
+    "CLAUDE.md §5 Architectural Conventions must contain a 'Worktree discipline' bullet",
+)
+check(
+    "suite93(ac3-claude-doc-link): CLAUDE.md §5 worktree bullet links to "
+    "docs/worktree-discipline.md",
+    "docs/worktree-discipline.md" in _s93_claude_wt_slice,
+    "CLAUDE.md §5 worktree bullet must reference 'docs/worktree-discipline.md'",
+)
+check(
+    "suite93(ac3-claude-u1-limit): CLAUDE.md §5 worktree bullet states the human-path "
+    "is discipline-only (U1 limit)",
+    "discipline" in _s93_claude_wt_slice
+    and (
+        "not a gate" in _s93_claude_wt_slice
+        or "discipline, not a gate" in _s93_claude_wt_slice
+        or "unreachable by any hook" in _s93_claude_wt_slice
+        or "U1" in _s93_claude_wt_slice
+    ),
+    "CLAUDE.md §5 worktree bullet must state the human own-terminal path is "
+    "discipline not a gate (U1 limit)",
+)
+
+# --- AC-4: orchestrator.md § Current State — worktree: / worktree_branch: / worktree_base: ---
+
+_S93_CURR_STATE_ANCHOR = "## Current State"
+_S93_CURR_STATE_STOP   = "## Phase Checklist"
+_s93_curr_state_idx  = _s93_orchestrator.find(_S93_CURR_STATE_ANCHOR)
+_s93_phase_check_idx = _s93_orchestrator.find(_S93_CURR_STATE_STOP)
+_s93_curr_state_slice = (
+    _s93_orchestrator[_s93_curr_state_idx:_s93_phase_check_idx]
+    if _s93_curr_state_idx != -1 and _s93_phase_check_idx != -1 and _s93_curr_state_idx < _s93_phase_check_idx
+    else ""
+)
+
+check(
+    "suite93(ac4-curr-state-anchor): orchestrator.md contains '## Current State' section",
+    bool(_s93_curr_state_slice),
+    f"anchor '{_S93_CURR_STATE_ANCHOR}' not found in orchestrator.md — "
+    "AC-4 worktree field checks will fail",
+)
+check(
+    "suite93(ac4-worktree-field): orchestrator.md § Current State has '- worktree:' field",
+    "- worktree:" in _s93_curr_state_slice,
+    "orchestrator.md § Current State must declare '- worktree: {absolute path | null}' field",
+)
+check(
+    "suite93(ac4-worktree-branch-field): orchestrator.md § Current State has "
+    "'- worktree_branch:' field",
+    "- worktree_branch:" in _s93_curr_state_slice,
+    "orchestrator.md § Current State must declare '- worktree_branch:' field",
+)
+check(
+    "suite93(ac4-worktree-base-field): orchestrator.md § Current State has "
+    "'- worktree_base:' field",
+    "- worktree_base:" in _s93_curr_state_slice,
+    "orchestrator.md § Current State must declare '- worktree_base:' field",
+)
+check(
+    "suite93(ac4-teardown-deterministic-lookup): orchestrator.md § Current State worktree "
+    "field note says delivery reads it directly (no filesystem search needed)",
+    bool(_s93_curr_state_slice)
+    and (
+        "no filesystem search" in _s93_curr_state_slice
+        or "reads this field directly" in _s93_curr_state_slice
+        or "deterministic" in _s93_curr_state_slice
+        or "lookup" in _s93_curr_state_slice
+    ),
+    "orchestrator.md § Current State worktree field must note that delivery reads it "
+    "directly for teardown — 'no filesystem search needed' or equivalent",
+)
+
+# --- AC-5: architect.md — Worktree: block in 01-plan.md PR template ---
+
+check(
+    "suite93(ac5-architect-worktree-block): agents/architect.md PR template includes "
+    "'- **Worktree:**' declaration",
+    "- **Worktree:**" in _s93_architect,
+    "agents/architect.md 01-plan.md PR template must include "
+    "'- **Worktree:** `{absolute worktree path | null}`' line (rule 5: plan declares the worktree)",
+)
+
+# --- AC-6: orchestrator.md Multi-Task Orchestration Step 4b — pre-launch collision check ---
+
+_S93_MT_ANCHOR  = "## Multi-Task Orchestration"
+_S93_MT_STOP    = ("\n## ",)
+_S93_STEP4B_ANCHOR = "Pre-launch collision check"
+_s93_mt_idx    = _s93_orchestrator.find(_S93_MT_ANCHOR)
+_s93_mt_tail   = _s93_orchestrator[_s93_mt_idx:] if _s93_mt_idx != -1 else ""
+_s93_step4b_idx = _s93_mt_tail.find(_S93_STEP4B_ANCHOR)
+# Slice from the collision-check paragraph to the next bold-header or heading
+_s93_step4b_slice = ""
+if _s93_step4b_idx != -1:
+    _s93_step4b_tail = _s93_mt_tail[_s93_step4b_idx:]
+    _m4b = re.search(r"\n(?:#{1,6} |\*\*Step )", _s93_step4b_tail[1:])
+    _s93_step4b_slice = _s93_step4b_tail[:_m4b.start() + 1] if _m4b else _s93_step4b_tail[:800]
+
+check(
+    "suite93(ac6-collision-check-anchor): orchestrator.md § Multi-Task Orchestration "
+    "contains 'Pre-launch collision check' paragraph",
+    bool(_s93_step4b_slice),
+    "orchestrator.md § Multi-Task Orchestration must have a 'Pre-launch collision check' "
+    "paragraph before git worktree add (rule 2 — #51596 guard)",
+)
+check(
+    "suite93(ac6-collision-check-51596): pre-launch collision check references #51596",
+    "#51596" in _s93_step4b_slice,
+    "orchestrator.md pre-launch collision check must reference #51596 "
+    "(silent hash-collision reuse — the documented risk)",
+)
+check(
+    "suite93(ac6-collision-check-stop): pre-launch collision check requires STOP on collision",
+    "STOP" in _s93_step4b_slice,
+    "orchestrator.md pre-launch collision check must use STOP on collision "
+    "— never silently reuse",
+)
+check(
+    "suite93(ac6-collision-check-no-silent-reuse): pre-launch collision check states "
+    "'never' silently reuse or similar non-permissive language",
+    (
+        "never silently reuse" in _s93_step4b_slice
+        or "Never proceed" in _s93_step4b_slice
+        or "Do not silently reuse" in _s93_step4b_slice
+        or "never proceed" in _s93_step4b_slice
+    ),
+    "orchestrator.md pre-launch collision check must prohibit silent reuse "
+    "('never silently reuse' / 'Never proceed past this check without explicit operator confirmation')",
+)
+check(
+    "suite93(ac6-collision-check-worktree-list): pre-launch collision check uses "
+    "'git worktree list' to detect existing worktrees",
+    "git worktree list" in _s93_step4b_slice,
+    "orchestrator.md pre-launch collision check must use 'git worktree list' "
+    "to detect existing worktrees at the target path",
+)
+check(
+    "suite93(ac6-collision-check-branch-list): pre-launch collision check uses "
+    "'git branch --list' to detect existing branches",
+    "git branch --list" in _s93_step4b_slice,
+    "orchestrator.md pre-launch collision check must use 'git branch --list' "
+    "to detect an existing branch with the target name",
+)
+
+# --- AC-7: delivery.md Step 11.4b teardown; Suite 53 "never from the active local branch" ≥2× ---
+
+_S93_DELIV_TEARDOWN_ANCHOR = "### Step 11.4b"
+_S93_DELIV_TEARDOWN_STOP   = "### Step 11.5"
+_s93_teardown_idx  = _s93_delivery.find(_S93_DELIV_TEARDOWN_ANCHOR)
+_s93_step115_idx   = _s93_delivery.find(_S93_DELIV_TEARDOWN_STOP)
+_s93_teardown_slice = (
+    _s93_delivery[_s93_teardown_idx:_s93_step115_idx]
+    if _s93_teardown_idx != -1 and _s93_step115_idx != -1 and _s93_teardown_idx < _s93_step115_idx
+    else (_s93_delivery[_s93_teardown_idx:_s93_teardown_idx + 1200] if _s93_teardown_idx != -1 else "")
+)
+
+check(
+    "suite93(ac7-delivery-teardown-anchor): agents/delivery.md contains '### Step 11.4b' "
+    "(post-merge worktree teardown)",
+    bool(_s93_teardown_slice),
+    "agents/delivery.md must contain '### Step 11.4b' — the post-merge worktree teardown step "
+    "(rule 3: teardown is triggered at PR-merge in delivery, not task-verified in orchestrator)",
+)
+check(
+    "suite93(ac7-teardown-worktree-remove): delivery.md Step 11.4b uses "
+    "'git worktree remove' in clean path",
+    bool(_s93_teardown_slice)
+    and "git worktree remove" in _s93_teardown_slice,
+    "delivery.md § Step 11.4b must use 'git worktree remove' for clean teardown",
+)
+check(
+    "suite93(ac7-teardown-prune): delivery.md Step 11.4b uses 'git worktree prune'",
+    bool(_s93_teardown_slice)
+    and "git worktree prune" in _s93_teardown_slice,
+    "delivery.md § Step 11.4b must use 'git worktree prune' after remove",
+)
+check(
+    "suite93(ac7-teardown-verify-gone): delivery.md Step 11.4b verifies worktree is absent "
+    "after removal (list / verify step)",
+    bool(_s93_teardown_slice)
+    and "git worktree list" in _s93_teardown_slice,
+    "delivery.md § Step 11.4b must verify the worktree is gone via 'git worktree list'",
+)
+check(
+    "suite93(ac7-teardown-dirty-stop): delivery.md Step 11.4b STOPs on dirty worktree",
+    bool(_s93_teardown_slice)
+    and "STOP" in _s93_teardown_slice
+    and ("dirty" in _s93_teardown_slice or "uncommitted" in _s93_teardown_slice),
+    "delivery.md § Step 11.4b must STOP when the worktree has uncommitted changes "
+    "(dirty → STOP, not remove)",
+)
+check(
+    "suite93(ac7-suite53-preserved): orchestrator.md contains 'never from the active local branch' "
+    "at least twice (Suite 53 pin — preserved across this PR)",
+    _s93_orchestrator.count("never from the active local branch") >= 2,
+    "orchestrator.md must contain 'never from the active local branch' at least 2 times "
+    "— Suite 53 anchors both the '#### 4a. Determine base branch' section and the "
+    "'**Worktree branch base:**' paragraph; any edit that drops one occurrence breaks Suite 53",
+)
+
+# --- AC-8: plugin.json + marketplace.json both at v2.88.0 or later (floor pin) ---
+
+_s93_marketplace_version = (
+    _s93_marketplace_json.get("plugins", [{}])[0].get("version", "")
+    if _s93_marketplace_json.get("plugins")
+    else ""
+)
+
+check(
+    "suite93(ac8-plugin-json-floor): .claude-plugin/plugin.json version is 2.88.0 or later",
+    _s59_ver_tuple(_s93_plugin_json.get("version", "0.0.0")) >= (2, 88, 0),
+    f"plugin.json version must be >= 2.88.0 (worktree-discipline release floor), "
+    f"got '{_s93_plugin_json.get('version', '')}'",
+)
+check(
+    "suite93(ac8-marketplace-json-floor): .claude-plugin/marketplace.json plugins[0].version "
+    "is 2.88.0 or later",
+    _s59_ver_tuple(_s93_marketplace_version or "0.0.0") >= (2, 88, 0),
+    f"marketplace.json plugins[0].version must be >= 2.88.0, got '{_s93_marketplace_version}'",
+)
+check(
+    "suite93(ac8-versions-match): plugin.json and marketplace.json th-entry versions are equal",
+    _s93_plugin_json.get("version", "PLUGIN_MISSING")
+    == _s93_marketplace_version,
+    f"plugin.json version '{_s93_plugin_json.get('version', '')}' must equal "
+    f"marketplace.json plugins[0].version '{_s93_marketplace_version}'",
+)
+
+# --- AC-9: hooks/worktree-guard.sh exists, fail-open, registered everywhere ---
+
+check(
+    "suite93(ac9-guard-sh-exists): hooks/worktree-guard.sh exists",
+    _s93_guard_sh_path.exists(),
+    "hooks/worktree-guard.sh must exist — the advisory fail-open PreToolUse hook",
+)
+check(
+    "suite93(ac9-guard-sh-fail-open): worktree-guard.sh is declared as fail-open",
+    "fail-open" in _s93_guard_sh.lower() or "FAIL-OPEN" in _s93_guard_sh
+    or "fail open" in _s93_guard_sh.lower(),
+    "hooks/worktree-guard.sh must declare itself as fail-open "
+    "(parity with checkpoint-guard.sh / gcp-guard.sh contract)",
+)
+check(
+    "suite93(ac9-guard-sh-own-terminal-limit): worktree-guard.sh reason-string states "
+    "it cannot cover own-terminal ops",
+    "cannot intercept" in _s93_guard_sh or "cannot cover" in _s93_guard_sh,
+    "hooks/worktree-guard.sh must state in its reason-string / header that it cannot "
+    "intercept a human's own-terminal git commands (the U1 boundary)",
+)
+# hooks/config.json registration: 3 OS blocks (windows / macos / linux) each must contain
+# "worktree-guard.sh" — verified by counting occurrences (≥3 = one per OS block)
+_s93_config_wt_count = _s93_config_json.count("worktree-guard.sh")
+check(
+    "suite93(ac9-config-json-3-os-blocks): hooks/config.json registers worktree-guard.sh "
+    "in at least 3 OS blocks (windows + macos + linux)",
+    _s93_config_wt_count >= 3,
+    f"hooks/config.json must register 'worktree-guard.sh' at least 3 times "
+    f"(one per OS block); found {_s93_config_wt_count} occurrences",
+)
+# Verify that a {"matcher":"Bash"} block contains "worktree-guard.sh".
+# Strategy: find each "worktree-guard.sh" occurrence in the command values and check
+# that a "Bash" matcher appears in the 300-char window before it (the JSON block structure
+# places the matcher line right before the hooks array which contains the command).
+_s93_config_bash_wt = False
+_s93_config_search = _s93_config_json
+_s93_config_offset = 0
+while True:
+    _s93_cmd_pos = _s93_config_search.find("worktree-guard.sh")
+    if _s93_cmd_pos == -1:
+        break
+    # Only consider occurrences that are in a "command": "..." value (not in _scripts comment)
+    _s93_window_before = _s93_config_search[max(0, _s93_cmd_pos - 300):_s93_cmd_pos]
+    if '"matcher": "Bash"' in _s93_window_before or '"matcher":"Bash"' in _s93_window_before:
+        _s93_config_bash_wt = True
+        break
+    _s93_config_search = _s93_config_search[_s93_cmd_pos + 1:]
+check(
+    "suite93(ac9-config-json-matcher-bash): hooks/config.json worktree-guard entry "
+    "uses matcher 'Bash'",
+    _s93_config_bash_wt,
+    "hooks/config.json must register worktree-guard.sh with a '\"Bash\"' matcher PreToolUse entry",
+)
+check(
+    "suite93(ac9-hooks-json-registered): .claude-plugin/hooks.json registers "
+    "worktree-guard.sh for plugin-runtime path",
+    "worktree-guard.sh" in _s93_hooks_json,
+    ".claude-plugin/hooks.json must register worktree-guard.sh "
+    "(plugin-runtime equivalent of hooks/config.json)",
+)
+check(
+    "suite93(ac9-hooks-json-bash-matcher): .claude-plugin/hooks.json worktree-guard entry "
+    "is under PreToolUse with Bash matcher",
+    "worktree-guard.sh" in _s93_hooks_json
+    and "PreToolUse" in _s93_hooks_json
+    and '"Bash"' in _s93_hooks_json,
+    ".claude-plugin/hooks.json worktree-guard.sh must be a PreToolUse Bash-matched entry",
+)
+
+# --- AC-10: reviewer.md — PR-review worktree lifecycle ---
+#
+# Pins the new review-worktree behavior added to agents/reviewer.md so none
+# of its structural invariants can silently regress. All checks use
+# anchor-scoped slices (anti-false-green).
+#
+# 10a — ## Worktree Lifecycle for PR Reviews section exists
+# 10b — create step applies no-silent-reuse check (Rule 2): git worktree
+#        list + git branch --list before creating the review worktree
+# 10c — path pattern is .claude/worktrees/pr-review-<number>; never the
+#        shared main tree ("DO NOT" / "never check out ... shared")
+# 10d — teardown on review completion: git worktree remove + git worktree
+#        prune + git worktree list (verify-gone)
+# 10e — dirty review worktree → STOP (not force-remove)
+# 10f — worktree_teardown: field present in reviewer status block
+# 10g — docs/worktree-discipline.md § Reviewing a PR has two-row teardown-
+#        triggers table (implement worktree / review worktree rows)
+# 10h — docs/worktree-discipline.md § Reviewing a PR rationale: "always"
+#        token + ("without" | "interrupt" | "current work") token
+# 10i — changelog.d/feat-worktree-discipline.md references review worktree
+
+_S93_REVIEWER_LIFECYCLE_ANCHOR = "## Worktree Lifecycle for PR Reviews"
+_s93_reviewer_lifecycle_slice = _slice_section(
+    _s93_reviewer,
+    _S93_REVIEWER_LIFECYCLE_ANCHOR,
+    ("\n## ", "\n---\n"),
+)
+
+# Slice the "Removing the review worktree" subsection for teardown checks
+_S93_REVIEWER_REMOVE_ANCHOR = "### Removing the review worktree"
+_s93_reviewer_remove_slice = _slice_section(
+    _s93_reviewer,
+    _S93_REVIEWER_REMOVE_ANCHOR,
+    ("\n### ", "\n## ", "\n---\n"),
+)
+
+# Slice docs/worktree-discipline.md § Reviewing a PR for discipline-doc checks
+_S93_DISCIPLINE_REVIEW_ANCHOR = "## Reviewing a PR"
+_s93_discipline_review_slice = _slice_section(
+    _s93_discipline,
+    _S93_DISCIPLINE_REVIEW_ANCHOR,
+    ("\n## ", "\n---\n"),
+)
+
+check(
+    "suite93(ac10a-reviewer-lifecycle-section): agents/reviewer.md contains "
+    "'## Worktree Lifecycle for PR Reviews' section",
+    bool(_s93_reviewer_lifecycle_slice),
+    "agents/reviewer.md must have a '## Worktree Lifecycle for PR Reviews' section "
+    "(review worktree lifecycle; missing anchor → false-green impossible)",
+)
+check(
+    "suite93(ac10b-reviewer-no-silent-reuse-check): reviewer.md create step applies "
+    "no-silent-reuse check (Rule 2) — git worktree list + git branch --list",
+    bool(_s93_reviewer_lifecycle_slice)
+    and "git worktree list" in _s93_reviewer_lifecycle_slice
+    and "git branch --list" in _s93_reviewer_lifecycle_slice,
+    "agents/reviewer.md Worktree Lifecycle section must apply the no-silent-reuse "
+    "check (Rule 2): run 'git worktree list' and 'git branch --list' before creating "
+    "the review worktree (Claude Code issue #51596 guard)",
+)
+check(
+    "suite93(ac10c-reviewer-path-pattern): reviewer.md uses '.claude/worktrees/pr-review-' "
+    "path pattern and prohibits checkout in the shared main tree",
+    bool(_s93_reviewer_lifecycle_slice)
+    and ".claude/worktrees/pr-review-" in _s93_reviewer_lifecycle_slice
+    and (
+        "Do NOT check out" in _s93_reviewer_lifecycle_slice
+        or "never check out" in _s93_reviewer_lifecycle_slice.lower()
+        or "DO NOT" in _s93_reviewer_lifecycle_slice
+    ),
+    "agents/reviewer.md must use a '.claude/worktrees/pr-review-<number>' sibling path "
+    "and explicitly prohibit checking out the PR branch in the shared main tree",
+)
+check(
+    "suite93(ac10d-reviewer-teardown-sequence): reviewer.md remove-on-review-completion "
+    "uses git worktree remove + prune + list (verify-gone)",
+    bool(_s93_reviewer_remove_slice)
+    and "git worktree remove" in _s93_reviewer_remove_slice
+    and "git worktree prune" in _s93_reviewer_remove_slice
+    and "git worktree list" in _s93_reviewer_remove_slice,
+    "agents/reviewer.md '### Removing the review worktree' must specify "
+    "'git worktree remove' + 'git worktree prune' + 'git worktree list' (verify step); "
+    "missing anchor → anti-false-green guard fires",
+)
+check(
+    "suite93(ac10e-reviewer-dirty-stop): reviewer.md states dirty review worktree → STOP",
+    bool(_s93_reviewer_remove_slice)
+    and "STOP" in _s93_reviewer_remove_slice
+    and (
+        "dirty" in _s93_reviewer_remove_slice
+        or "uncommitted" in _s93_reviewer_remove_slice
+    ),
+    "agents/reviewer.md removal section must state that a dirty worktree → STOP "
+    "(do not force-remove without operator instruction)",
+)
+check(
+    "suite93(ac10f-reviewer-worktree-teardown-field): reviewer.md status block contains "
+    "'worktree_teardown:' field",
+    "worktree_teardown:" in _s93_reviewer,
+    "agents/reviewer.md status block must declare 'worktree_teardown:' field with values "
+    "removed | skipped-no-worktree | blocked-dirty (implementer AC from changelog)",
+)
+check(
+    "suite93(ac10g-discipline-doc-teardown-table): docs/worktree-discipline.md "
+    "'## Reviewing a PR' has two-row teardown-triggers table "
+    "(Implement worktree row + Review worktree row)",
+    bool(_s93_discipline_review_slice)
+    and (
+        "Implement worktree" in _s93_discipline_review_slice
+        or "implement worktree" in _s93_discipline_review_slice.lower()
+    )
+    and (
+        "Review worktree" in _s93_discipline_review_slice
+        or "review worktree" in _s93_discipline_review_slice.lower()
+    )
+    and (
+        "PR merged" in _s93_discipline_review_slice
+        or "PR merge" in _s93_discipline_review_slice
+    )
+    and (
+        "Review complete" in _s93_discipline_review_slice
+        or "review complete" in _s93_discipline_review_slice.lower()
+    ),
+    "docs/worktree-discipline.md '## Reviewing a PR' must contain a two-row table: "
+    "'Implement worktree → PR merged' and 'Review worktree → Review complete' "
+    "(teardown-triggers comparison)",
+)
+check(
+    "suite93(ac10h-discipline-doc-always-rationale): docs/worktree-discipline.md "
+    "'## Reviewing a PR' states review ALWAYS uses a worktree + "
+    "rationale (without interrupting / current work)",
+    bool(_s93_discipline_review_slice)
+    and "always" in _s93_discipline_review_slice.lower()
+    and (
+        "without" in _s93_discipline_review_slice
+        or "interrupt" in _s93_discipline_review_slice
+        or "current work" in _s93_discipline_review_slice
+    ),
+    "docs/worktree-discipline.md '## Reviewing a PR' must state that a review "
+    "ALWAYS uses a worktree so the reviewer never has to interrupt or abandon "
+    "current work (the 'always' + rationale contract)",
+)
+check(
+    "suite93(ac10i-changelog-review-lifecycle): CHANGELOG.md [2.88.0] "
+    "references the review worktree lifecycle",
+    # Delivery assembles changelog.d/ fragments into CHANGELOG.md and deletes them.
+    # Assert the durable location, not the transient fragment (see feedback_changelog-fragment-test-assertion).
+    "[2.88.0]" in _s93_changelog_md
+    and (
+        "reviewer.md" in _s93_changelog_md
+        or "review worktree" in _s93_changelog_md.lower()
+        or "pr-review" in _s93_changelog_md
+        or "worktree_teardown" in _s93_changelog_md
+    ),
+    "CHANGELOG.md must contain a [2.88.0] section referencing the review worktree lifecycle "
+    "(reviewer.md change, worktree_teardown field, or pr-review path pattern)",
+)
+
+# Self-referential guards
+check(
+    "suite93(h1-registry): docs/testing.md registers 'Suite 93' and "
+    "'worktree-discipline' marker",
+    "Suite 93" in _s93_testing_md and "worktree-discipline" in _s93_testing_md,
+    "docs/testing.md must name Suite 93 and the worktree-discipline marker "
+    "(canonical suite registry)",
+)
+check(
+    "suite93(h2-hygiene): CLAUDE.md does NOT contain 'Suite 93'",
+    "Suite 93" not in _s93_claude,
+    "CLAUDE.md must not mention Suite 93 — only docs/testing.md is the canonical "
+    "registry (§11 hygiene contract)",
+)
+
+# Marker: worktree-discipline
 
 # ---------------------------------------------------------------------------
 # Summary

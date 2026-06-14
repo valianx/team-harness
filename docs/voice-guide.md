@@ -88,6 +88,22 @@ The agent never composes Spanish (post-audit, with the §7.3 exceptions). The op
 - **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on where it lives.
 - **Where does it live?** Gitignored workspaces → operator's chat language. Committed repo file → English (with the documented §7.3 exceptions).
 
+## Internal Chatter — IN/OUT table (§7.1.1 full)
+
+The table below defines which operations are **silent** vs **operator-facing**. Agents enforce this split at every step: internal mechanics (config, connectivity, init) produce no output on success; operator-facing events (decisions, results, STOP blocks, stage transitions) always surface.
+
+| Category | On success | On failure | Rationale |
+|----------|-----------|------------|-----------|
+| Config load (read `.team-harness.json`, resolve paths) | SILENT — log `operation.*` event | one-line error + suggestion | The operator does not need to see each config read |
+| MCP verify (memory / context7 connectivity probe) | SILENT — log `operation.*` event | one-line error + suggestion | Connectivity OK is noise; failure is actionable |
+| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the orchestrator boot |
+| Phase-transition status blocks | PERMITTED (operator-facing) | PERMITTED | The operator needs to know which stage is active |
+| Tool error (any tool call fails) | n/a | SURFACE one-line summary + next-step; full output → events | Errors are always reported — never raw dumps |
+
+**Internal chatter** = mechanical progress on steps the operator did not ask to see (config, connectivity, init). **Operator-facing** = decisions, plans, results, STOP blocks, and stage transitions. When uncertain: output that answers something the operator asked is operator-facing; output that narrates how the system reaches that answer is internal chatter.
+
+---
+
 ## orchestrator as the Canonical Entry Point (§7.5)
 
 When documenting how to invoke the system, treat `@th:orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
