@@ -73,20 +73,21 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache and prints `… updated from <X> to <Y>. Restart to apply changes.` Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
 
 6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure MCP servers and workspace mode; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
-   - **Source of truth.** The four managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
+   - **Source of truth.** The two active managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
      - `managed-blocks/orchestrator-dispatch-rule.md` (markers: `<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`)
-     - `managed-blocks/nested-dispatch-takeover.md` (markers: `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->`)
      - `managed-blocks/voice-rule.md` (markers: `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`)
-     - `managed-blocks/dev-mode.md` (markers: `<!-- dev-mode:start -->` … `<!-- dev-mode:end -->`)
-     Full paths under the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/managed-blocks/{orchestrator-dispatch-rule,nested-dispatch-takeover,voice-rule,dev-mode}.md`
-   - **Note:** The `dev-mode-entry` block is no longer distributed (the `/dev-mode` skill trigger-phrase mechanism was replaced by the `developer-mode` output style). If the `<!-- dev-mode-entry:start -->` … `<!-- dev-mode-entry:end -->` markers exist in `~/.claude/CLAUDE.md`, remove the block between them (inclusive) as part of this sync.
+     Full paths under the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<latest>/skills/setup/managed-blocks/{orchestrator-dispatch-rule,voice-rule}.md`
+   - **Cleanup — remove retired blocks.** Three blocks were retired in v2.89.0 and must be removed from existing `~/.claude/CLAUDE.md` files if present:
+     - `<!-- dev-mode:start -->` … `<!-- dev-mode:end -->` (retired — dev mode is no longer a mode)
+     - `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->` (retired — takeover machinery scoped to opencode docs only)
+     - `<!-- dev-mode-entry:start -->` … `<!-- dev-mode-entry:end -->` (retired earlier — trigger-phrase mechanism replaced by output style)
+     For each: if both start and end markers are present in `~/.claude/CLAUDE.md`, remove the entire block (inclusive of markers). If absent, no action.
    - **Developer-mode output style sync.** After syncing managed blocks, re-copy `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (create the directory if absent). This keeps the output style aligned with the installed plugin version.
-   - **Sync the `/dev-mode` skill.** Re-copy `skills/dev-mode/SKILL.md` from the plugin cache to the USER-LEVEL path `~/.claude/skills/dev-mode/SKILL.md` (create the directory if absent), overwriting any existing version. This skill is the in-session toggle that writes or removes the marker, persists `dev_mode_choice` in `.team-harness.json`, and adopts or exits the orchestrator disposition; it must stay aligned with the installed plugin version (a bare `/dev-mode` requires a user-level skill, since plugin skills are namespaced).
    - **Back up** `~/.claude/CLAUDE.md` to a single rolling backup `~/.claude/CLAUDE.md.bak` (overwritten each run) before the first write. If the file does not exist, create it (blocks-only) and skip the backup. No backup history accumulates and nothing is ever deleted — exactly one rolling backup is kept.
-   - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the three canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
+   - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the two canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
    - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
    - **Never touch anything outside the marker-delimited blocks.** All other content in `~/.claude/CLAUDE.md` is the operator's and is preserved byte-for-byte.
-   - **Record** each block's outcome (`updated` / `inserted` / `already current`) for the `managed blocks` row of the final report (step 7). Do not print it inline — the report is the only operator-facing message.
+   - **Record** each block's outcome (`updated` / `inserted` / `already current` / `removed`) for the `managed blocks` row of the final report (step 7). Do not print it inline — the report is the only operator-facing message.
 
    **Windows (PowerShell) — run this block verbatim on Windows:**
    ```powershell
@@ -101,8 +102,8 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup (single rolling backup — overwritten each run, never accumulates)
    Copy-Item $claudeMd "$claudeMd.bak"
 
-   # Sync each managed block (DESTRUCTIVE replace between markers, or append)
-   foreach ($block in @("orchestrator-dispatch-rule", "nested-dispatch-takeover", "voice-rule", "dev-mode")) {
+   # Sync active managed blocks (DESTRUCTIVE replace between markers, or append)
+   foreach ($block in @("orchestrator-dispatch-rule", "voice-rule")) {
        $canonicalPath = "$mbDir\$block.md"
        $canonical = Get-Content $canonicalPath -Raw
        $startMarker = "<!-- $block`:start -->"
@@ -119,15 +120,17 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        }
    }
 
-   # Remove obsolete dev-mode-entry block if present
+   # Remove retired blocks (dev-mode, nested-dispatch-takeover, dev-mode-entry)
    $content = Get-Content $claudeMd -Raw
-   $entryStart = "<!-- dev-mode-entry:start -->"
-   $entryEnd   = "<!-- dev-mode-entry:end -->"
-   if ($content -match [regex]::Escape($entryStart) -and $content -match [regex]::Escape($entryEnd)) {
-       $pattern = [regex]::Escape($entryStart) + "[\s\S]*?" + [regex]::Escape($entryEnd)
-       $content = [regex]::Replace($content, $pattern, "")
-       Set-Content $claudeMd $content -NoNewline
+   foreach ($retiredBlock in @("dev-mode", "nested-dispatch-takeover", "dev-mode-entry")) {
+       $retiredStart = "<!-- $retiredBlock`:start -->"
+       $retiredEnd   = "<!-- $retiredBlock`:end -->"
+       if ($content -match [regex]::Escape($retiredStart) -and $content -match [regex]::Escape($retiredEnd)) {
+           $pattern = [regex]::Escape($retiredStart) + "[\s\S]*?" + [regex]::Escape($retiredEnd)
+           $content = [regex]::Replace($content, $pattern, "")
+       }
    }
+   Set-Content $claudeMd $content -NoNewline
 
    # Sync developer-mode output style (skip-if-identical write — no -Force copy)
    $outputStyleSrc = "$($latestDir.FullName)\output-styles\developer-mode.md"
@@ -137,39 +140,6 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    $srcContent = Get-Content $outputStyleSrc -Raw
    if (-not (Test-Path $outputStyleDst) -or (Get-Content $outputStyleDst -Raw) -ne $srcContent) {
        Set-Content $outputStyleDst $srcContent -NoNewline
-   }
-
-   # Sync /dev-mode user-level skill (skip-if-identical write — no -Force copy, no -Force dir)
-   $devModeSkillSrc = "$($latestDir.FullName)\skills\dev-mode\SKILL.md"
-   $devModeSkillDst = "$env:USERPROFILE\.claude\skills\dev-mode\SKILL.md"
-   $devModeSkillDir = Split-Path $devModeSkillDst
-   if (-not (Test-Path $devModeSkillDir)) { New-Item -ItemType Directory -Path $devModeSkillDir | Out-Null }
-   $devSrcContent = Get-Content $devModeSkillSrc -Raw
-   if (-not (Test-Path $devModeSkillDst) -or (Get-Content $devModeSkillDst -Raw) -ne $devSrcContent) {
-       Set-Content $devModeSkillDst $devSrcContent -NoNewline
-   }
-
-   # Default-on: assert dev-mode marker unless operator explicitly opted out.
-   # Reads dev_mode_choice from ~/.claude/.team-harness.json:
-   #   absent or "on"  -> write marker dev_mode: true
-   #   "off"           -> leave marker absent; never remove an existing one.
-   # NOTE: this step reads .team-harness.json but never writes it (that config
-   # is /th:setup's domain). It only conditionally writes the marker file.
-   $thJson = "$env:USERPROFILE\.claude\.team-harness.json"
-   $devModeChoice = $null
-   if (Test-Path $thJson) {
-       try {
-           $thConfig = Get-Content $thJson -Raw | ConvertFrom-Json
-           $devModeChoice = $thConfig.dev_mode_choice
-       } catch {}
-   }
-   $markerPath = "$env:USERPROFILE\.claude\.dev-mode-active"
-   if ($devModeChoice -ne "off") {
-       # absent or "on" -> assert marker (default-on)
-       Set-Content $markerPath "dev_mode: true" -NoNewline
-       Write-Host "  dev mode: marker written (dev_mode_choice: $devModeChoice)"
-   } else {
-       Write-Host "  dev mode: marker not written (dev_mode_choice: off — opt-out respected)"
    }
    ```
 
@@ -184,8 +154,8 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup (single rolling backup — overwritten each run, never accumulates)
    cp "$CLAUDE_MD" "$CLAUDE_MD.bak"
 
-   # Sync each managed block (DESTRUCTIVE replace between markers, or append)
-   for BLOCK in orchestrator-dispatch-rule nested-dispatch-takeover voice-rule dev-mode; do
+   # Sync active managed blocks (DESTRUCTIVE replace between markers, or append)
+   for BLOCK in orchestrator-dispatch-rule voice-rule; do
        CANONICAL=$(cat "$MB_DIR/$BLOCK.md")
        START_MARKER="<!-- ${BLOCK}:start -->"
        END_MARKER="<!-- ${BLOCK}:end -->"
@@ -199,49 +169,18 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        fi
    done
 
-   # Remove obsolete dev-mode-entry block if present
-   if grep -qF "<!-- dev-mode-entry:start -->" "$CLAUDE_MD" && grep -qF "<!-- dev-mode-entry:end -->" "$CLAUDE_MD"; then
-       sed -i.tmp "/<!-- dev-mode-entry:start -->/,/<!-- dev-mode-entry:end -->/d" "$CLAUDE_MD"
-   fi
+   # Remove retired blocks (dev-mode, nested-dispatch-takeover, dev-mode-entry)
+   for RETIRED in dev-mode nested-dispatch-takeover dev-mode-entry; do
+       if grep -qF "<!-- ${RETIRED}:start -->" "$CLAUDE_MD" && grep -qF "<!-- ${RETIRED}:end -->" "$CLAUDE_MD"; then
+           sed -i.tmp "/<!-- ${RETIRED}:start -->/,/<!-- ${RETIRED}:end -->/d" "$CLAUDE_MD"
+       fi
+   done
 
    # Sync developer-mode output style (write-if-different — no unconditional cp)
    OUTPUT_STYLE_SRC="$PLUGIN_BASE/$LATEST_DIR/output-styles/developer-mode.md"
    OUTPUT_STYLE_DST="$HOME/.claude/output-styles/developer-mode.md"
    [ -d "$(dirname "$OUTPUT_STYLE_DST")" ] || mkdir -p "$(dirname "$OUTPUT_STYLE_DST")"
    cmp -s "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST" || cp "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST"
-
-   # Sync /dev-mode user-level skill (write-if-different — no unconditional cp)
-   DEV_MODE_SKILL_SRC="$PLUGIN_BASE/$LATEST_DIR/skills/dev-mode/SKILL.md"
-   DEV_MODE_SKILL_DST="$HOME/.claude/skills/dev-mode/SKILL.md"
-   [ -d "$(dirname "$DEV_MODE_SKILL_DST")" ] || mkdir -p "$(dirname "$DEV_MODE_SKILL_DST")"
-   cmp -s "$DEV_MODE_SKILL_SRC" "$DEV_MODE_SKILL_DST" || cp "$DEV_MODE_SKILL_SRC" "$DEV_MODE_SKILL_DST"
-
-   # Default-on: assert dev-mode marker unless operator explicitly opted out.
-   # Reads dev_mode_choice from ~/.claude/.team-harness.json:
-   #   absent or "on"  -> write marker dev_mode: true
-   #   "off"           -> leave marker absent; never remove an existing one.
-   # NOTE: this step reads .team-harness.json but never writes it (that config
-   # is /th:setup's domain). It only conditionally writes the marker file.
-   TH_JSON="$HOME/.claude/.team-harness.json"
-   DEV_MODE_CHOICE=""
-   if [ -f "$TH_JSON" ] && command -v python3 >/dev/null 2>&1; then
-       DEV_MODE_CHOICE=$(python3 -c "
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-    print(d.get('dev_mode_choice', ''))
-except Exception:
-    print('')
-" "$TH_JSON" 2>/dev/null || true)
-   fi
-   MARKER_PATH="$HOME/.claude/.dev-mode-active"
-   if [ "$DEV_MODE_CHOICE" != "off" ]; then
-       # absent or "on" -> assert marker (default-on)
-       printf 'dev_mode: true\n' > "$MARKER_PATH"
-       echo "  dev mode: marker written (dev_mode_choice: ${DEV_MODE_CHOICE:-absent})"
-   else
-       echo "  dev mode: marker not written (dev_mode_choice: off — opt-out respected)"
-   fi
    ```
 
 6b. **Runtime probe — python3 presence (advisory).** After the managed-block sync, run `command -v python3`. This step is advisory — update always completes regardless of the outcome. If python3 is available, record `python3: available` for the final report (Step 7) and continue silently.
@@ -291,8 +230,7 @@ Install python3 now for full coverage? [Y/n]
      catalog refresh     done
      installed version   <X>
      downloaded version  <Y>
-     managed blocks      <per-block outcome, e.g. "synced (orchestrator-dispatch-rule updated)" or "in sync (3/3)">
-     dev mode            <"marker written (default-on)" | "marker not written (opt-out: off)">
+     managed blocks      <per-block outcome, e.g. "synced (orchestrator-dispatch-rule updated, dev-mode removed)" or "in sync (2/2)">
      python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `Next: /reload-plugins (or restart Claude Code) to activate <Y>.`
@@ -304,8 +242,7 @@ Install python3 now for full coverage? [Y/n]
      catalog refresh     done
      installed version   <X>
      latest version      <X>
-     managed blocks      <e.g. "in sync (3/3)" or "synced (nested-dispatch-takeover updated)">
-     dev mode            <"marker written (default-on)" | "marker not written (opt-out: off)">
+     managed blocks      <e.g. "in sync (2/2)" or "synced (orchestrator-dispatch-rule updated)">
      python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `No action required.`
@@ -323,6 +260,6 @@ Install python3 now for full coverage? [Y/n]
 ## Important
 
 - This skill is for **plugin installations**. For legacy Go-installer installations, file syncing is a different path (deprecated).
-- The skill refreshes the marketplace catalog, downloads the new version into the plugin cache (`claude plugin update`), reports the version delta, syncs the marker-delimited managed blocks in `~/.claude/CLAUDE.md` to the version being activated, and conditionally writes the dev-mode activation marker (`~/.claude/.dev-mode-active`) based on the `dev_mode_choice` sentinel. It never edits repository files, **never writes `~/.claude/.team-harness.json`** (that config is `/th:setup`'s domain — it only READs `dev_mode_choice` from it), never touches `~/.claude/CLAUDE.md` content outside the managed-block markers, and never reloads the session — the reload/restart is always operator-driven.
+- The skill refreshes the marketplace catalog, downloads the new version into the plugin cache (`claude plugin update`), reports the version delta, syncs the marker-delimited managed blocks in `~/.claude/CLAUDE.md` to the version being activated, and removes retired blocks (`dev-mode`, `nested-dispatch-takeover`, `dev-mode-entry`). It never edits repository files, **never writes `~/.claude/.team-harness.json`** (that config is `/th:setup`'s domain), never touches `~/.claude/CLAUDE.md` content outside the managed-block markers, and never reloads the session — the reload/restart is always operator-driven.
 - **New hooks reach installed machines without re-running `/th:setup`.** The `session-start.sh` unified SessionStart hook is registered in `.claude-plugin/hooks.json`; the plugin runtime loads it automatically on the next update+reload (`/th:update` downloads the new version → `/reload-plugins` activates it). For Go-installer paths, the hook command is registered in `hooks/config.json` and is applied via the `mergeHookEntries` path on the next install run.
 - Division of labour with `/th:setup`: setup is the one-time bootstrap (MCP servers, workspace mode, first write of the managed blocks); update is the repeatable command that keeps the catalog and the managed blocks in sync on every run. Re-running setup is never required as part of the update flow.

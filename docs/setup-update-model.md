@@ -11,12 +11,11 @@ This document describes the working model that governs how Team Harness is insta
 | What | Owner | Frequency |
 |------|-------|-----------|
 | Operator KEYS — Memory MCP URL + token, context7 API key, workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language` | `/th:setup` | One-time bootstrap; re-run to reconfigure |
-| FILES — managed `~/.claude/CLAUDE.md` blocks, `output-styles/developer-mode.md`, user-level `/dev-mode` skill | `/th:update` | Every release |
+| FILES — managed `~/.claude/CLAUDE.md` blocks, `output-styles/developer-mode.md` | `/th:update` | Every release |
 | FLOWS — marketplace catalog refresh, plugin version download | `/th:update` | Every release |
 | `~/.claude/.team-harness.json` full write (merge-write-whole-document) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
-| `~/.claude/.dev-mode-active` marker (conditional write, reads `dev_mode_choice`) | `/th:setup` Step 4e and `/th:update` Step 6 | Bootstrap and every update |
 
-**Key constraint:** `/th:update` reads `~/.claude/.team-harness.json` (specifically `dev_mode_choice`) but **never writes it**. Writing that file is `/th:setup`'s domain. This means a brand-new operator KEY introduced in a release never arrives via `/th:update` — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys).
+**Key constraint:** `/th:update` reads `~/.claude/.team-harness.json` but **never writes it**. Writing that file is `/th:setup`'s domain. This means a brand-new operator KEY introduced in a release never arrives via `/th:update` — see [The residual seam: new operator keys](#the-residual-seam-new-operator-keys).
 
 ---
 
@@ -46,14 +45,10 @@ These artifacts must land at a specific absolute path under `~/.claude/` that th
 | Artifact | Target path | Mechanism in `/th:update` Step 6 |
 |----------|-------------|----------------------------------|
 | `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
-| `nested-dispatch-takeover` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
 | `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
-| `dev-mode` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
 | Developer-mode output style | `~/.claude/output-styles/developer-mode.md` | Force-copy from plugin cache |
-| `/dev-mode` user-level skill | `~/.claude/skills/dev-mode/SKILL.md` | Force-copy from plugin cache |
-| Dev-mode activation marker | `~/.claude/.dev-mode-active` | Conditional write based on `dev_mode_choice` |
 
-The `/dev-mode` skill requires the user-level path (not the plugin-namespaced path) because the bare `/dev-mode` command is only available as a user-level skill — plugin skills are namespaced as `/th:dev-mode`.
+> **Retired in v2.89.0 (dev mode eliminated):** the `dev-mode` and `nested-dispatch-takeover` managed blocks, the `/dev-mode` user-level skill, and the `~/.claude/.dev-mode-active` marker are no longer written. `/th:update` Step 6 additionally **deletes** the two retired blocks (and the obsolete `dev-mode-entry` marker) from any existing `~/.claude/CLAUDE.md`. The orchestrator disposition is now unconditional and the outward-action gate (`dev-guard.sh`) is always armed — no marker arms it.
 
 For the exact per-OS command blocks (bash and PowerShell), see `skills/update/SKILL.md` Step 6.
 
@@ -82,9 +77,8 @@ Running `/th:update` every release keeps both the cache artifacts (via the plugi
 
 `/th:update` Step 6 re-syncs every fixed-path artifact on every run, regardless of whether the plugin version changed:
 
-- **Managed CLAUDE.md blocks** — destructive marker-bounded replace (if markers are present) or append (if markers are absent). No content comparison — marker presence is the only check.
-- **Output style and user-level skill** — force-copy from the highest-version plugin cache directory.
-- **Dev-mode marker** — conditional write based on `dev_mode_choice` in `~/.claude/.team-harness.json`.
+- **Managed CLAUDE.md blocks** (`orchestrator-dispatch-rule`, `voice-rule`) — destructive marker-bounded replace (if markers are present) or append (if markers are absent). No content comparison — marker presence is the only check. Step 6 also **deletes** the retired `dev-mode` / `nested-dispatch-takeover` blocks if present.
+- **Output style** — force-copy from the highest-version plugin cache directory.
 
 Because Step 6 is unconditional and destructive, a machine that missed one or more updates self-corrects on the next run: the fixed-path artifacts are overwritten with the current version's canonical content.
 
@@ -126,4 +120,4 @@ This is a known, intentional limitation. The alternative — having `/th:update`
 - `docs/install.md § Updating` — the concise procedure reference for updating
 - `skills/setup/SKILL.md` — authoritative source for setup steps and per-OS command syntax
 - `skills/update/SKILL.md` — authoritative source for update steps and per-OS command syntax
-- `docs/dev-mode.md` — dev mode disposition, the default-on activation model, and the outward-action gate
+- `docs/dev-mode.md` — the orchestrator disposition contract and the outward-action gate (dev mode retired v2.89.0; disposition is unconditional)

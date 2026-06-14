@@ -14,7 +14,7 @@
 #     auto-approved — the exact #298 signal.
 #   - Edit/Write payloads are routed only to policy-block.sh per the
 #     Bash|Write|Edit|NotebookEdit matcher, never to dev-guard.sh (Bash only).
-#   - Covered outward actions with dev mode ON produce "ask".
+#   - Covered outward actions produce "ask" unconditionally (SEC-DR-2, v2.89.0).
 #   - Destructive Bash produces "deny" (policy-block.sh deny path).
 #
 # CANNOT prove (out of CI reach):
@@ -79,10 +79,10 @@ make_clean_home() {
 }
 
 make_home_with_marker() {
-    local tmp
-    tmp="$(make_clean_home)"
-    printf 'dev_mode: true\n' > "$tmp/.claude/.dev-mode-active"
-    echo "$tmp"
+    # Retained for call-site compatibility with Scenarios 2, 5, 6.
+    # As of v2.89.0 SEC-DR-2 re-founding, dev-guard.sh no longer reads any
+    # marker — the gate is unconditional. The marker is not written here.
+    make_clean_home
 }
 
 # ---------------------------------------------------------------------------
@@ -374,96 +374,100 @@ echo "============================================================"
 
 # ---------------------------------------------------------------------------
 # Scenario 1 (AC-7 — THE #298 SIGNAL):
-# dev mode OFF (no marker), Edit payload (no command field) -> CHAIN DEFERS
+# Edit payload (no command field) -> CHAIN DEFERS
 #
-# In a clean HOME with no dev-mode marker and an Edit-shaped payload,
-# the entire hook chain must emit NO permissionDecision. In pre-#298
-# dev-guard.sh this would have emitted allow (the bug). The fix made
-# dev-guard.sh emit no decision; but dev-guard.sh never sees Edit payloads
-# anyway (Bash-only matcher). The real check: policy-block.sh also defers
-# for this payload (no secret patterns matched). Net result: chain defers.
+# With an Edit-shaped payload the entire hook chain must emit NO
+# permissionDecision. In pre-#298 dev-guard.sh this would have emitted allow
+# (the bug). The fix made dev-guard.sh emit no decision; but dev-guard.sh
+# never sees Edit payloads anyway (Bash-only matcher). The real check:
+# policy-block.sh also defers for this payload (no secret patterns matched).
+# Net result: chain defers. Gate is unconditional (v2.89.0) — no marker needed.
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 1 (AC-7 — #298 signal): dev OFF, Edit payload -> CHAIN DEFERS ==="
+echo "=== Scenario 1 (AC-7 — #298 signal): Edit payload -> CHAIN DEFERS ==="
 H=$(make_clean_home)
 assert_chain_defer \
-    "S1: clean HOME, no marker, Edit payload (no command) -> defer (not auto-approved)" \
+    "S1: clean HOME, Edit payload (no command) -> defer (not auto-approved)" \
     "$H" "Edit" "$(make_edit_payload)"
 
 # ---------------------------------------------------------------------------
 # Scenario 2:
-# dev mode ON (marker present), Edit payload -> CHAIN DEFERS
-# dev-guard.sh doesn't see Edit (Bash-only); policy-block.sh defers (no secret).
+# Edit payload -> CHAIN DEFERS
+# dev-guard.sh doesn't see Edit (Bash-only matcher); policy-block.sh defers
+# (no secret patterns matched). Gate is unconditional — no marker required.
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 2: dev ON, Edit payload -> CHAIN DEFERS (dev-guard never sees Edit) ==="
+echo "=== Scenario 2: Edit payload -> CHAIN DEFERS (dev-guard never sees Edit) ==="
 H=$(make_home_with_marker)
 assert_chain_defer \
-    "S2: marker present, Edit payload -> defer (dev-guard has no Bash match)" \
+    "S2: Edit payload -> defer (dev-guard has Bash-only matcher)" \
     "$H" "Edit" "$(make_edit_payload)"
 
 # ---------------------------------------------------------------------------
 # Scenario 3:
-# dev mode OFF, Write payload (no command field) -> CHAIN DEFERS
-# Same class as Scenario 1 but Write tool.
+# Write payload (no command field) -> CHAIN DEFERS
+# Same class as Scenario 1 but Write tool. No marker needed (unconditional gate).
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 3: dev OFF, Write payload -> CHAIN DEFERS ==="
+echo "=== Scenario 3: Write payload -> CHAIN DEFERS ==="
 H=$(make_clean_home)
 assert_chain_defer \
-    "S3: clean HOME, no marker, Write payload -> defer" \
+    "S3: clean HOME, Write payload -> defer" \
     "$H" "Write" "$(make_write_payload)"
 
 # ---------------------------------------------------------------------------
 # Scenario 4:
-# dev mode OFF, benign Bash (git status) -> CHAIN DEFERS
+# Benign Bash (git status) -> CHAIN DEFERS
 # policy-block.sh: no deny pattern matched.
-# dev-guard.sh: cmd non-empty, marker absent -> nodecision.
+# dev-guard.sh: git status is not a covered outward action -> nodecision.
+# Gate is unconditional but only fires on covered actions (not on all Bash).
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 4: dev OFF, benign Bash (git status) -> CHAIN DEFERS ==="
+echo "=== Scenario 4: benign Bash (git status) -> CHAIN DEFERS ==="
 H=$(make_clean_home)
 assert_chain_defer \
-    "S4: clean HOME, no marker, git status -> defer" \
+    "S4: clean HOME, git status -> defer (not a covered outward action)" \
     "$H" "Bash" "$(make_bash_payload 'git status')"
 
 # ---------------------------------------------------------------------------
 # Scenario 5:
-# dev mode ON, benign Bash (git status) -> CHAIN DEFERS
+# Benign Bash (git status) -> CHAIN DEFERS
 # policy-block.sh: no deny pattern matched.
-# dev-guard.sh: cmd non-empty, marker present, NOT an outward action -> nodecision.
+# dev-guard.sh: git status is not a covered outward action -> nodecision.
+# Unconditional gate (v2.89.0) — no marker needed or read.
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 5: dev ON, benign Bash (git status) -> CHAIN DEFERS ==="
+echo "=== Scenario 5: benign Bash (git status) -> CHAIN DEFERS ==="
 H=$(make_home_with_marker)
 assert_chain_defer \
-    "S5: marker present, git status -> defer (not a covered outward action)" \
+    "S5: git status -> defer (not a covered outward action)" \
     "$H" "Bash" "$(make_bash_payload 'git status')"
 
 # ---------------------------------------------------------------------------
 # Scenario 6 (AC-8 — non-vacuous):
-# dev mode ON, covered outward action (gh pr merge 1) -> CHAIN ASK
+# Covered outward action (gh pr merge 1) -> CHAIN ASK (unconditional)
 # policy-block.sh: no deny pattern for gh pr merge.
-# dev-guard.sh: marker present + covered outward action -> ask.
+# dev-guard.sh: covered outward action -> ask (SEC-DR-2, unconditional, v2.89.0).
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 6 (AC-8): dev ON, 'gh pr merge 1' -> CHAIN ASK ==="
+echo "=== Scenario 6 (AC-8): 'gh pr merge 1' -> CHAIN ASK (unconditional) ==="
 H=$(make_home_with_marker)
 assert_chain_ask \
-    "S6: marker present, gh pr merge -> ask (covered outward action, dev mode on)" \
+    "S6: gh pr merge -> ask (covered outward action, gate unconditional)" \
     "$H" "Bash" "$(make_bash_payload 'gh pr merge 1')"
 
 # ---------------------------------------------------------------------------
-# Scenario 7:
-# dev mode OFF, covered outward action (gh pr merge 1) -> CHAIN DEFERS
-# dev-guard.sh: marker absent -> nodecision (dev mode off -> defers even on outward).
-# policy-block.sh: no deny pattern.
+# Scenario 7 (SEC-DR-2 re-founding, v2.89.0):
+# Covered outward action (gh pr merge 1) in clean HOME -> CHAIN ASK
+# dev-guard.sh: gate fires unconditionally — no marker needed.
+# Old behavior (pre-v2.89.0): CHAIN DEFERS when marker absent.
+# New behavior: CHAIN ASK (gate is always armed).
 # ---------------------------------------------------------------------------
 echo
-echo "=== Scenario 7: dev OFF, 'gh pr merge 1' -> CHAIN DEFERS ==="
+echo "=== Scenario 7 (SEC-DR-2): 'gh pr merge 1' in clean HOME -> CHAIN ASK (unconditional) ==="
 H=$(make_clean_home)
-assert_chain_defer \
-    "S7: clean HOME, no marker, gh pr merge -> defer (dev mode off)" \
+assert_chain_ask \
+    "S7: clean HOME, no marker, gh pr merge -> ask (gate unconditional, v2.89.0)" \
     "$H" "Bash" "$(make_bash_payload 'gh pr merge 1')"
 
 # ---------------------------------------------------------------------------
