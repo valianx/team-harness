@@ -1086,11 +1086,12 @@ check(
     "drift detected — enum value must match in all three files",
 )
 
-# --- nested-dispatch-takeover block (v2.33.1) ---
-# The block is written by /th:setup to ~/.claude/CLAUDE.md so top-level Claude
-# can auto-recover from a dispatch_handoff in ANY repo, not just team-harness.
-# Only the skill surface is asserted; the Go installer will be removed in a
-# follow-up task and is intentionally not mirrored.
+# --- nested-dispatch-takeover block — RETIRED v2.89.0 ---
+# The nested-dispatch-takeover managed block was installed by /th:setup into
+# ~/.claude/CLAUDE.md (v2.33.1). Retired in v2.89.0: the takeover machinery
+# is opencode/legacy-path only and is now documented in docs/subagent-orchestration.md.
+# The block is no longer installed by /th:setup; /th:update removes it from
+# existing user CLAUDE.md files.
 
 NESTED_TAKEOVER_MARKER_START = "<!-- nested-dispatch-takeover:start -->"
 NESTED_TAKEOVER_MARKER_END = "<!-- nested-dispatch-takeover:end -->"
@@ -1098,24 +1099,24 @@ NESTED_TAKEOVER_MARKER_END = "<!-- nested-dispatch-takeover:end -->"
 setup_skill_md = read(SKILLS_DIR / "setup" / "SKILL.md")
 
 check(
-    "skills/setup/SKILL.md contains nested-dispatch-takeover start marker",
-    NESTED_TAKEOVER_MARKER_START in setup_skill_md,
-    "setup SKILL.md must declare the new managed block start marker",
+    "skills/setup/SKILL.md nested-dispatch-takeover start marker ABSENT (block RETIRED v2.89.0)",
+    NESTED_TAKEOVER_MARKER_START not in setup_skill_md,
+    "setup SKILL.md must NOT declare the nested-dispatch-takeover block start marker — retired in v2.89.0",
 )
 check(
-    "skills/setup/SKILL.md contains nested-dispatch-takeover end marker",
-    NESTED_TAKEOVER_MARKER_END in setup_skill_md,
-    "setup SKILL.md must declare the new managed block end marker",
+    "skills/setup/SKILL.md nested-dispatch-takeover end marker ABSENT (block RETIRED v2.89.0)",
+    NESTED_TAKEOVER_MARKER_END not in setup_skill_md,
+    "setup SKILL.md must NOT declare the nested-dispatch-takeover block end marker — retired in v2.89.0",
 )
 check(
-    "skills/setup/SKILL.md nested block references docs/subagent-orchestration.md",
+    "skills/setup/SKILL.md references docs/subagent-orchestration.md (takeover protocol pointer)",
     "docs/subagent-orchestration.md" in setup_skill_md,
-    "the block must point operators to the full 8-step protocol",
+    "setup SKILL.md must still reference docs/subagent-orchestration.md for the takeover protocol",
 )
 check(
-    "skills/setup/SKILL.md nested block names the red-herring '~/.claude/agents/'",
-    "~/.claude/agents/" in setup_skill_md and "plugins/cache" in setup_skill_md,
-    "the block must clarify that ~/.claude/agents/ absence is not a failure",
+    "skills/setup/SKILL.md nested-dispatch-takeover red-herring note ABSENT (block RETIRED v2.89.0)",
+    "~/.claude/agents/" not in setup_skill_md,
+    "setup SKILL.md must NOT contain the ~/.claude/agents/ red-herring note — retired with the block in v2.89.0",
 )
 
 check(
@@ -1292,9 +1293,10 @@ check(
     or "honor EVERY gate" in _subagent_orch_md,
     "manifest must declare that skipping a stage/gate is a defect, not a shortcut",
 )
-# (d2) comply imperative inside the managed block in setup/SKILL.md.
-# Extract the managed block content between the markers so the assertion
-# is scoped to that block and not to the surrounding instructional text.
+# (d2/d3) nested-dispatch-takeover managed block retired in v2.89.0.
+# The comply imperative and Takeover Pipeline Manifest pointer are documented
+# in docs/subagent-orchestration.md only (the block is no longer in setup/SKILL.md).
+# Retained as empty-sentinel for downstream references to _managed_block_content.
 _TAKEOVER_START = "<!-- nested-dispatch-takeover:start -->"
 _TAKEOVER_END = "<!-- nested-dispatch-takeover:end -->"
 _block_start_idx = setup_skill_md.find(_TAKEOVER_START)
@@ -1305,18 +1307,13 @@ _managed_block_content = (
     else ""
 )
 check(
-    "skills/setup/SKILL.md managed block carries comply imperative (skipping any / honor EVERY gate)",
-    "skipping any" in _managed_block_content or "honor EVERY gate" in _managed_block_content,
-    "the nested-dispatch-takeover block itself must state the comply imperative, "
-    "not merely point to the manifest",
+    "skills/setup/SKILL.md nested-dispatch-takeover block ABSENT (retired v2.89.0)",
+    not _managed_block_content,
+    "The nested-dispatch-takeover managed block must NOT appear in setup/SKILL.md"
+    " — retired in v2.89.0 (takeover machinery is opencode/legacy docs only)",
 )
-# (d3) managed block references "Takeover Pipeline Manifest" by name
-check(
-    "skills/setup/SKILL.md managed block references 'Takeover Pipeline Manifest'",
-    "Takeover Pipeline Manifest" in _managed_block_content,
-    "block must point to the manifest by name so the reader knows where to find "
-    "the ordered stage list",
-)
+# Comply imperative is in docs/subagent-orchestration.md (d1 check above).
+# Takeover Pipeline Manifest is in docs/subagent-orchestration.md (see Check 6/AC-6).
 
 # -- (e) Drift no-regression guards — C1 (region-anchored) + C2 (annotated) -
 # C1: assertions are scoped to the steps 6-7 region of _subagent_orch_md,
@@ -1385,54 +1382,37 @@ check(
     "and are NOT checked here)",
 )
 
-# -- (g) Plugin cache-path resolvable (AC-5 / AC-8: fix/takeover-doc-plugin-cache-path) --
-# The managed block must name the explicit marketplace+plugin cache-path segment
-# ("team-harness-marketplace/th/") and the highest-semver resolution wording
-# ("<highest-version>") so plugin-only installs (no repo clone) can resolve the
-# docs/ and agents/ references during a takeover.
-#
-# DO NOT assert merely "plugins/cache" — line ~1088 already covers that substring
-# via the Red herring note and is green today.  These assertions target literals
-# that are ABSENT today and will become present only after the implementer's fix.
-# They fail pre-fix and pass post-fix (regression test contract, Phase 2.0).
-#
-# Resolution: scoped to _managed_block_content (extracted above in section (d2))
-# so ambient occurrences elsewhere in setup/SKILL.md do not produce false greens.
+# -- (g) Plugin cache-path resolvable — v2.89.0 re-pointing --
+# The nested-dispatch-takeover managed block is retired. The plugin cache-path
+# segment and highest-version resolution wording now live in:
+#   - orchestrator-dispatch-rule.md managed block (for operator reference)
+#   - docs/subagent-orchestration.md (for the takeover protocol itself)
+# Assert they are present in the orchestrator-dispatch-rule canonical file
+# and in docs/subagent-orchestration.md.
+_s18_odr_text = (SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md").read_text(encoding="utf-8") if (SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md").exists() else ""
+_s18_suborch_text = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
 check(
-    "skills/setup/SKILL.md managed block contains plugin cache-path segment 'team-harness-marketplace/th/'",
-    "team-harness-marketplace/th/" in _managed_block_content,
-    "the nested-dispatch-takeover block must include the explicit marketplace+plugin "
-    "cache-path segment so plugin-only installs can resolve docs/ and agents/ references; "
-    "the current Red herring uses an ellipsis ('.../th/') which is insufficiently specific",
+    "plugin-cache-path(g1): orchestrator-dispatch-rule.md contains plugin cache-path 'team-harness-marketplace/th/'",
+    "team-harness-marketplace/th/" in _s18_odr_text or "team-harness-marketplace/th/" in _s18_suborch_text,
+    "orchestrator-dispatch-rule.md or docs/subagent-orchestration.md must include the explicit "
+    "marketplace+plugin cache-path segment 'team-harness-marketplace/th/' (v2.89.0 re-pointing from retired managed block)",
 )
 check(
-    "skills/setup/SKILL.md managed block contains highest-version resolution wording '<highest-version>'",
-    "<highest-version>" in _managed_block_content,
-    "the block must instruct operators to resolve to the highest semver directory "
-    "('<highest-version>') rather than a fixed version or the ambiguous '<version>' "
-    "placeholder already present in the Red herring; multiple versions may be cached "
-    "after updates and the newest is canonical",
+    "plugin-cache-path(g2): orchestrator-dispatch-rule.md or subagent-orchestration.md contains '<highest-version>'",
+    "<highest-version>" in _s18_odr_text or "<highest-version>" in _s18_suborch_text,
+    "orchestrator-dispatch-rule.md or docs/subagent-orchestration.md must instruct operators "
+    "to resolve to the highest semver directory ('<highest-version>') (v2.89.0 re-pointing)",
 )
 
-# -- (h) Strip-rule co-occurrence (AC-9 / AC-8: fix/takeover-doc-plugin-cache-path additive pass) --
-# The managed block must document the prefix-strip rule using the EXACT example
-# literals `th:architect` AND `agents/architect.md`, co-occurring in the same block.
-# This captures defect B: the placeholder `{next_dispatch.agent}` is stored in
-# PREFIXED form (`th:architect`) for Task dispatch, but the file-read step (step 3)
-# must STRIP the `th:` prefix to derive the agent's on-disk path.
-#
-# These two literals are ABSENT today from _managed_block_content → assertion FAILS
-# pre-fix and PASSES post-fix (regression test contract, Phase 2.0 additive pass).
-#
-# Resolution: scoped to _managed_block_content so ambient occurrences elsewhere
-# in setup/SKILL.md do not produce false greens.
+# -- (h) Strip-rule co-occurrence — v2.89.0 re-pointing --
+# The prefix-strip rule (th:architect -> agents/architect.md) is now documented
+# in docs/subagent-orchestration.md (takeover protocol) and orchestrator-dispatch-rule.md.
 check(
-    "skills/setup/SKILL.md managed block contains strip-rule co-occurrence: 'th:architect' AND 'agents/architect.md'",
-    "th:architect" in _managed_block_content and "agents/architect.md" in _managed_block_content,
-    "the nested-dispatch-takeover block must document the prefix-strip rule with the "
-    "literal example 'th:architect' -> 'agents/architect.md'; both literals must "
-    "co-occur in the managed block so the transformation is unambiguous; "
-    "absent today (defect B — placeholder form undocumented in the block)",
+    "strip-rule(h1): docs/subagent-orchestration.md or orchestrator-dispatch-rule.md contains strip-rule co-occurrence",
+    ("th:architect" in _s18_suborch_text and "agents/architect.md" in _s18_suborch_text)
+    or ("th:architect" in _s18_odr_text and "agents/architect.md" in _s18_odr_text),
+    "docs/subagent-orchestration.md or orchestrator-dispatch-rule.md must document the prefix-strip rule "
+    "with 'th:architect' and 'agents/architect.md' co-occurring (v2.89.0 re-pointing from retired managed block)",
 )
 
 # Also assert the same strip-rule co-occurrence in docs/subagent-orchestration.md
@@ -7624,10 +7604,10 @@ _S39_SETUP_NDT_ANCHOR   = "<!-- nested-dispatch-takeover:start -->"
 _s39_orch_exit_slice    = _slice_section(_s39_orch_text,    _S39_ORCH_EXIT_ANCHOR)
 _s39_takeover_slice     = _slice_section(_s39_suborch_text, _S39_TAKEOVER_ANCHOR)
 _s39_schema_slice       = _slice_section(_s39_suborch_text, _S39_SCHEMA_ANCHOR)
-# Re-pointed (pr-th-update-fix Step 5): read canonical file directly; the block
-# starts on line 1 so _slice_section would stop at the first ## heading inside
-# the block — use the whole file instead, which IS the block.
-_s39_ndt_canonical_text = read(SKILLS_DIR / "setup" / "managed-blocks" / "nested-dispatch-takeover.md")
+# v2.89.0: nested-dispatch-takeover.md is retired (file deleted). Return empty
+# string; the AC-8 assertion below now asserts the file is ABSENT.
+_s39_ndt_path = SKILLS_DIR / "setup" / "managed-blocks" / "nested-dispatch-takeover.md"
+_s39_ndt_canonical_text = _s39_ndt_path.read_text(encoding="utf-8") if _s39_ndt_path.exists() else ""
 _s39_setup_ndt_slice    = _s39_ndt_canonical_text
 
 # 8 field names that the consumer reads (AC-3)
@@ -7813,24 +7793,18 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (9) / AC-8 -- skills/setup/SKILL.md nested-dispatch-takeover managed block:
-# Must contain a reinforcement line for the never-th:orchestrator guard.
-# Slices from the <!-- nested-dispatch-takeover:start --> marker to the next
-# heading, so a missing marker returns "" => always fails (anti-false-green).
+# Check (9) / AC-8 — v2.89.0 SEC-DR-2 re-founding:
+# The nested-dispatch-takeover managed block is RETIRED. Its canonical file
+# must not exist. The never-th:orchestrator guard is now documented in
+# docs/subagent-orchestration.md (AC-2) only; the operator-facing managed block
+# is removed (dispatch is unconditional on the CC path; takeover is opencode-only).
 # ---------------------------------------------------------------------------
-_S39_AC8_TOKENS = (
-    "th:orchestrator",
-    "malformed",
-)
 check(
-    "takeover-contract(9/ac-8): skills/setup/SKILL.md nested-dispatch-takeover"
-    " managed block contains never-th:orchestrator reinforcement line"
-    " (th:orchestrator => malformed)",
-    bool(_s39_setup_ndt_slice)
-    and all(t in _s39_setup_ndt_slice for t in _S39_AC8_TOKENS)
-    and "malformed" in _s39_setup_ndt_slice,
-    f"anchor '{_S39_SETUP_NDT_ANCHOR}' missing or tokens absent: {_S39_AC8_TOKENS}"
-    " -- never-th:orchestrator reinforcement line not found in the managed block",
+    "takeover-contract(9/ac-8-v289): nested-dispatch-takeover managed block RETIRED"
+    " — skills/setup/managed-blocks/nested-dispatch-takeover.md does NOT exist",
+    not _s39_ndt_path.exists(),
+    "skills/setup/managed-blocks/nested-dispatch-takeover.md must NOT exist"
+    " — retired in v2.89.0 (disposition is unconditional; takeover machinery is opencode-only docs)",
 )
 
 # ---------------------------------------------------------------------------
@@ -9333,19 +9307,9 @@ check(
 )
 
 check(
-    "canonical-blocks(2a): skills/setup/managed-blocks/nested-dispatch-takeover.md exists",
-    _MB_NDT.exists(),
-    "canonical file not yet created — implementer must copy the block from setup/SKILL.md",
-)
-check(
-    "canonical-blocks(2b): nested-dispatch-takeover.md contains start marker",
-    _MB_NDT.exists() and _NDT_START in read(_MB_NDT),
-    f"canonical file missing or does not contain '{_NDT_START}'",
-)
-check(
-    "canonical-blocks(2c): nested-dispatch-takeover.md contains end marker",
-    _MB_NDT.exists() and _NDT_END in read(_MB_NDT),
-    f"canonical file missing or does not contain '{_NDT_END}'",
+    "canonical-blocks(2a): skills/setup/managed-blocks/nested-dispatch-takeover.md does NOT exist (retired v2.89.0)",
+    not _MB_NDT.exists(),
+    "nested-dispatch-takeover.md must be deleted — retired in v2.89.0 (takeover machinery scoped to opencode/legacy docs only)",
 )
 
 check(
@@ -9411,11 +9375,10 @@ check(
     f"canonical exists: {_MB_ODR.exists()})",
 )
 check(
-    "canonical-blocks(4b): nested-dispatch-takeover.md is byte-faithful to inline block in setup/SKILL.md",
-    _MB_NDT.exists() and bool(_inline_ndt) and _ndt_canonical_text == _inline_ndt.strip(),
-    "canonical file content does not match the inline block snapshot from setup/SKILL.md "
-    f"(inline block present: {bool(_inline_ndt)}; "
-    f"canonical exists: {_MB_NDT.exists()})",
+    "canonical-blocks(4b): nested-dispatch-takeover.md does NOT exist (RETIRED v2.89.0 — opencode/legacy path only)",
+    not _MB_NDT.exists() and not bool(_inline_ndt),
+    "nested-dispatch-takeover.md must NOT exist and must NOT appear as an inline block in setup/SKILL.md "
+    "— retired in v2.89.0 (takeover machinery is opencode/legacy docs only)",
 )
 check(
     "canonical-blocks(4c): voice-rule.md is byte-faithful to inline block in setup/SKILL.md",
@@ -9442,19 +9405,17 @@ check(
     "canonical orchestrator-dispatch-rule.md must contain the '--fast' fast-path mention "
     "(key-content faithfulness check — indicates full block content was copied)",
 )
-# nested block: "## nested-dispatch-takeover" heading + "blocked-no-dispatch" status
-_ndt_canonical_for_content = read(_MB_NDT) if _MB_NDT.exists() else ""
+# nested-dispatch-takeover block RETIRED in v2.89.0 — canonical file must NOT exist
 check(
-    "canonical-blocks(4f): nested-dispatch-takeover.md contains '## nested-dispatch-takeover' heading",
-    "## nested-dispatch-takeover" in _ndt_canonical_for_content,
-    "canonical nested-dispatch-takeover.md must contain the '## nested-dispatch-takeover' heading "
-    "(key-content faithfulness check)",
+    "canonical-blocks(4f): nested-dispatch-takeover.md does NOT exist (retirement content guard)",
+    not _MB_NDT.exists(),
+    "canonical nested-dispatch-takeover.md must NOT exist — retired in v2.89.0 "
+    "(takeover machinery is opencode/legacy docs only; see docs/subagent-orchestration.md)",
 )
 check(
-    "canonical-blocks(4g): nested-dispatch-takeover.md contains 'blocked-no-dispatch' status literal",
-    "blocked-no-dispatch" in _ndt_canonical_for_content,
-    "canonical nested-dispatch-takeover.md must contain 'blocked-no-dispatch' "
-    "(key-content faithfulness check — indicates full block content was copied)",
+    "canonical-blocks(4g): skills/setup/managed-blocks/ does NOT contain nested-dispatch-takeover.md (RETIRED v2.89.0)",
+    not _MB_NDT.exists(),
+    "nested-dispatch-takeover.md must NOT be present in managed-blocks/ — retired in v2.89.0",
 )
 # voice block: "## Voice" heading + "regional" idioms reference
 _vr_canonical_for_content = read(_MB_VR) if _MB_VR.exists() else ""
@@ -9485,10 +9446,10 @@ check(
     "the double-occurrence is the root cause of the CLAUDE.md corruption",
 )
 check(
-    "canonical-blocks(5b): <!-- nested-dispatch-takeover:start --> appears exactly once in setup/SKILL.md (AC-2)",
-    _s44_setup_text.count(_NDT_START) == 1,
+    "canonical-blocks(5b): <!-- nested-dispatch-takeover:start --> appears ZERO times in setup/SKILL.md (RETIRED v2.89.0)",
+    _s44_setup_text.count(_NDT_START) == 0,
     f"marker '{_NDT_START}' appears {_s44_setup_text.count(_NDT_START)} times in setup/SKILL.md "
-    "(expected 1 after fix; currently 2)",
+    "(expected 0 — block retired in v2.89.0; must be fully removed from setup/SKILL.md)",
 )
 check(
     "canonical-blocks(5c): <!-- voice-rule:start --> appears exactly once in setup/SKILL.md (AC-2)",
@@ -9520,10 +9481,9 @@ check(
     "in Steps 4a (read-from-file design); currently not present",
 )
 check(
-    "canonical-blocks(6b): setup/SKILL.md references managed-blocks/nested-dispatch-takeover.md (AC-4)",
-    "managed-blocks/nested-dispatch-takeover.md" in _s44_setup_text,
-    "setup/SKILL.md must reference the canonical file path 'managed-blocks/nested-dispatch-takeover.md' "
-    "in Step 4b (read-from-file design); currently not present",
+    "canonical-blocks(6b): setup/SKILL.md does NOT reference nested-dispatch-takeover.md (retired v2.89.0)",
+    "managed-blocks/nested-dispatch-takeover.md" not in _s44_setup_text,
+    "setup/SKILL.md must NOT reference managed-blocks/nested-dispatch-takeover.md (retired v2.89.0)",
 )
 check(
     "canonical-blocks(6c): setup/SKILL.md references managed-blocks/voice-rule.md (AC-4)",
@@ -9545,10 +9505,9 @@ check(
     "currently the skill reads setup/SKILL.md inline and extracts between markers",
 )
 check(
-    "canonical-blocks(7b): update/SKILL.md references managed-blocks/nested-dispatch-takeover.md (AC-5)",
-    "managed-blocks/nested-dispatch-takeover.md" in _s44_update_text,
-    "update/SKILL.md step 6 must reference the canonical file 'managed-blocks/nested-dispatch-takeover.md'; "
-    "currently the skill reads setup/SKILL.md inline and extracts between markers",
+    "canonical-blocks(7b): update/SKILL.md does NOT reference nested-dispatch-takeover.md (retired v2.89.0)",
+    "managed-blocks/nested-dispatch-takeover.md" not in _s44_update_text,
+    "update/SKILL.md must NOT reference managed-blocks/nested-dispatch-takeover.md (retired v2.89.0)",
 )
 check(
     "canonical-blocks(7c): update/SKILL.md references managed-blocks/voice-rule.md (AC-5)",
@@ -9780,13 +9739,10 @@ check(
     "(Get-Content -Raw compare -> Set-Content -NoNewline only if different)",
 )
 check(
-    "sandbox-guard(3c/ac-3): neither per-OS block contains"
-    " 'Copy-Item $devModeSkillSrc $devModeSkillDst -Force' (unconditional -Force copy removed)",
-    bool(_s45_ps_slice) and "Copy-Item $devModeSkillSrc $devModeSkillDst -Force" not in _s45_ps_slice,
-    "PS block contains 'Copy-Item $devModeSkillSrc $devModeSkillDst -Force' — "
-    "this unconditional -Force copy to the protected /dev-mode path trips the sandbox; "
-    "implementer must replace with skip-if-identical write "
-    "(Get-Content -Raw compare -> Set-Content -NoNewline only if different)",
+    "sandbox-guard(3c/ac-3): /dev-mode skill copy removed — neither block references devModeSkill (retired v2.89.0)",
+    bool(_s45_ps_slice) and "devModeSkill" not in _s45_ps_slice,
+    "PS block still references 'devModeSkill' — the /dev-mode skill is retired in v2.89.0; "
+    "the Copy-Item $devModeSkillSrc $devModeSkillDst -Force must be removed",
 )
 check(
     "sandbox-guard(3d/ac-3): PowerShell block contains skip-if-identical compare"
@@ -9799,10 +9755,10 @@ check(
 )
 check(
     "sandbox-guard(3e/ac-3): bash block contains 'cmp -s' skip-if-identical guard"
-    " (write-if-different for output-style and /dev-mode)",
+    " (write-if-different for output-style)",
     bool(_s45_bash_slice) and "cmp -s" in _s45_bash_slice,
     "bash block does not contain 'cmp -s' — "
-    "the skip-if-identical write guard for output-style / /dev-mode is missing; "
+    "the skip-if-identical write guard for output-style is missing; "
     "implementer must replace unconditional cp with: cmp -s SRC DST || cp SRC DST",
 )
 
@@ -13471,10 +13427,10 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Suite 59 — dev-mode top-level orchestrator (PR-1, v2.53.0)
-# Mechanism: output-style (replaces base) + deterministic outward-action gate
+# Suite 59 — orchestrator disposition unconditional (SEC-DR-2 re-founded, v2.89.0)
+# Mechanism: output-style (replaces base) + unconditional outward-action gate
 # ---------------------------------------------------------------------------
-print("=== Suite 59: dev-mode-top-level-orchestrator (v2.53.0) ===")
+print("=== Suite 59: orchestrator-disposition-unconditional (v2.89.0) ===")
 
 _S59_STOP_SECTION = ("\n### ", "\n## ", "\n---\n")
 _S59_STOP_H2 = ("\n## ", "\n---\n")
@@ -13485,11 +13441,13 @@ _s59_style_path = REPO_ROOT / "output-styles" / "developer-mode.md"
 _s59_style = _s59_style_path.read_text(encoding="utf-8") if _s59_style_path.exists() else ""
 
 _s59_mb_dispatch = (SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md").read_text(encoding="utf-8") if (SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md").exists() else ""
-_s59_mb_devmode = (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").read_text(encoding="utf-8") if (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").exists() else ""
+# dev-mode.md managed block is retired in v2.89.0 — file no longer exists
+_s59_mb_devmode = ""
 
 _s59_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
 _s59_update = read(SKILLS_DIR / "update" / "SKILL.md")
-_s59_go_global = read(REPO_ROOT / "cmd" / "install" / "global_claude_md.go")
+# cmd/install/ is frozen (roadmapped as opencode installer; per docs/knowledge.md and CLAUDE.md §3):
+# Go-const mirror checks removed — canonical surface is managed-blocks/orchestrator-dispatch-rule.md
 _s59_claude = read(REPO_ROOT / "CLAUDE.md")
 _s59_docs_devmode = read(REPO_ROOT / "docs" / "dev-mode.md") if (REPO_ROOT / "docs" / "dev-mode.md").exists() else ""
 _s59_docs_subagent = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
@@ -13503,7 +13461,7 @@ _S59_STYLE_ROLE_ADOPT_ANCHOR = "## Role adoption"
 _S59_DOCS_DEVMODE_INVARIANT_ANCHOR = "## Security Floor Non-Waivability"
 _S59_DOCS_DEVMODE_TRIAGE_ANCHOR = "## Triage Safety-Bias"
 _S59_CLAUDE_S14_ANCHOR = "## 14. Subagent Orchestration"
-_S59_SUBAGENT_DEV_ANCHOR = "## Dev Mode — Primary Path"
+_S59_SUBAGENT_DEV_ANCHOR = "## CC Top-Level Orchestration — Primary Path"
 _S59_CHECKPOINT_DEV_ANCHOR = "### Dev mode — Layer-1 hook"
 
 _s59_style_antirush_slice = _slice_section(_s59_style, _S59_STYLE_ANTI_RUSHING_ANCHOR, _S59_STOP_H2)
@@ -13549,14 +13507,14 @@ check(
     "output-styles/developer-mode.md must include the orbital decoration (. . . . . . . / O hub dot)",
 )
 check(
-    "dev-mode(banner-developer-mode-active): developer-mode.md contains 'DEVELOPER MODE ACTIVE'",
-    "DEVELOPER MODE ACTIVE" in _s59_style,
-    "output-styles/developer-mode.md must contain 'DEVELOPER MODE ACTIVE' as the mode indicator line",
+    "dev-mode(banner-team-harness-orchestrator): developer-mode.md contains 'TEAM HARNESS ORCHESTRATOR' banner header",
+    "TEAM HARNESS ORCHESTRATOR" in _s59_style,
+    "output-styles/developer-mode.md must contain 'TEAM HARNESS ORCHESTRATOR' as the mode indicator line (v2.89.0 re-founded banner)",
 )
 check(
-    "dev-mode(observable-flag): developer-mode.md references the .dev-mode-active filesystem marker",
-    ".dev-mode-active" in _s59_style,
-    "output-styles/developer-mode.md must reference ~/.claude/.dev-mode-active as the observable session flag",
+    "dev-mode(unconditional-gate): developer-mode.md states gate fires unconditionally (no marker)",
+    "unconditionally" in _s59_style or "UNCONDITIONAL" in _s59_style or "no marker" in _s59_style,
+    "output-styles/developer-mode.md must state that hooks/dev-guard.sh fires unconditionally with no filesystem marker (SEC-DR-2 re-founding)",
 )
 
 # ---------------------------------------------------------------------------
@@ -13649,21 +13607,10 @@ def _extract_between_markers(text: str, start: str, end: str) -> str:
 _s59_canonical_block = _extract_between_markers(_s59_mb_dispatch, _S59_ODR_START, _S59_ODR_END)
 _s59_setup_block = _extract_between_markers(_s59_setup, _S59_ODR_START, _S59_ODR_END)
 
-# Extract Go const value between backtick delimiters for orchestratorRule
-_s59_go_const_match = re.search(
-    r'const orchestratorRule = `(.*?)`',
-    _s59_go_global,
-    re.DOTALL,
-)
-_s59_go_block = _s59_go_const_match.group(1).strip() if _s59_go_const_match else ""
-
-# The Go const uses Go string concatenation (` + ` joins), so we can't do a raw
-# byte comparison. Instead verify the key discriminant phrase (the inline-permit
-# text) is present in the Go const.
-# v2.56.0: phrase updated from "developer-mode output style is active" to "the
-# filesystem marker" (default-on model: all routes — setup/update, /dev-mode,
-# output style — satisfy the same observable marker condition).
-_S59_INLINE_PERMIT_PHRASE = "PERMITTED ONLY when the"
+# v2.89.0 SEC-DR-2 re-founding: orchestration is unconditional; the inline-permit phrase is
+# the authoritative marker in the canonical managed block and its setup/SKILL.md copy.
+# Go-const mirror checks are removed — cmd/install/ is frozen (opencode installer roadmap).
+_S59_INLINE_PERMIT_PHRASE = "PERMITTED at all times"
 
 check(
     "dev-mode(mirror-canonical-nonempty): orchestrator-dispatch-rule canonical .md block is non-empty",
@@ -13686,11 +13633,6 @@ check(
     f"skills/setup/SKILL.md embedded orchestrator-dispatch-rule must contain: '{_S59_INLINE_PERMIT_PHRASE}'",
 )
 check(
-    "dev-mode(mirror-go-inline-permit): Go const orchestratorRule contains the inline-permit phrase",
-    _S59_INLINE_PERMIT_PHRASE in _s59_go_global,
-    f"cmd/install/global_claude_md.go orchestratorRule const must contain: '{_S59_INLINE_PERMIT_PHRASE}'",
-)
-check(
     "dev-mode(mirror-canonical-fallback): canonical .md declares FALLBACK pointer to subagent-orchestration.md",
     "FALLBACK" in _s59_canonical_block
     and "docs/subagent-orchestration.md" in _s59_canonical_block,
@@ -13701,12 +13643,6 @@ check(
     "FALLBACK" in _s59_setup_block
     and "docs/subagent-orchestration.md" in _s59_setup_block,
     "orchestrator-dispatch-rule in setup/SKILL.md must declare FALLBACK",
-)
-check(
-    "dev-mode(mirror-go-fallback): Go const orchestratorRule declares FALLBACK pointer",
-    "FALLBACK" in _s59_go_global
-    and "subagent-orchestration.md" in _s59_go_global,
-    "Go const orchestratorRule must declare FALLBACK to docs/subagent-orchestration.md",
 )
 check(
     "dev-mode(mirrors-byte-identical-canonical-vs-setup): canonical .md block == setup/SKILL.md block",
@@ -13720,20 +13656,22 @@ check(
 # AC-9 — §14 prose anchored to observable flag (SEC-DR-2) in CLAUDE.md and mirrors
 # ---------------------------------------------------------------------------
 
-_S59_OBSERVABLE_PHRASE = "dev_mode: true"
 _S59_AD_HOC_PHRASE = "ad-hoc improvisation"
+# v2.89.0: "dev_mode: true" marker is retired; §14 now asserts unconditional CC architecture.
+# The new observable phrase is "No filesystem marker is required".
+_S59_OBSERVABLE_PHRASE = "No filesystem marker is required"
 
 check(
-    "dev-mode(claude-s14-observable-flag): CLAUDE.md §14 anchors inline permit to observable flag dev_mode: true",
+    "dev-mode(claude-s14-sec-dr2-refounding): CLAUDE.md §14 declares SEC-DR-2 re-founding — no filesystem marker",
     bool(_s59_claude_s14_slice)
     and _S59_OBSERVABLE_PHRASE in _s59_claude_s14_slice,
-    "CLAUDE.md §14 must anchor inline orchestration permit to the observable flag 'dev_mode: true'",
+    "CLAUDE.md §14 must declare SEC-DR-2 re-founding: 'No filesystem marker is required' (v2.89.0)",
 )
 check(
     "dev-mode(claude-s14-prohibited-adhoc): CLAUDE.md §14 prohibits inline without the flag",
     bool(_s59_claude_s14_slice)
     and _S59_AD_HOC_PHRASE in _s59_claude_s14_slice,
-    "CLAUDE.md §14 must use the phrase 'ad-hoc improvisation' for the prohibited case",
+    "CLAUDE.md §14 must use the phrase 'ad-hoc improvisation' for the prohibited case (retained v2.89.0)",
 )
 check(
     "dev-mode(claude-s14-fallback): CLAUDE.md §14 marks nested-handoff/takeover as FALLBACK",
@@ -13742,9 +13680,9 @@ check(
     "CLAUDE.md §14 must label the nested-handoff/takeover as FALLBACK",
 )
 check(
-    "dev-mode(canonical-observable-flag): orchestrator-dispatch-rule canonical .md contains dev_mode: true",
-    _S59_OBSERVABLE_PHRASE in _s59_canonical_block,
-    "orchestrator-dispatch-rule canonical .md must declare 'dev_mode: true' as the observable flag",
+    "dev-mode(canonical-inline-permit-unconditional): orchestrator-dispatch-rule canonical .md states inline permit is unconditional",
+    "PERMITTED at all times" in _s59_canonical_block or "not a mode" in _s59_canonical_block.lower(),
+    "orchestrator-dispatch-rule canonical .md must state inline orchestration is permitted at all times (SEC-DR-2 re-founding, v2.89.0)",
 )
 check(
     "dev-mode(canonical-ad-hoc): orchestrator-dispatch-rule canonical .md contains ad-hoc improvisation phrase",
@@ -13753,45 +13691,29 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# AC-13 — dev-mode managed block (operator-facing directive) — markers + content
-# The dev-mode-entry block is NOT distributed (obsolete skill trigger-phrase mechanism).
+# AC-13 — dev-mode managed block RETIRED (v2.89.0)
+# The dev-mode managed block and /dev-mode skill are removed. The orchestrator
+# disposition is unconditional (SEC-DR-2 re-founding). Verify retirement:
+#   - dev-mode.md managed block does NOT exist
+#   - nested-dispatch-takeover.md managed block does NOT exist
+#   - update/SKILL.md performs cleanup of retired blocks
+#   - The dev-mode-entry block was already obsolete (kept from v2.53.0)
 # ---------------------------------------------------------------------------
 
 check(
-    "dev-mode(devmode-block-exists): skills/setup/managed-blocks/dev-mode.md exists",
-    (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").exists(),
-    "Create skills/setup/managed-blocks/dev-mode.md",
+    "dev-mode(devmode-block-retired): skills/setup/managed-blocks/dev-mode.md does NOT exist (retired v2.89.0)",
+    not (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md").exists(),
+    "skills/setup/managed-blocks/dev-mode.md must NOT exist — retired in v2.89.0 (disposition is unconditional, no managed block needed)",
 )
 check(
-    "dev-mode(devmode-block-start-marker): dev-mode.md has start marker <!-- dev-mode:start -->",
-    "<!-- dev-mode:start -->" in _s59_mb_devmode,
-    "dev-mode.md must contain the start marker <!-- dev-mode:start -->",
-)
-check(
-    "dev-mode(devmode-block-end-marker): dev-mode.md has end marker <!-- dev-mode:end -->",
-    "<!-- dev-mode:end -->" in _s59_mb_devmode,
-    "dev-mode.md must contain the end marker <!-- dev-mode:end -->",
-)
-check(
-    "dev-mode(devmode-block-how-to-activate): dev-mode.md documents developer-mode output style activation",
-    "developer-mode" in _s59_mb_devmode,
-    "dev-mode.md must document how to activate via the developer-mode output style (not /dev-mode skill)",
-)
-check(
-    "dev-mode(devmode-block-deactivation): dev-mode.md documents deactivation via Default output style",
-    "Default" in _s59_mb_devmode
-    or "rm ~/.claude/.dev-mode-active" in _s59_mb_devmode,
-    "dev-mode.md must document how to deactivate (Default output style or delete marker)",
+    "dev-mode(nested-dispatch-block-retired): skills/setup/managed-blocks/nested-dispatch-takeover.md does NOT exist (retired v2.89.0)",
+    not (SKILLS_DIR / "setup" / "managed-blocks" / "nested-dispatch-takeover.md").exists(),
+    "skills/setup/managed-blocks/nested-dispatch-takeover.md must NOT exist — retired in v2.89.0 (scoped to opencode/legacy docs only)",
 )
 check(
     "dev-mode(devmode-entry-block-not-distributed): skills/setup/managed-blocks/dev-mode-entry.md does NOT exist",
     not (SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode-entry.md").exists(),
     "skills/setup/managed-blocks/dev-mode-entry.md must NOT exist (obsolete skill trigger-phrase, dropped in v2.53.0)",
-)
-check(
-    "dev-mode(setup-installs-devmode-block): setup/SKILL.md wires dev-mode managed block",
-    "<!-- dev-mode:start -->" in _s59_setup,
-    "skills/setup/SKILL.md must install the dev-mode managed block",
 )
 check(
     "dev-mode(setup-installs-output-style): setup/SKILL.md copies output-styles/developer-mode.md to ~/.claude/output-styles/",
@@ -13800,15 +13722,14 @@ check(
     "skills/setup/SKILL.md must include a step that copies output-styles/developer-mode.md to ~/.claude/output-styles/",
 )
 check(
+    "dev-mode(setup-no-devmode-block): setup/SKILL.md does NOT install dev-mode managed block (retired v2.89.0)",
+    "<!-- dev-mode:start -->" not in _s59_setup,
+    "skills/setup/SKILL.md must NOT install the dev-mode managed block (retired v2.89.0 — disposition is unconditional)",
+)
+check(
     "dev-mode(setup-no-entry-block): setup/SKILL.md does NOT wire dev-mode-entry block",
     "<!-- dev-mode-entry:start -->" not in _s59_setup,
     "skills/setup/SKILL.md must NOT install the obsolete dev-mode-entry managed block (dropped in v2.53.0)",
-)
-check(
-    "dev-mode(update-syncs-devmode-block): update/SKILL.md syncs dev-mode block",
-    "dev-mode" in _s59_update
-    and "<!-- dev-mode:start -->" in _s59_update,
-    "skills/update/SKILL.md must sync the dev-mode managed block",
 )
 check(
     "dev-mode(update-syncs-output-style): update/SKILL.md syncs developer-mode output style",
@@ -13817,55 +13738,44 @@ check(
     "skills/update/SKILL.md must re-copy output-styles/developer-mode.md on update",
 )
 check(
+    "dev-mode(update-removes-devmode-block): update/SKILL.md removes retired dev-mode block from existing user CLAUDE.md",
+    "dev-mode" in _s59_update
+    and ("<!-- dev-mode:start -->" in _s59_update or "dev-mode:start" in _s59_update),
+    "skills/update/SKILL.md must clean up the retired dev-mode managed block from existing user installations (v2.89.0)",
+)
+check(
+    "dev-mode(update-removes-nested-dispatch-block): update/SKILL.md removes retired nested-dispatch-takeover block",
+    "nested-dispatch-takeover" in _s59_update,
+    "skills/update/SKILL.md must clean up the retired nested-dispatch-takeover managed block from existing user installations (v2.89.0)",
+)
+check(
     "dev-mode(update-removes-entry-block): update/SKILL.md removes obsolete dev-mode-entry block if present",
     "dev-mode-entry" in _s59_update,
     "skills/update/SKILL.md must remove the obsolete dev-mode-entry block from ~/.claude/CLAUDE.md if present",
 )
-check(
-    "dev-mode(go-devmode-block): global_claude_md.go has devModeBlock const",
-    "devModeBlock" in _s59_go_global
-    and "<!-- dev-mode:start -->" in _s59_go_global,
-    "cmd/install/global_claude_md.go must define devModeBlock const with dev-mode markers",
-)
-check(
-    "dev-mode(go-removes-entry-block): global_claude_md.go calls removeManagedBlock for obsolete dev-mode-entry",
-    "removeManagedBlock" in _s59_go_global
-    and "devModeEntryMarker" in _s59_go_global,
-    "cmd/install/global_claude_md.go must call removeManagedBlock() to remove the obsolete dev-mode-entry block",
-)
 _s59_skill_path = SKILLS_DIR / "dev-mode" / "SKILL.md"
-_s59_skill = read(_s59_skill_path) if _s59_skill_path.exists() else ""
 check(
-    "dev-mode(skill-exists): skills/dev-mode/SKILL.md exists (the /dev-mode in-session activator)",
-    _s59_skill_path.exists(),
-    "Create skills/dev-mode/SKILL.md — the user-level /dev-mode skill that starts developer mode in the current session",
-)
-check(
-    "dev-mode(skill-frontmatter): /dev-mode skill declares name: dev-mode + disable-model-invocation: true",
-    "name: dev-mode" in _s59_skill and "disable-model-invocation: true" in _s59_skill,
-    "skills/dev-mode/SKILL.md frontmatter must declare name: dev-mode and disable-model-invocation: true (explicit operator opt-in)",
-)
-check(
-    "dev-mode(skill-starts-in-session): /dev-mode skill starts dev mode in-session — writes the marker, prints the banner, adopts the orchestrator role (no outputStyle config, no /clear)",
-    ".dev-mode-active" in _s59_skill
-    and "DEVELOPER MODE ACTIVE" in _s59_skill
-    and "orchestrator" in _s59_skill,
-    "skills/dev-mode/SKILL.md must start developer mode in the current session: write/remove the ~/.claude/.dev-mode-active marker, print the DEVELOPER MODE ACTIVE banner, and adopt the orchestrator role — it does NOT configure the outputStyle setting (that is the /config output-style path, not the skill's job)",
+    "dev-mode(skill-retired): skills/dev-mode/ does NOT exist (retired v2.89.0 — disposition is unconditional)",
+    not _s59_skill_path.exists(),
+    "skills/dev-mode/SKILL.md must NOT exist — the /dev-mode skill is retired in v2.89.0 (orchestrator disposition is unconditional at every session start via SessionStart hook)",
 )
 
-# AC — SessionStart hook: unified session-start.sh loads dev-mode, language, and workspace-mode
-# (v2.81.0: consolidated from dev-mode-session-start.sh + language-session-start.sh)
+# AC — SessionStart hook: unified session-start.sh loads orchestrator disposition
+# (unconditional), language, and workspace-mode.
+# v2.89.0 SEC-DR-2 re-founding: load_orchestrator fires on EVERY session —
+# no marker guard. load_dev_mode is replaced by load_orchestrator.
 _s59_ss_hook_path = HOOKS_DIR / "session-start.sh"
 _s59_ss_hook = read(_s59_ss_hook_path) if _s59_ss_hook_path.exists() else ""
 check(
     "dev-mode(sessionstart-hook-exists): hooks/session-start.sh exists",
     _s59_ss_hook_path.exists(),
-    "Create hooks/session-start.sh — the unified SessionStart hook that loads dev-mode, language, and workspace-mode into context at session start",
+    "hooks/session-start.sh must exist — the unified SessionStart hook loading orchestrator disposition, language, and workspace-mode",
 )
 check(
-    "dev-mode(sessionstart-hook-marker-gated): hook gates on .dev-mode-active (dev_mode: true) — inert in normal mode",
-    ".dev-mode-active" in _s59_ss_hook and "dev_mode: true" in _s59_ss_hook,
-    "hooks/session-start.sh must gate dev-mode load on the ~/.claude/.dev-mode-active marker so it injects nothing in normal mode",
+    "dev-mode(sessionstart-hook-unconditional): hook fires orchestrator disposition unconditionally — no marker guard",
+    "load_orchestrator" in _s59_ss_hook
+    and ".dev-mode-active" not in _s59_ss_hook,
+    "hooks/session-start.sh must use load_orchestrator (unconditional, no marker read) — not load_dev_mode. The .dev-mode-active path must be absent (SEC-DR-2 re-founding, v2.89.0)",
 )
 check(
     "dev-mode(sessionstart-hook-injects-context): hook emits SessionStart additionalContext",
@@ -13873,19 +13783,14 @@ check(
     "hooks/session-start.sh must emit hookSpecificOutput.additionalContext for the SessionStart event",
 )
 check(
-    "dev-mode(sessionstart-hook-silent): injected context forbids narrating the determination and re-inspecting the marker",
+    "dev-mode(sessionstart-hook-silent): injected context forbids narrating the determination",
     "SILENT" in _s59_ss_hook and "re-verify" in _s59_ss_hook,
-    "hooks/session-start.sh injected context must instruct the agent to keep the dev-mode determination SILENT and never re-verify the marker mid-session",
+    "hooks/session-start.sh injected context must instruct the agent to keep the determination SILENT and never re-verify mid-session",
 )
 check(
-    "dev-mode(sessionstart-hook-systemmessage): hook emits an instant app-rendered systemMessage banner",
-    "systemMessage" in _s59_ss_hook and "DEVELOPER MODE ACTIVE" in _s59_ss_hook,
-    "hooks/session-start.sh must emit a systemMessage carrying the DEVELOPER MODE banner — app-rendered and instant — instead of instructing the model to render slow ASCII art",
-)
-check(
-    "dev-mode(sessionstart-hook-no-model-banner): injected context tells the model NOT to print a banner itself",
-    "do NOT print any banner" in _s59_ss_hook,
-    "hooks/session-start.sh additionalContext must instruct the model not to render its own banner (the systemMessage already shows it)",
+    "dev-mode(sessionstart-hook-no-systemmessage-banner): hook does NOT emit systemMessage (banner removed in de-mode)",
+    "DEVELOPER MODE ACTIVE" not in _s59_ss_hook,
+    "hooks/session-start.sh must NOT emit the DEVELOPER MODE ACTIVE systemMessage banner (retired in v2.89.0 de-mode; disposition is silent)",
 )
 # Old hook filenames must be absent — they were merged into session-start.sh
 check(
@@ -14175,11 +14080,11 @@ check(
     "skills/report-issue/SKILL.md must still contain the Step 6 confirmation gate as the human-in-loop guard",
 )
 
-# AC-3 — dev-mode skill retains its flag (must not be touched)
+# AC-3 — dev-mode skill RETIRED in v2.89.0 — skill must NOT exist (disposition is unconditional)
 check(
-    "dev-mode(flag-retained): skills/dev-mode/SKILL.md still declares disable-model-invocation: true",
-    "disable-model-invocation: true" in _s60_devmode,
-    "skills/dev-mode/SKILL.md must retain disable-model-invocation: true (operator-only mode-switch)",
+    "dev-mode(flag-retained): skills/dev-mode/SKILL.md does NOT exist (RETIRED v2.89.0 — disposition is unconditional)",
+    not _s60_devmode_path.exists(),
+    "skills/dev-mode/SKILL.md must NOT exist — the /dev-mode skill is retired in v2.89.0 (operator disposition is unconditional at every session start)",
 )
 
 # AC-5 / AC-6 / AC-7 — clickup create sub-command documented
@@ -14517,99 +14422,42 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Suite 63 — Default-on dev mode (v2.56.0)
-# Guards the default-on behavioral inversion:
-#   1. Managed block (dev-mode.md) no longer claims "opt-in" / "Normal is the default"
-#   2. Orchestrator-dispatch-rule block no longer claims "Developer mode is the opt-in"
-#   3. setup/SKILL.md Step 4e writes the marker (default-on) not just copies files
-#   4. update/SKILL.md contains the default-on marker-write logic
-#   5. dev-mode/SKILL.md persists dev_mode_choice via merge-write
-#   6. docs/dev-mode.md documents the sentinel, decision table, and migration caveat
-#   7. output-styles/developer-mode.md (force-for-plugin stays absent/false)
-#   8. CLAUDE.md §5 dev-mode bullet reflects default-on
-#   9. README.md reflects default-on (no longer "opt-in" framing)
+# Suite 63 — Orchestrator disposition RETIRED as a mode (v2.89.0 SEC-DR-2 re-founding)
+# Reconciled from "default-on dev mode (v2.56.0)" to the de-moded model:
+#   - /dev-mode skill RETIRED — disposition is unconditional (always active)
+#   - managed-blocks/dev-mode.md RETIRED — no managed block for a non-mode
+#   - managed-blocks/nested-dispatch-takeover.md RETIRED
+#   - setup/SKILL.md: no marker write, no dev_mode_choice — unconditional disposition
+#   - update/SKILL.md: removes retired blocks, never writes marker
+#   - docs/dev-mode.md: documents unconditional disposition (SEC-DR-2 re-founding)
+#   - output-styles/developer-mode.md: still exists (opt-in strong floor)
+#   - CLAUDE.md §5: reflects unconditional orchestrator disposition
+#   - README.md: reflects default-on (pre-v2.89.0 framing acceptable; no "opt-in" claim)
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 63: Default-on dev mode (v2.56.0) ===")
+print("=== Suite 63: Orchestrator disposition RETIRED as a mode (v2.89.0 SEC-DR-2) ===")
 
 _setup_md = read(SKILLS_DIR / "setup" / "SKILL.md")
 _update_md = read(SKILLS_DIR / "update" / "SKILL.md")
-_dev_mode_skill = read(SKILLS_DIR / "dev-mode" / "SKILL.md")
+# skills/dev-mode/SKILL.md is RETIRED in v2.89.0 — read conditionally
+_dev_mode_skill_path = SKILLS_DIR / "dev-mode" / "SKILL.md"
+_dev_mode_skill = _dev_mode_skill_path.read_text(encoding="utf-8") if _dev_mode_skill_path.exists() else ""
 _dev_mode_doc = read(REPO_ROOT / "docs" / "dev-mode.md")
 _readme_md = read(REPO_ROOT / "README.md")
 _claude_md_repo = read(REPO_ROOT / "CLAUDE.md")
-_dev_mode_canonical_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md")
+# managed-blocks/dev-mode.md is RETIRED in v2.89.0 — read conditionally
+_dev_mode_mb_path = SKILLS_DIR / "setup" / "managed-blocks" / "dev-mode.md"
+_dev_mode_canonical_block = _dev_mode_mb_path.read_text(encoding="utf-8") if _dev_mode_mb_path.exists() else ""
 _orch_dispatch_canonical_block = read(SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md")
 
-# 1. dev-mode canonical managed block: must NOT say "opt-in" or "Normal is the default"
-# as the primary framing, but MUST document the escape hatch (/dev-mode off).
+# 1. dev-mode managed block: RETIRED in v2.89.0 — must NOT exist (disposition is unconditional).
 check(
-    "managed-blocks/dev-mode.md does NOT claim 'opt-in' as primary framing",
-    "OPT-IN" not in _dev_mode_canonical_block.upper().replace("opt-out", "").replace("NOT set", ""),
-    "dev-mode managed block still uses 'opt-in' framing — must reflect default-on",
-)
-check(
-    "managed-blocks/dev-mode.md does NOT claim 'Normal mode (general assistant) is the default'",
-    "Normal mode (general assistant) is the default" not in _dev_mode_canonical_block,
-    "managed block still asserts 'Normal mode ... is the default' — contradicts default-on",
-)
-check(
-    "managed-blocks/dev-mode.md documents the escape hatch (/dev-mode off)",
-    "/dev-mode off" in _dev_mode_canonical_block,
-    "managed block must document the /dev-mode off escape hatch",
-)
-check(
-    "managed-blocks/dev-mode.md documents that off persists (dev_mode_choice)",
-    "dev_mode_choice" in _dev_mode_canonical_block or "persists" in _dev_mode_canonical_block,
-    "managed block must document that /dev-mode off persists the choice",
+    "managed-blocks/dev-mode.md does NOT exist (RETIRED v2.89.0 — disposition is unconditional)",
+    not _dev_mode_mb_path.exists(),
+    "skills/setup/managed-blocks/dev-mode.md must NOT exist — retired in v2.89.0 (disposition is unconditional, not a mode)",
 )
 
 # 2. orchestrator-dispatch-rule canonical block: no "opt-in; direct is the default"
-check(
-    "managed-blocks/orchestrator-dispatch-rule.md does NOT say 'Developer mode is the opt-in; direct is the default'",
-    "Developer mode is the opt-in; direct is the default" not in _orch_dispatch_canonical_block,
-    "orchestrator-dispatch-rule block still claims 'Developer mode is the opt-in; direct is the default'",
-)
-check(
-    "managed-blocks/orchestrator-dispatch-rule.md states dev mode is the default",
-    "default" in _orch_dispatch_canonical_block and (
-        "written by" in _orch_dispatch_canonical_block or "th:setup" in _orch_dispatch_canonical_block
-    ),
-    "orchestrator-dispatch-rule block must state dev mode is the default (written by setup/update)",
-)
-
-# 3. setup/SKILL.md Step 4e: the surrounding conditional logic (outside the managed
-# blocks) must read dev_mode_choice and contain the marker-write and the opt-out branch.
-check(
-    "skills/setup/SKILL.md Step 4e: reads dev_mode_choice and writes dev_mode: true marker",
-    "dev_mode_choice" in _setup_md and "dev_mode: true" in _setup_md,
-    "setup/SKILL.md Step 4e must read dev_mode_choice and write the dev_mode: true marker",
-)
-check(
-    "skills/setup/SKILL.md Step 4e: has explicit 'do NOT write' branch for opt-out",
-    "do NOT write" in _setup_md,
-    "setup/SKILL.md Step 4e must have an explicit opt-out branch that does NOT write the marker",
-)
-
-# 3b. Inline managed-block copies in setup/SKILL.md must byte-match canonical files.
-# Extract the inline dev-mode block from setup/SKILL.md (between its markers).
-_DM_START = "<!-- dev-mode:start -->"
-_DM_END = "<!-- dev-mode:end -->"
-_setup_dm_a = _setup_md.find(_DM_START)
-_setup_dm_b = _setup_md.find(_DM_END)
-_setup_dm_inline = (
-    _setup_md[_setup_dm_a: _setup_dm_b + len(_DM_END)]
-    if _setup_dm_a != -1 and _setup_dm_b != -1
-    else ""
-)
-_canonical_dm = _dev_mode_canonical_block.strip()
-check(
-    "skills/setup/SKILL.md inline dev-mode block matches canonical managed-blocks/dev-mode.md",
-    _setup_dm_inline.strip() == _canonical_dm,
-    "inline copy diverges from canonical — edit both in the same commit",
-)
-
-# Extract the inline orchestrator-dispatch-rule block from setup/SKILL.md.
 _ODR_START = "<!-- orchestrator-dispatch-rule:start -->"
 _ODR_END = "<!-- orchestrator-dispatch-rule:end -->"
 _setup_odr_a = _setup_md.find(_ODR_START)
@@ -14621,63 +14469,73 @@ _setup_odr_inline = (
 )
 _canonical_odr = _orch_dispatch_canonical_block.strip()
 check(
+    "managed-blocks/orchestrator-dispatch-rule.md does NOT say 'Developer mode is the opt-in; direct is the default'",
+    "Developer mode is the opt-in; direct is the default" not in _orch_dispatch_canonical_block,
+    "orchestrator-dispatch-rule block still claims 'Developer mode is the opt-in; direct is the default'",
+)
+check(
+    "managed-blocks/orchestrator-dispatch-rule.md states unconditional inline permit (SEC-DR-2)",
+    "PERMITTED at all times" in _orch_dispatch_canonical_block,
+    "orchestrator-dispatch-rule block must state inline orchestration is PERMITTED at all times (SEC-DR-2 re-founding)",
+)
+check(
     "skills/setup/SKILL.md inline orchestrator-dispatch-rule block matches canonical",
-    _setup_odr_inline.strip() == _canonical_odr,
+    bool(_setup_odr_inline) and _setup_odr_inline.strip() == _canonical_odr,
     "inline orchestrator-dispatch-rule copy diverges from canonical — edit both in the same commit",
 )
 
-# 4. update/SKILL.md contains the default-on marker-write logic (both OS blocks).
+# 3. setup/SKILL.md: disposition is unconditional — no marker write, no dev_mode_choice.
 check(
-    "skills/update/SKILL.md PowerShell block contains default-on marker-write (dev_mode_choice check)",
-    "dev_mode_choice" in _update_md and "dev_mode: true" in _update_md,
-    "update/SKILL.md PowerShell block must read dev_mode_choice and write the marker",
+    "skills/setup/SKILL.md does NOT write dev_mode_choice or dev_mode: true marker (unconditional disposition)",
+    "dev_mode_choice" not in _setup_md and "dev_mode: true" not in _setup_md,
+    "setup/SKILL.md must NOT write the dev_mode_choice or .dev-mode-active marker — disposition is unconditional (v2.89.0)",
 )
 check(
-    "skills/update/SKILL.md bash block contains default-on marker-write (DEV_MODE_CHOICE check)",
-    "DEV_MODE_CHOICE" in _update_md or "dev_mode_choice" in _update_md,
-    "update/SKILL.md bash block must read dev_mode_choice and conditionally write the marker",
+    "skills/setup/SKILL.md does NOT contain dev-mode managed block (RETIRED v2.89.0)",
+    "<!-- dev-mode:start -->" not in _setup_md,
+    "skills/setup/SKILL.md must NOT install the dev-mode managed block — retired in v2.89.0",
+)
+
+# 4. update/SKILL.md: removes retired blocks, never writes the .dev-mode-active marker.
+check(
+    "skills/update/SKILL.md removes retired dev-mode block from existing user CLAUDE.md",
+    "<!-- dev-mode:start -->" in _update_md or "dev-mode:start" in _update_md,
+    "update/SKILL.md must clean up the retired dev-mode managed block from existing user installations",
+)
+check(
+    "skills/update/SKILL.md removes retired nested-dispatch-takeover block",
+    "nested-dispatch-takeover" in _update_md,
+    "update/SKILL.md must clean up the retired nested-dispatch-takeover managed block",
 )
 check(
     "skills/update/SKILL.md explicitly states it never writes .team-harness.json",
     "never writes" in _update_md.lower() and "team-harness.json" in _update_md,
-    "update/SKILL.md must state it never writes .team-harness.json (reads sentinel, writes only marker)",
+    "update/SKILL.md must state it never writes .team-harness.json",
 )
 
-# 5. dev-mode/SKILL.md persists dev_mode_choice via merge-write in both steps.
+# 5. skills/dev-mode/SKILL.md: RETIRED in v2.89.0 — must NOT exist.
 check(
-    "skills/dev-mode/SKILL.md Step 2A persists dev_mode_choice: 'on' via merge-write",
-    "dev_mode_choice" in _dev_mode_skill and '"on"' in _dev_mode_skill
-    and "merge-write" in _dev_mode_skill.lower(),
-    "dev-mode/SKILL.md Step 2A must merge-write dev_mode_choice: 'on'",
-)
-check(
-    "skills/dev-mode/SKILL.md Step 2B persists dev_mode_choice: 'off' via merge-write",
-    '"off"' in _dev_mode_skill and "merge-write" in _dev_mode_skill.lower(),
-    "dev-mode/SKILL.md Step 2B must merge-write dev_mode_choice: 'off'",
-)
-check(
-    "skills/dev-mode/SKILL.md states gate never reads dev_mode_choice",
-    "gate" in _dev_mode_skill.lower() and "dev_mode_choice" in _dev_mode_skill
-    and ("never reads" in _dev_mode_skill.lower() or "NEVER reads" in _dev_mode_skill
-         or "not a gate" in _dev_mode_skill.lower()),
-    "dev-mode/SKILL.md must document that the gate never reads dev_mode_choice",
+    "skills/dev-mode/SKILL.md does NOT exist (RETIRED v2.89.0 — disposition is unconditional)",
+    not _dev_mode_skill_path.exists(),
+    "skills/dev-mode/SKILL.md must NOT exist — the /dev-mode skill is retired in v2.89.0 (orchestrator disposition is unconditional)",
 )
 
-# 6. docs/dev-mode.md: documents sentinel, decision table, migration caveat.
+# 6. docs/dev-mode.md: documents unconditional disposition and retirement of the former marker model.
 check(
     "docs/dev-mode.md has 'Default-on disposition' section",
     "Default-on disposition" in _dev_mode_doc,
     "docs/dev-mode.md missing the Default-on disposition section",
 )
 check(
-    "docs/dev-mode.md documents the dev_mode_choice sentinel (tri-state)",
-    "dev_mode_choice" in _dev_mode_doc and ("absent" in _dev_mode_doc or "tri-state" in _dev_mode_doc),
-    "docs/dev-mode.md must document the dev_mode_choice tri-state sentinel",
+    "docs/dev-mode.md documents retirement of the former marker-based model (SEC-DR-2 re-founding)",
+    ("retired" in _dev_mode_doc.lower() and "unconditional" in _dev_mode_doc)
+    or "Previous framing (retired)" in _dev_mode_doc,
+    "docs/dev-mode.md must document that the former dev_mode_choice / .dev-mode-active marker model is retired (SEC-DR-2 re-founding)",
 )
 check(
-    "docs/dev-mode.md documents the migration caveat (pre-2.56.0 opt-outs re-activated)",
-    "pre-2.56.0" in _dev_mode_doc or ("migration" in _dev_mode_doc.lower() and "re-activat" in _dev_mode_doc.lower()),
-    "docs/dev-mode.md must document the pre-2.56.0 opt-out re-activation caveat",
+    "docs/dev-mode.md documents the v2.89.0 re-founding (disposition is now unconditional)",
+    "v2.89.0" in _dev_mode_doc and "unconditional" in _dev_mode_doc,
+    "docs/dev-mode.md must document the v2.89.0 SEC-DR-2 re-founding and that disposition is unconditional",
 )
 check(
     "docs/dev-mode.md records why force-for-plugin stays false",
@@ -14686,14 +14544,14 @@ check(
     "docs/dev-mode.md must explain why force-for-plugin stays false (decouples gate, removes escape hatch)",
 )
 check(
-    "docs/dev-mode.md does NOT claim 'Normal mode remains the default' (contradicts default-on)",
+    "docs/dev-mode.md does NOT claim 'Normal mode remains the default' (contradicts unconditional disposition)",
     "Normal mode remains the default" not in _dev_mode_doc,
-    "docs/dev-mode.md still has 'Normal mode remains the default' — contradicts default-on",
+    "docs/dev-mode.md still has 'Normal mode remains the default' — contradicts unconditional disposition",
 )
 check(
-    "docs/dev-mode.md does NOT claim 'cost is zero outside dev mode' (contradicts default-on)",
+    "docs/dev-mode.md does NOT claim 'cost is zero outside dev mode' (contradicts unconditional disposition)",
     "cost is zero outside dev mode" not in _dev_mode_doc,
-    "docs/dev-mode.md still claims 'cost is zero outside dev mode' — contradicts default-on",
+    "docs/dev-mode.md still claims 'cost is zero outside dev mode' — contradicts unconditional disposition",
 )
 
 # 7. output-styles/developer-mode.md: force-for-plugin must NOT be set to true.
@@ -14711,31 +14569,27 @@ if _output_style_path.exists():
         "force-for-plugin: true found in output-styles/developer-mode.md — must stay absent/false",
     )
     check(
-        "output-styles/developer-mode.md does NOT claim 'Normal mode is the default' (contradicts default-on)",
+        "output-styles/developer-mode.md does NOT claim 'Normal mode is the default' (contradicts unconditional disposition)",
         "Normal mode is the default" not in _output_style_md,
-        "output-styles/developer-mode.md still says 'Normal mode is the default' — contradicts default-on",
+        "output-styles/developer-mode.md still says 'Normal mode is the default' — contradicts unconditional disposition",
     )
     check(
-        "output-styles/developer-mode.md does NOT claim 'This output style is opt-in' as primary disposition framing (contradicts default-on)",
+        "output-styles/developer-mode.md does NOT claim 'This output style is opt-in' as primary disposition framing",
         "This output style is opt-in" not in _output_style_md,
-        "output-styles/developer-mode.md still says 'This output style is opt-in' — contradicts default-on disposition",
-    )
-    check(
-        "output-styles/developer-mode.md authorization clause uses marker-based discriminant (not output-style-active)",
-        "dev_mode: true" in _output_style_md or "marker" in _output_style_md,
-        "output-styles/developer-mode.md authorization clause must reference the marker as the discriminant",
+        "output-styles/developer-mode.md still says 'This output style is opt-in' — contradicts unconditional disposition",
     )
 
-# 8. CLAUDE.md §5 dev-mode bullet: no longer says "Opt-in session mode"; reflects default-on.
+# 8. CLAUDE.md §5: reflects unconditional orchestrator disposition (SEC-DR-2 re-founding).
 check(
-    "CLAUDE.md §5 dev-mode bullet says 'default' (default-on)",
-    "default" in _claude_md_repo and "dev mode" in _claude_md_repo.lower(),
-    "CLAUDE.md §5 dev-mode bullet must mention 'default' to reflect default-on",
+    "CLAUDE.md §5 orchestrator-disposition bullet says 'unconditional' or 'default'",
+    ("unconditional" in _claude_md_repo.lower() or "default" in _claude_md_repo)
+    and ("dev-mode" in _claude_md_repo.lower() or "orchestrator" in _claude_md_repo.lower()),
+    "CLAUDE.md §5 must mention 'unconditional' or 'default' and reference 'dev-mode' or 'orchestrator' to reflect the de-moded model",
 )
 check(
-    "CLAUDE.md §5 dev-mode bullet does NOT say 'Opt-in session mode'",
+    "CLAUDE.md §5 does NOT say 'Opt-in session mode'",
     "Opt-in session mode" not in _claude_md_repo,
-    "CLAUDE.md §5 still says 'Opt-in session mode' — must reflect default-on",
+    "CLAUDE.md §5 still says 'Opt-in session mode' — must reflect unconditional disposition",
 )
 
 # 9. README.md: no longer says "Developer mode is the opt-in; direct is the default".

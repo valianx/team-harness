@@ -8,7 +8,7 @@
 # is never blocked).
 #
 # Three sources are loaded:
-#   1. load_dev_mode       — ~/.claude/.dev-mode-active marker
+#   1. load_orchestrator   — unconditional orchestrator disposition (SEC-DR-2 re-founded)
 #   2. load_language       — .team-harness.json `language`
 #   3. load_workspace_mode — .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`
 #
@@ -22,11 +22,16 @@
 #   C — every error/early-exit path contributes nothing and never echoes the raw
 #       value. stdout is the trusted-context channel.
 #
+# SEC-DR-2 (re-founded v2.89.0): inline orchestration at top level is the CC
+#   architecture (the general agent IS the orchestrator). The outward-action
+#   security property — no push/merge/publish without operator approval — is
+#   enforced by hooks/dev-guard.sh, armed UNCONDITIONALLY. The disposition
+#   directive below fires on EVERY session without any marker guard.
+#
 # Cross-platform: Git Bash on Windows, native bash on macOS/Linux.
 
 set -euo pipefail
 
-MARKER="${HOME}/.claude/.dev-mode-active"
 CONFIG="${HOME}/.claude/.team-harness.json"
 
 # Drain the SessionStart payload on stdin so the producer never sees SIGPIPE.
@@ -34,7 +39,7 @@ cat >/dev/null 2>&1 || true
 
 # ============================================================================
 # REGISTRY — session-init loads, in invocation order:
-#   1. load_dev_mode       (source: ~/.claude/.dev-mode-active marker)
+#   1. load_orchestrator   (unconditional — orchestrator disposition, always)
 #   2. load_language       (source: .team-harness.json `language`)
 #   3. load_workspace_mode (source: .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`)
 #
@@ -53,29 +58,21 @@ cat >/dev/null 2>&1 || true
 # existing one or block session start.
 # ============================================================================
 
-system_message=""           # set only by load_dev_mode (app-rendered banner)
+system_message=""           # reserved for app-rendered banners (unused in de-moded path)
 directives=()               # additionalContext fragments, in load order
 
 # ----------------------------------------------------------------------------
-# Load 1 — dev-mode
-# Output is BYTE-IDENTICAL to the former dev-mode-session-start.sh.
-# The BANNER and CONTEXT strings must not be modified without also updating
-# the structural assertions in tests/test_agent_structure.py.
+# Load 1 — orchestrator disposition (UNCONDITIONAL)
+# Fires on every session. No marker guard — inline orchestration is the CC
+# architecture (SEC-DR-2 re-founded v2.89.0). The outward-action gate
+# (hooks/dev-guard.sh) is armed unconditionally and enforces the security
+# property independently of this directive.
+# The CONTEXT string must not be modified without also updating the structural
+# assertions in tests/test_agent_structure.py.
 # ----------------------------------------------------------------------------
-load_dev_mode() {
-    # Not in developer mode → contribute nothing.
-    [ -f "$MARKER" ] || return 0
-    grep -q 'dev_mode: true' "$MARKER" 2>/dev/null || return 0
-
-    # One-line, app-rendered mode banner (no double quotes / backslashes so it
-    # embeds in JSON without an escaping pass — jq still encodes it safely).
-    # fix(hooks): BYTE-IDENTICAL copy from dev-mode-session-start.sh
-    system_message='TEAM HARNESS | DEVELOPER MODE ACTIVE | pipeline on | outward actions require operator approval | stop: /dev-mode off'
-
-    # Silent disposition. The dev-mode determination is FINAL at session start
-    # and SILENT — the agent never re-verifies the marker and never narrates it.
-    # fix(hooks): BYTE-IDENTICAL copy from dev-mode-session-start.sh
-    directives+=( 'Team Harness developer mode is active for this session. This determination is FINAL at session start and SILENT - do NOT re-verify the marker ~/.claude/.dev-mode-active (the deterministic hooks read it, you do not) and do NOT narrate dev mode, the marker, or the routing rationale. A one-line mode banner is already shown to the operator by the app (systemMessage); do NOT print any banner or ASCII art yourself. Silently adopt the orchestrator disposition: route development tasks (features, fixes, refactors, enhancements, hotfixes, issue work, review) through the full pipeline (architect -> implementer -> tester + qa + security -> delivery), dispatch leaf agents directly via Task, apply the fail-closed triage invariant (ANY ambiguity about whether a task needs the pipeline -> enter the pipeline or ask the operator; NEVER handle a development task inline without gates), and treat security floors as non-waivable. Do NOT read agents/orchestrator.md or any docs/ contract at session start - pre-loading them is a 20s+ wait; defer all contract loading until a development task enters the pipeline, then read only the needed sections from the plugin cache ~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/. Outward actions (git push, gh pr merge/review/comment, GitHub API writes) are intercepted by hooks/dev-guard.sh and require explicit operator approval; you cannot auto-approve them. Serve the operator first message: if it is already a concrete request or question, address it directly (answer simple non-development queries yourself; route development tasks through the pipeline); only if there is no actionable request, reply with one short line asking what to work on. Do NOT run unprompted git, filesystem exploration, Memory/KG, or environment statistics.' )
+load_orchestrator() {
+    # Unconditional — no marker check. The CC general agent IS the orchestrator.
+    directives+=( 'Team Harness orchestrator disposition is active for this session. This determination is FINAL at session start and SILENT - do NOT narrate the routing rationale or re-verify any marker. Silently adopt the orchestrator disposition: route development tasks (features, fixes, refactors, enhancements, hotfixes, issue work, review) through the full pipeline (architect -> implementer -> tester + qa + security -> delivery), dispatch leaf agents directly via Task, apply the fail-closed triage invariant (ANY ambiguity about whether a task needs the pipeline -> enter the pipeline or ask the operator; NEVER handle a development task inline without gates), and treat security floors as non-waivable. Do NOT read agents/orchestrator.md or any docs/ contract at session start - pre-loading them is a 20s+ wait; defer all contract loading until a development task enters the pipeline, then read only the needed sections from the plugin cache ~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/. Outward actions (git push, gh pr merge/review/comment, GitHub API writes) are intercepted by hooks/dev-guard.sh and require explicit operator approval; you cannot auto-approve them. Serve the operator first message: if it is already a concrete request or question, address it directly (answer simple non-development queries yourself; route development tasks through the pipeline); only if there is no actionable request, reply with one short line asking what to work on. Do NOT run unprompted git, filesystem exploration, Memory/KG, or environment statistics.' )
 }
 
 # ----------------------------------------------------------------------------
@@ -172,7 +169,7 @@ load_workspace_mode() {
 # ---------------------------------------------------------------------------
 # Ordered invocation list (per REGISTRY above)
 # ---------------------------------------------------------------------------
-load_dev_mode
+load_orchestrator
 load_language
 load_workspace_mode
 

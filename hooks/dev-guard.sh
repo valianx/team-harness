@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # hooks/dev-guard.sh
 # fix(dev-guard): escape-aware command extraction in bash fallback (F-016, #304)
-# PreToolUse hook — deterministic outward-action gate for dev mode.
+# PreToolUse hook — deterministic outward-action gate (unconditional, SEC-DR-2).
 #
 # Wired via hooks/config.json (Go installer) and .claude-plugin/hooks.json
 # (plugin runtime) as its OWN PreToolUse entry with matcher:"Bash" (outward Bash
 # actions) AND a second entry with matcher:"mcp__.*__clickup_..." (ClickUp MCP
 # outward writes). policy-block.sh is wired separately with
 # matcher:"Bash|Write|Edit|NotebookEdit" for secret-scan. Reads tool_input from
-# stdin; intercepts outward/mutating actions when dev mode is active.
+# stdin; intercepts outward/mutating actions unconditionally.
 #
+# SEC-DR-2 re-founding (v2.89.0): inline orchestration is the CC architecture —
+# the general top-level agent IS the orchestrator. The outward-action security
+# property is enforced by THIS gate, armed UNCONDITIONALLY. There is no
+# dev-mode marker. Any covered outward action triggers ask, always.
 # Contract: docs/dev-mode.md § Outward-Action Gate
 #
-# WHAT THIS GATE COVERS (catalogue closed and enumerated here — paridad DENIED_BASH):
+# WHAT THIS GATE COVERS (catalogue closed and enumerated here — parity DENIED_BASH):
 #   1. Push to a remote: git push (bare, git -C <path> push, GIT_DIR=... git push)
 #      Note: git push --force is already denied by policy-block.sh; this gate
 #      covers git push without --force — the important bypass.
@@ -22,8 +26,7 @@
 #      - gh pr comment
 #      - gh api -X PUT|POST|PATCH|DELETE ... /pulls/.../merge|reviews|comments
 #      - curl/wget with mutating method against api.github.com or those paths
-#   3. Auto-manipulation of the dev-mode marker itself:
-#      rm / mv / > / >> / tee / cp targeting ~/.claude/.dev-mode-active
+#   3. ClickUp MCP outward writes (via mcp__.*__clickup_(update_task|create_task|...))
 #
 # WHAT THIS GATE DOES NOT COVER (documented residual limit):
 #   Obfuscation via eval/base64/alias/heredoc is a known limit of any
@@ -35,30 +38,16 @@
 #   checkpoint-guard.sh: FAIL-OPEN — the worst case is skipping a pedagogical
 #     pause, not a security regression.
 #   dev-guard.sh (this hook): FAIL-CLOSED for covered actions — the worst case
-#     is an unauthorised merge/push to main. Any uncertainty about the marker
-#     state + covered action -> ask (or deny for auto-manipulation).
+#     is an unauthorised merge/push to main. Any uncertainty about a covered
+#     action -> ask (or deny for policy-block denials).
 #   DEFAULT (non-covered calls): no-decision — exit 0, empty stdout; defers to
 #     the operator's normal permission flow (prompts in normal mode; honors the
-#     allowlist). ask/deny are EXCLUSIVELY for covered outward actions and
-#     marker manipulation. allow is EXCLUSIVELY for the activation-write
-#     (dev_mode: true) path — arming more gating is always the safe direction.
+#     allowlist). ask/deny are EXCLUSIVELY for covered outward actions.
 #
 # AUTHORISATION MODEL:
 #   permissionDecision:"ask" — the runtime prompts the OPERATOR interactively
-#   for that specific call. The agent CANNOT auto-approve an "ask". There is
-#   NO authorisation marker file that the agent can write to bypass this gate.
-#   A forged ~/.claude/.dev-mode-active only makes the gate MORE active (ask
-#   on more actions) — the safe direction.
-#
-# DEFAULT-ON (v2.56.0): dev mode is now the DEFAULT disposition. /th:setup and
-#   /th:update write the marker (~/.claude/.dev-mode-active) automatically unless
-#   the operator has explicitly opted out (dev_mode_choice: "off" in
-#   ~/.claude/.team-harness.json). This gate does NOT read dev_mode_choice and is
-#   NOT affected by default-on: it fires solely on the marker. The sentinel in
-#   .team-harness.json influences only setup/update marker-write decisions — it
-#   cannot disable this gate in a live session, by design. Activation writes
-#   (printf 'dev_mode: true' > marker) remain allowed without prompting (Step 6
-#   below) — that path is what makes /dev-mode and default-on reliable.
+#   for that specific call. The agent CANNOT auto-approve an "ask". This gate
+#   is unconditional — there is no marker file that arms or disarms it.
 #
 # Cross-platform: runs under Git Bash on Windows, native bash on macOS/Linux.
 # Generic: no tokens, no private endpoints, no personal config. CLAUDE.md §12.
@@ -71,23 +60,15 @@
 
 set -euo pipefail
 
-DEV_MODE_MARKER="${HOME}/.claude/.dev-mode-active"
-
 # ---------------------------------------------------------------------------
 # Output helpers
 # ---------------------------------------------------------------------------
-
-allow() {
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
-    exit 0
-}
 
 nodecision() {
     # No decision: exit 0 with empty stdout. Claude Code defers to the
     # operator's normal permission flow (prompts in normal mode; honors the
     # allowlist). Reserved for every default/fail-safe path — ask/deny are
-    # EXCLUSIVELY for covered outward actions and marker manipulation;
-    # allow is EXCLUSIVELY for the activation-write (dev_mode: true) path.
+    # EXCLUSIVELY for covered outward actions.
     exit 0
 }
 
@@ -113,7 +94,7 @@ input="$(cat)"
 # The matcher mcp__.*__clickup_(update_task|create_task|...) fires for any
 # registered ClickUp MCP server (server segment is registration-dependent and
 # must not be hard-coded). We extract tool_name and, if it matches the ClickUp
-# write pattern, issue ask when dev mode is active.
+# write pattern, issue ask unconditionally.
 # This branch runs before the Bash cmd-extraction path — ClickUp payloads have
 # no "command" field and would otherwise produce an empty cmd and nodecision.
 # ---------------------------------------------------------------------------
@@ -138,26 +119,8 @@ fi
 # fix(dev-guard): SEC-001 — mirror wiring semantics (.+) so multi-word servers match (#304)
 _clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
 if printf '%s' "$_tool_name" | grep -qE "^${_clickup_write_pattern}" 2>/dev/null; then
-    # ClickUp MCP outward write detected. Check dev mode marker.
-    if [ -f "$DEV_MODE_MARKER" ]; then
-        _marker_check=""
-        _marker_check=$(cat "$DEV_MODE_MARKER" 2>/dev/null || true)
-        _marker_active=false
-        if [ -z "$_marker_check" ]; then
-            _marker_active=true
-        elif printf '%s\n' "$_marker_check" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*true[[:space:]]*$" 2>/dev/null; then
-            _marker_active=true
-        elif printf '%s\n' "$_marker_check" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*false[[:space:]]*" 2>/dev/null; then
-            _marker_active=false
-        else
-            _marker_active=true  # corrupt/unreadable — fail-CLOSED
-        fi
-        if [ "$_marker_active" = "true" ]; then
-            ask "dev mode active — ClickUp MCP outward write ($_tool_name) requires explicit operator approval; preview the change before confirming (dev-guard.sh D1; see docs/dev-mode.md)"
-        fi
-    fi
-    # Marker absent or dev mode inactive — no decision (defer to normal flow).
-    nodecision
+    # ClickUp MCP outward write detected — unconditional ask (SEC-DR-2).
+    ask "outward action — ClickUp MCP outward write ($_tool_name) requires explicit operator approval; preview the change before confirming (dev-guard.sh; see docs/dev-mode.md)"
 fi
 
 # Resolve _json-extract.sh shared helper via the same 3-tier chain as sketch-guard
@@ -217,7 +180,7 @@ fi
 # An extra ask is the fail-safe direction (never converts ask -> allow on error).
 if [ -z "$cmd" ] && printf '%s' "$input" | grep -q '"tool_name"[[:space:]]*:[[:space:]]*"Bash"' 2>/dev/null; then
     if printf '%s' "$input" | grep -qE '(git\s+push|gh\s+pr\s+merge|gh\s+pr\s+review|gh\s+pr\s+comment|gh\s+api.*pulls|api\.github\.com)' 2>/dev/null; then
-        ask "dev mode active — outward action detected in raw payload (escape-aware extraction fallback; requires explicit operator approval)"
+        ask "outward action detected in raw payload (escape-aware extraction fallback); requires explicit operator approval (dev-guard.sh)"
     fi
 fi
 
@@ -229,132 +192,50 @@ if [ -z "$cmd" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 2 — Detect dev mode marker
-# Parse strictly: the file must exist AND contain "dev_mode: true" as a whole
-# line token (anti-spoof: "dev_mode: true # was false" does NOT match).
-# If marker is present but unreadable/corrupt -> treat as active (fail-CLOSED).
-# ---------------------------------------------------------------------------
-
-dev_mode_active=false
-
-if [ -f "$DEV_MODE_MARKER" ]; then
-    # File exists. Read its content.
-    marker_content=""
-    if marker_content=$(cat "$DEV_MODE_MARKER" 2>/dev/null); then
-        if [ -z "$marker_content" ]; then
-            # File exists but is empty — treat as active (fail-CLOSED).
-            # An operator who wrote the marker intends dev mode active; empty is not "absent".
-            dev_mode_active=true
-        elif printf '%s\n' "$marker_content" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*true[[:space:]]*$" 2>/dev/null; then
-            # File contains strict "dev_mode: true" token.
-            dev_mode_active=true
-        elif printf '%s\n' "$marker_content" | grep -q "^[[:space:]]*dev_mode:[[:space:]]*false[[:space:]]*" 2>/dev/null; then
-            # File explicitly says dev_mode: false -> not active; no decision.
-            nodecision
-        else
-            # File exists but content is not clearly parseable as active or inactive.
-            # Fail-CLOSED: treat as active.
-            dev_mode_active=true
-        fi
-    else
-        # File exists but is unreadable -> treat as active (fail-CLOSED).
-        dev_mode_active=true
-    fi
-fi
-
-# If dev mode is demonstrably absent, allow activation writes through before
-# exiting. An activation write (setting dev_mode: true) arms MORE gating — it
-# is safe and must not require a prompt even on a marker-absent machine. This
-# is the path /th:setup and /th:update use on a fresh install. We check the
-# write pattern and the dev_mode: true payload together.
-if [ "$dev_mode_active" = "false" ]; then
-    MARKER_PATH_PATTERN_EARLY='\.claude/\.dev-mode-active'
-    if printf '%s' "$cmd" | grep -qE "(>|>>|tee)\s.*${MARKER_PATH_PATTERN_EARLY}" 2>/dev/null \
-        && printf '%s' "$cmd" | grep -qE "dev_mode:[[:space:]]*true" 2>/dev/null; then
-        allow
-    fi
-    nodecision
-fi
-
-# Dev mode is active. Evaluate whether the command is a covered outward action.
-
-# ---------------------------------------------------------------------------
-# Step 3 — (marker manipulation is evaluated AFTER outward actions, in Step 6)
-# Outward actions are checked FIRST so a combined command such as
-# `rm <marker> && gh pr merge` surfaces the MERGE intent in the operator
-# prompt, not merely the marker change. Standalone marker manipulation falls
-# through to Step 6.
-# ---------------------------------------------------------------------------
-
-MARKER_PATH_PATTERN='\.claude/\.dev-mode-active'
-
-# ---------------------------------------------------------------------------
-# Step 4 — Detect outward/mutating actions by DESTINATION (-> ask)
+# Step 2 — Detect outward/mutating actions by DESTINATION (-> ask)
 # Gate by destination + mutating intent, not by binary name.
+# Unconditional — no marker check needed (SEC-DR-2 re-founding, v2.89.0).
 # ---------------------------------------------------------------------------
 
-# 4a. Push to a remote (any form).
+# 2a. Push to a remote (any form).
 # git push bare, git push <remote>, git push <remote> <branch>,
 # git -C <path> push ..., GIT_DIR=... git push
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)' 2>/dev/null; then
-    ask "dev mode active — outward action 'git push' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action 'git push' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 4b. gh pr merge
+# 2b. gh pr merge
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+merge(\s|$)' 2>/dev/null; then
-    ask "dev mode active — outward action 'gh pr merge' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action 'gh pr merge' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 4c. gh pr review (including --dismiss)
+# 2c. gh pr review (including --dismiss)
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+review(\s|$)' 2>/dev/null; then
-    ask "dev mode active — outward action 'gh pr review' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action 'gh pr review' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 4d. gh pr comment
+# 2d. gh pr comment
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+comment(\s|$)' 2>/dev/null; then
-    ask "dev mode active — outward action 'gh pr comment' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action 'gh pr comment' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 4e. gh api with mutating HTTP method against PR endpoints
+# 2e. gh api with mutating HTTP method against PR endpoints
 if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls' 2>/dev/null; then
-    ask "dev mode active — outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 4f. curl/wget with mutating method against api.github.com
+# 2f. curl/wget with mutating method against api.github.com
 if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com' 2>/dev/null; then
-    ask "dev mode active — outward action via curl/wget to api.github.com with mutating method requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action via curl/wget to api.github.com with mutating method requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
 # Also catch curl/wget with api.github.com in URL and -X / --request anywhere in cmd
 if printf '%s' "$cmd" | grep -qE 'api\.github\.com' 2>/dev/null \
    && printf '%s' "$cmd" | grep -qiE '(-X|--request)\s*(PUT|POST|PATCH|DELETE)' 2>/dev/null; then
-    ask "dev mode active — outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+    ask "outward action to api.github.com with mutating method requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
 # ---------------------------------------------------------------------------
-# Step 6 — Marker manipulation -> ask (operator confirms the dev-mode change).
-# Reached only when the command did NOT contain an outward action above, so a
-# standalone marker change (e.g. /dev-mode off running `rm <marker>`) prompts
-# the operator to confirm. This enables the toggle while preventing the agent
-# from SILENTLY disabling the gate; a combined marker+outward command already
-# surfaced the outward-action ask in Step 4.
-# ---------------------------------------------------------------------------
-if printf '%s' "$cmd" | grep -qE "(rm|mv|cp)\s.*${MARKER_PATH_PATTERN}" 2>/dev/null; then
-    ask "dev-guard: removing/moving the dev-mode marker EXITS developer mode and DISABLES the outward-action gate. Approve ONLY if you intend to deactivate dev mode (e.g. /dev-mode off)."
-fi
-if printf '%s' "$cmd" | grep -qE "(>|>>|tee)\s.*${MARKER_PATH_PATTERN}" 2>/dev/null; then
-    # A write that SETS "dev_mode: true" is an ACTIVATION — it arms MORE gating,
-    # so it is safe and is allowed without a prompt. This makes /dev-mode
-    # (re)activation reliable and friction-free, including re-enabling after an
-    # /dev-mode off in the same session. Any OTHER write to the marker (clearing
-    # or disabling it) still prompts, since that would disarm the gate.
-    if printf '%s' "$cmd" | grep -qE "dev_mode:[[:space:]]*true" 2>/dev/null; then
-        allow
-    fi
-    ask "dev-guard: writing the dev-mode marker changes the gate's armed state. Approve ONLY if you intend to change developer mode."
-fi
-
-# ---------------------------------------------------------------------------
-# Step 5 — No covered action detected; no decision (defer to normal flow).
+# Step 3 — No covered action detected; no decision (defer to normal flow).
 # ---------------------------------------------------------------------------
 nodecision

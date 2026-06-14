@@ -166,12 +166,13 @@ run_dev_guard_with_masked_python3() {
     PATH="$shim_dir:$safe_path" HOME="$fake_home" bash "$DEV_GUARD_HOOK" <<< "$payload" 2>/dev/null || true
 }
 
-# make_tmp_with_marker — create a fake HOME with dev-mode marker
+# make_tmp_with_marker — create a fake HOME (marker is no longer read by dev-guard.sh;
+# retained for call-site compatibility with F-016 and F-008 tests; the gate is unconditional
+# as of v2.89.0 SEC-DR-2 re-founding and fires regardless of any filesystem state).
 make_tmp_with_marker() {
     local tmp
     tmp="$(make_tmp)"
     mkdir -p "$tmp/.claude"
-    printf 'dev_mode: true\n' > "$tmp/.claude/.dev-mode-active"
     echo "$tmp"
 }
 
@@ -314,7 +315,7 @@ echo "############################################################"
 
 COMPOUND_PAYLOAD='{"tool_name":"Bash","tool_input":{"command":"git commit -m \"msg\" && git push origin feat/x"}}'
 
-# Case F016-1: compound command with embedded quote, python3 masked → ASK
+# Case F016-1: compound command with embedded quote, python3 masked → ASK (unconditional)
 echo
 echo "=== F-016-1: 'git commit -m \"msg\" && git push' with python3 masked -> EXACT ASK ==="
 TMP_F016=$(make_tmp_with_marker)
@@ -335,7 +336,7 @@ echo
 echo "=== F-016-3 (regression guard): compound command with python3 available -> EXACT ASK ==="
 TMP_F016C=$(make_tmp_with_marker)
 OUT_F016_3=$(HOME="$TMP_F016C" bash "$DEV_GUARD_HOOK" <<< "$COMPOUND_PAYLOAD" 2>/dev/null || true)
-assert_exact_ask "F016-3: compound cmd with python3 available -> ask (regression guard)" "$OUT_F016_3"
+assert_exact_ask "F016-3: compound cmd with python3 available -> ask (unconditional, regression guard)" "$OUT_F016_3"
 
 
 # ---------------------------------------------------------------------------
@@ -565,10 +566,10 @@ fi
 # ---------------------------------------------------------------------------
 # ============================================================================
 # F-008 (SEC-001 runtime): dev-guard.sh ClickUp MCP outward-write gate
-# SPEC: with dev mode active, dev-guard.sh must emit permissionDecision:ask for
-#   ANY registered ClickUp MCP server name, including multi-word server names
-#   whose spaces Claude Code normalizes to underscores (e.g. "Claude AI ClickUp"
-#   -> tool name segment "claude_ai_ClickUp").
+# SPEC: dev-guard.sh must emit permissionDecision:ask for ANY registered ClickUp
+#   MCP server name, including multi-word server names whose spaces Claude Code
+#   normalizes to underscores (e.g. "Claude AI ClickUp" -> "claude_ai_ClickUp").
+#   Gate is unconditional (SEC-DR-2 re-founding, v2.89.0) — no marker needed.
 # PRE-FIX STATE (SEC-001): the script-side pattern used [^_][^_]* which cannot
 #   match a server segment containing underscores; those calls fall through to
 #   empty cmd -> nodecision, silently bypassing the F-008 gate.
@@ -579,20 +580,20 @@ echo "# F-008 (SEC-001 runtime): ClickUp MCP write gate — runtime execution"
 echo "############################################################"
 
 # Case F008-RT-1: multi-word ClickUp server (underscore-normalized, e.g. "Claude AI ClickUp")
-#   tool_name: mcp__claude_ai_ClickUp__clickup_update_task, dev mode active -> ASK
+#   tool_name: mcp__claude_ai_ClickUp__clickup_update_task -> unconditional ASK
 # FAILS PRE-FIX: [^_][^_]* cannot match "claude_ai_ClickUp" server segment -> nodecision
 echo
-echo "=== F008-RT-1: mcp__claude_ai_ClickUp__clickup_update_task with dev mode active -> EXACT ASK ==="
+echo "=== F008-RT-1: mcp__claude_ai_ClickUp__clickup_update_task (unconditional) -> EXACT ASK ==="
 TMP_F008_RT1=$(make_tmp_with_marker)
 F008_RT1_PAYLOAD='{"tool_name":"mcp__claude_ai_ClickUp__clickup_update_task","tool_input":{}}'
 OUT_F008_RT1=$( ( export PATH="/usr/bin:/bin"; HOME="$TMP_F008_RT1" bash "$DEV_GUARD_HOOK" <<< "$F008_RT1_PAYLOAD" 2>/dev/null ) || true )
 assert_exact_ask "F008-RT-1: multi-word ClickUp server (underscore segment) outward write -> ask" "$OUT_F008_RT1"
 
 # Case F008-RT-2: single-word ClickUp server (no underscores in server segment)
-#   tool_name: mcp__clickup__clickup_create_task, dev mode active -> ASK
+#   tool_name: mcp__clickup__clickup_create_task -> unconditional ASK
 # Regression guard: this matched even pre-fix with [^_][^_]*, must continue to match.
 echo
-echo "=== F008-RT-2 (regression guard): mcp__clickup__clickup_create_task with dev mode active -> EXACT ASK ==="
+echo "=== F008-RT-2 (regression guard): mcp__clickup__clickup_create_task (unconditional) -> EXACT ASK ==="
 TMP_F008_RT2=$(make_tmp_with_marker)
 F008_RT2_PAYLOAD='{"tool_name":"mcp__clickup__clickup_create_task","tool_input":{}}'
 OUT_F008_RT2=$( ( export PATH="/usr/bin:/bin"; HOME="$TMP_F008_RT2" bash "$DEV_GUARD_HOOK" <<< "$F008_RT2_PAYLOAD" 2>/dev/null ) || true )

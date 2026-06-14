@@ -2,13 +2,13 @@
 
 > Extracted from CLAUDE.md §14 to keep the main file under 40 KB. The routing table and escalation rules remain inline in CLAUDE.md. This file contains the nested-context limitation details, dispatch handoff protocol, and blocked-manual-push handling.
 
-## Dev Mode — Primary Path (top-level orchestration)
+## CC Top-Level Orchestration — Primary Path
 
-The primary path for top-level orchestration is **dev mode** (the `developer-mode` output style). When dev mode is active (the `developer-mode` output style is loaded, signalled by `~/.claude/.dev-mode-active` containing `dev_mode: true`), the top-level agent adopts the orchestrator role and dispatches leaf agents via Task directly — no nested subagent, no dispatch_handoff round-trip. This eliminates the nested-context limitation described below. Full contract: `docs/dev-mode.md`. Activate via `/config` → Output style → `developer-mode`; deactivate by returning to Default and deleting the marker.
+The primary path for orchestration is the **CC native top-level agent** acting as orchestrator. On the CC foreground path, the top-level agent has `Task` and dispatches leaf agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery) directly — no nested subagent, no `dispatch_handoff` round-trip. Empirical testing (M1 probe, 2026-06-14) confirmed that nested foreground subagents retain `Task`, meaning the nested-context limitation below applies only on the **opencode/legacy path**, not the CC foreground path. Full contract: `docs/dev-mode.md`. The optional `developer-mode` output style (`/config` → Output style → `developer-mode`) provides a strong base-replacement floor (`keep-coding-instructions: false`).
 
-## Nested-Context Dispatch — FALLBACK
+## Nested-Context Dispatch — FALLBACK (opencode/legacy path)
 
-The nested-handoff/takeover machinery below is the **safety net** for cases where dev mode is not active and the orchestrator is invoked as a nested subagent. When dev mode is available and active, the nested-handoff path is not used.
+The nested-handoff/takeover machinery below is the **safety net for the opencode/legacy path** where the orchestrator is invoked as a nested subagent and the harness strips its `Task` tool. On the CC foreground path, this machinery is not used (nested subagents retain `Task`; see M1 probe result in `tests/probe_nested_dispatch.md`).
 
 When `orchestrator` is invoked from a context where another agent is already active — for example, via an `@th:orchestrator` mention inside an ongoing agent session, via a skill that itself runs inside a parent agent, or via a chained orchestrator dispatch — the Claude Code harness strips the `Task` tool as an anti-recursion safety measure. The orchestrator cannot dispatch specialist agents and emits a `dispatch_handoff` directive instead.
 
