@@ -22286,6 +22286,203 @@ check(
 # Marker: dual-review-convergence
 
 # ---------------------------------------------------------------------------
+# Suite 99 — hookify
+# ---------------------------------------------------------------------------
+# Structural assertions for the /th:hookify friction-to-hook proposal skill.
+# Written by implementer (2026-06-15). Marker: hookify
+#
+# Asserts:
+#   (1)  skills/hookify/SKILL.md exists
+#   (2)  valid frontmatter: name: hookify AND description present
+#   (3)  standalone imperative: "runs directly" + "orchestrator" in text
+#   (4)  hybrid input model documented: operator-supplied AND 00-execution-events both present
+#   (5)  transcript-not-read disclaimer: "does NOT read" + "transcript" co-present
+#   (6)  report shape fields present: intent, Trigger event, Match sketch, Severity, Rationale
+#   (7)  default severity `ask` named as the default proposed severity
+#   (8)  REPORT-only boundary names `hooks/` (anchor-scoped)
+#   (9)  REPORT-only boundary names `~/.claude/` (anchor-scoped)
+#   (10) no auto-write / no `--fix`: REPORT-only + no write + no --fix in boundary section
+#   (11) `## Voice` block present
+#   (12) `## Output Discipline` block present
+#   (13) TH-native framing: no external-project/method names (ECC, AgentShield, conversation-analyzer)
+#   (14) listed as Standalone in skills/README.md
+#   (15) self-ref registry: docs/testing.md contains Suite 99 + hookify; this file contains Suite 99 + _slice_section
+#   (16) hygiene guard: CLAUDE.md does NOT contain 'Suite 99'
+#   (17) suite does not invoke an agent: Suite 99 own non-comment source contains no Agent( or subagent_type
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 99: hookify ===")
+
+_s99_skill_path  = SKILLS_DIR / "hookify" / "SKILL.md"
+_s99_readme      = read(REPO_ROOT / "skills" / "README.md")
+_s99_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s99_claude_md   = read(REPO_ROOT / "CLAUDE.md")
+
+_S99_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# (1) skill file exists
+check(
+    "suite99(1-file-exists): skills/hookify/SKILL.md exists",
+    _s99_skill_path.exists(),
+    "skills/hookify/SKILL.md must exist",
+)
+
+_s99_skill = read(_s99_skill_path) if _s99_skill_path.exists() else ""
+
+# (2) valid frontmatter: name: hookify AND description present
+_s99_fm = parse_frontmatter(_s99_skill)
+check(
+    "suite99(2-frontmatter): SKILL.md has valid frontmatter with name: hookify and description",
+    _s99_fm.get("name") == "hookify" and bool(_s99_fm.get("description", "")),
+    "skills/hookify/SKILL.md must have YAML frontmatter with name: hookify and a non-empty description",
+)
+
+# (3) standalone imperative: "runs directly" + "orchestrator" tokens both present
+check(
+    "suite99(3-standalone-imperative): SKILL.md states 'runs directly' and names 'orchestrator'",
+    "runs directly" in _s99_skill and "orchestrator" in _s99_skill,
+    "skills/hookify/SKILL.md must contain the standalone imperative ('runs directly' + 'orchestrator')",
+)
+
+# (4) hybrid input model: operator-supplied AND 00-execution-events both present
+check(
+    "suite99(4-hybrid-input): SKILL.md documents operator-supplied input AND 00-execution-events enrichment",
+    "operator-supplied" in _s99_skill and "00-execution-events" in _s99_skill,
+    "skills/hookify/SKILL.md must document the hybrid input model (operator-supplied primary + 00-execution-events enrichment)",
+)
+
+# (5) transcript-not-read disclaimer
+check(
+    "suite99(5-transcript-disclaimer): SKILL.md states it does NOT read the chat transcript",
+    "does NOT read" in _s99_skill and "transcript" in _s99_skill,
+    "skills/hookify/SKILL.md must state that it does NOT read the raw chat transcript",
+)
+
+# (6) report shape fields present: intent, Trigger event, Match sketch, Severity, Rationale
+_s99_required_fields = ["Intent", "Trigger event", "Match sketch", "Severity", "Rationale"]
+check(
+    "suite99(6-report-shape): SKILL.md report shape includes Intent, Trigger event, Match sketch, Severity, Rationale",
+    all(f in _s99_skill for f in _s99_required_fields),
+    f"skills/hookify/SKILL.md must define report-shape fields: {_s99_required_fields}",
+)
+
+# (7) default severity `ask`
+check(
+    "suite99(7-default-severity-ask): SKILL.md names `ask` as the default proposed severity",
+    "ask" in _s99_skill and (
+        "default" in _s99_skill.lower()
+        and "ask" in _s99_skill
+    ),
+    "skills/hookify/SKILL.md must state that the default proposed severity is `ask`",
+)
+
+# (8) REPORT-only boundary section names `hooks/` — anchor-scoped
+_S99_BOUNDARY_ANCHOR = "## REPORT-only Boundary"
+_s99_boundary_slice = _slice_section(_s99_skill, _S99_BOUNDARY_ANCHOR, _S99_STOP)
+check(
+    "suite99(8-boundary-hooks): REPORT-only Boundary section names 'hooks/'",
+    bool(_s99_boundary_slice) and "hooks/" in _s99_boundary_slice,
+    "skills/hookify/SKILL.md '## REPORT-only Boundary' must name 'hooks/'",
+)
+
+# (9) REPORT-only boundary section names `~/.claude/` — anchor-scoped
+check(
+    "suite99(9-boundary-claude): REPORT-only Boundary section names '~/.claude/'",
+    bool(_s99_boundary_slice) and "~/.claude/" in _s99_boundary_slice,
+    "skills/hookify/SKILL.md '## REPORT-only Boundary' must name '~/.claude/'",
+)
+
+# (10) no auto-write / no --fix in boundary section
+_s99_boundary_has_report_only = bool(_s99_boundary_slice) and "REPORT-only" in _s99_boundary_slice
+_s99_boundary_no_fix = bool(_s99_boundary_slice) and (
+    "--fix" in _s99_boundary_slice or "no --fix" in _s99_boundary_slice or "--apply" in _s99_boundary_slice
+)
+_s99_boundary_no_write = bool(_s99_boundary_slice) and (
+    "no write" in _s99_boundary_slice.lower()
+    or "does not write" in _s99_boundary_slice.lower()
+    or "NOT write" in _s99_boundary_slice
+    or "never write" in _s99_boundary_slice.lower()
+)
+check(
+    "suite99(10-no-autowrite): REPORT-only Boundary section asserts REPORT-only + no --fix/--apply + no write path",
+    _s99_boundary_has_report_only and _s99_boundary_no_fix and _s99_boundary_no_write,
+    "skills/hookify/SKILL.md '## REPORT-only Boundary' must assert: REPORT-only + no --fix/--apply + no auto-write path",
+)
+
+# (11) `## Voice` block present
+check(
+    "suite99(11-voice-block): SKILL.md contains '## Voice' block",
+    "## Voice" in _s99_skill,
+    "skills/hookify/SKILL.md must contain a '## Voice' block (parity with sibling skills)",
+)
+
+# (12) `## Output Discipline` block present
+check(
+    "suite99(12-output-discipline): SKILL.md contains '## Output Discipline' block",
+    "## Output Discipline" in _s99_skill,
+    "skills/hookify/SKILL.md must contain an '## Output Discipline' block (parity with sibling skills)",
+)
+
+# (13) TH-native framing: no external-project/method names in shipped skill
+_s99_forbidden_literals = ["ECC", "AgentShield", "conversation-analyzer"]
+_s99_provenance_clean = all(lit not in _s99_skill for lit in _s99_forbidden_literals)
+check(
+    "suite99(13-th-native): SKILL.md contains no external-project/method names (ECC, AgentShield, conversation-analyzer)",
+    _s99_provenance_clean,
+    f"skills/hookify/SKILL.md must not contain external-project/method names: {_s99_forbidden_literals}",
+)
+
+# (14) listed as Standalone in skills/README.md
+check(
+    "suite99(14-readme-standalone): /th:hookify is listed as a Standalone skill in skills/README.md",
+    "/th:hookify" in _s99_readme and "Standalone" in _s99_readme,
+    "skills/README.md must list '/th:hookify' in the Standalone (no orchestrator involvement) list",
+)
+
+# (15) self-ref registry
+check(
+    "suite99(15-registry): docs/testing.md registers 'Suite 99' and 'hookify'",
+    "Suite 99" in _s99_testing_md and "hookify" in _s99_testing_md,
+    "docs/testing.md must register Suite 99 and the hookify marker (canonical suite registry)",
+)
+_s99_own_source = read(Path(__file__))
+check(
+    "suite99(15b-self-ref): this test file contains 'Suite 99' and '_slice_section'",
+    "Suite 99" in _s99_own_source and "_slice_section" in _s99_own_source,
+    "test file must reference Suite 99 and _slice_section (self-referential marker check)",
+)
+
+# (16) hygiene guard: CLAUDE.md must NOT contain 'Suite 99'
+check(
+    "suite99(16-hygiene): CLAUDE.md does NOT contain 'Suite 99'",
+    "Suite 99" not in _s99_claude_md,
+    "CLAUDE.md must not mention Suite 99 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (17) suite does not invoke an agent: Suite 99 own non-comment source contains no Agent( or subagent_type
+_s99_suite99_start = _s99_own_source.find("Suite 99 — hookify")
+_s99_suite99_end   = _s99_own_source.find("# Marker: hookify")
+_s99_own_region = (
+    _s99_own_source[_s99_suite99_start:_s99_suite99_end]
+    if _s99_suite99_start >= 0 and _s99_suite99_end > _s99_suite99_start
+    else _s99_own_source[_s99_suite99_start:]
+)
+_s99_code_lines = [
+    ln for ln in _s99_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s99_code_only = "\n".join(_s99_code_lines)
+_s99_agent_tok    = "Age" + "nt("       # split so this literal does not itself count as an invocation
+_s99_subagent_tok = "subagent" + "_type"  # same split
+check(
+    "suite99(17-no-agent-call): Suite 99 non-comment source contains no agent-invocation tokens",
+    _s99_agent_tok not in _s99_code_only and _s99_subagent_tok not in _s99_code_only,
+    "Suite 99 is a free structural suite — its non-comment source must not call the agent-dispatch APIs",
+)
+
+# Marker: hookify
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
