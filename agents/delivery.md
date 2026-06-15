@@ -872,7 +872,7 @@ worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-presen
 
 **Best-effort** — if the Memory MCP server is unavailable, log the skip and continue. Never fail the delivery on KG errors.
 
-**Content policy + dedup gate + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", § "Dedup gate", and § "Session attribution". Apply before every `create_nodes` / `add_observations` call in this step. The intended node type is `process-insight`; dedup operates on `process-insight` nodes only (do not cross-merge with `error`/`pattern` nodes).
+**Content policy + dedup gate + overlap verdict + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", § "Dedup gate", § "Overlap gate (Save / Absorb / Drop verdict)", and § "Session attribution". Apply before every `create_nodes` / `add_observations` call in this step. The intended node type is `process-insight`; dedup operates on `process-insight` nodes only (do not cross-merge with `error`/`pattern` nodes).
 
 ### Pre-flight MCP health check (mandatory first action)
 
@@ -924,7 +924,7 @@ The KG passive-capture is the largest single source of potential noise in the gr
 
 **Gate 2 — Dedup gate (`search_nodes` pre-flight).** Call `mcp__memory__search_nodes(query=<first observation>)`. **No cross-merge with security node types** — this gate operates on `process-insight` nodes only. Do not merge a `process-insight` passive-capture against a security finding node of type `error` or `pattern`. Those are distinct node types by design. Lean toward `add_observations` when in doubt. Full gate mechanics: see `agents/_shared/kg-write-policy.md` § "Dedup gate".
 
-Log outcomes as `kg_passive_capture: skipped: low-specificity (top-1: <type> <score>)`, `kg_passive_capture: skipped: type-mismatch (suggested: <top-1>, proposed: process-insight)`, `kg_passive_capture: merged-into: <existing-name>`, `kg_passive_capture: written-with-relation-note (related to <existing-name>)`, or `kg_passive_capture: written`.
+Log outcomes as `kg_passive_capture: skipped: low-specificity (top-1: <type> <score>)`, `kg_passive_capture: skipped: type-mismatch (suggested: <top-1>, proposed: process-insight)`, `kg_passive_capture: merged-into: <existing-name>` (Absorb verdict), `kg_passive_capture: written-with-relation-note (related to <existing-name>)`, `kg_passive_capture: written` (Save verdict), or `kg_passive_capture: skipped: overlap-drop (<existing-name> covers it)` (Drop verdict — existing same-type node fully covers the candidate with no new observation).
 
 **Content policy + pre-write checklist + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", and § "Session attribution". Pass `session_id` from `workspaces/{feature-name}/session.json` when valid (non-empty and session not yet ended); omit otherwise.
 

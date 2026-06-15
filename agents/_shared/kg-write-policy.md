@@ -111,6 +111,39 @@ Gate 2 dedup filters to the expected type explicitly.
 - Gates pass but `create_nodes` / `add_observations` fails → follow the writer agent's
   existing failure handling.
 
+## Overlap gate (Save / Absorb / Drop verdict)
+
+This section formalizes Gate 2's three outcomes into a named verdict and adds an explicit
+Drop path. Applies to same-`node_type` matches only — do NOT cross-merge between
+`process-insight` and `error`/`pattern` nodes (isolation by type, same rule as Gate 2).
+
+| Verdict | Fires when | Action |
+|---------|-----------|--------|
+| **Save** | No semantically close same-type match, OR a topically-related-but-distinct match | `create_nodes` (clean, or with a relation note for the related-but-distinct case). Unchanged from Gate 2. |
+| **Absorb** | A match clearly covers the same subject + same mechanism and the candidate carries at least one observation the match lacks | `add_observations` on the matched node, adding only the genuinely new observation(s). |
+| **Drop** | A match clearly covers the same subject + same mechanism AND the candidate adds NO new observation (pure restatement) | Skip the write entirely. Log the Drop outcome. Nothing is mutated. |
+
+**Absorb threshold:** the match must clearly cover the **same subject + same mechanism** — not merely a topically-related insight. When the candidate is topically related but covers a distinct fix or mechanism, emit **Save** with a relation note instead.
+
+**Confirmation-observation convention (bridge to TTL sweep):**
+
+An entry is **CONFIRMED** when any of its observations carries a `confirmed: YYYY-MM-DD`
+token. The Absorb verdict is the normal producer of that token: when a later pipeline run
+re-derives an insight that already exists in the KG, it Absorbs a one-line
+`confirmed: <today>` observation onto the matched node. This requires no new MCP tool
+(rides the existing `add_observations` path) and no schema change (rides the existing
+date-anchoring policy in `docs/kg-content-policy.md`). A fresh `Save` is UNCONFIRMED
+by construction (no `confirmed:` token yet).
+
+**Same-`node_type`-only isolation (restated):** the verdict operates exclusively on
+matches of the same node type. A `process-insight` candidate is never Absorbed into an
+`error` or `pattern` node. No cross-merge between `process-insight` and `error`/`pattern`.
+
+**Best-effort failure modes (never block the pipeline):**
+- `search_nodes` returns an error → proceed as **Save** (prefer a possible duplicate over
+  losing the insight). Never block the pipeline on a gate error.
+- Write failure after verdict → follow the writer agent's existing failure handling.
+
 ## Session attribution (best-effort)
 
 **Origin of the `session_id`.** The orchestrator calls `mcp__memory__session_start` at

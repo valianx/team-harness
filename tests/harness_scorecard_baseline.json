@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "score": 95,
+  "earned_total": 97,
+  "max_total": 102,
+  "categories": {
+    "agent_frontmatter_completeness": {
+      "earned": 10,
+      "max": 10
+    },
+    "skill_structural_validity": {
+      "earned": 9,
+      "max": 10
+    },
+    "hook_manifest_canonical_form": {
+      "earned": 8,
+      "max": 8
+    },
+    "hook_script_resolution": {
+      "earned": 8,
+      "max": 8
+    },
+    "test_suite_coverage_presence": {
+      "earned": 6,
+      "max": 8
+    },
+    "docs_testing_registry_sync": {
+      "earned": 8,
+      "max": 8
+    },
+    "version_sync_plugin_marketplace": {
+      "earned": 10,
+      "max": 10
+    },
+    "injection_preamble_coverage": {
+      "earned": 10,
+      "max": 10
+    },
+    "readonly_tier_tool_discipline": {
+      "earned": 8,
+      "max": 8
+    },
+    "agent_required_sections_presence": {
+      "earned": 6,
+      "max": 8
+    },
+    "model_effort_field_presence": {
+      "earned": 8,
+      "max": 8
+    },
+    "return_protocol_status_block_presence": {
+      "earned": 6,
+      "max": 6
+    }
+  }
+}
