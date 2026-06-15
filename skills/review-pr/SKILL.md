@@ -17,6 +17,7 @@ Before routing to a mode, parse optional flags from `$ARGUMENTS`:
 - `[TIER: N]` (in the PR number / arguments) → set `tier_override=N` (0–4). Takes precedence over auto-classification.
 - `--resume-from-draft` → skip Phases 1–3, go directly to Phase 4 using `.claude/pr-review-final.md` (or `.claude/pr-review-draft.md`).
 - `--auto-publish` → opt-in flag that skips the Phase 4 preview-and-confirm gate. The operator explicitly authorises publish without seeing the draft first. **Default (without this flag): preview is mandatory** — Phase 4 always shows the full draft and waits for an explicit operator selection before Phase 5 publishes. Set `auto_publish=true` when this flag is present, `auto_publish=false` otherwise.
+- `--converge` → opt-in flag that activates dual-review convergence. Set `converge=true` when this flag is present. When absent, convergence is still auto-enabled for Tier 4 PRs (see Phase 2 Tier Classification — the existing Tier-4 detection predicate triggers convergence without requiring the flag).
 
 **Publish gate alignment (`ref-direct-modes.md § Publish Gate`):** This skill implements the canonical publish gate at Phase 4 (decision menu = preview-and-confirm). The `--auto-publish` flag satisfies the opt-in contract defined in that gate. When `auto_publish=true`, Phase 4 is skipped and Phase 5 executes immediately after Phase 3 completes; the operator's explicit `--auto-publish` declaration is the approval. When `auto_publish=false` (the default), Phase 4 MUST show the full draft and wait for an explicit choice before Phase 5.
 
@@ -119,6 +120,9 @@ name: review-pr
    cleanup() {
      git worktree remove "$WORKTREE" --force 2>/dev/null || true
      rm -f .claude/pr-review-*.md .claude/pr-review-*.json 2>/dev/null || true
+     rm -f .claude/pr-review-*-A.md .claude/pr-review-*-A.json 2>/dev/null || true
+     rm -f .claude/pr-review-*-B.md .claude/pr-review-*-B.json 2>/dev/null || true
+     rm -f .claude/pr-review-convergence.json 2>/dev/null || true
    }
    trap cleanup EXIT
    ```
@@ -410,6 +414,83 @@ For Tier 3 / 4: dispatch reviewer, qa (if `has_workspaces=true`), and security i
 
 The `canonical_draft_path` is `.claude/pr-review-final.md` if it exists, else `.claude/pr-review-draft.md`.
 
+### Phase 3.1 — Dual-Review Convergence (when active)
+
+**When convergence is active:** `converge=true` (set by `--converge` flag OR by Tier 4 auto-on — the Tier-4 classification in Phase 2 automatically sets `converge=true` using the existing Tier-4 detection predicate; no new keyword list is introduced). When `converge=false`, skip this sub-section and proceed directly to Phase 3.5.
+
+**Convergence state initialization:**
+```sh
+convergence_round=1
+convergence_status=running   # running | converged | escalated
+# Record initial convergence block in 00-state.md convergence field
+```
+
+**Per-round loop (max 3 rounds):**
+
+For each round while `convergence_status == running` and `convergence_round <= 3`:
+
+1. **Dispatch Pass A and Pass B concurrently.** Each pass dispatches the orchestrator in `review-consolidate` mode with:
+   ```
+   Direct Mode Task:
+   - Mode: review-consolidate
+   - Convergence Pass: A          # or B for the second dispatch
+   - Focuses: {focuses list}
+   - Has QA draft: {true|false}
+   - Has Security draft: {true|false}
+   - Draft Output: .claude/pr-review-final-A.md    # -B for Pass B
+   - Inline Output: .claude/pr-review-inline-A.json  # -B for Pass B
+   - PR: #{number}
+   - Title: {title}
+   - Author: {author}
+   - URL: {url}
+   ```
+   **Isolation contract:** each pass receives only the original diff/policy/PR metadata. No prior-round artifacts are passed forward. Pass A and Pass B NEVER read each other's `-A` / `-B` draft files.
+
+2. **Wait for both passes to complete.** Read `event` from each pass's status block.
+
+3. **Comparator — three branches:**
+   - Both emit `APPROVE` → `convergence_status=converged`, `canonical_draft_path=.claude/pr-review-final-A.md` (either pass; A is canonical), `convergence_verdict=CONVERGED_APPROVE`. Break loop.
+   - Both emit `REQUEST_CHANGES` → `convergence_status=converged`, `canonical_draft_path=.claude/pr-review-final-A.md`, `convergence_verdict=CONVERGED_CHANGES`. Break loop.
+   - Passes diverge (one `APPROVE`, one `REQUEST_CHANGES`):
+     - If `convergence_round < 3`: increment `convergence_round`, delete the `-A` and `-B` draft files from this round, continue loop (fresh round — reviewers receive only original inputs on the next iteration).
+     - If `convergence_round == 3`: `convergence_status=escalated`. **STOP and escalate** — do NOT proceed to Phase 3.5 or Phase 4. Surface the escalation block below and wait for operator instruction.
+
+4. **Record round event** in the execution-events trace:
+   ```
+   {"event": "review.convergence.round", "round": {N}, "verdict_A": "{A}", "verdict_B": "{B}", "outcome": "{converged_approve|converged_changes|divergent_continue|divergent_escalate}"}
+   ```
+   Update `00-state.md` convergence block: `round`, `last_verdict_A`, `last_verdict_B`, `status`.
+
+**Round-state file:** write `.claude/pr-review-convergence.json` after each round:
+```json
+{
+  "pr": "{number}",
+  "round": {N},
+  "verdict_A": "{APPROVE|REQUEST_CHANGES}",
+  "verdict_B": "{APPROVE|REQUEST_CHANGES}",
+  "status": "{running|converged|escalated}"
+}
+```
+
+**Escalation STOP block (round 3, divergent):**
+```
+STOP — Dual-Review Convergence: reviewer disagreement after 3 rounds.
+Pass A verdict: {APPROVE | REQUEST_CHANGES}  (.claude/pr-review-final-A.md)
+Pass B verdict: {APPROVE | REQUEST_CHANGES}  (.claude/pr-review-final-B.md)
+
+Both review bodies are available for operator review.
+The system does not auto-resolve this disagreement. Operator decides the final verdict.
+Options:
+  (a) Accept Pass A verdict and body → run /th:review-pr {N} --resume-from-draft (after copying A to final)
+  (b) Accept Pass B verdict and body → run /th:review-pr {N} --resume-from-draft (after copying B to final)
+  (c) Cancel → discard all drafts, do not publish
+
+Choose [a/b/c]:
+```
+On `(c)` or no response: discard all drafts (cleanup trap fires). Do NOT publish.
+
+**After convergence loop completes (non-escalated):** `canonical_draft_path` is `.claude/pr-review-final-A.md`. Proceed to Phase 3.5.
+
 ### Phase 3.5 — Prior Review Check (MANDATORY before proceeding to Phase 4)
 
 Before showing the draft and presenting the decision menu, check for an existing review from the same author on this PR. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read prior PR reviews". When `has_gh=true`:
@@ -577,6 +658,9 @@ f. **Verify the review was posted.** After the API call, check the exit code. If
   - `.claude/pr-review-draft-security.md`, `.claude/pr-review-draft-architecture.md`, `.claude/pr-review-draft-style.md`
   - `.claude/pr-review-inline-security.json`, `.claude/pr-review-inline-architecture.json`, `.claude/pr-review-inline-style.json`
   - `.claude/pr-review-qa.md`, `.claude/pr-review-security.md`
+  - `.claude/pr-review-final-A.md`, `.claude/pr-review-inline-A.json` (convergence Pass A drafts)
+  - `.claude/pr-review-final-B.md`, `.claude/pr-review-inline-B.json` (convergence Pass B drafts)
+  - `.claude/pr-review-convergence.json` (convergence round-state file)
 - Remove the cleanup trap (EXIT trap already handles this, but call explicitly):
   ```sh
   trap - EXIT

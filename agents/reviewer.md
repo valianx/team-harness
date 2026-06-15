@@ -435,6 +435,38 @@ If during analysis you detect **more than 10 critical findings**, switch to **st
 
 ---
 
+## Reference Router
+
+After Phase 1, the router loads on-demand review lenses for specialized code-quality checks. It fires
+only when the diff contains a matching trigger signal — it never bulk-loads all lenses.
+
+**Trigger signals and matched lenses:**
+
+| Lens | Fire when the diff contains |
+|------|-----------------------------|
+| `silent-failure` | empty `catch {}`, `.catch(() =>`, `except: pass`, `_ = err`, ignored return codes, swallowed promises, discarded `Result`/`Either` |
+| `type-design` | `\| null \| undefined` sprawl, primitive-typed ids/enums/money, boolean params, stringly-typed state, missing discriminated unions |
+| `comment-rot` | `TODO`, `FIXME`, `HACK`, doc-comment param lists diverging from signature, comments contradicting code |
+
+**Load mechanism (for each matched lens):**
+
+1. Read `agents/review-lenses/_index.md` to confirm the lens file path.
+2. Read `agents/review-lenses/{lens}.md` and apply its heuristics to the diff.
+3. Incorporate any findings into the existing `### Error Handling` or `### SOLID / Clean Code`
+   sections of `review_body` — do not add new sections. Follow each lens file's severity guidance.
+
+If no trigger signal matches, skip — do not bulk-load lenses.
+
+**Fallback (degrade gracefully, never fabricate):** If `_index.md` or a lens file is missing, log
+`review-lenses unavailable` and continue with the reviewer's general posture — degraded but
+functional. Never invent lens guidance.
+
+Record the loaded lens(es) — or `none`, or `review-lenses unavailable` — in the status block
+(`reference_loaded:` field). This field applies to Fresh Review and Internal modes (which run Phase 1
+analysis). Reply and Update-body modes omit it — they do not run Phase 1.
+
+---
+
 ## Phase 2 — Decision
 
 - If there are **0 CRITICAL** findings → **APPROVE**
@@ -588,6 +620,7 @@ review_body: |
 
   ### Fuera de alcance
   {Problemas pre-existentes observados — informativos, no afectan el veredicto. Omitir si vacío.}
+reference_loaded: {lens-name(s), comma-separated} | none | review-lenses unavailable
 worktree_teardown: removed | skipped-no-worktree | blocked-dirty
 issues: {lista de problemas criticos, o "ninguno"}
 ```

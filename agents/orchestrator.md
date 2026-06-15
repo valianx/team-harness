@@ -1754,6 +1754,10 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
  ── Review Summary ──────────────────────
  {verbatim contents of ## Review Summary from 01-plan.md, line-wrapped}
 
+ ── Confidence ──────────────────────────
+ {render the **Confidence:** line from ### Confidence Score in ## Review Summary;
+  if absent: "Confidence: not stated"}
+
  ── PR Summary ─────────────────────────
  {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
 
@@ -1779,6 +1783,7 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
 
 **Rendering rules:**
 - Preserve markdown bullets and table syntax as-is — terminal users see them rendered by Claude Code, file-output users get faithful markdown.
+- **`── Confidence ──` band (additive, STAGE-GATE-1 only).** The Confidence Score is already present inside the `## Review Summary` verbatim copy above. The `── Confidence ──` band makes it prominent as a dedicated visual band for the reviewer. To populate it: scan the verbatim Review Summary copy for a line matching `**Confidence:** N/10 (single-pass)` and render it in the band. If no such line is found (architect ran without the contract, or task type is hotfix/Tier-1-fix), render `Confidence: not stated`. The band adds no new orchestrator read — it draws from the Review Summary copy already in memory.
 - If `## Review Summary` is missing in `01-plan.md`: this guard is **type-aware**.
   - For `type: feature`, `type: refactor`, `type: enhancement`, or `type: fix` (Tier 2-4): do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
   - For `type: hotfix` or `type: fix` Tier 1 (orchestrator-self-authored, no architect): do NOT route to architect (the architect is not dispatched in this flow — routing there would create a loop). Instead, route to the orchestrator-self-authored step above: the orchestrator writes `01-plan.md § Review Summary` from the Phase 0b bug-report payload and re-emits the gate. This is the **self-authored** path; it never routes to the architect.
@@ -3313,6 +3318,49 @@ When an agent returns, you parse its status block and propagate any of the follo
 Omit any sub-object the agent did not report. If the agent reported none of them, omit the `tools` field entirely (do not write `"tools": {}`).
 
 This is the data that feeds the **Tool Effectiveness** section of `00-pipeline-summary.md` and the `/th:trace <feature> --tools` view.
+
+---
+
+## Decision Ledger
+
+`00-decision-ledger.{jsonl|md}` is a **new per-workspace append-only file** distinct from `00-execution-events.{jsonl|md}`. The decision-ledger records durable decision dispositions, rationale, and dry-run enforcement records — the DECISION layer that `00-execution-events` deliberately does not carry. See `docs/observability.md § Decision Ledger` for the full schema, dual-format lifecycle, and JOIN relationship.
+
+**Anti-redundancy invariant:** the decision-ledger records dispositions + rationale + dry-run enforcement ONLY. It NEVER records phase timing, durations, token counts, tool-counts, or KG write batches — those stay exclusively in `00-execution-events`. Where a gate fires, `00-execution-events` records the FIRING (for the timeline) and the decision-ledger records the DECISION (verdict + rationale, for the audit). The two files JOIN on the shared `phase`/`stage` key.
+
+### Writer contract
+
+You (the orchestrator) are the **exclusive writer** of `00-decision-ledger.*`. No agent writes to it directly. Append-only `>>` with a here-doc, one JSON object per line — never rewritten. Dual-format: local mode → raw `00-decision-ledger.jsonl`; obsidian mode → `00-decision-ledger.md` with YAML frontmatter + ` ```jsonl ` fence (identical lifecycle to `00-execution-events.md`).
+
+**Resilience invariant:** if constructing or appending a ledger line fails, log the failure and continue — the pipeline NEVER hard-fails on a ledger emit error. This is best-effort observability; the deterministic gate outcome and the `00-execution-events` trace remain the authoritative record.
+
+**Tier-0 carve-out:** Tier-0 fixes (`workspaces: NONE`) produce no decision-ledger (same exemption as `00-execution-events`).
+
+### Write sites (where you emit each event type)
+
+Emit a ledger line at each gate boundary you already pass through — no new dispatch, no new control-flow step. Each line is written AFTER the decision is final.
+
+| Ledger event | Write site | Derives from |
+|--------------|------------|--------------|
+| `gate-verdict` | After Phase 1.5 (ratify-plan), Phase 1.6 (plan-review), Phase 3.5 (acceptance-gate), Phase 3.6 (acceptance-check); when emitting each STAGE-GATE STOP block | The verdict you already compute for `gate.pass`/`gate.fail`/`stage.gate` in `00-execution-events`; add the free-text `rationale` (one sentence, ≤240 chars) |
+| `operator-approval` | When the operator replies to a STAGE-GATE STOP | The reply you already record as `stage.gate.release` `decision` in `00-execution-events`; add `rationale` from operator's text or `"no reason given"` |
+| `disposition` | When a security, QA, or reviewer finding is accepted, deferred (watch), or rejected at a gate; emitted alongside the `gate.pass`/`gate.fail` event | The operator's accept/watch/reject choice on a surfaced finding; include `subject` (finding description) and `rationale` |
+| `dry-run-enforced` | When a deploy/migration action is routed through a dry-run / plan-only path before any approved apply | Your dry-run-first routing decision + the guard that gates the apply; include `action`, `dry_run_ref`, and `guard` |
+
+**Example append (local mode):**
+
+```bash
+cat >> {docs_root}/00-decision-ledger.jsonl <<LEDGER
+{"ts":"$(date -Iseconds)","event":"gate-verdict","feature":"{feature}","phase":"1.6-plan-review","decision":"concerns","rationale":"Reviewer raised SEC-001: missing rate-limit on /login; AC-3 scope adjusted."}
+LEDGER
+```
+
+### Confidence-is-not-approval / dry-run-first
+
+**Confidence is not approval.** A high-confidence plan, a green test suite, or a strong agent recommendation is NOT a substitute for the mandatory human gate. The STAGE-GATEs (STAGE-GATE-1, STAGE-GATE-2, STAGE-GATE-3) are non-skippable regardless of confidence score, suite results, or agent verdict. Every approval must be an explicit operator decision — there is no "it was obviously fine so I proceeded" path. The `operator-approval` ledger event makes every such decision durable and traceable.
+
+**Default dry-run for deploys and migrations.** Any intent to deploy, apply a schema migration, run a `gcloud` apply, or alter production data routes through a dry-run / plan-only / `--validate-only` path FIRST. The actual apply requires a separate, explicit operator approval after reviewing the dry-run output. When the apply is subsequently approved, emit a `dry-run-enforced` ledger event recording the action, the dry-run method used (`--dry-run`, `--validate-only`, `plan-only`, `migrate diff`), and which existing deterministic floor gated the apply (`gcp-guard.sh`, `dev-guard.sh`, `policy-block.sh`).
+
+**The enforcement layer is the existing deterministic hooks** — `gcp-guard.sh` (verb-classifier: mutating `gcloud` verbs → operator gate), `dev-guard.sh` (outward-action gate: `git push`, `gh pr merge`, and similar verbs → operator gate), `policy-block.sh` (destructive-command denylist). The decision-ledger AUDITS that the dry-run principle was honored (`dry-run-enforced` event); it does NOT enforce — enforcement is the exclusive responsibility of those hooks. This is the same defense-in-depth relationship the prompt-injection floor has to the policy hooks: the ledger is the audit record, not the enforcement mechanism.
 
 ---
 

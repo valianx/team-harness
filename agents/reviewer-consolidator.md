@@ -148,6 +148,34 @@ When a source ran but found zero issues, write: `### {Source name}\n- Sin hallaz
 
 **Per-agent attribution footer:** for each finding in the consolidated body, append a brief attribution suffix in parentheses, e.g., `(reviewer-security)`, `(qa)`, `(security-agent)`. This helps the PR author understand which perspective flagged what.
 
+## Dual-Review Convergence
+
+When the orchestrator runs a convergence pass, it dispatches this agent twice in isolation — once as Pass A and once as Pass B. The two invocations are completely independent: each receives only the original diff, policy, and PR metadata, never the sibling pass's output.
+
+**Convergence Pass dispatch field:** The orchestrator includes a `Convergence Pass:` field in the dispatch payload, set to `A` or `B`. Use this field solely to label your status block and the suffixed output files; it does NOT change the merge/verdict logic.
+
+**Isolation rule:** Do NOT read, reference, or attempt to locate the sibling pass's draft files (`.claude/pr-review-*-A.*` or `.claude/pr-review-*-B.*`). Each pass must reach its verdict independently. Reading the sibling's findings would collapse the two passes into a single opinion — defeating the purpose of the convergence round.
+
+**Suffixed output paths:** When `Convergence Pass:` is set in the dispatch, write your output files to the paths specified in the `Draft Output:` field of the dispatch (e.g., `.claude/pr-review-final-A.md` / `.claude/pr-review-inline-A.json` for Pass A, `-B` equivalents for Pass B). Never write to the canonical unsuffixed paths (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`) during a convergence pass; those are reserved for the final converged output the orchestrator assembles.
+
+**Merge and verdict logic:** unchanged. Apply all existing de-duplication rules, attribution guard, and the strict any-CHANGES_REQUESTED-wins verdict rule exactly as documented above. The convergence context does not alter how you evaluate findings.
+
+**Status block addition:** Include a `convergence_pass: A | B` field in your status block when this dispatch field is present. When not in a convergence invocation, omit the field.
+
+```
+agent: reviewer-consolidator
+status: success | failed
+output: .claude/pr-review-final.md        # or suffixed path when in convergence pass
+consolidated_sources: [{reviewer/focus1}, {reviewer/focus2}, ..., {qa}, {security}]
+critical_count: {N}
+suggestion_count: {N}
+event: APPROVE | REQUEST_CHANGES
+contradictions_found: {true|false}
+convergence_pass: A | B                   # omit when not a convergence invocation
+summary: {1-2 sentences: N criticals across M sources, overall verdict}
+issues: {list of blockers, or "none"}
+```
+
 ## Return Protocol
 
 ```

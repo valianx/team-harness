@@ -21334,6 +21334,1436 @@ check(
 # Marker: prompt-injection-defense-floor
 
 # ---------------------------------------------------------------------------
+# Suite 95 — eval-as-spec (v2.92.0)
+# ---------------------------------------------------------------------------
+# Structural assertions for the eval-as-spec layer added to /th:eval.
+# Pins arg contracts, report shape, spec template, baseline schema, and
+# registry hygiene so the deterministic free layer cannot silently regress.
+#
+# This suite reads text and JSON only.  It NEVER invokes an agent, calls
+# claude -p, or instantiates a subagent_type.  The paid run path is
+# cost-gated and exercised only by the operator via /th:eval ... --k N.
+#
+# Checks (20 total):
+#   1   SKILL.md documents Mode 5 --spec arg
+#   2   SKILL.md documents --k N arg (default 1)
+#   3   SKILL.md documents --baseline <sha> arg
+#   4   SKILL.md --spec mode documents parsing the pass-bar declaration section
+#   5   SKILL.md pass@k report block: pass-rate P/k string
+#   6   SKILL.md pass@k report block: pass@k verdict string
+#   7   SKILL.md NEW-failures-vs-baseline report shape
+#   8   eval-scenarios/_templates/spec.md exists + required sections present
+#   9   eval-scenarios/_templates/spec.md contains pass-bar declaration section
+#   10  eval-scenarios/architect/design-as-spec.md exists + filled-in pass-bar
+#   11  eval-scenarios/.baselines/architect.example.json parses + REQUIRED keys
+#   12  SKILL.md documents the same REQUIRED baseline keys
+#   13  eval-scenarios/README.md documents the same REQUIRED baseline keys
+#   14  SKILL.md documents cost math (N × ~$1 or equivalent)
+#   15  SKILL.md documents paid path NEVER in run-all.sh (cost-boundary string)
+#   16  tests/run-all.sh contains no new claude -p / agent invocation for eval
+#   17  Suite 95 own source contains no Agent( invocation token
+#   18  Suite 95 own source contains no subagent_type invocation token
+#   19  docs/testing.md registers Suite 95 + eval-as-spec marker
+#   20  CLAUDE.md does NOT contain 'Suite 95' (§11 hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 95: eval-as-spec (v2.92.0) ===")
+
+_S95_EVAL_SCENARIOS = REPO_ROOT / "eval-scenarios"
+_S95_SKILL_PATH = SKILLS_DIR / "eval" / "SKILL.md"
+_S95_TEMPLATE_PATH = _S95_EVAL_SCENARIOS / "_templates" / "spec.md"
+_S95_WORKED_SPEC_PATH = _S95_EVAL_SCENARIOS / "architect" / "design-as-spec.md"
+_S95_BASELINE_PATH = _S95_EVAL_SCENARIOS / ".baselines" / "architect.example.json"
+
+_s95_skill_text = read(_S95_SKILL_PATH) if _S95_SKILL_PATH.exists() else ""
+_s95_template_text = read(_S95_TEMPLATE_PATH) if _S95_TEMPLATE_PATH.exists() else ""
+_s95_worked_spec_text = read(_S95_WORKED_SPEC_PATH) if _S95_WORKED_SPEC_PATH.exists() else ""
+_s95_readme_text = read(_S95_EVAL_SCENARIOS / "README.md") if (_S95_EVAL_SCENARIOS / "README.md").exists() else ""
+
+# (1) --spec arg documented
+check(
+    "suite95(1-spec-arg): skills/eval/SKILL.md documents Mode 5 --spec arg",
+    "--spec" in _s95_skill_text and "Mode 5" in _s95_skill_text,
+    "SKILL.md must document '--spec' and 'Mode 5'",
+)
+
+# (2) --k N arg documented (default 1)
+check(
+    "suite95(2-k-arg): skills/eval/SKILL.md documents --k N arg with default 1",
+    "--k" in _s95_skill_text and "default" in _s95_skill_text and "1" in _s95_skill_text,
+    "SKILL.md must document '--k N' arg and its default of 1",
+)
+
+# (3) --baseline <sha> arg documented
+check(
+    "suite95(3-baseline-arg): skills/eval/SKILL.md documents --baseline <sha> arg",
+    "--baseline" in _s95_skill_text,
+    "SKILL.md must document '--baseline <sha>' arg",
+)
+
+# (4) --spec mode documents parsing the pass-bar declaration section
+check(
+    "suite95(4-passbar-parser): skills/eval/SKILL.md --spec mode references pass-bar declaration parsing",
+    "pass-bar" in _s95_skill_text and "parse" in _s95_skill_text.lower(),
+    "SKILL.md Mode 5 must document parsing the pass-bar declaration section by name",
+)
+
+# (5) pass@k report block: pass-rate P/k string
+check(
+    "suite95(5-passrate-format): skills/eval/SKILL.md documents pass-rate P/k report format",
+    "pass-rate" in _s95_skill_text and "P/k" in _s95_skill_text,
+    "SKILL.md must document the 'pass-rate P/k' report block string",
+)
+
+# (6) pass@k verdict string
+check(
+    "suite95(6-passat-k-verdict): skills/eval/SKILL.md documents pass@k verdict string",
+    "pass@k" in _s95_skill_text.lower(),
+    "SKILL.md must document the 'pass@k' verdict string",
+)
+
+# (7) NEW-failures-vs-baseline report shape
+check(
+    "suite95(7-new-failures-shape): skills/eval/SKILL.md documents NEW-failures-vs-baseline report shape",
+    "NEW failures" in _s95_skill_text or "NEW-failures" in _s95_skill_text,
+    "SKILL.md must document the NEW-failures-vs-baseline report shape",
+)
+
+# (8) spec template exists + required sections
+_S95_REQUIRED_TEMPLATE_SECTIONS = [
+    "## Input",
+    "## Context",
+    "## Expected Behaviors",
+    "## Anti-Patterns",
+    "## Output Criteria",
+]
+check(
+    "suite95(8-template-exists): eval-scenarios/_templates/spec.md exists with required sections",
+    _S95_TEMPLATE_PATH.exists() and all(s in _s95_template_text for s in _S95_REQUIRED_TEMPLATE_SECTIONS),
+    f"eval-scenarios/_templates/spec.md must exist and contain all required sections: {_S95_REQUIRED_TEMPLATE_SECTIONS}",
+)
+
+# (9) spec template contains pass-bar declaration section (case-insensitive)
+check(
+    "suite95(9-template-passbar): eval-scenarios/_templates/spec.md contains pass-bar declaration section",
+    "pass-bar" in _s95_template_text.lower(),
+    "eval-scenarios/_templates/spec.md must contain a pass-bar declaration section",
+)
+
+# (10) worked spec exists + filled-in pass-bar declaration (case-insensitive)
+check(
+    "suite95(10-worked-spec): eval-scenarios/architect/design-as-spec.md exists with filled-in pass-bar",
+    _S95_WORKED_SPEC_PATH.exists() and "pass-bar" in _s95_worked_spec_text.lower(),
+    "eval-scenarios/architect/design-as-spec.md must exist and contain a filled-in pass-bar declaration",
+)
+
+# (11) example baseline parses as valid JSON + REQUIRED keys present
+_S95_REQUIRED_BASELINE_KEYS_TOP = ["agent", "baseline_sha", "k", "scenarios"]
+_S95_REQUIRED_SCENARIO_KEYS = ["scenario", "pass_rate", "verdict"]
+
+_s95_baseline_ok = False
+_s95_baseline_detail = "eval-scenarios/.baselines/architect.example.json missing or invalid"
+if _S95_BASELINE_PATH.exists():
+    try:
+        _s95_baseline_data = json.loads(read(_S95_BASELINE_PATH))
+        _s95_top_keys_ok = all(k in _s95_baseline_data for k in _S95_REQUIRED_BASELINE_KEYS_TOP)
+        _s95_scenarios_ok = (
+            isinstance(_s95_baseline_data.get("scenarios"), list)
+            and len(_s95_baseline_data["scenarios"]) > 0
+            and all(
+                sk in _s95_baseline_data["scenarios"][0]
+                for sk in _S95_REQUIRED_SCENARIO_KEYS
+            )
+        )
+        _s95_baseline_ok = _s95_top_keys_ok and _s95_scenarios_ok
+        if not _s95_baseline_ok:
+            _s95_baseline_detail = (
+                f"missing top-level keys {[k for k in _S95_REQUIRED_BASELINE_KEYS_TOP if k not in _s95_baseline_data]} "
+                f"or scenario keys {[k for k in _S95_REQUIRED_SCENARIO_KEYS if k not in (_s95_baseline_data.get('scenarios') or [{}])[0]]}"
+            )
+    except (json.JSONDecodeError, Exception) as e:
+        _s95_baseline_detail = f"JSON parse error: {e}"
+
+check(
+    "suite95(11-baseline-schema): eval-scenarios/.baselines/architect.example.json parses + REQUIRED keys present",
+    _s95_baseline_ok,
+    _s95_baseline_detail,
+)
+
+# (12) SKILL.md documents the REQUIRED baseline keys (canonical required-key list)
+_S95_SKILL_REQUIRED_KEY_STRINGS = ["agent", "baseline_sha", "k", "scenarios"]
+check(
+    "suite95(12-skill-baseline-keys): skills/eval/SKILL.md documents REQUIRED baseline schema keys",
+    all(f'"{k}"' in _s95_skill_text or k in _s95_skill_text for k in _S95_SKILL_REQUIRED_KEY_STRINGS)
+    and "REQUIRED" in _s95_skill_text,
+    "SKILL.md must document the canonical REQUIRED baseline key list (agent, baseline_sha, k, scenarios[].scenario, pass_rate, verdict)",
+)
+
+# (13) README.md documents the REQUIRED baseline keys (same canonical list)
+check(
+    "suite95(13-readme-baseline-keys): eval-scenarios/README.md documents REQUIRED baseline schema keys",
+    bool(_s95_readme_text)
+    and all(k in _s95_readme_text for k in _S95_SKILL_REQUIRED_KEY_STRINGS)
+    and "REQUIRED" in _s95_readme_text,
+    "eval-scenarios/README.md must document the canonical REQUIRED baseline key list",
+)
+
+# (14) SKILL.md documents cost math (N × ~$1 or variant)
+check(
+    "suite95(14-cost-math): skills/eval/SKILL.md documents cost math (N × ~$1 per --k N)",
+    ("N × " in _s95_skill_text or "N x " in _s95_skill_text or "N ×" in _s95_skill_text)
+    and "$1" in _s95_skill_text,
+    "SKILL.md must document the cost math 'N × ~$1' (or equivalent) for --k N",
+)
+
+# (15) SKILL.md documents paid path NEVER in run-all.sh (cost-boundary string)
+check(
+    "suite95(15-cost-boundary): skills/eval/SKILL.md states paid path NEVER in run-all.sh",
+    "run-all.sh" in _s95_skill_text and "NEVER" in _s95_skill_text,
+    "SKILL.md must state that the paid agent-run path is NEVER part of tests/run-all.sh",
+)
+
+# (16) tests/run-all.sh contains no new claude -p entry referencing eval
+_s95_run_all_text = read(REPO_ROOT / "tests" / "run-all.sh")
+check(
+    "suite95(16-run-all-clean): tests/run-all.sh contains no claude -p eval invocation",
+    "claude -p" not in _s95_run_all_text,
+    "tests/run-all.sh must not contain any 'claude -p' invocation (paid path must stay out of the free suite)",
+)
+
+# (17) Suite 95 own source code (non-comment lines) contains no Agent( invocation token
+# The self-inspection strips comment lines so that the AC description strings
+# "contains no Agent( invocation token" in comments do not falsely trigger.
+_s95_own_source = read(Path(__file__))
+_s95_suite95_start = _s95_own_source.find("Suite 95 — eval-as-spec")
+_s95_suite95_end = _s95_own_source.find("# Marker: eval-as-spec")
+_s95_own_region = (
+    _s95_own_source[_s95_suite95_start:_s95_suite95_end]
+    if _s95_suite95_start >= 0 and _s95_suite95_end > _s95_suite95_start
+    else _s95_own_source[_s95_suite95_start:]
+)
+# Strip comment lines before scanning for invocation tokens
+_s95_code_lines = [
+    ln for ln in _s95_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s95_code_only = "\n".join(_s95_code_lines)
+check(
+    "suite95(17-no-agent-token): Suite 95 code (non-comment) region contains no Agent( invocation token",
+    "Agent(" not in _s95_code_only,
+    "Suite 95 must not contain Agent( in non-comment code — it is a pure text/JSON structural suite (no paid agent runs)",
+)
+
+# (18) Suite 95 own source code (non-comment lines) contains no subagent_type invocation token
+check(
+    "suite95(18-no-subagent-type): Suite 95 code (non-comment) region contains no subagent_type token",
+    "subagent_type" not in _s95_code_only,
+    "Suite 95 must not contain subagent_type in non-comment code — it is a pure text/JSON structural suite",
+)
+
+# (19) docs/testing.md registers Suite 95 + eval-as-spec marker
+_s95_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite95(19-registry): docs/testing.md registers 'Suite 95' and 'eval-as-spec' marker",
+    "Suite 95" in _s95_testing_md and "eval-as-spec" in _s95_testing_md,
+    "docs/testing.md must register Suite 95 and the eval-as-spec marker",
+)
+
+# (20) CLAUDE.md does NOT contain 'Suite 95' (§11 hygiene contract)
+_s95_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite95(20-hygiene): CLAUDE.md does NOT contain 'Suite 95'",
+    "Suite 95" not in _s95_claude_md,
+    "CLAUDE.md must not mention Suite 95 — docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: eval-as-spec
+
+# ---------------------------------------------------------------------------
+# Suite 96 — review-lenses (v2.91.0)
+# ---------------------------------------------------------------------------
+# Structural assertions for the reviewer agent on-demand review lenses system.
+# Written by implementer (2026-06-15). Marker: review-lenses
+#
+# Mirrors Suite 88 (gcp-infra-refs-on-demand) for the reviewer agent.
+# Asserts:
+#   (1a-f) reviewer.md contains a Reference Router section with required tokens
+#           + the Fresh Review status block carries the reference_loaded field
+#   (2a-d) agents/review-lenses/_index.md exists, lists all 3 lenses,
+#           documents the path convention, and documents fallback behavior
+#   (3)    all 3 lens files exist on disk
+#   (4)    all 3 lens files have NO YAML frontmatter (reference, not agents)
+#   (5)    per-lens required-token coverage
+#   (6a-b) single reviewer agent (no variant added)
+#   (7)    provenance guard — no external-project name in any shipped string
+#   (8)    Suite 96 own non-comment code contains no Agent( invocation token
+#   (9)    Suite 96 own non-comment code contains no subagent_type token
+#   (h1)   docs/testing.md registers Suite 96 + review-lenses marker
+#   (h2)   CLAUDE.md does NOT contain 'Suite 96' (§11 hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 96: review-lenses structural assertions (v2.91.0) ===")
+
+_s96_reviewer   = read(AGENTS_DIR / "reviewer.md")
+_s96_refs_dir   = AGENTS_DIR / "review-lenses"
+_s96_index_path = _s96_refs_dir / "_index.md"
+_s96_lenses     = ["silent-failure", "type-design", "comment-rot"]
+_s96_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s96_claude     = read(REPO_ROOT / "CLAUDE.md")
+_S96_STOP       = ("\n## ", "\n### ", "\n---\n")
+_s96_router     = _slice_section(_s96_reviewer, "## Reference Router", _S96_STOP)
+_s96_index_text = read(_s96_index_path) if _s96_index_path.exists() else ""
+
+# (1a) Reference Router section exists in reviewer.md
+check(
+    "suite96(1a): reviewer.md contains ## Reference Router section",
+    len(_s96_router) > 0,
+    "reviewer.md must contain a ## Reference Router section",
+)
+
+# (1b) Router references the manifest
+check(
+    "suite96(1b): Reference Router contains '_index.md'",
+    "_index.md" in _s96_router,
+    "## Reference Router must reference '_index.md' (the manifest)",
+)
+
+# (1c) Router lists all 3 lens names (3 sub-checks)
+for _s96_lens in _s96_lenses:
+    check(
+        f"suite96(1c): Reference Router contains lens name '{_s96_lens}'",
+        _s96_lens in _s96_router,
+        f"## Reference Router must list '{_s96_lens}' as a trigger lens",
+    )
+
+# (1d) Router declares graceful-degradation / never-fabricate fallback
+check(
+    "suite96(1d): Reference Router contains fallback / degrade token",
+    "unavailable" in _s96_router.lower() or "fabricate" in _s96_router.lower() or "degrade" in _s96_router.lower(),
+    "## Reference Router must declare graceful-degradation / never-fabricate fallback",
+)
+
+# (1e) Router references the reference_loaded status field
+check(
+    "suite96(1e): Reference Router contains 'reference_loaded' status field token",
+    "reference_loaded" in _s96_router,
+    "## Reference Router must reference the 'reference_loaded' status field",
+)
+
+# (1f) Fresh Review status block carries reference_loaded with 'review-lenses unavailable' value
+check(
+    "suite96(1f-statusfield): reviewer.md carries 'reference_loaded' field and 'review-lenses unavailable' value",
+    "reference_loaded" in _s96_reviewer and "review-lenses unavailable" in _s96_reviewer,
+    "reviewer.md Fresh Review status block must carry reference_loaded: field with 'review-lenses unavailable' documented",
+)
+
+# (2a) _index.md exists
+check(
+    "suite96(2a): agents/review-lenses/_index.md exists",
+    _s96_index_path.exists(),
+    "agents/review-lenses/_index.md must exist (Reference Router manifest)",
+)
+
+# (2b) _index.md lists all 3 lens names (3 sub-checks)
+for _s96_lens in _s96_lenses:
+    check(
+        f"suite96(2b): _index.md lists lens '{_s96_lens}'",
+        _s96_lens in _s96_index_text,
+        f"agents/review-lenses/_index.md must list lens '{_s96_lens}'",
+    )
+
+# (2c) _index.md documents the path convention
+check(
+    "suite96(2c): _index.md documents path convention 'agents/review-lenses/'",
+    "agents/review-lenses/" in _s96_index_text,
+    "agents/review-lenses/_index.md must document the path convention 'agents/review-lenses/'",
+)
+
+# (2d) _index.md documents fallback behavior
+check(
+    "suite96(2d): _index.md documents fallback behavior",
+    "unavailable" in _s96_index_text.lower() or "fallback" in _s96_index_text.lower(),
+    "agents/review-lenses/_index.md must document fallback behavior when a lens file is absent",
+)
+
+# (3) All 3 lens files exist on disk (3 sub-checks)
+_s96_lens_texts: dict[str, str] = {}
+for _s96_lens in _s96_lenses:
+    _s96_lens_path = _s96_refs_dir / f"{_s96_lens}.md"
+    check(
+        f"suite96(3): agents/review-lenses/{_s96_lens}.md exists",
+        _s96_lens_path.exists(),
+        f"agents/review-lenses/{_s96_lens}.md must exist (listed in manifest, must be present on disk)",
+    )
+    _s96_lens_texts[_s96_lens] = read(_s96_lens_path) if _s96_lens_path.exists() else ""
+
+# (4) All 3 lens files have NO YAML frontmatter (3 sub-checks)
+for _s96_lens in _s96_lenses:
+    check(
+        f"suite96(4): {_s96_lens}.md has NO YAML frontmatter",
+        not _s96_lens_texts[_s96_lens].startswith("---"),
+        f"agents/review-lenses/{_s96_lens}.md must NOT have YAML frontmatter (reference files are not agents)",
+    )
+
+# (5) Per-lens required-token coverage (one check per lens)
+_s96_lens_tokens = {
+    "silent-failure": ["catch", "swallow", "except"],
+    "type-design":    ["illegal", "primitive", "null"],
+    "comment-rot":    ["todo", "fixme", "stale"],
+}
+for _s96_lens, _s96_tokens in _s96_lens_tokens.items():
+    _s96_text_lower = _s96_lens_texts[_s96_lens].lower()
+    check(
+        f"suite96(5): {_s96_lens}.md covers required heuristic tokens {_s96_tokens}",
+        any(t in _s96_text_lower for t in _s96_tokens),
+        f"agents/review-lenses/{_s96_lens}.md must cover at least one of the required tokens: {_s96_tokens}",
+    )
+
+# (6a) reviewer stays a single agent (no variant added)
+check(
+    "suite96(6a): EXPECTED_AGENTS lists 'reviewer' exactly once",
+    EXPECTED_AGENTS.count("reviewer") == 1,
+    "EXPECTED_AGENTS must list 'reviewer' exactly once — no reviewer variant was added",
+)
+
+# (6b) No stray variant agent file (review-lens.md or reviewer-lenses.md)
+check(
+    "suite96(6b): no agents/review-lens.md or agents/reviewer-lenses.md exists",
+    not (AGENTS_DIR / "review-lens.md").exists() and not (AGENTS_DIR / "reviewer-lenses.md").exists(),
+    "no reviewer-variant agent file may exist — single reviewer agent only",
+)
+
+# (7) Provenance guard — no external-project name in any shipped artifact string
+_s96_forbidden = ["EC" + "C", "Agent" + "Shield"]
+_s96_provenance_strings = [_s96_router, _s96_index_text] + list(_s96_lens_texts.values())
+_s96_provenance_clean = all(
+    all(tok not in s for tok in _s96_forbidden)
+    for s in _s96_provenance_strings
+)
+check(
+    "suite96(7-no-provenance): no shipped artifact names an external project",
+    _s96_provenance_clean,
+    "No shipped string (router section, _index.md, lens files) may name an external project — use TH-native terms only",
+)
+
+# (8) Suite 96 own non-comment code contains no Agent( invocation token
+# Self-inspection: strip comment lines so that AC-description strings in comments don't falsely trigger.
+_s96_own_source = read(Path(__file__))
+_s96_suite96_start = _s96_own_source.find("Suite 96 — review-lenses")
+_s96_suite96_end   = _s96_own_source.find("# Marker: review-lenses")
+_s96_own_region = (
+    _s96_own_source[_s96_suite96_start:_s96_suite96_end]
+    if _s96_suite96_start >= 0 and _s96_suite96_end > _s96_suite96_start
+    else _s96_own_source[_s96_suite96_start:]
+)
+_s96_code_lines = [
+    ln for ln in _s96_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s96_code_only = "\n".join(_s96_code_lines)
+
+check(
+    "suite96(8-no-agent-token): Suite 96 code (non-comment) region contains no Agent( invocation token",
+    "Agent(" not in _s96_code_only,
+    "Suite 96 must not contain Agent( in non-comment code — it is a pure text/file structural suite (no paid agent runs)",
+)
+
+# (9) Suite 96 own non-comment code contains no subagent_type token
+check(
+    "suite96(9-no-subagent-type): Suite 96 code (non-comment) region contains no subagent_type token",
+    "subagent_type" not in _s96_code_only,
+    "Suite 96 must not contain subagent_type in non-comment code — it is a pure text/file structural suite",
+)
+
+# (h1) docs/testing.md registers Suite 96 + review-lenses marker
+check(
+    "suite96(h1-registry): docs/testing.md registers 'Suite 96' and 'review-lenses'",
+    "Suite 96" in _s96_testing_md and "review-lenses" in _s96_testing_md,
+    "docs/testing.md must register Suite 96 and the review-lenses marker (canonical suite registry)",
+)
+
+# (h2) CLAUDE.md hygiene: §11 must NOT contain 'Suite 96'
+check(
+    "suite96(h2-hygiene): CLAUDE.md does NOT contain 'Suite 96'",
+    "Suite 96" not in _s96_claude,
+    "CLAUDE.md must not mention Suite 96 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: review-lenses
+
+# ---------------------------------------------------------------------------
+# Suite 97 — confidence-scored-plan
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 97: confidence-scored-plan ===")
+
+_s97_arch_text    = read(AGENTS_DIR / "architect.md")
+_s97_orch_text    = read(AGENTS_DIR / "orchestrator.md")
+_s97_pr_text      = read(AGENTS_DIR / "plan-reviewer.md")
+_s97_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
+_s97_claude_md    = read(REPO_ROOT / "CLAUDE.md")
+
+# Stop markers: stop at next heading or horizontal rule (same as suite 96)
+_S97_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# Anchor for the architect contract block
+_S97_ARCH_ANCHOR = "### Confidence Score & Patterns to Mirror"
+
+# Slice the architect contract section (stops at next ### or ## or ---)
+_s97_arch_slice = _slice_section(_s97_arch_text, _S97_ARCH_ANCHOR, _S97_STOP)
+
+check(
+    "suite97(anchor): agents/architect.md contains '### Confidence Score & Patterns to Mirror' contract section",
+    bool(_s97_arch_slice),
+    f"anchor '{_S97_ARCH_ANCHOR}' not found — suite97 checks 1-5 will fail",
+)
+
+# (1) Four rubric factor names present in the contract slice
+_S97_RUBRIC_FACTORS = ["spec clarity", "prior art", "blast radius", "unknowns"]
+check(
+    "suite97(1-rubric-factors): architect.md Confidence Score contract names all four rubric factors",
+    bool(_s97_arch_slice) and all(f in _s97_arch_slice.lower() for f in _S97_RUBRIC_FACTORS),
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must name all four rubric factors: {_S97_RUBRIC_FACTORS}",
+)
+
+# (2) Single-pass semantics: (single-pass) qualifier AND one-shot/STAGE-GATE-3/without rework
+_s97_single_pass_qualifier = bool(_s97_arch_slice) and "(single-pass)" in _s97_arch_slice
+_s97_single_pass_semantics = bool(_s97_arch_slice) and (
+    "one-shot" in _s97_arch_slice
+    or "STAGE-GATE-3" in _s97_arch_slice
+    or "without rework" in _s97_arch_slice
+)
+check(
+    "suite97(2-single-pass-semantics): architect.md Confidence Score contract contains '(single-pass)' qualifier",
+    _s97_single_pass_qualifier,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain the '(single-pass)' qualifier",
+)
+check(
+    "suite97(2b-single-pass-meaning): architect.md Confidence Score contract pins single-pass semantics phrase",
+    _s97_single_pass_semantics,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain 'one-shot', 'STAGE-GATE-3', or 'without rework' to anchor the score semantics",
+)
+
+# (3) Canonical score-line format: **Confidence:** and N/10
+check(
+    "suite97(3-score-line): architect.md Confidence Score contract contains '**Confidence:**' token",
+    bool(_s97_arch_slice) and "**Confidence:**" in _s97_arch_slice,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain the '**Confidence:**' score-line token",
+)
+check(
+    "suite97(3b-score-format): architect.md Confidence Score contract contains 'N/10' format token",
+    bool(_s97_arch_slice) and "N/10" in _s97_arch_slice,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain the 'N/10' score format token",
+)
+
+# (4) Three calibration band labels
+_S97_BANDS = ["8–10", "5–7", "1–4"]
+check(
+    "suite97(4-calibration-bands): architect.md Confidence Score contract names all three calibration bands",
+    bool(_s97_arch_slice) and all(b in _s97_arch_slice for b in _S97_BANDS),
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must name the three calibration bands: 8–10, 5–7, 1–4",
+)
+
+# (5) Patterns to Mirror: section heading + explicit escape bullet
+# The contract section is sliced to stop at next ### heading, so ### Patterns to Mirror
+# is a stop marker. Check it appears in the full contract block (wider slice).
+_S97_ARCH_WIDE_STOP = ("\n## ", "\n---\n")
+_s97_arch_wide = _slice_section(_s97_arch_text, _S97_ARCH_ANCHOR, _S97_ARCH_WIDE_STOP)
+check(
+    "suite97(5-patterns-heading): architect.md contract block contains '### Patterns to Mirror' sub-section",
+    bool(_s97_arch_wide) and "### Patterns to Mirror" in _s97_arch_wide,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must include '### Patterns to Mirror' sub-section heading",
+)
+check(
+    "suite97(5b-escape-bullet): architect.md contract block contains 'No in-repo pattern to mirror' escape bullet",
+    bool(_s97_arch_wide) and "No in-repo pattern to mirror" in _s97_arch_wide,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must document the explicit escape bullet 'No in-repo pattern to mirror'",
+)
+
+# (6) Template wiring: architect.md full template block (code-fence) contains both sub-sections.
+# The template is inside a ```markdown ... ``` fence; _slice_section stops at the first \n## inside
+# the fence, so we check file-wide occurrence after the template anchor (same as Suite 94 heading
+# checks that use direct "in" membership). Both sub-section headings are meaningful only after the
+# template anchor — verify they appear in the region after the anchor.
+_S97_TEMPLATE_ANCHOR = "### Full `01-plan.md` template"
+_s97_arch_after_template = (
+    _s97_arch_text[_s97_arch_text.find(_S97_TEMPLATE_ANCHOR):]
+    if _S97_TEMPLATE_ANCHOR in _s97_arch_text
+    else ""
+)
+check(
+    "suite97(6-template-confidence): architect.md region after 01-plan.md template anchor contains '### Confidence Score'",
+    bool(_s97_arch_after_template) and "### Confidence Score" in _s97_arch_after_template,
+    f"architect.md § '{_S97_TEMPLATE_ANCHOR}' region must include '### Confidence Score' sub-section",
+)
+check(
+    "suite97(6b-template-patterns): architect.md region after 01-plan.md template anchor contains '### Patterns to Mirror'",
+    bool(_s97_arch_after_template) and "### Patterns to Mirror" in _s97_arch_after_template,
+    f"architect.md § '{_S97_TEMPLATE_ANCHOR}' region must include '### Patterns to Mirror' sub-section",
+)
+
+# (7) Return Protocol status block: confidence: field
+_S97_STATUS_ANCHOR = "## Return Protocol"
+_S97_STATUS_STOP = ("\n## ", "\n---\n")
+_s97_return_slice = _slice_section(_s97_arch_text, _S97_STATUS_ANCHOR, _S97_STATUS_STOP)
+check(
+    "suite97(7-status-block): architect.md Return Protocol contains 'confidence:' field",
+    bool(_s97_return_slice) and "confidence:" in _s97_return_slice,
+    f"architect.md § '{_S97_STATUS_ANCHOR}' must contain a 'confidence:' field in the status block",
+)
+
+# (8) Orchestrator STAGE-GATE-1 STOP block: ── Confidence ── band AND **Confidence:**
+_S97_GATE1_ANCHOR = "## STAGE-GATE-1"
+_S97_GATE1_STOP = ("\n## ", "\n---\n")
+_s97_gate1_slice = _slice_section(_s97_orch_text, _S97_GATE1_ANCHOR, _S97_GATE1_STOP)
+check(
+    "suite97(8-orch-confidence-band): orchestrator.md STAGE-GATE-1 STOP block contains '── Confidence ──' band token",
+    bool(_s97_gate1_slice) and "── Confidence ──" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must contain the '── Confidence ──' band line in the STOP template",
+)
+check(
+    "suite97(8b-orch-confidence-line): orchestrator.md STAGE-GATE-1 STOP block contains '**Confidence:**' token",
+    bool(_s97_gate1_slice) and "**Confidence:**" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must render '**Confidence:**' in the confidence band",
+)
+
+# (9) Orchestrator rendering note: "Confidence: not stated" fallback + verbatim Review-Summary copy note
+check(
+    "suite97(9-not-stated-fallback): orchestrator.md STAGE-GATE-1 contains 'Confidence: not stated' fallback wording",
+    bool(_s97_gate1_slice) and "Confidence: not stated" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must document the 'Confidence: not stated' fallback",
+)
+check(
+    "suite97(9b-verbatim-copy-note): orchestrator.md STAGE-GATE-1 explains the score rides the verbatim Review-Summary copy",
+    bool(_s97_gate1_slice) and (
+        "verbatim" in _s97_gate1_slice and "Review Summary" in _s97_gate1_slice
+    ),
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must note that the score already rides the verbatim Review-Summary copy",
+)
+
+# (10) plan-reviewer Rule 12 heading
+check(
+    "suite97(10-rule12-heading): plan-reviewer.md contains '### Rule 12 — Confidence Score presence + justification'",
+    "### Rule 12 — Confidence Score presence + justification" in _s97_pr_text,
+    "agents/plan-reviewer.md must define '### Rule 12 — Confidence Score presence + justification'",
+)
+
+# Slice Rule 12 section for subsequent checks
+_S97_RULE12_ANCHOR = "### Rule 12 — Confidence Score presence + justification"
+_S97_RULE12_STOP = ("\n## ", "\n### ", "\n---\n")
+_s97_rule12_slice = _slice_section(_s97_pr_text, _S97_RULE12_ANCHOR, _S97_RULE12_STOP)
+
+# (11) Rule 12 severity: concerns declared AND fail-OPEN language (never + fail)
+check(
+    "suite97(11-rule12-severity-concerns): plan-reviewer.md Rule 12 slice declares 'concerns' severity",
+    bool(_s97_rule12_slice) and "concerns" in _s97_rule12_slice,
+    f"agents/plan-reviewer.md § Rule 12 must declare 'concerns' severity",
+)
+check(
+    "suite97(11b-rule12-fail-open): plan-reviewer.md Rule 12 slice contains fail-OPEN language ('never' + 'fail')",
+    bool(_s97_rule12_slice) and "never" in _s97_rule12_slice and "fail" in _s97_rule12_slice,
+    f"agents/plan-reviewer.md § Rule 12 must use fail-OPEN language mirroring Rule 11",
+)
+
+# (12) Rule 12 no-op gating: names hotfix AND (Tier 1 OR research OR spike)
+_s97_rule12_has_hotfix = bool(_s97_rule12_slice) and "hotfix" in _s97_rule12_slice
+_s97_rule12_has_tier1_or_research = bool(_s97_rule12_slice) and (
+    "Tier 1" in _s97_rule12_slice
+    or "research" in _s97_rule12_slice
+    or "spike" in _s97_rule12_slice
+)
+check(
+    "suite97(12-rule12-noop-hotfix): plan-reviewer.md Rule 12 slice names 'hotfix' in no-op gating clause",
+    _s97_rule12_has_hotfix,
+    f"agents/plan-reviewer.md § Rule 12 must name 'hotfix' as a no-op case",
+)
+check(
+    "suite97(12b-rule12-noop-tier1): plan-reviewer.md Rule 12 slice names 'Tier 1' or 'research' or 'spike' in no-op gating",
+    _s97_rule12_has_tier1_or_research,
+    f"agents/plan-reviewer.md § Rule 12 must name 'Tier 1', 'research', or 'spike' in the no-op clause",
+)
+
+# (13) Summary table row: '12 — Confidence Score'
+check(
+    "suite97(13-summary-table-row): plan-reviewer.md ## Summary rules table contains '12 — Confidence Score' row",
+    "12 — Confidence Score" in _s97_pr_text,
+    "agents/plan-reviewer.md ## Summary rules table must contain a '12 — Confidence Score' row",
+)
+
+# (14) Findings template block: ### Rule 12 — Confidence Score findings block
+check(
+    "suite97(14-findings-block): plan-reviewer.md report template contains '### Rule 12 — Confidence Score' findings block",
+    "### Rule 12 — Confidence Score" in _s97_pr_text,
+    "agents/plan-reviewer.md report template must include a '### Rule 12 — Confidence Score' findings block",
+)
+
+# (15) Return Protocol: rule-12: line
+check(
+    "suite97(15-status-rule12): plan-reviewer.md Return Protocol contains 'rule-12:' field",
+    "rule-12:" in _s97_pr_text,
+    "agents/plan-reviewer.md Return Protocol status block must contain a 'rule-12:' field",
+)
+
+# (16) Verdict Calibration: Rule 12 stated as always concerns-severity
+_S97_VERDICT_ANCHOR = "## Verdict Calibration"
+_S97_VERDICT_STOP = ("\n## ", "\n---\n")
+_s97_verdict_slice = _slice_section(_s97_pr_text, _S97_VERDICT_ANCHOR, _S97_VERDICT_STOP)
+check(
+    "suite97(16-verdict-calibration): plan-reviewer.md Verdict Calibration states Rule 12 is always concerns-severity",
+    bool(_s97_verdict_slice) and (
+        "Rule 12" in _s97_verdict_slice
+        and "concerns" in _s97_verdict_slice
+    ),
+    f"agents/plan-reviewer.md § '{_S97_VERDICT_ANCHOR}' must document Rule 12 as always concerns-severity",
+)
+
+# (17) Self-referential registry: docs/testing.md contains 'Suite 97' AND 'confidence-scored-plan'
+check(
+    "suite97(h1-registry): docs/testing.md registers 'Suite 97' and 'confidence-scored-plan'",
+    "Suite 97" in _s97_testing_md and "confidence-scored-plan" in _s97_testing_md,
+    "docs/testing.md must register Suite 97 and the confidence-scored-plan marker (canonical suite registry)",
+)
+
+# (18) Hygiene guard: CLAUDE.md must NOT contain 'Suite 97'
+check(
+    "suite97(h2-hygiene): CLAUDE.md does NOT contain 'Suite 97'",
+    "Suite 97" not in _s97_claude_md,
+    "CLAUDE.md must not mention Suite 97 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (19) Suite-marker self-reference: this test file contains Suite 97, _slice_section, and confidence-scored-plan
+_s97_own_source = read(Path(__file__))
+check(
+    "suite97(h3-self-ref): this test file contains 'Suite 97', '_slice_section', and 'confidence-scored-plan'",
+    "Suite 97" in _s97_own_source
+    and "_slice_section" in _s97_own_source
+    and "confidence-scored-plan" in _s97_own_source,
+    "test file must reference Suite 97, _slice_section, and confidence-scored-plan (self-referential marker check)",
+)
+
+# Marker: confidence-scored-plan
+
+# ---------------------------------------------------------------------------
+# Suite 98 — dual-review-convergence
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 98: dual-review-convergence structural contract ===")
+
+_s98_consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
+_s98_ref_modes    = read(AGENTS_DIR / "ref-direct-modes.md")
+_s98_skill        = read(skill_path("review-pr"))
+_s98_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
+_s98_claude_md    = read(REPO_ROOT / "CLAUDE.md")
+
+_S98_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ── Consolidator section ──────────────────────────────────────────────────
+
+_S98_CONSOL_ANCHOR = "## Dual-Review Convergence"
+_s98_consol_slice = _slice_section(_s98_consolidator, _S98_CONSOL_ANCHOR, _S98_STOP)
+
+# (1) consolidator-section: heading present
+check(
+    "suite98(1-consolidator-section): agents/reviewer-consolidator.md contains '## Dual-Review Convergence' heading",
+    bool(_s98_consol_slice),
+    f"anchor '{_S98_CONSOL_ANCHOR}' not found — suite98 checks 2-4 will fail",
+)
+
+# (2) consolidator-pass-field: Convergence Pass: dispatch field documented
+check(
+    "suite98(2-consolidator-pass-field): consolidator section documents 'Convergence Pass:' dispatch field (pass A / pass B)",
+    bool(_s98_consol_slice) and "Convergence Pass:" in _s98_consol_slice and (
+        "Pass A" in _s98_consol_slice or "pass A" in _s98_consol_slice
+    ) and (
+        "Pass B" in _s98_consol_slice or "pass B" in _s98_consol_slice
+    ),
+    "consolidator '## Dual-Review Convergence' must document the 'Convergence Pass:' dispatch field with A and B values",
+)
+
+# (3) consolidator-isolation: isolation rule — never read sibling pass drafts
+check(
+    "suite98(3-consolidator-isolation): consolidator section documents isolation rule (never read sibling -A/-B drafts)",
+    bool(_s98_consol_slice) and (
+        "-A" in _s98_consol_slice or "-B" in _s98_consol_slice
+    ) and (
+        "isolation" in _s98_consol_slice.lower()
+        or "never read" in _s98_consol_slice.lower()
+        or "Do NOT read" in _s98_consol_slice
+    ),
+    "consolidator '## Dual-Review Convergence' must document the isolation rule (never read sibling pass's -A/-B drafts)",
+)
+
+# (4) consolidator-status-field: convergence_pass: field in status block
+check(
+    "suite98(4-consolidator-status-field): consolidator section documents 'convergence_pass:' status-block field",
+    bool(_s98_consol_slice) and "convergence_pass:" in _s98_consol_slice,
+    "consolidator '## Dual-Review Convergence' must document the 'convergence_pass: A | B' status-block field",
+)
+
+# ── Orchestrator sub-section ──────────────────────────────────────────────
+
+_S98_ORCH_ANCHOR = "### Dual-Review Convergence"
+_s98_orch_slice = _slice_section(_s98_ref_modes, _S98_ORCH_ANCHOR, _S98_STOP)
+
+# (5) orchestrator-subsection: heading present in ref-direct-modes.md
+check(
+    "suite98(5-orchestrator-subsection): agents/ref-direct-modes.md contains '### Dual-Review Convergence' sub-section",
+    bool(_s98_orch_slice),
+    f"anchor '{_S98_ORCH_ANCHOR}' not found in ref-direct-modes.md — suite98 checks 6-12 will fail",
+)
+
+# (6) orch-both-approve: both-must-APPROVE rule
+check(
+    "suite98(6-orch-both-approve): orchestrator sub-section documents both-must-APPROVE convergence rule",
+    bool(_s98_orch_slice) and "APPROVE" in _s98_orch_slice and (
+        "both" in _s98_orch_slice.lower() or "Both" in _s98_orch_slice
+    ) and "CONVERGED_APPROVE" in _s98_orch_slice,
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the both-must-APPROVE rule and CONVERGED_APPROVE outcome",
+)
+
+# (7) orch-isolation: context-isolation between the two passes
+check(
+    "suite98(7-orch-isolation): orchestrator sub-section documents context-isolation between passes",
+    bool(_s98_orch_slice) and (
+        "context-isolation" in _s98_orch_slice
+        or "isolation" in _s98_orch_slice.lower()
+    ) and (
+        "original diff" in _s98_orch_slice
+        or "only the original" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document context-isolation (passes receive only original inputs)",
+)
+
+# (8) orch-fresh-rounds: fresh-each-round rule (no prior-round artifacts)
+check(
+    "suite98(8-orch-fresh-rounds): orchestrator sub-section documents fresh-each-round rule (no prior-round artifacts)",
+    bool(_s98_orch_slice) and (
+        "fresh" in _s98_orch_slice.lower() or "Freshness" in _s98_orch_slice
+    ) and (
+        "prior" in _s98_orch_slice.lower() or "no artifacts" in _s98_orch_slice.lower()
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the fresh-each-round rule (no prior-round artifacts forwarded)",
+)
+
+# (9) orch-max-3: max 3 rounds hard cap
+check(
+    "suite98(9-orch-max-3): orchestrator sub-section documents max 3 rounds hard cap",
+    bool(_s98_orch_slice) and (
+        "max 3 rounds" in _s98_orch_slice
+        or "max 3" in _s98_orch_slice
+        or "3 rounds" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the max 3 rounds hard cap",
+)
+
+# (10) orch-escalate-no-autoresolve: STOP-and-escalate + never auto-resolve
+check(
+    "suite98(10-orch-escalate-no-autoresolve): orchestrator sub-section documents STOP-and-escalate and never-auto-resolve",
+    bool(_s98_orch_slice) and (
+        "escalate" in _s98_orch_slice.lower() or "STOP" in _s98_orch_slice
+    ) and (
+        "never auto-resolve" in _s98_orch_slice
+        or "never auto" in _s98_orch_slice.lower()
+        or "cannot auto-resolve" in _s98_orch_slice
+        or "does not auto-resolve" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document STOP-and-escalate and an explicit never-auto-resolve clause",
+)
+
+# (11) orch-before-gate: convergence runs BEFORE the Publish Gate, never calls write verb
+check(
+    "suite98(11-orch-before-gate): orchestrator sub-section states convergence runs BEFORE Publish Gate and never calls write verb",
+    bool(_s98_orch_slice) and (
+        "BEFORE" in _s98_orch_slice or "before" in _s98_orch_slice
+    ) and "Publish Gate" in _s98_orch_slice and (
+        "never calls" in _s98_orch_slice.lower()
+        or "never call" in _s98_orch_slice.lower()
+        or "never publishes" in _s98_orch_slice.lower()
+        or "write verb" in _s98_orch_slice.lower()
+        or "GitHub write verb" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must state convergence runs BEFORE the Publish Gate and never calls a GitHub write verb",
+)
+
+# (12) orch-state-record: convergence block in 00-state.md + review.convergence.round event
+check(
+    "suite98(12-orch-state-record): orchestrator sub-section documents convergence block in 00-state.md and review.convergence.round event",
+    bool(_s98_orch_slice) and "00-state.md" in _s98_orch_slice and "convergence" in _s98_orch_slice and (
+        "review.convergence.round" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the 00-state.md convergence block and review.convergence.round event",
+)
+
+# ── Skill flag + loop ──────────────────────────────────────────────────────
+
+_S98_FLAG_ANCHOR = "## Flag parsing"
+_s98_flag_slice = _slice_section(_s98_skill, _S98_FLAG_ANCHOR, _S98_STOP)
+
+# (13) skill-converge-flag: --converge flag documented in Flag parsing
+check(
+    "suite98(13-skill-converge-flag): skills/review-pr/SKILL.md Flag-parsing section documents '--converge' flag",
+    bool(_s98_flag_slice) and "--converge" in _s98_flag_slice,
+    "skills/review-pr/SKILL.md '## Flag parsing' section must document the '--converge' flag",
+)
+
+# (14) skill-tier4-autoon: Tier 4 auto-on using existing tier classification
+_S98_CONV_ANCHOR = "### Phase 3.1 — Dual-Review Convergence"
+_s98_conv_slice = _slice_section(_s98_skill, _S98_CONV_ANCHOR, _S98_STOP)
+
+check(
+    "suite98(14-skill-tier4-autoon): skill convergence section documents Tier 4 auto-on using existing tier classification (no new keyword list)",
+    bool(_s98_conv_slice) and "Tier 4" in _s98_conv_slice and (
+        "auto-on" in _s98_conv_slice or "auto_on" in _s98_conv_slice or "auto-enabled" in _s98_conv_slice
+        or "automatically sets" in _s98_conv_slice
+    ) and (
+        "existing" in _s98_conv_slice.lower() or "no new keyword" in _s98_conv_slice.lower()
+    ),
+    "skills/review-pr/SKILL.md convergence section must document Tier 4 auto-on referencing the EXISTING tier classification (no new keyword list)",
+)
+
+# (15) skill-loop-branches: round < 3 fresh-round branch AND round == 3 escalation STOP
+check(
+    "suite98(15-skill-loop-branches): skill convergence section documents round < 3 fresh-round branch and round == 3 escalation STOP",
+    bool(_s98_conv_slice) and (
+        "round < 3" in _s98_conv_slice or "convergence_round < 3" in _s98_conv_slice
+    ) and (
+        "round == 3" in _s98_conv_slice or "convergence_round == 3" in _s98_conv_slice
+    ) and (
+        "STOP" in _s98_conv_slice and "escalate" in _s98_conv_slice.lower()
+    ),
+    "skills/review-pr/SKILL.md convergence section must document both the 'round < 3' fresh-round branch and the 'round == 3' escalation STOP",
+)
+
+# (16) skill-state-and-cleanup: .claude/pr-review-convergence.json recorded AND -A/-B drafts in cleanup list
+check(
+    "suite98(16-skill-state-and-cleanup): skill documents pr-review-convergence.json AND -A/-B draft files in cleanup trap",
+    "pr-review-convergence.json" in _s98_skill and (
+        "pr-review-final-A.md" in _s98_skill or "pr-review-*-A" in _s98_skill
+    ) and (
+        "pr-review-final-B.md" in _s98_skill or "pr-review-*-B" in _s98_skill
+    ),
+    "skills/review-pr/SKILL.md must document .claude/pr-review-convergence.json round-state AND -A/-B draft files in the cleanup trap",
+)
+
+# ── Registry + hygiene ────────────────────────────────────────────────────
+
+# (17) registry: docs/testing.md registers Suite 98 and dual-review-convergence marker
+check(
+    "suite98(17-registry): docs/testing.md registers 'Suite 98' and 'dual-review-convergence' marker",
+    "Suite 98" in _s98_testing_md and "dual-review-convergence" in _s98_testing_md,
+    "docs/testing.md must register Suite 98 and the dual-review-convergence marker (canonical suite registry)",
+)
+
+# (18) hygiene: CLAUDE.md must NOT contain 'Suite 98'
+check(
+    "suite98(18-hygiene): CLAUDE.md does NOT contain 'Suite 98'",
+    "Suite 98" not in _s98_claude_md,
+    "CLAUDE.md must not mention Suite 98 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (19) self-non-invocation: this file's non-comment source contains no Agent( or subagent_type token
+_s98_own_source = read(Path(__file__))
+_s98_non_comment_lines = [
+    line for line in _s98_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s98_non_comment_text = "\n".join(_s98_non_comment_lines)
+check(
+    "suite98(19-no-agent-call): Suite 98 non-comment source contains no 'Agent(' or 'subagent_type' token (free suite guarantee)",
+    "Agent(" not in _s98_non_comment_text[_s98_non_comment_text.rfind("Suite 98"):]
+    and "subagent_type" not in _s98_non_comment_text[_s98_non_comment_text.rfind("Suite 98"):],
+    "Suite 98 is a free structural suite — its non-comment source must not invoke Agent() or subagent_type",
+)
+
+# (20) self-ref: this test file contains Suite 98, _slice_section, and dual-review-convergence
+check(
+    "suite98(20-self-ref): this test file contains 'Suite 98', '_slice_section', and 'dual-review-convergence'",
+    "Suite 98" in _s98_own_source
+    and "_slice_section" in _s98_own_source
+    and "dual-review-convergence" in _s98_own_source,
+    "test file must reference Suite 98, _slice_section, and dual-review-convergence (self-referential marker check)",
+)
+
+# Marker: dual-review-convergence
+
+# ---------------------------------------------------------------------------
+# Suite 99 — hookify
+# ---------------------------------------------------------------------------
+# Structural assertions for the /th:hookify friction-to-hook proposal skill.
+# Written by implementer (2026-06-15). Marker: hookify
+#
+# Asserts:
+#   (1)  skills/hookify/SKILL.md exists
+#   (2)  valid frontmatter: name: hookify AND description present
+#   (3)  standalone imperative: "runs directly" + "orchestrator" in text
+#   (4)  hybrid input model documented: operator-supplied AND 00-execution-events both present
+#   (5)  transcript-not-read disclaimer: "does NOT read" + "transcript" co-present
+#   (6)  report shape fields present: intent, Trigger event, Match sketch, Severity, Rationale
+#   (7)  default severity `ask` named as the default proposed severity
+#   (8)  REPORT-only boundary names `hooks/` (anchor-scoped)
+#   (9)  REPORT-only boundary names `~/.claude/` (anchor-scoped)
+#   (10) no auto-write / no `--fix`: REPORT-only + no write + no --fix in boundary section
+#   (11) `## Voice` block present
+#   (12) `## Output Discipline` block present
+#   (13) TH-native framing: no external-project/method name in shipped skill
+#   (14) listed as Standalone in skills/README.md
+#   (15) self-ref registry: docs/testing.md contains Suite 99 + hookify; this file contains Suite 99 + _slice_section
+#   (16) hygiene guard: CLAUDE.md does NOT contain 'Suite 99'
+#   (17) suite does not invoke an agent: Suite 99 own non-comment source contains no Agent( or subagent_type
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 99: hookify ===")
+
+_s99_skill_path  = SKILLS_DIR / "hookify" / "SKILL.md"
+_s99_readme      = read(REPO_ROOT / "skills" / "README.md")
+_s99_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s99_claude_md   = read(REPO_ROOT / "CLAUDE.md")
+
+_S99_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# (1) skill file exists
+check(
+    "suite99(1-file-exists): skills/hookify/SKILL.md exists",
+    _s99_skill_path.exists(),
+    "skills/hookify/SKILL.md must exist",
+)
+
+_s99_skill = read(_s99_skill_path) if _s99_skill_path.exists() else ""
+
+# (2) valid frontmatter: name: hookify AND description present
+_s99_fm = parse_frontmatter(_s99_skill)
+check(
+    "suite99(2-frontmatter): SKILL.md has valid frontmatter with name: hookify and description",
+    _s99_fm.get("name") == "hookify" and bool(_s99_fm.get("description", "")),
+    "skills/hookify/SKILL.md must have YAML frontmatter with name: hookify and a non-empty description",
+)
+
+# (3) standalone imperative: "runs directly" + "orchestrator" tokens both present
+check(
+    "suite99(3-standalone-imperative): SKILL.md states 'runs directly' and names 'orchestrator'",
+    "runs directly" in _s99_skill and "orchestrator" in _s99_skill,
+    "skills/hookify/SKILL.md must contain the standalone imperative ('runs directly' + 'orchestrator')",
+)
+
+# (4) hybrid input model: operator-supplied AND 00-execution-events both present
+check(
+    "suite99(4-hybrid-input): SKILL.md documents operator-supplied input AND 00-execution-events enrichment",
+    "operator-supplied" in _s99_skill and "00-execution-events" in _s99_skill,
+    "skills/hookify/SKILL.md must document the hybrid input model (operator-supplied primary + 00-execution-events enrichment)",
+)
+
+# (5) transcript-not-read disclaimer
+check(
+    "suite99(5-transcript-disclaimer): SKILL.md states it does NOT read the chat transcript",
+    "does NOT read" in _s99_skill and "transcript" in _s99_skill,
+    "skills/hookify/SKILL.md must state that it does NOT read the raw chat transcript",
+)
+
+# (6) report shape fields present: intent, Trigger event, Match sketch, Severity, Rationale
+_s99_required_fields = ["Intent", "Trigger event", "Match sketch", "Severity", "Rationale"]
+check(
+    "suite99(6-report-shape): SKILL.md report shape includes Intent, Trigger event, Match sketch, Severity, Rationale",
+    all(f in _s99_skill for f in _s99_required_fields),
+    f"skills/hookify/SKILL.md must define report-shape fields: {_s99_required_fields}",
+)
+
+# (7) default severity `ask`
+check(
+    "suite99(7-default-severity-ask): SKILL.md names `ask` as the default proposed severity",
+    "ask" in _s99_skill and (
+        "default" in _s99_skill.lower()
+        and "ask" in _s99_skill
+    ),
+    "skills/hookify/SKILL.md must state that the default proposed severity is `ask`",
+)
+
+# (8) REPORT-only boundary section names `hooks/` — anchor-scoped
+_S99_BOUNDARY_ANCHOR = "## REPORT-only Boundary"
+_s99_boundary_slice = _slice_section(_s99_skill, _S99_BOUNDARY_ANCHOR, _S99_STOP)
+check(
+    "suite99(8-boundary-hooks): REPORT-only Boundary section names 'hooks/'",
+    bool(_s99_boundary_slice) and "hooks/" in _s99_boundary_slice,
+    "skills/hookify/SKILL.md '## REPORT-only Boundary' must name 'hooks/'",
+)
+
+# (9) REPORT-only boundary section names `~/.claude/` — anchor-scoped
+check(
+    "suite99(9-boundary-claude): REPORT-only Boundary section names '~/.claude/'",
+    bool(_s99_boundary_slice) and "~/.claude/" in _s99_boundary_slice,
+    "skills/hookify/SKILL.md '## REPORT-only Boundary' must name '~/.claude/'",
+)
+
+# (10) no auto-write / no --fix in boundary section
+_s99_boundary_has_report_only = bool(_s99_boundary_slice) and "REPORT-only" in _s99_boundary_slice
+_s99_boundary_no_fix = bool(_s99_boundary_slice) and (
+    "--fix" in _s99_boundary_slice or "no --fix" in _s99_boundary_slice or "--apply" in _s99_boundary_slice
+)
+_s99_boundary_no_write = bool(_s99_boundary_slice) and (
+    "no write" in _s99_boundary_slice.lower()
+    or "does not write" in _s99_boundary_slice.lower()
+    or "NOT write" in _s99_boundary_slice
+    or "never write" in _s99_boundary_slice.lower()
+)
+check(
+    "suite99(10-no-autowrite): REPORT-only Boundary section asserts REPORT-only + no --fix/--apply + no write path",
+    _s99_boundary_has_report_only and _s99_boundary_no_fix and _s99_boundary_no_write,
+    "skills/hookify/SKILL.md '## REPORT-only Boundary' must assert: REPORT-only + no --fix/--apply + no auto-write path",
+)
+
+# (11) `## Voice` block present
+check(
+    "suite99(11-voice-block): SKILL.md contains '## Voice' block",
+    "## Voice" in _s99_skill,
+    "skills/hookify/SKILL.md must contain a '## Voice' block (parity with sibling skills)",
+)
+
+# (12) `## Output Discipline` block present
+check(
+    "suite99(12-output-discipline): SKILL.md contains '## Output Discipline' block",
+    "## Output Discipline" in _s99_skill,
+    "skills/hookify/SKILL.md must contain an '## Output Discipline' block (parity with sibling skills)",
+)
+
+# (13) TH-native framing: no external-project/method names in shipped skill
+_s99_forbidden_literals = ["EC" + "C", "Agent" + "Shield", "conversation-" + "analyzer"]
+_s99_provenance_clean = all(lit not in _s99_skill for lit in _s99_forbidden_literals)
+check(
+    "suite99(13-th-native): SKILL.md names no external project or external method",
+    _s99_provenance_clean,
+    "skills/hookify/SKILL.md must not name an external project or external method — use TH-native terms only",
+)
+
+# (14) listed as Standalone in skills/README.md
+check(
+    "suite99(14-readme-standalone): /th:hookify is listed as a Standalone skill in skills/README.md",
+    "/th:hookify" in _s99_readme and "Standalone" in _s99_readme,
+    "skills/README.md must list '/th:hookify' in the Standalone (no orchestrator involvement) list",
+)
+
+# (15) self-ref registry
+check(
+    "suite99(15-registry): docs/testing.md registers 'Suite 99' and 'hookify'",
+    "Suite 99" in _s99_testing_md and "hookify" in _s99_testing_md,
+    "docs/testing.md must register Suite 99 and the hookify marker (canonical suite registry)",
+)
+_s99_own_source = read(Path(__file__))
+check(
+    "suite99(15b-self-ref): this test file contains 'Suite 99' and '_slice_section'",
+    "Suite 99" in _s99_own_source and "_slice_section" in _s99_own_source,
+    "test file must reference Suite 99 and _slice_section (self-referential marker check)",
+)
+
+# (16) hygiene guard: CLAUDE.md must NOT contain 'Suite 99'
+check(
+    "suite99(16-hygiene): CLAUDE.md does NOT contain 'Suite 99'",
+    "Suite 99" not in _s99_claude_md,
+    "CLAUDE.md must not mention Suite 99 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (17) suite does not invoke an agent: Suite 99 own non-comment source contains no Agent( or subagent_type
+_s99_suite99_start = _s99_own_source.find("Suite 99 — hookify")
+_s99_suite99_end   = _s99_own_source.find("# Marker: hookify")
+_s99_own_region = (
+    _s99_own_source[_s99_suite99_start:_s99_suite99_end]
+    if _s99_suite99_start >= 0 and _s99_suite99_end > _s99_suite99_start
+    else _s99_own_source[_s99_suite99_start:]
+)
+_s99_code_lines = [
+    ln for ln in _s99_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s99_code_only = "\n".join(_s99_code_lines)
+_s99_agent_tok    = "Age" + "nt("       # split so this literal does not itself count as an invocation
+_s99_subagent_tok = "subagent" + "_type"  # same split
+check(
+    "suite99(17-no-agent-call): Suite 99 non-comment source contains no agent-invocation tokens",
+    _s99_agent_tok not in _s99_code_only and _s99_subagent_tok not in _s99_code_only,
+    "Suite 99 is a free structural suite — its non-comment source must not call the agent-dispatch APIs",
+)
+
+# Marker: hookify
+
+# ---------------------------------------------------------------------------
+# Suite 100 — decision-ledger
+# ---------------------------------------------------------------------------
+# Structural assertions for the per-workspace decision ledger.
+# Written by implementer (2026-06-15). Marker: decision-ledger
+#
+# Asserts:
+#   (1)  docs/observability.md contains ## Decision Ledger heading
+#   (2)  docs section states 00-decision-ledger is distinct from 00-execution-events
+#   (3)  docs section carries the anti-redundancy invariant (NEVER records timing)
+#   (4)  docs section declares all 4 event types
+#   (5)  docs section enumerates disposition vocabulary (accept/watch/reject)
+#   (6)  docs section documents required fields (rationale, ts, stage, decision)
+#   (7)  docs section states ts is injected at write time
+#   (8)  docs section carries secret-prohibition clause for rationale field
+#   (9)  docs section carries best-effort resilience clause
+#   (10) docs section carries Tier-0 carve-out
+#   (11) docs section documents dual-format (00-decision-ledger.jsonl + .md + jsonl fence)
+#   (12) agents/orchestrator.md contains ## Decision Ledger heading
+#   (13) orchestrator section names orchestrator as exclusive writer + append-only >>
+#   (14) orchestrator section write-sites table maps all 4 event types to gate boundaries
+#   (15) orchestrator section contains Confidence-is-not-approval / dry-run subsection
+#   (16) orchestrator subsection routes deploy/migration through dry-run-first
+#   (17) orchestrator subsection references existing guards + states ledger audits not enforces
+#   (18) orchestrator section mirrors the anti-redundancy invariant (present in BOTH sections)
+#   (19) orchestrator section carries resilience invariant
+#   (20) docs/testing.md registers Suite 100 and decision-ledger marker
+#   (21) CLAUDE.md does NOT contain 'Suite 100' (§11 hygiene contract)
+#   (22) this test file contains 'Suite 100', '_slice_section', and 'decision-ledger'
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 100: decision-ledger structural assertions ===")
+
+_s100_obs_path   = REPO_ROOT / "docs" / "observability.md"
+_s100_orch_path  = AGENTS_DIR / "orchestrator.md"
+_s100_obs        = read(_s100_obs_path)
+_s100_orch       = read(_s100_orch_path)
+_s100_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s100_claude_md  = read(REPO_ROOT / "CLAUDE.md")
+_S100_STOP       = ("\n## ", "\n---\n")
+
+# Anchor-scoped slices — anti-false-green: missing anchor → empty slice → check fails
+_s100_obs_slice  = _slice_section(_s100_obs,  "## Decision Ledger", _S100_STOP)
+_s100_orch_slice = _slice_section(_s100_orch, "## Decision Ledger", _S100_STOP)
+
+# (1) docs section exists
+check(
+    "suite100(1-docs-section): docs/observability.md contains '## Decision Ledger'",
+    len(_s100_obs_slice) > 0,
+    "docs/observability.md must contain a '## Decision Ledger' section",
+)
+
+# (2) new-file distinction: docs section names 00-decision-ledger AND 00-execution-events
+check(
+    "suite100(2-new-file-distinction): docs slice contains '00-decision-ledger' AND '00-execution-events'",
+    "00-decision-ledger" in _s100_obs_slice and "00-execution-events" in _s100_obs_slice,
+    "docs/observability.md ## Decision Ledger must reference BOTH 00-decision-ledger and 00-execution-events",
+)
+
+# (3) anti-redundancy invariant in docs: NEVER + (phase timing OR token) + execution-events
+_s100_docs_antiredundancy = (
+    "NEVER" in _s100_obs_slice
+    and ("phase timing" in _s100_obs_slice or "token" in _s100_obs_slice)
+    and "execution-events" in _s100_obs_slice
+)
+check(
+    "suite100(3-anti-redundancy-docs): docs slice contains NEVER-records-timing invariant",
+    _s100_docs_antiredundancy,
+    "docs/observability.md ## Decision Ledger must state the NEVER-records-timing invariant",
+)
+
+# (4) 4 event types declared in docs
+_s100_event_types = ["gate-verdict", "operator-approval", "disposition", "dry-run-enforced"]
+_s100_all_events_docs = all(et in _s100_obs_slice for et in _s100_event_types)
+check(
+    "suite100(4-event-types-docs): docs slice contains all 4 event types",
+    _s100_all_events_docs,
+    f"docs/observability.md ## Decision Ledger must declare all 4 event types: {_s100_event_types}",
+)
+
+# (5) disposition vocabulary in docs
+_s100_disp_vocab = ["accept", "watch", "reject"]
+_s100_disp_present = all(dv in _s100_obs_slice for dv in _s100_disp_vocab)
+check(
+    "suite100(5-disposition-vocab): docs slice contains 'accept', 'watch', 'reject'",
+    _s100_disp_present,
+    "docs/observability.md ## Decision Ledger must enumerate disposition values: accept, watch, reject",
+)
+
+# (6) required fields in docs
+_s100_req_fields = ["rationale", "ts", "stage", "decision"]
+_s100_fields_present = all(f in _s100_obs_slice for f in _s100_req_fields)
+check(
+    "suite100(6-required-fields): docs slice contains required fields (rationale, ts, stage, decision)",
+    _s100_fields_present,
+    f"docs/observability.md ## Decision Ledger must document fields: {_s100_req_fields}",
+)
+
+# (7) ts injected at write time
+_s100_ts_injected = (
+    "injected" in _s100_obs_slice
+    or "date -Iseconds" in _s100_obs_slice
+)
+check(
+    "suite100(7-ts-injected): docs slice states ts is injected at write time",
+    _s100_ts_injected,
+    "docs/observability.md ## Decision Ledger must state ts is injected at write time",
+)
+
+# (8) secret prohibition in docs (rationale field)
+_s100_secret_prohibition_docs = (
+    ("no tokens" in _s100_obs_slice or "credentials" in _s100_obs_slice)
+    and "user-path" in _s100_obs_slice
+)
+check(
+    "suite100(8-secret-prohibition-docs): docs slice carries secret-prohibition clause",
+    _s100_secret_prohibition_docs,
+    "docs/observability.md ## Decision Ledger must carry the secret-prohibition clause (no tokens/credentials/user-path)",
+)
+
+# (9) best-effort resilience in docs
+_s100_best_effort_docs = (
+    "best-effort" in _s100_obs_slice
+    and (
+        "never hard-fail" in _s100_obs_slice
+        or ("log" in _s100_obs_slice and "continue" in _s100_obs_slice)
+    )
+)
+check(
+    "suite100(9-best-effort-docs): docs slice carries best-effort + never-hard-fail clause",
+    _s100_best_effort_docs,
+    "docs/observability.md ## Decision Ledger must carry the best-effort / never-hard-fail resilience clause",
+)
+
+# (10) Tier-0 carve-out in docs
+_s100_tier0_docs = "Tier 0" in _s100_obs_slice or "Tier-0" in _s100_obs_slice
+check(
+    "suite100(10-tier0-docs): docs slice carries Tier-0 carve-out",
+    _s100_tier0_docs,
+    "docs/observability.md ## Decision Ledger must carry the Tier-0 carve-out",
+)
+
+# (11) dual-format documented in docs
+_s100_dual_format_docs = (
+    "00-decision-ledger.jsonl" in _s100_obs_slice
+    and "00-decision-ledger.md" in _s100_obs_slice
+    and "jsonl" in _s100_obs_slice
+)
+check(
+    "suite100(11-dual-format-docs): docs slice documents dual-format (jsonl + md + fence reference)",
+    _s100_dual_format_docs,
+    "docs/observability.md ## Decision Ledger must document both 00-decision-ledger.jsonl and 00-decision-ledger.md",
+)
+
+# (12) orchestrator section exists
+check(
+    "suite100(12-orch-section): agents/orchestrator.md contains '## Decision Ledger'",
+    len(_s100_orch_slice) > 0,
+    "agents/orchestrator.md must contain a '## Decision Ledger' section",
+)
+
+# (13) exclusive writer + append-only >>
+_s100_exclusive_writer = (
+    "orchestrator" in _s100_orch_slice
+    and ("exclusive" in _s100_orch_slice or "only writer" in _s100_orch_slice)
+    and ">>" in _s100_orch_slice
+)
+check(
+    "suite100(13-exclusive-writer): orch slice names orchestrator as exclusive writer + append-only >>",
+    _s100_exclusive_writer,
+    "agents/orchestrator.md ## Decision Ledger must name orchestrator as exclusive writer and reference append-only >>",
+)
+
+# (14) write-sites table maps all 4 event types to gate boundaries
+_s100_write_sites = (
+    "STAGE-GATE" in _s100_orch_slice
+    and "Phase 1.6" in _s100_orch_slice
+    and "disposition" in _s100_orch_slice
+)
+_s100_all_events_orch = all(et in _s100_orch_slice for et in _s100_event_types)
+check(
+    "suite100(14-write-sites): orch slice write-sites table maps all 4 event types to gate boundaries",
+    _s100_write_sites and _s100_all_events_orch,
+    "agents/orchestrator.md ## Decision Ledger must contain a write-sites table with STAGE-GATE + Phase 1.6 + disposition",
+)
+
+# (15) dry-run subsection present: Confidence + not approval + dry-run
+_s100_dry_run_subsection = (
+    "Confidence" in _s100_orch_slice
+    and "not approval" in _s100_orch_slice
+    and ("dry-run" in _s100_orch_slice or "dry run" in _s100_orch_slice)
+)
+check(
+    "suite100(15-dry-run-subsection): orch slice contains Confidence + not approval + dry-run subsection",
+    _s100_dry_run_subsection,
+    "agents/orchestrator.md ## Decision Ledger must contain Confidence-is-not-approval / dry-run subsection",
+)
+
+# (16) dry-run routes deploy/migration first
+_s100_dry_run_routes = (
+    "deploy" in _s100_orch_slice
+    and "migration" in _s100_orch_slice
+    and (
+        "--dry-run" in _s100_orch_slice
+        or "--validate-only" in _s100_orch_slice
+        or "plan-only" in _s100_orch_slice
+    )
+)
+check(
+    "suite100(16-dry-run-routes): orch slice routes deploy/migration through dry-run-first",
+    _s100_dry_run_routes,
+    "agents/orchestrator.md ## Decision Ledger must route deploy/migration through --dry-run/--validate-only/plan-only",
+)
+
+# (17) references existing guards + states ledger audits, not enforces
+_s100_guards_audit = (
+    "gcp-guard.sh" in _s100_orch_slice
+    and "dev-guard.sh" in _s100_orch_slice
+    and "audit" in _s100_orch_slice
+    and "not" in _s100_orch_slice
+    and "enforc" in _s100_orch_slice
+)
+check(
+    "suite100(17-guards-audit): orch slice references gcp-guard.sh + dev-guard.sh + audit/not/enforc",
+    _s100_guards_audit,
+    "agents/orchestrator.md ## Decision Ledger must reference gcp-guard.sh + dev-guard.sh and state ledger audits, not enforces",
+)
+
+# (18) anti-redundancy invariant mirrored in orchestrator section
+_s100_orch_antiredundancy = (
+    "NEVER" in _s100_orch_slice
+    and ("phase timing" in _s100_orch_slice or "token" in _s100_orch_slice)
+    and "execution-events" in _s100_orch_slice
+)
+check(
+    "suite100(18-anti-redundancy-orch): orch slice mirrors the NEVER-records-timing invariant",
+    _s100_orch_antiredundancy,
+    "agents/orchestrator.md ## Decision Ledger must also carry the NEVER-records-timing invariant",
+)
+
+# (19) resilience invariant in orchestrator section
+_s100_resilience_orch = (
+    "best-effort" in _s100_orch_slice
+    and (
+        "never hard-fail" in _s100_orch_slice
+        or ("log" in _s100_orch_slice and "continue" in _s100_orch_slice)
+    )
+)
+check(
+    "suite100(19-resilience-orch): orch slice carries best-effort + never-hard-fail resilience",
+    _s100_resilience_orch,
+    "agents/orchestrator.md ## Decision Ledger must carry best-effort / never-hard-fail resilience invariant",
+)
+
+# (20) registry: docs/testing.md contains Suite 100 and decision-ledger
+check(
+    "suite100(20-registry): docs/testing.md contains 'Suite 100' and 'decision-ledger'",
+    "Suite 100" in _s100_testing_md and "decision-ledger" in _s100_testing_md,
+    "docs/testing.md must register Suite 100 and the decision-ledger marker",
+)
+
+# (21) hygiene guard: CLAUDE.md must NOT contain 'Suite 100'
+check(
+    "suite100(21-hygiene): CLAUDE.md does NOT contain 'Suite 100'",
+    "Suite 100" not in _s100_claude_md,
+    "CLAUDE.md must not mention Suite 100 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (22) self-referential: this test file contains Suite 100, _slice_section, and decision-ledger
+_s100_own_source = read(Path(__file__))
+check(
+    "suite100(22-self-ref): this test file contains 'Suite 100', '_slice_section', and 'decision-ledger'",
+    "Suite 100" in _s100_own_source
+    and "_slice_section" in _s100_own_source
+    and "decision-ledger" in _s100_own_source,
+    "test file must reference Suite 100, _slice_section, and decision-ledger (self-referential marker check)",
+)
+
+# Marker: decision-ledger
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

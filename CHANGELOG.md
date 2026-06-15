@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.92.0] - 2026-06-15
+
+### Added
+- `/th:eval --spec`: treat an eval scenario as a pre-declared quality contract with a pass-bar declaration; the skill parses the pass-bar section and sets the pass/fail threshold before running.
+- `/th:eval --k N`: run a scenario N times and report aggregate pass-rate `P/k` and pass@k verdict; default `--k 1` preserves today's single-run cost. Cost-gated (operator-invoked only).
+- `/th:eval --baseline <sha>`: compare results against a committed baseline at `eval-scenarios/.baselines/{agent}.json` and report only NEW failures vs that SHA.
+- `eval-scenarios/` directory with `README.md` (spec format + baseline schema docs), `_templates/spec.md`, a worked example spec, and an example baseline file. Suite 95 (`eval-as-spec`) asserts arg contracts, report shape, spec template sections, baseline schema, and cost-boundary guarantee.
+- On-demand review lenses for `agents/reviewer.md`: silent-failure, type-design, and comment-rot lenses loaded by a Reference Router on trigger-keyword match only (never bulk-loaded). `agents/review-lenses/` directory with `_index.md` manifest and three lens files. Suite 96 (`review-lenses`) asserts manifest drift, no-frontmatter invariant, and router tokens.
+- Confidence Score (1–10, single-pass semantics) and Patterns to Mirror sub-sections in the architect's `## Review Summary`; surfaced verbatim at STAGE-GATE-1 via the existing verbatim-copy channel. `confidence: N` field in the architect status block. Plan-reviewer Rule 12 (fail-OPEN) flags a missing or unjustified score as `concerns`. Suite 97 (`confidence-scored-plan`) asserts the contract.
+- Opt-in dual-review convergence protocol: two context-isolated review passes (A and B) must both APPROVE for a PR to be considered converged-clean; divergence triggers a fresh round up to a hard cap of 3, then STOP-and-escalate to the operator. Auto-on for security-sensitive / Tier-4 PRs; off by default. Suite 98 (`dual-review-convergence`) asserts isolation, escalation, and no-auto-resolve invariants.
+- `/th:hookify` skill: REPORT-only friction-to-hook proposal tool that analyzes operator-supplied friction signals and proposes candidate deterministic hook rules (never writes to `hooks/` or `~/.claude/`). Suite 99 (`hookify`) asserts the REPORT-only boundary and standalone routing.
+- `00-decision-ledger.jsonl` (dual-format: `.md` in obsidian mode) per workspace: append-only ledger of gate verdicts, operator approvals, finding dispositions, and dry-run enforcement records — orchestrator-exclusive writer, best-effort (never blocks control flow). Codifies the "confidence is not approval; dry-run-first for deploys/migrations" gate principle in `agents/orchestrator.md` pointing at the existing deterministic hook floors. Suite 100 (`decision-ledger`) asserts the schema, secret prohibition, concern-separation invariant, and no-new-enforcement guarantee.
+
 ## [2.91.0] - 2026-06-14
 
 ### Added
