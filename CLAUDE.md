@@ -172,6 +172,7 @@ All commands run from the repo root.
 - **Hook enforcement floors.** `policy-block.sh` secret-scans write content + commit-`Bash` (deny high-confidence, ask medium+entropy; `.env.example` allowlisted; codifies §6.5). `checkpoint-guard.sh` covers B1/B2/B3 (B1: `th:architect`; B2/B3: boundary-keyed). See `docs/reasoning-checkpoint.md`.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
 - **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Start-gate: clean+main → branch in place; dirty or non-main → worktree. Always fetch + base from `origin/main`. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
+- **Parallel batch implementation.** ADDITIVE items may be implemented concurrently (one worktree per item) and consolidated into ONE PR: item-local wholesale, shared-serial in reserved order, per-item `python3 tests/test_agent_structure.py`, then `run-all.sh` once. See `docs/parallel-batch-implementation.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 

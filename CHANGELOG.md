@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.94.0] - 2026-06-15
+
+### Added
+- Parallel Batch Implementation contract (`agents/orchestrator.md` + `docs/parallel-batch-implementation.md`): when an autonomous batch fans out planning across N items, it can also fan out implementation — one `git worktree` per item — and consolidate into one PR by merging each item branch sequentially into an integration branch, validating after each merge (the discipline of merging PRs one at a time, applied to commits). Includes a Consolidator role with four directives: a single consolidator owns the integration branch and every merge; merges happen one item at a time in reserved order, validating after each; all separately-authored suites must pass together in one final `run-all.sh`; and a new suite must not embed literals that trip a whole-file guard. Suite 106 (`parallel-batch-implementation`). Implements #337.
+- Dual-review convergence wired into the development pipeline's Phase 4.5 internal review (`agents/orchestrator.md`): the A/B context-isolated convergence loop (both-must-agree comparator, 3-round cap, STOP-and-escalate, never auto-resolve) now also guards the pipeline's pre-STAGE-GATE-3 internal review, reusing the canonical contract from `skills/review-pr/SKILL.md` Phase 3.1 — auto-on for Tier-4/security-sensitive work, operator opt-in otherwise, off by default. Suite 107 (`convergence-stage3`). Implements #339.
+
 ## [2.93.0] - 2026-06-15
 
 ### Added
