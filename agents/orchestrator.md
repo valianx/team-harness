@@ -3928,25 +3928,26 @@ Every file touched by an item MUST be declared in that item's `01-plan.md` with 
 
 **The invariant:** a shared-serial file is NEVER edited in a worktree. An item that needs to "edit" a shared-serial file instead declares its reserved insertion block in its plan; the orchestrator splices all blocks centrally at consolidation in reserved order.
 
-### Consolidation
+### Consolidation (sequential merge + validate)
 
-After all parallel implementers finish and each item passes its in-worktree verify:
-
-**Item-local files:**
+Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. The consolidator (the single top-level orchestrator) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it **one at a time, in reserved order** (lowest reserved suite number first), validating after every merge:
 
 ```
-git checkout <item-branch> -- <item-local-paths>
+git switch -c <integration-branch> <base>
+# then, per item, in reserved order:
+git merge <item-branch>          # resolve conflicts (see below)
+bash tests/run-all.sh            # validate; proceed to the next item only when green
 ```
 
-Safe because the edit-class split guarantees no two items touch the same item-local file.
+**Conflict resolution.** git auto-merges disjoint edits (e.g., two items editing different regions of `orchestrator.md`). The expected conflicts are the shared-serial append points — when two items each add a suite block before the same `# Summary` anchor, or a row to the same `docs/testing.md` registry. Resolve by KEEPING ALL blocks in reserved order; never drop one and never pick a "winner". These are additive conflicts, not competing edits.
 
-**Shared-serial files:**
+**Validate after every merge, not only at the end.** Incremental validation localizes any failure to the item just merged (or its interaction with what is already integrated) — which a single end-of-batch run cannot do, and which catches a contaminated or mislabeled item commit at the merge that introduces it.
 
-Walk items in **reserved order** (lowest reserved suite number / earliest registry slot first). From each item's worktree branch extract ONLY its added block (the pure insertion — `git diff` added lines for that file, scoped to the item's reserved region) and concatenate the blocks in order into the single shared file. Because every shared-serial edit is a pure insertion at a reserved, non-overlapping location, concatenation in reserved order reproduces the intended final file with no merge conflict.
+**Item-local files** ride along in each item's merge automatically — no separate checkout step — because the edit-class split guarantees no two items touch the same item-local file (so they never conflict).
 
-**Version + CHANGELOG:** done ONCE at batch end by delivery (single version bump; one consolidated changelog entry). Items do NOT bump the version.
+**Version + CHANGELOG:** done ONCE, after all items are merged and green, by delivery (single version bump; one consolidated changelog entry). Items do NOT bump the version.
 
-Full splice algorithm and the PR #338 worked example (suite blocks 100–105 spliced in number order): `docs/parallel-batch-implementation.md § Consolidation`.
+**Open the PR only when every item branch is merged and the full suite is green on the integration branch** — that branch is then the single PR head (the consolidated safety-net gate). Full method + worked example: `docs/parallel-batch-implementation.md § Consolidation`.
 
 ### Verify
 
@@ -3958,24 +3959,24 @@ python3 tests/test_agent_structure.py
 
 Use the single suite file directly. NOT concurrent `run-all.sh` — concurrent `run-all.sh` invocations chain `checkpoint-guard` on stdin and orphan bash trees on Windows (known platform constraint). Per-item verify is necessary but not sufficient.
 
-**On the consolidated tree, once:**
+**On the integration branch, after each merge and as the final gate:**
 
 ```
 bash tests/run-all.sh
 ```
 
-Run the full suite exactly ONCE as the mandatory safety net that catches cross-item interactions the isolated per-item runs cannot see. The single consolidated full-suite run is the gate; per-item verify does not substitute for it.
+Run the full suite after every merge during Consolidation, and once more as the final gate before the PR. The together-run — all items merged, every suite green in one run — is the gate; per-item verify does not substitute for it.
 
 ### Consolidator role and directives
 
-Consolidation is owned by a SINGLE designated consolidator — the top-level orchestrator, never a subagent and never split across actors. The consolidator is the ONLY writer of shared-serial files; parallel implementers never reconcile each other's work. This single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file: observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated (each commit ended up carrying the other item's suite block). The consolidator follows four directives:
+Consolidation is owned by a SINGLE designated consolidator — the top-level orchestrator, never a subagent and never split across actors. The consolidator owns the integration branch and performs every merge; parallel implementers never reconcile each other's work. This single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file: observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated (each commit ended up carrying the other item's suite block). The consolidator follows four directives:
 
-1. **Re-derive, do not trust.** Treat every worktree's copy of a shared-serial file as untrusted. Rebuild each shared-serial file from `base + each item's reserved block`, extracting each item's block via `git diff <base>..<item-branch>`; never adopt a worktree's mutated shared file wholesale.
-2. **All new suites must pass together.** Run `bash tests/run-all.sh` exactly once on the consolidated tree; EVERY separately-authored suite (106, 107, …) must pass in that single together-run. A per-item in-worktree pass is necessary but never sufficient — the together-run is the gate, and the consolidation is not done until it is green.
+1. **Merge via git, one item at a time, validating after each.** Create the integration branch and `git merge` each item branch sequentially in reserved order — do NOT hand-splice shared files. git surfaces real conflicts; resolve the additive same-anchor conflicts by keeping all blocks in reserved order. Run `bash tests/run-all.sh` after each merge and proceed only when green, so a contaminated or mislabeled commit is caught at the merge that introduces it.
+2. **All new suites must pass together.** The final integration branch must show EVERY separately-authored suite (106, 107, …) green in one `bash tests/run-all.sh` before the PR. A per-item in-worktree pass is necessary but never sufficient — the together-run is the gate, and the consolidation is not done until it is green.
 3. **No new suite may break a global guard.** A new suite's non-comment source must not embed the literal agent-invocation tokens that the whole-file free-suite guard scans for; phrase no-agent-call descriptions generically and assemble the tokens in variables (`"Age" + "nt("`), exactly as the sibling suites do. Observed live: a new suite's check description embedded the literal tokens and tripped the whole-file Suite 98 guard — caught only by the together-run, never by per-item verify.
-4. **One actor, one sequence.** The consolidator performs the item-local checkouts, the shared-serial re-derivation, the single version bump, and the CHANGELOG assembly as one serial sequence in the parent session — never concurrently with another consolidation step.
+4. **One actor, one sequence.** The consolidator performs the sequential merges, conflict resolution, the single version bump, and the CHANGELOG assembly as one serial sequence in the parent session — never concurrently with another consolidation step.
 
-**Empirical basis:** this contract was dogfooded live in PR #338 — N items planned in parallel, implemented across isolated worktrees, item-local files checked out wholesale, shared-serial suite blocks and registry rows spliced in reserved order, single final `run-all.sh` green — and proven to work. The Consolidator directives above were added after a later batch hit the cross-contamination and global-guard failure modes they now forbid. The contract codifies that proven-and-hardened procedure.
+**Empirical basis and evolution:** this contract was first dogfooded in PR #338 — N items planned in parallel, implemented across isolated worktrees, consolidated into one PR with a single final `run-all.sh`. A later batch then hit cross-contamination and a global-guard collision under the original hand-splice consolidation; the Consolidator directives above replace the splice with sequential `git merge` + validate-after-each, which surfaces those failure modes as a merge conflict or a per-merge red run rather than silently accepting them. The contract codifies the hardened procedure.
 
 **Marker: parallel-batch-implementation**
 

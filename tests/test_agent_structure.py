@@ -23799,13 +23799,13 @@ check(
     "section must contain both 'item-local' and 'shared-serial' to define the edit-class split",
 )
 
-# (5) consolidation step: wholesale + splice + reserved order
+# (5) consolidation step: sequential git merge in reserved order, validate per merge
 check(
-    "suite106(5-consolidation): section slice contains consolidation language",
-    ("git checkout" in _s106_slice or "wholesale" in _s106_slice)
-    and ("splice" in _s106_slice or "insertion" in _s106_slice)
-    and "reserved order" in _s106_slice,
-    "section must describe consolidation with wholesale checkout, splice/insertion, and reserved order",
+    "suite106(5-consolidation): section slice contains sequential-merge consolidation language",
+    "git merge" in _s106_slice
+    and "reserved order" in _s106_slice
+    and ("one at a time" in _s106_slice or "one item at a time" in _s106_slice),
+    "section must describe consolidation as a sequential git merge in reserved order, one item at a time",
 )
 
 # (6) concurrent fan-out: (concurrent OR parallel) AND implementer AND batch_concurrency
@@ -23854,13 +23854,13 @@ check(
 # (9b) consolidator role + all-suites-pass-together directive
 _s106_slice_lower = _s106_slice.lower()
 check(
-    "suite106(9b-consolidator): section names a single consolidator that re-derives shared-serial "
-    "files and requires all new suites to pass together",
+    "suite106(9b-consolidator): section names a single consolidator that merges items one at a time "
+    "and requires all new suites to pass together",
     "consolidator" in _s106_slice_lower
-    and ("re-derive" in _s106_slice_lower or "untrusted" in _s106_slice_lower)
+    and ("integration branch" in _s106_slice_lower or "git merge" in _s106_slice_lower)
     and ("pass together" in _s106_slice_lower or "together-run" in _s106_slice_lower),
-    "section must define a single consolidator that re-derives shared-serial files from base "
-    "(never trusting a worktree's copy) and require all separately-authored suites to pass together in one run",
+    "section must define a single consolidator that merges item branches one at a time into the "
+    "integration branch and require all separately-authored suites to pass together in one run",
 )
 
 # (10) docs/parallel-batch-implementation.md exists and contains required content

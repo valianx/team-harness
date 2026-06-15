@@ -57,39 +57,32 @@ Items that touch only item-local files can be fully autonomous in their worktree
 
 ## Consolidation
 
-Consolidation runs after all N implementers have finished and each item has passed its in-worktree verify step. The orchestrator performs consolidation on the consolidation branch (typically `feat/<batch-name>` checked out at `origin/main`).
+Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. It runs after all N implementers have finished and each item has passed its in-worktree verify. A SINGLE consolidator (the top-level orchestrator) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it one at a time.
 
-### Item-local files
+### Sequential merge, validate after each
 
 ```bash
-git checkout <item-branch> -- <item-local-file-1> <item-local-file-2> ...
+git switch -c <integration-branch> <base>      # base = origin/main (fresh)
+# then, per item, in reserved order (lowest reserved suite number first):
+git merge <item-branch>                         # resolve conflicts (below)
+bash tests/run-all.sh                           # validate; continue only when green
 ```
 
-Repeat for each item. Safe because the edit-class split guarantees no two items declare the same file as item-local. The wholesale checkout brings the file exactly as the implementer left it, with no conflict.
+Validate after EVERY merge, not only at the end. Incremental validation localizes any failure to the item just merged (or its interaction with what is already integrated), and catches a contaminated or mislabeled item commit at the merge that introduces it — a single end-of-batch run cannot.
 
-### Shared-serial files
+### Conflict resolution
 
-For each contended file, walk items in **reserved order** (lowest reserved suite number first, or earliest registry slot first for non-suite files):
+git auto-merges disjoint edits (e.g., two items editing different regions of the same agent file). The expected conflicts are the shared-serial append points — two items each adding a suite block before the same `# Summary` anchor, or a row to the same `docs/testing.md` registry. Resolve by KEEPING ALL blocks in reserved order; never drop one and never pick a "winner". These are additive conflicts, not competing edits.
 
-1. From each item's worktree branch, extract only that item's added block. The cleanest way: `git diff origin/main <item-branch> -- <shared-file>` then isolate the `+` lines scoped to the item's reserved region.
-2. Concatenate the blocks in reserved order into the shared file. Because every block is a pure insertion at a reserved, non-overlapping location, the concatenation reproduces the intended final file.
-
-No merge conflicts are possible under these constraints: every addition is additive, and reserved regions do not overlap.
-
-### PR #338 worked example
-
-PR #338 (Tier 3+4 batch) had 6 items with pre-reserved suite blocks 100–105.
-
-For `tests/test_agent_structure.py`:
-
-- Item (suite 100) wrote its suite-100 block as item-local. All other items wrote their own blocks as item-local (each had a unique, reserved region). The consolidation wholesale-checked out all six items' suite files — because each item owned a distinct file segment that no other item touched, the wholesale checkout did not conflict.
-- The `docs/testing.md` registry rows were added in the order suite 100, 101, 102, 103, 104, 105 (ascending reserved order).
-
-Result: single consolidated `run-all.sh` green on the first run.
+Item-local files (those only one item touches) ride along in that item's merge automatically — the edit-class split guarantees no two items touch the same item-local file, so they never conflict.
 
 ### Version + CHANGELOG
 
-Version bump and CHANGELOG entry are done ONCE at batch end by the delivery agent. Items do not bump the version individually. Delivery reads all `changelog.d/<item-slug>.md` fragments (if any) and assembles them into the versioned `## [Unreleased]` block.
+Done ONCE, after all items are merged and the full suite is green, by the delivery agent. Items do not bump the version individually. Open the PR only when every item branch is merged and `run-all.sh` is green on the integration branch.
+
+### Evolution from the splice method
+
+The first batch (PR #338) consolidated by hand-splicing each item's added lines into the shared files. A later batch hit cross-contamination (two worktrees' copies of the shared test file cross-mixed) and a global-guard collision (a new suite embedding literal agent-tokens that the whole-file guard scans for) — both caught only by the final run, not localized. Sequential `git merge` + validate-after-each replaces the splice: git surfaces real conflicts (resolved by keeping all blocks), and per-merge validation localizes failures. This is the hardened method.
 
 ---
 
