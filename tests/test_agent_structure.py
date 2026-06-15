@@ -21580,6 +21580,217 @@ check(
 # Marker: eval-as-spec
 
 # ---------------------------------------------------------------------------
+# Suite 96 — review-lenses (v2.91.0)
+# ---------------------------------------------------------------------------
+# Structural assertions for the reviewer agent on-demand review lenses system.
+# Written by implementer (2026-06-15). Marker: review-lenses
+#
+# Mirrors Suite 88 (gcp-infra-refs-on-demand) for the reviewer agent.
+# Asserts:
+#   (1a-f) reviewer.md contains a Reference Router section with required tokens
+#           + the Fresh Review status block carries the reference_loaded field
+#   (2a-d) agents/review-lenses/_index.md exists, lists all 3 lenses,
+#           documents the path convention, and documents fallback behavior
+#   (3)    all 3 lens files exist on disk
+#   (4)    all 3 lens files have NO YAML frontmatter (reference, not agents)
+#   (5)    per-lens required-token coverage
+#   (6a-b) single reviewer agent (no variant added)
+#   (7)    provenance guard — no "ECC" or "AgentShield" in any shipped string
+#   (8)    Suite 96 own non-comment code contains no Agent( invocation token
+#   (9)    Suite 96 own non-comment code contains no subagent_type token
+#   (h1)   docs/testing.md registers Suite 96 + review-lenses marker
+#   (h2)   CLAUDE.md does NOT contain 'Suite 96' (§11 hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 96: review-lenses structural assertions (v2.91.0) ===")
+
+_s96_reviewer   = read(AGENTS_DIR / "reviewer.md")
+_s96_refs_dir   = AGENTS_DIR / "review-lenses"
+_s96_index_path = _s96_refs_dir / "_index.md"
+_s96_lenses     = ["silent-failure", "type-design", "comment-rot"]
+_s96_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s96_claude     = read(REPO_ROOT / "CLAUDE.md")
+_S96_STOP       = ("\n## ", "\n### ", "\n---\n")
+_s96_router     = _slice_section(_s96_reviewer, "## Reference Router", _S96_STOP)
+_s96_index_text = read(_s96_index_path) if _s96_index_path.exists() else ""
+
+# (1a) Reference Router section exists in reviewer.md
+check(
+    "suite96(1a): reviewer.md contains ## Reference Router section",
+    len(_s96_router) > 0,
+    "reviewer.md must contain a ## Reference Router section",
+)
+
+# (1b) Router references the manifest
+check(
+    "suite96(1b): Reference Router contains '_index.md'",
+    "_index.md" in _s96_router,
+    "## Reference Router must reference '_index.md' (the manifest)",
+)
+
+# (1c) Router lists all 3 lens names (3 sub-checks)
+for _s96_lens in _s96_lenses:
+    check(
+        f"suite96(1c): Reference Router contains lens name '{_s96_lens}'",
+        _s96_lens in _s96_router,
+        f"## Reference Router must list '{_s96_lens}' as a trigger lens",
+    )
+
+# (1d) Router declares graceful-degradation / never-fabricate fallback
+check(
+    "suite96(1d): Reference Router contains fallback / degrade token",
+    "unavailable" in _s96_router.lower() or "fabricate" in _s96_router.lower() or "degrade" in _s96_router.lower(),
+    "## Reference Router must declare graceful-degradation / never-fabricate fallback",
+)
+
+# (1e) Router references the reference_loaded status field
+check(
+    "suite96(1e): Reference Router contains 'reference_loaded' status field token",
+    "reference_loaded" in _s96_router,
+    "## Reference Router must reference the 'reference_loaded' status field",
+)
+
+# (1f) Fresh Review status block carries reference_loaded with 'review-lenses unavailable' value
+check(
+    "suite96(1f-statusfield): reviewer.md carries 'reference_loaded' field and 'review-lenses unavailable' value",
+    "reference_loaded" in _s96_reviewer and "review-lenses unavailable" in _s96_reviewer,
+    "reviewer.md Fresh Review status block must carry reference_loaded: field with 'review-lenses unavailable' documented",
+)
+
+# (2a) _index.md exists
+check(
+    "suite96(2a): agents/review-lenses/_index.md exists",
+    _s96_index_path.exists(),
+    "agents/review-lenses/_index.md must exist (Reference Router manifest)",
+)
+
+# (2b) _index.md lists all 3 lens names (3 sub-checks)
+for _s96_lens in _s96_lenses:
+    check(
+        f"suite96(2b): _index.md lists lens '{_s96_lens}'",
+        _s96_lens in _s96_index_text,
+        f"agents/review-lenses/_index.md must list lens '{_s96_lens}'",
+    )
+
+# (2c) _index.md documents the path convention
+check(
+    "suite96(2c): _index.md documents path convention 'agents/review-lenses/'",
+    "agents/review-lenses/" in _s96_index_text,
+    "agents/review-lenses/_index.md must document the path convention 'agents/review-lenses/'",
+)
+
+# (2d) _index.md documents fallback behavior
+check(
+    "suite96(2d): _index.md documents fallback behavior",
+    "unavailable" in _s96_index_text.lower() or "fallback" in _s96_index_text.lower(),
+    "agents/review-lenses/_index.md must document fallback behavior when a lens file is absent",
+)
+
+# (3) All 3 lens files exist on disk (3 sub-checks)
+_s96_lens_texts: dict[str, str] = {}
+for _s96_lens in _s96_lenses:
+    _s96_lens_path = _s96_refs_dir / f"{_s96_lens}.md"
+    check(
+        f"suite96(3): agents/review-lenses/{_s96_lens}.md exists",
+        _s96_lens_path.exists(),
+        f"agents/review-lenses/{_s96_lens}.md must exist (listed in manifest, must be present on disk)",
+    )
+    _s96_lens_texts[_s96_lens] = read(_s96_lens_path) if _s96_lens_path.exists() else ""
+
+# (4) All 3 lens files have NO YAML frontmatter (3 sub-checks)
+for _s96_lens in _s96_lenses:
+    check(
+        f"suite96(4): {_s96_lens}.md has NO YAML frontmatter",
+        not _s96_lens_texts[_s96_lens].startswith("---"),
+        f"agents/review-lenses/{_s96_lens}.md must NOT have YAML frontmatter (reference files are not agents)",
+    )
+
+# (5) Per-lens required-token coverage (one check per lens)
+_s96_lens_tokens = {
+    "silent-failure": ["catch", "swallow", "except"],
+    "type-design":    ["illegal", "primitive", "null"],
+    "comment-rot":    ["todo", "fixme", "stale"],
+}
+for _s96_lens, _s96_tokens in _s96_lens_tokens.items():
+    _s96_text_lower = _s96_lens_texts[_s96_lens].lower()
+    check(
+        f"suite96(5): {_s96_lens}.md covers required heuristic tokens {_s96_tokens}",
+        any(t in _s96_text_lower for t in _s96_tokens),
+        f"agents/review-lenses/{_s96_lens}.md must cover at least one of the required tokens: {_s96_tokens}",
+    )
+
+# (6a) reviewer stays a single agent (no variant added)
+check(
+    "suite96(6a): EXPECTED_AGENTS lists 'reviewer' exactly once",
+    EXPECTED_AGENTS.count("reviewer") == 1,
+    "EXPECTED_AGENTS must list 'reviewer' exactly once — no reviewer variant was added",
+)
+
+# (6b) No stray variant agent file (review-lens.md or reviewer-lenses.md)
+check(
+    "suite96(6b): no agents/review-lens.md or agents/reviewer-lenses.md exists",
+    not (AGENTS_DIR / "review-lens.md").exists() and not (AGENTS_DIR / "reviewer-lenses.md").exists(),
+    "no reviewer-variant agent file may exist — single reviewer agent only",
+)
+
+# (7) Provenance guard — no "ECC" or "AgentShield" in any shipped artifact string
+_s96_provenance_strings = [_s96_router, _s96_index_text] + list(_s96_lens_texts.values())
+_s96_provenance_clean = all(
+    "ECC" not in s and "AgentShield" not in s
+    for s in _s96_provenance_strings
+)
+check(
+    "suite96(7-no-provenance): no shipped artifact contains 'ECC' or 'AgentShield'",
+    _s96_provenance_clean,
+    "No shipped string (router section, _index.md, lens files) may contain 'ECC' or 'AgentShield' — use TH-native terms only",
+)
+
+# (8) Suite 96 own non-comment code contains no Agent( invocation token
+# Self-inspection: strip comment lines so that AC-description strings in comments don't falsely trigger.
+_s96_own_source = read(Path(__file__))
+_s96_suite96_start = _s96_own_source.find("Suite 96 — review-lenses")
+_s96_suite96_end   = _s96_own_source.find("# Marker: review-lenses")
+_s96_own_region = (
+    _s96_own_source[_s96_suite96_start:_s96_suite96_end]
+    if _s96_suite96_start >= 0 and _s96_suite96_end > _s96_suite96_start
+    else _s96_own_source[_s96_suite96_start:]
+)
+_s96_code_lines = [
+    ln for ln in _s96_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s96_code_only = "\n".join(_s96_code_lines)
+
+check(
+    "suite96(8-no-agent-token): Suite 96 code (non-comment) region contains no Agent( invocation token",
+    "Agent(" not in _s96_code_only,
+    "Suite 96 must not contain Agent( in non-comment code — it is a pure text/file structural suite (no paid agent runs)",
+)
+
+# (9) Suite 96 own non-comment code contains no subagent_type token
+check(
+    "suite96(9-no-subagent-type): Suite 96 code (non-comment) region contains no subagent_type token",
+    "subagent_type" not in _s96_code_only,
+    "Suite 96 must not contain subagent_type in non-comment code — it is a pure text/file structural suite",
+)
+
+# (h1) docs/testing.md registers Suite 96 + review-lenses marker
+check(
+    "suite96(h1-registry): docs/testing.md registers 'Suite 96' and 'review-lenses'",
+    "Suite 96" in _s96_testing_md and "review-lenses" in _s96_testing_md,
+    "docs/testing.md must register Suite 96 and the review-lenses marker (canonical suite registry)",
+)
+
+# (h2) CLAUDE.md hygiene: §11 must NOT contain 'Suite 96'
+check(
+    "suite96(h2-hygiene): CLAUDE.md does NOT contain 'Suite 96'",
+    "Suite 96" not in _s96_claude,
+    "CLAUDE.md must not mention Suite 96 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: review-lenses
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
