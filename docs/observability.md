@@ -337,3 +337,74 @@ The `/trace <feature>` skill is the canonical 30-second answer to "did this pipe
 ### Tier 0 carve-out
 
 **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. This is the only exception; all other pipeline types including Tier 1-4 bug fixes, features, refactors, and documentation flows are subject to the mandatory observability contract.
+
+---
+
+## Decision Ledger
+
+`00-decision-ledger.{jsonl|md}` is a **new per-workspace append-only file** distinct from `00-execution-events.{jsonl|md}`. The two files answer different questions: `00-execution-events` answers "what happened, when, and how much?" (phase timing, durations, token counts, tool-counts, KG writes); `00-decision-ledger` answers "what was decided, why, and was a dangerous action gated?" (gate verdicts with rationale, operator approvals with reasoning, finding dispositions, and dry-run enforcement records).
+
+**Anti-redundancy invariant (contract between the two files):** the decision-ledger records dispositions + rationale + dry-run enforcement ONLY. It NEVER records phase timing, durations, token counts, tool-counts, or KG write batches — those stay exclusively in `00-execution-events`. Where a gate fires, `00-execution-events` records the FIRING (timestamped, for the timeline) and the decision-ledger records the DECISION (verdict + rationale + disposition, for the audit). The two files JOIN on the shared `phase` / `stage` key.
+
+### Purpose and scope
+
+The decision-ledger provides a durable audit trail of every judgement call made during a pipeline run:
+
+- **Gate verdicts** — why a plan-review or acceptance-gate passed, raised concerns, or failed.
+- **Operator approvals** — what the operator explicitly approved or rejected at each STAGE-GATE, and any reason they gave.
+- **Finding dispositions** — how security, QA, and reviewer findings were classified (accepted, deferred to watch-list, or rejected as non-applicable).
+- **Dry-run enforcement** — when a deploy or migration action was routed through a dry-run / plan-only path before any apply, recording which existing hook gated the apply.
+
+### Schema (4 event types)
+
+Every line is a JSON object. One JSON object per line, append-only, never rewritten.
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `ts` | always | ISO-8601 with timezone — injected by the orchestrator at write time (`date -Iseconds`). |
+| `event` | always | One of: `gate-verdict`, `operator-approval`, `disposition`, `dry-run-enforced`. |
+| `feature` | always | Kebab-case, matches the workspaces folder (same convention as `00-execution-events`). |
+| `stage` | conditional | Stage number (`1`/`2`/`3`). Required for `gate-verdict` and `operator-approval` at a STAGE-GATE. |
+| `phase` | conditional | Phase identifier (e.g. `1.6-plan-review`, `3-verify`, `3.5-acceptance-gate`). Required for internal-gate `gate-verdict` and for `disposition`. Shared JOIN key with `00-execution-events`. |
+| `decision` | conditional | The decision value. For `gate-verdict`: `pass`/`concerns`/`fail`. For `operator-approval`: `approved`/`approved-autonomous`/`rejected`/`edit`/`ship`/`amend`/`abort`. For `disposition`: `accept`/`watch`/`reject`. Required for all three event types. |
+| `subject` | conditional | What the disposition applies to (e.g. `SEC-finding: missing JWT signature verification`). Required for `disposition`. |
+| `rationale` | always | One free-text sentence (≤240 chars) — WHY this verdict/approval/disposition. `"no reason given"` is the explicit value when the operator gave none. **Secret prohibition applies** — the `rationale` field MUST NOT contain tokens, credentials, private URLs, or user-path identifiers. Use mechanical context only (same policy as `operation.*` `detail` fields). |
+| `action` | conditional | For `dry-run-enforced`: the deploy/migration action that was gated (e.g. `gcloud sql instances patch`, `prisma migrate deploy`). Required for `dry-run-enforced`. |
+| `dry_run_ref` | conditional | For `dry-run-enforced`: how the dry-run was performed (`--dry-run`, `--validate-only`, `plan-only`, `migrate diff`). Required for `dry-run-enforced`. |
+| `guard` | conditional | For `dry-run-enforced`: which existing deterministic floor gated the apply (`gcp-guard.sh`, `dev-guard.sh`, `policy-block.sh`). Required for `dry-run-enforced` — names the enforcement layer the ledger is auditing. |
+
+**Disposition vocabulary** (`decision` field when `event == "disposition"`): `accept` (finding acknowledged and accepted as-is), `watch` (accept-with-followup; operator adds to a deferred list), `reject` (finding dismissed as non-applicable).
+
+### Dual-format lifecycle
+
+Mirrors `00-execution-events` exactly:
+
+- **Local mode:** raw `00-decision-ledger.jsonl` — append one JSON object per line.
+- **Obsidian mode:** `00-decision-ledger.md` — YAML frontmatter (`tags: [work-logs, {repo}, decision-ledger]`) + `# Decision Ledger` heading + ` ```jsonl ` fence, identical structure to `00-execution-events.md`.
+- The orchestrator is the **exclusive writer**; append-only `>>` with a here-doc; never rewritten.
+- **best-effort resilience:** if constructing or appending a ledger line fails, log the failure and continue — the pipeline NEVER hard-fails on a ledger emit error. The deterministic gate outcome and the `00-execution-events` trace remain the authoritative record.
+- **Tier 0 carve-out:** Tier-0 fixes (`workspaces: NONE`) produce no decision-ledger (same exemption as `00-execution-events`).
+
+### Example lines
+
+```jsonl
+{"ts":"2026-06-15T10:00:01-03:00","event":"gate-verdict","feature":"auth-jwt","phase":"1.6-plan-review","decision":"concerns","rationale":"Reviewer raised SEC-001: missing rate-limit on /login; AC-3 scope adjusted."}
+{"ts":"2026-06-15T10:05:33-03:00","event":"operator-approval","feature":"auth-jwt","stage":"1","decision":"approved","rationale":"Operator accepted concerns; SEC-001 filed as follow-up issue #99."}
+{"ts":"2026-06-15T10:42:11-03:00","event":"disposition","feature":"auth-jwt","phase":"3-verify","decision":"watch","subject":"SEC-finding: token expiry uses Date.now() without UTC normalisation","rationale":"Low-risk today; timezone bug possible in DST transition. Filed follow-up."}
+{"ts":"2026-06-15T11:00:00-03:00","event":"dry-run-enforced","feature":"auth-jwt","action":"gcloud sql instances patch","dry_run_ref":"--validate-only","guard":"gcp-guard.sh","rationale":"Schema migration validated before apply; separate apply approval required."}
+```
+
+### Relationship to 00-execution-events
+
+The two files are complementary — neither replaces the other:
+
+| Concern | File |
+|---------|------|
+| When did each phase run? How long? How many tokens? | `00-execution-events` |
+| What gate fired? (timeline marker) | `00-execution-events` (`gate.pass`/`gate.fail`/`stage.gate`) |
+| Why did the gate reach that verdict? | `00-decision-ledger` (`gate-verdict` + `rationale`) |
+| What did the operator say at the STAGE-GATE? | `00-decision-ledger` (`operator-approval` + `rationale`) |
+| How was a security/QA finding classified? | `00-decision-ledger` (`disposition` + `subject`) |
+| Was a dangerous action forced through dry-run first? | `00-decision-ledger` (`dry-run-enforced` + `guard`) |
+
+The decision-ledger is queryable with `jq` and uses the same `phase`/`stage` key as `00-execution-events` so the two files can be joined on a shared identifier.

@@ -22483,6 +22483,286 @@ check(
 # Marker: hookify
 
 # ---------------------------------------------------------------------------
+# Suite 100 — decision-ledger
+# ---------------------------------------------------------------------------
+# Structural assertions for the per-workspace decision ledger.
+# Written by implementer (2026-06-15). Marker: decision-ledger
+#
+# Asserts:
+#   (1)  docs/observability.md contains ## Decision Ledger heading
+#   (2)  docs section states 00-decision-ledger is distinct from 00-execution-events
+#   (3)  docs section carries the anti-redundancy invariant (NEVER records timing)
+#   (4)  docs section declares all 4 event types
+#   (5)  docs section enumerates disposition vocabulary (accept/watch/reject)
+#   (6)  docs section documents required fields (rationale, ts, stage, decision)
+#   (7)  docs section states ts is injected at write time
+#   (8)  docs section carries secret-prohibition clause for rationale field
+#   (9)  docs section carries best-effort resilience clause
+#   (10) docs section carries Tier-0 carve-out
+#   (11) docs section documents dual-format (00-decision-ledger.jsonl + .md + jsonl fence)
+#   (12) agents/orchestrator.md contains ## Decision Ledger heading
+#   (13) orchestrator section names orchestrator as exclusive writer + append-only >>
+#   (14) orchestrator section write-sites table maps all 4 event types to gate boundaries
+#   (15) orchestrator section contains Confidence-is-not-approval / dry-run subsection
+#   (16) orchestrator subsection routes deploy/migration through dry-run-first
+#   (17) orchestrator subsection references existing guards + states ledger audits not enforces
+#   (18) orchestrator section mirrors the anti-redundancy invariant (present in BOTH sections)
+#   (19) orchestrator section carries resilience invariant
+#   (20) docs/testing.md registers Suite 100 and decision-ledger marker
+#   (21) CLAUDE.md does NOT contain 'Suite 100' (§11 hygiene contract)
+#   (22) this test file contains 'Suite 100', '_slice_section', and 'decision-ledger'
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 100: decision-ledger structural assertions ===")
+
+_s100_obs_path   = REPO_ROOT / "docs" / "observability.md"
+_s100_orch_path  = AGENTS_DIR / "orchestrator.md"
+_s100_obs        = read(_s100_obs_path)
+_s100_orch       = read(_s100_orch_path)
+_s100_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s100_claude_md  = read(REPO_ROOT / "CLAUDE.md")
+_S100_STOP       = ("\n## ", "\n---\n")
+
+# Anchor-scoped slices — anti-false-green: missing anchor → empty slice → check fails
+_s100_obs_slice  = _slice_section(_s100_obs,  "## Decision Ledger", _S100_STOP)
+_s100_orch_slice = _slice_section(_s100_orch, "## Decision Ledger", _S100_STOP)
+
+# (1) docs section exists
+check(
+    "suite100(1-docs-section): docs/observability.md contains '## Decision Ledger'",
+    len(_s100_obs_slice) > 0,
+    "docs/observability.md must contain a '## Decision Ledger' section",
+)
+
+# (2) new-file distinction: docs section names 00-decision-ledger AND 00-execution-events
+check(
+    "suite100(2-new-file-distinction): docs slice contains '00-decision-ledger' AND '00-execution-events'",
+    "00-decision-ledger" in _s100_obs_slice and "00-execution-events" in _s100_obs_slice,
+    "docs/observability.md ## Decision Ledger must reference BOTH 00-decision-ledger and 00-execution-events",
+)
+
+# (3) anti-redundancy invariant in docs: NEVER + (phase timing OR token) + execution-events
+_s100_docs_antiredundancy = (
+    "NEVER" in _s100_obs_slice
+    and ("phase timing" in _s100_obs_slice or "token" in _s100_obs_slice)
+    and "execution-events" in _s100_obs_slice
+)
+check(
+    "suite100(3-anti-redundancy-docs): docs slice contains NEVER-records-timing invariant",
+    _s100_docs_antiredundancy,
+    "docs/observability.md ## Decision Ledger must state the NEVER-records-timing invariant",
+)
+
+# (4) 4 event types declared in docs
+_s100_event_types = ["gate-verdict", "operator-approval", "disposition", "dry-run-enforced"]
+_s100_all_events_docs = all(et in _s100_obs_slice for et in _s100_event_types)
+check(
+    "suite100(4-event-types-docs): docs slice contains all 4 event types",
+    _s100_all_events_docs,
+    f"docs/observability.md ## Decision Ledger must declare all 4 event types: {_s100_event_types}",
+)
+
+# (5) disposition vocabulary in docs
+_s100_disp_vocab = ["accept", "watch", "reject"]
+_s100_disp_present = all(dv in _s100_obs_slice for dv in _s100_disp_vocab)
+check(
+    "suite100(5-disposition-vocab): docs slice contains 'accept', 'watch', 'reject'",
+    _s100_disp_present,
+    "docs/observability.md ## Decision Ledger must enumerate disposition values: accept, watch, reject",
+)
+
+# (6) required fields in docs
+_s100_req_fields = ["rationale", "ts", "stage", "decision"]
+_s100_fields_present = all(f in _s100_obs_slice for f in _s100_req_fields)
+check(
+    "suite100(6-required-fields): docs slice contains required fields (rationale, ts, stage, decision)",
+    _s100_fields_present,
+    f"docs/observability.md ## Decision Ledger must document fields: {_s100_req_fields}",
+)
+
+# (7) ts injected at write time
+_s100_ts_injected = (
+    "injected" in _s100_obs_slice
+    or "date -Iseconds" in _s100_obs_slice
+)
+check(
+    "suite100(7-ts-injected): docs slice states ts is injected at write time",
+    _s100_ts_injected,
+    "docs/observability.md ## Decision Ledger must state ts is injected at write time",
+)
+
+# (8) secret prohibition in docs (rationale field)
+_s100_secret_prohibition_docs = (
+    ("no tokens" in _s100_obs_slice or "credentials" in _s100_obs_slice)
+    and "user-path" in _s100_obs_slice
+)
+check(
+    "suite100(8-secret-prohibition-docs): docs slice carries secret-prohibition clause",
+    _s100_secret_prohibition_docs,
+    "docs/observability.md ## Decision Ledger must carry the secret-prohibition clause (no tokens/credentials/user-path)",
+)
+
+# (9) best-effort resilience in docs
+_s100_best_effort_docs = (
+    "best-effort" in _s100_obs_slice
+    and (
+        "never hard-fail" in _s100_obs_slice
+        or ("log" in _s100_obs_slice and "continue" in _s100_obs_slice)
+    )
+)
+check(
+    "suite100(9-best-effort-docs): docs slice carries best-effort + never-hard-fail clause",
+    _s100_best_effort_docs,
+    "docs/observability.md ## Decision Ledger must carry the best-effort / never-hard-fail resilience clause",
+)
+
+# (10) Tier-0 carve-out in docs
+_s100_tier0_docs = "Tier 0" in _s100_obs_slice or "Tier-0" in _s100_obs_slice
+check(
+    "suite100(10-tier0-docs): docs slice carries Tier-0 carve-out",
+    _s100_tier0_docs,
+    "docs/observability.md ## Decision Ledger must carry the Tier-0 carve-out",
+)
+
+# (11) dual-format documented in docs
+_s100_dual_format_docs = (
+    "00-decision-ledger.jsonl" in _s100_obs_slice
+    and "00-decision-ledger.md" in _s100_obs_slice
+    and "jsonl" in _s100_obs_slice
+)
+check(
+    "suite100(11-dual-format-docs): docs slice documents dual-format (jsonl + md + fence reference)",
+    _s100_dual_format_docs,
+    "docs/observability.md ## Decision Ledger must document both 00-decision-ledger.jsonl and 00-decision-ledger.md",
+)
+
+# (12) orchestrator section exists
+check(
+    "suite100(12-orch-section): agents/orchestrator.md contains '## Decision Ledger'",
+    len(_s100_orch_slice) > 0,
+    "agents/orchestrator.md must contain a '## Decision Ledger' section",
+)
+
+# (13) exclusive writer + append-only >>
+_s100_exclusive_writer = (
+    "orchestrator" in _s100_orch_slice
+    and ("exclusive" in _s100_orch_slice or "only writer" in _s100_orch_slice)
+    and ">>" in _s100_orch_slice
+)
+check(
+    "suite100(13-exclusive-writer): orch slice names orchestrator as exclusive writer + append-only >>",
+    _s100_exclusive_writer,
+    "agents/orchestrator.md ## Decision Ledger must name orchestrator as exclusive writer and reference append-only >>",
+)
+
+# (14) write-sites table maps all 4 event types to gate boundaries
+_s100_write_sites = (
+    "STAGE-GATE" in _s100_orch_slice
+    and "Phase 1.6" in _s100_orch_slice
+    and "disposition" in _s100_orch_slice
+)
+_s100_all_events_orch = all(et in _s100_orch_slice for et in _s100_event_types)
+check(
+    "suite100(14-write-sites): orch slice write-sites table maps all 4 event types to gate boundaries",
+    _s100_write_sites and _s100_all_events_orch,
+    "agents/orchestrator.md ## Decision Ledger must contain a write-sites table with STAGE-GATE + Phase 1.6 + disposition",
+)
+
+# (15) dry-run subsection present: Confidence + not approval + dry-run
+_s100_dry_run_subsection = (
+    "Confidence" in _s100_orch_slice
+    and "not approval" in _s100_orch_slice
+    and ("dry-run" in _s100_orch_slice or "dry run" in _s100_orch_slice)
+)
+check(
+    "suite100(15-dry-run-subsection): orch slice contains Confidence + not approval + dry-run subsection",
+    _s100_dry_run_subsection,
+    "agents/orchestrator.md ## Decision Ledger must contain Confidence-is-not-approval / dry-run subsection",
+)
+
+# (16) dry-run routes deploy/migration first
+_s100_dry_run_routes = (
+    "deploy" in _s100_orch_slice
+    and "migration" in _s100_orch_slice
+    and (
+        "--dry-run" in _s100_orch_slice
+        or "--validate-only" in _s100_orch_slice
+        or "plan-only" in _s100_orch_slice
+    )
+)
+check(
+    "suite100(16-dry-run-routes): orch slice routes deploy/migration through dry-run-first",
+    _s100_dry_run_routes,
+    "agents/orchestrator.md ## Decision Ledger must route deploy/migration through --dry-run/--validate-only/plan-only",
+)
+
+# (17) references existing guards + states ledger audits, not enforces
+_s100_guards_audit = (
+    "gcp-guard.sh" in _s100_orch_slice
+    and "dev-guard.sh" in _s100_orch_slice
+    and "audit" in _s100_orch_slice
+    and "not" in _s100_orch_slice
+    and "enforc" in _s100_orch_slice
+)
+check(
+    "suite100(17-guards-audit): orch slice references gcp-guard.sh + dev-guard.sh + audit/not/enforc",
+    _s100_guards_audit,
+    "agents/orchestrator.md ## Decision Ledger must reference gcp-guard.sh + dev-guard.sh and state ledger audits, not enforces",
+)
+
+# (18) anti-redundancy invariant mirrored in orchestrator section
+_s100_orch_antiredundancy = (
+    "NEVER" in _s100_orch_slice
+    and ("phase timing" in _s100_orch_slice or "token" in _s100_orch_slice)
+    and "execution-events" in _s100_orch_slice
+)
+check(
+    "suite100(18-anti-redundancy-orch): orch slice mirrors the NEVER-records-timing invariant",
+    _s100_orch_antiredundancy,
+    "agents/orchestrator.md ## Decision Ledger must also carry the NEVER-records-timing invariant",
+)
+
+# (19) resilience invariant in orchestrator section
+_s100_resilience_orch = (
+    "best-effort" in _s100_orch_slice
+    and (
+        "never hard-fail" in _s100_orch_slice
+        or ("log" in _s100_orch_slice and "continue" in _s100_orch_slice)
+    )
+)
+check(
+    "suite100(19-resilience-orch): orch slice carries best-effort + never-hard-fail resilience",
+    _s100_resilience_orch,
+    "agents/orchestrator.md ## Decision Ledger must carry best-effort / never-hard-fail resilience invariant",
+)
+
+# (20) registry: docs/testing.md contains Suite 100 and decision-ledger
+check(
+    "suite100(20-registry): docs/testing.md contains 'Suite 100' and 'decision-ledger'",
+    "Suite 100" in _s100_testing_md and "decision-ledger" in _s100_testing_md,
+    "docs/testing.md must register Suite 100 and the decision-ledger marker",
+)
+
+# (21) hygiene guard: CLAUDE.md must NOT contain 'Suite 100'
+check(
+    "suite100(21-hygiene): CLAUDE.md does NOT contain 'Suite 100'",
+    "Suite 100" not in _s100_claude_md,
+    "CLAUDE.md must not mention Suite 100 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (22) self-referential: this test file contains Suite 100, _slice_section, and decision-ledger
+_s100_own_source = read(Path(__file__))
+check(
+    "suite100(22-self-ref): this test file contains 'Suite 100', '_slice_section', and 'decision-ledger'",
+    "Suite 100" in _s100_own_source
+    and "_slice_section" in _s100_own_source
+    and "decision-ledger" in _s100_own_source,
+    "test file must reference Suite 100, _slice_section, and decision-ledger (self-referential marker check)",
+)
+
+# Marker: decision-ledger
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
