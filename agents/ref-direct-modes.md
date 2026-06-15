@@ -649,3 +649,66 @@ Present:
 - Locale files location: `{locale-dir}/en.json`, `{locale-dir}/es.json`
 - Translation report: `workspaces/{feature-name}/00-translation.md`
 - Next steps: review translations, add language switcher, configure locale detection
+
+---
+
+## Test Mode
+
+When invoked with `Direct Mode Task: test`:
+
+**Routing:** the user invokes `/th:test {feature}` (or "run tests for this feature"). The skill optionally detects frontend markers and includes `frontend_scope: true` in the payload.
+
+### Payload fields consumed
+
+| Field | Type | Source | Effect |
+|-------|------|--------|--------|
+| `feature_name` | string | skill | Locates `workspaces/{feature}/` |
+| `frontend_scope` | bool | skill frontend detection | See bridge below |
+
+### `frontend_scope` bridge
+
+When the payload carries `frontend_scope: true`:
+
+1. **Persist to `00-state.md`.** Write or update `frontend_scope: true` in `workspaces/{feature}/00-state.md § Current State`. Create the state file if it does not yet exist (use the minimal template: `phase: test`, `status: in_progress`, `frontend_scope: true`).
+2. **Precedence vs. full-pipeline Phase 0a Step 7 value.** The two sources are ORed: if EITHER the payload flag OR the Phase-0a-derived value is `true`, `frontend_scope` is `true`. The skill-derived value never downgrades a pipeline-derived `true`.
+3. **Pass into the tester invocation.** Include `frontend_scope: true` in the tester Task payload and append to the invocation instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
+4. **Tester mode obligations.** The tester runs in authoring-equivalent mode. TESTING.md (R4) write and decision-log obligations apply — the tester must record its test-type decisions in `03-testing.md § Test-Type Decisions`.
+
+When `frontend_scope` is absent or `false`, the tester is invoked without the flag and the browser-test decision rule is not applied.
+
+### Flow
+
+1. Check `workspaces/{feature}/02-implementation.md` and `workspaces/{feature}/01-plan.md` § Task List (AC) exist. If either is missing, warn the user and stop.
+2. Extract AC from `01-plan.md` § Task List.
+3. If no AC found, warn the user: "No acceptance criteria found in `01-plan.md § Task List`. Run `/th:define-ac {feature}` first."
+4. If payload carries `frontend_scope: true`, execute the `frontend_scope` bridge (above) before invoking the tester.
+5. Invoke `tester` (authoring mode) via Task tool, passing: feature name, workspaces path, AC list, `frontend_scope` flag (when true), and the instruction above.
+6. Before reporting results, apply the two console-path readiness gates (mirrors of the full-pipeline checks at `orchestrator.md` Phase 2.7):
+   - **A1-F3 — browser readiness:** when the tester's status block `warranted_types` contains `e2e` or `browser-mode` AND its findings report missing tooling or binaries, surface the proposed setup commands (e.g. `npx playwright install --with-deps`, dependency-add commands) directly in the result summary — NOT buried in `03-testing.md`. Do not skip silently. See `orchestrator.md` Phase 2.7 `**A1-F3**` for the canonical gate text and the exact operator prompt wording.
+   - **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND the tester's decision log in `03-testing.md § Test-Type Decisions` records a browser-API or interaction AC that was routed to jsdom, emit the Hot Context note defined in `orchestrator.md` Phase 2.7 `**A1-F4**` directly in the result summary. This note is non-blocking. Do NOT emit it when all AC are pure-logic or unit-level with no browser-API/interaction mismatch in the decision log.
+7. Report results to user.
+
+---
+
+## Test-Pipeline Mode
+
+When invoked with `Direct Mode Task: test-pipeline`:
+
+Full step-by-step instructions are in `ref-special-flows.md § Test Pipeline Flow`. This section documents the `frontend_scope` contract only.
+
+### `frontend_scope` in test-pipeline
+
+The test-pipeline skill detects frontend markers and may include `frontend_scope: true` in the payload. Handling mirrors the Test Mode bridge:
+
+- Persist `frontend_scope: true` to `workspaces/test-pipeline/00-state.md § Current State` at Phase 0 setup (before any module-test dispatch).
+- Precedence rule: logical OR of payload flag and any pipeline-derived value — neither source can downgrade the other.
+- Thread `frontend_scope: true` into each `module-test` payload with the same one-line instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
+
+### Console-path readiness gates (consolidation/report step)
+
+At the consolidation and report step (see `ref-special-flows.md § Test Pipeline Flow` for the full sequence), apply the same two gates used in Test Mode:
+
+- **A1-F3 — browser readiness:** when any module-tester status block reports `warranted_types` containing `e2e` or `browser-mode` AND findings include missing tooling or binaries, surface the proposed setup commands directly in the consolidated result summary. See `orchestrator.md` Phase 2.7 `**A1-F3**` for the canonical gate text.
+- **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND any module's decision log records a browser-API or interaction AC routed to jsdom, emit the Hot Context note from `orchestrator.md` Phase 2.7 `**A1-F4**` in the consolidated result summary. Non-blocking; omit when no browser-API/interaction mismatch is present.
+
+See `ref-special-flows.md § Test Pipeline Flow` for the full phase sequence, module splitting, and reporting contract.

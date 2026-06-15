@@ -194,7 +194,7 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 5 — GitHub Update | orchestrator | PR | issue comment + board update | — |
 | 6 — KG Save | orchestrator | pipeline insights | knowledge graph entities | — |
 
-*`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend-scope: true` (enrich at Phase 1, validate at Phase 3).
+*`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true` (enrich at Phase 1, validate at Phase 3).
 
 **On-demand reading:** each phase has a detailed section further in this document. When you reach a phase, read its section before dispatching. Use these approximate offsets (may shift after edits — use Grep for the section header if offset is stale):
 - Phase 0a (Intake): search the `Phase 0a` heading
@@ -553,7 +553,7 @@ If any of steps 6–8 fail (file missing, file empty, or insufficient `phase.end
 
 - A `docs` pipeline that never dispatched `security` does NOT expect `04-security.md`.
 - A `fix` pipeline (Tier 2–4) that dispatched `tester` in `pre-fix-regression` mode DOES expect `02-regression-test.md`.
-- A `feat` pipeline with `frontend-scope: true` DOES expect `01-ux-review.md` and `04-ux-validation.md` (because `ux-reviewer` appears in Agent Results).
+- A `feat` pipeline with `frontend_scope: true` DOES expect `01-ux-review.md` and `04-ux-validation.md` (because `ux-reviewer` appears in Agent Results).
 
 **STOP block template for failure path:**
 
@@ -1197,7 +1197,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - GitHub issue has a `security` label
      - **Task type is `fix` or `hotfix`** — security agent runs ALWAYS for bugs (operator override; defense-in-depth: many bugs have non-obvious security implications, and fixes can introduce new vulnerabilities). For `type: fix` / `type: hotfix`, `security-sensitive` is **forced to `true`** regardless of the other criteria above. This is a hard requirement of the Bug-fix Flow — see `ref-special-flows.md` § Bug-fix Flow. **Tier modulation:** for `type: fix` / `type: hotfix`, the `security-sensitive: true` default is preserved for Tier 3+ and derived from the tier (see Tier classification below). Tier 1 (docs/trivial) and Tier 2 (light) skip the security agent because the impacted scope is non-functional or non-production code; if a Tier 1 / Tier 2 fix touches a security-sensitive path, the path signal auto-promotes the tier to 3+. The "always on for bugs" rule survives semantically: security runs for every Tier 3+ bug, and the tier system is what determines whether the bug is Tier 3+.
 
-   - **Frontend-scope:** `true` | `false` — set to `true` if ANY of these apply:
+   - **`frontend_scope`:** `true` | `false` — set to `true` if ANY of these apply:
      - Task touches UI components, pages, views, or layouts
      - Task modifies CSS, Tailwind classes, styled-components, or design tokens
      - Task adds or changes forms, modals, navigation, or interactive elements
@@ -1205,7 +1205,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - Request mentions UI/UX keywords: `UI`, `UX`, `botón`, `button`, `formulario`, `form`, `modal`, `layout`, `responsive`, `diseño`, `pantalla`, `vista`, `componente`, `accesibilidad`, `accessibility`
      - User explicitly requests UX review
      - GitHub issue has a `frontend`, `ui`, or `ux` label
-     When `frontend-scope: true`: the `ux-reviewer` agent is dispatched in Stage 1 (enrich mode, after architect) and Stage 3 (validate mode, in parallel with tester/qa/security). The ux-reviewer adds UI/UX AC in enrich mode and validates them in validate mode. Only `critical` findings (WCAG A violations) block delivery; all other findings are recommendations.
+     When `frontend_scope: true`: the `ux-reviewer` agent is dispatched in Stage 1 (enrich mode, after architect) and Stage 3 (validate mode, in parallel with tester/qa/security). The ux-reviewer adds UI/UX AC in enrich mode and validates them in validate mode. Only `critical` findings (WCAG A violations) block delivery; all other findings are recommendations.
 
    - **Bug tier (only when `type: fix` or `type: hotfix`):** `0` | `1` | `2` | `3` | `4`. The tier determines how much of the Bug-fix Pipeline runs against a given fix — trivial bugs skip ceremony, critical bugs add prior-art research and extended security analysis. Combine three signals; high-tier signals win, default to Tier 3 when ambiguous, operator declarations override auto-classification.
 
@@ -1318,7 +1318,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
     - When in doubt (ambiguous scope) → ask the user: "Do you want to test a specific feature or the entire service?"
 12. **Announce** to the user: task classified, proceeding to SPECIFY.
 
-13. **Update `00-state.md` with classification results.** The file was created at Step 1c with `status: classifying`. Now update it with the full classification: `type`, `complexity`, `security-sensitive`, `frontend-scope`, `bug_tier`, `bug_tier_source`, `fast_mode`. Rewrite TL;DR: `Now`: "Phase 0b spec investigation starting." `Last`: "Pipeline started — task classified as {type}/{complexity}." `Next`: "Phase 0b SPECIFY, then Phase 1 design." `Open issues`: "none".
+13. **Update `00-state.md` with classification results.** The file was created at Step 1c with `status: classifying`. Now update it with the full classification: `type`, `complexity`, `security-sensitive`, `frontend_scope`, `bug_tier`, `bug_tier_source`, `fast_mode`. Rewrite TL;DR: `Now`: "Phase 0b spec investigation starting." `Last`: "Pipeline started — task classified as {type}/{complexity}." `Next`: "Phase 0b SPECIFY, then Phase 1 design." `Open issues`: "none".
 
 ---
 
@@ -2038,14 +2038,22 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 **When to run:** After Phase 2.5 (Constraint Reconciliation) and the Phase 2-close scope check complete. Before launching Phase 3. Applies to all pipeline types (`feature`, `refactor`, `enhancement`, `fix`, `hotfix`).
 
 **Dispatch via Task tool:**
-- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-PR AC block)** — the tester must map each AC to at least one test and run the suite once to confirm all authored tests pass. Reference to `00-knowledge-context.md` if it exists.
-- Instruction: "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this PR. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)."
+- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-PR AC block)** — the tester must map each AC to at least one test and run the suite once to confirm all authored tests pass. Reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
+- Instruction: "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this PR. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
 
 **Scope constraint (security advisory):** The `authoring` mode must not become a seam to touch production code. The tester writes and edits test files exclusively — the same "test files only" invariant that governs all other tester modes.
 
 **Gate (status-block):** Read the `tester` status block only.
 - If `status: success` → proceed to Phase 3. The working tree now has a complete, stable AC-test artifact.
 - If `status: failed` → read `failure-brief.md` and route back to tester (counts against max-3 budget). Do NOT launch Phase 3 until authoring succeeds.
+
+**A1-F3 — Browser readiness check (runs before Phase 3, non-blocking on the authoring success path):** When the tester's authoring status block reports `warranted_types` containing `e2e` or `browser-mode` AND its findings propose missing tooling or binaries (e.g. Playwright executables not installed), surface the proposed setup commands (e.g. `npx playwright install`, dependency adds) to the operator at this gate BEFORE launching Phase 3. Do NOT proceed silently — runtime failures in Phase 3 are harder to diagnose than a pre-flight prompt here. Present as: "Browser-real tests were authored but require browser/binary setup. Proposed commands: `{commands}`. Run these in the target repo, then confirm to proceed to Phase 3." Phase 3 does not launch until the operator confirms (or declines and accepts that browser suites will be skipped at runtime).
+
+**A1-F4 — jsdom-only soft gate (non-blocking, operator visibility):** When `frontend_scope: true` and the tester's authoring status block `warranted_types` contains no browser-real type (`e2e`, `browser-mode`, `a11y`, `ui-component`, or `visual` — the types that run in a real browser per the engine-overlap note in `agents/testing-refs/_index.md`), AND the tester's decision log in `03-testing.md § Test-Type Decisions` records a browser-API or interaction AC that was routed to jsdom, emit the following Hot Context note before proceeding to Phase 3:
+
+> **Hot Context — frontend task ended jsdom-only.** Verify the AC genuinely have no browser-API/journey dependency (see the tester decision log in `03-testing.md` § Test-Type Decisions). If browser-API or interaction AC were present but defaulted to jsdom, route back to tester with the browser-test decision rule. This note is non-blocking — proceed to Phase 3 unless operator requests a re-route.
+
+Note: a frontend repo with zero browser-real types is legitimately jsdom-only when all AC are pure-logic or unit-level (no browser-API/interaction mismatch in the decision log). Do NOT emit the note in that case.
 
 **Emit events:**
 ```json
@@ -2080,7 +2088,7 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 → When `security` reports Critical/High findings and a KG write is performed (see § "KG write on security findings" below), emit a `kg_write` event per § "Emitting kg_write events".
 
 Launch agents simultaneously using Task tool calls in the same message:
-- **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
+- **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
 - **qa** (validate mode): feature name, summary of what was implemented (from implementer's status block summary). For `type: fix` / `type: hotfix` (Tier 2-4): also instruct: "Validate AC-1 (reproduction-no-longer-bug) by reading reproduction steps from `01-plan.md` § Review Summary and verifying observed behaviour matches expected. Validate AC-2 (regression-test-exists) by cross-checking `02-regression-test.md` against the current suite. Set `regression_test_referenced: true|false` and `reproduction_steps_validated: true|false` in your status block." For `type: fix` Tier 1: instruct: "Reduced validation. Verify the diff matches the intent stated in `01-plan.md` § Review Summary. AC list is implicit — the cited issue is fixed. Set `regression_test_referenced: null` (Phase 2.0 was skipped) and `reproduction_steps_validated: true|false` in your status block."
 - **security** (pipeline mode, only when the dispatch table above says so): feature name, list of files created/modified, summary of what was implemented, reference to `00-knowledge-context.md` if it exists. Instruct: "This is pipeline mode — focus on the changed files and their security implications." For `bug_tier: 4`: additionally instruct: "Extended analysis. Read `01-root-cause.md ## Prior Art` and cross-reference any prior `process-insight` nodes describing similar failure modes. Analyse the adjacent code paths beyond the diff (one hop out in the call graph) for related vulnerability classes. Surface findings on adjacent code as `## Adjacent Surface Findings` in `04-security.md` separate from the diff findings."
 
@@ -2298,7 +2306,7 @@ For each candidate in `security`'s `kg_save_candidates` (may be bare string lega
 4. **`go.mod` exists** → `go build ./...`
 5. **`Cargo.toml` exists** → `cargo build`
 
-If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end","feature":"<name>","phase":"3.75-build-verification","agent":"orchestrator","status":"skipped","summary":"no build/lint commands detected"}` and proceed to Phase 3.6.
+If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end","feature":"<name>","phase":"3.75-build-verification","agent":"orchestrator","status":"skipped","summary":"no build/lint commands detected"}` and proceed to Phase 3.6. Note: browser-real suites (e2e, browser-mode) are executed by the tester agent — not by Build Verification — and require browsers/binaries provisioned beforehand (see the A1-F3 readiness check at the Phase 2.7 gate).
 
 **Execution:**
 
@@ -4085,7 +4093,7 @@ All special flows are detailed in `ref-special-flows.md`. Read it on-demand when
 | Bug-fix | `type: fix` | architect produces `01-root-cause.md` (1pg) + `01-plan.md` instead of just `01-plan.md`; Phase 2.0 inserts a mandatory regression test before Phase 2; `security` runs always (forced `security-sensitive: true`); delivery routes CHANGELOG to `### Fixed` and PR title to `fix(area):`; implementer scope-discipline contract bars tangential refactors |
 | Hotfix | `type: hotfix` | Same as Bug-fix; Phase 1 (root-cause analysis) skipped — orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 still mandatory. PR title appends `(hotfix)` suffix |
 | Security-sensitive | `security-sensitive: true` | Phase 3 adds `security` agent in parallel (already forced `true` for `type: fix` / `type: hotfix`) |
-| Frontend-scope | `frontend-scope: true` | Phase 1 adds `ux-reviewer` (enrich mode, after architect) to add UI/UX AC; Phase 3 adds `ux-reviewer` (validate mode, in parallel with tester/qa/security) to validate UI/UX criteria. Only `critical` findings block delivery |
+| Frontend-scope | `frontend_scope: true` | Phase 1 adds `ux-reviewer` (enrich mode, after architect) to add UI/UX AC; Phase 3 adds `ux-reviewer` (validate mode, in parallel with tester/qa/security) to validate UI/UX criteria. Only `critical` findings block delivery |
 | Database changes | DB migration involved | Design must include migration strategy + rollback |
 | Research | `type: research` | Architect only (research mode) → skip Phases 2-5 |
 | Spike | `type: spike` | Implementer only (no design, no tests) → ask user: formalize/discard/investigate |
@@ -4164,7 +4172,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the five-layer guard: Layers 1-3 (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify); **Layer 4** (mode-transition gate — corrective language NEVER auto-routes, requires explicit confirmation); **Layer 5** (branch-author guard — fail-closed if author-of-PR or operator identity is indeterminate). **Publish gate:** before ANY `gh pr review`/`POST reviews`, `PUT reviews/:id`, reply, or dismiss verb, present the full draft to the operator and wait for explicit approval (`ref-direct-modes.md § Publish Gate`); `--auto-publish` opt-in skips the preview. **`review_context` state:** write `review_context: { pr: {N}, status: in-progress, author: {login} }` to `00-state.md` when entering review mode; clear it on a confirmed mode-transition or session close. |
 | init | `init` | none | invoke → report generated files |
 | design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
-| test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** |
+| test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** **`frontend_scope` bridge:** if the payload carries `frontend_scope: true`, (a) persist `frontend_scope: true` to `workspaces/{feature}/00-state.md § Current State` (create the state file if it does not yet exist, otherwise update the field in-place); (b) pass `frontend_scope: true` in the tester invocation payload with the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." The tester runs in authoring-equivalent mode: TESTING.md (R4) and decision-log obligations apply. See `ref-direct-modes.md § Test Mode` for the full field contract. |
 | validate | `qa` (validate mode) | `01-plan.md` § Task List + implementation | check AC exist. If missing → tell user to run `/th:define-ac` first. Do NOT invoke without AC. |
 | deliver | `delivery` | implementation + tests + validation | verify `02-implementation.md`, `03-testing.md`, AND `04-validation.md` exist. If any missing → tell user. After `delivery` completes its internal work (branch, commits, changelog), run Phase 4.5 (internal review) and then emit STAGE-GATE-3 BEFORE any `git push` or `gh pr create`. The safe default for direct deliver is to emit the gate — it does NOT ship immediately. This mirrors the Stage 3 close of the full pipeline. |
 | define-ac | `qa-plan` (define-ac mode) | none | invoke → present `00-acceptance-criteria.md` |
@@ -4184,7 +4192,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:
 
-- **`ref-direct-modes.md`** — Diagram (Excalidraw), LikeC4 Diagram, D2 Diagram, Review, Translate mode
+- **`ref-direct-modes.md`** — Diagram (Excalidraw), LikeC4 Diagram, D2 Diagram, Review, Translate, Test, Test-Pipeline mode
 - **`ref-special-flows.md`** — Research, Spike, Plan, Parallel Dispatch, Hotfix, Security-Sensitive, Database Changes, Refactor, User-Initiated Simple mode
 
 ---

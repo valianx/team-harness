@@ -540,7 +540,7 @@ A dedicated pipeline for achieving **80% branch coverage service-wide**. Decompo
 
 9. **If `--modules` flag provided** --- skip decomposition, create tasks only for specified modules.
 10. **Write workspaces:**
-    - `workspaces/test-pipeline/00-state.md` --- initial pipeline state
+    - `workspaces/test-pipeline/00-state.md` --- initial pipeline state. When the Direct Mode Task payload carries `frontend_scope: true`, record `frontend_scope: true` in this file. (Phase 0 step 2's stack detection — react/vue/svelte markers — corroborates it, but the skill's prior detection is authoritative; do not re-detect.)
     - `workspaces/test-pipeline/batch-progress.md` --- task table (reusing multi-task format)
 
 ### Phase 1 --- Blocker Round
@@ -607,11 +607,23 @@ Test-Pipeline Task:
 - Stack: {detected framework}
 - Coverage target: aim for >= 85% branch coverage per module (overshot intentionally --- the service-wide gate is 80% and rounding/overlap means per-module must exceed 80% to guarantee the aggregate passes)
 - Skip security: {true/false from --skip-security flag}
+- frontend_scope: {true|false from 00-state.md}
 - Instruction:
   1. TESTER PHASE: Write comprehensive tests for all files in {module path}.
      Use factory pattern for mocks. Cover the module's behavior systematically
      (happy paths, error cases, edge cases, input validation).
      Follow existing test patterns. No AC to map --- cover source files.
+     1a. BROWSER-VS-JSDOM ROUTING (when frontend_scope: true): For each source
+         file in this module, apply the tester Phase-0 browser-test decision rule
+         per-file. Files whose behavior depends on real browser APIs (layout/geometry,
+         IntersectionObserver/ResizeObserver, matchMedia, Web Animations/CSS transitions,
+         computed CSS) or that are components whose rendering requires a real browser
+         should be covered in browser-mode (NOT jsdom). Pure-logic files (data
+         transforms, hooks with no DOM dependency, utilities) stay jsdom. If the
+         detected stack has no browser-mode support (e.g., Vue, Svelte, non-React
+         frameworks), record "browser-mode: n/a for this stack" in the module summary
+         and fall back to the stack's available test environment --- do not force
+         browser-mode.
   2. QUALITY CHECK: After tests pass, run coverage for this module only.
      Report: files tested, branch coverage %, uncovered branches.
   3. SECURITY SCAN (unless skip-security): Review the module's source files

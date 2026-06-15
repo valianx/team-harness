@@ -48,9 +48,10 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 **Process:**
 
 1. Read the architecture proposal and task list
-2. Identify all UI-facing changes (new components, modified views, layout changes, form additions, navigation changes)
-3. For each UI-facing change, evaluate against the checklist below
-4. Write `01-ux-review.md` with recommended AC additions and findings
+2. Detect the frontend stack (`next.config.*` / `app/` directory → react-nextjs; `vite.config.*` + react → vite-react; etc.); when the stack supports Vitest Browser Mode (currently react-nextjs), browser-real component AC are realizable in isolation — state that in findings; when not, scope browser-real assertions to e2e (Playwright) so the tester does not hit a tooling dead-end.
+3. Identify all UI-facing changes (new components, modified views, layout changes, form additions, navigation changes)
+4. For each UI-facing change, evaluate against the checklist below
+5. Write `01-ux-review.md` with recommended AC additions and findings
 
 **Checklist (evaluate each UI change against):**
 
@@ -62,6 +63,8 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 | **Component reuse** | Does a similar component already exist? Can an existing component be extended rather than creating a new one? Flag duplication |
 | **Visual consistency** | Spacing, typography, color palette — matches existing design system or patterns in the codebase |
 | **Content** | Truncation handling, empty states have helpful messages, error messages are actionable, no raw error codes shown to users |
+
+**Browser-real signal hints:** when an AC depends on real browser behavior — layout geometry (`getBoundingClientRect`/`offsetWidth`), `IntersectionObserver`/`ResizeObserver`, `matchMedia`/viewport breakpoints (375px/768px/1024px), Web Animations/CSS transitions, or computed CSS — state that dependency EXPLICITLY in the Then clause. Example: `…Then the lazy image loads when it intersects the viewport (IntersectionObserver)`. The tester routes such AC to browser-real environments; AC that omit the signal default to jsdom.
 
 **AC format:** append to the existing PR's AC list using Given/When/Then format:
 ```
@@ -107,6 +110,8 @@ Read the implementation and validate against UI/UX criteria.
 | **Missing states** | Interactive elements without loading/error/empty/disabled states | medium |
 | **Accessibility violations** | Missing alt text, no keyboard support, insufficient contrast, missing ARIA | high (blocker if WCAG A) |
 | **Responsive gaps** | Layout breaks at common breakpoints, touch targets too small | medium |
+
+**Stage-3 ownership boundary:** where a Browser Mode viewport test or Playwright/axe a11y test asserts a property (responsive reflow at a breakpoint, computed contrast, observer-driven loading), that automated test is AUTHORITATIVE — validate the test EXISTS and matches the AC; do not re-assert the property manually. Reserve manual validation for properties no automated test covers: visual polish, content tone, design-system consistency.
 
 ---
 

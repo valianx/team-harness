@@ -19936,6 +19936,7 @@ check(
 # Marker: obsidian-path-override-fleetwide
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Suite 92 — haiku-research-fanout (v2.85.0)
 # Structural assertions for the parallel haiku research fan-out feature and the
 # v2.85.0 fleet rightsizing (init/acceptance-checker/translator → haiku;
@@ -21245,6 +21246,1388 @@ check(
 )
 
 # Marker: worktree-discipline
+# Suite 106 — browser-mode-reference (v2.84.0)
+# Structural assertions for the Vitest Browser Mode reference added by
+# feature-e2e-testing-agent (D7 item 15, AC-3/AC-5/AC-7).
+# Written by tester (2026-06-12). Marker: browser-mode-reference
+# Strengthened (2026-06-12): R3-1/R3-2/R3-3/R3-4/R3-5/R3-6/R3-8 code-review
+# fixes + new-content pinning for toMatchScreenshot, trace retain-on-failure,
+# async render, routing precedence, a11y routing, and vitest-browser-mode guard.
+# Re-pinned (2026-06-12): C8 direction-pin 7f/7g/4f; C9 7a repointed to
+# __screenshots__/; C10 1c filename-matched; C11 7e comment added; C12 4o
+# slice tightened; 13 new checks for just-landed invariants.
+# Strengthened (2026-06-13, iteration-3): 8a negative guard closes false-green
+# (@vitest/browser/context substring); toMatchScreenshot-subject negative pin.
+#
+# Covers (69 checks):
+#   (1a)   browser-mode.md exists on disk
+#   (1b)   _index.md names 'browser-mode' (manifest → disk forward)
+#   (1c)   reverse-scan: every *.md filename (stem+".md") in testing-refs/
+#          (excl. _index.md) is listed in _index.md (disk → manifest complete
+#          reverse; C10: filename-matched — bare stem would pass on prose mentions)
+#   (2a-2m) browser-mode.md canonical-shape + content tokens:
+#       (2a)  'When to use' guidance present
+#       (2b)  'When NOT to use' section present
+#       (2c)  '@vitest/browser-playwright' documented
+#       (2d)  'provider: playwright()' in config
+#       (2e)  'browser.enabled' / 'enabled: true' key
+#       (2f)  'instances:' key (with colon — value token, not prose word)
+#       (2g)  'vitest-browser-react' referenced
+#       (2h)  '__screenshots__/' storage-path (C9: repointed — was dup of 7a)
+#       (2i)  Playwright-format traces coverage
+#       (2j)  per-file isolation ('ISOLATION LIMITATION' + 'single page')
+#       (2k)  vi.mock spy caveat
+#       (2l)  no YAML frontmatter (R3-8: reference file, not an agent)
+#       (2m)  '## Principles' section present (R3-8: canonical-shape guard)
+#   (3a-3c) nestjs/go/python are n/a notes (not full sections)
+#   (4a)   Phase-0 slice names 'browser-mode' warranted type (R3-3: slice-scoped)
+#   (4b-4d) decision-log shape tokens (Selected test type:, Reason:,
+#           Loaded references:)
+#   (4e)   propose-setup posture (no auto-install + no jsdom fallback)
+#   (4f)   step-3b derivation bullet co-locates 'AC about layout/geometry',
+#          '→', and '`browser-mode`' ON THE SAME LINE (C8/R3-1: per-line
+#          binding + arrow-target pinned so target change is caught)
+#   (4g-authoring)  authoring-mode Flow slice contains 'browser-test decision rule'
+#   (4g-verify)     verify-run-mode Flow slice contains 'browser-test decision rule'
+#   (4h)   decision rule viewport clause '375px' (A3-1)
+#   (4i)   decision rule 'aria-live' branch (F4)
+#   (4j)   decision rule 'drag-and-drop' branch (F4)
+#   (4k)   decision rule jsdom timer caveat — 'Web-Animations' and
+#          'CSS-animation' as separate stable tokens (R3-5: de-brittled)
+#   (4l)   _index.md 'Frontend AC category' table + 'breakpoint' + 'Multi-page'
+#          row tokens (R3-5: de-brittled stable tokens)
+#   (4m)   _index.md engine-overlap note (F6)
+#   (4n)   ui-component.md boundary note naming browser-mode.md (F2a)
+#   (4o)   browser-mode.md When-NOT-to-use SECTION names 'ui-component.md'
+#          and 'engine' (C12/R3-5: slice stops at next ###, not ## — prevents
+#          false-green from tokens in later subsections)
+#   (4p)   visual.md Option C + browser-mode.md cross-ref (F5)
+#   (4q)   a11y.md No-Storybook + vitest-browser-react (F7)
+#   (5a-5d) four version-sync sites >= 2.84.0
+#   (6a-6b) e2e.md react-nextjs: cross-pointer to browser-mode.md
+#           + v1.60.0-noble image tag
+#   (7a)   '__screenshots__/' storage-path in browser-mode.md (C9: repointed
+#          from toMatchScreenshot dup — now catches screenshot storage path)
+#   (7b)   'toMatchScreenshot' present in visual.md (C1 visual.md parity)
+#   (7c)   "trace: 'retain-on-failure'" present in browser-mode.md
+#   (7d)   'await render(' present in browser-mode.md (async note)
+#   (7e)   no un-awaited render() call in browser-mode.md (negative check;
+#          C11: known limitation — file-scoped; future legit jsdom comparative
+#          snippets tagged '// jsdom' would need an allowlist)
+#   (7f)   routing precedence: backtick-quoted '`e2e`' + 'still wins' on one
+#          line in tester.md (C8 direction-pin: catches inversion, not just
+#          deletion — bare 'e2e' without backtick cannot satisfy the check)
+#   (7g)   _index.md 'color contrast' row routes to backtick-quoted '`a11y`'
+#          as the type cell (C8 cell-anchored: must be the type token, not
+#          prose mention of 'a11y' anywhere in the row)
+#   (7h)   'Selected test type: browser-mode' present in tester.md
+#          (normalized log token — no 'vitest-browser-mode' variant)
+#   (7i)   'vitest-browser-mode' absent from all files in agents/
+#          (negative: old token must not re-appear)
+#   (8a)   viewport-control: 'page.viewport' + 'vitest/browser' import both
+#          present in browser-mode.md AND '@vitest/browser/context' ABSENT
+#          (just-landed Viewport control subsection; strengthened: negative guard
+#          closes the false-green — '@vitest/browser/context' is a substring of
+#          'vitest/browser' so a positive-only check is a false-green)
+#   (8b)   platform-suffix caveat in browser-mode.md ('platform' near
+#          screenshots section — baselines embed OS in filename)
+#   (8c)   platform-suffix caveat in visual.md (same caveat for Option C)
+#   (8d)   ARIA live-region subsection present in browser-mode.md
+#          ('### ARIA live-region assertion')
+#   (8e)   e2e.md responsive assertions subsection: 'setViewportSize' present
+#          (just-landed '### Responsive assertions in E2E' subsection)
+#   (8f)   _index.md keyboard-nav row NOT routed to '`a11y`' as type cell
+#          (per-line: axe cannot verify keyboard operability → ui-component /
+#          browser-mode, not a11y)
+#   (8g)   _index.md catch-all browser-API row: 'clipboard' token + '`browser-mode`'
+#          as type cell on the SAME line (just-landed catch-all row)
+#   (8h)   tester.md catch-all branch in decision rule: 'clipboard' token
+#          (confirms catch-all enumerated families + per-API verify clause)
+#   (8i)   tester.md conventions-vs-reference precedence: 'cypress.config'
+#          detection example present (discovered framework wins)
+#   (8j)   tester.md '## Test-Type Decisions' template section present
+#          (decision log landing artifact in 03-testing.md template)
+#   (8k)   tester.md 'warranted_types:' status-block field present
+#   (8l)   tester.md binaries-missing clause: 'binaries' token in the
+#          Neither-installed paragraph (packages-present-but-binaries-missing)
+#   (8m)   tester.md n/a re-derive fallback: 'Re-derive'/'re-derive' token in
+#          Router fallback section (n/a stack → re-derive, not author-from-repo)
+#   (8n)   tester.md 'all type files' count-free phrasing present AND
+#          'all six type files' ABSENT (count-free after seventh type landed)
+#   (toMatchScreenshot-subject) negative: 'expect(container).toMatchScreenshot'
+#          absent from browser-mode.md AND visual.md (iteration-3 fix: correct
+#          locator subject is 'screen.getByRole(...)'; mirrors 7e pattern)
+#   (h1-h2) self-referential guard + CLAUDE.md hygiene
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 106: browser-mode-reference structural assertions (v2.84.0) ===")
+
+_s106_testing_refs  = AGENTS_DIR / "testing-refs"
+_s106_bm_path       = _s106_testing_refs / "browser-mode.md"
+_s106_index_path    = _s106_testing_refs / "_index.md"
+_s106_tester        = read(AGENTS_DIR / "tester.md")
+_s106_e2e           = read(_s106_testing_refs / "e2e.md") if (_s106_testing_refs / "e2e.md").exists() else ""
+_s106_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s106_claude        = read(REPO_ROOT / "CLAUDE.md")
+_s106_STOP          = ("\n## ", "\n### ", "\n---\n")
+
+# ---- (1a) browser-mode.md exists ----------------------------------------
+check(
+    "suite106(1a): agents/testing-refs/browser-mode.md exists on disk",
+    _s106_bm_path.exists(),
+    "agents/testing-refs/browser-mode.md must exist (Reference Router manifest entry is present)",
+)
+_s106_bm = read(_s106_bm_path) if _s106_bm_path.exists() else ""
+
+# ---- (1b) _index.md forward manifest agreement --------------------------
+# Extends Suite 67's pattern: suite67 covers the original 6 types; Suite 92
+# adds the forward check specifically for 'browser-mode' (manifest → disk).
+_s106_index_text = read(_s106_index_path) if _s106_index_path.exists() else ""
+check(
+    "suite106(1b): agents/testing-refs/_index.md names 'browser-mode' (manifest → disk forward)",
+    "browser-mode" in _s106_index_text,
+    "agents/testing-refs/_index.md must list 'browser-mode' in the manifest row",
+)
+
+# ---- (1c) reverse-scan: every type filename (stem+".md") in _index.md ----
+# R3-4: real reverse scan replaces the former pure conjunction of 1a + 1b.
+# C10: match f.stem + ".md" (filename with extension) instead of bare stem
+# substring — bare stem "browser-mode" would match inside prose text like
+# "browser-mode-focused-tests" or "see browser-mode docs"; requiring the
+# ".md" extension pins to the actual filename reference in the manifest row.
+_s106_index_text_load = read(_s106_index_path) if _s106_index_path.exists() else ""
+_s106_type_files = [
+    f for f in _s106_testing_refs.glob("*.md") if f.name != "_index.md"
+] if _s106_testing_refs.exists() else []
+check(
+    "suite106(1c): every *.md filename in agents/testing-refs/ (excl. _index.md)"
+    " is listed in _index.md (disk → manifest complete reverse; C10: filename-matched)",
+    bool(_s106_type_files) and all(
+        (f.stem + ".md") in _s106_index_text_load for f in _s106_type_files
+    ),
+    "agents/testing-refs/_index.md must list every type filename (stem+'.md')"
+    " (C10: filename-matched reverse scan — bare stem substring is too weak;"
+    " a new type file without a manifest row fails here)",
+)
+
+# ---- (2a) when-to-use guidance ------------------------------------------
+check(
+    "suite106(2a): browser-mode.md contains 'When to use' guidance",
+    "When to use" in _s106_bm,
+    "browser-mode.md must contain a 'When to use' guidance section",
+)
+
+# ---- (2b) when-NOT-to-use guidance --------------------------------------
+check(
+    "suite106(2b): browser-mode.md contains 'When NOT to use' guidance",
+    "When NOT to use" in _s106_bm,
+    "browser-mode.md must contain a 'When NOT to use' section",
+)
+
+# ---- (2c) @vitest/browser-playwright ------------------------------------
+check(
+    "suite106(2c): browser-mode.md references '@vitest/browser-playwright'",
+    "@vitest/browser-playwright" in _s106_bm,
+    "browser-mode.md must document the '@vitest/browser-playwright' provider package",
+)
+
+# ---- (2d) provider: playwright() ----------------------------------------
+check(
+    "suite106(2d): browser-mode.md contains 'provider: playwright()'",
+    "provider: playwright()" in _s106_bm,
+    "browser-mode.md must show 'provider: playwright()' in the minimal config",
+)
+
+# ---- (2e) browser.enabled / enabled: true --------------------------------
+check(
+    "suite106(2e): browser-mode.md contains 'browser.enabled' or 'enabled: true'",
+    "browser.enabled" in _s106_bm or "enabled: true" in _s106_bm,
+    "browser-mode.md must document the 'browser.enabled' / 'enabled: true' config key",
+)
+
+# ---- (2f) instances: key (with colon — value token, not prose word) ------
+# R3-6: tightened from bare 'instances' to 'instances:' to pin the config
+# key itself, not any prose mention of the word.
+check(
+    "suite106(2f): browser-mode.md contains 'instances:' key",
+    "instances:" in _s106_bm,
+    "browser-mode.md must document the 'instances:' config key (colon required — pinning the key, not prose)",
+)
+
+# ---- (2g) vitest-browser-react -------------------------------------------
+check(
+    "suite106(2g): browser-mode.md contains 'vitest-browser-react'",
+    "vitest-browser-react" in _s106_bm,
+    "browser-mode.md must reference 'vitest-browser-react' for React-stack targets",
+)
+
+# ---- (2h) __screenshots__/ storage path (C9: repointed from toMatchScreenshot dup)
+# 7a already pins 'toMatchScreenshot' file-wide; 2h was a literal duplicate.
+# C9: repoint 2h to the '__screenshots__/' storage-path token in browser-mode.md
+# (the location where reference images are stored alongside the test file).
+# This catches deletion of the storage-path documentation without duplicating 7a.
+check(
+    "suite106(2h): browser-mode.md documents '__screenshots__/' storage path"
+    " (C9: repointed — distinct from 7a toMatchScreenshot pin)",
+    "__screenshots__/" in _s106_bm,
+    "browser-mode.md must document '__screenshots__/' as the reference image"
+    " storage path (alongside the test file, committed to version control)"
+    " (C9: was a duplicate of 7a; now pins the storage-path token independently)",
+)
+
+# ---- (2i) Playwright traces ----------------------------------------------
+check(
+    "suite106(2i): browser-mode.md covers Playwright-format traces",
+    "trace" in _s106_bm.lower() and ("tracing" in _s106_bm or "Trace Viewer" in _s106_bm),
+    "browser-mode.md must cover Playwright-format traces (Vitest 4.0+ trace recording)",
+)
+
+# ---- (2j) per-file isolation limitation (single page) --------------------
+# The isolation section title is 'ISOLATION LIMITATION'.  The body uses the
+# phrase "single page" to describe the per-file scope.  Both anchors are
+# stable; assert co-presence of the section heading and the key phrase.
+check(
+    "suite106(2j): browser-mode.md covers per-file isolation limitation ('single page')",
+    "ISOLATION LIMITATION" in _s106_bm and "single page" in _s106_bm,
+    "browser-mode.md must document the ISOLATION LIMITATION with the 'single page' phrase",
+)
+
+# ---- (2k) vi.mock spy caveat ---------------------------------------------
+check(
+    "suite106(2k): browser-mode.md documents the vi.mock spy caveat",
+    "vi.mock" in _s106_bm,
+    "browser-mode.md must document the vi.mock / vi.spyOn caveat for Browser Mode",
+)
+
+# ---- (2l) no YAML frontmatter (R3-8: reference file, not an agent) ------
+# Reference files under testing-refs/ must NOT have YAML frontmatter —
+# they are not agents and frontmatter would cause Suite 67's frontmatter
+# parser to fail silently.  Canonical-shape guard mirrors Suite 67 check.
+check(
+    "suite106(2l): browser-mode.md starts without YAML frontmatter (canonical-shape guard)",
+    not _s106_bm.startswith("---"),
+    "browser-mode.md must not have YAML frontmatter — it is a reference file, not an agent"
+    " (R3-8: canonical-shape guard; frontmatter would break Suite 67's parser)",
+)
+
+# ---- (2m) ## Principles section present (R3-8) --------------------------
+# Every type file must begin with a ## Principles section (per Suite 67
+# check pattern).  This mirrors the existing Suite 67 disk-type-3 check
+# specifically for browser-mode.md to catch accidental removal.
+check(
+    "suite106(2m): browser-mode.md contains '## Principles' section",
+    "## Principles" in _s106_bm,
+    "browser-mode.md must contain a '## Principles' section"
+    " (R3-8: matches Suite 67 disk-type-3 requirement for all type files)",
+)
+
+# ---- (3a-3c) nestjs/go/python are n/a notes (not full sections) ---------
+# The file must contain n/a notes for server-side stacks.  Presence of
+# 'Not applicable' in each section confirms the stub note is there; absence
+# of a full `###` heading inside those sections confirms they are stubs.
+_s106_nestjs_slice = _slice_section(_s106_bm, "## nestjs", _s106_STOP)
+check(
+    "suite106(3a): browser-mode.md ## nestjs section is a n/a note (not a full section)",
+    bool(_s106_nestjs_slice) and "Not applicable" in _s106_nestjs_slice,
+    "browser-mode.md ## nestjs must be a n/a note, not a full implementation section",
+)
+_s106_go_slice = _slice_section(_s106_bm, "## go", _s106_STOP)
+check(
+    "suite106(3b): browser-mode.md ## go section is a n/a note (not a full section)",
+    bool(_s106_go_slice) and "Not applicable" in _s106_go_slice,
+    "browser-mode.md ## go must be a n/a note, not a full implementation section",
+)
+_s106_python_slice = _slice_section(_s106_bm, "## python", _s106_STOP)
+check(
+    "suite106(3c): browser-mode.md ## python section is a n/a note (not a full section)",
+    bool(_s106_python_slice) and "Not applicable" in _s106_python_slice,
+    "browser-mode.md ## python must be a n/a note, not a full implementation section",
+)
+
+# ---- (4a) Phase-0 slice names 'browser-mode' warranted type (R3-3) ------
+# R3-3: _s106_phase0_slice was computed but the condition was file-wide.
+# Now asserts the token within the Phase-0 slice so a false positive from
+# any other section (e.g. a Reference Router table row) cannot mask absence.
+_s106_phase0_slice = _slice_section(_s106_tester, "## Phase 0 — Discovery", _s106_STOP)
+check(
+    "suite106(4a): agents/tester.md Phase 0 slice contains 'browser-mode' warranted type",
+    "browser-mode" in _s106_phase0_slice,
+    "agents/tester.md Phase 0 — Discovery section must name 'browser-mode' as a"
+    " warranted test type (R3-3: condition uses the slice, not a file-wide search)",
+)
+
+# ---- (4b) decision-log shape: 'Selected test type:' ---------------------
+check(
+    "suite106(4b): agents/tester.md contains decision-log shape token 'Selected test type:'",
+    "Selected test type:" in _s106_tester,
+    "agents/tester.md must document the mandatory decision log with 'Selected test type:' field",
+)
+
+# ---- (4c) decision-log shape: 'Reason:' ----------------------------------
+check(
+    "suite106(4c): agents/tester.md contains decision-log shape token 'Reason:'",
+    "Reason:" in _s106_tester,
+    "agents/tester.md must document the mandatory decision log with 'Reason:' field",
+)
+
+# ---- (4d) decision-log shape: 'Loaded references:' ----------------------
+check(
+    "suite106(4d): agents/tester.md contains decision-log shape token 'Loaded references:'",
+    "Loaded references:" in _s106_tester,
+    "agents/tester.md must document the mandatory decision log with 'Loaded references:' field",
+)
+
+# ---- (4e) propose-setup posture (no auto-install, no jsdom fallback) ----
+check(
+    "suite106(4e): agents/tester.md documents propose-setup posture"
+    " (no auto-install + no silent jsdom fallback)",
+    "Do NOT auto-install" in _s106_tester and (
+        "jsdom" in _s106_tester and (
+            "fall back to jsdom" in _s106_tester or "silently fall back" in _s106_tester
+        )
+    ),
+    "agents/tester.md must state: do NOT auto-install AND do NOT silently fall back to jsdom",
+)
+
+# ---- (4f) warranted-type derivation bullet: layout/geometry + arrow + browser-mode
+#           on the SAME LINE (C8/R3-1: per-line binding + arrow-target pinned)
+# R3-1: the former check was a file-wide conjunction (both tokens present
+# anywhere in the file).  The fix binds per-line: the derivation bullet in
+# step-3b must have 'AC about layout/geometry' AND '→' AND '`browser-mode`'
+# on the same line so moving any token to a different line fails the check.
+# C8: adding '→' and the backtick-quoted type token pins the arrow TARGET
+# specifically — a change in routing destination (e.g., to 'e2e') is caught.
+check(
+    "suite106(4f): agents/tester.md step-3b derivation bullet co-locates"
+    " 'AC about layout/geometry', '→', and '`browser-mode`' on the same line"
+    " (C8/R3-1: per-line binding + arrow-target pinned)",
+    any(
+        "AC about layout/geometry" in ln and "→" in ln and "`browser-mode`" in ln
+        for ln in _s106_tester.splitlines()
+    ),
+    "agents/tester.md step-3b must have a single bullet line containing"
+    " 'AC about layout/geometry', '→', and '`browser-mode`' (C8/R3-1:"
+    " per-line binding + arrow-target pin; routing destination change is caught)",
+)
+
+# ---- (4g) authoring + verify-run modes each inherit the decision rule ----
+# R3-2: the former single check was file-wide.  Now both mode sections are
+# sliced independently; each must contain 'browser-test decision rule' in
+# its own Flow line so the rule is inherited in BOTH test-writing paths.
+_s106_authoring_slice = _slice_section(_s106_tester, "## Mode: `authoring`", _s106_STOP)
+check(
+    "suite106(4g-authoring): authoring-mode Flow slice contains 'browser-test decision rule'",
+    bool(_s106_authoring_slice) and "browser-test decision rule" in _s106_authoring_slice,
+    "agents/tester.md ## Mode: `authoring` Flow must contain 'browser-test decision rule'"
+    " (R3-2: authoring-mode slice check — not a file-wide search)",
+)
+_s106_verify_slice = _slice_section(_s106_tester, "## Mode: `verify-run`", _s106_STOP)
+check(
+    "suite106(4g-verify): verify-run-mode Flow slice contains 'browser-test decision rule'",
+    bool(_s106_verify_slice) and "browser-test decision rule" in _s106_verify_slice,
+    "agents/tester.md ## Mode: `verify-run` Flow must contain 'browser-test decision rule'"
+    " (R3-2: verify-run-mode slice check — ensures rule is not skipped in run-only path)",
+)
+
+# ---- (4h) decision rule contains viewport clause (A3-1) -----------------
+# The viewport/responsive signal words (375px, viewport-conditional layout)
+# must appear in the decision rule so ux-reviewer AC vocabulary routes
+# correctly.
+check(
+    "suite106(4h): agents/tester.md decision rule contains viewport clause ('375px')",
+    "375px" in _s106_tester,
+    "agents/tester.md decision rule must name '375px' (A3-1: viewport-conditional"
+    " layout clause) so responsive AC vocabulary routes to browser-mode",
+)
+
+# ---- (4i) decision rule contains aria-live/a11y branch (F4) -------------
+check(
+    "suite106(4i): agents/tester.md decision rule contains aria-live branch",
+    "aria-live" in _s106_tester,
+    "agents/tester.md decision rule must contain an 'aria-live' branch routing"
+    " screen-reader ACs to a11y with real-browser axe (F4)",
+)
+
+# ---- (4j) decision rule contains animation/drag-and-drop branch (F4) ----
+check(
+    "suite106(4j): agents/tester.md decision rule contains drag-and-drop branch",
+    "drag-and-drop" in _s106_tester,
+    "agents/tester.md decision rule must name 'drag-and-drop' (F4: animation/"
+    "drag-and-drop branch routes to browser-mode, not jsdom)",
+)
+
+# ---- (4k) decision rule jsdom timer caveat — separate stable tokens ------
+# R3-5: de-brittled from the compound literal 'CSS-animation/Web-Animations'
+# (punctuation-sensitive).  Both tokens are asserted individually,
+# case-tolerant, so a wording change that preserves meaning still passes.
+check(
+    "suite106(4k): agents/tester.md decision rule contains jsdom timer caveat"
+    " — 'Web-Animations' and 'CSS-animation' tokens (R3-5: de-brittled)",
+    "web-animations" in _s106_tester.lower() and "css-animation" in _s106_tester.lower(),
+    "agents/tester.md decision rule must contain the jsdom-timer caveat"
+    " with both 'Web-Animations' and 'CSS-animation' tokens (case-tolerant);"
+    " asserting them separately avoids brittleness on punctuation (R3-5)",
+)
+
+# ---- (4l) _index.md canonical Frontend AC mapping table (A3-4) ----------
+# R3-5: de-brittled from 'Responsive / breakpoint' (punctuation-sensitive)
+# and 'Multi-page journey' to stable single-word tokens that survive minor
+# wording edits to the table row text.
+check(
+    "suite106(4l): agents/testing-refs/_index.md contains 'Frontend AC category'"
+    " table header + 'breakpoint' + 'Multi-page' row tokens (R3-5: stable tokens)",
+    "Frontend AC category" in _s106_index_text_load
+    and "breakpoint" in _s106_index_text_load
+    and "Multi-page" in _s106_index_text_load,
+    "agents/testing-refs/_index.md must contain the 'Frontend AC category' table"
+    " with stable tokens 'breakpoint' and 'Multi-page' in the row text"
+    " (R3-5: de-brittled from punctuation-sensitive compound literals)",
+)
+
+# ---- (4m) _index.md engine-overlap note (F6) ----------------------------
+check(
+    "suite106(4m): agents/testing-refs/_index.md contains engine-overlap note",
+    "Engine-overlap note" in _s106_index_text_load,
+    "agents/testing-refs/_index.md must contain the Engine-overlap note naming"
+    " the three types sharing Vitest Browser Mode (F6)",
+)
+
+# ---- (4n) ui-component.md boundary note naming browser-mode.md (F2a) ----
+_s106_uic = read(_s106_testing_refs / "ui-component.md") if (
+    _s106_testing_refs / "ui-component.md"
+).exists() else ""
+check(
+    "suite106(4n): agents/testing-refs/ui-component.md contains boundary"
+    " note naming browser-mode.md",
+    "Boundary with browser-mode.md" in _s106_uic,
+    "agents/testing-refs/ui-component.md must contain a boundary note"
+    " referencing browser-mode.md (F2a: bidirectional ui-component/browser-mode"
+    " boundary)",
+)
+
+# ---- (4o) browser-mode.md When-NOT-to-use SECTION (anchor-scoped) -------
+# R3-5: the former check was file-wide (ui-component.md OR same Vitest
+# Browser Mode engine could appear anywhere).  Slice the specific section
+# so only the When-NOT-to-use table satisfies the check.
+# C12: tighten stop markers to include "\n### " — the next ### subsection
+# begins at "### Difference vs Playwright E2E" (line 34 in the file).
+# The previous stop markers ("\n## ", "\n---\n") let the slice run past that
+# ### boundary all the way to ## ISOLATION LIMITATION, which is too wide —
+# tokens from later subsections could satisfy checks meant for this table only.
+_s106_wnu_slice = _slice_section(
+    _s106_bm, "### When NOT to use Browser Mode", ("\n### ", "\n## ", "\n---\n")
+)
+check(
+    "suite106(4o): browser-mode.md When-NOT-to-use section (anchor-scoped,"
+    " C12: tightened to stop at next ###) names 'ui-component.md' and 'engine'",
+    bool(_s106_wnu_slice)
+    and "ui-component.md" in _s106_wnu_slice
+    and "engine" in _s106_wnu_slice,
+    "agents/testing-refs/browser-mode.md ### When NOT to use Browser Mode section"
+    " must name 'ui-component.md' and 'engine' within the section body"
+    " (C12/R3-5: slice stops at next ### — prevents false-green from tokens"
+    " in Difference vs Playwright E2E and later subsections)",
+)
+
+# ---- (4p) visual.md Option C names Vitest Browser Mode + browser-mode.md
+#           (F5) -------------------------------------------------------------
+_s106_visual = read(_s106_testing_refs / "visual.md") if (
+    _s106_testing_refs / "visual.md"
+).exists() else ""
+check(
+    "suite106(4p): agents/testing-refs/visual.md contains Option C naming"
+    " Vitest Browser Mode and referencing browser-mode.md",
+    "Option C" in _s106_visual and "browser-mode.md" in _s106_visual,
+    "agents/testing-refs/visual.md must document Option C (Vitest Browser Mode"
+    " component screenshots) and cross-reference browser-mode.md (F5)",
+)
+
+# ---- (4q) a11y.md contains No-Storybook vitest-browser-react axe note (F7)
+_s106_a11y = read(_s106_testing_refs / "a11y.md") if (
+    _s106_testing_refs / "a11y.md"
+).exists() else ""
+check(
+    "suite106(4q): agents/testing-refs/a11y.md contains No-Storybook path"
+    " with vitest-browser-react axe note",
+    "No-Storybook path" in _s106_a11y and "vitest-browser-react" in _s106_a11y,
+    "agents/testing-refs/a11y.md must document the No-Storybook path running"
+    " axe via vitest-browser-react (F7: component-level real-browser axe"
+    " without Storybook)",
+)
+
+# ---- (5a-5d) four version-sync sites >= 2.84.0 --------------------------
+# Uses the repo-wide _s59_ver_tuple() helper (defined near Suite 59).
+# The four canonical sites: plugin.json, marketplace.json, CLAUDE.md §3,
+# cmd/install/main.go. This feature released at v2.84.0; assert the floor.
+_s106_plugin_json   = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s106_marketplace   = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s106_main_go       = read(REPO_ROOT / "cmd" / "install" / "main.go")
+_s106_VER_FLOOR     = (2, 84, 0)
+
+check(
+    "suite106(5a): .claude-plugin/plugin.json version >= 2.84.0",
+    _s59_ver_tuple(_s106_plugin_json.get("version", "0.0.0")) >= _s106_VER_FLOOR,
+    "plugin.json version must be 2.84.0 or later (e2e-testing-agent feature release)",
+)
+check(
+    "suite106(5b): .claude-plugin/marketplace.json plugins[0].version >= 2.84.0",
+    _s59_ver_tuple(
+        _s106_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _s106_VER_FLOOR,
+    "marketplace.json plugins[0].version must be 2.84.0 or later",
+)
+check(
+    "suite106(5c): CLAUDE.md §3 Current version >= 2.84.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s106_claude) or "0.0.0") >= _s106_VER_FLOOR,
+    "CLAUDE.md §3 Current version must show 2.84.0 or later",
+)
+check(
+    "suite106(5d): cmd/install/main.go var version >= 2.84.0",
+    'var version = "' in _s106_main_go and _s59_ver_tuple(
+        _s106_main_go.split('var version = "')[1].split('"')[0]
+        if 'var version = "' in _s106_main_go else "0.0.0"
+    ) >= _s106_VER_FLOOR,
+    "cmd/install/main.go var version must be 2.84.0 or later",
+)
+
+# ---- (6a) e2e.md react-nextjs section cross-pointer to browser-mode.md --
+# Use top-level `\n## ` as the only stop marker so that nested `###`
+# sub-sections (e.g. `### When to write`, `### Selectors`, `### CI sharding`)
+# are included in the slice.  The cross-pointer is in the section preamble;
+# the v1.60.0-noble tag is in the CI-sharding sub-section near the end.
+_s106_e2e_rn_slice = _slice_section(_s106_e2e, "## react-nextjs", ("\n## ",))
+check(
+    "suite106(6a): agents/testing-refs/e2e.md ## react-nextjs contains cross-pointer to browser-mode.md",
+    bool(_s106_e2e_rn_slice) and "browser-mode.md" in _s106_e2e_rn_slice,
+    "e2e.md ## react-nextjs must contain a cross-reference to 'browser-mode.md'",
+)
+
+# ---- (6b) e2e.md react-nextjs section contains v1.60.0-noble image tag --
+check(
+    "suite106(6b): agents/testing-refs/e2e.md ## react-nextjs contains 'v1.60.0-noble' CI image tag",
+    bool(_s106_e2e_rn_slice) and "v1.60.0-noble" in _s106_e2e_rn_slice,
+    "e2e.md ## react-nextjs must document the 'v1.60.0-noble' Docker image tag (version-matched CI)",
+)
+
+# ---- (7a-7i) New-content pinning: fixes introduced by code-review --------
+
+# (7a) __screenshots__/ storage-path in browser-mode.md (C9: repointed — was dup of 2h)
+# 2h has been repointed to __screenshots__/ as well; 7a provides an independent
+# copy of the same assertion (two enforcement sites, consistent with the
+# two-site pattern used for toMatchScreenshot in 2h/7b after C1).
+check(
+    "suite106(7a): browser-mode.md contains '__screenshots__/' storage path"
+    " (C9: repointed from toMatchScreenshot dup; independent enforcement site)",
+    "__screenshots__/" in _s106_bm,
+    "browser-mode.md must document '__screenshots__/' as the reference image"
+    " storage path (C9: was a duplicate of the old 2h toMatchScreenshot check;"
+    " now both 2h and 7a pin the storage-path token — two independent sites)",
+)
+
+# (7b) toMatchScreenshot in visual.md (C1 parity: same correct matcher)
+check(
+    "suite106(7b): agents/testing-refs/visual.md contains 'toMatchScreenshot'",
+    "toMatchScreenshot" in _s106_visual,
+    "agents/testing-refs/visual.md must use 'toMatchScreenshot' in Option C"
+    " (C1 visual.md parity: correct Vitest 4.0+ matcher, not toMatchSnapshot)",
+)
+
+# (7c) trace: 'retain-on-failure' in browser-mode.md
+check(
+    "suite106(7c): browser-mode.md contains \"trace: 'retain-on-failure'\"",
+    "trace: 'retain-on-failure'" in _s106_bm,
+    "browser-mode.md must document \"trace: 'retain-on-failure'\" as the trace config"
+    " value (Vitest 4.0+ retain-on-failure mode; not the old 'tracing: on-failure' key)",
+)
+
+# (7d) await render( present in browser-mode.md (async render note)
+check(
+    "suite106(7d): browser-mode.md contains 'await render(' (async render note)",
+    "await render(" in _s106_bm,
+    "browser-mode.md must document 'await render(' — render() is async since"
+    " vitest-browser-react 2.0 and must always be awaited",
+)
+
+# (7e) negative: no un-awaited render() call in browser-mode.md
+# Asserts that every line containing '= render(' also contains 'await' on
+# the same line, so a code example with a missing await fails immediately.
+# C11 KNOWN LIMITATION: this check is file-scoped to browser-mode.md only
+# (not a broader agents/ scan).  A future legitimate jsdom comparative snippet
+# in browser-mode.md that uses '= render(' without 'await' (e.g., a side-by-side
+# "DO NOT do this in jsdom" example tagged '// jsdom') would trip this check
+# and require an allowlist mechanism.  For now the content does not have such
+# snippets, so no behavior change is needed — only this documentation.
+check(
+    "suite106(7e): browser-mode.md has no un-awaited '= render(' assignment",
+    not any(
+        "= render(" in ln and "await" not in ln
+        for ln in _s106_bm.splitlines()
+    ),
+    "browser-mode.md must not contain '= render(' without 'await' on the same line"
+    " — every render() call must be awaited (vitest-browser-react 2.0+)"
+    " (C11: known limitation — file-scoped; future jsdom comparative snippets"
+    " would need an allowlist)",
+)
+
+# (7f) routing precedence: backtick-quoted '`e2e`' + 'still wins' on one line
+# The browser-test decision rule states that when a running application is
+# required AND the AC contains viewport vocabulary, '`e2e`' still wins.
+# C8 DIRECTION-PIN: require the backtick-quoted token '`e2e`' (not bare 'e2e')
+# so a routing inversion (e.g., '`browser-mode` still wins') cannot satisfy
+# this check — bare 'e2e' would match in the wrong direction ('e2e' appearing
+# as the LOSING type in a sentence like 'browser-mode wins over e2e').
+# Asserting the type token in backtick form AND 'still wins' co-present on
+# one line ensures the precedence DIRECTION is captured, not just keywords.
+check(
+    "suite106(7f): tester.md decision rule contains backtick-quoted '`e2e`' + 'still wins'"
+    " on one line (C8 direction-pin: routing precedence for running-app ACs with viewport vocabulary)",
+    any(
+        "`e2e`" in ln and "still wins" in ln
+        for ln in _s106_tester.splitlines()
+    ),
+    "agents/tester.md browser-test decision rule must have a line with both"
+    " backtick-quoted '`e2e`' and 'still wins' — the first-match precedence clause"
+    " (C8 direction-pin: bare 'e2e' without backtick cannot satisfy this check;"
+    " routing inversion where browser-mode wins would be caught immediately)",
+)
+
+# (7g) _index.md 'color contrast' row routes to backtick-quoted '`a11y`' as type
+# The a11y/browser-mode split moved color-contrast into the a11y warranted type.
+# C8 CELL-ANCHORED: require the backtick-quoted token '`a11y`' (the type cell)
+# on the same line as 'color contrast', not just any prose mention of 'a11y'.
+# Without the backtick, a row like 'Color contrast | `browser-mode` | ... axe is a11y ...'
+# would satisfy a bare 'a11y' check even though the TYPE CELL says browser-mode.
+# Backtick-quoting anchors the assertion to the actual type-cell value.
+check(
+    "suite106(7g): _index.md 'color contrast' row has backtick-quoted '`a11y`' as type cell"
+    " (C8 cell-anchored: type cell value, not a prose mention of 'a11y')",
+    any(
+        "color contrast" in ln.lower() and "`a11y`" in ln
+        for ln in _s106_index_text_load.splitlines()
+    ),
+    "agents/testing-refs/_index.md must have a row where 'color contrast' routes to"
+    " backtick-quoted '`a11y`' as the type cell (C8: bare 'a11y' not sufficient —"
+    " must be the type-cell token; routing back to browser-mode is caught immediately)",
+)
+
+# (7h) 'Selected test type: browser-mode' normalized log token in tester.md
+# The decision log uses the normalized token 'browser-mode' (not the old
+# 'vitest-browser-mode' variant).  Assert the full normalized phrase so
+# the old token cannot silently re-appear in the expected log shape.
+check(
+    "suite106(7h): tester.md contains 'Selected test type: browser-mode' (normalized log token)",
+    "Selected test type: browser-mode" in _s106_tester,
+    "agents/tester.md must use 'Selected test type: browser-mode' in the decision log"
+    " (normalized token — 'vitest-browser-mode' is the old name and must not appear)",
+)
+
+# (7i) 'vitest-browser-mode' absent from all files in agents/
+# Negative guard: the old token must not re-appear anywhere in agents/.
+# This is intentionally file-wide (any agents/ file), not section-scoped —
+# the goal is to catch any accidental re-introduction of the stale name.
+_s106_agents_text_concat = " ".join(
+    read(f) for f in AGENTS_DIR.rglob("*.md")
+) if AGENTS_DIR.exists() else ""
+check(
+    "suite106(7i): 'vitest-browser-mode' is absent from all files in agents/",
+    "vitest-browser-mode" not in _s106_agents_text_concat,
+    "No file in agents/ may contain 'vitest-browser-mode' — it is the stale token;"
+    " the normalized name is 'browser-mode' (7i: negative guard)",
+)
+
+# ---- (8a-8n) New pins for just-landed invariants --------------------------
+
+# (8a) viewport-control subsection: 'page.viewport' + 'vitest/browser' import
+# The just-landed '### Viewport control' subsection in browser-mode.md shows
+# how to programmatically resize the viewport inside a test using the `page`
+# object from `vitest/browser`.  Both tokens must be present together.
+# NOTE: 'vitest/browser' alone is a false-green because '@vitest/browser/context'
+# (the OLD import path) also satisfies the substring match.  The negative guard
+# '@vitest/browser/context' ABSENT makes the check real — mirrors 7i/7e pattern.
+check(
+    "suite106(8a): browser-mode.md contains 'page.viewport' and 'vitest/browser' import"
+    " (just-landed Viewport control subsection)",
+    "page.viewport" in _s106_bm
+    and "vitest/browser" in _s106_bm
+    and "@vitest/browser/context" not in _s106_bm,
+    "browser-mode.md must document 'page.viewport' and 'import { page } from"
+    " \"vitest/browser\"'; '@vitest/browser/context' must be ABSENT (8a: stale import"
+    " path is a substring of 'vitest/browser' — positive check alone is a false-green;"
+    " negative guard required; mirrors 7i/7e pattern)",
+)
+
+# (8b) platform-suffix caveat in browser-mode.md
+# Baselines embed browser AND OS platform in filenames (e.g., -chromium-darwin.png
+# vs -chromium-linux.png).  The word 'platform' is a stable token for this caveat.
+check(
+    "suite106(8b): browser-mode.md documents platform-suffix caveat for visual baselines",
+    "platform" in _s106_bm,
+    "browser-mode.md must document the platform-suffix caveat (baseline filenames"
+    " embed browser + OS platform; macOS/Windows baselines missing on Linux CI"
+    " → first CI run fails on missing references, not drift) (8b)",
+)
+
+# (8c) platform-suffix caveat in visual.md (Option C)
+# The same caveat must appear in visual.md Option C (Vitest Browser Mode screenshots).
+# A stable token is 'platform' near the Option C section.
+check(
+    "suite106(8c): visual.md Option C documents platform-suffix caveat for visual baselines",
+    "platform" in _s106_visual,
+    "agents/testing-refs/visual.md Option C must document the platform-suffix caveat"
+    " (same caveat as browser-mode.md: Vitest embeds browser + OS platform in baseline"
+    " filenames; macOS/Windows baselines fail on Linux CI) (8c)",
+)
+
+# (8d) ARIA live-region assertion subsection in browser-mode.md
+# The just-landed '### ARIA live-region assertion' subsection documents how to
+# assert live-region text content after a triggering action.
+check(
+    "suite106(8d): browser-mode.md contains '### ARIA live-region assertion' subsection",
+    "### ARIA live-region assertion" in _s106_bm,
+    "browser-mode.md must contain a '### ARIA live-region assertion' subsection"
+    " (8d: just-landed — documents how to assert aria-live region content via"
+    " DOM state after a triggering action; axe complements for role validity)",
+)
+
+# (8e) e2e.md responsive assertions subsection: 'setViewportSize' present
+# The just-landed '### Responsive assertions in E2E' subsection in e2e.md
+# shows how to use Playwright's viewport emulation for full-page responsive
+# behavior.  The stable token is 'setViewportSize' (the Playwright API).
+check(
+    "suite106(8e): agents/testing-refs/e2e.md contains 'setViewportSize'"
+    " (just-landed Responsive assertions in E2E subsection)",
+    "setViewportSize" in _s106_e2e,
+    "agents/testing-refs/e2e.md must contain 'setViewportSize' (8e: just-landed"
+    " ### Responsive assertions in E2E subsection — Playwright viewport emulation"
+    " for full-page responsive behavior in a running application)",
+)
+
+# (8f) _index.md keyboard-nav row NOT routed to '`a11y`' as type cell
+# axe cannot verify keyboard operability; the correct routing for keyboard-nav
+# / focus-order ACs is ui-component (story play function) or browser-mode
+# (document.activeElement), NOT a11y.  Assert that the line containing
+# 'keyboard nav' does NOT have '`a11y`' as its type cell.
+check(
+    "suite106(8f): _index.md keyboard-nav row is NOT routed to '`a11y`' as type cell"
+    " (per-line: axe cannot verify keyboard operability → ui-component / browser-mode)",
+    any(
+        "keyboard nav" in ln and "`a11y`" not in ln
+        for ln in _s106_index_text_load.splitlines()
+    ),
+    "agents/testing-refs/_index.md keyboard-nav row must NOT route to '`a11y`' as"
+    " the type cell (8f: axe cannot verify keyboard operability; correct type is"
+    " ui-component or browser-mode; routing to a11y is a false-pass generator)",
+)
+
+# (8g) _index.md catch-all browser-API row: 'clipboard' + '`browser-mode`' per-line
+# The just-landed catch-all row in the Frontend AC mapping table covers browser APIs
+# outside the enumerated families (clipboard, geolocation, fullscreen, notifications).
+# Assert 'clipboard' AND backtick-quoted '`browser-mode`' on the SAME LINE so
+# a deletion or re-routing of the catch-all row is caught immediately.
+check(
+    "suite106(8g): _index.md catch-all row has 'clipboard' + '`browser-mode`' on same line"
+    " (just-landed catch-all row for browser APIs outside enumerated families)",
+    any(
+        "clipboard" in ln and "`browser-mode`" in ln
+        for ln in _s106_index_text_load.splitlines()
+    ),
+    "agents/testing-refs/_index.md must have a catch-all row where 'clipboard'"
+    " and backtick-quoted '`browser-mode`' co-appear on the same line (8g:"
+    " just-landed catch-all — covers browser APIs outside enumerated families;"
+    " deletion or re-routing is caught immediately)",
+)
+
+# (8h) tester.md catch-all branch: 'clipboard' token in decision rule
+# The just-landed catch-all branch in step-3b closes the decision rule to the
+# enumerated families + per-API verify clause (N5 fix).  The 'clipboard' example
+# token confirms the catch-all is present.
+check(
+    "suite106(8h): agents/tester.md decision rule contains 'clipboard' (catch-all branch)",
+    "clipboard" in _s106_tester,
+    "agents/tester.md browser-test decision rule must name 'clipboard' in the"
+    " catch-all branch (8h: confirms the rule is closed to enumerated families"
+    " + catch-all; clipboard is the canonical example of a non-enumerated browser API)",
+)
+
+# (8i) tester.md conventions-vs-reference precedence: 'cypress.config' token
+# The just-landed conventions-vs-reference precedence sentence states that when
+# the discovered repo framework differs from the reference's tool choice (e.g.,
+# a Cypress repo detected via 'cypress.config'), the discovered framework wins.
+check(
+    "suite106(8i): agents/tester.md conventions-vs-reference precedence contains"
+    " 'cypress.config' detection example",
+    "cypress.config" in _s106_tester,
+    "agents/tester.md Reference Router section must contain 'cypress.config' as"
+    " the detection example for conventions-vs-reference precedence (8i: discovered"
+    " repo framework wins; reference applies as principles only; log divergence)",
+)
+
+# (8j) tester.md '## Test-Type Decisions' template section present
+# The just-landed template section in the 03-testing.md template documents
+# where the mandatory decision log lands (N4 fix: auditable pipeline artifact).
+check(
+    "suite106(8j): agents/tester.md contains '## Test-Type Decisions' template section",
+    "## Test-Type Decisions" in _s106_tester,
+    "agents/tester.md 03-testing.md template must contain a '## Test-Type Decisions'"
+    " section (8j: just-landed decision-log landing artifact — makes the log"
+    " auditable from pipeline artifacts, not just from review)",
+)
+
+# (8k) tester.md 'warranted_types:' status-block field present
+# The just-landed 'warranted_types:' field in the Return Protocol status block
+# makes the warranted type tokens machine-readable for pipeline tracing.
+check(
+    "suite106(8k): agents/tester.md Return Protocol contains 'warranted_types:' field",
+    "warranted_types:" in _s106_tester,
+    "agents/tester.md Return Protocol must contain a 'warranted_types:' field"
+    " (8k: just-landed status-block field — final warranted type tokens from"
+    " Phase 0 step 3b; [] when none apply; machine-readable for pipeline tracing)",
+)
+
+# (8l) tester.md binaries-missing clause in Neither-installed paragraph
+# The just-landed binaries-missing clause (C5/N5 fix) covers the case where
+# packages are present but browser binaries are missing (e.g., npx playwright install
+# never ran).  The stable token is 'binaries' within the Neither-installed paragraph.
+check(
+    "suite106(8l): agents/tester.md Neither-installed paragraph contains 'binaries' clause",
+    "binaries" in _s106_tester,
+    "agents/tester.md Neither-installed paragraph must contain a 'binaries' clause"
+    " (8l: packages-present-but-browser-binaries-missing posture — propose"
+    " 'npx playwright install --with-deps' as a finding; same posture as Neither-installed)",
+)
+
+# (8m) tester.md n/a re-derive fallback: 're-derive' token in Router fallback
+# The just-landed n/a re-derive disposition in the Router fallback section states
+# that when a (type, stack) section is marked n/a for the stack (e.g., browser-mode
+# on a backend stack), the agent must re-derive the warranted type via Phase 0 step 3b.
+# The stable token is 're-derive' (case-sensitive: matches 're-derive' in the text).
+check(
+    "suite106(8m): agents/tester.md Router fallback contains 're-derive' disposition"
+    " for n/a stack sections",
+    "re-derive" in _s106_tester,
+    "agents/tester.md Reference Router fallback must contain 're-derive' (8m:"
+    " when a (type, stack) section is marked n/a, re-derive the warranted type"
+    " via Phase 0 step 3b — do NOT author from repo conventions using the n/a file)",
+)
+
+# (8n) tester.md 'all type files' count-free AND 'all six type files' ABSENT
+# The just-landed count-free phrasing replaces 'all six type files' (stale after
+# browser-mode became the seventh type file).  Assert the count-free form is
+# present AND the stale counted form is absent.
+check(
+    "suite106(8n): agents/tester.md uses 'all type files' (count-free) and NOT"
+    " 'all six type files' (stale count — seven types now)",
+    "all type files" in _s106_tester and "all six type files" not in _s106_tester,
+    "agents/tester.md must use 'all type files' (count-free phrasing) and must NOT"
+    " contain 'all six type files' (8n: stale count — browser-mode is the seventh"
+    " type file; count-free phrasing survives future additions without a check update)",
+)
+
+# (toMatchScreenshot-subject) negative: 'expect(container).toMatchScreenshot' absent
+# Iteration-3 fix: the correct locator subject is 'screen.getByRole(...)' not the
+# bare 'container' reference.  Pin the correction with a negative check so a
+# regression to the old subject is caught immediately.  Mirrors 7e un-awaited-render
+# negative guard (file-scoped).
+check(
+    "suite106(toMatchScreenshot-subject): 'expect(container).toMatchScreenshot' absent"
+    " from browser-mode.md AND visual.md (negative: locator-subject correction pinned)",
+    "expect(container).toMatchScreenshot" not in _s106_bm
+    and "expect(container).toMatchScreenshot" not in _s106_visual,
+    "Neither browser-mode.md nor visual.md may contain 'expect(container).toMatchScreenshot'"
+    " — correct form is 'expect(screen.getByRole(...)).toMatchScreenshot(...)'"
+    " (iteration-3 fix: locator-subject correction; mirrors 7e un-awaited-render"
+    " negative guard)",
+)
+
+# ---- (h1) self-referential guard ----------------------------------------
+check(
+    "suite106(h1-registry): docs/testing.md registers 'Suite 106' and 'browser-mode-reference'",
+    "Suite 106" in _s106_testing_md and "browser-mode-reference" in _s106_testing_md,
+    "docs/testing.md must name Suite 93 and the browser-mode-reference marker (canonical suite registry)",
+)
+
+# ---- (h2) CLAUDE.md hygiene ---------------------------------------------
+check(
+    "suite106(h2-hygiene): CLAUDE.md does NOT contain 'Suite 106'",
+    "Suite 106" not in _s106_claude,
+    "CLAUDE.md must not mention Suite 93 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: browser-mode-reference
+
+# ---------------------------------------------------------------------------
+# Suite 107 — frontend-flow-activation (v2.85.0)
+# Structural assertions for the frontend detection + Gate-B responsive-intent
+# + TESTING.md guide + browser-readiness check changes introduced by
+# feature/frontend-flow-activation (PR-2).  Written by tester (2026-06-12).
+# Re-pinned (iteration-2 fixes) by tester (2026-06-13).
+# Re-pinned (iteration-3 fixes) by tester (2026-06-13): iter3-rdm check (A1-F3/A1-F4
+# on console path in ref-direct-modes.md ## Test Mode).
+# Marker: frontend-flow-activation
+#
+# Covers (35 checks):
+#   AC-1 (a/b)  orchestrator.md Phase 2.7 tester dispatch line contains
+#               'frontend_scope: true' (per-line binding, not file-wide);
+#               orchestrator.md Phase 3 tester dispatch line contains
+#               'frontend_scope: true' (per-line binding, independent site)
+#   AC-2 (a/b)  skills/test/SKILL.md contains 'frontend_scope: true' in
+#               payload area; skills/test-pipeline/SKILL.md same
+#   AC-3 (a/b)  tester.md contains 'Responsive-intent check (Gate B)'
+#               token; Gate B prose explicitly states it gates ONLY the
+#               viewport/responsive branch (not other browser-mode signals)
+#   AC-4 (a/b)  orchestrator.md browser-readiness paragraph present
+#               ('A1-F3' label + 'binaries'); 'npx playwright install'
+#               (or 'npx playwright install --with-deps') example present
+#               in same paragraph (substring match; both forms accepted)
+#   AC-5 (a-f)  tester.md TESTING.md contract present: 'TESTING.md' token
+#               + five section names ('Stack & detection', 'Test map',
+#               'How to run', 'Latest results',
+#               'Actions & recommendations')
+#   AC-6 (a-d)  ux-reviewer.md 'IntersectionObserver' in signal-hints block
+#               (browser-real signal hints present in enrich area);
+#               qa-plan.md 'IntersectionObserver' same;
+#               ux-reviewer.md 'AUTHORITATIVE' ownership-boundary token;
+#               ux-reviewer.md 'Detect the frontend stack' step present
+#   R3  (a/b)   browser-mode.md 'Where to look when it fails' artifacts
+#               section present; e2e.md same
+#   C7  (a-d)   cross-file contract (iteration-2, closes the F1 gap):
+#               (a) orchestrator.md Direct Modes 'test' table row carries
+#                   'frontend_scope' token AND '00-state.md' reference
+#                   on the same line (per-line binding);
+#               (b) ref-direct-modes.md '## Test Mode' section present
+#                   AND 'frontend_scope' token present in that section
+#                   (anchor-scoped);
+#               (c) ref-special-flows.md per-module module-test payload
+#                   carries 'frontend_scope' field (anchor-scoped to the
+#                   per-module task payload block);
+#               (d) A1-F4 block in orchestrator.md (anchor-scoped) names
+#                   'ui-component' AND 'visual' in the browser-real set
+#   iter2 (a-d) iteration-2 invariants:
+#               (a) tester.md Phase 0 step 2 labeled 'Gate A'
+#                   ('Gate A — frontend stack detection' present);
+#               (b) tester.md contains '<!-- th:testing-guide v1 -->'
+#                   TESTING.md sentinel token;
+#               (c) tester.md contains 'Team-harness repo guard' wording
+#                   (repo-root guard prevents writing TESTING.md into the
+#                   team-harness repo itself);
+#               (d) tester.md contains Vue/Svelte n/a disposition token
+#                   ('non-react stacks: vue' present)
+#   iter3       iteration-3 invariants:
+#               ref-direct-modes.md '## Test Mode' section (anchor-scoped,
+#               stop at next '## ', includes ### subsections) references
+#               'A1-F3' AND 'A1-F4' (console-path gates surfaced in iter3)
+#   ver (a-d)   four version-sync sites >= (2,85,0)
+#   self (h1/h2) docs/testing.md registers 'Suite 107' + marker;
+#                CLAUDE.md does NOT contain 'Suite 107'
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 107: frontend-flow-activation structural assertions (v2.85.0) ===")
+
+_s107_orch         = read(AGENTS_DIR / "orchestrator.md")
+_s107_tester       = read(AGENTS_DIR / "tester.md")
+_s107_ux           = read(AGENTS_DIR / "ux-reviewer.md")
+_s107_qa_plan      = read(AGENTS_DIR / "qa-plan.md")
+_s107_bm           = read(AGENTS_DIR / "testing-refs" / "browser-mode.md") \
+                    if (AGENTS_DIR / "testing-refs" / "browser-mode.md").exists() else ""
+_s107_e2e          = read(AGENTS_DIR / "testing-refs" / "e2e.md") \
+                    if (AGENTS_DIR / "testing-refs" / "e2e.md").exists() else ""
+_s107_test_skill   = read(skill_path("test"))
+_s107_tp_skill     = read(skill_path("test-pipeline"))
+_s107_rdm          = read(AGENTS_DIR / "ref-direct-modes.md") \
+                    if (AGENTS_DIR / "ref-direct-modes.md").exists() else ""
+_s107_rsf          = read(AGENTS_DIR / "ref-special-flows.md") \
+                    if (AGENTS_DIR / "ref-special-flows.md").exists() else ""
+_s107_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
+_s107_claude       = read(REPO_ROOT / "CLAUDE.md")
+_s107_STOP         = ("\n## ", "\n### ", "\n---\n")
+
+# ---- AC-1 (a) orchestrator.md Phase 2.7 dispatch line carries frontend_scope ----
+# Per-line binding: the line that starts the Phase 2.7 tester dispatch bullet
+# must itself contain 'frontend_scope: true'.  File-wide presence is
+# insufficient (other lines mention the token for other reasons).
+check(
+    "suite107(AC-1a): orchestrator.md Phase 2.7 tester dispatch line contains"
+    " 'frontend_scope: true' (per-line binding — not a file-wide hit)",
+    any(
+        "authoring mode" in ln and "frontend_scope: true" in ln
+        for ln in _s107_orch.splitlines()
+    ),
+    "orchestrator.md Phase 2.7 tester dispatch bullet must carry 'frontend_scope: true'"
+    " on the same line as 'authoring mode' (per-line: drift to a different line is caught)",
+)
+
+# ---- AC-1 (b) orchestrator.md Phase 3 tester dispatch line carries frontend_scope ----
+# Independent second site: the Phase 3 run-only dispatch bullet.
+check(
+    "suite107(AC-1b): orchestrator.md Phase 3 tester dispatch line contains"
+    " 'frontend_scope: true' (per-line binding — independent Phase-3 site)",
+    any(
+        "run-only mode" in ln and "frontend_scope: true" in ln
+        for ln in _s107_orch.splitlines()
+    ),
+    "orchestrator.md Phase 3 tester dispatch bullet must carry 'frontend_scope: true'"
+    " on the same line as 'run-only mode' (per-line: AC-1b is an independent check from AC-1a)",
+)
+
+# ---- AC-2 (a) skills/test/SKILL.md frontend detection produces frontend_scope: true ----
+check(
+    "suite107(AC-2a): skills/test/SKILL.md contains 'frontend_scope: true' in payload area",
+    "frontend_scope: true" in _s107_test_skill,
+    "skills/test/SKILL.md must include 'frontend_scope: true' in the Direct Mode Task"
+    " payload example (AC-2: frontend detection step added to /th:test skill)",
+)
+
+# ---- AC-2 (b) skills/test-pipeline/SKILL.md same ----
+check(
+    "suite107(AC-2b): skills/test-pipeline/SKILL.md contains 'frontend_scope: true' in payload area",
+    "frontend_scope: true" in _s107_tp_skill,
+    "skills/test-pipeline/SKILL.md must include 'frontend_scope: true' in the Task"
+    " payload example (AC-2: frontend detection step added to /th:test-pipeline skill)",
+)
+
+# ---- AC-3 (a) tester.md Gate-B step present ----
+# The exact token 'Responsive-intent check (Gate B)' anchors the new step.
+check(
+    "suite107(AC-3a): agents/tester.md contains 'Responsive-intent check (Gate B)' token",
+    "Responsive-intent check (Gate B)" in _s107_tester,
+    "agents/tester.md Phase 0 must contain a 'Responsive-intent check (Gate B)' step"
+    " (AC-3: new Gate B step between warranted-type list and browser-test decision rule)",
+)
+
+# ---- AC-3 (b) Gate B prose scopes to viewport branch only ----
+# The spec requires Gate B to gate ONLY the viewport/responsive branch and
+# explicitly state that other browser-mode signals are unaffected.  The
+# stable token is 'gates only the viewport' (case-tolerant).
+check(
+    "suite107(AC-3b): agents/tester.md Gate-B prose states it gates only the"
+    " viewport/responsive branch (other browser-mode signals unaffected)",
+    "Gate B gates only the viewport" in _s107_tester
+    or "gates only the viewport" in _s107_tester,
+    "agents/tester.md Gate B description must explicitly state it gates ONLY the"
+    " viewport/responsive branch (AC-3: Gate B must not block clipboard/observer/animation"
+    " branches — those are handled by other decision-rule bullets)",
+)
+
+# ---- AC-4 (a) orchestrator.md browser-readiness paragraph label + 'binaries' ----
+# The 'A1-F3' bold-label paragraph must be present and must mention 'binaries'.
+check(
+    "suite107(AC-4a): orchestrator.md contains 'A1-F3' browser-readiness paragraph"
+    " with 'binaries' token",
+    "A1-F3" in _s107_orch and "binaries" in _s107_orch,
+    "orchestrator.md Phase 2.7 gate must contain an 'A1-F3' browser-readiness"
+    " paragraph that mentions 'binaries' (AC-4: pre-Phase-3 readiness check for"
+    " e2e/browser-mode suites that require binary installation)",
+)
+
+# ---- AC-4 (b) 'npx playwright install' example in the A1-F3 paragraph ----
+# Anchor-scoped: slice from 'A1-F3' to the next section boundary.
+# Uses substring match — 'npx playwright install' is contained in both the
+# plain form and the '--with-deps' form, so both are accepted (C7 relax).
+_s107_a1f3_slice = _slice_section(_s107_orch, "A1-F3 — Browser readiness check", _s107_STOP)
+check(
+    "suite107(AC-4b): orchestrator.md A1-F3 paragraph (anchor-scoped) contains"
+    " 'npx playwright install' setup-command example",
+    bool(_s107_a1f3_slice) and "npx playwright install" in _s107_a1f3_slice,
+    "orchestrator.md A1-F3 paragraph must name 'npx playwright install' as the"
+    " example setup command (AC-4b: anchor-scoped — distant occurrences in other"
+    " sections cannot satisfy this check)",
+)
+
+# ---- AC-5 (a) tester.md TESTING.md project guide contract present ----
+check(
+    "suite107(AC-5a): agents/tester.md contains 'TESTING.md' project guide contract",
+    "TESTING.md" in _s107_tester,
+    "agents/tester.md Session Documentation must contain a TESTING.md project"
+    " guide contract (AC-5: R4 guide generated at end of authoring/verify-run"
+    " when frontend_scope: true)",
+)
+
+# ---- AC-5 (b-f) five required section names inside the TESTING.md contract ----
+# Anchor-scoped slice.  The section names (## Stack & detection, etc.) live
+# INSIDE a fenced code block (```markdown...```) so \n## and \n### are NOT
+# top-level stop markers here — we stop only at the next \n--- separator
+# which follows the closing ``` fence of the template block.
+_s107_testing_contract_slice = _slice_section(
+    _s107_tester, "### TESTING.md project guide (R4)", ("\n---\n",)
+)
+for _s107_section_name in (
+    "Stack & detection",
+    "Test map",
+    "How to run",
+    "Latest results",
+    "Actions & recommendations",
+):
+    check(
+        f"suite107(AC-5): tester.md TESTING.md contract (anchor-scoped) contains"
+        f" section name '{_s107_section_name}'",
+        bool(_s107_testing_contract_slice)
+        and _s107_section_name in _s107_testing_contract_slice,
+        f"agents/tester.md TESTING.md project guide contract must name"
+        f" '{_s107_section_name}' as one of the 5 required template sections"
+        f" (AC-5: anchor-scoped — must appear inside the ### TESTING.md project"
+        f" guide (R4) block, not elsewhere in the file)",
+    )
+
+# ---- AC-6 (a) ux-reviewer.md signal-hints block contains 'IntersectionObserver' ----
+# Anchor-scoped slice from the Browser-real signal hints label.
+_s107_ux_hints_slice = _slice_section(
+    _s107_ux, "Browser-real signal hints:", _s107_STOP
+)
+check(
+    "suite107(AC-6a): agents/ux-reviewer.md Browser-real signal hints block"
+    " (anchor-scoped) contains 'IntersectionObserver'",
+    bool(_s107_ux_hints_slice) and "IntersectionObserver" in _s107_ux_hints_slice,
+    "agents/ux-reviewer.md enrich area must contain a 'Browser-real signal hints:'"
+    " paragraph with 'IntersectionObserver' as a concrete signal example"
+    " (AC-6a: anchor-scoped — must appear in the hints block, not elsewhere)",
+)
+
+# ---- AC-6 (b) qa-plan.md signal-hints block contains 'IntersectionObserver' ----
+_s107_qa_hints_slice = _slice_section(
+    _s107_qa_plan, "Browser-real signal hints:", _s107_STOP
+)
+check(
+    "suite107(AC-6b): agents/qa-plan.md Browser-real signal hints block"
+    " (anchor-scoped) contains 'IntersectionObserver'",
+    bool(_s107_qa_hints_slice) and "IntersectionObserver" in _s107_qa_hints_slice,
+    "agents/qa-plan.md define-ac frontend template must contain a"
+    " 'Browser-real signal hints:' paragraph with 'IntersectionObserver'"
+    " (AC-6b: anchor-scoped — parallel to ux-reviewer check AC-6a)",
+)
+
+# ---- AC-6 (c) ux-reviewer.md Stage-3 ownership-boundary 'AUTHORITATIVE' token ----
+check(
+    "suite107(AC-6c): agents/ux-reviewer.md Stage-3 ownership-boundary paragraph"
+    " contains 'AUTHORITATIVE' token",
+    "AUTHORITATIVE" in _s107_ux,
+    "agents/ux-reviewer.md validate mode must contain a Stage-3 ownership boundary"
+    " paragraph declaring automated tests as 'AUTHORITATIVE' for the properties"
+    " they assert (AC-6c: prevents ux-reviewer from duplicating automated checks"
+    " in manual validation)",
+)
+
+# ---- AC-6 (d) ux-reviewer.md 'Detect the frontend stack' step present ----
+check(
+    "suite107(AC-6d): agents/ux-reviewer.md enrich Process contains"
+    " 'Detect the frontend stack' step",
+    "Detect the frontend stack" in _s107_ux,
+    "agents/ux-reviewer.md enrich Process must include a 'Detect the frontend stack'"
+    " step (AC-6d: stack-awareness addition — stack detection drives whether"
+    " browser-real component AC are realizable in isolation vs e2e scope)",
+)
+
+# ---- R3 (a) browser-mode.md 'Where to look when it fails' artifacts section ----
+check(
+    "suite107(R3a): agents/testing-refs/browser-mode.md contains"
+    " 'Where to look when it fails' artifacts section",
+    "Where to look when it fails" in _s107_bm,
+    "agents/testing-refs/browser-mode.md must contain a 'Where to look when it"
+    " fails' section listing screenshot/trace/report artifacts (R3: developer-useful"
+    " failure navigation; added between Golden commands and Decision log)",
+)
+
+# ---- R3 (b) e2e.md 'Where to look when it fails' artifacts section ----
+check(
+    "suite107(R3b): agents/testing-refs/e2e.md contains"
+    " 'Where to look when it fails' artifacts section",
+    "Where to look when it fails" in _s107_e2e,
+    "agents/testing-refs/e2e.md must contain a 'Where to look when it fails' section"
+    " listing playwright-report/trace/screenshot artifacts (R3: parallel to"
+    " browser-mode.md artifacts section; added to ## react-nextjs section)",
+)
+
+# ---- C7 (a) orchestrator.md Direct Modes 'test' table row carries frontend_scope + 00-state.md ----
+# Per-line binding: the 'test' row in the Direct Modes table must carry both
+# 'frontend_scope' and '00-state.md' on the same line.  This closes the F1 gap:
+# the prior suite pinned Phase 2.7/Phase 3 dispatch lines (full-pipeline-only)
+# but not the direct-mode 'test' entry point used by /th:test invocations.
+check(
+    "suite107(C7a): orchestrator.md Direct Modes 'test' table row contains"
+    " 'frontend_scope' and '00-state.md' on the same line (per-line binding)",
+    any(
+        "| test |" in ln and "frontend_scope" in ln and "00-state.md" in ln
+        for ln in _s107_orch.splitlines()
+    ),
+    "orchestrator.md Direct Modes table 'test' row must carry both 'frontend_scope'"
+    " and '00-state.md' on the same line (C7: cross-file contract — the direct-mode"
+    " bridge must be visible in the orchestrator routing table, not only in"
+    " ref-direct-modes.md)",
+)
+
+# ---- C7 (b) ref-direct-modes.md '## Test Mode' section + frontend_scope token (anchor-scoped) ----
+# The section heading anchors the slice; the token must appear within the section.
+_s107_rdm_testmode_slice = _slice_section(_s107_rdm, "## Test Mode", _s107_STOP)
+check(
+    "suite107(C7b): agents/ref-direct-modes.md contains '## Test Mode' section"
+    " with 'frontend_scope' token (anchor-scoped)",
+    bool(_s107_rdm_testmode_slice) and "frontend_scope" in _s107_rdm_testmode_slice,
+    "agents/ref-direct-modes.md must have a '## Test Mode' section that documents"
+    " the 'frontend_scope' field contract (C7: the full field contract is documented"
+    " here and referenced from the orchestrator Direct Modes table row)",
+)
+
+# ---- C7 (c) ref-special-flows.md per-module module-test payload carries frontend_scope ----
+# Anchor-scoped to the '#### Per-module task payload' block.  The payload field
+# 'frontend_scope: {true|false from 00-state.md}' must appear in that block.
+_s107_rsf_module_payload_slice = _slice_section(
+    _s107_rsf, "#### Per-module task payload", _s107_STOP
+)
+check(
+    "suite107(C7c): agents/ref-special-flows.md per-module task payload"
+    " (anchor-scoped) carries 'frontend_scope' field",
+    bool(_s107_rsf_module_payload_slice)
+    and "frontend_scope" in _s107_rsf_module_payload_slice,
+    "agents/ref-special-flows.md '#### Per-module task payload' block must list"
+    " 'frontend_scope' as a payload field (C7: threads the flag into each"
+    " module-test dispatch so /th:test-pipeline respects frontend_scope)",
+)
+
+# ---- C7 (d) A1-F4 block names 'ui-component' AND 'visual' in the browser-real set ----
+# Anchor-scoped to A1-F4 paragraph.  The prior suite did not check A1-F4 content
+# (only A1-F3).  F3 review finding: the original A1-F4 omitted ui-component and
+# visual, causing false 'no browser-real types' notes for tasks warranting those
+# types.  The fix extended the set to all five; this check enforces it.
+_s107_a1f4_slice = _slice_section(_s107_orch, "A1-F4 — jsdom-only soft gate", _s107_STOP)
+check(
+    "suite107(C7d): orchestrator.md A1-F4 paragraph (anchor-scoped) names"
+    " 'ui-component' AND 'visual' in the browser-real type set",
+    bool(_s107_a1f4_slice)
+    and "ui-component" in _s107_a1f4_slice
+    and "visual" in _s107_a1f4_slice,
+    "orchestrator.md A1-F4 jsdom-only soft gate must list 'ui-component' and"
+    " 'visual' as browser-real types (C7d: F3 fix — these types run on the Vitest"
+    " Browser Mode engine per _index.md engine-overlap note; omitting them causes"
+    " false cry-wolf for tasks that legitimately warrant only ui-component/visual)",
+)
+
+# ---- iter2 (a) tester.md Phase 0 step 2 labeled 'Gate A' ----
+# The iteration-2 fix labeled the Phase-0 stack-detection step 'Gate A' so that
+# 'Gate A' references in the template, knowledge.md, and tester.md itself all
+# resolve to a real labeled step (previously dangling).
+check(
+    "suite107(iter2a): agents/tester.md Phase 0 step 2 labeled 'Gate A —"
+    " frontend stack detection'",
+    "Gate A — frontend stack detection" in _s107_tester,
+    "agents/tester.md Phase 0 must label step 2 as 'Gate A — frontend stack"
+    " detection' (iter2: fixes the dangling 'Gate A' reference found by REV-A/REV-B"
+    " — tester.md template and knowledge.md both reference Gate A; the label is now"
+    " the stable anchor)",
+)
+
+# ---- iter2 (b) tester.md TESTING.md sentinel token ----
+# The sentinel '<!-- th:testing-guide v1 -->' drives the overwrite/redirect
+# decision on subsequent runs.  A stable machine-readable token replaces the
+# undecidable 'unrecognizable as this template' heuristic (iteration-2 fix C).
+check(
+    "suite107(iter2b): agents/tester.md contains '<!-- th:testing-guide v1 -->'"
+    " TESTING.md sentinel token",
+    "<!-- th:testing-guide v1 -->" in _s107_tester,
+    "agents/tester.md TESTING.md project guide (R4) must document the sentinel"
+    " '<!-- th:testing-guide v1 -->' that governs overwrite/redirect decisions"
+    " (iter2: replaces the undecidable 'unrecognizable as this template' heuristic"
+    " from PR-1 — the sentinel is a stable machine-readable first-line token)",
+)
+
+# ---- iter2 (c) tester.md team-harness repo-root guard wording ----
+# Prevents the tester from writing TESTING.md into the team-harness repo itself
+# when running inside a team-harness worktree with self-detected frontend_scope.
+check(
+    "suite107(iter2c): agents/tester.md contains 'Team-harness repo guard'"
+    " repo-root protection wording",
+    "Team-harness repo guard" in _s107_tester,
+    "agents/tester.md must document the 'Team-harness repo guard' that prevents"
+    " writing TESTING.md into the team-harness repo root (iter2: identified by"
+    " REV-A/REV-C — tester running inside a team-harness worktree with"
+    " self-detected frontend_scope would otherwise overwrite the harness TESTING.md)",
+)
+
+# ---- iter2 (d) tester.md Vue/Svelte n/a disposition token ----
+# When a non-react frontend stack (vue/nuxt/svelte) is detected, browser-mode is
+# n/a for that stack.  The iteration-2 fix adds an explicit 'do not silently
+# degrade' disposition to Gate A.  Token: 'non-react stacks: vue' in the Gate-A
+# step prose (the most specific stable phrase).
+check(
+    "suite107(iter2d): agents/tester.md Gate A contains Vue/Svelte n/a disposition"
+    " token ('non-react stacks: vue' present — do not silently degrade)",
+    "non-react stacks: vue" in _s107_tester,
+    "agents/tester.md Gate A must document that for non-react frontend stacks"
+    " (vue/nuxt/svelte) browser-mode is n/a and the tester must NOT silently"
+    " degrade — log the gap in the decision log instead (iter2: REV-C #8 finding;"
+    " skills mark frontend_scope for these stacks but no realizable browser-mode"
+    " lane exists; explicit disposition prevents silent fallback to jsdom without"
+    " operator visibility)",
+)
+
+# ---- iter3: ref-direct-modes.md ## Test Mode section references A1-F3 + A1-F4 ----
+# Iteration-3 surfaced A1-F3 (browser readiness) and A1-F4 (jsdom-only soft gate)
+# on the console path inside both ## Test Mode and ## Test-Pipeline Mode in
+# ref-direct-modes.md.  Anchor-scoped to ## Test Mode; stop marker is the next
+# ## only (wider than _s107_STOP) so that ### subsections within Test Mode are
+# included — A1-F3/A1-F4 appear in a ### subsection of ## Test Mode.
+_s107_rdm_testmode_a1_slice = _slice_section(_s107_rdm, "## Test Mode", ("\n## ",))
+check(
+    "suite107(iter3-rdm): agents/ref-direct-modes.md '## Test Mode' section"
+    " (anchor-scoped, stops at next '## ', includes ### subsections)"
+    " references 'A1-F3' AND 'A1-F4'",
+    bool(_s107_rdm_testmode_a1_slice)
+    and "A1-F3" in _s107_rdm_testmode_a1_slice
+    and "A1-F4" in _s107_rdm_testmode_a1_slice,
+    "agents/ref-direct-modes.md '## Test Mode' section must reference 'A1-F3' and"
+    " 'A1-F4' (iter3: pins console-path gates for binaries readiness and jsdom-only"
+    " soft gate added to the direct-mode console path in iteration-3; anchor-scoped"
+    " to '## Test Mode' with stop at next '## ' so all ### subsections are in scope)",
+)
+
+# ---- version floor: all four sync sites >= (2, 85, 0) ----
+_s107_plugin_json    = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s107_marketplace    = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s107_main_go        = read(REPO_ROOT / "cmd" / "install" / "main.go")
+_s107_VER_FLOOR      = (2, 85, 0)
+
+check(
+    "suite107(ver-a): .claude-plugin/plugin.json version >= 2.85.0",
+    _s59_ver_tuple(_s107_plugin_json.get("version", "0.0.0")) >= _s107_VER_FLOOR,
+    "plugin.json version must be 2.85.0 or later (frontend-flow-activation release)",
+)
+check(
+    "suite107(ver-b): .claude-plugin/marketplace.json plugins[0].version >= 2.85.0",
+    _s59_ver_tuple(
+        _s107_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _s107_VER_FLOOR,
+    "marketplace.json plugins[0].version must be 2.85.0 or later",
+)
+check(
+    "suite107(ver-c): CLAUDE.md §3 Current version >= 2.85.0",
+    _s59_ver_tuple(_s59_claude_current_version(_s107_claude) or "0.0.0") >= _s107_VER_FLOOR,
+    "CLAUDE.md §3 Current version must show 2.85.0 or later",
+)
+check(
+    "suite107(ver-d): cmd/install/main.go var version >= 2.85.0",
+    'var version = "' in _s107_main_go and _s59_ver_tuple(
+        _s107_main_go.split('var version = "')[1].split('"')[0]
+        if 'var version = "' in _s107_main_go else "0.0.0"
+    ) >= _s107_VER_FLOOR,
+    "cmd/install/main.go var version must be 2.85.0 or later",
+)
+
+# ---- self-referential guard (h1) ----
+check(
+    "suite107(h1-registry): docs/testing.md registers 'Suite 107'"
+    " and 'frontend-flow-activation'",
+    "Suite 107" in _s107_testing_md and "frontend-flow-activation" in _s107_testing_md,
+    "docs/testing.md must name Suite 94 and the frontend-flow-activation marker"
+    " (canonical suite registry)",
+)
+
+# ---- CLAUDE.md hygiene (h2) ----
+check(
+    "suite107(h2-hygiene): CLAUDE.md does NOT contain 'Suite 107'",
+    "Suite 107" not in _s107_claude,
+    "CLAUDE.md must not mention Suite 94 — only docs/testing.md is the canonical"
+    " registry (§11 hygiene contract)",
+)
+
+# Marker: frontend-flow-activation
 
 # ---------------------------------------------------------------------------
 # Suite 94 — prompt-injection-defense-floor (v2.90.0)
