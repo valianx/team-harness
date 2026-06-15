@@ -610,6 +610,84 @@ assert_nodecision "F008-RT-3: ClickUp read tool (get_task) -> nodecision (write 
 
 
 # ---------------------------------------------------------------------------
+# ============================================================================
+# M3a / M3b / M3c — dual-path parity (bash-degraded path)
+# SPEC: with python3 masked, the bash-degraded path must agree with python3 on
+#   all M3 decisions: egress read guard (M3a), config-anti-weakening (M3b),
+#   and the --no-verify tokenizer including SEC-001 new evasion forms (M3c).
+# ============================================================================
+echo
+echo "############################################################"
+echo "# M3 dual-path parity: bash-degraded path (python3 masked)"
+echo "############################################################"
+
+# --- M3a: egress read guard (bash-degraded) ---
+echo
+echo "=== M3-DUAL-1: M3a — Read .env with python3 masked -> EXACT ASK ==="
+OUT_M3D_1=$(run_policy_with_masked_python3 '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env"}}')
+assert_exact_ask "M3-DUAL-1: Read .env (bash-degraded) -> ask (parity with python3)" "$OUT_M3D_1"
+
+echo
+echo "=== M3-DUAL-2: M3a — Read private.key with python3 masked -> EXACT ASK ==="
+OUT_M3D_2=$(run_policy_with_masked_python3 '{"tool_name":"Read","tool_input":{"file_path":"/etc/ssl/private.key"}}')
+assert_exact_ask "M3-DUAL-2: Read private.key (bash-degraded) -> ask" "$OUT_M3D_2"
+
+echo
+echo "=== M3-DUAL-3: M3a — Read .env.example (allowlisted) with python3 masked -> NODECISION ==="
+OUT_M3D_3=$(run_policy_with_masked_python3 '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env.example"}}')
+assert_nodecision "M3-DUAL-3: Read .env.example (bash-degraded, allowlisted) -> nodecision" "$OUT_M3D_3"
+
+# --- M3b: config-anti-weakening (bash-degraded) ---
+echo
+echo "=== M3-DUAL-4: M3b — rules emptied in .eslintrc with python3 masked -> EXACT ASK ==="
+OUT_M3D_4=$(run_policy_with_masked_python3 '{"tool_name":"Edit","tool_input":{"file_path":"/app/.eslintrc.json","old_string":"\"rules\":{\"no-console\":\"error\"}","new_string":"\"rules\":{  }"}}')
+assert_exact_ask "M3-DUAL-4: eslintrc rules emptied (bash-degraded) -> ask (parity with python3)" "$OUT_M3D_4"
+
+echo
+echo "=== M3-DUAL-5: M3b — ruff.toml select=[] with python3 masked -> EXACT ASK ==="
+OUT_M3D_5=$(run_policy_with_masked_python3 '{"tool_name":"Write","tool_input":{"file_path":"/app/ruff.toml","content":"[lint]\nselect = []\nline-length = 120"}}')
+assert_exact_ask "M3-DUAL-5: ruff.toml select=[] (bash-degraded) -> ask (parity with python3)" "$OUT_M3D_5"
+
+echo
+echo "=== M3-DUAL-6: M3b — TypeScript strict disabled with python3 masked -> EXACT ASK ==="
+OUT_M3D_6=$(run_policy_with_masked_python3 '{"tool_name":"Edit","tool_input":{"file_path":"/app/tsconfig.json","old_string":"\"strict\": true","new_string":"\"strict\": false"}}')
+assert_exact_ask "M3-DUAL-6: tsconfig strict:false (bash-degraded) -> ask (parity with python3)" "$OUT_M3D_6"
+
+# --- M3c: --no-verify tokenizer including SEC-001 new evasion forms (bash-degraded) ---
+echo
+echo "=== M3-DUAL-7: M3c — git commit --no-verify with python3 masked -> EXACT DENY ==="
+OUT_M3D_7=$(run_policy_with_masked_python3 '{"tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m \"bypass\""}}')
+assert_exact_deny "M3-DUAL-7: git commit --no-verify (bash-degraded) -> deny" "$OUT_M3D_7"
+
+echo
+echo "=== M3-DUAL-8: M3c SEC-001 — git commit -n with python3 masked -> EXACT DENY ==="
+OUT_M3D_8=$(run_policy_with_masked_python3 '{"tool_name":"Bash","tool_input":{"command":"git commit -n -m \"bypass\""}}')
+assert_exact_deny "M3-DUAL-8: git commit -n (bash-degraded) -> deny (SEC-001 short alias)" "$OUT_M3D_8"
+
+echo
+echo "=== M3-DUAL-9: M3c SEC-001 — git commit -nm with python3 masked -> EXACT DENY ==="
+OUT_M3D_9=$(run_policy_with_masked_python3 '{"tool_name":"Bash","tool_input":{"command":"git commit -nm \"bypass hooks\""}}')
+assert_exact_deny "M3-DUAL-9: git commit -nm (bash-degraded) -> deny (SEC-001 cluster)" "$OUT_M3D_9"
+
+echo
+echo "=== M3-DUAL-10: M3c SEC-001 — git commit --no-ver with python3 masked -> EXACT DENY ==="
+OUT_M3D_10=$(run_policy_with_masked_python3 '{"tool_name":"Bash","tool_input":{"command":"git commit --no-ver -m \"bypass\""}}')
+assert_exact_deny "M3-DUAL-10: git commit --no-ver (bash-degraded) -> deny (SEC-001 prefix)" "$OUT_M3D_10"
+
+echo
+echo "=== M3-DUAL-11: M3c SEC-001 — git push -n (dry-run) with python3 masked -> NODECISION ==="
+OUT_M3D_11=$(run_policy_with_masked_python3 '{"tool_name":"Bash","tool_input":{"command":"git push -n origin feature/x"}}')
+assert_nodecision "M3-DUAL-11: git push -n (bash-degraded, dry-run not bypass) -> nodecision" "$OUT_M3D_11"
+
+echo
+echo "=== M3-DUAL-12: M3c SEC-002 — -m body mentions --no-verify with python3 masked -> NODECISION ==="
+# SEC-002: the bash-degraded path must NOT falsely deny this (false-positive fix).
+# Both python3 and bash paths must agree: the string in a -m body is not a real flag.
+OUT_M3D_12=$(run_policy_with_masked_python3 '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fixes the --no-verify bypass\""}}')
+assert_nodecision "M3-DUAL-12: git commit -m body has --no-verify (bash-degraded) -> nodecision (no false-positive)" "$OUT_M3D_12"
+
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo

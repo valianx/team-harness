@@ -272,8 +272,106 @@ assert_allow "git commit without secret in message" \
   '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fix bug in parser\""}}'
 
 echo
-echo "=== Other tools (ALLOW — hook only inspects Bash/Write/Edit/NotebookEdit) ==="
-assert_allow "Read on .env (read-only is fine)" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env"}}'
+echo "=== M3a: Read egress guard — secret paths (ASK) ==="
+assert_ask "Read .env" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env"}}'
+assert_ask "Read .env.production" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env.production"}}'
+assert_ask "Read cert.pem" '{"tool_name":"Read","tool_input":{"file_path":"/etc/ssl/cert.pem"}}'
+assert_ask "Read id_rsa" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.ssh/id_rsa"}}'
+assert_ask "Read .aws/credentials" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.aws/credentials"}}'
+assert_ask "Read credentials.json" '{"tool_name":"Read","tool_input":{"file_path":"/srv/app/credentials.json"}}'
+assert_ask "Read secrets.yaml" '{"tool_name":"Read","tool_input":{"file_path":"/srv/app/secrets.yaml"}}'
+assert_ask "Read private.key" '{"tool_name":"Read","tool_input":{"file_path":"/etc/ssl/private.key"}}'
+assert_ask "Read my-app-secret.json" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/my-app-secret.json"}}'
+
+echo
+echo "=== M3a: Read egress guard — allowlisted paths (ALLOW) ==="
+assert_allow "Read .env.example (allowlisted)" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env.example"}}'
+assert_allow "Read .env.sample (allowlisted)" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env.sample"}}'
+assert_allow "Read .env.template (allowlisted)" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/.env.template"}}'
+assert_allow "Read regular source file" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/app/main.py"}}'
+assert_allow "Read README.md" '{"tool_name":"Read","tool_input":{"file_path":"/home/u/README.md"}}'
+
+echo
+echo "=== M3b: Config-anti-weakening — weakening edits (ASK) ==="
+assert_ask "Edit .eslintrc: rules emptied" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/app/.eslintrc.json","old_string":"\"rules\":{\"no-console\":\"error\"}","new_string":"\"rules\":{  }"}}'
+assert_ask "Write eslint.config.js: broad disable block" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/app/eslint.config.js","content":"/* eslint-disable */ module.exports = {}"}}'
+assert_ask "Edit tsconfig.json: noImplicitAny disabled" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/app/tsconfig.json","old_string":"\"noImplicitAny\": true","new_string":"\"noImplicitAny\": false"}}'
+assert_ask "Edit tsconfig.json: strict disabled" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/app/tsconfig.strict.json","old_string":"\"strict\": true","new_string":"\"strict\": false"}}'
+
+echo
+echo "=== M3b: Config-anti-weakening — benign config edits (ALLOW) ==="
+assert_allow "Edit .eslintrc: add a rule (not weakening)" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/app/.eslintrc.json","old_string":"\"no-console\":\"warn\"","new_string":"\"no-console\":\"error\""}}'
+assert_allow "Edit regular .json file (not a config)" \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/app/package.json","old_string":"\"version\":\"1.0.0\"","new_string":"\"version\":\"1.1.0\""}}'
+assert_allow "Write ruff.toml with no weakening patterns" \
+  '{"tool_name":"Write","tool_input":{"file_path":"/app/ruff.toml","content":"[lint]\nselect = [\"E\", \"F\", \"W\"]\nline-length = 120"}}'
+
+echo
+echo "=== M3c: --no-verify tokenizer — false positive fix (ALLOW) ==="
+# AC-9: the naive regex falsely denied this; the tokenizer MUST return no-decision.
+assert_allow "git commit -m 'mentions --no-verify in body' (false positive)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"note: we never use --no-verify here\""}}'
+assert_allow "git commit -m '... --no-verify ...' (message body, not a flag)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"refactor: remove --no-verify from old scripts\""}}'
+
+echo
+echo "=== M3c: --no-verify tokenizer — real violations (DENY) ==="
+# AC-10: real --no-verify flag tokens MUST still be denied.
+assert_deny "git commit --no-verify (real flag)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m \"bypass hooks\""}}'
+assert_deny "git commit --no-verify after -m value" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"my message\" --no-verify"}}'
+assert_deny "git -c core.hooksPath=/dev/null commit" \
+  '{"tool_name":"Bash","tool_input":{"command":"git -c core.hooksPath=/dev/null commit -m \"bypass\""}}'
+
+echo
+echo "=== M3c: SEC-001 — new evasion forms (DENY) ==="
+# SEC-001: short alias -n on git commit (= --no-verify on commit).
+assert_deny "git commit -n (short alias of --no-verify)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -n -m \"bypass\""}}'
+# SEC-001: bundled short-flag cluster containing n (commit only).
+assert_deny "git commit -nm (cluster: n+m, commit)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -nm \"bypass hooks\""}}'
+# SEC-001: unambiguous abbreviation --no-ver of --no-verify.
+assert_deny "git commit --no-ver (unambiguous prefix abbreviation)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit --no-ver -m \"bypass\""}}'
+# SEC-009: shorter unambiguous prefixes --no-ve / --no-v (no other commit option starts with --no-v).
+assert_deny "git commit --no-ve (unambiguous prefix)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit --no-ve -m \"bypass\""}}'
+assert_deny "git commit --no-v (shortest unambiguous prefix)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit --no-v -m \"bypass\""}}'
+
+echo
+echo "=== M3c: SEC-001 — dry-run -n on push/clean must NOT be denied (ALLOW) ==="
+# -n on git push means --dry-run, NOT --no-verify. Must pass through.
+assert_allow "git push -n (dry-run, not --no-verify)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git push -n origin feature/x"}}'
+# -n on git clean means --dry-run too.
+assert_allow "git clean -n (dry-run, not --no-verify)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git clean -n"}}'
+
+echo
+echo "=== M3c: SEC-002 — --no-verify inside -m body must NOT be denied (ALLOW) ==="
+# SEC-002: the string '--no-verify' inside a quoted -m body is NOT a real flag.
+# Both the python3 path and the bash-degraded path must agree: no-decision (ALLOW).
+assert_allow "git commit -m body mentions --no-verify (false positive guard)" \
+  '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fixes the --no-verify bypass\""}}'
+
+echo
+echo "=== M3: FAIL-CLOSED — unmatched edge payload (ALLOW / no-decision) ==="
+# AC-12: unmatched payloads must produce no-decision (empty stdout), never allow JSON.
+assert_allow "unmatched Read on non-secret path" \
+  '{"tool_name":"Read","tool_input":{"file_path":"/home/u/app/config.yaml"}}'
+assert_allow "unmatched tool type (Task)" \
+  '{"tool_name":"Task","tool_input":{"prompt":"do something"}}'
+
+echo
+echo "=== Other tools (ALLOW — non-inspected tool types) ==="
 assert_allow "Glob" '{"tool_name":"Glob","tool_input":{"pattern":"**/*.py"}}'
 
 echo
