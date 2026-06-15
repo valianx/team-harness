@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.91.0] - 2026-06-14
+
+### Added
+- `/th:audit-security` skill: security self-scan for this repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`). REPORT-only — no auto-fix.
+- `tests/test_security_scan.py` (Suite 12): five-check scanner wired into `tests/run-all.sh` and CI; checks read-only-tier Bash escalation, web-facing agent §6.6 preamble, hook injection anti-patterns (eval/$(), curl|bash, rm -rf $VAR), hook-manifest canonical command form (WARN), and concrete secrets in shipped assets. Each check carries a positive (red-on-regression) fixture (AC-9).
+
+### Security
+- Check 1 pins the structural suite's `READ_ONLY_AGENTS` Bash-exclusion rule as a dedicated security gate with a consolidated CI exit, closing the gap between the structural suite's assertion and a security-framed report.
+- Check 2 enforces that every agent whose frontmatter grants `WebFetch` or `WebSearch` carries the `## Untrusted content & prompt-injection floor` (§6.6) preamble; web-facing agents are derived strictly from frontmatter `tools:`, never from a body grep.
+- Check 5 reuses `hooks/policy-block.sh`'s high-confidence secret class patterns; the detector-file allowlist (`policy-block.sh`, `test_policy_block.sh`, `test_security_scan.py`) prevents self-collision on the clean tree.
+
 ## [2.88.0] - 2026-06-13
 
 ### Added
