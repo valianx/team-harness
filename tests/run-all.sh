@@ -131,6 +131,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 12: security self-scan (5-check MVP)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_security_scan.py"; then
+    echo "security-scan: PASS"
+else
+    echo "security-scan: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
