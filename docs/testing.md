@@ -345,6 +345,10 @@ Positive fixtures (AC-9): each check carries a synthetic in-memory fixture provi
 
 Self-referential guard: `Suite 12` and `security-self-scan` present in `docs/testing.md` (canonical registry); `Suite 12` NOT in `CLAUDE.md §11` (hygiene contract). Marker: `security-self-scan`.
 
+### Suite 101 — session-handoff
+
+16 checks. Structural drift guard for the `/th:save-session` + `/th:resume-session` session handoff skills. File: `tests/test_agent_structure.py`. Asserts the two standalone skills exist and are correctly shaped, the shared three-field schema (`### What Worked`, `### What NOT to Retry`, `### Next Step`) is pinned on both sides, the confirmation gate and single write target are documented in `save-session`, the REPORT-only boundary in `resume-session` declares no file write / no agent dispatch / no `--apply` path, both skills carry `## Voice` and `## Output Discipline` blocks, neither names an external project or external method (TH-native framing), both are listed as Standalone in `skills/README.md`, and `docs/testing.md` registers `Suite 101` + `session-handoff`. All content checks use the anchor-scoped 3-arg `_slice_section` idiom (anti-false-green: missing anchor → empty slice → check fails). Pure text/file reads — no agent invocation, no paid spend. Written by implementer (2026-06-15). Marker: `session-handoff`.
+
 ## When to add a test
 
 Any new pattern in `policy-block.sh` (new denylist or allowlist case) MUST be backed by an `assert_deny` / `assert_allow` line. Any new pipeline phase, new agent contract field, or new mandatory section MUST be backed by a `check(...)` line in the appropriate suite of `test_agent_structure.py`. Any new agent file in `agents/` is picked up automatically by `test_agent_frontmatter.py` — no manual addition needed; the test fails immediately if its YAML does not parse. All three files are append-only by design — refactor an assertion only when the assertion itself is wrong.

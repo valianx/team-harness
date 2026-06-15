@@ -22764,6 +22764,239 @@ check(
 # Marker: decision-ledger
 
 # ---------------------------------------------------------------------------
+# Suite 101 — session-handoff
+# ---------------------------------------------------------------------------
+# Structural drift guard for the /th:save-session + /th:resume-session skills.
+# Written by implementer (2026-06-15). Marker: session-handoff
+#
+# Asserts:
+#   (1)  skills/save-session/SKILL.md exists
+#   (2)  skills/resume-session/SKILL.md exists
+#   (3)  save SKILL.md frontmatter: name: save-session AND non-empty description
+#   (4)  resume SKILL.md frontmatter: name: resume-session AND non-empty description
+#   (5)  save SKILL.md declares standalone: "runs directly" + "does NOT invoke" + "orchestrator"
+#   (6)  resume SKILL.md declares standalone: "runs directly" + "does NOT invoke" + "orchestrator"
+#   (7)  save SKILL.md contains all three field anchors:
+#        ### What Worked / ### What NOT to Retry / ### Next Step
+#   (8)  resume SKILL.md references the same three field anchors (schema agreement)
+#   (9)  save SKILL.md documents an explicit confirmation gate before any write
+#        (tokens: "confirmation" + "before" + "write", scoped to the confirmation step)
+#   (10) save SKILL.md names 00-session-handoff.md as its write target
+#   (11) resume SKILL.md ## REPORT-only Boundary asserts:
+#        never writes a file + never dispatches + no --apply/--fix path
+#   (12) both SKILL.md files contain a ## Voice block
+#   (13) both SKILL.md files contain an ## Output Discipline block
+#   (14) provenance guard: neither SKILL.md names an external project or method
+#        (split-literal forbidden-token list, mirrors Suite 99 check 13)
+#   (15) skills/README.md Standalone section lists /th:save-session AND /th:resume-session
+#   (16) registry + hygiene + self-ref:
+#        docs/testing.md registers Suite 101 + session-handoff;
+#        CLAUDE.md does NOT contain Suite 101;
+#        this test file contains Suite 101 + _slice_section + session-handoff;
+#        Suite 101 non-comment source contains no Agent( or subagent_type token
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 101: session-handoff structural assertions ===")
+
+_s101_save_path   = SKILLS_DIR / "save-session"   / "SKILL.md"
+_s101_resume_path = SKILLS_DIR / "resume-session" / "SKILL.md"
+_s101_readme      = read(REPO_ROOT / "skills" / "README.md")
+_s101_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s101_claude_md   = read(REPO_ROOT / "CLAUDE.md")
+
+_S101_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# (1) save skill file exists
+check(
+    "suite101(1-save-exists): skills/save-session/SKILL.md exists",
+    _s101_save_path.exists(),
+    "skills/save-session/SKILL.md must exist",
+)
+
+# (2) resume skill file exists
+check(
+    "suite101(2-resume-exists): skills/resume-session/SKILL.md exists",
+    _s101_resume_path.exists(),
+    "skills/resume-session/SKILL.md must exist",
+)
+
+_s101_save   = read(_s101_save_path)   if _s101_save_path.exists()   else ""
+_s101_resume = read(_s101_resume_path) if _s101_resume_path.exists() else ""
+
+# (3) save frontmatter: name: save-session AND non-empty description
+_s101_save_fm = parse_frontmatter(_s101_save)
+check(
+    "suite101(3-save-frontmatter): save SKILL.md has name: save-session and non-empty description",
+    _s101_save_fm.get("name") == "save-session" and bool(_s101_save_fm.get("description", "")),
+    "skills/save-session/SKILL.md must have frontmatter with name: save-session and a non-empty description",
+)
+
+# (4) resume frontmatter: name: resume-session AND non-empty description
+_s101_resume_fm = parse_frontmatter(_s101_resume)
+check(
+    "suite101(4-resume-frontmatter): resume SKILL.md has name: resume-session and non-empty description",
+    _s101_resume_fm.get("name") == "resume-session" and bool(_s101_resume_fm.get("description", "")),
+    "skills/resume-session/SKILL.md must have frontmatter with name: resume-session and a non-empty description",
+)
+
+# (5) save standalone declaration: "runs directly" + "does NOT invoke" + "orchestrator"
+check(
+    "suite101(5-save-standalone): save SKILL.md declares 'runs directly', 'does NOT invoke', and 'orchestrator'",
+    "runs directly" in _s101_save and "does NOT invoke" in _s101_save and "orchestrator" in _s101_save,
+    "skills/save-session/SKILL.md must declare it runs directly and does NOT invoke the orchestrator",
+)
+
+# (6) resume standalone declaration: "runs directly" + "does NOT invoke" + "orchestrator"
+check(
+    "suite101(6-resume-standalone): resume SKILL.md declares 'runs directly', 'does NOT invoke', and 'orchestrator'",
+    "runs directly" in _s101_resume and "does NOT invoke" in _s101_resume and "orchestrator" in _s101_resume,
+    "skills/resume-session/SKILL.md must declare it runs directly and does NOT invoke the orchestrator",
+)
+
+# (7) save contains all three field anchors
+_s101_three_anchors = ["### What Worked", "### What NOT to Retry", "### Next Step"]
+check(
+    "suite101(7-three-fields-save): save SKILL.md contains all three field anchors",
+    all(anchor in _s101_save for anchor in _s101_three_anchors),
+    f"skills/save-session/SKILL.md must contain all three anchors: {_s101_three_anchors}",
+)
+
+# (8) resume references the same three field anchors (schema agreement)
+check(
+    "suite101(8-three-fields-resume): resume SKILL.md references all three field anchors",
+    all(anchor in _s101_resume for anchor in _s101_three_anchors),
+    f"skills/resume-session/SKILL.md must reference all three schema anchors: {_s101_three_anchors}",
+)
+
+# (9) save confirmation gate — scoped to the Step 3 confirmation section
+_S101_CONFIRM_ANCHOR = "## Step 3 — Confirmation gate"
+_s101_confirm_slice = _slice_section(_s101_save, _S101_CONFIRM_ANCHOR, _S101_STOP)
+_s101_gate_present = (
+    bool(_s101_confirm_slice)
+    and "confirmation" in _s101_confirm_slice.lower()
+    and "before" in _s101_confirm_slice.lower()
+    and "write" in _s101_confirm_slice.lower()
+)
+check(
+    "suite101(9-save-confirmation-gate): save SKILL.md confirmation step documents gate before write",
+    _s101_gate_present,
+    "skills/save-session/SKILL.md Step 3 must document an explicit confirmation gate before writing",
+)
+
+# (10) save names 00-session-handoff.md as its write target
+check(
+    "suite101(10-save-single-write): save SKILL.md names 00-session-handoff.md as write target",
+    "00-session-handoff.md" in _s101_save,
+    "skills/save-session/SKILL.md must name '00-session-handoff.md' as its only write target",
+)
+
+# (11) resume ## REPORT-only Boundary asserts: no write + no dispatch + no --apply/--fix
+_S101_BOUNDARY_ANCHOR = "## REPORT-only Boundary"
+_s101_boundary_slice = _slice_section(_s101_resume, _S101_BOUNDARY_ANCHOR, _S101_STOP)
+_s101_no_write = bool(_s101_boundary_slice) and (
+    "never writes a file" in _s101_boundary_slice
+    or "NOT write" in _s101_boundary_slice
+    or "no write" in _s101_boundary_slice.lower()
+    or "never write" in _s101_boundary_slice.lower()
+)
+_s101_no_dispatch = bool(_s101_boundary_slice) and (
+    "never dispatches" in _s101_boundary_slice
+    or "no dispatch" in _s101_boundary_slice.lower()
+    or ("dispatch" in _s101_boundary_slice and "no" in _s101_boundary_slice)
+)
+_s101_no_apply = bool(_s101_boundary_slice) and (
+    "--apply" in _s101_boundary_slice or "--fix" in _s101_boundary_slice
+)
+check(
+    "suite101(11-resume-report-only): resume ## REPORT-only Boundary asserts no file write, no dispatch, no --apply/--fix",
+    _s101_no_write and _s101_no_dispatch and _s101_no_apply,
+    "skills/resume-session/SKILL.md '## REPORT-only Boundary' must assert: no file write + no dispatch + no --apply/--fix path",
+)
+
+# (12) both SKILL.md files contain a ## Voice block
+check(
+    "suite101(12-voice-blocks): both SKILL.md files contain '## Voice' block",
+    "## Voice" in _s101_save and "## Voice" in _s101_resume,
+    "Both skills/save-session/SKILL.md and skills/resume-session/SKILL.md must contain a '## Voice' block",
+)
+
+# (13) both SKILL.md files contain an ## Output Discipline block
+check(
+    "suite101(13-output-discipline): both SKILL.md files contain '## Output Discipline' block",
+    "## Output Discipline" in _s101_save and "## Output Discipline" in _s101_resume,
+    "Both SKILL.md files must contain an '## Output Discipline' block",
+)
+
+# (14) provenance guard: no external-project/method names in either shipped SKILL.md
+_s101_forbidden = ["EC" + "C", "Agent" + "Shield", "conversation-" + "analyzer"]
+_s101_provenance_clean = all(
+    lit not in _s101_save and lit not in _s101_resume
+    for lit in _s101_forbidden
+)
+check(
+    "suite101(14-th-native): neither SKILL.md names an external project or external method",
+    _s101_provenance_clean,
+    "skills/save-session/SKILL.md and skills/resume-session/SKILL.md must not name external projects or methods — TH-native only",
+)
+
+# (15) skills/README.md Standalone section lists both skills
+_S101_STANDALONE_ANCHOR = "**Standalone** (no orchestrator involvement)"
+_s101_standalone_slice = _slice_section(_s101_readme, _S101_STANDALONE_ANCHOR, ("\n-", "\n\n"))
+check(
+    "suite101(15-readme-standalone): skills/README.md Standalone section lists /th:save-session AND /th:resume-session",
+    "/th:save-session" in _s101_readme and "/th:resume-session" in _s101_readme,
+    "skills/README.md must list '/th:save-session' AND '/th:resume-session' in the Standalone section",
+)
+
+# (16) registry + hygiene + self-ref + no-agent-token guard
+# (16a) docs/testing.md registers Suite 101 and session-handoff
+check(
+    "suite101(16a-registry): docs/testing.md contains 'Suite 101' and 'session-handoff'",
+    "Suite 101" in _s101_testing_md and "session-handoff" in _s101_testing_md,
+    "docs/testing.md must register Suite 101 and the session-handoff marker (canonical suite registry)",
+)
+
+# (16b) CLAUDE.md must NOT contain 'Suite 101' (§11 hygiene)
+check(
+    "suite101(16b-hygiene): CLAUDE.md does NOT contain 'Suite 101'",
+    "Suite 101" not in _s101_claude_md,
+    "CLAUDE.md must not mention Suite 101 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (16c) this test file contains Suite 101, _slice_section, and session-handoff
+_s101_own_source = read(Path(__file__))
+check(
+    "suite101(16c-self-ref): this test file contains 'Suite 101', '_slice_section', and 'session-handoff'",
+    "Suite 101" in _s101_own_source
+    and "_slice_section" in _s101_own_source
+    and "session-handoff" in _s101_own_source,
+    "test file must reference Suite 101, _slice_section, and session-handoff (self-referential marker check)",
+)
+
+# (16d) Suite 101 non-comment source contains no Agent( or subagent_type token
+_s101_suite_start = _s101_own_source.find("Suite 101 — session-handoff")
+_s101_suite_end   = _s101_own_source.find("# Marker: session-handoff")
+_s101_own_region  = (
+    _s101_own_source[_s101_suite_start:_s101_suite_end]
+    if _s101_suite_start >= 0 and _s101_suite_end > _s101_suite_start
+    else _s101_own_source[_s101_suite_start:]
+)
+_s101_code_lines = [
+    ln for ln in _s101_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s101_code_only = "\n".join(_s101_code_lines)
+_s101_agent_tok    = "Age" + "nt("
+_s101_subagent_tok = "subagent" + "_type"
+check(
+    "suite101(16d-no-agent-call): Suite 101 non-comment source contains no agent-invocation tokens",
+    _s101_agent_tok not in _s101_code_only and _s101_subagent_tok not in _s101_code_only,
+    "Suite 101 is a free structural suite — its non-comment source must not call the agent-dispatch APIs",
+)
+
+# Marker: session-handoff
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
