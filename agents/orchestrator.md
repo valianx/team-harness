@@ -1754,6 +1754,10 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
  ── Review Summary ──────────────────────
  {verbatim contents of ## Review Summary from 01-plan.md, line-wrapped}
 
+ ── Confidence ──────────────────────────
+ {render the **Confidence:** line from ### Confidence Score in ## Review Summary;
+  if absent: "Confidence: not stated"}
+
  ── PR Summary ─────────────────────────
  {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
 
@@ -1779,6 +1783,7 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
 
 **Rendering rules:**
 - Preserve markdown bullets and table syntax as-is — terminal users see them rendered by Claude Code, file-output users get faithful markdown.
+- **`── Confidence ──` band (additive, STAGE-GATE-1 only).** The Confidence Score is already present inside the `## Review Summary` verbatim copy above. The `── Confidence ──` band makes it prominent as a dedicated visual band for the reviewer. To populate it: scan the verbatim Review Summary copy for a line matching `**Confidence:** N/10 (single-pass)` and render it in the band. If no such line is found (architect ran without the contract, or task type is hotfix/Tier-1-fix), render `Confidence: not stated`. The band adds no new orchestrator read — it draws from the Review Summary copy already in memory.
 - If `## Review Summary` is missing in `01-plan.md`: this guard is **type-aware**.
   - For `type: feature`, `type: refactor`, `type: enhancement`, or `type: fix` (Tier 2-4): do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
   - For `type: hotfix` or `type: fix` Tier 1 (orchestrator-self-authored, no architect): do NOT route to architect (the architect is not dispatched in this flow — routing there would create a loop). Instead, route to the orchestrator-self-authored step above: the orchestrator writes `01-plan.md § Review Summary` from the Phase 0b bug-report payload and re-emits the gate. This is the **self-authored** path; it never routes to the architect.

@@ -1248,8 +1248,57 @@ Write your analysis to `workspaces/{feature-name}/01-plan.md`.
 The Review Summary contains:
 1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many PRs are planned, and the principal risk (or "no risk worth flagging").
 2. `### Decisions for human review` (3-5 bullets, hard cap 7) — decisions that genuinely require human judgement, each ending with `→ decided as X` or `→ open question`.
-3. `### Risks` — a table of risks, severities, and mitigations.
-4. `### Trade-offs` — the key trade-offs made.
+3. `### Proposed Approach` — one paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives.
+4. `### Confidence Score` — a single self-assessed score (see contract below).
+5. `### Patterns to Mirror` — real in-repo `file:line` references (see contract below).
+6. `### Risks` — a table of risks, severities, and mitigations.
+7. `### Trade-offs` — the key trade-offs made.
+
+### Confidence Score & Patterns to Mirror
+
+**Confidence Score contract.** For every `feature | refactor | enhancement | fix` (Tier 2–4) design, write a `### Confidence Score` sub-section inside `## Review Summary`. The score is a single-pass self-assessment: **the likelihood that a one-shot implementation passes STAGE-GATE-3 without rework.**
+
+**Score line format (mandatory):**
+```
+**Confidence:** N/10 (single-pass)
+```
+The `(single-pass)` qualifier is mandatory in the score line — it pins the semantics so the number cannot drift into "plan quality" or "effort confidence".
+
+**Four-factor rubric.** Evaluate each factor and let it raise or lower the number:
+- **Spec clarity** — is the requirement specific and unambiguous? Vague or contradictory specs lower the score.
+- **Prior art** — does the codebase already have a similar pattern to mirror? Good prior art raises the score; a wholly new surface lowers it.
+- **Blast radius** — how many files / components / services does the change touch? Larger blast radius lowers the score.
+- **Unknowns** — any third-party API, runtime behaviour, or migration risk not yet confirmed? Each unresolved unknown lowers the score.
+
+**Calibration bands:**
+- `8–10` — spec is clear, strong prior art, narrow blast radius, no material unknowns. Expect first-pass success.
+- `5–7` — one factor is uncertain (vague spec, limited prior art, moderate blast radius, or one unresolved unknown). Rework is possible.
+- `1–4` — multiple uncertain factors. First-pass success is unlikely; extra spec-clarification or a spike may be warranted before implementation.
+
+**Rationale requirement.** After the score line, write ≥1 bullet naming the factor(s) that most influenced the number. A bare score with no rationale is flagged as `concerns` by the plan-reviewer (Rule 12). Example:
+
+```
+**Confidence:** 7/10 (single-pass)
+- Prior art: `src/auth/middleware.ts` follows the same guard pattern — high reuse value.
+- Unknowns: third-party webhook delivery timing not confirmed; retry behaviour untested.
+```
+
+**Patterns to Mirror contract.** Write a `### Patterns to Mirror` sub-section inside `## Review Summary` listing real in-repo `file:line` references the implementer should copy. Use the format:
+
+```
+- `src/payments/gateway.ts:42` — error-handling pattern for external API timeouts.
+- `src/auth/jwt.ts:18` — token-validation guard the implementer should replicate.
+```
+
+If no relevant prior art exists in the repo, write the explicit escape bullet:
+
+```
+- No in-repo pattern to mirror — this introduces a new surface. → noted
+```
+
+Do NOT leave the section empty — use the escape bullet or list real references. Fabricating a `file:line` that does not exist is worse than the escape bullet.
+
+**No-op for research / spike / hotfix / Tier-1-fix** — these task types do not produce a full architect-authored `## Review Summary`. The Confidence Score and Patterns to Mirror are omitted for these types; Rule 12 is a no-op.
 
 **Decisions for human review** bullets — what belongs:
 - Irreversible or hard-to-reverse moves (data migrations, schema breakage, public API / contract changes, deletion of services).
@@ -1291,6 +1340,15 @@ If you find yourself with 0 bullets to list, write a single bullet `- No human-j
 
 ### Proposed Approach
 {1 paragraph: the chosen approach and, when approach_freedom:high, the material alternatives (one sentence each).}
+
+### Confidence Score
+**Confidence:** N/10 (single-pass)
+- {factor name}: {one sentence on how this factor influenced the score}
+- {factor name}: {one sentence on how this factor influenced the score}
+
+### Patterns to Mirror
+- `{path}:{line}` — {what pattern to copy}
+(or "- No in-repo pattern to mirror — this introduces a new surface. → noted")
 
 ### Risks
 | Risk | Severity | Mitigation |
@@ -1407,6 +1465,7 @@ output: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
 approach_freedom: high | low   # design mode only: high = material alternatives exist; low = one clear approach; orchestrator gates on this
 approach_alternatives: [alt1, alt2]   # design mode, approach_freedom:high only; omit when low
+confidence: N   # design mode only: 1-10 single-pass confidence; mirrors ### Confidence Score in the plan
 spec_seed_dissent: true | false   # design mode only: true when seeded approach was deficient and ### Architect Dissent on Seed was written; false or omit otherwise
 type_reclassify: false | true   # set to true only in root-cause mode when the bug is actually a feature gap; omit the line otherwise
 tier_promote: 2 | 3 | 4 | null   # set only in root-cause mode when the scope is wider than the initial classification; null/omit otherwise

@@ -463,23 +463,61 @@ if exists(api_sketch_path) and not is_trivially_empty(api_sketch_path):
 
 **Override:** the architect may NOT override Rule 11 to `fail`. The maximum severity is `concerns` by design; the override escape hatch does not apply.
 
+### Rule 12 — Confidence Score presence + justification
+
+**Gating:** Rule 12 fires for `type: feature | refactor | enhancement` and for `type: fix` Tier 2-4. For `type: hotfix`, `type: research`, `type: spike`, and `type: fix` Tier 1 this rule is a **no-op** — these task types are either self-authored (no architect rubric) or exploratory (no implementation commitment), and the Confidence Score contract does not apply.
+
+**What to check:**
+
+1. `01-plan.md § Review Summary` must contain a `### Confidence Score` sub-section.
+2. The sub-section must contain a line matching `**Confidence:** N/10 (single-pass)` where `N` is an integer between 1 and 10 (inclusive).
+3. The sub-section must contain ≥1 rationale bullet (`-` at start of line) that names at least one rubric factor (`spec clarity`, `prior art`, `blast radius`, or `unknowns`). A bare score with no rationale bullet is unjustified and triggers this rule.
+
+**Detection algorithm:**
+
+```
+if type in {hotfix, research, spike} or (type == fix and bug_tier == 1):
+    return  # no-op
+
+confidence_section = slice_section(review_summary, "### Confidence Score")
+
+if confidence_section is None or confidence_section.strip() == "":
+    findings.append(("Rule 12: ## Review Summary is missing ### Confidence Score sub-section", CONCERNS))
+    return
+
+score_line = re.search(r"\*\*Confidence:\*\*\s+\d+/10\s+\(single-pass\)", confidence_section)
+if score_line is None:
+    findings.append(("Rule 12: ### Confidence Score sub-section exists but missing the **Confidence:** N/10 (single-pass) score line", CONCERNS))
+
+rubric_keywords = ["spec clarity", "prior art", "blast radius", "unknowns"]
+has_rationale = any(kw in confidence_section.lower() for kw in rubric_keywords)
+if not has_rationale:
+    findings.append(("Rule 12: ### Confidence Score has a score line but no rationale bullet naming a rubric factor (spec clarity / prior art / blast radius / unknowns)", CONCERNS))
+```
+
+**Severity: always `concerns` — never `fail`.** The Confidence Score is the architect's self-assessment surface for the human reviewer, not a shape contract the system can mechanically verify as correct. A missing or unjustified score surfaces for the human at STAGE-GATE-1; it does not block the gate. This is the same fail-OPEN posture as Rule 11 (sketch completeness).
+
+**Override:** not applicable — Rule 12 is already `concerns`-only. No `Plan-reviewer override:` is needed or recognised for this rule; the combined verdict absorbs the concerns normally.
+
 ---
 
 ## Verdict Calibration
 
 | Verdict | When |
 |---|---|
-| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`; Rule 11 when applicable type). |
-| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, rule 11 sketch completeness (always `concerns`, never `fail`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
+| `pass` | Zero findings. All applicable rules satisfied (Rules 1-6 and 9 always; Rule 10 when `Consolidates:` is declared; Rules 7-8 when `type: fix | hotfix`; Rule 11 when applicable type; Rule 12 when applicable type). |
+| `concerns` | Findings exist but all are in rules 3, 4, 5 (document shape, cross-ref hygiene, identity declaration), rule 6 overflow/order (sections exist but bloated or out of order), rule 7 size overflow (>120 lines in `01-root-cause.md`), rule 10 `concerns`-level consolidation conditions, rule 11 sketch completeness (always `concerns`, never `fail`), rule 12 confidence score (always `concerns`, never `fail`), OR findings in rules 1, 2, 6-missing carry valid `Plan-reviewer override:` notes. The plan is structurally OK to be reviewed by the human; the orchestrator surfaces concerns and proceeds to STAGE-GATE-1. The human can still reject. |
 | `fail` | Any finding in rule 1 (PR-count), rule 2 (per-PR ACs), rule 6 missing-section without an override, rule 9 (stacked PR / invalid base), rule 10 `fail` escalation (production-code fusion in a `Consolidates:` PR), **rule 7 missing section / missing sub-field / invalid Test layer value / `manual-repro-script` value** (Bug-fix Flow), or **rule 8 missing regression-test AC reference** (Bug-fix Flow). These are core contract violations. The orchestrator routes back to architect with the list of findings and re-runs Phase 1.6 after the architect's revision. Counts toward iteration budget (max 3 round trips). |
 
-**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, 10 `concerns`, and rule 11 are not.
+**Tie-breaker:** when in doubt between `concerns` and `fail`, ask: "is this a rule the team set as 'must hold before human review'?" Rules 1, 2, 6-missing, 7-structural, 8, 9, and rule 10 `fail` escalation are; rules 3, 4, 5, 6-overflow/order, 7-size-overflow, 10 `concerns`, rule 11, and rule 12 are not.
 
 **Rules 7 and 8 are no-ops for non-bug-fix types.** When the task payload declares `type: feature | refactor | enhancement | research | spike`, Rules 7 and 8 do not fire (zero findings, no severity assigned). The plan-reviewer determines applicability from the `type` field passed in the task payload (sourced from `00-state.md`).
 
 **Rule 10 is a no-op when no PR declares `Consolidates:`.** The rule fires only when explicitly triggered by the architect's field declaration; a plan without `Consolidates:` is governed solely by Rules 1-9.
 
 **Rule 11 is always `concerns`-severity.** It mirrors the fail-OPEN design of `sketch-guard.sh`. Rule 11 never causes a `fail` verdict; the worst outcome is `concerns` escalating the combined verdict to `concerns` (not `fail`).
+
+**Rule 12 is always `concerns`-severity.** The Confidence Score is an advisory self-assessment — the plan-reviewer audits shape (presence + justification), not correctness (whether the number is right). Missing or unjustified score → `concerns`, never `fail`. No-op for `type: hotfix | research | spike` and `type: fix` Tier 1.
 
 ---
 
@@ -510,6 +548,8 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 | 8 — Regression test AC cross-ref (Bug-fix) | {N} | fail-blocking; no-op for non-fix |
 | 9 — No stacked PRs / base must be main | {N} | fail-blocking |
 | 10 — Multi-service consolidation | {N} | mixed (concerns default; fail when production code fused); no-op when no PR declares `Consolidates:` |
+| 11 — Sketch completeness | {N} | concerns; no-op for hotfix/Tier-0/research/spike |
+| 12 — Confidence Score | {N} | concerns; no-op for hotfix/Tier-1-fix/research/spike |
 | **Total** | **{N}** | — |
 
 ## Findings
@@ -570,6 +610,13 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 - 01-plan.md:{line} — PR-{id} declares `Consolidates:` but condition (e) is not established: the concerns would not collide on append-only files as separate PRs (CONCERNS).
 (or "Not applicable — no PR in § Task List declares `Consolidates:`. Rule 10 is a no-op.")
 (or "None — all `Consolidates:` PRs satisfy the five cumulative conditions.")
+
+### Rule 12 — Confidence Score
+- 01-plan.md: `### Confidence Score` sub-section missing from `## Review Summary` (CONCERNS).
+- 01-plan.md: `### Confidence Score` exists but the `**Confidence:** N/10 (single-pass)` score line is absent (CONCERNS).
+- 01-plan.md: `### Confidence Score` has a score line but no rationale bullet naming a rubric factor (`spec clarity` / `prior art` / `blast radius` / `unknowns`) (CONCERNS).
+(or "Not applicable — `type` is `hotfix | research | spike` or `fix` Tier 1. Rule 12 is a no-op.")
+(or "None — ### Confidence Score present with a valid score line and ≥1 rationale bullet.")
 
 ### Overrides honoured
 - PR-{id}: `Plan-reviewer override: <one-line justification>` on Rule {N}. Finding kept; severity degraded from fail to concerns.
@@ -641,6 +688,8 @@ findings:
   - rule-8: {count}    # Bug-fix Flow; reports 0 when type is not fix/hotfix
   - rule-9: {count}    # Always fires; stacked PRs / base ≠ main
   - rule-10: {count}   # Fires only when a PR declares `Consolidates:`; reports 0 otherwise
+  - rule-11: {count}   # Sketch completeness; no-op for hotfix/Tier-0/research/spike
+  - rule-12: {count}   # Confidence Score presence + justification; no-op for hotfix/Tier-1-fix/research/spike
 human_entry_points:
   tldr: {true|false}
   decisions_for_human_review: {true|false}

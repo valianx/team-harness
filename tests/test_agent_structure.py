@@ -21791,6 +21791,258 @@ check(
 # Marker: review-lenses
 
 # ---------------------------------------------------------------------------
+# Suite 97 — confidence-scored-plan
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 97: confidence-scored-plan ===")
+
+_s97_arch_text    = read(AGENTS_DIR / "architect.md")
+_s97_orch_text    = read(AGENTS_DIR / "orchestrator.md")
+_s97_pr_text      = read(AGENTS_DIR / "plan-reviewer.md")
+_s97_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
+_s97_claude_md    = read(REPO_ROOT / "CLAUDE.md")
+
+# Stop markers: stop at next heading or horizontal rule (same as suite 96)
+_S97_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# Anchor for the architect contract block
+_S97_ARCH_ANCHOR = "### Confidence Score & Patterns to Mirror"
+
+# Slice the architect contract section (stops at next ### or ## or ---)
+_s97_arch_slice = _slice_section(_s97_arch_text, _S97_ARCH_ANCHOR, _S97_STOP)
+
+check(
+    "suite97(anchor): agents/architect.md contains '### Confidence Score & Patterns to Mirror' contract section",
+    bool(_s97_arch_slice),
+    f"anchor '{_S97_ARCH_ANCHOR}' not found — suite97 checks 1-5 will fail",
+)
+
+# (1) Four rubric factor names present in the contract slice
+_S97_RUBRIC_FACTORS = ["spec clarity", "prior art", "blast radius", "unknowns"]
+check(
+    "suite97(1-rubric-factors): architect.md Confidence Score contract names all four rubric factors",
+    bool(_s97_arch_slice) and all(f in _s97_arch_slice.lower() for f in _S97_RUBRIC_FACTORS),
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must name all four rubric factors: {_S97_RUBRIC_FACTORS}",
+)
+
+# (2) Single-pass semantics: (single-pass) qualifier AND one-shot/STAGE-GATE-3/without rework
+_s97_single_pass_qualifier = bool(_s97_arch_slice) and "(single-pass)" in _s97_arch_slice
+_s97_single_pass_semantics = bool(_s97_arch_slice) and (
+    "one-shot" in _s97_arch_slice
+    or "STAGE-GATE-3" in _s97_arch_slice
+    or "without rework" in _s97_arch_slice
+)
+check(
+    "suite97(2-single-pass-semantics): architect.md Confidence Score contract contains '(single-pass)' qualifier",
+    _s97_single_pass_qualifier,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain the '(single-pass)' qualifier",
+)
+check(
+    "suite97(2b-single-pass-meaning): architect.md Confidence Score contract pins single-pass semantics phrase",
+    _s97_single_pass_semantics,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain 'one-shot', 'STAGE-GATE-3', or 'without rework' to anchor the score semantics",
+)
+
+# (3) Canonical score-line format: **Confidence:** and N/10
+check(
+    "suite97(3-score-line): architect.md Confidence Score contract contains '**Confidence:**' token",
+    bool(_s97_arch_slice) and "**Confidence:**" in _s97_arch_slice,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain the '**Confidence:**' score-line token",
+)
+check(
+    "suite97(3b-score-format): architect.md Confidence Score contract contains 'N/10' format token",
+    bool(_s97_arch_slice) and "N/10" in _s97_arch_slice,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must contain the 'N/10' score format token",
+)
+
+# (4) Three calibration band labels
+_S97_BANDS = ["8–10", "5–7", "1–4"]
+check(
+    "suite97(4-calibration-bands): architect.md Confidence Score contract names all three calibration bands",
+    bool(_s97_arch_slice) and all(b in _s97_arch_slice for b in _S97_BANDS),
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must name the three calibration bands: 8–10, 5–7, 1–4",
+)
+
+# (5) Patterns to Mirror: section heading + explicit escape bullet
+# The contract section is sliced to stop at next ### heading, so ### Patterns to Mirror
+# is a stop marker. Check it appears in the full contract block (wider slice).
+_S97_ARCH_WIDE_STOP = ("\n## ", "\n---\n")
+_s97_arch_wide = _slice_section(_s97_arch_text, _S97_ARCH_ANCHOR, _S97_ARCH_WIDE_STOP)
+check(
+    "suite97(5-patterns-heading): architect.md contract block contains '### Patterns to Mirror' sub-section",
+    bool(_s97_arch_wide) and "### Patterns to Mirror" in _s97_arch_wide,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must include '### Patterns to Mirror' sub-section heading",
+)
+check(
+    "suite97(5b-escape-bullet): architect.md contract block contains 'No in-repo pattern to mirror' escape bullet",
+    bool(_s97_arch_wide) and "No in-repo pattern to mirror" in _s97_arch_wide,
+    f"architect.md § '{_S97_ARCH_ANCHOR}' must document the explicit escape bullet 'No in-repo pattern to mirror'",
+)
+
+# (6) Template wiring: architect.md full template block (code-fence) contains both sub-sections.
+# The template is inside a ```markdown ... ``` fence; _slice_section stops at the first \n## inside
+# the fence, so we check file-wide occurrence after the template anchor (same as Suite 94 heading
+# checks that use direct "in" membership). Both sub-section headings are meaningful only after the
+# template anchor — verify they appear in the region after the anchor.
+_S97_TEMPLATE_ANCHOR = "### Full `01-plan.md` template"
+_s97_arch_after_template = (
+    _s97_arch_text[_s97_arch_text.find(_S97_TEMPLATE_ANCHOR):]
+    if _S97_TEMPLATE_ANCHOR in _s97_arch_text
+    else ""
+)
+check(
+    "suite97(6-template-confidence): architect.md region after 01-plan.md template anchor contains '### Confidence Score'",
+    bool(_s97_arch_after_template) and "### Confidence Score" in _s97_arch_after_template,
+    f"architect.md § '{_S97_TEMPLATE_ANCHOR}' region must include '### Confidence Score' sub-section",
+)
+check(
+    "suite97(6b-template-patterns): architect.md region after 01-plan.md template anchor contains '### Patterns to Mirror'",
+    bool(_s97_arch_after_template) and "### Patterns to Mirror" in _s97_arch_after_template,
+    f"architect.md § '{_S97_TEMPLATE_ANCHOR}' region must include '### Patterns to Mirror' sub-section",
+)
+
+# (7) Return Protocol status block: confidence: field
+_S97_STATUS_ANCHOR = "## Return Protocol"
+_S97_STATUS_STOP = ("\n## ", "\n---\n")
+_s97_return_slice = _slice_section(_s97_arch_text, _S97_STATUS_ANCHOR, _S97_STATUS_STOP)
+check(
+    "suite97(7-status-block): architect.md Return Protocol contains 'confidence:' field",
+    bool(_s97_return_slice) and "confidence:" in _s97_return_slice,
+    f"architect.md § '{_S97_STATUS_ANCHOR}' must contain a 'confidence:' field in the status block",
+)
+
+# (8) Orchestrator STAGE-GATE-1 STOP block: ── Confidence ── band AND **Confidence:**
+_S97_GATE1_ANCHOR = "## STAGE-GATE-1"
+_S97_GATE1_STOP = ("\n## ", "\n---\n")
+_s97_gate1_slice = _slice_section(_s97_orch_text, _S97_GATE1_ANCHOR, _S97_GATE1_STOP)
+check(
+    "suite97(8-orch-confidence-band): orchestrator.md STAGE-GATE-1 STOP block contains '── Confidence ──' band token",
+    bool(_s97_gate1_slice) and "── Confidence ──" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must contain the '── Confidence ──' band line in the STOP template",
+)
+check(
+    "suite97(8b-orch-confidence-line): orchestrator.md STAGE-GATE-1 STOP block contains '**Confidence:**' token",
+    bool(_s97_gate1_slice) and "**Confidence:**" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must render '**Confidence:**' in the confidence band",
+)
+
+# (9) Orchestrator rendering note: "Confidence: not stated" fallback + verbatim Review-Summary copy note
+check(
+    "suite97(9-not-stated-fallback): orchestrator.md STAGE-GATE-1 contains 'Confidence: not stated' fallback wording",
+    bool(_s97_gate1_slice) and "Confidence: not stated" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must document the 'Confidence: not stated' fallback",
+)
+check(
+    "suite97(9b-verbatim-copy-note): orchestrator.md STAGE-GATE-1 explains the score rides the verbatim Review-Summary copy",
+    bool(_s97_gate1_slice) and (
+        "verbatim" in _s97_gate1_slice and "Review Summary" in _s97_gate1_slice
+    ),
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' must note that the score already rides the verbatim Review-Summary copy",
+)
+
+# (10) plan-reviewer Rule 12 heading
+check(
+    "suite97(10-rule12-heading): plan-reviewer.md contains '### Rule 12 — Confidence Score presence + justification'",
+    "### Rule 12 — Confidence Score presence + justification" in _s97_pr_text,
+    "agents/plan-reviewer.md must define '### Rule 12 — Confidence Score presence + justification'",
+)
+
+# Slice Rule 12 section for subsequent checks
+_S97_RULE12_ANCHOR = "### Rule 12 — Confidence Score presence + justification"
+_S97_RULE12_STOP = ("\n## ", "\n### ", "\n---\n")
+_s97_rule12_slice = _slice_section(_s97_pr_text, _S97_RULE12_ANCHOR, _S97_RULE12_STOP)
+
+# (11) Rule 12 severity: concerns declared AND fail-OPEN language (never + fail)
+check(
+    "suite97(11-rule12-severity-concerns): plan-reviewer.md Rule 12 slice declares 'concerns' severity",
+    bool(_s97_rule12_slice) and "concerns" in _s97_rule12_slice,
+    f"agents/plan-reviewer.md § Rule 12 must declare 'concerns' severity",
+)
+check(
+    "suite97(11b-rule12-fail-open): plan-reviewer.md Rule 12 slice contains fail-OPEN language ('never' + 'fail')",
+    bool(_s97_rule12_slice) and "never" in _s97_rule12_slice and "fail" in _s97_rule12_slice,
+    f"agents/plan-reviewer.md § Rule 12 must use fail-OPEN language mirroring Rule 11",
+)
+
+# (12) Rule 12 no-op gating: names hotfix AND (Tier 1 OR research OR spike)
+_s97_rule12_has_hotfix = bool(_s97_rule12_slice) and "hotfix" in _s97_rule12_slice
+_s97_rule12_has_tier1_or_research = bool(_s97_rule12_slice) and (
+    "Tier 1" in _s97_rule12_slice
+    or "research" in _s97_rule12_slice
+    or "spike" in _s97_rule12_slice
+)
+check(
+    "suite97(12-rule12-noop-hotfix): plan-reviewer.md Rule 12 slice names 'hotfix' in no-op gating clause",
+    _s97_rule12_has_hotfix,
+    f"agents/plan-reviewer.md § Rule 12 must name 'hotfix' as a no-op case",
+)
+check(
+    "suite97(12b-rule12-noop-tier1): plan-reviewer.md Rule 12 slice names 'Tier 1' or 'research' or 'spike' in no-op gating",
+    _s97_rule12_has_tier1_or_research,
+    f"agents/plan-reviewer.md § Rule 12 must name 'Tier 1', 'research', or 'spike' in the no-op clause",
+)
+
+# (13) Summary table row: '12 — Confidence Score'
+check(
+    "suite97(13-summary-table-row): plan-reviewer.md ## Summary rules table contains '12 — Confidence Score' row",
+    "12 — Confidence Score" in _s97_pr_text,
+    "agents/plan-reviewer.md ## Summary rules table must contain a '12 — Confidence Score' row",
+)
+
+# (14) Findings template block: ### Rule 12 — Confidence Score findings block
+check(
+    "suite97(14-findings-block): plan-reviewer.md report template contains '### Rule 12 — Confidence Score' findings block",
+    "### Rule 12 — Confidence Score" in _s97_pr_text,
+    "agents/plan-reviewer.md report template must include a '### Rule 12 — Confidence Score' findings block",
+)
+
+# (15) Return Protocol: rule-12: line
+check(
+    "suite97(15-status-rule12): plan-reviewer.md Return Protocol contains 'rule-12:' field",
+    "rule-12:" in _s97_pr_text,
+    "agents/plan-reviewer.md Return Protocol status block must contain a 'rule-12:' field",
+)
+
+# (16) Verdict Calibration: Rule 12 stated as always concerns-severity
+_S97_VERDICT_ANCHOR = "## Verdict Calibration"
+_S97_VERDICT_STOP = ("\n## ", "\n---\n")
+_s97_verdict_slice = _slice_section(_s97_pr_text, _S97_VERDICT_ANCHOR, _S97_VERDICT_STOP)
+check(
+    "suite97(16-verdict-calibration): plan-reviewer.md Verdict Calibration states Rule 12 is always concerns-severity",
+    bool(_s97_verdict_slice) and (
+        "Rule 12" in _s97_verdict_slice
+        and "concerns" in _s97_verdict_slice
+    ),
+    f"agents/plan-reviewer.md § '{_S97_VERDICT_ANCHOR}' must document Rule 12 as always concerns-severity",
+)
+
+# (17) Self-referential registry: docs/testing.md contains 'Suite 97' AND 'confidence-scored-plan'
+check(
+    "suite97(h1-registry): docs/testing.md registers 'Suite 97' and 'confidence-scored-plan'",
+    "Suite 97" in _s97_testing_md and "confidence-scored-plan" in _s97_testing_md,
+    "docs/testing.md must register Suite 97 and the confidence-scored-plan marker (canonical suite registry)",
+)
+
+# (18) Hygiene guard: CLAUDE.md must NOT contain 'Suite 97'
+check(
+    "suite97(h2-hygiene): CLAUDE.md does NOT contain 'Suite 97'",
+    "Suite 97" not in _s97_claude_md,
+    "CLAUDE.md must not mention Suite 97 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (19) Suite-marker self-reference: this test file contains Suite 97, _slice_section, and confidence-scored-plan
+_s97_own_source = read(Path(__file__))
+check(
+    "suite97(h3-self-ref): this test file contains 'Suite 97', '_slice_section', and 'confidence-scored-plan'",
+    "Suite 97" in _s97_own_source
+    and "_slice_section" in _s97_own_source
+    and "confidence-scored-plan" in _s97_own_source,
+    "test file must reference Suite 97, _slice_section, and confidence-scored-plan (self-referential marker check)",
+)
+
+# Marker: confidence-scored-plan
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
