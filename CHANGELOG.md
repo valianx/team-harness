@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.93.0] - 2026-06-15
+
+### Added
+- `/th:save-session` + `/th:resume-session` skills: a confirmation-gated session handoff. `save-session` writes one `00-session-handoff.md` recording What Worked / What NOT to Retry / Next Step; `resume-session` is REPORT-only — it reads the handoff, touches no files, and never dispatches. Both are standalone (do not route through the orchestrator). Suite 101 (`session-handoff`).
+- KG overlap-gate (Save / Absorb / Drop verdict) on the `process-insight` capture path: before persisting an insight, existing knowledge is searched for overlap; Absorb fires only on a "same subject + same mechanism" match (additive observation, never a cross-merge), Drop skips on full coverage, Save persists the rest. Plus an operator-confirmed 30-day TTL freshness sweep for UNCONFIRMED entries in `/th:kg` (soft-delete via `mark_superseded`, reversible — never auto-deletes). Best-effort; technical-only. Suite 102 (`kg-overlap-gate-ttl`).
+- `/th:harness-audit` skill + `tests/harness_scorecard.py`: a deterministic, stdlib-only, non-LLM scorecard computing a 0–100 health score across 12 mechanically-checkable categories with a same-commit-same-score guarantee and a committed advisory baseline (`tests/harness_scorecard_baseline.json`) for drift tracking. REPORT-only. Wired into `tests/run-all.sh` as Suite 13 (informational, exit-0-unless-crash); the determinism + category contract is hard-gated by Suite 103 (`harness-scorecard`).
+- `/th:lint` quality + dedup lens (the skill was structural-only before): Check 9 (skill overlap / search-before-create — lexical name+description+keyword heuristic with an expected-overlap allowlist for the diagram/obsidian families) and Check 10 (per-skill quality quick-scan, optional `--changed`). Both advisory and never produce a FAIL rung, so a threshold miscalibration cannot block CI. A search-before-create note is added to `agent-builder.md`. Suite 104 (`skill-audit-lens`).
+- `docs/opencode-distribution-roadmap.md`: a forward-looking distribution-layer spec (design-only; the Go installer stays frozen) covering an adapter registry + format-shim, a two-layer install manifest with managed-ownership state, and a single data-home resolver (`TEAM_HARNESS_DATA_HOME` + `TH_DATA_HOME` alias) with a per-item specifiable-now-vs-defer assessment. Suite 105 (`opencode-distribution-roadmap`).
+
 ## [2.92.0] - 2026-06-15
 
 ### Added
