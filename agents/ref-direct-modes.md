@@ -253,6 +253,44 @@ The `### Publish Gate (preview-and-confirm)` section below defines the full cont
 
 **Anti-drift anchor:** Suite 57 in `tests/test_agent_structure.py` asserts the gate token at each of the three execution sites. A site that loses the gate turns the suite red.
 
+### Dual-Review Convergence
+
+The convergence protocol is an optional loop that wraps the existing per-pass consolidation flow. It applies when the review is Tier 4 (auto-on) or when the operator passes the `--converge` flag. For Tier 0–3 reviews without `--converge`, the single-pass path runs unchanged.
+
+**Trigger conditions (either is sufficient):**
+- PR classified as Tier 4 (security-sensitive paths or security keywords) — auto-on.
+- Operator passes `--converge` flag in the skill invocation — manual opt-in for high-risk non-Tier-4 PRs.
+
+**Loop contract:**
+
+Each convergence round dispatches **two isolated consolidated passes** — Pass A and Pass B. Each pass runs the tier-appropriate reviewer set through `reviewer-consolidator`, writing to disjoint suffixed draft paths (`.claude/pr-review-final-A.md` / `.claude/pr-review-inline-A.json` for Pass A; `-B` equivalents for Pass B). The two passes run concurrently. They never read each other's drafts — context-isolation between the two passes is mandatory and enforced by the dispatch contract (each pass receives only the original diff, policy, and PR metadata from the current round).
+
+**Comparator — three branches:**
+1. Both passes emit `APPROVE` → verdict is `CONVERGED_APPROVE`. Proceed to the existing Publish Gate.
+2. Both passes emit `REQUEST_CHANGES` → verdict is `CONVERGED_CHANGES`. Proceed to the existing Publish Gate with a `REQUEST_CHANGES` event.
+3. Passes diverge (one `APPROVE`, one `REQUEST_CHANGES`):
+   - If `round < 3`: run a **fresh round**. Round-N reviewers receive ONLY the original diff/policy/conversation — no artifacts from any prior round are passed forward. Freshness is mandatory; prior-round outputs must not appear in the next round's dispatch.
+   - If `round == 3` and still divergent: **STOP and escalate** both review bodies to the operator with a structured comparison. The system never auto-resolves a divergence by picking a winner between the two passes. The operator decides.
+
+**Hard cap:** max 3 rounds. Round counting begins at 1. Escalation on round-3 divergence is unconditional.
+
+**Pre-gate positioning:** Convergence runs strictly BEFORE the Publish Gate. The loop never calls a GitHub write verb (`gh pr review`, `POST /reviews`, `PUT`, `POST /comments`, or any equivalent). Writing to GitHub is the sole responsibility of the Publish Gate after operator approval.
+
+**Round-state recording:**
+- `00-state.md` carries a `convergence` block: `round`, `last_verdict_A`, `last_verdict_B`, `status` (`running` / `converged` / `escalated`).
+- The execution-events trace receives a `review.convergence.round` event for each round, carrying `round`, `verdict_A`, `verdict_B`, and `outcome` (`converged_approve` / `converged_changes` / `divergent_continue` / `divergent_escalate`).
+
+**Escalation format (round-3 divergent STOP block):**
+```
+STOP — Dual-Review Convergence: reviewer disagreement after 3 rounds.
+Pass A verdict: {APPROVE | REQUEST_CHANGES}
+Pass B verdict: {APPROVE | REQUEST_CHANGES}
+Pass A body: {.claude/pr-review-final-A.md}
+Pass B body: {.claude/pr-review-final-B.md}
+Action required: operator reviews both bodies and decides the final verdict.
+The system cannot auto-resolve this disagreement. Resume with the chosen verdict.
+```
+
 ## Read-Only Working-Tree Guard
 
 This guard applies to the `review` direct mode running over the operator's active repository. It does NOT apply to the `/th:review-pr` skill flow, which already runs in a separate worktree with a cleanup trap (`skills/review-pr/SKILL.md:71-78`) and does not mutate the operator's checkout.

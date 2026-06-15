@@ -22043,6 +22043,249 @@ check(
 # Marker: confidence-scored-plan
 
 # ---------------------------------------------------------------------------
+# Suite 98 — dual-review-convergence
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 98: dual-review-convergence structural contract ===")
+
+_s98_consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
+_s98_ref_modes    = read(AGENTS_DIR / "ref-direct-modes.md")
+_s98_skill        = read(skill_path("review-pr"))
+_s98_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
+_s98_claude_md    = read(REPO_ROOT / "CLAUDE.md")
+
+_S98_STOP = ("\n## ", "\n### ", "\n---\n")
+
+# ── Consolidator section ──────────────────────────────────────────────────
+
+_S98_CONSOL_ANCHOR = "## Dual-Review Convergence"
+_s98_consol_slice = _slice_section(_s98_consolidator, _S98_CONSOL_ANCHOR, _S98_STOP)
+
+# (1) consolidator-section: heading present
+check(
+    "suite98(1-consolidator-section): agents/reviewer-consolidator.md contains '## Dual-Review Convergence' heading",
+    bool(_s98_consol_slice),
+    f"anchor '{_S98_CONSOL_ANCHOR}' not found — suite98 checks 2-4 will fail",
+)
+
+# (2) consolidator-pass-field: Convergence Pass: dispatch field documented
+check(
+    "suite98(2-consolidator-pass-field): consolidator section documents 'Convergence Pass:' dispatch field (pass A / pass B)",
+    bool(_s98_consol_slice) and "Convergence Pass:" in _s98_consol_slice and (
+        "Pass A" in _s98_consol_slice or "pass A" in _s98_consol_slice
+    ) and (
+        "Pass B" in _s98_consol_slice or "pass B" in _s98_consol_slice
+    ),
+    "consolidator '## Dual-Review Convergence' must document the 'Convergence Pass:' dispatch field with A and B values",
+)
+
+# (3) consolidator-isolation: isolation rule — never read sibling pass drafts
+check(
+    "suite98(3-consolidator-isolation): consolidator section documents isolation rule (never read sibling -A/-B drafts)",
+    bool(_s98_consol_slice) and (
+        "-A" in _s98_consol_slice or "-B" in _s98_consol_slice
+    ) and (
+        "isolation" in _s98_consol_slice.lower()
+        or "never read" in _s98_consol_slice.lower()
+        or "Do NOT read" in _s98_consol_slice
+    ),
+    "consolidator '## Dual-Review Convergence' must document the isolation rule (never read sibling pass's -A/-B drafts)",
+)
+
+# (4) consolidator-status-field: convergence_pass: field in status block
+check(
+    "suite98(4-consolidator-status-field): consolidator section documents 'convergence_pass:' status-block field",
+    bool(_s98_consol_slice) and "convergence_pass:" in _s98_consol_slice,
+    "consolidator '## Dual-Review Convergence' must document the 'convergence_pass: A | B' status-block field",
+)
+
+# ── Orchestrator sub-section ──────────────────────────────────────────────
+
+_S98_ORCH_ANCHOR = "### Dual-Review Convergence"
+_s98_orch_slice = _slice_section(_s98_ref_modes, _S98_ORCH_ANCHOR, _S98_STOP)
+
+# (5) orchestrator-subsection: heading present in ref-direct-modes.md
+check(
+    "suite98(5-orchestrator-subsection): agents/ref-direct-modes.md contains '### Dual-Review Convergence' sub-section",
+    bool(_s98_orch_slice),
+    f"anchor '{_S98_ORCH_ANCHOR}' not found in ref-direct-modes.md — suite98 checks 6-12 will fail",
+)
+
+# (6) orch-both-approve: both-must-APPROVE rule
+check(
+    "suite98(6-orch-both-approve): orchestrator sub-section documents both-must-APPROVE convergence rule",
+    bool(_s98_orch_slice) and "APPROVE" in _s98_orch_slice and (
+        "both" in _s98_orch_slice.lower() or "Both" in _s98_orch_slice
+    ) and "CONVERGED_APPROVE" in _s98_orch_slice,
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the both-must-APPROVE rule and CONVERGED_APPROVE outcome",
+)
+
+# (7) orch-isolation: context-isolation between the two passes
+check(
+    "suite98(7-orch-isolation): orchestrator sub-section documents context-isolation between passes",
+    bool(_s98_orch_slice) and (
+        "context-isolation" in _s98_orch_slice
+        or "isolation" in _s98_orch_slice.lower()
+    ) and (
+        "original diff" in _s98_orch_slice
+        or "only the original" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document context-isolation (passes receive only original inputs)",
+)
+
+# (8) orch-fresh-rounds: fresh-each-round rule (no prior-round artifacts)
+check(
+    "suite98(8-orch-fresh-rounds): orchestrator sub-section documents fresh-each-round rule (no prior-round artifacts)",
+    bool(_s98_orch_slice) and (
+        "fresh" in _s98_orch_slice.lower() or "Freshness" in _s98_orch_slice
+    ) and (
+        "prior" in _s98_orch_slice.lower() or "no artifacts" in _s98_orch_slice.lower()
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the fresh-each-round rule (no prior-round artifacts forwarded)",
+)
+
+# (9) orch-max-3: max 3 rounds hard cap
+check(
+    "suite98(9-orch-max-3): orchestrator sub-section documents max 3 rounds hard cap",
+    bool(_s98_orch_slice) and (
+        "max 3 rounds" in _s98_orch_slice
+        or "max 3" in _s98_orch_slice
+        or "3 rounds" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the max 3 rounds hard cap",
+)
+
+# (10) orch-escalate-no-autoresolve: STOP-and-escalate + never auto-resolve
+check(
+    "suite98(10-orch-escalate-no-autoresolve): orchestrator sub-section documents STOP-and-escalate and never-auto-resolve",
+    bool(_s98_orch_slice) and (
+        "escalate" in _s98_orch_slice.lower() or "STOP" in _s98_orch_slice
+    ) and (
+        "never auto-resolve" in _s98_orch_slice
+        or "never auto" in _s98_orch_slice.lower()
+        or "cannot auto-resolve" in _s98_orch_slice
+        or "does not auto-resolve" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document STOP-and-escalate and an explicit never-auto-resolve clause",
+)
+
+# (11) orch-before-gate: convergence runs BEFORE the Publish Gate, never calls write verb
+check(
+    "suite98(11-orch-before-gate): orchestrator sub-section states convergence runs BEFORE Publish Gate and never calls write verb",
+    bool(_s98_orch_slice) and (
+        "BEFORE" in _s98_orch_slice or "before" in _s98_orch_slice
+    ) and "Publish Gate" in _s98_orch_slice and (
+        "never calls" in _s98_orch_slice.lower()
+        or "never call" in _s98_orch_slice.lower()
+        or "never publishes" in _s98_orch_slice.lower()
+        or "write verb" in _s98_orch_slice.lower()
+        or "GitHub write verb" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must state convergence runs BEFORE the Publish Gate and never calls a GitHub write verb",
+)
+
+# (12) orch-state-record: convergence block in 00-state.md + review.convergence.round event
+check(
+    "suite98(12-orch-state-record): orchestrator sub-section documents convergence block in 00-state.md and review.convergence.round event",
+    bool(_s98_orch_slice) and "00-state.md" in _s98_orch_slice and "convergence" in _s98_orch_slice and (
+        "review.convergence.round" in _s98_orch_slice
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must document the 00-state.md convergence block and review.convergence.round event",
+)
+
+# ── Skill flag + loop ──────────────────────────────────────────────────────
+
+_S98_FLAG_ANCHOR = "## Flag parsing"
+_s98_flag_slice = _slice_section(_s98_skill, _S98_FLAG_ANCHOR, _S98_STOP)
+
+# (13) skill-converge-flag: --converge flag documented in Flag parsing
+check(
+    "suite98(13-skill-converge-flag): skills/review-pr/SKILL.md Flag-parsing section documents '--converge' flag",
+    bool(_s98_flag_slice) and "--converge" in _s98_flag_slice,
+    "skills/review-pr/SKILL.md '## Flag parsing' section must document the '--converge' flag",
+)
+
+# (14) skill-tier4-autoon: Tier 4 auto-on using existing tier classification
+_S98_CONV_ANCHOR = "### Phase 3.1 — Dual-Review Convergence"
+_s98_conv_slice = _slice_section(_s98_skill, _S98_CONV_ANCHOR, _S98_STOP)
+
+check(
+    "suite98(14-skill-tier4-autoon): skill convergence section documents Tier 4 auto-on using existing tier classification (no new keyword list)",
+    bool(_s98_conv_slice) and "Tier 4" in _s98_conv_slice and (
+        "auto-on" in _s98_conv_slice or "auto_on" in _s98_conv_slice or "auto-enabled" in _s98_conv_slice
+        or "automatically sets" in _s98_conv_slice
+    ) and (
+        "existing" in _s98_conv_slice.lower() or "no new keyword" in _s98_conv_slice.lower()
+    ),
+    "skills/review-pr/SKILL.md convergence section must document Tier 4 auto-on referencing the EXISTING tier classification (no new keyword list)",
+)
+
+# (15) skill-loop-branches: round < 3 fresh-round branch AND round == 3 escalation STOP
+check(
+    "suite98(15-skill-loop-branches): skill convergence section documents round < 3 fresh-round branch and round == 3 escalation STOP",
+    bool(_s98_conv_slice) and (
+        "round < 3" in _s98_conv_slice or "convergence_round < 3" in _s98_conv_slice
+    ) and (
+        "round == 3" in _s98_conv_slice or "convergence_round == 3" in _s98_conv_slice
+    ) and (
+        "STOP" in _s98_conv_slice and "escalate" in _s98_conv_slice.lower()
+    ),
+    "skills/review-pr/SKILL.md convergence section must document both the 'round < 3' fresh-round branch and the 'round == 3' escalation STOP",
+)
+
+# (16) skill-state-and-cleanup: .claude/pr-review-convergence.json recorded AND -A/-B drafts in cleanup list
+check(
+    "suite98(16-skill-state-and-cleanup): skill documents pr-review-convergence.json AND -A/-B draft files in cleanup trap",
+    "pr-review-convergence.json" in _s98_skill and (
+        "pr-review-final-A.md" in _s98_skill or "pr-review-*-A" in _s98_skill
+    ) and (
+        "pr-review-final-B.md" in _s98_skill or "pr-review-*-B" in _s98_skill
+    ),
+    "skills/review-pr/SKILL.md must document .claude/pr-review-convergence.json round-state AND -A/-B draft files in the cleanup trap",
+)
+
+# ── Registry + hygiene ────────────────────────────────────────────────────
+
+# (17) registry: docs/testing.md registers Suite 98 and dual-review-convergence marker
+check(
+    "suite98(17-registry): docs/testing.md registers 'Suite 98' and 'dual-review-convergence' marker",
+    "Suite 98" in _s98_testing_md and "dual-review-convergence" in _s98_testing_md,
+    "docs/testing.md must register Suite 98 and the dual-review-convergence marker (canonical suite registry)",
+)
+
+# (18) hygiene: CLAUDE.md must NOT contain 'Suite 98'
+check(
+    "suite98(18-hygiene): CLAUDE.md does NOT contain 'Suite 98'",
+    "Suite 98" not in _s98_claude_md,
+    "CLAUDE.md must not mention Suite 98 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (19) self-non-invocation: this file's non-comment source contains no Agent( or subagent_type token
+_s98_own_source = read(Path(__file__))
+_s98_non_comment_lines = [
+    line for line in _s98_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s98_non_comment_text = "\n".join(_s98_non_comment_lines)
+check(
+    "suite98(19-no-agent-call): Suite 98 non-comment source contains no 'Agent(' or 'subagent_type' token (free suite guarantee)",
+    "Agent(" not in _s98_non_comment_text[_s98_non_comment_text.rfind("Suite 98"):]
+    and "subagent_type" not in _s98_non_comment_text[_s98_non_comment_text.rfind("Suite 98"):],
+    "Suite 98 is a free structural suite — its non-comment source must not invoke Agent() or subagent_type",
+)
+
+# (20) self-ref: this test file contains Suite 98, _slice_section, and dual-review-convergence
+check(
+    "suite98(20-self-ref): this test file contains 'Suite 98', '_slice_section', and 'dual-review-convergence'",
+    "Suite 98" in _s98_own_source
+    and "_slice_section" in _s98_own_source
+    and "dual-review-convergence" in _s98_own_source,
+    "test file must reference Suite 98, _slice_section, and dual-review-convergence (self-referential marker check)",
+)
+
+# Marker: dual-review-convergence
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
