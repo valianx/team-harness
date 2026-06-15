@@ -94,6 +94,16 @@ Ask the operator for the default language for agent responses and workspace pros
 - If the operator presses Enter without input, keep the existing value (or `en` if none is set).
 - Persist the chosen value as the `language` key in `~/.claude/.team-harness.json` via **merge-write of the complete document**: read the full JSON, replace or add only the `language` key, write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, and all other existing keys.
 
+### 3.6. Configure english-learning correction mode
+
+Ask the operator whether to enable the english-learning correction mode. This mode — when ON — gives the operator a brief, low-key English correction signal at the start of each reply when the message is written in English. It is opt-in and off by default.
+
+- **Prompt:** `Enable english-learning correction mode? [y/N]` (default: N — off)
+- Show the current configured value from `~/.claude/.team-harness.json` `english_learning` field (if present) as the default hint.
+- Accept `y` (enable) or `n`/Enter (disable / keep off).
+- On `y`: persist `english_learning: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `english_learning` key (set to `true`), write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `language`, `files`, `clickup`, `pricing`, and all other existing keys.
+- On `n`/Enter: if no prior `english_learning` key existed, omit the key entirely (absence of the key means mode OFF — matching the `language` omit-when-blank rule). If a prior value of `true` existed and the operator declines, write `english_learning: false` to clear it.
+
 ### 4a. Write orchestrator dispatch rule
 
 Read the canonical block from `managed-blocks/orchestrator-dispatch-rule.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/orchestrator-dispatch-rule.md`).
@@ -116,6 +126,8 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 **Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
 
 **Language propagation.** The configured `language` governs two surfaces: (a) pipeline dispatch — when dispatching the orchestrator, resolve the operator's language using the 4-level precedence chain and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` Precedence: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from the operator's first message → (4) `en`; (b) non-pipeline sessions — the `session-start.sh` unified SessionStart hook reads the same config key and injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence over the hook directive for that session. This ensures both pipeline agents and ordinary conversational turns respond in the operator's configured language.
+
+**English-learning mode propagation.** The `english_learning` boolean in `~/.claude/.team-harness.json` is set the same way as `language`: via `/th:setup` Step 3.6, or via a chat toggle with a persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) routed through the orchestrator's Y/n confirmation gate. A chat toggle WITHOUT a persistence marker applies as a session-only override recorded in `00-state.md` only — the config file is never written without an explicit persistence signal. This key is NOT in the session-override whitelist; it requires the persistence-marker + Y/n gate to become permanent.
 
 **Outward-action gate.** Outward actions (git push, gh pr merge/review/comment, GitHub API writes, ClickUp MCP writes) require explicit operator approval via the deterministic gate `hooks/dev-guard.sh`, which fires UNCONDITIONALLY. The agent cannot auto-approve these actions. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 
@@ -169,13 +181,16 @@ Write `~/.claude/.team-harness.json` with:
   "logs-mode": "<local|obsidian>",
   "logs-path": "<vault path or empty>",
   "logs-subfolder": "<subfolder or empty>",
-  "language": "<ISO 639-1 code, e.g. 'en' or 'es'; omit key if not configured>"
+  "language": "<ISO 639-1 code, e.g. 'en' or 'es'; omit key if not configured>",
+  "english_learning": "<true|false; omit key if not configured>"
 }
 ```
 
-Preserve ALL existing fields (like `files`, `clickup`, `pricing`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, and any other operator-configured key.
+Preserve ALL existing fields (like `files`, `clickup`, `pricing`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, and any other operator-configured key.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
+
+The `english_learning` key is written only when the operator answered in Step 3.6; if they declined and no prior value existed, omit the key entirely (absence of the key means mode OFF, which is the default).
 
 ### 6. Verify connectivity
 

@@ -973,6 +973,8 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | inicializar, init, bootstrap | `init` | write |
    | **(b) language-persistent-default-set** — "configurá/configura el idioma por defecto en X", "poné el idioma por defecto en X", "set my default language to X", "make X my default language", "siempre respondé en X", or any language request with an explicit persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) | **language-set** (persistent) | write |
    | **(c) language-session-override** — "respondé en X por ahora", "switch to X", "en X esta vez", "answer in X now", "for this session use X", or any language request WITHOUT an explicit persistence marker | **language-set** (ephemeral) | write |
+   | **(b′) english-learning-persistent-set** — "activá el modo de corrección de inglés por defecto", "turn on english learning por defecto", "enable english learning permanently", "enable english-learning mode", or any english-learning toggle WITH an explicit persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) | **english-learning-set** (persistent) | write |
+   | **(c′) english-learning-session-toggle** — "turn on english learning for now", "enable english correction this session", "activá corrección de inglés", or any english-learning toggle WITHOUT an explicit persistence marker | **english-learning-set** (ephemeral) | write |
    | crear/diseñar/mejorar un agente o skill, create/design/improve an agent or skill, "nuevo agente", "new agent", "build a skill", "build an agent" | `/th:agent-builder` skill flow | write |
    | feature, fix, bug, refactor, enhancement, hotfix, implementar, solucionar, arreglar, corregir, fixear, debuguear, regresión, error, "corrija un bug", "haga un fix", "haga un hotfix", "corregir error", "arreglar el bug", "hay un bug en X", "está rompiendo", "no funciona Y", "error en Z" | **full pipeline** | write |
    | ambiguous / mixed concerns | **unclear** | — |
@@ -995,6 +997,18 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - On **Y**: perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `language` key, write the whole document back (never a partial payload). Then update `operator_language` in `00-state.md § Current State` for the current session.
      - On **n**: offer to apply the change as an ephemeral session override instead (intent (c) path). Do NOT write the config file.
    - **(c) Session-override** (no persistence marker, or ephemeral marker present): update only `operator_language` in `00-state.md § Current State`. Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
+
+   **English-learning-set intent handling.** When the intent matches an `english-learning-set` row:
+
+   - **(b′) Persistent-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
+     ```
+     About to set english-learning correction mode to "<on|off>" (persistent write to ~/.claude/.team-harness.json).
+     This affects all future sessions. The current session also switches to "<on|off>".
+     Confirm? [Y/n]:
+     ```
+     - On **Y**: perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `true` or `false`), write the whole document back (never a partial payload). Then record the session state in `00-state.md § Current State` under an `english_learning` field.
+     - On **n**: offer to apply the change as an ephemeral session-only override instead (intent (c′) path). Do NOT write the config file.
+   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only (`english_learning: true|false`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
 
    **Step 6b — Route based on category:**
 
