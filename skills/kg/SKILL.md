@@ -134,6 +134,52 @@ name: kg
 4. Ask user: "Soft-delete (archive observations) any of these? List entity names separated by commas, or 'none'."
 5. If user confirms → for each entity, call Knowledge Graph MCP `mark_superseded(old=<name>, new=<name>, archive_old_observations=true, reason="prune: stale per /th:kg prune <date>")`. The self-supersedes pattern (`old == new`) marks the node archived without inventing a replacement — confirm the MCP backend accepts this; otherwise fall back to creating a placeholder entity `archived-<name>` of type `process-insight` with a single observation `"Archived: superseded entry for <name>, no replacement"` and use that as `new`.
 
+## TTL freshness sweep
+
+**Scope: `process-insight` nodes only.** Other entity types (`pattern`, `decision`,
+`constraint`, etc.) represent durable knowledge and remain governed by the existing
+6-month general-staleness rule, not this 30-day freshness rule.
+
+**Freshness rule:** a `process-insight` entry is a TTL candidate when:
+1. Its NEWEST dated observation (any observation carrying a `YYYY-MM-DD` date token) is
+   ≥30 days old relative to the current run date, AND
+2. None of its observations carries a `confirmed: YYYY-MM-DD` token.
+
+The "newest dated observation" clock means any Absorb — including a confirmation Absorb
+from a later delivery run — refreshes freshness and resets the TTL window.
+
+**Date-less entries:** reported separately as "cannot assess freshness (no date)" — never
+auto-flagged as TTL-stale. Mirrors the existing prune behavior for date-less nodes.
+
+**MCP unreachable:** report "Knowledge Graph MCP unreachable — no TTL action taken" and
+perform no write. Best-effort, graceful skip.
+
+**Action:** all TTL candidates are operator-confirmed before any deletion. Present the
+candidate list and ask the operator which entries to soft-delete (same gate as `prune`).
+For each confirmed entry, call:
+```
+mark_superseded(
+  old=<name>,
+  new=<name>,
+  archive_old_observations=true,
+  reason="ttl-prune: unconfirmed >30d per /th:kg prune <date>"
+)
+```
+The self-supersedes pattern archives the node's observations without inventing a
+replacement. Reversible — observations are archived, the node and its relations stay
+queryable. Never auto-deletes.
+
+**Candidate display block** (added to the existing `prune` candidate list):
+```
+Unconfirmed (>30 days, process-insight only):
+- {entity-name} — newest date: {date}, no confirmed: token
+```
+
+**When running `/th:kg prune`:** after displaying the standard stale/duplicate/no-date
+candidates, append the TTL candidate block above. The combined list is shown once before
+the operator is asked to confirm deletions. The existing "Ask user: … or 'none'"
+confirmation gate covers all categories including TTL candidates.
+
 ### `consolidate` — Merge similar entities via `mark_superseded`
 
 1. Use Knowledge Graph MCP `read_graph` (or `find_conflicts` per node for targeted audits)

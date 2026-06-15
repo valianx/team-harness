@@ -22997,6 +22997,759 @@ check(
 # Marker: session-handoff
 
 # ---------------------------------------------------------------------------
+# Suite 102 — kg-overlap-gate-ttl
+# ---------------------------------------------------------------------------
+print("\n=== Suite 102: kg-overlap-gate-ttl ===")
+
+_s102_policy = read(AGENTS_DIR / "_shared" / "kg-write-policy.md")
+_s102_delivery = read(AGENTS_DIR / "delivery.md")
+_s102_kg_skill = read(REPO_ROOT / "skills" / "kg" / "SKILL.md")
+_s102_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s102_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s102_own_source = read(Path(__file__))
+_S102_STOP = ("\n## ", "\n---\n")
+_s102_policy_slice = _slice_section(_s102_policy, "## Overlap gate (Save / Absorb / Drop verdict)", _S102_STOP)
+
+# (1) kg-write-policy.md contains the overlap-gate section (anchor-scoped — missing anchor → empty slice → fail)
+check(
+    "suite102(1-policy-section)",
+    len(_s102_policy_slice) > 0,
+    "agents/_shared/kg-write-policy.md must contain '## Overlap gate (Save / Absorb / Drop verdict)' section",
+)
+
+# (2) All three verdicts named in the section
+check(
+    "suite102(2-three-verdicts)",
+    "Save" in _s102_policy_slice and "Absorb" in _s102_policy_slice and "Drop" in _s102_policy_slice,
+    "Overlap gate section must name all three verdicts: Save, Absorb, Drop",
+)
+
+# (3) Drop is defined as skip-on-full-coverage-with-no-new-content
+check(
+    "suite102(3-drop-semantics)",
+    "Drop" in _s102_policy_slice and (
+        "no new observation" in _s102_policy_slice
+        or "adds NO new" in _s102_policy_slice
+        or "pure restatement" in _s102_policy_slice
+    ),
+    "Drop verdict must be defined as skip when existing node fully covers candidate with no new observation",
+)
+
+# (4) Absorb maps to add_observations (not a new MCP call)
+check(
+    "suite102(4-absorb-add-observations)",
+    "Absorb" in _s102_policy_slice and "add_observations" in _s102_policy_slice,
+    "Absorb verdict must map to add_observations MCP call",
+)
+
+# (5) Confirmation-observation convention documented with the dated token
+check(
+    "suite102(5-confirmation-token)",
+    "confirmed:" in _s102_policy_slice and "YYYY-MM-DD" in _s102_policy_slice,
+    "Overlap gate section must document confirmed: YYYY-MM-DD confirmation-observation convention",
+)
+
+# (6) Same-node_type-only isolation restated in the new section
+check(
+    "suite102(6-no-cross-merge)",
+    (
+        "process-insight" in _s102_policy_slice
+        and ("error" in _s102_policy_slice or "pattern" in _s102_policy_slice)
+        and ("cross-merge" in _s102_policy_slice or "same" in _s102_policy_slice)
+    ),
+    "Overlap gate section must restate same-node_type-only isolation (no cross-merge between process-insight and error/pattern)",
+)
+
+# (7) Best-effort failure clause present (search error → Save; never block)
+check(
+    "suite102(7-best-effort-policy)",
+    (
+        "search_nodes" in _s102_policy_slice
+        and (
+            "never block" in _s102_policy_slice
+            or "best-effort" in _s102_policy_slice
+            or ("proceed" in _s102_policy_slice and "Save" in _s102_policy_slice)
+        )
+    ),
+    "Overlap gate section must carry best-effort failure clause: search_nodes error → Save, never block pipeline",
+)
+
+# (8) delivery Step 11.5 pointer names the overlap-gate section
+check(
+    "suite102(8-delivery-pointer)",
+    "Overlap gate" in _s102_delivery,
+    "agents/delivery.md must reference the 'Overlap gate' section in Step 11.5",
+)
+
+# (9) delivery log vocabulary carries the Drop outcome
+check(
+    "suite102(9-delivery-drop-outcome)",
+    "overlap-drop" in _s102_delivery or "drop:" in _s102_delivery,
+    "agents/delivery.md kg_passive_capture log vocabulary must include a Drop outcome (overlap-drop or drop:)",
+)
+
+# (10) delivery frontmatter tools: line did NOT gain mark_superseded
+_s102_delivery_tools_slice = _slice_section(_s102_delivery, "tools:", ("\n",))
+check(
+    "suite102(10-delivery-tools-unchanged)",
+    "mark_superseded" not in _s102_delivery_tools_slice,
+    "agents/delivery.md frontmatter tools: line must NOT include mark_superseded (overlap-gate reuses existing tools)",
+)
+
+# (11) /th:kg skill contains the TTL freshness sweep sub-section
+check(
+    "suite102(11-ttl-section)",
+    "TTL freshness sweep" in _s102_kg_skill,
+    "skills/kg/SKILL.md must contain a 'TTL freshness sweep' sub-section",
+)
+
+# (12) TTL window scoped to UNCONFIRMED process-insight — 30-day window
+_ttl_slice = _slice_section(_s102_kg_skill, "## TTL freshness sweep", _S102_STOP)
+check(
+    "suite102(12-ttl-window-and-scope)",
+    (
+        "30" in _ttl_slice
+        and "process-insight" in _ttl_slice
+        and ("confirmed" in _ttl_slice or "UNCONFIRMED" in _ttl_slice)
+    ),
+    "TTL freshness sweep must scope a 30-day UNCONFIRMED window to process-insight nodes",
+)
+
+# (13) TTL flagged entries route through operator-confirmed reversible soft-delete; never auto-delete
+check(
+    "suite102(13-ttl-soft-delete-gated)",
+    (
+        "mark_superseded" in _ttl_slice
+        and ("operator" in _ttl_slice or "confirm" in _ttl_slice)
+        and ("reversible" in _ttl_slice or "archive_old_observations" in _ttl_slice)
+    ),
+    "TTL sweep must use operator-confirmed reversible mark_superseded soft-delete — never auto-deletes",
+)
+
+# (14) docs/testing.md registers Suite 102 + marker
+check(
+    "suite102(14-registry)",
+    "Suite 102" in _s102_testing_md and "kg-overlap-gate-ttl" in _s102_testing_md,
+    "docs/testing.md must register Suite 102 and the kg-overlap-gate-ttl marker",
+)
+
+# (15) CLAUDE.md does NOT mention Suite 102 (§11 hygiene contract)
+check(
+    "suite102(15-hygiene)",
+    "Suite 102" not in _s102_claude_md,
+    "CLAUDE.md must NOT mention Suite 102 (§11 hygiene contract — canonical registry is docs/testing.md only)",
+)
+
+# (16) Self-referential marker guard
+check(
+    "suite102(16-self-ref)",
+    (
+        "Suite 102" in _s102_own_source
+        and "_slice_section" in _s102_own_source
+        and "kg-overlap-gate-ttl" in _s102_own_source
+    ),
+    "test file must contain 'Suite 102', '_slice_section', and 'kg-overlap-gate-ttl' (self-referential marker guard)",
+)
+
+# Marker: kg-overlap-gate-ttl
+
+# ---------------------------------------------------------------------------
+# Suite 103 — harness-scorecard structural assertions
+# ---------------------------------------------------------------------------
+# Checks:
+#   (1)  scorer-exists — tests/harness_scorecard.py on disk
+#   (2)  skill-exists  — skills/harness-audit/SKILL.md on disk
+#   (3)  baseline-exists — tests/harness_scorecard_baseline.json valid JSON
+#   (4)  determinism — two subprocess runs of --json produce byte-identical stdout
+#   (5)  category-set-present — exactly 12 expected category keys, no more no fewer
+#   (6)  no-forbidden-imports — scorer contains none of the determinism-hazard tokens
+#   (7)  report-only — the only open("w") / write_text / Path.write in scorer is
+#        guarded by --write-baseline and targets only harness_scorecard_baseline.json
+#   (8)  max-total-pinned — scorer max_total equals 102
+#   (9)  skill-report-only — skill declares REPORT-only, no --fix/--apply/auto-remediat,
+#        no orchestrator invocation, includes ## Voice and ## Output Discipline
+#   (10) skill-th-native — skill names no external project/method (provenance guard)
+#   (11) run-all-wired — run-all.sh contains "Suite 13" and "harness_scorecard.py"
+#   (12) docs-registry — docs/testing.md registers "Suite 103" and "harness-scorecard"
+#   (13) claude-md-hygiene — CLAUDE.md does NOT contain "Suite 103"
+#   (14) self-ref — this test file references "Suite 103", "_slice_section", "harness-scorecard"
+#   (15) free-suite — Suite 103 non-comment source contains no Agent( or subagent_type token
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 103: harness-scorecard structural assertions ===")
+
+import subprocess as _s103_subprocess
+
+_s103_scorer_path = REPO_ROOT / "tests" / "harness_scorecard.py"
+_s103_skill_path  = REPO_ROOT / "skills" / "harness-audit" / "SKILL.md"
+_s103_baseline_path = REPO_ROOT / "tests" / "harness_scorecard_baseline.json"
+_s103_run_all_path  = REPO_ROOT / "tests" / "run-all.sh"
+_s103_testing_md_path = REPO_ROOT / "docs" / "testing.md"
+_s103_claude_md_path  = REPO_ROOT / "CLAUDE.md"
+
+# (1) scorer-exists
+check(
+    "suite103(1-scorer-exists): tests/harness_scorecard.py exists on disk",
+    _s103_scorer_path.exists(),
+    "tests/harness_scorecard.py must exist",
+)
+
+# (2) skill-exists
+check(
+    "suite103(2-skill-exists): skills/harness-audit/SKILL.md exists on disk",
+    _s103_skill_path.exists(),
+    "skills/harness-audit/SKILL.md must exist",
+)
+
+# (3) baseline-exists — valid JSON with score integer and categories object
+_s103_baseline_valid = False
+if _s103_baseline_path.exists():
+    try:
+        _s103_bl_data = json.loads(read(_s103_baseline_path))
+        _s103_baseline_valid = (
+            isinstance(_s103_bl_data.get("score"), int)
+            and isinstance(_s103_bl_data.get("categories"), dict)
+        )
+    except (json.JSONDecodeError, OSError):
+        _s103_baseline_valid = False
+check(
+    "suite103(3-baseline-exists): tests/harness_scorecard_baseline.json valid JSON with score+categories",
+    _s103_baseline_valid,
+    "tests/harness_scorecard_baseline.json must exist and parse as JSON with 'score' (int) and 'categories' (dict)",
+)
+
+# (4) determinism — two independent subprocess runs produce byte-identical JSON stdout
+# Using subprocess.run twice (not in-process import) to prove same-commit-same-score.
+_s103_determinism = False
+if _s103_scorer_path.exists():
+    _s103_run1 = _s103_subprocess.run(
+        [sys.executable, str(_s103_scorer_path), "--json"],
+        capture_output=True, text=True
+    )
+    _s103_run2 = _s103_subprocess.run(
+        [sys.executable, str(_s103_scorer_path), "--json"],
+        capture_output=True, text=True
+    )
+    _s103_determinism = (
+        _s103_run1.returncode == 0
+        and _s103_run2.returncode == 0
+        and _s103_run1.stdout == _s103_run2.stdout
+        and len(_s103_run1.stdout.strip()) > 0
+    )
+check(
+    "suite103(4-determinism): two subprocess --json runs produce byte-identical stdout",
+    _s103_determinism,
+    "python3 tests/harness_scorecard.py --json run twice must produce identical stdout (same-commit-same-score)",
+)
+
+# (5) category-set-present — canonical JSON categories map contains exactly 12 expected keys
+_S103_EXPECTED_CATEGORIES = [
+    "agent_frontmatter_completeness",
+    "skill_structural_validity",
+    "hook_manifest_canonical_form",
+    "hook_script_resolution",
+    "test_suite_coverage_presence",
+    "docs_testing_registry_sync",
+    "version_sync_plugin_marketplace",
+    "injection_preamble_coverage",
+    "readonly_tier_tool_discipline",
+    "agent_required_sections_presence",
+    "model_effort_field_presence",
+    "return_protocol_status_block_presence",
+]
+_s103_category_set_ok = False
+if _s103_determinism:
+    try:
+        _s103_json_data = json.loads(_s103_run1.stdout)
+        _s103_actual_keys = list(_s103_json_data.get("categories", {}).keys())
+        _s103_category_set_ok = _s103_actual_keys == _S103_EXPECTED_CATEGORIES
+    except (json.JSONDecodeError, KeyError):
+        _s103_category_set_ok = False
+check(
+    "suite103(5-category-set-present): canonical JSON categories contains exactly the 12 expected keys",
+    _s103_category_set_ok,
+    f"scorer JSON must have exactly these category keys in order: {_S103_EXPECTED_CATEGORIES}",
+)
+
+# (6) no-forbidden-imports — scorer source contains none of the determinism-hazard tokens
+_S103_FORBIDDEN_IMPORTS = [
+    "import time",
+    "import random",
+    "import datetime",
+    "from datetime",
+    "os.urandom",
+    "import socket",
+    "import urllib",
+    "import http",
+    "import requests",
+    "time.time",
+    "datetime.now",
+]
+_s103_scorer_src = read(_s103_scorer_path) if _s103_scorer_path.exists() else ""
+_s103_no_forbidden = all(tok not in _s103_scorer_src for tok in _S103_FORBIDDEN_IMPORTS)
+check(
+    "suite103(6-no-forbidden-imports): scorer source contains none of the determinism-hazard import tokens",
+    _s103_no_forbidden,
+    f"tests/harness_scorecard.py must not import: {_S103_FORBIDDEN_IMPORTS}",
+)
+
+# (7) report-only — the only open("w") / write_text / Path.write in scorer is guarded by
+#     --write-baseline and targets only harness_scorecard_baseline.json
+_s103_report_only = (
+    "--write-baseline" in _s103_scorer_src
+    and "harness_scorecard_baseline.json" in _s103_scorer_src
+    and "agents/" not in _s103_scorer_src.replace('AGENTS_DIR', '')
+        .replace('"agents/"', '').replace("'agents/'", '')
+)
+# Verify no unguarded write path exists outside write_baseline block
+# A simple heuristic: count write-capable calls and verify they're all baseline-targeted
+_s103_write_calls = (
+    _s103_scorer_src.count(".write_text(") +
+    _s103_scorer_src.count("open(") +
+    _s103_scorer_src.count(".write(")
+)
+# The scorer should have exactly one write site (BASELINE_PATH.write_text)
+_s103_report_only = (
+    _s103_write_calls <= 2  # write_text call + possibly open in read() helper
+    and "BASELINE_PATH.write_text" in _s103_scorer_src
+    and "write-baseline" in _s103_scorer_src
+)
+check(
+    "suite103(7-report-only): scorer write-path is confined to --write-baseline → harness_scorecard_baseline.json",
+    _s103_report_only,
+    "tests/harness_scorecard.py must only write to harness_scorecard_baseline.json and only under --write-baseline",
+)
+
+# (8) max-total-pinned — scorer MAX_TOTAL equals 102
+_s103_max_total_ok = False
+if _s103_determinism:
+    try:
+        _s103_max_total_ok = _s103_json_data.get("max_total") == 102
+    except Exception:
+        _s103_max_total_ok = False
+check(
+    "suite103(8-max-total-pinned): scorer max_total equals 102",
+    _s103_max_total_ok,
+    "scorer JSON max_total must equal 102 (sum of all category max values per design)",
+)
+
+# (9) skill-report-only — skill declares REPORT-only, no --fix/--apply as accepted flags,
+#     no auto-remediat tokens, says do NOT invoke the orchestrator, has ## Voice + ## Output Discipline.
+# "no --fix/--apply as accepted flags" means those strings must not appear in the ## Arguments table
+# as valid flag entries (it is acceptable to mention them in a declarative "there is no --fix" sentence).
+_s103_skill_src = read(_s103_skill_path) if _s103_skill_path.exists() else ""
+# Extract the ## Arguments section to check the flag table
+_s103_args_section_start = _s103_skill_src.find("## Arguments")
+_s103_args_section = ""
+if _s103_args_section_start >= 0:
+    _s103_args_end_markers = ["\n## ", "\n---\n"]
+    _s103_args_tail = _s103_skill_src[_s103_args_section_start:]
+    _s103_args_end = len(_s103_args_tail)
+    for _m in _s103_args_end_markers:
+        _p = _s103_args_tail.find(_m, len("## Arguments"))
+        if _p >= 0 and _p < _s103_args_end:
+            _s103_args_end = _p
+    _s103_args_section = _s103_args_tail[:_s103_args_end]
+# --fix and --apply must not appear as table entries in the Arguments section
+_s103_no_fix_flag = "--fix" not in _s103_args_section
+_s103_no_apply_flag = "--apply" not in _s103_args_section
+_s103_skill_report_only = (
+    "REPORT-only" in _s103_skill_src
+    and _s103_no_fix_flag
+    and _s103_no_apply_flag
+    and "auto-remediat" not in _s103_skill_src
+    and "do NOT invoke the `orchestrator`" in _s103_skill_src
+    and "## Voice" in _s103_skill_src
+    and "## Output Discipline" in _s103_skill_src
+)
+check(
+    "suite103(9-skill-report-only): skill declares REPORT-only, no --fix/--apply/auto-remediat, no orchestrator invocation, has ## Voice + ## Output Discipline",
+    _s103_skill_report_only,
+    "skills/harness-audit/SKILL.md must: declare REPORT-only, omit --fix/--apply/auto-remediat from Arguments table, say 'do NOT invoke the `orchestrator`', have ## Voice and ## Output Discipline",
+)
+
+# (10) skill-th-native — skill names no external project/method (provenance guard, parity with Suite 96/99)
+_s103_forbidden_tokens = [
+    "EC" + "C",
+    "Agent" + "Shield",
+    "conversation-" + "analyzer",
+]
+_s103_th_native = all(tok not in _s103_skill_src for tok in _s103_forbidden_tokens)
+check(
+    "suite103(10-skill-th-native): skill names no external project or external method",
+    _s103_th_native,
+    "skills/harness-audit/SKILL.md must not name external projects or methods — TH-native only",
+)
+
+# (11) run-all-wired — run-all.sh contains "Suite 13" and "harness_scorecard.py"
+_s103_run_all_src = read(_s103_run_all_path) if _s103_run_all_path.exists() else ""
+check(
+    "suite103(11-run-all-wired): tests/run-all.sh contains 'Suite 13' and 'harness_scorecard.py'",
+    "Suite 13" in _s103_run_all_src and "harness_scorecard.py" in _s103_run_all_src,
+    "tests/run-all.sh must wire Suite 13 and reference harness_scorecard.py",
+)
+
+# (12) docs-registry — docs/testing.md registers "Suite 103" and "harness-scorecard"
+_s103_testing_md_src = read(_s103_testing_md_path) if _s103_testing_md_path.exists() else ""
+check(
+    "suite103(12-docs-registry): docs/testing.md contains 'Suite 103' and 'harness-scorecard'",
+    "Suite 103" in _s103_testing_md_src and "harness-scorecard" in _s103_testing_md_src,
+    "docs/testing.md must register Suite 103 and the harness-scorecard marker (canonical suite registry)",
+)
+
+# (13) claude-md-hygiene — CLAUDE.md does NOT contain "Suite 103"
+_s103_claude_md_src = read(_s103_claude_md_path) if _s103_claude_md_path.exists() else ""
+check(
+    "suite103(13-claude-md-hygiene): CLAUDE.md does NOT contain 'Suite 103'",
+    "Suite 103" not in _s103_claude_md_src,
+    "CLAUDE.md must not mention Suite 103 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (14) self-ref — this test file references "Suite 103", "_slice_section", "harness-scorecard"
+_s103_own_source = read(Path(__file__))
+check(
+    "suite103(14-self-ref): this test file contains 'Suite 103', '_slice_section', and 'harness-scorecard'",
+    "Suite 103" in _s103_own_source
+    and "_slice_section" in _s103_own_source
+    and "harness-scorecard" in _s103_own_source,
+    "test file must reference Suite 103, _slice_section, and harness-scorecard (self-referential marker check)",
+)
+
+# (15) free-suite — Suite 103 non-comment source contains no Agent( or subagent_type token
+_s103_suite_start = _s103_own_source.find("Suite 103 — harness-scorecard structural")
+_s103_suite_end   = _s103_own_source.find("# Marker: harness-scorecard")
+_s103_own_region  = (
+    _s103_own_source[_s103_suite_start:_s103_suite_end]
+    if _s103_suite_start >= 0 and _s103_suite_end > _s103_suite_start
+    else _s103_own_source[_s103_suite_start:]
+)
+_s103_code_lines = [
+    ln for ln in _s103_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s103_code_only = "\n".join(_s103_code_lines)
+_s103_agent_tok    = "Age" + "nt("
+_s103_subagent_tok = "subagent" + "_type"
+check(
+    "suite103(15-free-suite): Suite 103 non-comment source contains no agent-invocation tokens",
+    _s103_agent_tok not in _s103_code_only and _s103_subagent_tok not in _s103_code_only,
+    "Suite 103 is a free structural suite — its non-comment source must not call the agent-dispatch APIs",
+)
+
+# Marker: harness-scorecard
+
+# ---------------------------------------------------------------------------
+# Suite 104 — skill-audit-lens
+# Structural assertions for Check 9 (skill dedup / SEARCH-BEFORE-CREATE) and
+# Check 10 (skill quality quick-scan) added to /th:lint, and the
+# SEARCH-BEFORE-CREATE note added to agents/agent-builder.md Phase 1.
+# Pure text/file reads — no agent invocation, no paid spend.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 104: skill-audit-lens ===")
+
+_s104_lint    = read(skill_path("lint"))
+_s104_builder = read(AGENTS_DIR / "agent-builder.md")
+_s104_readme  = read(SKILLS_DIR / "README.md")
+_s104_testing = read(REPO_ROOT / "docs" / "testing.md")
+_s104_claude  = read(REPO_ROOT / "CLAUDE.md")
+_s104_own     = read(REPO_ROOT / "tests" / "test_agent_structure.py")
+
+_S104_STOP = ("\n## ", "\n---\n")
+
+# (1) Check 9 section exists
+_s104_c9_slice = _slice_section(_s104_lint, "## Check 9 — Skill overlap", _S104_STOP)
+check(
+    "suite104(1-check9-exists): lint SKILL.md contains '## Check 9 — Skill overlap' section",
+    bool(_s104_c9_slice),
+    "skills/lint/SKILL.md must contain a '## Check 9 — Skill overlap' section",
+)
+
+# (2) Check 9 carries SEARCH-BEFORE-CREATE + dedup framing
+check(
+    "suite104(2-check9-framing): Check 9 slice contains 'SEARCH-BEFORE-CREATE' and 'dedup'",
+    "SEARCH-BEFORE-CREATE" in _s104_c9_slice and "dedup" in _s104_c9_slice,
+    "skills/lint/SKILL.md Check 9 section must contain 'SEARCH-BEFORE-CREATE' and 'dedup'",
+)
+
+# (3) Check 9 names the three overlap dimensions
+check(
+    "suite104(3-check9-dimensions): Check 9 slice names 'name', 'description', and 'keyword' or 'trigger'",
+    "name" in _s104_c9_slice
+    and "description" in _s104_c9_slice
+    and ("keyword" in _s104_c9_slice or "trigger" in _s104_c9_slice),
+    "skills/lint/SKILL.md Check 9 must name the three overlap dimensions: name, description, and keyword/trigger",
+)
+
+# (4) Check 9 declares the search-before-create mode arg
+check(
+    "suite104(4-check9-against-arg): Check 9 slice contains '--against'",
+    "--against" in _s104_c9_slice,
+    "skills/lint/SKILL.md Check 9 must document the '--against' search-before-create mode argument",
+)
+
+# (5) Check 9 is REPORT-only / never FAIL
+check(
+    "suite104(5-check9-report-only): Check 9 slice contains 'REPORT-only' and ('never FAIL' or 'Never FAIL' or 'advisory')",
+    "REPORT-only" in _s104_c9_slice
+    and (
+        "never FAIL" in _s104_c9_slice
+        or "Never FAIL" in _s104_c9_slice
+        or "Never **FAIL**" in _s104_c9_slice
+        or "advisory" in _s104_c9_slice
+    ),
+    "skills/lint/SKILL.md Check 9 must declare REPORT-only and never-FAIL / advisory contract",
+)
+
+# (6) Check 9 carries the expected-overlap allowlist
+check(
+    "suite104(6-check9-allowlist): Check 9 slice contains 'allowlist' and 'diagram'",
+    "allowlist" in _s104_c9_slice and "diagram" in _s104_c9_slice,
+    "skills/lint/SKILL.md Check 9 must carry an expected-overlap allowlist naming the diagram family",
+)
+
+# (7) Check 10 section exists
+_s104_c10_slice = _slice_section(_s104_lint, "## Check 10 — Skill quality quick-scan", _S104_STOP)
+check(
+    "suite104(7-check10-exists): lint SKILL.md contains '## Check 10 — Skill quality quick-scan' section",
+    bool(_s104_c10_slice),
+    "skills/lint/SKILL.md must contain a '## Check 10 — Skill quality quick-scan' section",
+)
+
+# (8) Check 10 declares the Q1–Q5 checklist criteria
+check(
+    "suite104(8-check10-criteria): Check 10 slice contains single responsibility, Voice, Output discipline/Discipline, orphaned, and routing",
+    "single responsibility" in _s104_c10_slice
+    and "Voice" in _s104_c10_slice
+    and ("Output discipline" in _s104_c10_slice or "Output Discipline" in _s104_c10_slice)
+    and "orphaned" in _s104_c10_slice
+    and "routing" in _s104_c10_slice,
+    "skills/lint/SKILL.md Check 10 must declare Q1–Q5 (single responsibility, Voice, Output discipline, orphaned, routing)",
+)
+
+# (9) Check 10 supports changed-only via --changed
+check(
+    "suite104(9-check10-changed): Check 10 slice contains '--changed'",
+    "--changed" in _s104_c10_slice,
+    "skills/lint/SKILL.md Check 10 must document the '--changed' changed-only scan mode",
+)
+
+# (10) Check 10 is advisory / never FAIL
+check(
+    "suite104(10-check10-advisory): Check 10 slice contains 'WARN' and ('never FAIL' or 'advisory')",
+    "WARN" in _s104_c10_slice
+    and ("never FAIL" in _s104_c10_slice or "Never FAIL" in _s104_c10_slice or "advisory" in _s104_c10_slice),
+    "skills/lint/SKILL.md Check 10 must declare WARN (advisory) and never-FAIL contract",
+)
+
+# (11) lint Arguments documents both new args (file-level)
+check(
+    "suite104(11-args-documented): lint SKILL.md contains '--against' and '--changed' at file level",
+    "--against" in _s104_lint and "--changed" in _s104_lint,
+    "skills/lint/SKILL.md must document both '--against' and '--changed' arguments",
+)
+
+# (12) lint summary denominator updated to 10 (positive) AND old '/ 8' is absent (negative)
+check(
+    "suite104(12-denominator-10): lint SKILL.md contains '/ 10 checks passed' and does NOT contain '/ 8 checks passed'",
+    "/ 10 checks passed" in _s104_lint and "/ 8 checks passed" not in _s104_lint,
+    "skills/lint/SKILL.md must declare '/ 10 checks passed' and must NOT contain '/ 8 checks passed'",
+)
+
+# (13) lint Output Format includes Check 9 and Check 10 blocks
+check(
+    "suite104(13-output-format): lint SKILL.md contains 'Check 9:' and 'Check 10:' in its Output Format",
+    "Check 9:" in _s104_lint and "Check 10:" in _s104_lint,
+    "skills/lint/SKILL.md Output Format must include 'Check 9:' and 'Check 10:' blocks",
+)
+
+# (14) lint stays standalone (existing guard preserved)
+check(
+    "suite104(14-standalone-guard): lint SKILL.md contains 'do NOT invoke the' and 'orchestrator'",
+    "do NOT invoke the" in _s104_lint and "orchestrator" in _s104_lint,
+    "skills/lint/SKILL.md must preserve the standalone guard ('do NOT invoke the orchestrator')",
+)
+
+# (15) agent-builder carries the SEARCH-BEFORE-CREATE skill note
+check(
+    "suite104(15-builder-sbc): agent-builder.md contains 'SEARCH-BEFORE-CREATE', '--against', and 'extend the existing skill'",
+    "SEARCH-BEFORE-CREATE" in _s104_builder
+    and "--against" in _s104_builder
+    and "extend the existing skill" in _s104_builder,
+    "agents/agent-builder.md must contain the SEARCH-BEFORE-CREATE note with '--against' and 'extend the existing skill'",
+)
+
+# (16) agent-builder note is REPORT-only / references Check 9
+_S104_BUILDER_ANCHOR = "SEARCH-BEFORE-CREATE (skills)"
+_s104_builder_sbc_slice = _slice_section(_s104_builder, _S104_BUILDER_ANCHOR, ("\n\n", "\n##", "\n###"))
+check(
+    "suite104(16-builder-report-only): agent-builder SEARCH-BEFORE-CREATE note contains 'REPORT-only' (or 'never deletes') and 'Check 9'",
+    bool(_s104_builder_sbc_slice)
+    and ("REPORT-only" in _s104_builder_sbc_slice or "never deletes" in _s104_builder_sbc_slice)
+    and "Check 9" in _s104_builder_sbc_slice,
+    "agents/agent-builder.md SEARCH-BEFORE-CREATE note must say REPORT-only / never deletes and reference Check 9",
+)
+
+# (17) README still classifies /th:lint as Standalone
+check(
+    "suite104(17-readme-standalone): skills/README.md Standalone section contains '/th:lint'",
+    "/th:lint" in _s104_readme,
+    "skills/README.md must list '/th:lint' in the Standalone section",
+)
+
+# (18) TH-native provenance guard: no external-project/method name in touched files
+_s104_forbidden = ["EC" + "C", "Agent" + "Shield"]
+_s104_provenance_clean = all(
+    lit not in _s104_lint and lit not in _s104_builder
+    for lit in _s104_forbidden
+)
+check(
+    "suite104(18-th-native): lint SKILL.md and agent-builder.md contain no external-project/method name",
+    _s104_provenance_clean,
+    "skills/lint/SKILL.md and agents/agent-builder.md must not name external projects or methods — TH-native only",
+)
+
+# (19) registry: docs/testing.md registers Suite 104 + marker
+check(
+    "suite104(19-registry): docs/testing.md contains 'Suite 104' and 'skill-audit-lens'",
+    "Suite 104" in _s104_testing and "skill-audit-lens" in _s104_testing,
+    "docs/testing.md must register Suite 104 and the 'skill-audit-lens' marker (canonical suite registry)",
+)
+
+# (20) hygiene: CLAUDE.md does NOT contain 'Suite 104'
+check(
+    "suite104(20-hygiene): CLAUDE.md does NOT contain 'Suite 104'",
+    "Suite 104" not in _s104_claude,
+    "CLAUDE.md must not mention Suite 104 — only docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# (21) self-ref: test file contains Suite 104 + _slice_section + marker
+check(
+    "suite104(21-self-ref): this test file contains 'Suite 104', '_slice_section', and 'skill-audit-lens'",
+    "Suite 104" in _s104_own and "_slice_section" in _s104_own and "skill-audit-lens" in _s104_own,
+    "test file must reference Suite 104, _slice_section, and skill-audit-lens (self-referential marker check)",
+)
+
+# Marker: skill-audit-lens
+
+# ---------------------------------------------------------------------------
+# Suite 105 — opencode-distribution-roadmap (doc-structure guard, Tier-4)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 105: opencode-distribution-roadmap doc-structure guard ===")
+
+_s105_doc_path    = REPO_ROOT / "docs" / "opencode-distribution-roadmap.md"
+_s105_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s105_claude_md   = read(REPO_ROOT / "CLAUDE.md")
+_S105_STOP        = ("\n## ", "\n---\n")
+
+# (1) doc exists
+check(
+    "suite105(1-doc-exists): docs/opencode-distribution-roadmap.md exists",
+    _s105_doc_path.exists(),
+    "the roadmap doc must exist at docs/opencode-distribution-roadmap.md",
+)
+_s105_doc = read(_s105_doc_path) if _s105_doc_path.exists() else ""
+
+# (2) status banner: design only / not built
+check(
+    "suite105(2-status-banner): doc carries a 'design only' / not-built banner",
+    ("design only" in _s105_doc or "Status: design" in _s105_doc)
+    and "cmd/install" in _s105_doc,
+    "doc must open with a design-only status banner referencing the frozen cmd/install",
+)
+
+# (3) assessment table: per-item buildable-now-vs-defer
+_s105_assess = _slice_section(_s105_doc, "## Buildable", _S105_STOP) or \
+               _slice_section(_s105_doc, "buildable-now-vs-defer", _S105_STOP)
+check(
+    "suite105(3-assessment): doc contains a buildable-now-vs-defer assessment "
+    "naming all three items",
+    len(_s105_assess) > 0
+    and "defer" in _s105_assess.lower()
+    and "specifi" in _s105_assess.lower(),
+    "doc must contain a per-item specifiable-now-vs-defer assessment",
+)
+
+# (4) Item 1 — adapter registry + format-shim
+_s105_item1 = _slice_section(_s105_doc, "## Item 1", _S105_STOP)
+check(
+    "suite105(4-item1-adapter): Item 1 section covers adapter descriptor + shim "
+    "normalization contract",
+    len(_s105_item1) > 0
+    and "adapter" in _s105_item1.lower()
+    and ("shim" in _s105_item1.lower() or "normaliz" in _s105_item1.lower()),
+    "Item 1 must define the adapter descriptor shape and the shim normalization contract",
+)
+
+# (5) Item 2 — two-layer install manifest + ownership
+_s105_item2 = _slice_section(_s105_doc, "## Item 2", _S105_STOP)
+check(
+    "suite105(5-item2-manifest): Item 2 section covers two-layer manifest + "
+    "plan/apply + ownership uninstall",
+    len(_s105_item2) > 0
+    and "manifest" in _s105_item2.lower()
+    and "plan" in _s105_item2.lower()
+    and "apply" in _s105_item2.lower()
+    and ("uninstall" in _s105_item2.lower() or "owner" in _s105_item2.lower()),
+    "Item 2 must define module/component manifests, plan-vs-apply, and the ownership model",
+)
+
+# (6) Item 3 — single data-home resolver + TH-native env var
+_s105_item3 = _slice_section(_s105_doc, "## Item 3", _S105_STOP)
+check(
+    "suite105(6-item3-datahome): Item 3 names TEAM_HARNESS_DATA_HOME + a "
+    "resolution order",
+    len(_s105_item3) > 0
+    and "TEAM_HARNESS_DATA_HOME" in _s105_item3
+    and ("resolution order" in _s105_item3.lower() or "first match" in _s105_item3.lower()),
+    "Item 3 must name the TH-native env var TEAM_HARNESS_DATA_HOME and a resolution order",
+)
+
+# (7) provenance guard: no external-project / external-method name in the doc
+# Assembled programmatically so this guard file does not contain the forbidden
+# literals verbatim — mirrors the "EC"+"C" idiom used in Suites 96/99.
+_S105_FORBIDDEN = [
+    "EC" + "C",           # external security project name
+    "Agent" + "Shield",   # associated tool brand
+    "open" + "code-the-product-vendor-name",  # placeholder used in plan spec only
+]
+_s105_no_forbidden = all(tok not in _s105_doc for tok in _S105_FORBIDDEN)
+check(
+    "suite105(7-provenance): doc contains no forbidden external-project/method token",
+    _s105_no_forbidden,
+    "the committed roadmap doc must read as TH-native (no external project/method name)",
+)
+
+# (8) registry: docs/testing.md registers Suite 105
+check(
+    "suite105(8-registry): docs/testing.md registers 'Suite 105' + marker",
+    "Suite 105" in _s105_testing_md
+    and "opencode-distribution-roadmap" in _s105_testing_md,
+    "docs/testing.md must register Suite 105 and the opencode-distribution-roadmap marker",
+)
+
+# (9) hygiene: CLAUDE.md must NOT contain 'Suite 105'
+check(
+    "suite105(9-hygiene): CLAUDE.md does NOT contain 'Suite 105'",
+    "Suite 105" not in _s105_claude_md,
+    "CLAUDE.md must not mention Suite 105 — only docs/testing.md is the canonical registry",
+)
+
+# (10) self-referential marker
+_s105_own_source = read(Path(__file__))
+check(
+    "suite105(10-self-ref): test file references 'Suite 105', '_slice_section', "
+    "and 'opencode-distribution-roadmap'",
+    "Suite 105" in _s105_own_source
+    and "_slice_section" in _s105_own_source
+    and "opencode-distribution-roadmap" in _s105_own_source,
+    "test file must self-reference Suite 105 + _slice_section + the marker",
+)
+
+# Marker: opencode-distribution-roadmap
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

@@ -142,6 +142,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 13: harness scorecard (informational)"
+echo "############################################################"
+if python3 "$TESTS_DIR/harness_scorecard.py"; then
+    echo "harness-scorecard: PASS"
+else
+    echo "harness-scorecard: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

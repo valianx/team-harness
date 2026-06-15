@@ -246,6 +246,8 @@ read agents/{most-similar-agent}.md
 
 Check for overlap with existing agents. If overlap exists, propose extending the existing one instead of creating a new one.
 
+**SEARCH-BEFORE-CREATE (skills).** Before writing a new skill, run `/th:lint` Check 9 in search-before-create mode — `/th:lint --against "<proposed-name> | <proposed-description> | <trigger-keywords>"` — to detect overlap with existing skills by name, description, and trigger keywords. If a near-duplicate is reported, extend the existing skill instead of creating a new one. This is REPORT-only; Check 9 never deletes or rewrites a skill, and the decision to extend vs. create stays with the builder.
+
 ### Phase 2 — Design
 
 Plan the agent on paper first:

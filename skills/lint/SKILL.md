@@ -221,6 +221,79 @@ Result:
 ---
 name: lint
 
+## Check 9 — Skill overlap (SEARCH-BEFORE-CREATE / dedup)
+
+Detect near-duplicate skills so the team does not accumulate redundant slash commands. REPORT-only — this check never deletes or rewrites a skill. Never FAIL.
+
+**Modes:**
+
+- **Standing audit (default):** compare every skill in `skills/` against every other skill and report overlapping pairs.
+- **Search-before-create (when `$ARGUMENTS` carries `--against "<name> | <description> | <keywords>"`):** compare one proposed skill against the existing corpus and report the nearest matches, with a verdict: `Proceed (no near-duplicate) | Review (near-duplicate <name> exists — extend it instead)`.
+
+**Dedup heuristic (lexical, deterministic — no model call):**
+
+For each skill, build a comparison profile from its `SKILL.md`:
+- `name` — the frontmatter `name` (or directory name if frontmatter is absent).
+- `desc_tokens` — lowercased word set of the frontmatter `description`, minus stopwords (`the, a, an, and, or, to, of, for, in, on, with, use, when, this, that, run`).
+- `keyword_tokens` — union of `desc_tokens`, the routing class (`orchestrator` | `standalone`), and any verb in the skill name.
+
+Compute three overlap signals per pair (A, B):
+1. **Name overlap** — `1.0` if `name_A` is a substring of `name_B` or vice versa; else token-set Jaccard of hyphen-split names.
+2. **Description Jaccard** — `|desc_tokens_A ∩ desc_tokens_B| / |desc_tokens_A ∪ desc_tokens_B|`.
+3. **Trigger-keyword overlap** — count of shared high-signal keywords after stopword removal.
+
+Classify the pair:
+- **`[WARN] near-duplicate`** — description Jaccard ≥ 0.50 **OR** (name overlap ≥ 0.60 AND description Jaccard ≥ 0.30).
+- **`[INFO] related`** — description Jaccard in [0.30, 0.50) and not already WARN.
+- Below the INFO floor → not reported.
+
+**Expected-overlap allowlist** — pairs in these families are intentionally adjacent; report as `[INFO]` only, never `[WARN]`:
+- Diagram family: `diagram`, `d2-diagram`, `likec4-diagram`, `excalidraw-diagram`.
+- Obsidian family: `obsidian-markdown`, `obsidian-bases`, `obsidian-cli`, `json-canvas`.
+
+Result:
+- **PASS** if no pair exceeds the INFO floor (beyond the allowlist).
+- **WARN** if any `near-duplicate` pair is found outside the allowlist (advisory — the operator decides whether to consolidate).
+- **Never FAIL** — dedup is advisory; the operator owns the consolidation decision.
+
+---
+name: lint
+
+## Check 10 — Skill quality quick-scan
+
+Apply a per-skill quality checklist as a quick scan. REPORT-only — this check never modifies a skill file. Never FAIL.
+
+**Changed-only mode:** when `$ARGUMENTS` carries `--changed`, scan only skills whose `SKILL.md` differs from `git HEAD` (via `git diff --name-only HEAD -- skills/`). If git is unavailable, scan all skills and note the degradation. Without `--changed`, all skills are scanned.
+
+**Quality checklist (Q1–Q5) per skill `SKILL.md`:**
+
+| # | Criterion | Heuristic |
+|---|-----------|-----------|
+| Q1 | single responsibility | Frontmatter `description` present and ≤ 240 characters; opening line has a primary action verb (no "and also" multi-purpose framing). |
+| Q2 | Voice-rule compliance | A `## Voice` block is present OR the skill references `agents/_shared/operational-rules.md`; body contains none of the forbidden enthusiasm/emoji markers (`✅`, `⚠️`, `🎉`, `✨`, "Perfecto", "Excelente", "Great job"). |
+| Q3 | Output discipline | An `## Output Discipline` block is present (or an explicit Output Format contract section). |
+| Q4 | No orphaned references | Every `agents/<x>.md`, `skills/<x>/`, `docs/<x>.md`, or `hooks/<x>` path referenced in the body resolves on disk. Unresolvable internal path → finding. |
+| Q5 | Correct routing classification | The skill's actual behavior (declares "do NOT invoke the orchestrator" / "runs directly" → standalone; builds a task payload and routes → orchestrator) matches its classification in `skills/README.md` Routing. Mismatch → finding. |
+
+Result:
+- **PASS** if every scanned skill satisfies Q1–Q5.
+- **WARN** if any skill misses any criterion — lists `<skill>: missing <Qn> — <reason>` (advisory).
+- **Never FAIL** — quality is advisory (parity with the Check 4 guardrails-are-advisory model).
+
+---
+name: lint
+
+## Arguments
+
+| Argument | Applies to | Description |
+|----------|-----------|-------------|
+| `--fix` | Check 2 | Auto-sync agents and skill files from project to global `~/.claude/`. Only Check 2 has an auto-fix path; Checks 9 and 10 are always REPORT-only. |
+| `--against "<name> \| <description> \| <keywords>"` | Check 9 | Search-before-create mode: compare one proposed skill (by name, description, and trigger keywords) against the existing corpus. Reports the nearest matches and a proceed/review verdict. |
+| `--changed` | Check 10 | Changed-only quality scan: restrict Check 10 to skills whose `SKILL.md` differs from `git HEAD`. Without this flag, all skills are scanned. |
+
+---
+name: lint
+
 ## --fix Mode
 
 If the user invokes `/th:lint --fix` (check if `$ARGUMENTS` contains `--fix`):
@@ -299,8 +372,22 @@ python3:  {available | WARN: absent — policy gate running degraded}
 wired-scripts: {N resolved on disk | FAIL: <script> wired but not found on disk — gate is dead}
 obsidian: {coverage confirmed | WARN: obsidian mode — verify F-010 fix | N/A (local mode)}
 
+--- Check 9: Skill overlap (dedup) ---
+Status: {PASS|WARN}
+Mode: {standing audit | search-before-create (--against)}
+{for each near-duplicate pair: "  [WARN] near-duplicate: <skill-A> ↔ <skill-B> (description Jaccard: 0.XX)"}
+{for each related pair outside allowlist: "  [INFO] related: <skill-A> ↔ <skill-B> (description Jaccard: 0.XX)"}
+{if --against mode: "Verdict: Proceed (no near-duplicate) | Review (near-duplicate <name> exists — extend it instead)"}
+{if PASS: "No near-duplicate skill pairs detected"}
+
+--- Check 10: Skill quality quick-scan ---
+Status: {PASS|WARN}
+Scope: {all skills | changed-only (--changed)}
+{for each skill with issues: "  [WARN] <skill>: missing <Qn> — <reason>"}
+{if PASS: "All scanned skills satisfy Q1–Q5"}
+
 ====================================
-  Result: {X} / 8 checks passed
+  Result: {X} / 10 checks passed
 ====================================
 {if --fix applied: "\n--- Auto-fix applied ---\n{list of fixes}"}
 ```
