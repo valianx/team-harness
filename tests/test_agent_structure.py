@@ -21334,6 +21334,252 @@ check(
 # Marker: prompt-injection-defense-floor
 
 # ---------------------------------------------------------------------------
+# Suite 95 — eval-as-spec (v2.92.0)
+# ---------------------------------------------------------------------------
+# Structural assertions for the eval-as-spec layer added to /th:eval.
+# Pins arg contracts, report shape, spec template, baseline schema, and
+# registry hygiene so the deterministic free layer cannot silently regress.
+#
+# This suite reads text and JSON only.  It NEVER invokes an agent, calls
+# claude -p, or instantiates a subagent_type.  The paid run path is
+# cost-gated and exercised only by the operator via /th:eval ... --k N.
+#
+# Checks (20 total):
+#   1   SKILL.md documents Mode 5 --spec arg
+#   2   SKILL.md documents --k N arg (default 1)
+#   3   SKILL.md documents --baseline <sha> arg
+#   4   SKILL.md --spec mode documents parsing the pass-bar declaration section
+#   5   SKILL.md pass@k report block: pass-rate P/k string
+#   6   SKILL.md pass@k report block: pass@k verdict string
+#   7   SKILL.md NEW-failures-vs-baseline report shape
+#   8   eval-scenarios/_templates/spec.md exists + required sections present
+#   9   eval-scenarios/_templates/spec.md contains pass-bar declaration section
+#   10  eval-scenarios/architect/design-as-spec.md exists + filled-in pass-bar
+#   11  eval-scenarios/.baselines/architect.example.json parses + REQUIRED keys
+#   12  SKILL.md documents the same REQUIRED baseline keys
+#   13  eval-scenarios/README.md documents the same REQUIRED baseline keys
+#   14  SKILL.md documents cost math (N × ~$1 or equivalent)
+#   15  SKILL.md documents paid path NEVER in run-all.sh (cost-boundary string)
+#   16  tests/run-all.sh contains no new claude -p / agent invocation for eval
+#   17  Suite 95 own source contains no Agent( invocation token
+#   18  Suite 95 own source contains no subagent_type invocation token
+#   19  docs/testing.md registers Suite 95 + eval-as-spec marker
+#   20  CLAUDE.md does NOT contain 'Suite 95' (§11 hygiene contract)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 95: eval-as-spec (v2.92.0) ===")
+
+_S95_EVAL_SCENARIOS = REPO_ROOT / "eval-scenarios"
+_S95_SKILL_PATH = SKILLS_DIR / "eval" / "SKILL.md"
+_S95_TEMPLATE_PATH = _S95_EVAL_SCENARIOS / "_templates" / "spec.md"
+_S95_WORKED_SPEC_PATH = _S95_EVAL_SCENARIOS / "architect" / "design-as-spec.md"
+_S95_BASELINE_PATH = _S95_EVAL_SCENARIOS / ".baselines" / "architect.example.json"
+
+_s95_skill_text = read(_S95_SKILL_PATH) if _S95_SKILL_PATH.exists() else ""
+_s95_template_text = read(_S95_TEMPLATE_PATH) if _S95_TEMPLATE_PATH.exists() else ""
+_s95_worked_spec_text = read(_S95_WORKED_SPEC_PATH) if _S95_WORKED_SPEC_PATH.exists() else ""
+_s95_readme_text = read(_S95_EVAL_SCENARIOS / "README.md") if (_S95_EVAL_SCENARIOS / "README.md").exists() else ""
+
+# (1) --spec arg documented
+check(
+    "suite95(1-spec-arg): skills/eval/SKILL.md documents Mode 5 --spec arg",
+    "--spec" in _s95_skill_text and "Mode 5" in _s95_skill_text,
+    "SKILL.md must document '--spec' and 'Mode 5'",
+)
+
+# (2) --k N arg documented (default 1)
+check(
+    "suite95(2-k-arg): skills/eval/SKILL.md documents --k N arg with default 1",
+    "--k" in _s95_skill_text and "default" in _s95_skill_text and "1" in _s95_skill_text,
+    "SKILL.md must document '--k N' arg and its default of 1",
+)
+
+# (3) --baseline <sha> arg documented
+check(
+    "suite95(3-baseline-arg): skills/eval/SKILL.md documents --baseline <sha> arg",
+    "--baseline" in _s95_skill_text,
+    "SKILL.md must document '--baseline <sha>' arg",
+)
+
+# (4) --spec mode documents parsing the pass-bar declaration section
+check(
+    "suite95(4-passbar-parser): skills/eval/SKILL.md --spec mode references pass-bar declaration parsing",
+    "pass-bar" in _s95_skill_text and "parse" in _s95_skill_text.lower(),
+    "SKILL.md Mode 5 must document parsing the pass-bar declaration section by name",
+)
+
+# (5) pass@k report block: pass-rate P/k string
+check(
+    "suite95(5-passrate-format): skills/eval/SKILL.md documents pass-rate P/k report format",
+    "pass-rate" in _s95_skill_text and "P/k" in _s95_skill_text,
+    "SKILL.md must document the 'pass-rate P/k' report block string",
+)
+
+# (6) pass@k verdict string
+check(
+    "suite95(6-passat-k-verdict): skills/eval/SKILL.md documents pass@k verdict string",
+    "pass@k" in _s95_skill_text.lower(),
+    "SKILL.md must document the 'pass@k' verdict string",
+)
+
+# (7) NEW-failures-vs-baseline report shape
+check(
+    "suite95(7-new-failures-shape): skills/eval/SKILL.md documents NEW-failures-vs-baseline report shape",
+    "NEW failures" in _s95_skill_text or "NEW-failures" in _s95_skill_text,
+    "SKILL.md must document the NEW-failures-vs-baseline report shape",
+)
+
+# (8) spec template exists + required sections
+_S95_REQUIRED_TEMPLATE_SECTIONS = [
+    "## Input",
+    "## Context",
+    "## Expected Behaviors",
+    "## Anti-Patterns",
+    "## Output Criteria",
+]
+check(
+    "suite95(8-template-exists): eval-scenarios/_templates/spec.md exists with required sections",
+    _S95_TEMPLATE_PATH.exists() and all(s in _s95_template_text for s in _S95_REQUIRED_TEMPLATE_SECTIONS),
+    f"eval-scenarios/_templates/spec.md must exist and contain all required sections: {_S95_REQUIRED_TEMPLATE_SECTIONS}",
+)
+
+# (9) spec template contains pass-bar declaration section (case-insensitive)
+check(
+    "suite95(9-template-passbar): eval-scenarios/_templates/spec.md contains pass-bar declaration section",
+    "pass-bar" in _s95_template_text.lower(),
+    "eval-scenarios/_templates/spec.md must contain a pass-bar declaration section",
+)
+
+# (10) worked spec exists + filled-in pass-bar declaration (case-insensitive)
+check(
+    "suite95(10-worked-spec): eval-scenarios/architect/design-as-spec.md exists with filled-in pass-bar",
+    _S95_WORKED_SPEC_PATH.exists() and "pass-bar" in _s95_worked_spec_text.lower(),
+    "eval-scenarios/architect/design-as-spec.md must exist and contain a filled-in pass-bar declaration",
+)
+
+# (11) example baseline parses as valid JSON + REQUIRED keys present
+_S95_REQUIRED_BASELINE_KEYS_TOP = ["agent", "baseline_sha", "k", "scenarios"]
+_S95_REQUIRED_SCENARIO_KEYS = ["scenario", "pass_rate", "verdict"]
+
+_s95_baseline_ok = False
+_s95_baseline_detail = "eval-scenarios/.baselines/architect.example.json missing or invalid"
+if _S95_BASELINE_PATH.exists():
+    try:
+        _s95_baseline_data = json.loads(read(_S95_BASELINE_PATH))
+        _s95_top_keys_ok = all(k in _s95_baseline_data for k in _S95_REQUIRED_BASELINE_KEYS_TOP)
+        _s95_scenarios_ok = (
+            isinstance(_s95_baseline_data.get("scenarios"), list)
+            and len(_s95_baseline_data["scenarios"]) > 0
+            and all(
+                sk in _s95_baseline_data["scenarios"][0]
+                for sk in _S95_REQUIRED_SCENARIO_KEYS
+            )
+        )
+        _s95_baseline_ok = _s95_top_keys_ok and _s95_scenarios_ok
+        if not _s95_baseline_ok:
+            _s95_baseline_detail = (
+                f"missing top-level keys {[k for k in _S95_REQUIRED_BASELINE_KEYS_TOP if k not in _s95_baseline_data]} "
+                f"or scenario keys {[k for k in _S95_REQUIRED_SCENARIO_KEYS if k not in (_s95_baseline_data.get('scenarios') or [{}])[0]]}"
+            )
+    except (json.JSONDecodeError, Exception) as e:
+        _s95_baseline_detail = f"JSON parse error: {e}"
+
+check(
+    "suite95(11-baseline-schema): eval-scenarios/.baselines/architect.example.json parses + REQUIRED keys present",
+    _s95_baseline_ok,
+    _s95_baseline_detail,
+)
+
+# (12) SKILL.md documents the REQUIRED baseline keys (canonical required-key list)
+_S95_SKILL_REQUIRED_KEY_STRINGS = ["agent", "baseline_sha", "k", "scenarios"]
+check(
+    "suite95(12-skill-baseline-keys): skills/eval/SKILL.md documents REQUIRED baseline schema keys",
+    all(f'"{k}"' in _s95_skill_text or k in _s95_skill_text for k in _S95_SKILL_REQUIRED_KEY_STRINGS)
+    and "REQUIRED" in _s95_skill_text,
+    "SKILL.md must document the canonical REQUIRED baseline key list (agent, baseline_sha, k, scenarios[].scenario, pass_rate, verdict)",
+)
+
+# (13) README.md documents the REQUIRED baseline keys (same canonical list)
+check(
+    "suite95(13-readme-baseline-keys): eval-scenarios/README.md documents REQUIRED baseline schema keys",
+    bool(_s95_readme_text)
+    and all(k in _s95_readme_text for k in _S95_SKILL_REQUIRED_KEY_STRINGS)
+    and "REQUIRED" in _s95_readme_text,
+    "eval-scenarios/README.md must document the canonical REQUIRED baseline key list",
+)
+
+# (14) SKILL.md documents cost math (N × ~$1 or variant)
+check(
+    "suite95(14-cost-math): skills/eval/SKILL.md documents cost math (N × ~$1 per --k N)",
+    ("N × " in _s95_skill_text or "N x " in _s95_skill_text or "N ×" in _s95_skill_text)
+    and "$1" in _s95_skill_text,
+    "SKILL.md must document the cost math 'N × ~$1' (or equivalent) for --k N",
+)
+
+# (15) SKILL.md documents paid path NEVER in run-all.sh (cost-boundary string)
+check(
+    "suite95(15-cost-boundary): skills/eval/SKILL.md states paid path NEVER in run-all.sh",
+    "run-all.sh" in _s95_skill_text and "NEVER" in _s95_skill_text,
+    "SKILL.md must state that the paid agent-run path is NEVER part of tests/run-all.sh",
+)
+
+# (16) tests/run-all.sh contains no new claude -p entry referencing eval
+_s95_run_all_text = read(REPO_ROOT / "tests" / "run-all.sh")
+check(
+    "suite95(16-run-all-clean): tests/run-all.sh contains no claude -p eval invocation",
+    "claude -p" not in _s95_run_all_text,
+    "tests/run-all.sh must not contain any 'claude -p' invocation (paid path must stay out of the free suite)",
+)
+
+# (17) Suite 95 own source code (non-comment lines) contains no Agent( invocation token
+# The self-inspection strips comment lines so that the AC description strings
+# "contains no Agent( invocation token" in comments do not falsely trigger.
+_s95_own_source = read(Path(__file__))
+_s95_suite95_start = _s95_own_source.find("Suite 95 — eval-as-spec")
+_s95_suite95_end = _s95_own_source.find("# Marker: eval-as-spec")
+_s95_own_region = (
+    _s95_own_source[_s95_suite95_start:_s95_suite95_end]
+    if _s95_suite95_start >= 0 and _s95_suite95_end > _s95_suite95_start
+    else _s95_own_source[_s95_suite95_start:]
+)
+# Strip comment lines before scanning for invocation tokens
+_s95_code_lines = [
+    ln for ln in _s95_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s95_code_only = "\n".join(_s95_code_lines)
+check(
+    "suite95(17-no-agent-token): Suite 95 code (non-comment) region contains no Agent( invocation token",
+    "Agent(" not in _s95_code_only,
+    "Suite 95 must not contain Agent( in non-comment code — it is a pure text/JSON structural suite (no paid agent runs)",
+)
+
+# (18) Suite 95 own source code (non-comment lines) contains no subagent_type invocation token
+check(
+    "suite95(18-no-subagent-type): Suite 95 code (non-comment) region contains no subagent_type token",
+    "subagent_type" not in _s95_code_only,
+    "Suite 95 must not contain subagent_type in non-comment code — it is a pure text/JSON structural suite",
+)
+
+# (19) docs/testing.md registers Suite 95 + eval-as-spec marker
+_s95_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite95(19-registry): docs/testing.md registers 'Suite 95' and 'eval-as-spec' marker",
+    "Suite 95" in _s95_testing_md and "eval-as-spec" in _s95_testing_md,
+    "docs/testing.md must register Suite 95 and the eval-as-spec marker",
+)
+
+# (20) CLAUDE.md does NOT contain 'Suite 95' (§11 hygiene contract)
+_s95_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite95(20-hygiene): CLAUDE.md does NOT contain 'Suite 95'",
+    "Suite 95" not in _s95_claude_md,
+    "CLAUDE.md must not mention Suite 95 — docs/testing.md is the canonical registry (§11 hygiene contract)",
+)
+
+# Marker: eval-as-spec
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

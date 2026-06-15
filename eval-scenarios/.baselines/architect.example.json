@@ -1,0 +1,20 @@
+{
+  "agent": "architect",
+  "baseline_sha": "1477a26",
+  "recorded_at": "2026-06-15",
+  "k": 5,
+  "scenarios": [
+    {
+      "scenario": "design-as-spec",
+      "pass_rate": "5/5",
+      "verdict": "PASS",
+      "dimensions": {
+        "critical_rules": "5/5",
+        "never_boundaries": "5/5",
+        "expected_behaviors": "4/5",
+        "anti_patterns": "5/5",
+        "output_criteria": "5/5"
+      }
+    }
+  ]
+}

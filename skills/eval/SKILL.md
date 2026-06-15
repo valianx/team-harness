@@ -331,4 +331,167 @@ Show usage:
 /th:eval --list                    — list available scenarios
 /th:eval --create {agent-name}     — auto-generate scenarios from agent definition
 /th:eval {agent-name} --dry-run    — show evaluation plan without executing
+/th:eval {agent-name} --spec X     — run scenario X as an authored spec (Mode 5)
+/th:eval {agent-name} --k N        — run the scenario N times and report pass-rate P/k
+/th:eval {agent-name} --baseline S — compare results against baseline SHA S
 ```
+
+---
+name: eval
+
+## Mode 5 — `--spec` (eval-as-spec)
+
+Input pattern: `{agent-name} --spec {scenario-name} [--k N] [--baseline <sha>] [--dry-run]`
+
+A spec scenario is an authored quality contract: the pass/fail threshold is
+declared in the scenario file before the run, not derived after. The `--spec`
+mode reads the **pass-bar declaration** from the scenario and sets the pass/fail
+bar for the evaluation accordingly.
+
+### `--spec` argument
+
+- `--spec {name}`: required — the scenario to evaluate as a spec. The file must
+  be `eval-scenarios/{agent-name}/{name}.md` and must contain a
+  `## Pass-Bar Declaration` section. If the section is absent, report an error
+  and stop.
+
+**Parsing the pass-bar declaration:** when `--spec` is active, parse the
+`## Pass-Bar Declaration` section of the scenario file to extract:
+
+1. `minimum_pass_rate` — the minimum fraction of `--k` runs that must score
+   PASS overall (e.g., `4/5`). Parse as `numerator/denominator`.
+2. `failing_dimensions_allowed` — per-dimension pass floors (e.g.,
+   `0 on Critical Rules and NEVER Boundaries; 1 on others`). Read the full
+   text and apply it as soft rules for the per-dimension verdict.
+3. `rationale` — informational; include in the spec report header.
+
+The pass-bar sets the evaluation threshold for the run. A run where the
+pass-rate meets or exceeds `minimum_pass_rate` AND the per-dimension floors
+are satisfied is a **spec PASS**; otherwise it is a **spec FAIL**.
+
+### `--k N` argument — pass@k
+
+- `--k N`: optional — run the scenario N times and report the aggregate
+  pass-rate. Default: `--k 1` (today's single-run cost is preserved).
+- `N` must be a positive integer. If N > 1, the evaluation invokes the agent N
+  times and records each result independently.
+
+**Cost:** the `--k N` agent-run path is PAID. Each run costs approximately $1
+(one agent invocation). Total cost: **N × ~$1**. Use `--dry-run` to see the
+plan and cost estimate without spending a single run.
+
+**Cost-gated boundary:** the actual N agent invocations are NEVER part of
+`tests/run-all.sh`. They are operator-invoked only. Suite 95 (`run-all.sh`)
+tests the arg contract and report shape as text assertions — it never runs an
+agent.
+
+**Pipeline SHOULD-convention:** for tasks that change an agent's system prompt,
+authoring a `--spec` scenario as an acceptance criterion and running
+`/th:eval {agent} --spec {name} --k N` before shipping is recommended. This is
+a documented SHOULD, not a hard Stage-2 gate — a ≈$1–$5 non-deterministic run
+must not sit on the critical path of every agent-prompt PR.
+
+### pass@k report block
+
+After all `--k` runs for a scenario, produce the pass@k summary:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  /th:eval --spec — {agent-name} / {scenario-name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Spec pass-bar: {minimum_pass_rate} overall; {failing_dimensions_allowed}
+  Rationale: {rationale from pass-bar declaration}
+
+  Runs: {k}
+  pass-rate: {P}/{k}   (P = number of runs that scored PASS)
+  pass@k: {PASS|FAIL}  (PASS if P/k meets or exceeds minimum_pass_rate)
+
+  {if pass@k is FAIL:}
+  --- Spec Failures ---
+  Run {n}: [{category}] {criterion}: {evidence, max 2 lines}
+  ...
+```
+
+### `--baseline <sha>` argument — regression detection
+
+- `--baseline <sha>`: optional — compare the current run results against a
+  committed baseline file at `eval-scenarios/.baselines/{agent-name}.json`.
+  Report NEW failures only: scenarios that were `PASS` at `<sha>` and are now
+  `FAIL` (or whose `pass_rate` dropped below the baseline rate).
+
+Scenarios already failing at the baseline SHA are not re-flagged. The intent
+is regression detection, not a full rerun.
+
+**NEW-failures-vs-baseline report shape:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Baseline: {agent-name} @ {sha}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  NEW failures vs {sha}:
+  {if none:}   none — all previously-passing scenarios still pass
+
+  {if any:}
+  - {scenario}: was {baseline_verdict} ({baseline_pass_rate}), now {current_verdict} ({current_pass_rate})
+  ...
+
+  Scenarios already failing at baseline: {N} (not re-flagged)
+  Total scenarios evaluated: {M}
+```
+
+### Baseline file schema (`eval-scenarios/.baselines/{agent}.json`)
+
+The baseline file is committed to the repo and records pass rates from a
+previous paid run. It MUST carry the following REQUIRED keys:
+
+| Key | Level | Description |
+|-----|-------|-------------|
+| `agent` | top-level | Agent name (e.g., `"architect"`) |
+| `baseline_sha` | top-level | Git SHA the baseline was recorded at |
+| `k` | top-level | Number of runs per scenario used when recording |
+| `scenarios` | top-level | Array of per-scenario records |
+| `scenarios[].scenario` | per-scenario | Scenario name (`.md` filename without extension) |
+| `scenarios[].pass_rate` | per-scenario | Pass rate string (e.g., `"5/5"`) |
+| `scenarios[].verdict` | per-scenario | `"PASS"` or `"FAIL"` |
+
+OPTIONAL keys (allowed but not required):
+
+| Key | Level | Description |
+|-----|-------|-------------|
+| `recorded_at` | top-level | ISO date the baseline was recorded |
+| `scenarios[].dimensions` | per-scenario | Per-dimension score breakdown object |
+
+Example (`eval-scenarios/.baselines/architect.example.json`):
+
+```json
+{
+  "agent": "architect",
+  "baseline_sha": "1477a26",
+  "recorded_at": "2026-06-15",
+  "k": 5,
+  "scenarios": [
+    {
+      "scenario": "design-as-spec",
+      "pass_rate": "5/5",
+      "verdict": "PASS",
+      "dimensions": {
+        "critical_rules": "5/5",
+        "never_boundaries": "5/5",
+        "expected_behaviors": "4/5",
+        "anti_patterns": "5/5",
+        "output_criteria": "5/5"
+      }
+    }
+  ]
+}
+```
+
+Recording a real baseline (writing actual run data into the file) requires a
+paid run. That step is deferred — ship the schema now for format stability.
+
+### Output Discipline
+
+Follow the same Voice and Output Discipline rules as Modes 1–4. Status blocks
+and verdict lines are declarative; no enthusiasm markers; no padding.
