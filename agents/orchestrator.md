@@ -630,6 +630,8 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - worktree: {absolute path | null}             # worktree path for this task; null when running branch-in-place. Set at Phase 0a when a worktree is created. Teardown in delivery reads this field directly — no filesystem search needed.
 - worktree_branch: {branch name | null}        # branch checked out in the worktree; null when worktree is null
 - worktree_base: {origin/main | <dep-branch> | null}  # the ref the worktree branch was cut from; null when worktree is null
+- converge: {true | false | null}              # Phase 4.5 dual-review convergence activation. Auto-on (true) when bug_tier: 4 or security_sensitive: true; operator opt-in via payload converge: true; false/null = single-pass (OFF by default).
+- convergence: {round: N, last_verdict_A: APPROVE|REQUEST_CHANGES|null, last_verdict_B: APPROVE|REQUEST_CHANGES|null, status: running|converged|escalated}  # Phase 4.5 convergence loop state; null when converge is false/null. Mirrors the review-pr skill's convergence block.
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -2522,6 +2524,31 @@ Next: internal review (or Phase 5 if skipped)
 | `success` | 1+ | Proceed to Phase 5 BUT highlight the criticals in the report. The user can decide whether to amend the PR before merging or accept the risk. |
 | `failed` / `blocked` | (any) | Reviewer broke. Log the issue, retry once. If still failing, log a warning and proceed to Phase 5 (this phase is non-binding by design). |
 
+### Phase 4.5 — Dual-Review Convergence (when active)
+
+**Trigger resolution (evaluate before dispatching the reviewer):**
+
+1. **Auto-on** — `00-state.md` has `bug_tier: 4` OR `security_sensitive: true`. In these cases `converge` is automatically set to `true` and the convergence loop runs in place of the single-pass dispatch above.
+2. **Operator opt-in** — the task payload or `00-state.md` carries `converge: true` explicitly. The loop runs.
+3. **OFF by default** — all other runs (no `bug_tier: 4`, not `security_sensitive`, no explicit `converge: true`). The existing single-pass internal review runs unchanged. Low-tier pipeline runs are byte-behaviour-identical to today; no second pass, no added cost.
+
+**When active — loop mechanics:**
+
+Run the A/B convergence loop exactly per `agents/ref-direct-modes.md § Dual-Review Convergence`, with these pipeline-local bindings:
+
+- **Agent per pass:** `reviewer` (mode: `internal`) — the same agent that runs in the single-pass path above.
+- **Context isolation:** Pass A and Pass B each receive the same pre-fetched diff, changed-files list, and PR metadata for the current round. The two passes run concurrently and never read each other's draft — context-isolation between the two passes is mandatory. Each pass receives only the original diff/metadata from the current round; no prior-round artifacts are forwarded.
+- **Per-pass draft paths:** Pass A writes `04-internal-review-A.md` in the workspace; Pass B writes `04-internal-review-B.md`. These are disjoint from the single-pass `04-internal-review.md`.
+- **Pre-gate positioning:** The loop runs strictly BEFORE STAGE-GATE-3. It never calls a GitHub write verb (`gh pr review`, `POST /reviews`, or any equivalent). Writing to GitHub remains the exclusive responsibility of the Publish Gate after operator approval at STAGE-GATE-3.
+- **Comparator — three branches:**
+  1. Both passes emit `APPROVE` → verdict is `CONVERGED_APPROVE`. Proceed to the `**Report to user:**` block and then STAGE-GATE-3.
+  2. Both passes emit `REQUEST_CHANGES` → verdict is `CONVERGED_CHANGES`. Proceed to the report and STAGE-GATE-3 with criticals highlighted.
+  3. Passes diverge (one `APPROVE`, one `REQUEST_CHANGES`):
+     - If `round < 3`: run a fresh round. Fresh round dispatches only receive the original diff/policy/conversation — no prior-round artifacts are passed forward.
+     - If `round == 3` and still divergent: **STOP and escalate** both review bodies to the operator. The system cannot auto-resolve this disagreement and does not auto-resolve it under any circumstances. The operator decides the final verdict. Emit the canonical escalation STOP block from `agents/ref-direct-modes.md § Dual-Review Convergence`.
+- **Hard cap:** max 3 rounds. Escalation on round-3 divergence is unconditional.
+- **State recording:** Update `00-state.md` with the `convergence` block (`round`, `last_verdict_A`, `last_verdict_B`, `status` ∈ `running | converged | escalated`). Append a `review.convergence.round` event to `{docs_root}/{events_file}` for each round.
+
 **Report to user:**
 
 ```
@@ -3855,6 +3882,102 @@ Offer to report completed and failed worktree paths from `batch-progress.md`. Do
 - **On user abort:** clean up worktrees and report partial results
 - **Recovery:** if the dispatcher itself dies, `/th:recover --batch` reads `batch-progress.md` and re-launches
 - **No remote:** delivery creates local branches only. Dispatcher offers merge options at the end
+
+---
+
+## Parallel Batch Implementation
+
+**Applies only when the operator has authorized a batch of independent, ADDITIVE, single-repo items whose planning has already been fanned out.** When any eligibility condition is not met, fall back to serial implementation — this contract is opt-in and never automatic.
+
+**What this feature does.** When an autonomous batch fans out N architect designs and N plan-reviewers concurrently (Stage 1), it can also fan out their *implementation* concurrently — one implementer per `git worktree`, one commit per item — then consolidate into ONE PR. Today implementation serializes because every item appends to the same shared files (`tests/test_agent_structure.py`, `docs/testing.md`, `README`, the plugin version, the CHANGELOG). This contract removes that bottleneck via an edit-class split: item-local edits are safe in the worktree; shared-serial edits are spliced centrally in reserved order. Proven empirically in PR #338 (the prior Tier 3+4 batch). Full reference: `docs/parallel-batch-implementation.md`.
+
+### When this applies
+
+All of the following must hold:
+
+1. **Operator-authorized** — the operator approved the batch and its scope (the same authority gate as the #336/#338 batches).
+2. **Single repo** — all items land in the same repository.
+3. **ADDITIVE** — every item adds new files or makes pure insertions into shared files. No item rewrites existing lines owned by another item.
+4. **Independent** — no item depends on another item's output. Items that share a dependency must be serialized.
+5. **Pre-reserved suite block numbers** — each item was handed its reserved suite block number(s) at plan time. Concurrent implementers MUST NOT race to claim the next free suite number; reservation happens at planning (not at implementation).
+
+If any condition fails → fall back to serial implementation (today's default). This contract is opt-in and never fires automatically.
+
+### Worktree isolation
+
+Each item is implemented in its own `git worktree`, following `docs/worktree-discipline.md`:
+
+- **Rule 1:** `git fetch origin main` → `git worktree add -b <branch> <path> origin/main` → verify HEAD is on the fresh base.
+- **Rule 2:** no-silent-reuse collision check before creating the worktree (stop on an existing branch/path with the same name).
+- **Rule 5:** each item's worktree path, branch, and base commit are recorded in that item's `00-state.md` / `01-plan.md`.
+
+One worktree per item: concurrent implementers never contend on the same working tree because each holds its own.
+
+### Concurrent implementer fan-out
+
+Dispatch N implementers in parallel via concurrent `Task` calls in the parent session — the same in-message mechanism already live for `tester + qa + security` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`. Cap by `batch_concurrency` (default 5) using the eager slot-fill wave model from `## Multi-Task Orchestration § Step 4`. This mirrors the Stage-1 planning fan-out on the implementation side.
+
+### Edit-class split
+
+Every file touched by an item MUST be declared in that item's `01-plan.md` with its edit class. Two classes:
+
+| Class | Examples | Where edited | Reconciliation at consolidation |
+|-------|----------|--------------|--------------------------------|
+| **item-local** | new skill/agent/script file; the item's own pre-reserved suite block; the item's own new doc | inside the item's worktree — no other item touches it | wholesale `git checkout <branch> -- <paths>` |
+| **shared-serial** | `tests/test_agent_structure.py` suite blocks (collectively), `docs/testing.md` registry rows, `README` / `skills/README.md` listings, `.claude-plugin/plugin.json` + `marketplace.json`, `CHANGELOG.md` / `changelog.d/` | NEVER edited inside the worktree — the item reserves its insertion block in its plan; the actual splice happens centrally at consolidation | extract each item's added block and splice in reserved order |
+
+**The invariant:** a shared-serial file is NEVER edited in a worktree. An item that needs to "edit" a shared-serial file instead declares its reserved insertion block in its plan; the orchestrator splices all blocks centrally at consolidation in reserved order.
+
+### Consolidation
+
+After all parallel implementers finish and each item passes its in-worktree verify:
+
+**Item-local files:**
+
+```
+git checkout <item-branch> -- <item-local-paths>
+```
+
+Safe because the edit-class split guarantees no two items touch the same item-local file.
+
+**Shared-serial files:**
+
+Walk items in **reserved order** (lowest reserved suite number / earliest registry slot first). From each item's worktree branch extract ONLY its added block (the pure insertion — `git diff` added lines for that file, scoped to the item's reserved region) and concatenate the blocks in order into the single shared file. Because every shared-serial edit is a pure insertion at a reserved, non-overlapping location, concatenation in reserved order reproduces the intended final file with no merge conflict.
+
+**Version + CHANGELOG:** done ONCE at batch end by delivery (single version bump; one consolidated changelog entry). Items do NOT bump the version.
+
+Full splice algorithm and the PR #338 worked example (suite blocks 100–105 spliced in number order): `docs/parallel-batch-implementation.md § Consolidation`.
+
+### Verify
+
+**Per-item, in the worktree:**
+
+```
+python3 tests/test_agent_structure.py
+```
+
+Use the single suite file directly. NOT concurrent `run-all.sh` — concurrent `run-all.sh` invocations chain `checkpoint-guard` on stdin and orphan bash trees on Windows (known platform constraint). Per-item verify is necessary but not sufficient.
+
+**On the consolidated tree, once:**
+
+```
+bash tests/run-all.sh
+```
+
+Run the full suite exactly ONCE as the mandatory safety net that catches cross-item interactions the isolated per-item runs cannot see. The single consolidated full-suite run is the gate; per-item verify does not substitute for it.
+
+### Consolidator role and directives
+
+Consolidation is owned by a SINGLE designated consolidator — the top-level orchestrator, never a subagent and never split across actors. The consolidator is the ONLY writer of shared-serial files; parallel implementers never reconcile each other's work. This single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file: observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated (each commit ended up carrying the other item's suite block). The consolidator follows four directives:
+
+1. **Re-derive, do not trust.** Treat every worktree's copy of a shared-serial file as untrusted. Rebuild each shared-serial file from `base + each item's reserved block`, extracting each item's block via `git diff <base>..<item-branch>`; never adopt a worktree's mutated shared file wholesale.
+2. **All new suites must pass together.** Run `bash tests/run-all.sh` exactly once on the consolidated tree; EVERY separately-authored suite (106, 107, …) must pass in that single together-run. A per-item in-worktree pass is necessary but never sufficient — the together-run is the gate, and the consolidation is not done until it is green.
+3. **No new suite may break a global guard.** A new suite's non-comment source must not embed the literal agent-invocation tokens that the whole-file free-suite guard scans for; phrase no-agent-call descriptions generically and assemble the tokens in variables (`"Age" + "nt("`), exactly as the sibling suites do. Observed live: a new suite's check description embedded the literal tokens and tripped the whole-file Suite 98 guard — caught only by the together-run, never by per-item verify.
+4. **One actor, one sequence.** The consolidator performs the item-local checkouts, the shared-serial re-derivation, the single version bump, and the CHANGELOG assembly as one serial sequence in the parent session — never concurrently with another consolidation step.
+
+**Empirical basis:** this contract was dogfooded live in PR #338 — N items planned in parallel, implemented across isolated worktrees, item-local files checked out wholesale, shared-serial suite blocks and registry rows spliced in reserved order, single final `run-all.sh` green — and proven to work. The Consolidator directives above were added after a later batch hit the cross-contamination and global-guard failure modes they now forbid. The contract codifies that proven-and-hardened procedure.
+
+**Marker: parallel-batch-implementation**
 
 ---
 

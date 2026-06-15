@@ -23750,6 +23750,419 @@ check(
 # Marker: opencode-distribution-roadmap
 
 # ---------------------------------------------------------------------------
+# Suite 106 — parallel-batch-implementation
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 106: parallel-batch-implementation doc-structure guard ===")
+
+_s106_orch_path   = AGENTS_DIR / "orchestrator.md"
+_s106_doc_path    = REPO_ROOT / "docs" / "parallel-batch-implementation.md"
+_s106_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s106_claude_md   = read(REPO_ROOT / "CLAUDE.md")
+_S106_STOP        = ("\n## ", "\n---\n")
+
+_s106_orch = read(_s106_orch_path)
+
+# (1) orchestrator.md contains the exact section anchor
+check(
+    "suite106(1-orch-section): agents/orchestrator.md contains '## Parallel Batch Implementation'",
+    "## Parallel Batch Implementation" in _s106_orch,
+    "agents/orchestrator.md must contain the exact header '## Parallel Batch Implementation'",
+)
+
+# (2) the section carries its trailing marker (anchor-scoped)
+_s106_slice = _slice_section(_s106_orch, "## Parallel Batch Implementation", _S106_STOP)
+check(
+    "suite106(2-marker): section slice is non-empty AND contains '**Marker: parallel-batch-implementation**'",
+    len(_s106_slice) > 0 and "**Marker: parallel-batch-implementation**" in _s106_slice,
+    "the ## Parallel Batch Implementation section must end with '**Marker: parallel-batch-implementation**'; "
+    "missing anchor yields empty slice (anti-false-green)",
+)
+
+# (3) worktree-isolation language
+check(
+    "suite106(3-worktree-isolation): section slice contains worktree-isolation language",
+    "worktree" in _s106_slice
+    and ("worktree-discipline" in _s106_slice or "origin/main" in _s106_slice)
+    and (
+        "one worktree per item" in _s106_slice
+        or ("per item" in _s106_slice and "worktree" in _s106_slice)
+    ),
+    "section must describe worktree isolation citing worktree-discipline or origin/main, "
+    "and reference one worktree per item",
+)
+
+# (4) edit-class split: item-local AND shared-serial
+check(
+    "suite106(4-edit-class-split): section slice contains 'item-local' AND 'shared-serial'",
+    "item-local" in _s106_slice and "shared-serial" in _s106_slice,
+    "section must contain both 'item-local' and 'shared-serial' to define the edit-class split",
+)
+
+# (5) consolidation step: wholesale + splice + reserved order
+check(
+    "suite106(5-consolidation): section slice contains consolidation language",
+    ("git checkout" in _s106_slice or "wholesale" in _s106_slice)
+    and ("splice" in _s106_slice or "insertion" in _s106_slice)
+    and "reserved order" in _s106_slice,
+    "section must describe consolidation with wholesale checkout, splice/insertion, and reserved order",
+)
+
+# (6) concurrent fan-out: (concurrent OR parallel) AND implementer AND batch_concurrency
+check(
+    "suite106(6-fanout): section slice contains concurrent implementer fan-out language",
+    ("concurrent" in _s106_slice or "parallel" in _s106_slice)
+    and "implementer" in _s106_slice
+    and "batch_concurrency" in _s106_slice,
+    "section must describe concurrent/parallel implementer fan-out capped by batch_concurrency",
+)
+
+# (7) per-item verify: python3 tests/test_agent_structure.py NOT concurrent run-all.sh
+check(
+    "suite106(7-per-item-verify): section names python3 tests/test_agent_structure.py "
+    "and a negative clause for concurrent run-all.sh",
+    "python3 tests/test_agent_structure.py" in _s106_slice
+    and "run-all.sh" in _s106_slice
+    and (
+        "NOT" in _s106_slice
+        or "not concurrent" in _s106_slice.lower()
+        or "never" in _s106_slice.lower()
+    ),
+    "section must state per-item verify uses python3 tests/test_agent_structure.py "
+    "and NOT concurrent run-all.sh",
+)
+
+# (8) single consolidated full-suite safety net
+check(
+    "suite106(8-safety-net): section slice names the single consolidated full-suite run",
+    "run-all.sh" in _s106_slice
+    and (
+        "once" in _s106_slice
+        or "safety net" in _s106_slice
+        or "consolidated" in _s106_slice
+    ),
+    "section must name the single consolidated run-all.sh as the safety net",
+)
+
+# (9) empirical basis: PR #338 cited
+check(
+    "suite106(9-empirical-basis): section slice cites '#338' as the empirical basis",
+    "#338" in _s106_slice or "PR #338" in _s106_slice,
+    "section must cite PR #338 as the proven empirical basis",
+)
+
+# (9b) consolidator role + all-suites-pass-together directive
+_s106_slice_lower = _s106_slice.lower()
+check(
+    "suite106(9b-consolidator): section names a single consolidator that re-derives shared-serial "
+    "files and requires all new suites to pass together",
+    "consolidator" in _s106_slice_lower
+    and ("re-derive" in _s106_slice_lower or "untrusted" in _s106_slice_lower)
+    and ("pass together" in _s106_slice_lower or "together-run" in _s106_slice_lower),
+    "section must define a single consolidator that re-derives shared-serial files from base "
+    "(never trusting a worktree's copy) and require all separately-authored suites to pass together in one run",
+)
+
+# (10) docs/parallel-batch-implementation.md exists and contains required content
+_s106_doc_exists = _s106_doc_path.exists()
+check(
+    "suite106(10-doc-exists): docs/parallel-batch-implementation.md exists and contains "
+    "'item-local', 'shared-serial', and 'reserved order'",
+    _s106_doc_exists,
+    "docs/parallel-batch-implementation.md must exist",
+)
+_s106_doc = read(_s106_doc_path) if _s106_doc_exists else ""
+check(
+    "suite106(10b-doc-content): doc contains 'item-local', 'shared-serial', and 'reserved order'",
+    len(_s106_doc) > 0
+    and "item-local" in _s106_doc
+    and "shared-serial" in _s106_doc
+    and "reserved order" in _s106_doc,
+    "docs/parallel-batch-implementation.md must contain 'item-local', 'shared-serial', "
+    "and 'reserved order'",
+)
+
+# (11) provenance guard — no external-project/method token; no markdown-link URL syntax
+# Assembled programmatically so this guard file does not contain the forbidden
+# literals verbatim — mirrors the "EC"+"C" idiom used in Suites 96/99/105.
+_S106_FORBIDDEN = [
+    "EC" + "C",           # external security project name
+    "Agent" + "Shield",   # associated tool brand
+]
+_s106_no_forbidden_orch = all(tok not in _s106_slice for tok in _S106_FORBIDDEN)
+_s106_no_forbidden_doc  = all(tok not in _s106_doc  for tok in _S106_FORBIDDEN)
+check(
+    "suite106(11-provenance): section slice and doc contain no forbidden external-project/method token",
+    _s106_no_forbidden_orch and _s106_no_forbidden_doc,
+    "neither the orchestrator section nor the reference doc must contain a forbidden external-project token",
+)
+check(
+    "suite106(11b-plain-urls): doc contains no markdown-link URL syntax ('](http')",
+    "](http" not in _s106_doc,
+    "docs/parallel-batch-implementation.md must use plain URLs only, not markdown-link syntax",
+)
+
+# (12) combined: registry + hygiene + self-ref + no-agent-token free-suite guard
+_s106_own_source = read(Path(__file__))
+# no-agent-token: scope to the Suite 106 region of this file
+_s106_own_region_start = _s106_own_source.find("Suite 106 — parallel-batch-implementation")
+_s106_own_region_end   = _s106_own_source.find("# Marker: parallel-batch-implementation")
+_s106_own_region = (
+    _s106_own_source[_s106_own_region_start:_s106_own_region_end]
+    if _s106_own_region_start != -1 and _s106_own_region_end != -1
+    else ""
+)
+# Strip comment lines before the agent-token check
+_s106_non_comment_lines = [
+    ln for ln in _s106_own_region.splitlines()
+    if not ln.lstrip().startswith("#")
+]
+_s106_non_comment = "\n".join(_s106_non_comment_lines)
+
+check(
+    "suite106(12-registry-hygiene-selfref-noagent): registry + hygiene + self-ref + no-agent-token",
+    (
+        "Suite 106" in _s106_testing_md
+        and "parallel-batch-implementation" in _s106_testing_md
+    )
+    and ("Suite 106" not in _s106_claude_md)
+    and (
+        "Suite 106" in _s106_own_source
+        and "_slice_section" in _s106_own_source
+        and "parallel-batch-implementation" in _s106_own_source
+    )
+    and (
+        ("Age" + "nt(") not in _s106_non_comment
+        and ("subagent" + "_type") not in _s106_non_comment
+    ),
+    "docs/testing.md must register Suite 106 + marker; CLAUDE.md must NOT contain 'Suite 106'; "
+    "test file must self-reference Suite 106 + _slice_section + marker; "
+    "no-agent-token guard must pass (no agent-invocation tokens in non-comment Suite 106 region)",
+)
+
+# Marker: parallel-batch-implementation
+
+# ---------------------------------------------------------------------------
+# Suite 107 — convergence-stage3
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 107: convergence-stage3 structural contract ===")
+
+_s107_orch_text     = read(AGENTS_DIR / "orchestrator.md")
+_s107_ref_text      = read(AGENTS_DIR / "ref-direct-modes.md")
+_s107_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s107_claude_md     = read(REPO_ROOT / "CLAUDE.md")
+
+# Stop tuples — per S4 fix: the orchestrator P45 slice must NOT use "\n### " as a
+# stop token because the convergence sub-step is itself a ### heading. Use a
+# Phase 4.5-level stop tuple that terminates at the next ## or --- separator.
+# Reserve the ### stop only for the ref-direct-modes slice (a ### -level section).
+_S107_P45_STOP  = ("\n## ", "\n---\n")           # orchestrator: stops at next ## or ---
+_S107_REF_STOP  = ("\n## ", "\n### ", "\n---\n") # ref-direct-modes: stops at next ## or ###
+
+# ── Orchestrator Phase 4.5 region ────────────────────────────────────────
+_S107_P45_ANCHOR = "## Phase 4.5 — Internal Review"
+_s107_orch_p45 = _slice_section(_s107_orch_text, _S107_P45_ANCHOR, _S107_P45_STOP)
+
+# (1) suite107(1-p45-section): section exists and contains a convergence sub-step
+check(
+    "suite107(1-p45-section): orchestrator.md '## Phase 4.5 — Internal Review' section "
+    "exists and contains a convergence sub-step",
+    bool(_s107_orch_p45)
+    and "convergence" in _s107_orch_p45.lower()
+    and "Dual-Review Convergence" in _s107_orch_p45,
+    "Phase 4.5 section must exist and contain a convergence sub-step with 'Dual-Review Convergence'",
+)
+
+# (2) suite107(2-p45-points-canonical): sub-step POINTS to ref-direct-modes canonical contract
+check(
+    "suite107(2-p45-points-canonical): Phase 4.5 convergence sub-step points to "
+    "agents/ref-direct-modes.md and 'Dual-Review Convergence' (reuse, not a second copy)",
+    bool(_s107_orch_p45)
+    and "ref-direct-modes.md" in _s107_orch_p45
+    and "Dual-Review Convergence" in _s107_orch_p45,
+    "Phase 4.5 sub-step must reference 'ref-direct-modes.md' and 'Dual-Review Convergence' "
+    "to prove it delegates to the canonical contract rather than duplicating it",
+)
+
+# (3) suite107(3-p45-ab-isolation): documents two context-isolated passes + disjoint draft paths
+check(
+    "suite107(3-p45-ab-isolation): Phase 4.5 sub-step documents context-isolated passes "
+    "with disjoint draft paths 04-internal-review-A and 04-internal-review-B",
+    bool(_s107_orch_p45)
+    and ("Pass A" in _s107_orch_p45 or "pass A" in _s107_orch_p45)
+    and ("Pass B" in _s107_orch_p45 or "pass B" in _s107_orch_p45)
+    and (
+        "isolation" in _s107_orch_p45.lower()
+        or "never read" in _s107_orch_p45.lower()
+        or "only the original" in _s107_orch_p45.lower()
+    )
+    and "04-internal-review-A" in _s107_orch_p45
+    and "04-internal-review-B" in _s107_orch_p45,
+    "Phase 4.5 sub-step must document Pass A / Pass B context-isolation and the "
+    "disjoint draft paths 04-internal-review-A.md / 04-internal-review-B.md",
+)
+
+# (4) suite107(4-p45-comparator): documents three-branch comparator with CONVERGED_APPROVE and CONVERGED_CHANGES
+check(
+    "suite107(4-p45-comparator): Phase 4.5 sub-step documents three-branch comparator "
+    "with CONVERGED_APPROVE and CONVERGED_CHANGES outcomes",
+    bool(_s107_orch_p45)
+    and "CONVERGED_APPROVE" in _s107_orch_p45
+    and "CONVERGED_CHANGES" in _s107_orch_p45
+    and (
+        "diverge" in _s107_orch_p45.lower()
+        or "divergent" in _s107_orch_p45.lower()
+    ),
+    "Phase 4.5 sub-step must document CONVERGED_APPROVE, CONVERGED_CHANGES, and a diverge branch",
+)
+
+# (5) suite107(5-p45-cap): documents the hard 3-round cap
+check(
+    "suite107(5-p45-cap): Phase 4.5 sub-step documents hard 3-round cap",
+    bool(_s107_orch_p45)
+    and (
+        "max 3 rounds" in _s107_orch_p45
+        or "max 3" in _s107_orch_p45
+        or "3 rounds" in _s107_orch_p45
+    ),
+    "Phase 4.5 sub-step must document the hard 3-round cap",
+)
+
+# (6) suite107(6-p45-escalate-never-autoresolve): documents STOP-and-escalate + never-auto-resolve
+check(
+    "suite107(6-p45-escalate-never-autoresolve): Phase 4.5 sub-step documents "
+    "STOP-and-escalate and an explicit never-auto-resolve clause",
+    bool(_s107_orch_p45)
+    and (
+        "escalate" in _s107_orch_p45.lower()
+        or "STOP" in _s107_orch_p45
+    )
+    and (
+        "never auto-resolve" in _s107_orch_p45
+        or "never auto" in _s107_orch_p45.lower()
+        or "cannot auto-resolve" in _s107_orch_p45
+        or "does not auto-resolve" in _s107_orch_p45
+    ),
+    "Phase 4.5 sub-step must document STOP-and-escalate and an explicit never-auto-resolve clause",
+)
+
+# (7) suite107(7-p45-before-gate3): loop runs strictly BEFORE STAGE-GATE-3 and never calls write verb
+check(
+    "suite107(7-p45-before-gate3): Phase 4.5 sub-step states convergence runs strictly "
+    "BEFORE STAGE-GATE-3 and never calls a write verb",
+    bool(_s107_orch_p45)
+    and ("BEFORE" in _s107_orch_p45 or "before" in _s107_orch_p45)
+    and "STAGE-GATE-3" in _s107_orch_p45
+    and (
+        "never calls" in _s107_orch_p45.lower()
+        or "never publishes" in _s107_orch_p45.lower()
+        or "write verb" in _s107_orch_p45.lower()
+    ),
+    "Phase 4.5 sub-step must state the loop runs strictly BEFORE STAGE-GATE-3 "
+    "and never calls a write verb",
+)
+
+# (8) suite107(8-p45-trigger-policy): documents Tier-4 auto-on + opt-in flag + OFF-default
+check(
+    "suite107(8-p45-trigger-policy): Phase 4.5 sub-step documents Tier-4/security-sensitive "
+    "auto-on trigger using existing signals + operator opt-in via 'converge' + OFF by default",
+    bool(_s107_orch_p45)
+    and (
+        "Tier 4" in _s107_orch_p45
+        or "bug_tier: 4" in _s107_orch_p45
+        or "security_sensitive" in _s107_orch_p45
+    )
+    and (
+        "auto-on" in _s107_orch_p45
+        or "auto-enabled" in _s107_orch_p45
+        or "automatically" in _s107_orch_p45.lower()
+    )
+    and "converge" in _s107_orch_p45
+    and (
+        "OFF by default" in _s107_orch_p45
+        or "default" in _s107_orch_p45.lower()
+    ),
+    "Phase 4.5 sub-step must document Tier-4/security_sensitive auto-on, "
+    "operator opt-in via 'converge', and OFF by default for low-tier runs",
+)
+
+# (9) suite107(9-p45-state-and-event): documents 00-state.md convergence recording + review.convergence.round event
+check(
+    "suite107(9-p45-state-and-event): Phase 4.5 sub-step documents 00-state.md convergence "
+    "block recording and the review.convergence.round event",
+    bool(_s107_orch_p45)
+    and "00-state.md" in _s107_orch_p45
+    and "convergence" in _s107_orch_p45
+    and "review.convergence.round" in _s107_orch_p45,
+    "Phase 4.5 sub-step must document both 00-state.md convergence block recording "
+    "and the review.convergence.round event",
+)
+
+# ── ref-direct-modes cross-pointer ────────────────────────────────────────
+_S107_REF_ANCHOR = "### Dual-Review Convergence"
+_s107_ref_conv = _slice_section(_s107_ref_text, _S107_REF_ANCHOR, _S107_REF_STOP)
+
+# (10) suite107(10-ref-crosspointer): canonical section carries cross-pointer to pipeline Phase 4.5
+check(
+    "suite107(10-ref-crosspointer): agents/ref-direct-modes.md '### Dual-Review Convergence' "
+    "carries a cross-pointer referencing the pipeline Phase 4.5 internal review",
+    bool(_s107_ref_conv)
+    and "Phase 4.5" in _s107_ref_conv
+    and (
+        "pipeline" in _s107_ref_conv.lower()
+        or "internal review" in _s107_ref_conv.lower()
+    ),
+    "ref-direct-modes.md '### Dual-Review Convergence' must carry a cross-pointer to Phase 4.5 "
+    "noting it as a second call site of the convergence contract",
+)
+
+# ── Registry / hygiene / free-suite / self-ref ────────────────────────────
+
+# (11) suite107(11-registry): docs/testing.md registers Suite 107 and convergence-stage3 marker
+check(
+    "suite107(11-registry): docs/testing.md registers 'Suite 107' and 'convergence-stage3' marker",
+    "Suite 107" in _s107_testing_md and "convergence-stage3" in _s107_testing_md,
+    "docs/testing.md must register Suite 107 and the convergence-stage3 marker",
+)
+
+# (12) suite107(12-hygiene): CLAUDE.md does NOT contain 'Suite 107' (§11 hygiene contract)
+check(
+    "suite107(12-hygiene): CLAUDE.md does NOT contain 'Suite 107'",
+    "Suite 107" not in _s107_claude_md,
+    "CLAUDE.md must not mention Suite 107 — only docs/testing.md is the canonical registry",
+)
+
+# (13) suite107(13-no-agent-call): Suite 107 non-comment own source invokes no agent-dispatch API
+_s107_own_source = read(Path(__file__))
+_s107_non_comment_lines = [
+    line for line in _s107_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s107_non_comment_text = "\n".join(_s107_non_comment_lines)
+_s107_suite_start = _s107_non_comment_text.rfind("Suite 107")
+_s107_agent_tok = "Age" + "nt("
+_s107_subagent_tok = "subagent" + "_type"
+check(
+    "suite107(13-no-agent-call): Suite 107 non-comment source contains no agent-invocation tokens (free structural suite guarantee)",
+    _s107_agent_tok not in _s107_non_comment_text[_s107_suite_start:]
+    and _s107_subagent_tok not in _s107_non_comment_text[_s107_suite_start:],
+    "Suite 107 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+
+# (14) suite107(14-self-ref): test file contains 'Suite 107', '_slice_section', and 'convergence-stage3'
+check(
+    "suite107(14-self-ref): test file contains 'Suite 107', '_slice_section', "
+    "and 'convergence-stage3'",
+    "Suite 107" in _s107_own_source
+    and "_slice_section" in _s107_own_source
+    and "convergence-stage3" in _s107_own_source,
+    "test file must self-reference Suite 107 + _slice_section + the convergence-stage3 marker",
+)
+
+# Marker: convergence-stage3
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

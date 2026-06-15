@@ -291,6 +291,8 @@ Action required: operator reviews both bodies and decides the final verdict.
 The system cannot auto-resolve this disagreement. Resume with the chosen verdict.
 ```
 
+**Pipeline call site:** The SDD pipeline's Phase 4.5 internal review (`agents/orchestrator.md § Phase 4.5 — Internal Review`) reuses this same convergence contract for its pre-STAGE-GATE-3 dual-review pass. The `skills/review-pr` Phase 3.1 standalone path and the pipeline Phase 4.5 path are the two call sites of this contract.
+
 ## Read-Only Working-Tree Guard
 
 This guard applies to the `review` direct mode running over the operator's active repository. It does NOT apply to the `/th:review-pr` skill flow, which already runs in a separate worktree with a cleanup trap (`skills/review-pr/SKILL.md:71-78`) and does not mutate the operator's checkout.

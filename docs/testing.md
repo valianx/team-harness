@@ -383,6 +383,40 @@ Suite 105 + marker; (9) `CLAUDE.md` does NOT contain `Suite 105` (§11 hygiene c
 anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails).
 Marker: `opencode-distribution-roadmap`.
 
+### Suite 106 — parallel-batch-implementation
+
+12 checks. Doc-structure guard for the orchestrator's parallel-batch-implementation contract
+(in-message implementer fan-out across worktrees for a single-repo additive batch, consolidated
+to ONE PR). File: `tests/test_agent_structure.py`. Pure text/file reads — no agent invocation,
+no paid spend. Asserts: (1) `agents/orchestrator.md` carries the `## Parallel Batch Implementation`
+section; (2) the section carries its trailing marker; (3) worktree-isolation language; (4) the
+item-local-vs-shared-serial edit-class split; (5) the consolidation step (wholesale checkout +
+reserved-order insertion splice); (6) concurrent implementer fan-out capped by `batch_concurrency`;
+(7) per-item verify is `python3 tests/test_agent_structure.py`, not concurrent `run-all.sh`;
+(8) the single consolidated full-suite safety net; (9) PR #338 cited as empirical basis;
+(10) `docs/parallel-batch-implementation.md` exists and carries the edit-class split +
+reserved-order splice; (11) provenance guard — no external-project/method token, plain URLs only;
+(12) registry + hygiene (`CLAUDE.md` lacks `Suite 106`) + self-ref + no-agent-token free-suite
+guard. All content checks use anchor-scoped `_slice_section` (missing anchor → empty slice →
+check fails). Marker: `parallel-batch-implementation`.
+
+### Suite 107 — convergence-stage3
+
+Pure text/file reads — no agent invocation, no paid spend. Asserts the SDD pipeline's
+Phase 4.5 internal review wires the EXISTING dual-review convergence loop: (1) Phase 4.5
+section has a convergence sub-step; (2) it points to the canonical ref-direct-modes
+contract (no second copy); (3) A/B context-isolation + disjoint -A/-B draft paths;
+(4) three-branch comparator; (5) max 3 rounds; (6) STOP-and-escalate never-auto-resolve;
+(7) runs BEFORE STAGE-GATE-3 + never calls a write verb; (8) Tier-4 auto-on + opt-in +
+OFF default trigger policy; (9) 00-state.md convergence block + review.convergence.round
+event; (10) ref-direct-modes carries the Phase 4.5 cross-pointer; (11) docs/testing.md
+registers Suite 107 + marker; (12) CLAUDE.md does NOT contain Suite 107 (§11 hygiene);
+(13) Suite 107 non-comment source has no agent-invocation token; (14) test file
+self-references Suite 107 + _slice_section + marker. All content checks use anchor-scoped
+3-arg _slice_section.
+
+Marker: `convergence-stage3`.
+
 ## When to add a test
 
 Any new pattern in `policy-block.sh` (new denylist or allowlist case) MUST be backed by an `assert_deny` / `assert_allow` line. Any new pipeline phase, new agent contract field, or new mandatory section MUST be backed by a `check(...)` line in the appropriate suite of `test_agent_structure.py`. Any new agent file in `agents/` is picked up automatically by `test_agent_frontmatter.py` — no manual addition needed; the test fails immediately if its YAML does not parse. All three files are append-only by design — refactor an assertion only when the assertion itself is wrong.
