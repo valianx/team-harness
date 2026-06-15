@@ -7,10 +7,11 @@
 # one combined JSON. None contribute → emit nothing, exit 0 (session start
 # is never blocked).
 #
-# Three sources are loaded:
-#   1. load_orchestrator   — unconditional orchestrator disposition (SEC-DR-2 re-founded)
-#   2. load_language       — .team-harness.json `language`
-#   3. load_workspace_mode — .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`
+# Four sources are loaded:
+#   1. load_orchestrator       — unconditional orchestrator disposition (SEC-DR-2 re-founded)
+#   2. load_language           — .team-harness.json `language`
+#   3. load_english_learning   — .team-harness.json `english_learning` (boolean, opt-in)
+#   4. load_workspace_mode     — .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`
 #
 # Security (SEC-DR-A/B/C):
 #   A — each config-derived value is validated with a FULL-STRING check before
@@ -39,9 +40,10 @@ cat >/dev/null 2>&1 || true
 
 # ============================================================================
 # REGISTRY — session-init loads, in invocation order:
-#   1. load_orchestrator   (unconditional — orchestrator disposition, always)
-#   2. load_language       (source: .team-harness.json `language`)
-#   3. load_workspace_mode (source: .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`)
+#   1. load_orchestrator       (unconditional — orchestrator disposition, always)
+#   2. load_language           (source: .team-harness.json `language`)
+#   3. load_english_learning   (source: .team-harness.json `english_learning`; boolean, opt-in; off when key is absent/false/non-true)
+#   4. load_workspace_mode     (source: .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`)
 #
 # To add a new session-init load:
 #   (1) write a load_<name> function that VALIDATES its source and echoes its
@@ -121,7 +123,58 @@ load_language() {
 }
 
 # ----------------------------------------------------------------------------
-# Load 3 — workspace mode
+# Load 3 — english-learning correction mode
+# SEC-DR-A: boolean-safe parse — only the exact literal "true" enables the mode.
+# Any other value (false / absent / empty / malformed / multiline) → return 0
+# (contribute nothing). The directive is a fixed ASCII template with ZERO config
+# interpolation; the boolean is never echoed into output. This is strictly safer
+# than load_language, which interpolates the validated $lang token.
+# Placed after load_language so the response-language directive is established
+# before the correction directive (load order matters per the plan).
+# ----------------------------------------------------------------------------
+load_english_learning() {
+    [ -f "$CONFIG" ] || return 0
+
+    # Extract the english_learning boolean value. Try jq first; fall back to
+    # pure-bash grep for the JSON boolean literal (not a quoted string).
+    local el=""
+    if command -v jq >/dev/null 2>&1; then
+        # jq -r outputs "true", "false", or empty when the key is absent/null.
+        el=$(jq -r '.english_learning // empty' "$CONFIG" 2>/dev/null) || el=""
+    else
+        # Bash fallback: match the unquoted boolean literal true.
+        # Pattern: "english_learning": true (with optional whitespace).
+        el=$(grep -o '"english_learning"[[:space:]]*:[[:space:]]*true' "$CONFIG" 2>/dev/null \
+             | sed 's/.*:[[:space:]]*//' 2>/dev/null) || el=""
+    fi
+
+    # BOOLEAN-SAFE: only the exact literal "true" enables the mode.
+    # false / absent / empty / malformed / multiline → contribute nothing.
+    [ "$el" = "true" ] || return 0
+
+    # SEC-DR-B: fixed ASCII template — NO config bytes are interpolated here.
+    # The boolean was parsed to an on/off decision above and is never echoed.
+    directives+=( 'Team Harness english-learning mode is active for this session. At the START of every reply, when the operator'"'"'s latest message is written in English, give one brief, low-key learning signal, then continue and answer the operator'"'"'s request normally in the same turn. Keep the signal unobtrusive — the operator is learning passively while working, so the signal must never dominate the reply or stall the conversation.
+
+Every message gets a signal (kept minimal). If the operator'"'"'s English message is already correct, acknowledge it with the plain-ASCII emoticon :) on its own short line — nothing more (do NOT render it as an emoji glyph; it is the literal two-character sequence). If the message contains a correctable error, show the compact correction block instead. Either way, the substantive answer follows in the same turn.
+
+What to correct (selective, not comprehensive). Correct treatable, rule-governed errors — verb tense, subject-verb agreement, articles, prepositions, plurals, capitalization, word order — and any error that genuinely impedes comprehension. Do NOT flag stylistic choices, informal register, idiomatic phrasing, or acceptable alternatives. If you are unsure whether something is an error, leave it and treat the message as correct (:)).
+
+Correction format (compact, minimal-edit, labeled). Present the corrected version of the operator'"'"'s message, changing ONLY what is wrong and preserving their phrasing and meaning — minimal edits, not a fluency rewrite. After it, give a brief metalinguistic label for each fix (for example: "past tense", "article", "subject-verb agreement"). Keep it to a few words per fix; do not write a grammar lesson by default. No diff symbols, no color codes — chat is plain text.
+
+Turn structure (signal first, then continue). The learning signal (:) or the correction block) comes first; the substantive answer to the operator'"'"'s actual request follows in the same reply. Never stall the conversation waiting for acknowledgement, and never let the signal replace the answer.
+
+Explanation only on explicit request. Do not append grammar explanations to the default turn. Provide a fuller, rule-based explanation ONLY when the operator explicitly asks (for example "why?", "explain that", "explicá"). When asked, keep the explanation atomic and rule-based: one edit, one reason, concise — not an extended lesson.
+
+Exemptions — never "correct" these. Code, commands, file paths, URLs, identifiers, proper nouns, and any message NOT written in English (for example Spanish) are out of scope: do not evaluate them for English grammar, do not rewrite them, and do not emit a :) for a non-English message. If the message mixes English prose with code/paths, correct only the English prose around them.
+
+Failure modes to guard. (a) Do not over-correct — the default tendency is to rewrite correct text for fluency; resist it, especially for already-fluent messages. (b) Keep each correction local to the sentence where the error occurs. (c) Do not correct register or style as if it were a grammar error.
+
+Affective posture. Keep the signal brief, neutral, and non-punitive — the goal is to help, not to grade. This learning signal targets the operator'"'"'s English only; your own prose stays under the standard neutral-register voice rules.' )
+}
+
+# ----------------------------------------------------------------------------
+# Load 4 — workspace mode
 # SEC-DR-A: logs-path is rejected if it contains any control character.
 # Default logs-subfolder: work-logs.
 # Directive framed for dev-mode-default disposition (top-level agent acting as
@@ -171,6 +224,7 @@ load_workspace_mode() {
 # ---------------------------------------------------------------------------
 load_orchestrator
 load_language
+load_english_learning
 load_workspace_mode
 
 # ---------------------------------------------------------------------------
