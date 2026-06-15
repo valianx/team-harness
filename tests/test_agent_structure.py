@@ -25546,6 +25546,217 @@ check(
 # Marker: convergence-stage3
 
 # ---------------------------------------------------------------------------
+# Suite 108 — collaborative-pr-review
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 108: collaborative-pr-review structural contract ===")
+
+_s108_skill_text    = read(REPO_ROOT / "skills" / "review-pr" / "SKILL.md")
+_s108_reviewer_text = read(AGENTS_DIR / "reviewer.md")
+_s108_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s108_claude_md     = read(REPO_ROOT / "CLAUDE.md")
+
+# Anchor-scoped slices — avoids false-green from file-wide substring matches
+_S108_STEP9_ANCHOR   = "9. **Fetch PR conversation and prior reviews"
+_S108_P35_ANCHOR     = "### Phase 3.5 — Prior Review Check"
+_S108_P4_ANCHOR      = "### Phase 4 — Decision Menu"
+_S108_P49_ANCHOR     = "### Phase 4.9 — Pre-Publish Concurrent Review Check"
+_S108_PH0_ANCHOR     = "4. **Extract `PR Comments:` and `Prior Reviews:` context"
+_S108_PH15_ANCHOR    = "## Phase 1.5 — Net-New Gate"
+
+_S108_STOP_H2    = ("\n## ", "\n---\n")
+_S108_STOP_H3    = ("\n## ", "\n### ", "\n---\n")
+
+_s108_skill_step9  = _slice_section(_s108_skill_text, _S108_STEP9_ANCHOR,  _S108_STOP_H3)
+_s108_skill_p35    = _slice_section(_s108_skill_text, _S108_P35_ANCHOR,    _S108_STOP_H3)
+_s108_skill_p4     = _slice_section(_s108_skill_text, _S108_P4_ANCHOR,     _S108_STOP_H3)
+_s108_skill_p49    = _slice_section(_s108_skill_text, _S108_P49_ANCHOR,    _S108_STOP_H3)
+_s108_reviewer_ph0 = _slice_section(_s108_reviewer_text, _S108_PH0_ANCHOR, _S108_STOP_H3)
+_s108_reviewer_ph15 = _slice_section(_s108_reviewer_text, _S108_PH15_ANCHOR, _S108_STOP_H2)
+
+# (1) suite108(1-step9-all-authors-fetch): SKILL.md step 9 fetches all-authors reviews
+#     and passes the Prior Reviews: field to Phase 3 dispatchers
+check(
+    "suite108(1-step9-all-authors-fetch): SKILL.md step 9 fetches all-authors reviews "
+    "from GET .../pulls/{number}/reviews and passes 'Prior Reviews:' field to dispatchers",
+    bool(_s108_skill_step9)
+    and "prior_reviews" in _s108_skill_step9
+    and "Prior Reviews:" in _s108_skill_text
+    and "pulls/{number}/reviews" in _s108_skill_step9,
+    "SKILL.md Phase 1 step 9 must fetch all-authors reviews and populate a 'Prior Reviews:' "
+    "dispatch field (R1 — collaborative PR review)",
+)
+
+# (2) suite108(2-p35-all-authors-read): SKILL.md Phase 3.5 no longer hard-filters to
+#     current author for the read-first path; it fetches all reviews then filters client-side
+check(
+    "suite108(2-p35-all-authors-read): SKILL.md Phase 3.5 reads all reviews before filtering "
+    "to same-author — the hard '.user.login == {current_user}' filter is not the sole fetch",
+    bool(_s108_skill_p35)
+    and (
+        "all reviews" in _s108_skill_p35.lower()
+        or "all_reviews" in _s108_skill_p35
+        or "same-author" in _s108_skill_p35.lower()
+    )
+    and (
+        "filter" in _s108_skill_p35.lower()
+        or "same_author_review" in _s108_skill_p35
+    ),
+    "SKILL.md Phase 3.5 must fetch all reviews (all authors) and then filter to same-author — "
+    "the read-first path must not be limited to the current user only",
+)
+
+# (3) suite108(3-reviewer-interact-dont-restate): reviewer.md declares the
+#     'Interact, don't restate' rule with explicit confirmar/refutar/extender stances
+check(
+    "suite108(3-reviewer-interact-dont-restate): reviewer.md Phase 0 step 4 declares "
+    "'Interact, don't restate' rule with confirmar / refutar / extender stances",
+    bool(_s108_reviewer_ph0)
+    and "Interact, don" in _s108_reviewer_ph0
+    and "Confirmar" in _s108_reviewer_ph0
+    and "Refutar" in _s108_reviewer_ph0
+    and "Extender" in _s108_reviewer_ph0,
+    "reviewer.md Phase 0 step 4 must declare the 'Interact, don't restate' rule "
+    "with confirmar / refutar / extender stances (R2 — collaborative PR review)",
+)
+
+# (4) suite108(4-reviewer-net-new-gate): reviewer.md declares Phase 1.5 net-new gate
+#     with net_new field, three classifications, AND the independent-agreement condition
+#     for event: COMMENT — and the explicit disagreement → net-new-signal rule (AC-7)
+check(
+    "suite108(4-reviewer-net-new-gate): reviewer.md declares Phase 1.5 net-new gate "
+    "with net_new field, three classifications, and independent-agreement condition for COMMENT (AC-7)",
+    bool(_s108_reviewer_ph15)
+    and "net_new" in _s108_reviewer_ph15
+    and "net-new" in _s108_reviewer_ph15
+    and "confirms-prior" in _s108_reviewer_ph15
+    and "already-resolved" in _s108_reviewer_ph15
+    and (
+        "independently agrees" in _s108_reviewer_ph15.lower()
+        or "independent" in _s108_reviewer_ph15.lower()
+    )
+    and (
+        "disagrees" in _s108_reviewer_ph15.lower()
+        or "disagree" in _s108_reviewer_ph15.lower()
+    ),
+    "reviewer.md Phase 1.5 must declare the net-new gate with three classifications AND "
+    "the independent-agreement condition: COMMENT only when reviewer independently agrees "
+    "with the standing verdict; disagreement drives an appropriate event (AC-7)",
+)
+
+# (4b) suite108(4b-ac2-sentinel-gh-unavailable): SKILL.md step 9 and reviewer.md Phase 1.5
+#      both use the AC-2-specified sentinel for the gh-unavailable degrade case (not a combined string)
+check(
+    "suite108(4b-ac2-sentinel-gh-unavailable): SKILL.md step 9 uses the AC-2 sentinel "
+    "'reviews not fetched: gh unavailable' and reviewer.md Phase 1.5 recognises it",
+    "reviews not fetched: gh unavailable" in _s108_skill_step9
+    and "reviews not fetched: gh unavailable" in _s108_reviewer_ph15,
+    "Both SKILL.md step 9 and reviewer.md Phase 1.5 must use the AC-2 sentinel string "
+    "'reviews not fetched: gh unavailable' for the gh-unavailable degrade case (AC-2)",
+)
+
+# (5) suite108(5-skill-p49-pre-publish-refetch): SKILL.md declares Phase 4.9 as a
+#     pre-publish re-fetch step positioned before Phase 5
+check(
+    "suite108(5-skill-p49-pre-publish-refetch): SKILL.md declares Phase 4.9 "
+    "'Pre-Publish Concurrent Review Check' before Phase 5",
+    bool(_s108_skill_p49)
+    and "Phase 5" in _s108_skill_p49
+    and (
+        "re-fetch" in _s108_skill_p49.lower()
+        or "refetch" in _s108_skill_p49.lower()
+        or "reviews_now" in _s108_skill_p49
+    )
+    and "best-effort" in _s108_skill_p49.lower(),
+    "SKILL.md must declare Phase 4.9 as a best-effort pre-publish concurrent-review re-fetch "
+    "positioned before Phase 5 (R4 — collaborative PR review)",
+)
+
+# (6) suite108(6-skill-p4-no-net-new-hint): SKILL.md Phase 4 recommendation hint includes
+#     the 'net_new == 0 → post nothing / one-line COMMENT' branch
+check(
+    "suite108(6-skill-p4-no-net-new-hint): SKILL.md Phase 4 recommendation hint "
+    "includes 'net_new == 0' cancel or COMMENT branch",
+    bool(_s108_skill_p4)
+    and "net_new" in _s108_skill_p4
+    and (
+        "cancel" in _s108_skill_p4.lower()
+        or "post nothing" in _s108_skill_p4.lower()
+    )
+    and "COMMENT" in _s108_skill_p4,
+    "SKILL.md Phase 4 recommendation hint must include a net_new == 0 branch that "
+    "recommends cancel (post nothing) or one-line COMMENT (R3)",
+)
+
+# (7) suite108(7-reviewer-source-of-truth): reviewer.md states source-of-truth invariant
+#     AND that a contradicting/refuting finding is net-new and must never be suppressed
+check(
+    "suite108(7-reviewer-source-of-truth): reviewer.md states the source-of-truth invariant "
+    "(code is the only source of truth) and that a refuting finding is net-new and never suppressed",
+    bool(_s108_reviewer_ph0)
+    and (
+        "source of truth" in _s108_reviewer_ph0.lower()
+        or "only source of truth" in _s108_reviewer_ph0.lower()
+    )
+    and (
+        "contradict" in _s108_reviewer_ph0.lower()
+        or "refut" in _s108_reviewer_ph0.lower()
+    )
+    and (
+        "never suppressed" in _s108_reviewer_ph0.lower()
+        or "NEVER suppressed" in _s108_reviewer_ph0
+        or "never be suppressed" in _s108_reviewer_ph0.lower()
+    ),
+    "reviewer.md Phase 0 must state the source-of-truth invariant (code = only source of truth) "
+    "and that a contradicting/refuting finding is net-new and must never be suppressed (AC-15)",
+)
+
+# ── Registry / hygiene / free-suite / self-ref ────────────────────────────
+
+# (8) suite108(8-registry): docs/testing.md registers Suite 108 and collaborative-pr-review marker
+check(
+    "suite108(8-registry): docs/testing.md registers 'Suite 108' and 'collaborative-pr-review' marker",
+    "Suite 108" in _s108_testing_md and "collaborative-pr-review" in _s108_testing_md,
+    "docs/testing.md must register Suite 108 and the collaborative-pr-review marker",
+)
+
+# (9) suite108(9-hygiene): CLAUDE.md does NOT contain 'Suite 108' (§11 hygiene contract)
+check(
+    "suite108(9-hygiene): CLAUDE.md does NOT contain 'Suite 108'",
+    "Suite 108" not in _s108_claude_md,
+    "CLAUDE.md must not mention Suite 108 — only docs/testing.md is the canonical registry",
+)
+
+# (10) suite108(10-no-agent-call): Suite 108 non-comment own source invokes no agent-dispatch API
+_s108_own_source = read(Path(__file__))
+_s108_non_comment_lines = [
+    line for line in _s108_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s108_non_comment_text = "\n".join(_s108_non_comment_lines)
+_s108_suite_start = _s108_non_comment_text.rfind("Suite 108")
+_s108_agent_tok    = "Age" + "nt("
+_s108_subagent_tok = "subagent" + "_type"
+check(
+    "suite108(10-no-agent-call): Suite 108 non-comment source contains no agent-invocation tokens (free structural suite guarantee)",
+    _s108_agent_tok not in _s108_non_comment_text[_s108_suite_start:]
+    and _s108_subagent_tok not in _s108_non_comment_text[_s108_suite_start:],
+    "Suite 108 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+
+# (11) suite108(11-self-ref): test file contains 'Suite 108', '_slice_section', and 'collaborative-pr-review'
+check(
+    "suite108(11-self-ref): test file contains 'Suite 108', '_slice_section', "
+    "and 'collaborative-pr-review'",
+    "Suite 108" in _s108_own_source
+    and "_slice_section" in _s108_own_source
+    and "collaborative-pr-review" in _s108_own_source,
+    "test file must self-reference Suite 108 + _slice_section + the collaborative-pr-review marker",
+)
+
+# Marker: collaborative-pr-review
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

@@ -140,9 +140,9 @@ name: review-pr
    ```
    Pass `workspaces_PATH` to qa when dispatched.
 
-9. **Fetch PR conversation as review context** (best-effort INPUT step — never blocks the review).
+9. **Fetch PR conversation and prior reviews as review context** (best-effort INPUT step — never blocks the review).
 
-   **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read PR comments". Run the probe (already set in step 2). Collect issue-level comments and line-level review comments separately:
+   **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read PR comments". Run the probe (already set in step 2). Collect issue-level comments and line-level review comments separately, then fetch all prior formal reviews:
 
    ```bash
    pr_comments=""
@@ -174,6 +174,46 @@ name: review-pr
 
    Truncate if the combined output exceeds ~200 lines: keep most recent 100 lines with a truncation note prepended.
    Store result in `$pr_comments` and pass it to Phase 3 dispatcher as the `PR Comments:` field.
+
+   **Also fetch all prior formal reviews (all authors)** — store in `$prior_reviews`. This captures every reviewer's verdict and summary so the current reviewer can interact with prior findings rather than duplicate them.
+
+   ```bash
+   prior_reviews=""
+   prior_reviews_fetched=false
+   if [ "$has_gh" = "true" ]; then
+     prior_reviews=$(gh api repos/{owner}/{repo}/pulls/{number}/reviews \
+       --jq '.[] | "[\(.user.login) | \(.state) | \(.submitted_at[:16])] \(.body[:200])"' \
+       2>/dev/null || true)
+     prior_reviews_fetched=true
+   elif [ "$is_github" = "true" ]; then
+     auth_header=""
+     token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+     [ -n "$token" ] && auth_header="-H \"Authorization: Bearer $token\""
+     prior_reviews=$(curl -sf $auth_header \
+       -H "Accept: application/vnd.github+json" \
+       "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100" \
+       2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+lines = [f'[{r[\"user\"][\"login\"]} | {r[\"state\"]} | {r[\"submitted_at\"][:16]}] {r[\"body\"][:200]}' for r in d]
+print('\n'.join(lines))
+" 2>/dev/null || true)
+     prior_reviews_fetched=true
+   fi
+
+   # Distinguish: gh/curl unavailable vs. fetch succeeded but PR has zero reviews.
+   # Both sentinels are treated as "no prior-review context; proceed" by the reviewer.
+   if [ -z "$prior_reviews" ]; then
+     if [ "$prior_reviews_fetched" = "true" ]; then
+       prior_reviews="(none — no prior reviews on this PR)"
+     else
+       prior_reviews="(none — reviews not fetched: gh unavailable)"
+     fi
+   fi
+   ```
+
+   Store result in `$prior_reviews`. Truncate if the output exceeds ~100 lines: keep the 50 most recent lines with a truncation note prepended.
+   Pass `$prior_reviews` to Phase 3 dispatcher as the `Prior Reviews:` field alongside `PR Comments:`.
 
 ### Step 1.4 — Auto-suggest multi-reviewer for large PRs (no cost warning per operator policy)
 
@@ -315,6 +355,7 @@ Dispatch review agents based on tier classification. ALL Bash happens in the mai
    - Draft Output: .claude/pr-review-draft-{focus}.md
    - Inline Output: .claude/pr-review-inline-{focus}.json
    - PR Comments: {$pr_comments from step 9 — same value as single-reviewer path}
+   - Prior Reviews: {$prior_reviews from step 9 — all-authors formal reviews; "(none — reviews not fetched: gh unavailable)" when unavailable, "(none — no prior reviews on this PR)" when the PR has none}
    - {... same PR fields as single-reviewer ...}
    ```
    Dispatches run **in parallel** (same pattern as Phase 3 tester+qa+security parallel). Wait for all to complete.
@@ -385,6 +426,7 @@ For Tier 3 / 4: dispatch reviewer, qa (if `has_workspaces=true`), and security i
    - Has Policy: {true if .team-harness/review-policy.md was found in Step 1.5, else false}
    - Review Policy: {verbatim content of .team-harness/review-policy.md, or omit field when has_policy=false}
    - PR Comments: {$pr_comments from step 9 — issue-level + line-level combined; "(none — comments not fetched: gh unavailable)" when fetch failed}
+   - Prior Reviews: {$prior_reviews from step 9 — all-authors formal reviews; "(none — reviews not fetched: gh unavailable)" when unavailable, "(none — no prior reviews on this PR)" when the PR has none}
    - Worktree: {WORKTREE}
    - workspaces path: {workspaces_PATH or "none"}
    ```
@@ -493,11 +535,26 @@ On `(c)` or no response: discard all drafts (cleanup trap fires). Do NOT publish
 
 ### Phase 3.5 — Prior Review Check (MANDATORY before proceeding to Phase 4)
 
-Before showing the draft and presenting the decision menu, check for an existing review from the same author on this PR. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read prior PR reviews". When `has_gh=true`:
+Before showing the draft and presenting the decision menu, fetch all reviews on this PR (all authors) and then filter to the current author to detect a same-author prior review. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read prior PR reviews". When `has_gh=true`:
+```bash
+# Resolve current user for same-author check
+current_user=$(gh api user --jq '.login' 2>/dev/null || echo "")
+
+# Fetch all reviews (all authors) — reuse $prior_reviews from Phase 1 step 9 when available
+all_reviews=$(gh api repos/{owner}/{repo}/pulls/{number}/reviews 2>/dev/null || echo "[]")
+
+# Filter to same-author review for the same-author menu logic
+same_author_review=$(echo "$all_reviews" | python3 -c "
+import sys, json
+reviews = json.load(sys.stdin)
+import os; u = os.environ.get('CURRENT_USER', '')
+matches = [r for r in reviews if r.get('user', {}).get('login') == u]
+if matches:
+    r = matches[-1]
+    print(f'id={r[\"id\"]} state={r[\"state\"]} submitted_at={r[\"submitted_at\"]} body_excerpt={r[\"body\"][:120]}')
+" CURRENT_USER="$current_user" 2>/dev/null || true)
 ```
-gh api repos/{owner}/{repo}/pulls/{number}/reviews --jq '.[] | select(.user.login == "{current_user}") | {id: .id, state: .state, submitted_at: .submitted_at, body: .body[:120]}'
-```
-Replace `{current_user}` with the output of `gh api user --jq '.login'`. When `has_gh=false`: use the curl fallback to fetch the reviews list. If unavailable, default to treating as "no prior review" (worst case is a duplicate review, recoverable via dismiss).
+When `has_gh=false`: use the curl fallback to fetch the reviews list (all authors), then filter client-side. If unavailable, default to treating as "no prior review" (worst case is a duplicate review, recoverable via dismiss).
 
 - **If NO prior review exists** from the same author → proceed to Phase 4 (decision menu).
 
@@ -607,9 +664,10 @@ Choose [a/b/c/d/e]:
 ```
 
 **Recommendation hint:**
-- 0 critical findings, 0 high-priority → `(a) approve`
-- 0 critical, 1+ high-priority → `(c) comment only`
-- 1+ critical → `(b) request changes`
+- `net_new == 0` (all findings overlap prior reviews or are already resolved) → `(e) cancel` (post nothing) if there are no new substantive points, or `(c) comment only` with a single-line Spanish summary if a one-line acknowledgement adds value
+- 0 critical findings, 0 high-priority, `net_new > 0` → `(a) approve`
+- 0 critical, 1+ high-priority, `net_new > 0` → `(c) comment only`
+- 1+ critical, `net_new > 0` → `(b) request changes`
 
 **If operator picks `(d) defer`:**
 - Ensure draft is at `.claude/pr-review-final.md` (copy from canonical path if needed).
@@ -622,10 +680,43 @@ Choose [a/b/c/d/e]:
 - STOP.
 
 **If operator selects `(a)`, `(b)`, or `(c)`:**
-- Proceed to Phase 5.
+- Proceed to Phase 4.9.
 
 **If operator requests edits before committing:**
 - Modify the draft per feedback, show again, repeat until a final choice is made.
+
+### Phase 4.9 — Pre-Publish Concurrent Review Check (best-effort, before Phase 5 POST)
+
+Before submitting to GitHub, re-fetch the reviews list to detect any new review that landed after the Phase 1 step-9 snapshot. This prevents publishing a duplicate when a concurrent reviewer completed while this review was in progress.
+
+```bash
+# ETag-conditional re-fetch (best-effort — degrade to publish-as-chosen on any failure)
+reviews_now=""
+if [ "$has_gh" = "true" ]; then
+  reviews_now=$(gh api repos/{owner}/{repo}/pulls/{number}/reviews \
+    --jq '[.[] | {login: .user.login, state: .state, submitted_at: .submitted_at, body_excerpt: .body[:120]}]' \
+    2>/dev/null || echo "")
+elif [ "$is_github" = "true" ]; then
+  auth_header=""
+  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  [ -n "$token" ] && auth_header="-H \"Authorization: Bearer $token\""
+  reviews_now=$(curl -sf $auth_header \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100" \
+    2>/dev/null || echo "")
+fi
+```
+
+**If the re-fetch succeeds**, compare the review count and authors against `$prior_reviews` from Phase 1 step 9. When a new review appears that was not in the Phase 1 snapshot AND its findings overlap the current draft (same file paths), surface a one-line prompt:
+
+```
+Nueva revisión de {author} cubrió hallazgos similares hace {N}s. ¿Publicar igual? [s/n]:
+```
+
+- If the operator answers `n` → discard all draft files (cleanup trap fires). STOP.
+- If the operator answers `s`, or the re-fetch fails (any error, timeout, unavailable), or no overlapping new review was detected → proceed to Phase 5 immediately (publish as chosen).
+
+**Degrade contract:** Phase 4.9 is best-effort. Any failure (non-zero exit, parse error, timeout) MUST NOT block publication. Log a one-line note (`Pre-publish check unavailable — publishing as chosen`) and proceed to Phase 5.
 
 ### Phase 5 — Publish + Cleanup
 
