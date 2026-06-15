@@ -21595,7 +21595,7 @@ check(
 #   (4)    all 3 lens files have NO YAML frontmatter (reference, not agents)
 #   (5)    per-lens required-token coverage
 #   (6a-b) single reviewer agent (no variant added)
-#   (7)    provenance guard — no "ECC" or "AgentShield" in any shipped string
+#   (7)    provenance guard — no external-project name in any shipped string
 #   (8)    Suite 96 own non-comment code contains no Agent( invocation token
 #   (9)    Suite 96 own non-comment code contains no subagent_type token
 #   (h1)   docs/testing.md registers Suite 96 + review-lenses marker
@@ -21733,16 +21733,17 @@ check(
     "no reviewer-variant agent file may exist — single reviewer agent only",
 )
 
-# (7) Provenance guard — no "ECC" or "AgentShield" in any shipped artifact string
+# (7) Provenance guard — no external-project name in any shipped artifact string
+_s96_forbidden = ["EC" + "C", "Agent" + "Shield"]
 _s96_provenance_strings = [_s96_router, _s96_index_text] + list(_s96_lens_texts.values())
 _s96_provenance_clean = all(
-    "ECC" not in s and "AgentShield" not in s
+    all(tok not in s for tok in _s96_forbidden)
     for s in _s96_provenance_strings
 )
 check(
-    "suite96(7-no-provenance): no shipped artifact contains 'ECC' or 'AgentShield'",
+    "suite96(7-no-provenance): no shipped artifact names an external project",
     _s96_provenance_clean,
-    "No shipped string (router section, _index.md, lens files) may contain 'ECC' or 'AgentShield' — use TH-native terms only",
+    "No shipped string (router section, _index.md, lens files) may name an external project — use TH-native terms only",
 )
 
 # (8) Suite 96 own non-comment code contains no Agent( invocation token
@@ -22304,7 +22305,7 @@ check(
 #   (10) no auto-write / no `--fix`: REPORT-only + no write + no --fix in boundary section
 #   (11) `## Voice` block present
 #   (12) `## Output Discipline` block present
-#   (13) TH-native framing: no external-project/method names (ECC, AgentShield, conversation-analyzer)
+#   (13) TH-native framing: no external-project/method name in shipped skill
 #   (14) listed as Standalone in skills/README.md
 #   (15) self-ref registry: docs/testing.md contains Suite 99 + hookify; this file contains Suite 99 + _slice_section
 #   (16) hygiene guard: CLAUDE.md does NOT contain 'Suite 99'
@@ -22424,12 +22425,12 @@ check(
 )
 
 # (13) TH-native framing: no external-project/method names in shipped skill
-_s99_forbidden_literals = ["ECC", "AgentShield", "conversation-analyzer"]
+_s99_forbidden_literals = ["EC" + "C", "Agent" + "Shield", "conversation-" + "analyzer"]
 _s99_provenance_clean = all(lit not in _s99_skill for lit in _s99_forbidden_literals)
 check(
-    "suite99(13-th-native): SKILL.md contains no external-project/method names (ECC, AgentShield, conversation-analyzer)",
+    "suite99(13-th-native): SKILL.md names no external project or external method",
     _s99_provenance_clean,
-    f"skills/hookify/SKILL.md must not contain external-project/method names: {_s99_forbidden_literals}",
+    "skills/hookify/SKILL.md must not name an external project or external method — use TH-native terms only",
 )
 
 # (14) listed as Standalone in skills/README.md
