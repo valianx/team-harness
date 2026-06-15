@@ -109,7 +109,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.90.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.91.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -129,6 +129,8 @@ All commands run from the repo root.
 | Install plugin | `/plugin marketplace add valianx/team-harness` then `/plugin install th` then `/th:setup` |
 | Build installer from source (contributors) | `go run ./cmd/install` |
 | Validate agents/skills health | `/th:lint` inside Claude Code |
+| Run security self-scan (5-check MVP) | `/th:audit-security` inside Claude Code |
+| Run security self-scan directly | `python3 tests/test_security_scan.py` |
 | Run free verification suite (policy-block + structure + frontmatter) | `bash tests/run-all.sh` |
 | Run policy-block functional tests | `bash tests/test_policy_block.sh` |
 | Run agent/skill/hook structural tests | `python3 tests/test_agent_structure.py` |

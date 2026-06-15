@@ -21247,7 +21247,7 @@ check(
 # Marker: worktree-discipline
 
 # ---------------------------------------------------------------------------
-# Suite 94 — prompt-injection-defense-floor (ecc-quickwins, v2.90.0)
+# Suite 94 — prompt-injection-defense-floor (v2.90.0)
 # ---------------------------------------------------------------------------
 # Pins the canonical '## Untrusted content & prompt-injection floor' block
 # verbatim in all 8 agents that received the M1 prepend.  CI fails
