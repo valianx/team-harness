@@ -712,3 +712,40 @@ At the consolidation and report step (see `ref-special-flows.md § Test Pipeline
 - **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND any module's decision log records a browser-API or interaction AC routed to jsdom, emit the Hot Context note from `orchestrator.md` Phase 2.7 `**A1-F4**` in the consolidated result summary. Non-blocking; omit when no browser-API/interaction mismatch is present.
 
 See `ref-special-flows.md § Test Pipeline Flow` for the full phase sequence, module splitting, and reporting contract.
+
+---
+
+## Apply-Review Mode
+
+When invoked with `Direct Mode Task: apply-review`:
+
+This is the explicit, on-demand entry point into the orchestrator's author-side
+apply-review handling. It is a COMPLEMENT to the automatic, lifecycle-bound trigger
+in `orchestrator.md § "PR Comment Incorporation — Apply-Review Disposition"`, not a
+replacement. Both paths load the same shared disposition snippet
+(`agents/_shared/apply-review-disposition.md`) and behave identically per comment.
+
+### Step 1 — Resolve the PR
+
+Extract the PR reference (`#N`, `N`, or URL) from the payload `PR:` field. If absent,
+report `status: blocked` asking the operator for a PR reference.
+
+### Step 2 — Pull fresh PR comments
+
+Run `gh pr view {number} --comments` (or the gh-fallback path — see
+`agents/_shared/gh-fallback.md § "Tier A — read PR comments"`) to fetch all current
+reviewer comments. Read the PR diff for current code state.
+
+### Step 3 — Apply the disposition to every comment
+
+For each reviewer comment, apply `agents/_shared/apply-review-disposition.md` in full:
+classify (Step 1), run the verification filter for CHANGE comments that delete or
+loosen (Step 2), apply deletion discipline (Step 3), resolve rather than obey (Step 4),
+and emit the per-comment output (Step 5). Apply the `agents/_shared/finding-connection.md`
+cross-check at Step 2.4. Do NOT restate the disposition here — reference and follow it.
+
+### Step 4 — Report
+
+Surface the per-comment dispositions to the operator. Any code changes that result are
+applied to the PR branch under the standard worktree + branch-author discipline. This
+direct mode does NOT emit a STAGE-GATE STOP block — it is a focused, on-demand action.
