@@ -25956,6 +25956,230 @@ check(
 # Marker: learn-english-skill
 
 # ---------------------------------------------------------------------------
+# Suite 110 — loosening-dispositions
+# ---------------------------------------------------------------------------
+# Structural assertions for the author/reviewer loosening dispositions feature
+# (issue #348, v2.99.0). Pins: (1) loosening-impact lens file exists and is
+# registered in both _index.md manifest and reviewer.md Reference Router; (2)
+# finding-connection snippet exists and is referenced by both
+# apply-review-disposition.md and loosening-impact.md; (3) bright-line
+# substring at reviewer.md is unchanged (AC-4); (4) apply-review-disposition.md
+# contains key clauses (phrasing-not-severity, deletion-discipline,
+# per-comment output); (5) orchestrator.md references apply-review-disposition
+# in its PR-work handling (automatic injection present); (6) NEGATIVE: no new
+# hooks/*.sh gate file added by this change; (7) NEGATIVE: no
+# skills/apply-review/ skill directory exists (AC-7 scope boundary); (8–9)
+# version floor >= 2.99.0; (10) registry + hygiene guards; (11) free-suite
+# no-agent-call guard; (12) self-ref check.
+#
+# This is a FREE STRUCTURAL SUITE — pure text reads, no agent dispatch, no
+# paid spend. It runs in CI via run-all.sh on every PR.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 110: loosening-dispositions structural contract ===")
+
+_s110_loosening_lens_path     = AGENTS_DIR / "review-lenses" / "loosening-impact.md"
+_s110_finding_conn_path       = AGENTS_DIR / "_shared" / "finding-connection.md"
+_s110_disposition_path        = AGENTS_DIR / "_shared" / "apply-review-disposition.md"
+_s110_index_path              = AGENTS_DIR / "review-lenses" / "_index.md"
+_s110_reviewer_path           = AGENTS_DIR / "reviewer.md"
+_s110_orchestrator_path       = AGENTS_DIR / "orchestrator.md"
+_s110_hooks_dir               = HOOKS_DIR
+_s110_skills_dir              = SKILLS_DIR
+
+_s110_lens_text         = read(_s110_loosening_lens_path) if _s110_loosening_lens_path.exists() else ""
+_s110_conn_text         = read(_s110_finding_conn_path) if _s110_finding_conn_path.exists() else ""
+_s110_disp_text         = read(_s110_disposition_path) if _s110_disposition_path.exists() else ""
+_s110_index_text        = read(_s110_index_path) if _s110_index_path.exists() else ""
+_s110_reviewer_text     = read(_s110_reviewer_path) if _s110_reviewer_path.exists() else ""
+_s110_orchestrator_text = read(_s110_orchestrator_path) if _s110_orchestrator_path.exists() else ""
+_s110_plugin_json       = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s110_marketplace       = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s110_testing_md        = read(REPO_ROOT / "docs" / "testing.md")
+_s110_claude_md         = read(REPO_ROOT / "CLAUDE.md")
+_s110_VER_FLOOR         = (2, 99, 0)
+
+# (1a) suite110(1a-lens-exists): agents/review-lenses/loosening-impact.md exists
+check(
+    "suite110(1a-lens-exists): agents/review-lenses/loosening-impact.md exists and is non-empty",
+    _s110_loosening_lens_path.exists() and len(_s110_lens_text) > 0,
+    "agents/review-lenses/loosening-impact.md must exist and be non-empty",
+)
+
+# (1b) suite110(1b-lens-in-index): loosening-impact is registered in _index.md manifest
+check(
+    "suite110(1b-lens-in-index): loosening-impact registered in agents/review-lenses/_index.md",
+    "loosening-impact" in _s110_index_text and "loosening-impact.md" in _s110_index_text,
+    "agents/review-lenses/_index.md must list loosening-impact and loosening-impact.md",
+)
+
+# (1c) suite110(1c-lens-in-router): loosening-impact registered in reviewer.md Reference Router table
+check(
+    "suite110(1c-lens-in-router): loosening-impact registered in reviewer.md Reference Router table",
+    "loosening-impact" in _s110_reviewer_text,
+    "agents/reviewer.md Reference Router must include loosening-impact",
+)
+
+# (2a) suite110(2a-finding-conn-exists): agents/_shared/finding-connection.md exists
+check(
+    "suite110(2a-finding-conn-exists): agents/_shared/finding-connection.md exists and is non-empty",
+    _s110_finding_conn_path.exists() and len(_s110_conn_text) > 0,
+    "agents/_shared/finding-connection.md must exist and be non-empty",
+)
+
+# (2b) suite110(2b-conn-in-disposition): apply-review-disposition.md references finding-connection.md
+check(
+    "suite110(2b-conn-in-disposition): apply-review-disposition.md references finding-connection.md",
+    "finding-connection.md" in _s110_disp_text,
+    "agents/_shared/apply-review-disposition.md must reference finding-connection.md (Step 2.4)",
+)
+
+# (2c) suite110(2c-conn-in-lens): loosening-impact.md references finding-connection.md
+check(
+    "suite110(2c-conn-in-lens): loosening-impact.md references finding-connection.md",
+    "finding-connection.md" in _s110_lens_text,
+    "agents/review-lenses/loosening-impact.md must reference finding-connection.md (point c)",
+)
+
+# (3) suite110(3-bright-line): reviewer.md bright-line substring still present (AC-4)
+# Pin the stable substring — must remain unchanged; the lens is additive.
+_s110_bright_line_tok = "treat any rule removal or severity downgrade as a critical finding"
+check(
+    "suite110(3-bright-line): reviewer.md bright-line substring unchanged (AC-4)",
+    _s110_bright_line_tok in _s110_reviewer_text,
+    "agents/reviewer.md must still contain the bright-line: "
+    "'treat any rule removal or severity downgrade as a critical finding'",
+)
+
+# (4a) suite110(4a-disp-exists): apply-review-disposition.md exists and is non-empty
+check(
+    "suite110(4a-disp-exists): agents/_shared/apply-review-disposition.md exists and is non-empty",
+    _s110_disposition_path.exists() and len(_s110_disp_text) > 0,
+    "agents/_shared/apply-review-disposition.md must exist and be non-empty",
+)
+
+# (4b) suite110(4b-phrasing-not-severity): disposition contains phrasing-not-severity clause
+_s110_phrasing_tok = "Phrasing" + " " + chr(8800)  # ≠ – but may not be exact; use prose token
+_s110_phrasing_tok = "phrasing"
+check(
+    "suite110(4b-phrasing-not-severity): apply-review-disposition.md contains phrasing-not-severity clause",
+    "phrasing" in _s110_disp_text.lower() and "severity" in _s110_disp_text.lower(),
+    "apply-review-disposition.md must contain the phrasing-not-severity clause",
+)
+
+# (4c) suite110(4c-deletion-discipline): disposition contains deletion-discipline clause
+check(
+    "suite110(4c-deletion-discipline): apply-review-disposition.md contains deletion-discipline clause",
+    "deletion" in _s110_disp_text.lower()
+    and "positive justification" in _s110_disp_text,
+    "apply-review-disposition.md must contain the deletion-discipline clause "
+    "('deletion' + 'positive justification')",
+)
+
+# (4d) suite110(4d-per-comment-output): disposition contains per-comment output clause
+check(
+    "suite110(4d-per-comment-output): apply-review-disposition.md contains per-comment output clause",
+    "per-comment output" in _s110_disp_text.lower()
+    or "Per-comment output" in _s110_disp_text,
+    "apply-review-disposition.md must contain a per-comment output section",
+)
+
+# (5) suite110(5-orchestrator-injection): orchestrator.md references apply-review-disposition
+#     in its PR-work handling (automatic lifecycle-bound injection)
+check(
+    "suite110(5-orchestrator-injection): orchestrator.md references apply-review-disposition.md "
+    "in PR-work handling",
+    "apply-review-disposition.md" in _s110_orchestrator_text,
+    "agents/orchestrator.md must reference apply-review-disposition.md "
+    "(the automatic lifecycle-bound injection in PR-work handling)",
+)
+
+# (6) suite110(6-no-new-hook): no new hooks/*.sh gate file added by this change (AC-7 scope)
+#     The canonical hook set is: notify-windows.sh, notify-mac.sh, notify-linux.sh,
+#     notify-stage.sh, dev-guard.sh, policy-block.sh, checkpoint-guard.sh,
+#     worktree-guard.sh.  Any hook file not in this set triggers the assertion.
+_s110_CANONICAL_HOOKS = {
+    "notify-windows.sh", "notify-mac.sh", "notify-linux.sh", "notify-stage.sh",
+    "dev-guard.sh", "policy-block.sh", "checkpoint-guard.sh", "worktree-guard.sh",
+    "_json-extract.sh", "gcp-guard.sh", "language-user-prompt.sh",
+    "session-start.sh", "sketch-guard.sh",
+}
+_s110_actual_hooks = {p.name for p in _s110_hooks_dir.glob("*.sh")} if _s110_hooks_dir.exists() else set()
+_s110_extra_hooks = _s110_actual_hooks - _s110_CANONICAL_HOOKS
+check(
+    "suite110(6-no-new-hook): no new hooks/*.sh gate file added by this change (AC-7)",
+    len(_s110_extra_hooks) == 0,
+    f"unexpected hooks/*.sh files not in the canonical set: {sorted(_s110_extra_hooks)}",
+)
+
+# (7) suite110(7-no-apply-review-skill): no skills/apply-review/ directory exists (AC-7)
+_s110_apply_review_skill = _s110_skills_dir / "apply-review"
+check(
+    "suite110(7-no-apply-review-skill): skills/apply-review/ skill directory does NOT exist (AC-7)",
+    not _s110_apply_review_skill.exists(),
+    "skills/apply-review/ must NOT exist — 2.A is automatic (not a skill command)",
+)
+
+# (8) suite110(8-ver-plugin-json): .claude-plugin/plugin.json version >= 2.99.0
+check(
+    "suite110(8-ver-plugin-json): .claude-plugin/plugin.json version >= 2.99.0",
+    _s59_ver_tuple(_s110_plugin_json.get("version", "0.0.0")) >= _s110_VER_FLOOR,
+    "plugin.json version must be 2.99.0 or later (loosening-dispositions release)",
+)
+
+# (9) suite110(9-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.99.0
+check(
+    "suite110(9-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.99.0",
+    _s59_ver_tuple(
+        _s110_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _s110_VER_FLOOR,
+    "marketplace.json plugins[0].version must be 2.99.0 or later (loosening-dispositions release)",
+)
+
+# (10) suite110(10-registry): docs/testing.md registers 'Suite 110' and 'loosening-dispositions' marker
+check(
+    "suite110(10-registry): docs/testing.md registers 'Suite 110' and 'loosening-dispositions' marker",
+    "Suite 110" in _s110_testing_md and "loosening-dispositions" in _s110_testing_md,
+    "docs/testing.md must register Suite 110 and the loosening-dispositions marker",
+)
+
+# (11) suite110(11-hygiene): CLAUDE.md does NOT contain 'Suite 110' (§11 hygiene contract)
+check(
+    "suite110(11-hygiene): CLAUDE.md does NOT contain 'Suite 110'",
+    "Suite 110" not in _s110_claude_md,
+    "CLAUDE.md must not mention Suite 110 — only docs/testing.md is the canonical registry",
+)
+
+# (12) suite110(12-no-agent-call): Suite 110 non-comment own source contains no agent-invocation tokens
+_s110_own_source = read(Path(__file__))
+_s110_non_comment_lines = [
+    line for line in _s110_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s110_non_comment_text = "\n".join(_s110_non_comment_lines)
+_s110_suite_start   = _s110_non_comment_text.rfind("Suite 110")
+_s110_agent_tok     = "Age" + "nt("
+_s110_subagent_tok  = "subagent" + "_type"
+check(
+    "suite110(12-no-agent-call): Suite 110 non-comment source contains no agent-invocation tokens "
+    "(free structural suite guarantee)",
+    _s110_agent_tok not in _s110_non_comment_text[_s110_suite_start:]
+    and _s110_subagent_tok not in _s110_non_comment_text[_s110_suite_start:],
+    "Suite 110 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+
+# (13) suite110(13-self-ref): test file contains 'Suite 110', '_slice_section', and 'loosening-dispositions'
+check(
+    "suite110(13-self-ref): test file contains 'Suite 110', '_slice_section', and 'loosening-dispositions'",
+    "Suite 110" in _s110_own_source
+    and "_slice_section" in _s110_own_source
+    and "loosening-dispositions" in _s110_own_source,
+    "test file must self-reference Suite 110 + _slice_section + the loosening-dispositions marker",
+)
+
+# Marker: loosening-dispositions
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

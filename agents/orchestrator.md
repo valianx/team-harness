@@ -2486,6 +2486,49 @@ fi
 
 ---
 
+## PR Comment Incorporation — Apply-Review Disposition (automatic, lifecycle-bound)
+
+**Trigger:** This section activates AUTOMATICALLY when the orchestrator works on
+an existing PR that **carries reviewer comments** — the iterate-after-review
+surface of the uniform pull-fresh → read-all-context → act → clean lifecycle.
+
+This is NOT always-present. A routine pipeline run that opens a fresh PR with no
+comments never loads this disposition. The trigger is the PRESENCE of review
+comments on the PR under work.
+
+**Automatic ≠ always-present:** when an existing PR accumulates reviewer
+comments and the orchestrator resumes or continues work against it, load the
+following two shared snippets by section and apply them to every comment before
+making any code change:
+
+- **`agents/_shared/apply-review-disposition.md`** — the full conservative
+  author-side disposition (two-axis classification, mandatory verification
+  filter, deletion discipline, resolve-don't-obey, per-comment output). Do NOT
+  restate it inline; reference and follow it here.
+- **`agents/_shared/finding-connection.md`** — the shared cross-check that links
+  a change widening a path with any other comment declaring a risk on that path.
+  Referenced at Step 2.4 of the disposition; do NOT restate it inline.
+
+**What to do:**
+
+1. Pull fresh context: run `gh pr view {number} --comments` (or the appropriate
+   gh-fallback path — see `agents/_shared/gh-fallback.md` § "Tier A — read PR
+   comments") to fetch all current reviewer comments. Read the PR diff for
+   current code state.
+
+2. For each reviewer comment, apply `agents/_shared/apply-review-disposition.md`
+   in full — classify (Step 1), run the verification filter for CHANGE comments
+   that delete or loosen (Step 2), apply deletion discipline (Step 3), resolve
+   rather than obey (Step 4), and emit the per-comment output (Step 5).
+
+3. After all comments are evaluated and changes (if any) are applied, proceed
+   through the standard Verify + Delivery phases for the updated code.
+
+**No command route, no new skill.** This is part of the orchestrator's normal
+PR-work handling. The operator does not invoke a separate command to enable it.
+
+---
+
 ## Phase 4 — Delivery
 
 **If `skip-delivery: true` was passed in the task payload → SKIP this entire phase and Phases 5-6.** Update `00-state.md` with `status: verified` (not `complete`) and report:

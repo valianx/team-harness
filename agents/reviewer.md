@@ -464,6 +464,7 @@ only when the diff contains a matching trigger signal — it never bulk-loads al
 | `silent-failure` | empty `catch {}`, `.catch(() =>`, `except: pass`, `_ = err`, ignored return codes, swallowed promises, discarded `Result`/`Either` |
 | `type-design` | `\| null \| undefined` sprawl, primitive-typed ids/enums/money, boolean params, stringly-typed state, missing discriminated unions |
 | `comment-rot` | `TODO`, `FIXME`, `HACK`, doc-comment param lists diverging from signature, comments contradicting code |
+| `loosening-impact` | removed `if (`/`guard`/`assert`/`validate`/`whitelist`/`allowlist`/`require`/`check`; removed `try`/`catch`/error-handling; removed test cases; removed gate conditions; deleted or short-circuited flag reads; removed early-return guards |
 
 **Load mechanism (for each matched lens):**
 
