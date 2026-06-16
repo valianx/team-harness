@@ -543,7 +543,7 @@ current_user=$(gh api user --jq '.login' 2>/dev/null || echo "")
 # Fetch all reviews (all authors) — reuse $prior_reviews from Phase 1 step 9 when available
 all_reviews=$(gh api repos/{owner}/{repo}/pulls/{number}/reviews 2>/dev/null || echo "[]")
 
-# Filter to same-author review for the same-author menu logic
+# Filter to same-author review and extract id + commit_id for staleness comparison
 same_author_review=$(echo "$all_reviews" | python3 -c "
 import sys, json
 reviews = json.load(sys.stdin)
@@ -551,7 +551,7 @@ import os; u = os.environ.get('CURRENT_USER', '')
 matches = [r for r in reviews if r.get('user', {}).get('login') == u]
 if matches:
     r = matches[-1]
-    print(f'id={r[\"id\"]} state={r[\"state\"]} submitted_at={r[\"submitted_at\"]} body_excerpt={r[\"body\"][:120]}')
+    print(f'id={r[\"id\"]} state={r[\"state\"]} submitted_at={r[\"submitted_at\"]} commit_id={r.get(\"commit_id\", \"\")} body_excerpt={r[\"body\"][:120]}')
 " CURRENT_USER="$current_user" 2>/dev/null || true)
 ```
 When `has_gh=false`: use the curl fallback to fetch the reviews list (all authors), then filter client-side. If unavailable, default to treating as "no prior review" (worst case is a duplicate review, recoverable via dismiss).
@@ -560,85 +560,41 @@ When `has_gh=false`: use the curl fallback to fetch the reviews list (all author
 
 - **Re-review continuity detection:** if a prior review exists, inspect its body for the `## Hallazgos por enfoque` section header. If found, the prior review was a multi-reviewer run. Auto-apply `multi_reviewer=true` for this re-review (preserves focus coverage). Emit one line: "Prior review was multi-reviewer — applying --multi for continuity."
 
-- **If a prior review exists**, present this menu to the user:
+- **If a prior review exists**, determine whether new commits have landed since that review by comparing the prior review's `commit_id` (the head SHA the review was submitted against) with the current PR head SHA (already fetched in Phase 1 step 4 as `headRefName`, resolved to a SHA via `git rev-parse origin/{headRefName}`):
+
+  ```bash
+  pr_head_sha=$(git rev-parse origin/{headRefName} 2>/dev/null || echo "")
+  # Extract commit_id from same_author_review parse output
+  prior_commit_id=$(echo "$same_author_review" | grep -oP 'commit_id=\K\S+' 2>/dev/null || echo "")
   ```
-  A prior review by this author exists on this PR (ID: {review_id}, date: {submitted_at}, state: {state}).
-  GitHub does not allow adding inline comments to an already-submitted review. Three options:
 
-  (a) Update the summary only — PUT review body (prior inline comments preserved)
-  (b) Reply to an existing thread — reply to one of the prior inline comments
-  (c) Re-review cycle — dismiss the prior review and create a new atomic one (code changed)
-  (d) Cancel
+  **Three-way automatic branch — no interactive menu:**
 
-  Which option?
-  ```
-  Route to the corresponding substep below based on user choice.
+  1. **No prior review** → proceed to Phase 4 (decision menu, fresh review flow). *(covered above)*
 
-### Step 3.5a — Update summary only
+  2. **Prior review + no new commits** (i.e. `prior_commit_id` is non-empty AND equals `pr_head_sha`) → emit one operator-facing note and STOP without dismissing or posting:
+     ```
+     Prior review by {current_user} (ID: {review_id}, {submitted_at}) is current — no new commits since it was submitted. No duplicate review posted. Re-run after pushing new commits to refresh the review.
+     ```
+     Do NOT dismiss the prior review. Do NOT post a new review.
 
-1. Re-invoke the orchestrator with the same PR data but with mode `update-body`:
-   ```
-   Direct Mode Task:
-   - Mode: review
-   - Submode: update-body
-   - PR: #{number}
-   - {... same fields as step 10 ...}
-   - Existing review ID: {review_id}
-   - Existing review body: {current body text}
-   - Instruction: Generate an updated summary incorporating any new observations.
-   ```
-2. The orchestrator invokes the reviewer in `update-body` mode and writes the new body to `.claude/pr-review-draft.md`.
-3. Read `.claude/pr-review-draft.md` and show to the user for approval.
-4. On approval, publish with PUT. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When `has_gh=true`: use `gh api -X PUT`. When `has_gh=false` and a token is available: use `curl -X PUT`. When neither is available: instruct the operator to run the curl command with their token.
-   ```bash
-   jq -n --arg body "$(cat .claude/pr-review-draft.md)" '{body: $body}' \
-   | gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id} --input -
-   ```
-5. Verify success, cleanup draft files, and STOP.
+  3. **Prior review + new commits since it** (i.e. `prior_commit_id` differs from `pr_head_sha`, OR `prior_commit_id` is unavailable — treat as "new commits" when uncertain: the safe default is a fresh review, never skip silently) → automatically dismiss the prior review and proceed to Phase 4:
 
-### Step 3.5b — Reply to existing thread
+     ```bash
+     # Dismiss the existing review automatically (no prompt)
+     gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id}/dismissals \
+       -f message="Superseded by new review"
+     ```
+     **Detection + fallback:** Tier B — use `gh api -X PUT` when available, curl PATCH fallback with token, or operator instruction.
 
-1. List the existing inline comments on this PR:
-   ```
-   gh api repos/{owner}/{repo}/pulls/{number}/comments --jq '.[] | select(.pull_request_review_id == {review_id}) | {id: .id, path: .path, line: .line, body: .body[:120]}'
-   ```
-   If no inline comments exist, tell the user: "The prior review has no inline comments to reply to. Use option (a) to update the summary instead." Then re-show the menu.
-2. Display the list and ask the user to select a `comment_id`.
-3. Re-invoke the orchestrator with mode `reply`:
-   ```
-   Direct Mode Task:
-   - Mode: review
-   - Submode: reply
-   - PR: #{number}
-   - {... same fields as step 10 ...}
-   - Thread context:
-     - comment_id: {selected_id}
-     - path: {file path}
-     - line: {line number}
-     - original_body: {the inline comment text}
-   - Instruction: Generate a focused reply to this thread.
-   ```
-4. The orchestrator invokes the reviewer in `reply` mode and writes the reply to `.claude/pr-review-reply-draft.md`.
-5. Read `.claude/pr-review-reply-draft.md` and show to the user for approval.
-6. On approval, publish the reply. **Detection + fallback:** Tier B — same pattern as step 3.5a. Use `gh api` when available, curl fallback when token present, operator instruction otherwise.
-   ```bash
-   jq -n --arg body "$(cat .claude/pr-review-reply-draft.md)" '{body: $body}' \
-   | gh api -X POST repos/{owner}/{repo}/pulls/{number}/comments/{comment_id}/replies --input -
-   ```
-7. Verify success, cleanup draft files, and STOP.
+     Verify the dismiss succeeded. If it fails, report the error and STOP — do not attempt to post a new review over an undismissed one.
 
-### Step 3.5c — Dismiss and re-review
+     Emit one operator-facing line:
+     ```
+     Prior review by {current_user} (ID: {review_id}) dismissed — new commits detected since {submitted_at}. Proceeding to fresh review.
+     ```
 
-1. Dismiss the existing review. **Detection + fallback:** Tier B — use `gh api -X PUT` when available, curl PATCH fallback with token, or operator instruction.
-   ```
-   gh api -X PUT repos/{owner}/{repo}/pulls/{number}/reviews/{review_id}/dismissals -f message="Superseded by new review"
-   ```
-2. Verify the dismiss succeeded. If it fails, report the error and STOP.
-3. Proceed to Phase 4 (decision menu, fresh review flow with atomic submission).
-
-### Step 3.5d — Cancel
-
-Delete all `.claude/pr-review-*.md` and `.claude/pr-review-*.json` files (if they exist) and STOP. The worktree cleanup runs via the trap registered in step 7. Do NOT publish anything.
+     Proceed to Phase 4 (decision menu, fresh review flow with atomic submission).
 
 ### Phase 4 — Decision Menu
 
@@ -802,9 +758,9 @@ name: review-pr
 - **Agents read files from `$WORKTREE/path/to/file`, NOT from the operator's current checkout.** Pass `$WORKTREE` to every agent dispatch.
 - **Multi-PR safety:** worktree name includes the PR number — concurrent PR reviews in the same session do not conflict.
 - The user approves the review before publishing (Phase 4)
-- **ONE review per author per PR.** A fresh review is created only when no prior review exists (Phase 5) or after an explicit dismiss (step 3.5c). NEVER publish a second review without dismissing first.
+- **ONE review per author per PR.** A fresh review is created only when no prior review exists (Phase 5) or after the automatic dismiss in the Phase 3.5 new-commits branch. NEVER publish a second review without dismissing first.
 - **Atomic submission for fresh reviews.** The `gh api POST .../reviews` call (Phase 5) includes body + event + comments[] in a single call. NEVER split into `gh pr review` + separate `gh api pulls/:n/comments`. This applies to both the `gh` and curl paths.
-- **GitHub API model:** A submitted review is an immutable container for inline comments. You cannot add inline comments to an existing review. To add context: PUT body, reply to thread, or dismiss+re-review.
+- **GitHub API model:** A submitted review is an immutable container for inline comments. You cannot add inline comments to an already-submitted review. The re-review path is always dismiss (`PUT .../dismissals`) followed by a fresh atomic `POST .../reviews` — there is no in-place edit path for inline comments.
 - **Tier classification:** Tier 0/1 → reviewer only. Tier 2 → reviewer + qa (if AC found). Tier 3/4 → reviewer + qa + security (parallel). Auto-escalation: any security-sensitive path or keyword → Tier 4.
 - **Decision menu:** operator always picks the action explicitly. The recommendation hint is advisory only. Options: approve / request changes / comment only / defer / cancel.
 - **Cleanup is trap-style** — worktree and draft files are removed even on early exit via the EXIT trap registered in step 7.
