@@ -25757,6 +25757,205 @@ check(
 # Marker: collaborative-pr-review
 
 # ---------------------------------------------------------------------------
+# Suite 109 — learn-english-skill
+# ---------------------------------------------------------------------------
+# Structural assertions for the /th:learn-english toggle skill (v2.98.0).
+# Pins: skill exists with correct frontmatter name; standalone framing; `on`
+# writes BOTH keys + the dual-activation message tokens; `off` writes
+# english_learning: false + has the language keep/change prompt + does NOT
+# auto-change language; `status`/no-arg is explicitly read-only; version-sync
+# floors; registry + hygiene guards.
+#
+# This is a FREE STRUCTURAL SUITE — pure text reads, no agent dispatch, no
+# paid spend. It runs in CI via run-all.sh on every PR.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 109: learn-english-skill structural contract ===")
+
+_s109_skill_path    = SKILLS_DIR / "learn-english" / "SKILL.md"
+_s109_skill_text    = read(_s109_skill_path) if _s109_skill_path.exists() else ""
+_s109_plugin_json   = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s109_marketplace   = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s109_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s109_claude_md     = read(REPO_ROOT / "CLAUDE.md")
+_s109_VER_FLOOR     = (2, 98, 0)
+
+# Anchor-scoped slices (anti-false-green: missing anchor → empty slice → check fails)
+_S109_ENABLE_ANCHOR  = "## Enable branch (`on`)"
+_S109_DISABLE_ANCHOR = "## Disable branch (`off`, interactive)"
+_S109_STATUS_ANCHOR  = "## Status branch (`status` / empty, NO write)"
+_S109_STOP_H2        = ("\n## ", "\n---\n")
+
+_s109_enable_slice  = _slice_section(_s109_skill_text, _S109_ENABLE_ANCHOR,  _S109_STOP_H2)
+_s109_disable_slice = _slice_section(_s109_skill_text, _S109_DISABLE_ANCHOR, _S109_STOP_H2)
+_s109_status_slice  = _slice_section(_s109_skill_text, _S109_STATUS_ANCHOR,  _S109_STOP_H2)
+
+# (1) suite109(1-skill-exists): skills/learn-english/SKILL.md exists and is non-empty
+#     with frontmatter name: learn-english
+check(
+    "suite109(1-skill-exists): skills/learn-english/SKILL.md exists and has frontmatter name: learn-english",
+    _s109_skill_path.exists()
+    and len(_s109_skill_text) > 0
+    and parse_frontmatter(_s109_skill_text).get("name") == "learn-english",
+    "skills/learn-english/SKILL.md must exist, be non-empty, and declare name: learn-english in frontmatter",
+)
+
+# (2) suite109(2-standalone-framing): SKILL.md states it does NOT route through the orchestrator
+#     and writes ~/.claude/.team-harness.json directly
+check(
+    "suite109(2-standalone-framing): SKILL.md states standalone (does NOT route through the orchestrator) "
+    "and writes ~/.claude/.team-harness.json directly",
+    "does NOT route through the orchestrator" in _s109_skill_text
+    and ".team-harness.json" in _s109_skill_text,
+    "SKILL.md must declare standalone framing (does NOT route through the orchestrator) "
+    "and name ~/.claude/.team-harness.json as the write target",
+)
+
+# (3) suite109(3-on-writes-both-keys): the `on` branch section names english_learning set to true
+#     AND language set to en AND declares merge-write-whole-document
+check(
+    "suite109(3-on-writes-both-keys): `on` branch names english_learning true AND language en "
+    "AND declares merge-write-whole-document",
+    bool(_s109_enable_slice)
+    and "english_learning" in _s109_enable_slice
+    and "true" in _s109_enable_slice
+    and "language" in _s109_enable_slice
+    and '"en"' in _s109_enable_slice
+    and "merge-write" in _s109_enable_slice,
+    "`on` branch section must name english_learning set to true AND language set to en "
+    "AND declare merge-write-whole-document",
+)
+
+# (4) suite109(4-on-dual-activation-message): the `on` report contains the load-bearing dual-activation
+#     phrases: 'sets English as the default response language', 'activates BOTH',
+#     'language: en', 'english_learning: true'
+_s109_dual_phrase_1 = "sets English as the default response language"
+_s109_dual_phrase_2 = "activates BOTH"
+_s109_dual_token_lang = "language: en"
+_s109_dual_token_el   = "english_learning: true"
+check(
+    "suite109(4-on-dual-activation-message): `on` report contains dual-activation load-bearing phrases "
+    "('sets English as the default response language', 'activates BOTH', 'language: en', 'english_learning: true')",
+    bool(_s109_enable_slice)
+    and _s109_dual_phrase_1 in _s109_enable_slice
+    and _s109_dual_phrase_2 in _s109_enable_slice
+    and _s109_dual_token_lang in _s109_enable_slice
+    and _s109_dual_token_el in _s109_enable_slice,
+    "`on` branch section must contain the dual-activation load-bearing phrases: "
+    "'sets English as the default response language', 'activates BOTH', 'language: en', 'english_learning: true'",
+)
+
+# (5) suite109(5-off-sets-false): the `off` branch section names english_learning set to false
+#     (explicit, not key-removal)
+check(
+    "suite109(5-off-sets-false): `off` branch names english_learning set to false (explicit, not key-removal)",
+    bool(_s109_disable_slice)
+    and "english_learning" in _s109_disable_slice
+    and "false" in _s109_disable_slice,
+    "`off` branch section must name english_learning set to false (explicit write, not key-removal)",
+)
+
+# (6) suite109(6-off-keep-change-prompt): the `off` branch contains the interactive language keep/change prompt
+_s109_keep_tok   = "keep"
+_s109_change_tok = "change <code>"
+check(
+    "suite109(6-off-keep-change-prompt): `off` branch contains the interactive language keep/change prompt "
+    "('keep' and 'change <code>')",
+    bool(_s109_disable_slice)
+    and _s109_keep_tok in _s109_disable_slice
+    and _s109_change_tok in _s109_disable_slice
+    and "language" in _s109_disable_slice,
+    "`off` branch section must contain the interactive keep/change language prompt with 'keep' and 'change <code>' options",
+)
+
+# (7) suite109(7-off-no-auto-change): the `off` branch explicitly states it does NOT modify language
+#     unless the operator chooses 'change'
+check(
+    "suite109(7-off-no-auto-change): `off` branch explicitly states it does NOT touch language "
+    "automatically (merge-write step does not write language)",
+    bool(_s109_disable_slice)
+    and (
+        "Do NOT touch" in _s109_disable_slice
+        or "do NOT touch" in _s109_disable_slice
+        or "do not touch" in _s109_disable_slice.lower()
+    )
+    and "language" in _s109_disable_slice,
+    "`off` branch section must explicitly state that language is not modified automatically "
+    "(only when the operator chooses 'change')",
+)
+
+# (8) suite109(8-status-read-only): the `status`/empty branch states it performs NO write
+check(
+    "suite109(8-status-read-only): `status` branch states it performs NO write under any circumstance",
+    bool(_s109_status_slice)
+    and (
+        "NO write" in _s109_status_slice
+        or "no write" in _s109_status_slice.lower()
+        or "Perform NO write" in _s109_status_slice
+    ),
+    "`status` branch section must state it performs NO write under any circumstance",
+)
+
+# (9) suite109(9-ver-plugin-json): .claude-plugin/plugin.json version >= 2.98.0
+check(
+    "suite109(9-ver-plugin-json): .claude-plugin/plugin.json version >= 2.98.0",
+    _s59_ver_tuple(_s109_plugin_json.get("version", "0.0.0")) >= _s109_VER_FLOOR,
+    "plugin.json version must be 2.98.0 or later (learn-english-skill release)",
+)
+
+# (10) suite109(10-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.98.0
+check(
+    "suite109(10-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.98.0",
+    _s59_ver_tuple(
+        _s109_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _s109_VER_FLOOR,
+    "marketplace.json plugins[0].version must be 2.98.0 or later (learn-english-skill release)",
+)
+
+# (11) suite109(11-registry): docs/testing.md registers 'Suite 109' and 'learn-english-skill' marker
+check(
+    "suite109(11-registry): docs/testing.md registers 'Suite 109' and 'learn-english-skill' marker",
+    "Suite 109" in _s109_testing_md and "learn-english-skill" in _s109_testing_md,
+    "docs/testing.md must register Suite 109 and the learn-english-skill marker",
+)
+
+# (12) suite109(12-hygiene): CLAUDE.md does NOT contain 'Suite 109' (§11 hygiene contract)
+check(
+    "suite109(12-hygiene): CLAUDE.md does NOT contain 'Suite 109'",
+    "Suite 109" not in _s109_claude_md,
+    "CLAUDE.md must not mention Suite 109 — only docs/testing.md is the canonical registry",
+)
+
+# (13) suite109(13-no-agent-call): Suite 109 non-comment own source contains no agent-invocation tokens
+_s109_own_source = read(Path(__file__))
+_s109_non_comment_lines = [
+    line for line in _s109_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s109_non_comment_text = "\n".join(_s109_non_comment_lines)
+_s109_suite_start   = _s109_non_comment_text.rfind("Suite 109")
+_s109_agent_tok     = "Age" + "nt("
+_s109_subagent_tok  = "subagent" + "_type"
+check(
+    "suite109(13-no-agent-call): Suite 109 non-comment source contains no agent-invocation tokens "
+    "(free structural suite guarantee)",
+    _s109_agent_tok not in _s109_non_comment_text[_s109_suite_start:]
+    and _s109_subagent_tok not in _s109_non_comment_text[_s109_suite_start:],
+    "Suite 109 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+
+# (14) suite109(14-self-ref): test file contains 'Suite 109', '_slice_section', and 'learn-english-skill'
+check(
+    "suite109(14-self-ref): test file contains 'Suite 109', '_slice_section', and 'learn-english-skill'",
+    "Suite 109" in _s109_own_source
+    and "_slice_section" in _s109_own_source
+    and "learn-english-skill" in _s109_own_source,
+    "test file must self-reference Suite 109 + _slice_section + the learn-english-skill marker",
+)
+
+# Marker: learn-english-skill
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
