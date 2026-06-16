@@ -17327,7 +17327,8 @@ check(
 #
 # Assertions:
 #  (f1) Phase 5 single atomic POST .../reviews is still the only submission
-#  (f2) Phase 3.5 reply step is still present (no regression)
+#  (f2) Phase 3.5 implements the collapsed automatic dismiss+fresh re-review
+#       lifecycle (no interactive a/b/c/d menu)
 # ---------------------------------------------------------------------------
 
 check(
@@ -17343,14 +17344,20 @@ check(
 )
 
 check(
-    "suite72(f2-phase35-reply-present): SKILL.md Phase 3.5 reply step is still"
-    " present (no accidental removal)",
+    "suite72(f2-phase35-collapsed-lifecycle): SKILL.md Phase 3.5 implements the"
+    " automatic dismiss+fresh re-review lifecycle (no interactive a/b/c/d menu)",
     (
         "Phase 3.5" in _s72_skill
-        or "3.5" in _s72_skill
+        and "dismissals" in _s72_skill
+        and (
+            "new commits" in _s72_skill.lower()
+            or "commit_id" in _s72_skill
+        )
+        and "Which option" not in _s72_skill
     ),
-    "SKILL.md must still contain Phase 3.5 (reply-to-thread step) — this step"
-    " must not be removed when adding the input-side comment-fetch",
+    "SKILL.md Phase 3.5 must implement the collapsed automatic lifecycle:"
+    " dismiss+fresh on new commits, skip+note on no new commits — the interactive"
+    " a/b/c/d menu must be absent; 'dismissals' API call must be present",
 )
 
 # ---------------------------------------------------------------------------
@@ -26178,6 +26185,201 @@ check(
 )
 
 # Marker: loosening-dispositions
+
+# ---------------------------------------------------------------------------
+# Suite 111 — re-review-collapse
+# ---------------------------------------------------------------------------
+# Structural assertions for the Phase 3.5 prior-review menu collapse (v2.100.0).
+# The interactive a/b/c/d menu and substeps 3.5a/3.5b/3.5d are removed; the
+# dismiss+fresh path (3.5c) is promoted to the automatic default on new commits;
+# no new commits → skip with one-line note; no prior review → Phase 4 unchanged.
+# The ## Hallazgos por enfoque continuity detection is preserved.
+# The Phase 5 atomic POST contract is frozen (unchanged).
+#
+# All content checks use the anchor-scoped 3-arg _slice_section idiom
+# (anti-false-green: missing anchor → empty slice → check fails).
+#
+# Pure text/JSON reads — no agent invocation, no paid spend.
+# Written by implementer (2026-06-16).
+# Marker: re-review-collapse
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 111: re-review-collapse structural contract ===")
+
+_s111_skill_text   = read(REPO_ROOT / "skills" / "review-pr" / "SKILL.md")
+_s111_testing_md   = read(REPO_ROOT / "docs" / "testing.md")
+_s111_claude_md    = read(REPO_ROOT / "CLAUDE.md")
+_s111_plugin_json  = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s111_marketplace  = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+
+_S111_P35_ANCHOR  = "### Phase 3.5 — Prior Review Check"
+_S111_P5_ANCHOR   = "### Phase 5 — Publish + Cleanup"
+_S111_IMP_ANCHOR  = "## Important"
+_S111_STOP_H3     = ("\n## ", "\n### ", "\n---\n")
+_S111_STOP_H2     = ("\n## ", "\n---\n")
+
+_s111_skill_p35   = _slice_section(_s111_skill_text, _S111_P35_ANCHOR, _S111_STOP_H3)
+_s111_skill_p5    = _slice_section(_s111_skill_text, _S111_P5_ANCHOR,  _S111_STOP_H3)
+_s111_skill_imp   = _slice_section(_s111_skill_text, _S111_IMP_ANCHOR, _S111_STOP_H2)
+
+_s111_VER_FLOOR   = (2, 100, 0)
+
+# (1) suite111(1-no-menu): Phase 3.5 does NOT present an interactive a/b/c/d menu
+check(
+    "suite111(1-no-menu): SKILL.md Phase 3.5 does NOT present an interactive a/b/c/d menu",
+    bool(_s111_skill_p35)
+    and "Which option" not in _s111_skill_p35
+    and "(a) Update the summary" not in _s111_skill_p35
+    and "(b) Reply to" not in _s111_skill_p35
+    and "(c) Re-review cycle" not in _s111_skill_p35
+    and "(d) Cancel" not in _s111_skill_p35,
+    "SKILL.md Phase 3.5 must NOT present the interactive a/b/c/d menu — the collapse"
+    " removes all interactive prompts from this phase",
+)
+
+# (2) suite111(2-auto-dismiss-on-new-commits): Phase 3.5 performs automatic dismiss
+#     when new commits are detected (dismissals token present, commit_id comparison present)
+check(
+    "suite111(2-auto-dismiss-on-new-commits): SKILL.md Phase 3.5 automatically dismisses"
+    " the prior review when new commits are detected",
+    bool(_s111_skill_p35)
+    and "dismissals" in _s111_skill_p35
+    and (
+        "commit_id" in _s111_skill_p35
+        or "new commits" in _s111_skill_p35.lower()
+    ),
+    "SKILL.md Phase 3.5 must automatically call the dismissals API when new commits exist"
+    " since the prior review — 'dismissals' token must appear in the Phase 3.5 slice",
+)
+
+# (3) suite111(3-skip-on-no-new-commits): Phase 3.5 skips posting when no new commits
+check(
+    "suite111(3-skip-on-no-new-commits): SKILL.md Phase 3.5 emits a note and stops"
+    " when no new commits exist since the prior review",
+    bool(_s111_skill_p35)
+    and (
+        "no new commits" in _s111_skill_p35.lower()
+        or "No duplicate review posted" in _s111_skill_p35
+        or "no duplicate" in _s111_skill_p35.lower()
+    ),
+    "SKILL.md Phase 3.5 must emit a one-line note and STOP (no dismiss, no post)"
+    " when the prior review commit_id matches the current PR head SHA",
+)
+
+# (4) suite111(4-same-author-detection-preserved): Phase 3.5 still fetches all reviews
+#     and filters to same-author (the detection input is unchanged)
+check(
+    "suite111(4-same-author-detection-preserved): SKILL.md Phase 3.5 still fetches"
+    " all reviews (all authors) and filters to same-author",
+    bool(_s111_skill_p35)
+    and (
+        "all_reviews" in _s111_skill_p35
+        or "all reviews" in _s111_skill_p35.lower()
+    )
+    and (
+        "same_author_review" in _s111_skill_p35
+        or "same-author" in _s111_skill_p35.lower()
+    ),
+    "SKILL.md Phase 3.5 must preserve the all-authors fetch + same-author filter"
+    " (detection input is unchanged by the collapse)",
+)
+
+# (5) suite111(5-continuity-detection-preserved): Phase 3.5 still checks for
+#     ## Hallazgos por enfoque to auto-apply --multi for continuity
+check(
+    "suite111(5-continuity-detection-preserved): SKILL.md Phase 3.5 preserves the"
+    " ## Hallazgos por enfoque → --multi continuity detection",
+    "Hallazgos por enfoque" in _s111_skill_p35,
+    "SKILL.md Phase 3.5 must preserve the '## Hallazgos por enfoque' continuity"
+    " detection — if a prior review body contains this header, --multi is auto-applied",
+)
+
+# (6) suite111(6-phase5-atomic-post-frozen): Phase 5 atomic POST is unchanged
+check(
+    "suite111(6-phase5-atomic-post-frozen): SKILL.md Phase 5 single atomic POST"
+    " .../reviews is still present (publish contract frozen)",
+    bool(_s111_skill_p5)
+    and "POST" in _s111_skill_p5
+    and "reviews" in _s111_skill_p5,
+    "SKILL.md Phase 5 must still declare the single atomic POST .../reviews"
+    " — the publish contract is unchanged by the Phase 3.5 collapse",
+)
+
+# (7) suite111(7-important-notes-reconciled): Important notes describe the automatic
+#     dismiss+fresh path; no stale references to interactive PUT-body or reply options
+check(
+    "suite111(7-important-notes-reconciled): SKILL.md Important notes describe the"
+    " automatic dismiss+fresh path with no stale interactive-option references",
+    bool(_s111_skill_imp)
+    and "automatic" in _s111_skill_imp.lower()
+    and "dismiss" in _s111_skill_imp.lower()
+    and "PUT body" not in _s111_skill_imp
+    and "reply to thread" not in _s111_skill_imp.lower(),
+    "SKILL.md Important notes must describe the automatic dismiss+fresh re-review path"
+    " and must not mention the removed interactive PUT-body or reply-to-thread options",
+)
+
+# ── Registry / hygiene / free-suite / self-ref ────────────────────────────
+
+# (8) suite111(8-registry): docs/testing.md registers Suite 111 and re-review-collapse marker
+check(
+    "suite111(8-registry): docs/testing.md registers 'Suite 111' and 're-review-collapse' marker",
+    "Suite 111" in _s111_testing_md and "re-review-collapse" in _s111_testing_md,
+    "docs/testing.md must register Suite 111 and the re-review-collapse marker",
+)
+
+# (9) suite111(9-hygiene): CLAUDE.md does NOT contain 'Suite 111' (§11 hygiene contract)
+check(
+    "suite111(9-hygiene): CLAUDE.md does NOT contain 'Suite 111'",
+    "Suite 111" not in _s111_claude_md,
+    "CLAUDE.md must not mention Suite 111 — only docs/testing.md is the canonical registry",
+)
+
+# (10) suite111(10-ver-plugin-json): .claude-plugin/plugin.json version >= 2.100.0
+check(
+    "suite111(10-ver-plugin-json): .claude-plugin/plugin.json version >= 2.100.0",
+    _s59_ver_tuple(_s111_plugin_json.get("version", "0.0.0")) >= _s111_VER_FLOOR,
+    "plugin.json version must be 2.100.0 or later (re-review-collapse minor bump)",
+)
+
+# (11) suite111(11-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.100.0
+check(
+    "suite111(11-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.100.0",
+    _s59_ver_tuple(
+        _s111_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _s111_VER_FLOOR,
+    "marketplace.json plugins[0].version must be 2.100.0 or later (matched with plugin.json)",
+)
+
+# (12) suite111(12-no-agent-call): Suite 111 non-comment own source contains no agent-invocation tokens
+_s111_own_source = read(Path(__file__))
+_s111_non_comment_lines = [
+    line for line in _s111_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s111_non_comment_text = "\n".join(_s111_non_comment_lines)
+_s111_suite_start  = _s111_non_comment_text.rfind("Suite 111")
+_s111_agent_tok    = "Age" + "nt("
+_s111_subagent_tok = "subagent" + "_type"
+check(
+    "suite111(12-no-agent-call): Suite 111 non-comment source contains no agent-invocation tokens "
+    "(free structural suite guarantee)",
+    _s111_agent_tok not in _s111_non_comment_text[_s111_suite_start:]
+    and _s111_subagent_tok not in _s111_non_comment_text[_s111_suite_start:],
+    "Suite 111 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+
+# (13) suite111(13-self-ref): test file contains 'Suite 111', '_slice_section', and 're-review-collapse'
+check(
+    "suite111(13-self-ref): test file contains 'Suite 111', '_slice_section', "
+    "and 're-review-collapse'",
+    "Suite 111" in _s111_own_source
+    and "_slice_section" in _s111_own_source
+    and "re-review-collapse" in _s111_own_source,
+    "test file must self-reference Suite 111 + _slice_section + the re-review-collapse marker",
+)
+
+# Marker: re-review-collapse
 
 # ---------------------------------------------------------------------------
 # Summary
