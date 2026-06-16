@@ -625,6 +625,44 @@ assert_output_contains "el-noconfig-orch-fires: orchestrator disposition still f
 rm -rf "$TMP"
 
 # ===========================================================================
+# SECTION 7 — Directive content assertions: C1 (capitalization), C3 (format order), C2 (Spanish exemption)
+# ===========================================================================
+
+echo
+echo "=== English-learning (C1): correct-error list does NOT contain 'capitalization' ==="
+# The word 'capitalization' must NOT appear in the corrected-error list.
+# The list reads: verb tense, subject-verb agreement, articles, prepositions, plurals, word order
+# We assert that the specific pattern 'plurals, capitalization' no longer appears.
+TMP=$(make_tmp_home '{"english_learning":true}')
+assert_output_not_contains "el-c1-no-cap-in-correct-list: corrected-error list must not contain 'plurals, capitalization'" "$TMP" "plurals, capitalization"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (C1): do-not-flag clause names 'capitalization' ==="
+# The 'Do NOT flag' sentence must now include 'capitalization'.
+TMP=$(make_tmp_home '{"english_learning":true}')
+assert_output_contains "el-c1-cap-in-do-not-flag: Do NOT flag clause must contain 'capitalization'" "$TMP" "Do NOT flag"
+assert_output_contains "el-c1-cap-in-do-not-flag-word: do-not-flag clause names capitalization" "$TMP" "capitalization (including sentence-start and acronym case)"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (C3): correction format places labels before corrected version ==="
+# The format clause must state that labels come first and the corrected version is last.
+# Assert that 'labels' (or 'label') precede the corrected-version placement indicator.
+TMP=$(make_tmp_home '{"english_learning":true}')
+assert_output_contains "el-c3-labels-first: format clause references labels before corrected version" "$TMP" "After the labels"
+assert_output_contains "el-c3-corrected-last: corrected version is on the final line of the block" "$TMP" "final line of the correction block"
+assert_output_contains "el-c3-preserve-casing: corrected version preserves operator casing" "$TMP" "preserving their original casing"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (C2 regression lock): non-English / Spanish exemption clause still present ==="
+TMP=$(make_tmp_home '{"english_learning":true}')
+assert_output_contains "el-c2-spanish-exemption: Spanish exemption clause present" "$TMP" "Spanish"
+assert_output_contains "el-c2-non-english-exemption: non-English out-of-scope clause present" "$TMP" "do not emit a :) for a non-English message"
+rm -rf "$TMP"
+
+# ===========================================================================
 # SECTION 7 — Structure assertions for load_english_learning (AC-3)
 # ===========================================================================
 
