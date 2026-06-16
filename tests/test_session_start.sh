@@ -663,6 +663,33 @@ assert_output_contains "el-c2-non-english-exemption: non-English out-of-scope cl
 rm -rf "$TMP"
 
 # ===========================================================================
+# SECTION 7 — Language-gate cases (C1 truth table: el-true + lang variant)
+# AC-1: el=true + lang=en  → directive present
+# AC-2: el=true + lang=es  → directive dormant (principal-risk case)
+# AC-3: el=true + lang absent → directive present (absent → default en)
+# ===========================================================================
+
+echo
+echo "=== English-learning language-gate (AC-1): el=true + lang=en → directive present ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"en"}')
+assert_output_contains "el-lang-en-fires: directive present when language is en" "$TMP" "english-learning mode is active"
+assert_output_contains "el-lang-en-orch-fires: orchestrator disposition fires" "$TMP" "orchestrator disposition"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning language-gate (AC-2): el=true + lang=es → directive dormant (principal risk) ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_not_contains "el-lang-es-dormant: directive absent when language is es" "$TMP" "english-learning mode is active"
+assert_output_contains "el-lang-es-orch-fires: orchestrator disposition still fires when el-directive is dormant" "$TMP" "orchestrator disposition"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning language-gate (AC-3): el=true + no language key → directive present (absent→en) ==="
+TMP=$(make_tmp_home '{"english_learning":true}')
+assert_output_contains "el-lang-absent-fires: directive present when language key is absent" "$TMP" "english-learning mode is active"
+rm -rf "$TMP"
+
+# ===========================================================================
 # SECTION 7 — Structure assertions for load_english_learning (AC-3)
 # ===========================================================================
 
