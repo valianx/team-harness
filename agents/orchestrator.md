@@ -1004,11 +1004,13 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      ```
      About to set english-learning correction mode to "<on|off>" (persistent write to ~/.claude/.team-harness.json).
      This affects all future sessions. The current session also switches to "<on|off>".
+     Note: enabling english-learning also sets the response language to English (language: en) at the same scope.
      Confirm? [Y/n]:
      ```
-     - On **Y**: perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `true` or `false`), write the whole document back (never a partial payload). Then record the session state in `00-state.md § Current State` under an `english_learning` field.
+     - On **Y** (enabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add BOTH the `english_learning` key (boolean `true`) AND the `language` key (`"en"`), write the whole document back (never a partial payload). Then record both in `00-state.md § Current State`: `english_learning: true` and `operator_language: en`.
+     - On **Y** (disabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `false`). Do NOT modify the `language` key on disable. Then record `english_learning: false` in `00-state.md § Current State`.
      - On **n**: offer to apply the change as an ephemeral session-only override instead (intent (c′) path). Do NOT write the config file.
-   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only (`english_learning: true|false`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
+   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only. When enabling: record BOTH `english_learning: true` AND `operator_language: en`. When disabling: record `english_learning: false` only (do NOT modify `operator_language`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
 
    **Step 6b — Route based on category:**
 
