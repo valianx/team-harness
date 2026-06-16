@@ -26119,13 +26119,11 @@ check(
     f"unexpected hooks/*.sh files not in the canonical set: {sorted(_s110_extra_hooks)}",
 )
 
-# (7) suite110(7-no-apply-review-skill): no skills/apply-review/ directory exists (AC-7)
-_s110_apply_review_skill = _s110_skills_dir / "apply-review"
-check(
-    "suite110(7-no-apply-review-skill): skills/apply-review/ skill directory does NOT exist (AC-7)",
-    not _s110_apply_review_skill.exists(),
-    "skills/apply-review/ must NOT exist — 2.A is automatic (not a skill command)",
-)
+# (7) RETIRED in v2.101.0 — suite110(7-no-apply-review-skill) removed (not stubbed).
+# It asserted skills/apply-review/ does NOT exist (loosening-dispositions PR v2.99.0
+# scoped the skill out, AC-7). The apply-review-direct-mode PR (v2.101.0) explicitly
+# adds that skill, reversing that scope decision; Suite 112 now positively asserts the
+# skill exists and is correctly wired. No vacuous always-pass stub is retained.
 
 # (8) suite110(8-ver-plugin-json): .claude-plugin/plugin.json version >= 2.99.0
 check(
@@ -26380,6 +26378,241 @@ check(
 )
 
 # Marker: re-review-collapse
+
+# ---------------------------------------------------------------------------
+# Suite 112 — apply-review-direct-mode
+# ---------------------------------------------------------------------------
+# Structural assertions for the /th:apply-review direct mode (v2.101.0).
+# A thin routing skill skills/apply-review/SKILL.md is added as an explicit,
+# on-demand complement to the orchestrator's automatic lifecycle-bound
+# apply-review handling. The automatic trigger is preserved (AC-2). The
+# disposition body remains single-sourced in apply-review-disposition.md (AC-3).
+#
+# All content checks use the anchor-scoped 3-arg _slice_section idiom
+# (anti-false-green: missing anchor → empty slice → check fails).
+#
+# Pure text/JSON reads — no agent invocation, no paid spend.
+# Written by implementer (2026-06-16).
+# Marker: apply-review-direct-mode
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 112: apply-review-direct-mode structural contract ===")
+
+_s112_skill_path      = SKILLS_DIR / "apply-review" / "SKILL.md"
+_s112_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
+_s112_ref_modes       = read(AGENTS_DIR / "ref-direct-modes.md")
+_s112_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
+_s112_claude_md       = read(REPO_ROOT / "CLAUDE.md")
+_s112_plugin_json     = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s112_marketplace     = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s112_skill_text      = read(_s112_skill_path) if _s112_skill_path.exists() else ""
+
+_S112_IMP_ANCHOR      = "## Important"
+_S112_STOP_H2         = ("\n## ", "\n---\n")
+_S112_AR_ANCHOR       = "## Apply-Review Mode"
+_S112_STOP_RULE       = ("\n---\n", "\n## ")
+_S112_PR_INCORP       = "## PR Comment Incorporation"
+_S112_STEP6_ANCHOR    = "**Step 6a — Classify intent.**"
+_S112_DIRECT_ANCHOR   = "## Direct Modes"
+_S112_STOP_H2_RULE    = ("\n## ", "\n---\n")
+
+_s112_VER_FLOOR       = (2, 101, 0)
+
+_s112_skill_imp       = _slice_section(_s112_skill_text, _S112_IMP_ANCHOR, _S112_STOP_H2)
+_s112_ref_ar_section  = _slice_section(_s112_ref_modes, _S112_AR_ANCHOR, _S112_STOP_RULE)
+_s112_orch_pr_incorp  = _slice_section(_s112_orchestrator, _S112_PR_INCORP, _S112_STOP_H2_RULE)
+_s112_orch_step6      = _slice_section(_s112_orchestrator, _S112_STEP6_ANCHOR, _S112_STOP_H2_RULE)
+_s112_orch_direct     = _slice_section(_s112_orchestrator, _S112_DIRECT_ANCHOR, _S112_STOP_H2_RULE)
+
+# (1) suite112(1-skill-exists): skills/apply-review/SKILL.md exists and is non-empty
+check(
+    "suite112(1-skill-exists): skills/apply-review/SKILL.md exists and is non-empty",
+    _s112_skill_path.exists() and len(_s112_skill_text) > 0,
+    "skills/apply-review/SKILL.md must exist and be non-empty",
+)
+
+# (2) suite112(2-skill-thin): SKILL.md is thin — routes to orchestrator, does NOT
+#     restate the disposition body (disposition tokens must not appear in the skill)
+#     Key disposition phrases: "two-axis", "classification table", "mandatory verification"
+_s112_DISP_TOKENS = ["two-axis", "classification table", "mandatory verification",
+                     "Step 1 — Classify", "Step 2 — Verification", "Step 3 — Deletion"]
+check(
+    "suite112(2-skill-thin): SKILL.md is thin — does NOT restate the disposition body",
+    bool(_s112_skill_text)
+    and "orchestrator" in _s112_skill_text
+    and "Direct Mode Task" in _s112_skill_text
+    and all(tok not in _s112_skill_text for tok in _s112_DISP_TOKENS),
+    "SKILL.md must route to orchestrator with Direct Mode Task payload and must NOT"
+    " restate disposition body tokens (two-axis, classification table, mandatory verification,"
+    " Step 1/2/3 disposition headings)",
+)
+
+# (3) suite112(3-skill-references-disposition): skill Important section references
+#     apply-review-disposition.md by path (single-source contract)
+check(
+    "suite112(3-skill-references-disposition): SKILL.md Important section references"
+    " apply-review-disposition.md by path",
+    bool(_s112_skill_imp)
+    and "apply-review-disposition.md" in _s112_skill_imp,
+    "SKILL.md ## Important must reference agents/_shared/apply-review-disposition.md by path"
+    " — disposition body is single-sourced (not restated in the skill)",
+)
+
+# (4) suite112(4-skill-complement-note): skill Important section declares this is a
+#     COMPLEMENT to the automatic trigger, not a replacement
+check(
+    "suite112(4-skill-complement-note): SKILL.md Important section declares this is a"
+    " COMPLEMENT to the automatic trigger",
+    bool(_s112_skill_imp)
+    and "COMPLEMENT" in _s112_skill_imp
+    and "automatic" in _s112_skill_imp.lower(),
+    "SKILL.md ## Important must state this direct mode is a COMPLEMENT to the automatic"
+    " lifecycle-bound apply-review handling — not a replacement",
+)
+
+# (5) suite112(5-orchestrator-catalog-row): orchestrator.md Direct Modes table
+#     has an apply-review row that references ref-direct-modes.md § Apply-Review Mode
+check(
+    "suite112(5-orchestrator-catalog-row): orchestrator.md Direct Modes catalog"
+    " has apply-review row referencing ref-direct-modes.md § Apply-Review Mode",
+    bool(_s112_orch_direct)
+    and "apply-review" in _s112_orch_direct
+    and "ref-direct-modes.md" in _s112_orch_direct
+    and "Apply-Review Mode" in _s112_orch_direct,
+    "orchestrator.md ## Direct Modes table must include an apply-review row that"
+    " references ref-direct-modes.md § Apply-Review Mode",
+)
+
+# (6) suite112(6-step6-intent-row): orchestrator.md Step 6 intent table
+#     has an apply-review row (author-side comment incorporation intent pattern)
+check(
+    "suite112(6-step6-intent-row): orchestrator.md Step 6 intent table has"
+    " apply-review row for author-side comment incorporation",
+    bool(_s112_orch_step6)
+    and "apply-review" in _s112_orch_step6
+    and "apply review comments" in _s112_orch_step6.lower(),
+    "orchestrator.md Step 6a intent table must include an apply-review row with"
+    " the 'apply review comments' intent pattern",
+)
+
+# (7) suite112(7-disambiguation-note): orchestrator.md disambiguation block
+#     has the apply-review disambiguation note (AUTHOR side vs REVIEWER side)
+check(
+    "suite112(7-disambiguation-note): orchestrator.md disambiguation block has"
+    " apply-review vs review-pr disambiguation note",
+    "apply-review" in _s112_orchestrator
+    and "AUTHOR side" in _s112_orchestrator
+    and "REVIEWER side" in _s112_orchestrator,
+    "orchestrator.md disambiguation block must distinguish apply-review (AUTHOR side)"
+    " from review/review-pr (REVIEWER side)",
+)
+
+# (8) suite112(8-automatic-trigger-preserved): orchestrator.md still declares the
+#     automatic trigger section with the (automatic, lifecycle-bound) header (AC-2)
+check(
+    "suite112(8-automatic-trigger-preserved): orchestrator.md still has the"
+    " (automatic, lifecycle-bound) PR Comment Incorporation section header (AC-2)",
+    "PR Comment Incorporation — Apply-Review Disposition (automatic, lifecycle-bound)"
+    in _s112_orchestrator,
+    "orchestrator.md must still declare the automatic, lifecycle-bound trigger section"
+    " header — the automatic path must not be removed or weakened (AC-2)",
+)
+
+# (9) suite112(9-stale-note-gone): orchestrator.md no longer contains the stale
+#     'No command route, no new skill' phrasing (reconciled by this PR)
+check(
+    "suite112(9-stale-note-gone): orchestrator.md does NOT contain the stale"
+    " 'No command route, no new skill' phrasing",
+    "No command route, no new skill" not in _s112_orchestrator,
+    "orchestrator.md must NOT contain the stale 'No command route, no new skill' note"
+    " — this was replaced by the 'Automatic by default; also invokable explicitly' note",
+)
+
+# (10) suite112(10-new-note-present): orchestrator.md PR Comment Incorporation section
+#      contains the new complementary note (automatic + explicit)
+check(
+    "suite112(10-new-note-present): orchestrator.md PR Comment Incorporation section"
+    " contains the 'Automatic by default; also invokable explicitly' note",
+    bool(_s112_orch_pr_incorp)
+    and "Automatic by default" in _s112_orch_pr_incorp
+    and "also invokable explicitly" in _s112_orch_pr_incorp,
+    "orchestrator.md ## PR Comment Incorporation must contain the new note:"
+    " 'Automatic by default; also invokable explicitly'",
+)
+
+# (11) suite112(11-ref-modes-section): ref-direct-modes.md has ## Apply-Review Mode
+#      section that references apply-review-disposition.md by path (not restated)
+check(
+    "suite112(11-ref-modes-section): ref-direct-modes.md has ## Apply-Review Mode"
+    " section referencing apply-review-disposition.md by path",
+    bool(_s112_ref_ar_section)
+    and "apply-review-disposition.md" in _s112_ref_ar_section
+    and all(tok not in _s112_ref_ar_section for tok in _s112_DISP_TOKENS),
+    "ref-direct-modes.md ## Apply-Review Mode must reference apply-review-disposition.md"
+    " by path and must NOT restate the disposition body tokens",
+)
+
+# ── Registry / hygiene / free-suite / self-ref ────────────────────────────
+
+# (12) suite112(12-registry): docs/testing.md registers Suite 112 and apply-review-direct-mode marker
+check(
+    "suite112(12-registry): docs/testing.md registers 'Suite 112' and 'apply-review-direct-mode' marker",
+    "Suite 112" in _s112_testing_md and "apply-review-direct-mode" in _s112_testing_md,
+    "docs/testing.md must register Suite 112 and the apply-review-direct-mode marker",
+)
+
+# (13) suite112(13-hygiene): CLAUDE.md does NOT contain 'Suite 112' (§11 hygiene contract)
+check(
+    "suite112(13-hygiene): CLAUDE.md does NOT contain 'Suite 112'",
+    "Suite 112" not in _s112_claude_md,
+    "CLAUDE.md must not mention Suite 112 — only docs/testing.md is the canonical registry",
+)
+
+# (14) suite112(14-ver-plugin-json): .claude-plugin/plugin.json version >= 2.101.0
+check(
+    "suite112(14-ver-plugin-json): .claude-plugin/plugin.json version >= 2.101.0",
+    _s59_ver_tuple(_s112_plugin_json.get("version", "0.0.0")) >= _s112_VER_FLOOR,
+    "plugin.json version must be 2.101.0 or later (apply-review-direct-mode minor bump)",
+)
+
+# (15) suite112(15-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.101.0
+check(
+    "suite112(15-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.101.0",
+    _s59_ver_tuple(
+        _s112_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _s112_VER_FLOOR,
+    "marketplace.json plugins[0].version must be 2.101.0 or later (matched with plugin.json)",
+)
+
+# (16) suite112(16-no-agent-call): Suite 112 non-comment own source contains no agent-invocation tokens
+_s112_own_source = read(Path(__file__))
+_s112_non_comment_lines = [
+    line for line in _s112_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s112_non_comment_text = "\n".join(_s112_non_comment_lines)
+_s112_suite_start  = _s112_non_comment_text.rfind("Suite 112")
+_s112_agent_tok    = "Age" + "nt("
+_s112_subagent_tok = "subagent" + "_type"
+check(
+    "suite112(16-no-agent-call): Suite 112 non-comment source contains no agent-invocation tokens "
+    "(free structural suite guarantee)",
+    _s112_agent_tok not in _s112_non_comment_text[_s112_suite_start:]
+    and _s112_subagent_tok not in _s112_non_comment_text[_s112_suite_start:],
+    "Suite 112 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+
+# (17) suite112(17-self-ref): test file contains 'Suite 112', '_slice_section', and 'apply-review-direct-mode'
+check(
+    "suite112(17-self-ref): test file contains 'Suite 112', '_slice_section', "
+    "and 'apply-review-direct-mode'",
+    "Suite 112" in _s112_own_source
+    and "_slice_section" in _s112_own_source
+    and "apply-review-direct-mode" in _s112_own_source,
+    "test file must self-reference Suite 112 + _slice_section + the apply-review-direct-mode marker",
+)
+
+# Marker: apply-review-direct-mode
 
 # ---------------------------------------------------------------------------
 # Summary

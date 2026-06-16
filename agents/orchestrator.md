@@ -966,6 +966,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | validar (implementación), validate, "verificar implementación" | `validate` | read-only |
    | revisar/auditar plan, "revisa el plan", review/audit my plan, "is my plan compliant?" | `plan-review` | read-only |
    | review PR | `/th:review-pr` | read-only |
+   | apply review comments, "apply the review on PR #N", "incorporá los comentarios del review", "aplicá los comentarios del PR", author-side comment incorporation | `apply-review` | write |
    | planificar, plan, "desglosar en tareas", breakdown | `plan` | read-only |
    | spike, exploración rápida, prototype, PoC | `spike` | write |
    | documentar, documenta, document, "write docs", "genera documentación", "documenta en obsidian", "create documentation" | `docs` | write |
@@ -984,6 +985,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - "Review this PR / revisa el PR #N / @th:orchestrator review PR" → `/th:review-pr` skill flow (read-only, auto-route). DISTINCT from `plan-review` (which audits a design artifact, not a GitHub PR) and from `full pipeline` (the PR already exists — no new development pipeline). The orchestrator routes to the skill flow and does NOT bare-dispatch the `reviewer` agent; the skill flow manages worktree, tier classification, behavioral verification, multi-reviewer panel, consolidation, and atomic submission.
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
+   - "Apply the review comments on PR #N / incorporá los comentarios del review" → `apply-review` direct mode (AUTHOR side — incorporate reviewer comments into the PR's code under the conservative disposition). DISTINCT from `review` / `/th:review-pr` (REVIEWER side — produce a review of a PR, no code change) and from `full pipeline` (the PR already exists; this incorporates comments, it does not start new development). The `apply-review` direct mode is the explicit, deterministic complement to the orchestrator's automatic lifecycle-bound apply-review handling.
    - **Diagram engine disambiguation** — Three diagram engines are available. "D2 / diagrama D2 / D2 diagram / dot" → `d2-diagram` mode (D2 graph language, structural diagrams). "LikeC4 / C4 / architecture-as-code / diagrama C4" → `likec4-diagram` mode (LikeC4 architecture views). Generic "diagrama / diagram / visualizar arquitectura" → `diagram` mode (Excalidraw, DEFAULT — use when no engine is specified). The `diagram` (Excalidraw) route is the default; engine-specific routes are additive and take precedence when the engine name is mentioned.
 
    **Language-set intent handling.** When the intent matches a `language-set` row:
@@ -2524,8 +2526,12 @@ making any code change:
 3. After all comments are evaluated and changes (if any) are applied, proceed
    through the standard Verify + Delivery phases for the updated code.
 
-**No command route, no new skill.** This is part of the orchestrator's normal
-PR-work handling. The operator does not invoke a separate command to enable it.
+**Automatic by default; also invokable explicitly.** This handling fires
+AUTOMATICALLY as part of the orchestrator's normal PR-work lifecycle (the trigger
+above). It is ALSO invokable on demand via the `/th:apply-review <PR>` direct mode
+(`ref-direct-modes.md § Apply-Review Mode`) — an explicit, deterministic entry point
+that loads this SAME section and the SAME shared disposition snippet. The direct mode
+is a complement, not a replacement: the automatic trigger is unchanged.
 
 ---
 
@@ -4248,10 +4254,11 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | docs | `architect` (research) → `documenter` → `diagrammer` (conditional) → `qa` | none | see `ref-special-flows.md` § Documentation Flow |
 | gcp-costs | `gcp-cost-analyzer` | gcloud auth | create workspaces → invoke → present `00-gcp-costs.md` |
 | gcp-infra | `gcp-infra` → (Apply mode only) `th:security` + `th:qa` | gcloud auth | create workspaces → invoke gcp-infra → if `02-apply.sh` present: dispatch `th:security` then `th:qa` to audit into `02-gcp-review.md`; then present Phase 4 STOP gate carrying review verdict; gate required before any apply |
+| apply-review | you (orchestrator) | a PR reference (#N / URL) | pull the PR's comments (gh / gh-fallback Tier A) → load `agents/_shared/apply-review-disposition.md` + `agents/_shared/finding-connection.md` → apply the disposition in full to every comment → emit per-comment output → report. Same behavior as the automatic `## PR Comment Incorporation` handling, on explicit demand. See `ref-direct-modes.md § Apply-Review Mode`. |
 
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:
 
-- **`ref-direct-modes.md`** — Diagram (Excalidraw), LikeC4 Diagram, D2 Diagram, Review, Translate, Test, Test-Pipeline mode
+- **`ref-direct-modes.md`** — Diagram (Excalidraw), LikeC4 Diagram, D2 Diagram, Review, Translate, Test, Test-Pipeline, Apply-Review mode
 - **`ref-special-flows.md`** — Research, Spike, Plan, Parallel Dispatch, Hotfix, Security-Sensitive, Database Changes, Refactor, User-Initiated Simple mode
 
 ---
