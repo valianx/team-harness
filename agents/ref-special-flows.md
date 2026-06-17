@@ -144,6 +144,21 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple PRs, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or orchestrator judges a scope too large for one task/PR, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
+### Batch consolidation vs the anti-split invariant
+
+These two rules are the same constraint read from two directions:
+
+- **Anti-split invariant (single-task reading):** A single task is NEVER split across multiple PRs. The Operator-authority invariant above is the governing statement — no agent divides a task's plan or implementation on its own authority. "One task = one PR" means exactly this: do not split ONE task across N PRs.
+- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default. The orchestrator's `## Multi-Task Orchestration` **Consolidation default** paragraph is the governing statement — all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
+
+Read together: a task is never SPLIT across PRs (anti-split), and a same-repo batch consolidates INTO one PR (consolidation default). There is no contradiction — one rule prevents explosion outward (splitting), the other prevents explosion inward (one PR per task in a batch). The wording "one task = one PR" refers only to the anti-split direction: a single task is never divided across PRs.
+
+**Operator opt-out.** The operator — and only the operator — may override the consolidation default by requesting separate PRs ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open PR-N+1 only after PR-N lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
+
+**Genuine blocker (the only non-opt-out reason for separate PRs in a same-repo batch).** Absent an operator opt-out, the orchestrator splits a batch into separate PRs ONLY for: (a) an UNRESOLVABLE merge conflict between task branches at consolidation Step 5a; or (b) a temporal-prod / cross-repo deploy reason from the plan-reviewer's existing closed list — `coexistence window`, `production signal`, `cross-repo deploy gate` (see `agents/plan-reviewer.md § Rule 1`). No new blocker categories exist.
+
+**Same delivery flow alignment.** The consolidated batch ships via the same delivery flow and the same PR lifecycle as a single task — the same `delivery` agent (orchestrator Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge per `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path. The only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single task branch.
+
 **Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `04-security.md`, and `04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
 
 **Milestone Index (summary).** The plan's `00-state.md` `## Milestone Index` table tracks one row per milestone with a `Commit` column (commit sha per milestone). No per-milestone `PR` column. A single build-level PR is recorded once at the end.

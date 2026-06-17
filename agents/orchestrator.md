@@ -3654,6 +3654,12 @@ The guarantee mirrors the KG passive-capture pattern in `agents/delivery.md` § 
 
 **DEFAULT behavior for 2+ tasks.** Whenever you have multiple tasks — from `/th:issue` batch, `/th:plan plan-and-execute`, user request for batch work, or your own breakdown of a broad scope — dispatch them using dependency analysis, parallel worktrees, and event-driven monitoring via hooks. You NEVER run multiple tasks sequentially in a single session.
 
+**Consolidation default — a same-repo task batch ships as ONE PR.** When the batch is single-repo, the default outcome is ONE consolidated PR: all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work (Step 5d). This is the default, not a special case — do NOT open one PR per batched task. This consolidation default and the milestone anti-split invariant ("a single task is never split across PRs," `agents/ref-special-flows.md § Milestone-Build Flow`) are the same rule read two ways: a task is never SPLIT across PRs, and a same-repo batch consolidates INTO one PR. The consolidated batch ships via the **same delivery flow** and the same PR lifecycle as a single task — the same `delivery` agent (Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge, `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path; the only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a), not a single task branch.
+
+**Operator opt-out.** The operator — and only the operator — may request separate PRs by saying so ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open PR-N+1 only after PR-N lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
+
+**Genuine blocker (the only non-opt-out reason for separate PRs).** Absent an operator opt-out, the orchestrator splits a batch into separate PRs ONLY for a genuine blocker: (a) an UNRESOLVABLE merge conflict between task branches at Step 5a — Step 5a already pauses and asks the operator; or (b) a temporal-prod / cross-repo deploy reason drawn from the plan-reviewer's existing closed list (`coexistence window`, `production signal`, `cross-repo deploy gate` — see `plan-reviewer.md § Rule 1`). No new blocker categories are introduced.
+
 **How you get here:**
 - `/th:issue #1 #2 #3` → multiple issues received → jump here from Phase 0a Step 8
 - `/th:plan plan-and-execute` → architect produces task breakdown → jump here after planning
@@ -3903,6 +3909,8 @@ The delivery agent will:
 - Create ONE consolidated changelog entry listing all tasks
 - Commit and push the verify branch
 - Create ONE PR that covers all batch work
+
+This is the same delivery flow as a single task (see **Consolidation default** above): the `delivery` agent, the same review → merge → worktree-teardown lifecycle. No separate batch-delivery path.
 
 **5e. Knowledge save:**
 Run Phase 6 (Knowledge Save) once for the entire batch, not per task.

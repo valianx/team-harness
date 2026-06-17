@@ -26615,6 +26615,263 @@ check(
 # Marker: apply-review-direct-mode
 
 # ---------------------------------------------------------------------------
+# Suite 114 — batch-consolidation-default (v2.102.0, issue #354)
+#
+# Pins the batch-consolidation-default contract so none of its structural
+# invariants can silently regress. All checks are anchor-scoped via the
+# 3-arg _slice_section idiom (anti-false-green: missing anchor → empty
+# slice → check fails), mirroring the Suite 111/112 pattern.
+#
+# AC coverage:
+#   AC-1  — orchestrator.md § Multi-Task Orchestration: "Consolidation default"
+#            clause present, one-PR default named, opt-out phrases, closed-list
+#            reasons, same-delivery-flow alignment (AC-6)
+#   AC-2  — orchestrator.md opt-out phrase ("keep them as separate PRs" /
+#            "separate PRs") + three closed-list reasons
+#   AC-3  — ref-special-flows.md: "Batch consolidation vs the anti-split
+#            invariant" subsection + reconciled phrasing
+#            docs/knowledge.md: companion [decision] bullet
+#            plan-reviewer.md Rule 1: complementary clause
+#   AC-4  — Suite 114 wiring (self-ref + registry)
+#   AC-5  — version floor >= (2, 102, 0) in both plugin files
+#   AC-6  — "same delivery flow" phrase in orchestrator.md
+#
+# Self-referential guards:
+#   h1 — docs/testing.md registers "Suite 114" + "batch-consolidation-default"
+#   h2 — CLAUDE.md does NOT contain "Suite 114" (§11 hygiene contract)
+#
+# Marker: batch-consolidation-default
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 114: batch-consolidation-default structural contract (v2.102.0) ===")
+
+_s114_orchestrator     = read(AGENTS_DIR / "orchestrator.md")
+_s114_ref_flows        = read(AGENTS_DIR / "ref-special-flows.md")
+_s114_plan_reviewer    = read(AGENTS_DIR / "plan-reviewer.md")
+_s114_knowledge_md     = read(REPO_ROOT / "docs" / "knowledge.md")
+_s114_claude           = read(REPO_ROOT / "CLAUDE.md")
+_s114_testing_md       = read(REPO_ROOT / "docs" / "testing.md")
+_s114_plugin_json      = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s114_marketplace_json = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+
+# Anchor and stop-marker definitions
+_S114_ORCH_ANCHOR   = "## Multi-Task Orchestration"
+_S114_ORCH_STOPS    = ("\n## ", "\n---\n")
+_S114_RSF_ANCHOR    = "### Batch consolidation vs the anti-split invariant"
+_S114_RSF_STOPS     = ("\n### ", "\n## ", "\n---\n")
+_S114_PR1_ANCHOR    = "### Rule 1"
+_S114_PR1_STOPS     = ("\n### Rule 2", "\n## ", "\n---\n")
+
+# Anchor-scoped slices (3-arg form — missing anchor → "")
+_s114_orch_slice = _slice_section(_s114_orchestrator, _S114_ORCH_ANCHOR, _S114_ORCH_STOPS)
+_s114_rsf_slice  = _slice_section(_s114_ref_flows, _S114_RSF_ANCHOR, _S114_RSF_STOPS)
+_s114_pr1_slice  = _slice_section(_s114_plan_reviewer, _S114_PR1_ANCHOR, _S114_PR1_STOPS)
+
+_S114_VER_FLOOR = (2, 102, 0)
+
+# --- AC-1: orchestrator.md names the consolidation default explicitly --------
+
+check(
+    "suite114(ac1-orch-anchor): orchestrator.md contains '## Multi-Task Orchestration' anchor",
+    bool(_s114_orch_slice),
+    f"anchor '{_S114_ORCH_ANCHOR}' not found in orchestrator.md — all AC-1 checks will fail",
+)
+check(
+    "suite114(ac1-consolidation-default): orchestrator.md § Multi-Task Orchestration "
+    "contains the 'Consolidation default' named clause",
+    "Consolidation default" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must contain 'Consolidation default' "
+    "(the named clause — not just the behavior)",
+)
+check(
+    "suite114(ac1-one-pr-default): orchestrator.md § Multi-Task Orchestration states "
+    "ONE consolidated PR as the default outcome",
+    "ONE consolidated PR" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must state 'ONE consolidated PR' as the default",
+)
+check(
+    "suite114(ac1-no-one-pr-per-task): orchestrator.md § Multi-Task Orchestration "
+    "prohibits one PR per batched task",
+    "do NOT open one PR per batched task" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must prohibit 'one PR per batched task'",
+)
+
+# --- AC-2: opt-out phrases + closed-list reasons ----------------------------
+
+check(
+    "suite114(ac2-opt-out-keep-separate): orchestrator.md § Multi-Task Orchestration "
+    "documents 'keep them as separate PRs' as the opt-out typed phrase",
+    "keep them as separate PRs" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must contain the opt-out typed phrase "
+    "'keep them as separate PRs'",
+)
+check(
+    "suite114(ac2-separate-prs-phrase): orchestrator.md § Multi-Task Orchestration "
+    "includes 'separate PRs' in the opt-out definition",
+    "separate PRs" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must mention 'separate PRs' as an opt-out signal",
+)
+check(
+    "suite114(ac2-closed-list-coexistence): orchestrator.md § Multi-Task Orchestration "
+    "names 'coexistence window' as a genuine blocker reason",
+    "coexistence window" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must name 'coexistence window' "
+    "from the plan-reviewer closed list as a genuine-blocker reason",
+)
+check(
+    "suite114(ac2-closed-list-production-signal): orchestrator.md § Multi-Task Orchestration "
+    "names 'production signal' as a genuine blocker reason",
+    "production signal" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must name 'production signal' "
+    "from the plan-reviewer closed list as a genuine-blocker reason",
+)
+check(
+    "suite114(ac2-closed-list-cross-repo): orchestrator.md § Multi-Task Orchestration "
+    "names 'cross-repo deploy gate' as a genuine blocker reason",
+    "cross-repo deploy gate" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must name 'cross-repo deploy gate' "
+    "from the plan-reviewer closed list as a genuine-blocker reason",
+)
+check(
+    "suite114(ac2-plan-reviewer-pointer): orchestrator.md § Multi-Task Orchestration "
+    "references plan-reviewer.md Rule 1 for the closed list",
+    "plan-reviewer.md" in _s114_orch_slice and "Rule 1" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must reference 'plan-reviewer.md § Rule 1' "
+    "as the source of the genuine-blocker closed list",
+)
+
+# --- AC-6: same delivery flow alignment in orchestrator.md ------------------
+
+check(
+    "suite114(ac6-same-delivery-flow): orchestrator.md § Multi-Task Orchestration "
+    "states the consolidated batch ships via the 'same delivery flow'",
+    "same delivery flow" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must state 'same delivery flow' "
+    "(AC-6: no separate batch-delivery path; same delivery agent, same lifecycle)",
+)
+check(
+    "suite114(ac6-worktree-teardown): orchestrator.md § Multi-Task Orchestration "
+    "references worktree-teardown lifecycle (worktree-discipline.md Rule 3)",
+    "worktree-discipline.md" in _s114_orch_slice and "Rule 3" in _s114_orch_slice,
+    "orchestrator.md § Multi-Task Orchestration must reference "
+    "'docs/worktree-discipline.md Rule 3' (teardown on PR merge, same lifecycle as single task)",
+)
+
+# --- AC-3a: ref-special-flows.md reconciliation subsection ------------------
+
+check(
+    "suite114(ac3a-rsf-anchor): agents/ref-special-flows.md contains "
+    "'### Batch consolidation vs the anti-split invariant' subsection",
+    bool(_s114_rsf_slice),
+    f"anchor '{_S114_RSF_ANCHOR}' not found in ref-special-flows.md — AC-3a checks will fail",
+)
+check(
+    "suite114(ac3a-rsf-anti-split): ref-special-flows.md § Batch consolidation "
+    "states the anti-split rule",
+    "never split" in _s114_rsf_slice or "never SPLIT" in _s114_rsf_slice,
+    "ref-special-flows.md § Batch consolidation must state the anti-split rule "
+    "(a single task is never split across PRs)",
+)
+check(
+    "suite114(ac3a-rsf-opt-out): ref-special-flows.md § Batch consolidation "
+    "documents the operator opt-out phrase",
+    "separate PRs" in _s114_rsf_slice,
+    "ref-special-flows.md § Batch consolidation must document the opt-out "
+    "('separate PRs' / 'keep them as separate PRs')",
+)
+check(
+    "suite114(ac3a-rsf-same-delivery-flow): ref-special-flows.md § Batch consolidation "
+    "states same delivery flow alignment (AC-6)",
+    "same delivery flow" in _s114_rsf_slice,
+    "ref-special-flows.md § Batch consolidation must state 'same delivery flow' alignment",
+)
+
+# --- AC-3b: docs/knowledge.md companion bullet ------------------------------
+
+check(
+    "suite114(ac3b-knowledge-batch-consolidation): docs/knowledge.md contains "
+    "a batch-consolidation-default companion bullet",
+    "Consolidation default" in _s114_knowledge_md
+    or "Batch consolidation default" in _s114_knowledge_md,
+    "docs/knowledge.md must contain a [decision] bullet for the batch-consolidation-default "
+    "(co-located with the stacked-PRs-prohibited rule)",
+)
+check(
+    "suite114(ac3b-knowledge-orchestrator-ref): docs/knowledge.md batch-consolidation "
+    "bullet references orchestrator.md and the Multi-Task Orchestration section",
+    "orchestrator.md" in _s114_knowledge_md
+    and "Multi-Task Orchestration" in _s114_knowledge_md,
+    "docs/knowledge.md batch-consolidation bullet must reference "
+    "'orchestrator.md § Multi-Task Orchestration — Consolidation default'",
+)
+
+# --- AC-3c: plan-reviewer.md Rule 1 complementary clause --------------------
+
+check(
+    "suite114(ac3c-pr-anchor): agents/plan-reviewer.md contains '### Rule 1' anchor",
+    bool(_s114_pr1_slice),
+    f"anchor '{_S114_PR1_ANCHOR}' not found in plan-reviewer.md — AC-3c checks will fail",
+)
+check(
+    "suite114(ac3c-pr-complementary): plan-reviewer.md Rule 1 states "
+    "batch consolidation is complementary to (not in tension with) Rule 1",
+    "complementary" in _s114_pr1_slice.lower()
+    and ("batch" in _s114_pr1_slice.lower() or "consolidat" in _s114_pr1_slice.lower()),
+    "plan-reviewer.md Rule 1 must state that 'one PR per service' is complementary to "
+    "the batch-consolidation default (not in tension with it)",
+)
+check(
+    "suite114(ac3c-pr-split-direction): plan-reviewer.md Rule 1 identifies itself "
+    "as the split-direction rule",
+    "split" in _s114_pr1_slice.lower() and "direction" in _s114_pr1_slice.lower(),
+    "plan-reviewer.md Rule 1 must identify itself as the SPLIT-DIRECTION rule "
+    "(prevents splitting one logical change into N PRs)",
+)
+
+# --- AC-5: version floor + self-ref + hygiene --------------------------------
+
+_s114_marketplace_version = (
+    _s114_marketplace_json.get("plugins", [{}])[0].get("version", "")
+    if _s114_marketplace_json.get("plugins")
+    else ""
+)
+
+check(
+    "suite114(ac5-plugin-json-floor): .claude-plugin/plugin.json version is 2.102.0 or later",
+    _s59_ver_tuple(_s114_plugin_json.get("version", "0.0.0")) >= _S114_VER_FLOOR,
+    f"plugin.json version must be >= 2.102.0 (batch-consolidation-default release floor), "
+    f"got '{_s114_plugin_json.get('version', '')}'",
+)
+check(
+    "suite114(ac5-marketplace-json-floor): .claude-plugin/marketplace.json "
+    "plugins[0].version is 2.102.0 or later",
+    _s59_ver_tuple(_s114_marketplace_version or "0.0.0") >= _S114_VER_FLOOR,
+    f"marketplace.json plugins[0].version must be >= 2.102.0, "
+    f"got '{_s114_marketplace_version}'",
+)
+check(
+    "suite114(ac5-versions-match): plugin.json and marketplace.json versions are equal",
+    _s114_plugin_json.get("version", "PLUGIN_MISSING") == _s114_marketplace_version,
+    f"plugin.json version '{_s114_plugin_json.get('version', '')}' must equal "
+    f"marketplace.json plugins[0].version '{_s114_marketplace_version}'",
+)
+check(
+    "suite114(h1-registry): docs/testing.md registers 'Suite 114' and "
+    "'batch-consolidation-default' marker",
+    "Suite 114" in _s114_testing_md and "batch-consolidation-default" in _s114_testing_md,
+    "docs/testing.md must name Suite 114 and the batch-consolidation-default marker "
+    "(canonical suite registry)",
+)
+check(
+    "suite114(h2-hygiene): CLAUDE.md does NOT contain 'Suite 114'",
+    "Suite 114" not in _s114_claude,
+    "CLAUDE.md must not mention Suite 114 — only docs/testing.md is the canonical "
+    "registry (§11 hygiene contract)",
+)
+
+# Marker: batch-consolidation-default
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
