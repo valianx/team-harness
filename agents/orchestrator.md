@@ -2514,19 +2514,32 @@ making any code change:
   a change widening a path with any other comment declaring a risk on that path.
   Referenced at Step 2.4 of the disposition; do NOT restate it inline.
 
+**Mandatory adherence:** every comment (inline or body) is ALWAYS processed
+through the full Steps 1–5 of the disposition — no ad-hoc path. See
+`apply-review-disposition.md § Mandatory adherence`.
+
 **What to do:**
 
 1. Pull fresh context: run `gh pr view {number} --comments` (or the appropriate
    gh-fallback path — see `agents/_shared/gh-fallback.md` § "Tier A — read PR
-   comments") to fetch all current reviewer comments. Read the PR diff for
-   current code state.
+   comments") to fetch all current reviewer comments. Also list inline review
+   threads via the GraphQL listing query (`agents/_shared/gh-fallback.md §
+   "Tier B — list review threads (map comment → thread id)"`) to obtain thread
+   IDs for Step 3. Read the PR diff for current code state.
 
 2. For each reviewer comment, apply `agents/_shared/apply-review-disposition.md`
    in full — classify (Step 1), run the verification filter for CHANGE comments
    that delete or loosen (Step 2), apply deletion discipline (Step 3), resolve
-   rather than obey (Step 4), and emit the per-comment output (Step 5).
+   the concern rather than obey the instruction (Step 4), and emit the
+   per-comment output (Step 5).
 
-3. After all comments are evaluated and changes (if any) are applied, proceed
+3. For each inline review thread, reply with the per-comment disposition and
+   resolve the thread WHEN Decision is APPLIED — following
+   `apply-review-disposition.md § Step 6` and the fallback commands at
+   `agents/_shared/gh-fallback.md § "Tier B — reply to a review thread"` and
+   `§ "Tier B — resolve a review thread"`.
+
+4. After all comments are evaluated and changes (if any) are applied, proceed
    through the standard Verify + Delivery phases for the updated code.
 
 **Automatic by default; also invokable explicitly.** This handling fires
@@ -4265,7 +4278,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | docs | `architect` (research) → `documenter` → `diagrammer` (conditional) → `qa` | none | see `ref-special-flows.md` § Documentation Flow |
 | gcp-costs | `gcp-cost-analyzer` | gcloud auth | create workspaces → invoke → present `00-gcp-costs.md` |
 | gcp-infra | `gcp-infra` → (Apply mode only) `th:security` + `th:qa` | gcloud auth | create workspaces → invoke gcp-infra → if `02-apply.sh` present: dispatch `th:security` then `th:qa` to audit into `02-gcp-review.md`; then present Phase 4 STOP gate carrying review verdict; gate required before any apply |
-| apply-review | you (orchestrator) | a PR reference (#N / URL) | pull the PR's comments (gh / gh-fallback Tier A) → load `agents/_shared/apply-review-disposition.md` + `agents/_shared/finding-connection.md` → apply the disposition in full to every comment → emit per-comment output → report. Same behavior as the automatic `## PR Comment Incorporation` handling, on explicit demand. See `ref-direct-modes.md § Apply-Review Mode`. |
+| apply-review | you (orchestrator) | a PR reference (#N / URL) | pull the PR's comments (gh / gh-fallback Tier A) → list review threads (gh-fallback Tier B list) → load `agents/_shared/apply-review-disposition.md` + `agents/_shared/finding-connection.md` → apply the disposition in full to every comment → emit per-comment output → reply per thread + resolve-on-APPLIED (gh-fallback Tier B reply/resolve). Same behavior as the automatic `## PR Comment Incorporation` handling, on explicit demand. See `ref-direct-modes.md § Apply-Review Mode`. |
 
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:
 

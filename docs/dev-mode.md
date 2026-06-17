@@ -21,6 +21,7 @@ The gate fires UNCONDITIONALLY for covered outward actions. No filesystem marker
 | `gh pr review` (including `--dismiss`) | `ask` | Publishes a review on behalf of the operator |
 | `gh pr comment` | `ask` | Publishes a comment on behalf of the operator |
 | `gh api -X PUT|POST|PATCH|DELETE` against PR endpoints (`/pulls/.../merge|reviews|comments`) | `ask` | Covers API-level bypass of the `gh` CLI |
+| `gh api graphql` with a PR-write mutation name (`resolveReviewThread`, `unresolveReviewThread`, `addPullRequestReviewThreadReply`, `addPullRequestReview`, `submitPullRequestReview`, `mergePullRequest`) | `ask` | GraphQL PR mutations post to `/graphql` without `-X` flag — not matched by the REST pattern above; read-only `reviewThreads` listing queries stay ungated |
 | `curl`/`wget` with mutating method against `api.github.com` | `ask` | Covers binary-level bypass |
 | ClickUp MCP outward writes (`mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`) | `ask` | Outward write to external service |
 | Any non-covered call (Edit/Write/NotebookEdit payloads; benign Bash) | no decision (exit 0, empty stdout) | Defer to the operator's normal permission flow |

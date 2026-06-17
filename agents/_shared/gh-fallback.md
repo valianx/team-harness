@@ -352,6 +352,191 @@ else
 fi
 ```
 
+### Tier B — list review threads (map comment → thread id)
+
+Enumerate all review threads on a PR, yielding the GraphQL thread `id`
+(format `PRRT_…`), `isResolved`, `isOutdated`, and the nested comments with
+`databaseId` (integer REST ID for cross-walk), `body`, and `author.login`.
+This is the ONLY way to obtain thread IDs and `isResolved` state — the REST
+API has no thread-level endpoint and no `isResolved` field.
+
+**This operation is GraphQL-only — no REST equivalent exists for thread
+enumeration.** When `gh` is unavailable and no token is present, emit the exact
+command below for operator paste.
+
+```bash
+if [ "$has_gh" = "true" ]; then
+  gh api graphql -f query='
+    query($owner: String!, $repo: String!, $pr: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $pr) {
+          reviewThreads(first: 100) {
+            nodes {
+              id isResolved isOutdated path
+              comments(first: 50) {
+                nodes { id databaseId body author { login } }
+              }
+            }
+          }
+        }
+      }
+    }' -f owner=OWNER -f repo=REPO -F pr=PR_NUMBER
+else
+  # No gh available — operator-paste path.
+  # curl cannot return PullRequestReviewThread.id or isResolved (REST has no
+  # thread endpoint). Emit the command for the operator to run manually.
+  echo "Thread listing requires gh CLI (GraphQL-only). Run this command manually:"
+  echo ""
+  echo "  gh api graphql -f query='"
+  echo "    query(\$owner: String!, \$repo: String!, \$pr: Int!) {"
+  echo "      repository(owner: \$owner, name: \$repo) {"
+  echo "        pullRequest(number: \$pr) {"
+  echo "          reviewThreads(first: 100) {"
+  echo "            nodes {"
+  echo "              id isResolved isOutdated path"
+  echo "              comments(first: 50) {"
+  echo "                nodes { id databaseId body author { login } }"
+  echo "              }"
+  echo "            }"
+  echo "          }"
+  echo "        }"
+  echo "      }"
+  echo "    }' -f owner=OWNER -f repo=REPO -F pr=PR_NUMBER"
+fi
+```
+
+Pagination: `first: 100` covers virtually every real PR. If a PR has more than
+100 threads, add a `pageInfo { endCursor hasNextPage }` field and follow the
+cursor. This extension is rarely needed in practice.
+
+### Tier B — reply to a review thread
+
+Post a reply to an existing inline review thread. The primary path uses GraphQL
+`addPullRequestReviewThreadReply` (recommended: the thread `id` from the listing
+query is already in hand — no separate root-comment lookup needed). The curl
+fallback uses the REST `/replies` endpoint with the root comment's integer ID.
+
+```bash
+if [ "$has_gh" = "true" ]; then
+  # GraphQL path — recommended (thread id from the listing query, Op 2)
+  gh api graphql -f query='
+    mutation($threadId: ID!, $body: String!) {
+      addPullRequestReviewThreadReply(input: {
+        pullRequestReviewThreadId: $threadId
+        body: $body
+      }) {
+        comment { id }
+      }
+    }' -F threadId=PRRT_THREAD_ID_HERE -f body='<per-comment disposition text>'
+elif [ "$is_github" = "true" ] && [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+  # curl fallback — REST POST /replies (requires root top-level comment ID,
+  # NOT a reply ID; use the databaseId from the listing query for the first
+  # comment in the thread)
+  token="${GH_TOKEN:-$GITHUB_TOKEN}"
+  curl -sf -X POST \
+    -H "Authorization: Bearer $token" \
+    -H "Accept: application/vnd.github+json" \
+    -H "Content-Type: application/json" \
+    "https://api.github.com/repos/$repo_path/pulls/{pull_number}/comments/{root_comment_id}/replies" \
+    --data "{\"body\":\"<per-comment disposition text>\"}"
+else
+  # Operator-paste path — emit the exact gh api graphql command + thread id
+  echo "Reply to thread manually by running (replace PRRT_… with the thread id"
+  echo "from the listing query output):"
+  echo ""
+  echo "  gh api graphql -f query='"
+  echo "    mutation(\$threadId: ID!, \$body: String!) {"
+  echo "      addPullRequestReviewThreadReply(input: {"
+  echo "        pullRequestReviewThreadId: \$threadId"
+  echo "        body: \$body"
+  echo "      }) { comment { id } }"
+  echo "    }' -F threadId=PRRT_… -f body='<per-comment disposition text>'"
+fi
+```
+
+**Note:** REST replies must use the root top-level comment ID, not the ID of a
+reply. The `in_reply_to` field in responses is set automatically by the API and
+is not a request parameter for the `/replies` endpoint. Replies to replies are
+not supported by the REST API — use GraphQL if the thread has nested replies.
+
+**Shell quoting for the `body` value.** The `-f body='...'` argument is always
+passed as a single single-quoted argument. Any literal single quote in the reply
+text must be escaped using the `'\''` idiom (close the single-quoted string,
+insert a literal `'`, reopen), or pass the value via `--field body=@file` (a
+temporary file) to avoid shell quoting entirely. The reply text is the
+agent-composed disposition (Nature / Severity / Decision + rationale) — it is
+never a literal copy or concatenation of the reviewer's comment text.
+
+**Required permission:** "Pull requests: write". A standard `gh auth login`
+token (`repo` scope) covers this operation.
+
+### Tier B — resolve a review thread
+
+Mark a review thread as resolved using the GraphQL `resolveReviewThread`
+mutation. Resolution is gated strictly on Decision = APPLIED per
+`apply-review-disposition.md § Step 6` — never mass-resolve.
+
+**There is NO REST equivalent for `resolveReviewThread`.** The GitHub REST API
+has no thread-resolution endpoint. When `gh` is unavailable, the only path is
+operator-paste — there is no curl-REST fallback tier for this operation.
+
+```bash
+if [ "$has_gh" = "true" ]; then
+  # Attempt resolve; degrade gracefully on 403 (see note below)
+  gh api graphql -f query='
+    mutation($threadId: ID!) {
+      resolveReviewThread(input: { threadId: $threadId }) {
+        thread { id isResolved }
+      }
+    }' -F threadId=PRRT_THREAD_ID_HERE
+else
+  # No gh available — NO curl-REST fallback exists (resolveReviewThread is
+  # GraphQL-only). Emit the command for the operator to run manually.
+  echo "Thread resolution requires gh CLI (GraphQL-only — no REST equivalent)."
+  echo "Run this command manually (replace PRRT_… with the thread id):"
+  echo ""
+  echo "  gh api graphql -f query='"
+  echo "    mutation(\$threadId: ID!) {"
+  echo "      resolveReviewThread(input: { threadId: \$threadId }) {"
+  echo "        thread { id isResolved }"
+  echo "      }"
+  echo "    }' -F threadId=PRRT_…"
+fi
+```
+
+**Permission and degradation on 403.**
+`resolveReviewThread` requires "Contents: read+write" in addition to "Pull
+requests: write". A standard `gh auth login` token (`repo` scope) covers both
+in the common case (the author has write access to the base repo). On a 403
+(e.g., fork author without base-repo write access, or a fine-grained PAT
+without Contents write), do NOT retry. Inspect the response for the
+`X-Accepted-GitHub-Permissions` header — it lists the exact missing permission
+(e.g., `contents=write`). Degrade to **replied-but-not-resolved**: the
+per-comment reply still posts; the resolve step is skipped with a one-line note
+naming the missing permission. This is a best-effort posture, not a hard
+failure.
+
+**Invariant: resolve ≠ dismiss.** Resolving a review thread does NOT change the
+formal review state. A `CHANGES_REQUESTED` review persists after every thread
+on the PR is resolved. Branch protection's required-review gate is unaffected.
+The review state changes only when (a) the reviewer submits a new APPROVED
+review, or (b) an admin or write-access user dismisses it via
+`PUT .../reviews/{review_id}/dismissals`. Authors cannot dismiss their own
+`CHANGES_REQUESTED` review. Resolving threads is bookkeeping; re-review remains
+the reviewer's action.
+
+**Rate limiting.** Pause at least 1 second between successive `resolveReviewThread`
+mutations to stay under GitHub's secondary rate limit (80 content-creating
+requests/min). For typical PRs (single-digit to low-double-digit threads), this
+is well within both primary (5000 pts/hr) and secondary limits.
+
+**Idempotency.** Re-resolving an already-resolved thread is a no-op — the
+mutation returns `isResolved: true`. Safe to re-run.
+
+**Outdated threads.** `resolveReviewThread` works on outdated threads (threads
+orphaned by rebase, force-push, or squash) even when the UI shows no resolution
+affordance. The mutation proceeds normally.
+
 ## Tier D — project board ops (graceful skip)
 
 `gh project` calls wrap GitHub's Projects V2 GraphQL API. There is no REST

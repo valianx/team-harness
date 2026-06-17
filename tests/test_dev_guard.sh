@@ -308,6 +308,36 @@ assert_nodecision "#298 AC-3: ls -la" "$TMP" "$(make_payload 'ls -la /tmp')"
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
+# GraphQL PR-mutation gate cases (SEC-001 remediation, Suite 83 extension)
+# These three cases verify the 2e-bis branch added to close the gap where
+# gh api graphql PR-write mutations fell through to nodecision.
+# ---------------------------------------------------------------------------
+
+# Case SEC-001-A — ASK: resolveReviewThread mutation
+echo
+echo "=== ASK: gh api graphql resolveReviewThread mutation (SEC-001 gate) ==="
+TMP=$(make_tmp)
+assert_ask "gh api graphql resolveReviewThread" "$TMP" "$(make_payload \
+    "gh api graphql -f query='mutation(\$threadId: ID!) { resolveReviewThread(input: { threadId: \$threadId }) { thread { id isResolved } } }' -F threadId=PRRT_x")"
+rm -rf "$TMP"
+
+# Case SEC-001-B — ASK: addPullRequestReviewThreadReply mutation
+echo
+echo "=== ASK: gh api graphql addPullRequestReviewThreadReply mutation (SEC-001 gate) ==="
+TMP=$(make_tmp)
+assert_ask "gh api graphql addPullRequestReviewThreadReply" "$TMP" "$(make_payload \
+    "gh api graphql -f query='mutation(\$t: ID!, \$b: String!) { addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: \$t, body: \$b}) { comment { id } } }' -F t=PRRT_x -f b=hi")"
+rm -rf "$TMP"
+
+# Case SEC-001-C — NODECISION: read-only reviewThreads listing query must NOT gate
+echo
+echo "=== NODECISION: gh api graphql reviewThreads listing (read-only, must not gate) ==="
+TMP=$(make_tmp)
+assert_nodecision "gh api graphql reviewThreads read-only listing" "$TMP" "$(make_payload \
+    "gh api graphql -f query='query { repository(owner:\"o\", name:\"r\") { pullRequest(number:1) { reviewThreads(first:100) { nodes { id isResolved } } } } }'")"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo
