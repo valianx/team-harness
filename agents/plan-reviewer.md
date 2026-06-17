@@ -87,6 +87,8 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 ### Rule 1 — One PR per service unless temporal-prod reason
 
+**Relationship to batch consolidation.** "One PR per service" is the SPLIT-DIRECTION rule — it prevents a single logical change from being split into multiple PRs without a valid temporal-prod reason. It is COMPLEMENTARY to the orchestrator's batch-consolidation default, not in tension with it. A same-repo batch of independent tasks consolidating into ONE PR (the `agents/orchestrator.md § Multi-Task Orchestration — Consolidation default`) is NOT a Rule 1 split — those tasks belong to different independent work items, not to one logical change being artificially divided. Rule 1 applies when a SINGLE plan or service produces more than one PR.
+
 **What to check:**
 
 1. Parse the PR list from `01-plan.md` (§ Task List). Each PR has a `Service:` field.
