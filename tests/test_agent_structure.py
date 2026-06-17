@@ -27045,6 +27045,288 @@ check(
 # Marker: batch-consolidation-default
 
 # ---------------------------------------------------------------------------
+# Suite 116 — reviewer-version-changelog-check (v2.105.0)
+#
+# Pins the conditional project-version + changelog convention check added to
+# agents/reviewer.md so none of its structural invariants can silently
+# regress. All content checks are anchor-scoped via _slice_section (the
+# 2-arg form defined at line 4542): missing anchor → empty slice → check
+# fails (anti-false-green), mirroring Suites 38/57/113/114.
+#
+# AC coverage:
+#   AC-1  — anchor present + slice non-empty; three gates (convention-present,
+#            user-facing, automated-version) in reviewer.md
+#   AC-2  — Gate 1 requires BOTH manifest AND changelog ("both"/"AND")
+#   AC-3  — User-facing gate references Tier 0 / docs-only / *.md
+#   AC-4  — Automated-version gate names release-please + one of
+#            semantic-release / changesets and states SKIP
+#   AC-5  — Severity model: SUGGESTION default + CRITICAL when policy
+#            references .team-harness/review-policy.md or Policy-aware
+#   AC-6  — De-dup carve-out: info.version / OpenAPI / gateway named as
+#            NOT duplicated; lockfiles explicitly excluded
+#   AC-7  — Suite 116 registered in docs/testing.md; CLAUDE.md hygiene;
+#            version floor >= (2, 105, 0) in both plugin files; self-ref
+#   AC-8  — Fail-open token; attribution-scope token; skills/review-pr
+#            exemption note; manifest examples present
+#
+# Self-referential guards:
+#   h1 — docs/testing.md registers "Suite 116" + "reviewer-version-changelog-check"
+#   h2 — CLAUDE.md does NOT contain "Suite 116" (§11 hygiene contract)
+#
+# Marker: reviewer-version-changelog-check
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 116: reviewer-version-changelog-check structural contract (v2.105.0) ===")
+
+_s116_reviewer      = read(AGENTS_DIR / "reviewer.md")
+_s116_skill_path    = SKILLS_DIR / "review-pr" / "SKILL.md"
+_s116_skill         = read(_s116_skill_path) if _s116_skill_path.exists() else ""
+_s116_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
+_s116_claude        = read(REPO_ROOT / "CLAUDE.md")
+_s116_plugin_json   = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s116_marketplace   = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+
+_S116_ANCHOR  = "### Project Version & Changelog Convention"
+_S116_STOPS   = ("\n### ", "\n## ", "\n---\n")
+_S116_VER_FLOOR = (2, 105, 0)
+
+# Anchor-scoped slice (3-arg form: anchor → first stop marker)
+_s116_slice = _slice_section(_s116_reviewer, _S116_ANCHOR, _S116_STOPS)
+
+# --- AC-1a: anchor present + slice non-empty --------------------------------
+
+check(
+    "suite116(ac1-anchor): agents/reviewer.md contains '### Project Version & Changelog Convention'",
+    bool(_s116_slice),
+    f"anchor '{_S116_ANCHOR}' not found in reviewer.md — all content checks will fail",
+)
+
+# --- AC-1b: convention-present gate tokens (both manifest AND changelog) ----
+
+check(
+    "suite116(ac1-gate1-manifest): slice contains 'version manifest' token",
+    "version manifest" in _s116_slice or "version-manifest" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must reference 'version manifest'",
+)
+check(
+    "suite116(ac1-gate1-changelog): slice contains 'changelog' token",
+    "changelog" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must reference 'changelog'",
+)
+check(
+    "suite116(ac1-gate1-both): slice states BOTH are required (AND / both)",
+    "AND" in _s116_slice or "both" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must require BOTH manifest AND changelog",
+)
+
+# --- AC-8a: language-agnostic manifest examples -----------------------------
+
+check(
+    "suite116(ac8-manifest-package-json): slice names 'package.json' as manifest example",
+    "package.json" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must list 'package.json'",
+)
+check(
+    "suite116(ac8-manifest-cargo-toml): slice names 'Cargo.toml' as manifest example",
+    "Cargo.toml" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must list 'Cargo.toml'",
+)
+check(
+    "suite116(ac8-manifest-pyproject-toml): slice names 'pyproject.toml' as manifest example",
+    "pyproject.toml" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must list 'pyproject.toml'",
+)
+check(
+    "suite116(ac8-manifest-plugin-json): slice names '.claude-plugin/plugin.json' as manifest example",
+    ".claude-plugin/plugin.json" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must list '.claude-plugin/plugin.json'",
+)
+check(
+    "suite116(ac8-manifest-version-file): slice names 'VERSION' file as manifest example",
+    "VERSION" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must list 'VERSION' file",
+)
+
+# --- AC-1c: changelog convention tokens (CHANGELOG + changelog.d) -----------
+
+check(
+    "suite116(ac1-changelog-md): slice names 'CHANGELOG' as a changelog convention",
+    "CHANGELOG" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must name 'CHANGELOG'",
+)
+check(
+    "suite116(ac1-changelog-d): slice names 'changelog.d' as a changelog convention",
+    "changelog.d" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must name 'changelog.d'",
+)
+
+# --- AC-6a: lockfile exclusion ----------------------------------------------
+
+check(
+    "suite116(ac6-lockfile-exclusion): slice explicitly excludes lockfiles",
+    "lockfile" in _s116_slice.lower()
+    or "package-lock.json" in _s116_slice
+    or "Cargo.lock" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must explicitly exclude lockfiles",
+)
+
+# --- AC-3: user-facing gate (Tier 0 / docs-only) ----------------------------
+
+check(
+    "suite116(ac3-user-facing-gate): slice references Tier 0 / docs-only / *.md exemption",
+    "Tier 0" in _s116_slice
+    or "docs-only" in _s116_slice
+    or "*.md" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must reference Tier 0 / docs-only gate",
+)
+
+# --- AC-4: automated-version exemption gate ---------------------------------
+
+check(
+    "suite116(ac4-release-please): slice names 'release-please' in automated-version gate",
+    "release-please" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must name 'release-please'",
+)
+check(
+    "suite116(ac4-automation-alt): slice names 'semantic-release' or 'changesets'",
+    "semantic-release" in _s116_slice or "changesets" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must name 'semantic-release' or 'changesets'",
+)
+check(
+    "suite116(ac4-skip-token): slice states the check SKIPs for automated-version repos",
+    "skip" in _s116_slice.lower() or "silent" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must state the check skips for automation",
+)
+
+# --- AC-5: severity model (SUGGESTION default + CRITICAL when policy) -------
+
+check(
+    "suite116(ac5-suggestion-default): slice states SUGGESTION is the default severity",
+    "SUGGESTION" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must declare SUGGESTION as default severity",
+)
+check(
+    "suite116(ac5-critical-when-policy): slice states CRITICAL when policy declares it",
+    "CRITICAL" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must mention CRITICAL upgrade path",
+)
+check(
+    "suite116(ac5-policy-path): slice references policy file or Policy-aware path",
+    ".team-harness/review-policy.md" in _s116_slice or "Policy-aware" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must reference review-policy.md or Policy-aware",
+)
+
+# --- AC-6b: de-duplication carve-out vs gateway/OAS check ------------------
+
+check(
+    "suite116(ac6-dedup-openapi): slice explicitly carves out OpenAPI / info.version / gateway",
+    "info.version" in _s116_slice
+    or "OpenAPI" in _s116_slice
+    or "gateway" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must carve out the OAS/gateway check",
+)
+check(
+    "suite116(ac6-dedup-not-duplicate): slice states it does NOT duplicate the gateway check",
+    "not duplicate" in _s116_slice.lower()
+    or "not duplicat" in _s116_slice.lower()
+    or "distinct" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must state it does not duplicate "
+    "the gateway/OAS version check",
+)
+
+# --- AC-8b: fail-open token -------------------------------------------------
+
+check(
+    "suite116(ac8-fail-open): slice states absence of signal produces no finding",
+    "fail-open" in _s116_slice.lower()
+    or "silent" in _s116_slice.lower()
+    or "produces no finding" in _s116_slice.lower()
+    or "zero findings" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must state the fail-open invariant",
+)
+
+# --- AC-8c: attribution scope (diff + introduced) ---------------------------
+
+check(
+    "suite116(ac8-attribution-diff): slice states assertion is on the PR's own diff",
+    "diff" in _s116_slice.lower(),
+    "reviewer.md § Project Version & Changelog Convention must reference the PR diff",
+)
+check(
+    "suite116(ac8-attribution-introduced): slice uses 'introduced' or 'PR's own'",
+    "introduced" in _s116_slice or "PR's own" in _s116_slice or "the PR" in _s116_slice,
+    "reviewer.md § Project Version & Changelog Convention must state assertion is attribution-scoped",
+)
+
+# --- AC-8d: skills/review-pr/SKILL.md Tier 0 exemption note ----------------
+
+check(
+    "suite116(ac8-skill-exemption): skills/review-pr/SKILL.md contains Tier 0 exemption note "
+    "for project-version/changelog check",
+    "project-version" in _s116_skill
+    or "version/changelog" in _s116_skill
+    or "version and changelog" in _s116_skill.lower()
+    or "version check" in _s116_skill.lower(),
+    "skills/review-pr/SKILL.md must contain a note that Tier 0 PRs are exempt from "
+    "the project-version/changelog reviewer check",
+)
+
+# --- AC-7: version floor + docs/testing.md registry + hygiene ---------------
+
+_s116_marketplace_version = (
+    _s116_marketplace.get("plugins", [{}])[0].get("version", "")
+    if _s116_marketplace.get("plugins")
+    else ""
+)
+
+check(
+    "suite116(ac7-plugin-json-floor): .claude-plugin/plugin.json version >= 2.105.0",
+    _s59_ver_tuple(_s116_plugin_json.get("version", "0.0.0")) >= _S116_VER_FLOOR,
+    f"plugin.json version must be >= 2.105.0 (reviewer-version-changelog-check release floor), "
+    f"got '{_s116_plugin_json.get('version', '')}'",
+)
+check(
+    "suite116(ac7-marketplace-json-floor): .claude-plugin/marketplace.json "
+    "plugins[0].version >= 2.105.0",
+    _s59_ver_tuple(_s116_marketplace_version or "0.0.0") >= _S116_VER_FLOOR,
+    f"marketplace.json plugins[0].version must be >= 2.105.0, "
+    f"got '{_s116_marketplace_version}'",
+)
+check(
+    "suite116(ac7-versions-match): plugin.json and marketplace.json versions are equal",
+    _s116_plugin_json.get("version", "PLUGIN_MISSING") == _s116_marketplace_version,
+    f"plugin.json version '{_s116_plugin_json.get('version', '')}' must equal "
+    f"marketplace.json plugins[0].version '{_s116_marketplace_version}'",
+)
+
+check(
+    "suite116(h1-registry): docs/testing.md registers 'Suite 116' and "
+    "'reviewer-version-changelog-check' marker",
+    "Suite 116" in _s116_testing_md and "reviewer-version-changelog-check" in _s116_testing_md,
+    "docs/testing.md must name Suite 116 and the reviewer-version-changelog-check marker "
+    "(canonical suite registry)",
+)
+check(
+    "suite116(h2-hygiene): CLAUDE.md does NOT contain 'Suite 116'",
+    "Suite 116" not in _s116_claude,
+    "CLAUDE.md must not mention Suite 116 — only docs/testing.md is the canonical "
+    "registry (§11 hygiene contract)",
+)
+
+# Self-ref
+_s116_own_source = read(Path(__file__))
+check(
+    "suite116(self-ref): test file contains 'Suite 116', '_slice_section', "
+    "and 'reviewer-version-changelog-check'",
+    "Suite 116" in _s116_own_source
+    and "_slice_section" in _s116_own_source
+    and "reviewer-version-changelog-check" in _s116_own_source,
+    "test file must self-reference Suite 116 + _slice_section + reviewer-version-changelog-check",
+)
+
+# Marker: reviewer-version-changelog-check
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

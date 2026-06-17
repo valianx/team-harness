@@ -331,6 +331,8 @@ Classify the PR's tier based on the changed file list. Use `tier_override` if se
 
 **Auto-escalation:** if a Tier-4 path or keyword is detected, escalate to Tier 4 regardless of other signals.
 
+**Note:** Tier 0 (docs-only) PRs are exempt from the reviewer's project-version/changelog check by construction — the reviewer's user-facing gate reuses this Tier 0 classification and produces no finding when Gate 2 fails.
+
 **Emit one line to the operator:**
 ```
 PR classified as Tier {N} — agents: {list}.

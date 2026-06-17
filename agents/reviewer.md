@@ -366,6 +366,38 @@ This is informational, not a verdict. It does NOT change `event` (`APPROVE` / `R
 - **Gateway / spec sync.** When a PR adds or modifies endpoints behind an API gateway (Apigee, ingress, BFF), check that the contract / OpenAPI spec is updated and version-bumped in the same PR. Otherwise the gateway will reject the new path even when the backend accepts it, and the user will be tempted to "patch the URL" in client code instead of fixing the contract.
 - **Severity guidance:** hardcoded `BASE` in code → CRITICAL (blocks per-environment deploy). Endpoint paths in `.env*` → CRITICAL (breaks ambient assumption that envs are interchangeable). PR mixing path + env without justification → SUGGESTION (request a split or explicit reason).
 
+### Project Version & Changelog Convention
+
+This category is a three-gate conditional check. When any gate fails the category is completely silent — it produces no finding (fail-open invariant). Apply only when all three gates pass.
+
+**Gate 1 — Convention-present (BOTH required):** The check fires only when the repo has BOTH a recognized version manifest AND a changelog convention. Detection reads files in the worktree root (Glob/Read — no new Bash).
+
+Version manifest — present if any of these exists AND carries a version field/value: `package.json` (top-level `"version"`), `.claude-plugin/plugin.json` (top-level `"version"`), `pyproject.toml` (`[project] version` or `[tool.poetry] version`), `setup.cfg` (`[metadata] version`), `Cargo.toml` (`[package] version`), `*.gemspec` (`spec.version`), `VERSION` / `VERSION.txt` (whole file), `*.csproj` / `Directory.Build.props` (`<Version>` element).
+
+Lockfiles are explicitly excluded from the version-manifest set: `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Cargo.lock`, `Gemfile.lock`, `poetry.lock`, `go.sum`. A version appearing only in a lockfile does NOT count as a version-manifest bump.
+
+Changelog convention — present if any of these exists: `CHANGELOG.md`, `CHANGELOG.rst`, `CHANGELOG.txt`, `CHANGELOG` (extensionless), `HISTORY.md`, `NEWS.md`, a `changelog.d/` directory, or `[tool.towncrier]` / `[tool.scriv]` in `pyproject.toml`.
+
+Gate 1 PASS condition: (≥1 version manifest detected) AND (≥1 changelog convention detected). Either absent → entire category is silent.
+
+**Gate 2 — User-facing (Tier 0 exempt):** The check must not fire on docs-only PRs. Reuse the review-pr Tier 0 classification: when every changed path matches `*.md`, comments, `LICENSE`, or `CHANGELOG*`, Gate 2 FAILS → category is silent. A changelog-only PR is docs-only → Tier 0 → exempt (it is never flagged as "missing changelog"). Gate 2 PASS condition: the PR changes at least one non-docs source path (Tier ≥1).
+
+**Gate 3 — Automated-version exempt:** When the repo delegates versioning to release automation, humans must NOT bump per-PR. Detect and skip for: `release-please` (marker files `release-please-config.json`, `.release-please-manifest.json`, or a `release-please` workflow in `.github/workflows/**`), `semantic-release` (`.releaserc*`, `release.config.js`, or `semantic-release` in `devDependencies`), `changesets` (`.changeset/config.json`), or Go module tag-based versioning (`go.mod` present with no `VERSION` file and no other manifest). Conservative bias: when uncertain, skip. Gate 3 PASS condition: NO release-automation marker detected.
+
+**Assertion (only when Gate 1 AND Gate 2 AND Gate 3 all PASS):**
+
+Assert, attribution-scoped to the PR's own diff (never on repo history):
+1. **Version bump** — the PR's diff modified the detected version manifest's version field (a new value). For a monorepo, require that at least one version manifest co-located with the changed source paths was bumped (heuristic).
+2. **Changelog entry** — the PR's diff introduced a new entry to the detected changelog (a new `changelog.d/` fragment, OR a new line under the `[Unreleased]` section, OR a new versioned section).
+
+When the assertion fails, the absence of a clear version-bump or changelog signal in the diff produces no finding by default (fail-open). A finding is raised only when the diff makes it clear source code changed without any bump or entry.
+
+**De-duplication:** This category covers project-level release versions only. It does NOT duplicate the `### URL & Environment Configuration` gateway check (line above), which owns the OpenAPI `info.version` / API spec sync concern. The OpenAPI `info.version` is distinct from the project version manifest; an OpenAPI document is not counted as a version manifest by this category.
+
+**Severity guidance:**
+- **Default: SUGGESTION** — non-blocking; goes in `### Sugerencias` section of `review_body`; never inline, never affects `event`. Finding body example (Spanish, condensed): `` `package.json` — el PR cambia código fuente pero no incrementa la versión del proyecto ni agrega entrada al changelog (convención detectada en el repo). ``
+- **Upgraded to CRITICAL** only when the consumer repo's `.team-harness/review-policy.md` declares this rule `critical` (the existing Policy-aware review path at `## Policy-aware review` handles the upgrade — no new mechanism). When CRITICAL: follows the standard path (`inline_findings[]` + `### Problemas Criticos` + drives `event: REQUEST_CHANGES`).
+
 ### Performance
 - N+1 queries — database calls inside loops
 - Unbounded results — queries or API calls without limits/pagination
