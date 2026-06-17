@@ -20,9 +20,17 @@ git worktree list     # are any worktrees already active?
 
 | Condition | Action |
 |-----------|--------|
-| Tree is clean AND currently on `main` | Branch in place is permitted — but see the note below. |
-| Tree is dirty OR currently on a non-main branch | Create a worktree — do NOT branch in place. |
+| Tree is clean AND at/behind `origin/main` | Branch in place is permitted — but see the note below. |
+| Tree has uncommitted changes OR is ahead of `origin/main` (incl. on a non-main branch) | Create a worktree — do NOT branch in place. |
 | Another session is running in the same tree (any doubt) | Create a worktree — the collision that motivated this rule was a clean-tree branch-in-place while another session held uncommitted WIP. |
+
+**Detecting ahead of origin/main:** after `git fetch origin main`, run:
+
+```bash
+git rev-list --count origin/main..HEAD
+```
+
+A count `> 0` means the local branch is ahead of `origin/main` — a worktree is required. A count of `0` with a clean tree means branch-in-place is permitted.
 
 **Always cut from fresh `origin/main`**, regardless of which path is chosen:
 

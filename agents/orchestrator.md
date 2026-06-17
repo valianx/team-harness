@@ -630,6 +630,9 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - worktree: {absolute path | null}             # worktree path for this task; null when running branch-in-place. Set at Phase 0a when a worktree is created. Teardown in delivery reads this field directly — no filesystem search needed.
 - worktree_branch: {branch name | null}        # branch checked out in the worktree; null when worktree is null
 - worktree_base: {origin/main | <dep-branch> | null}  # the ref the worktree branch was cut from; null when worktree is null
+
+**Single-task start-gate (branch-in-place vs. worktree):** before creating a branch for any single-task implementation or delivery, run `git fetch origin main` and check the tree's position. Branch-in-place is permitted ONLY when the tree is clean AND at/behind `origin/main` (`git rev-list --count origin/main..HEAD` returns `0`). Create a worktree when there are uncommitted changes OR the tree is ahead of origin/main — including when on a non-main branch. Branching from a local `main` that is ahead of `origin/main` carries unpushed commits onto the new feature branch and bundles two independent developments into one PR. The canonical decision table and detection command are in `docs/worktree-discipline.md` Rule 1.
+
 - converge: {true | false | null}              # Phase 4.5 dual-review convergence activation. Auto-on (true) when bug_tier: 4 or security_sensitive: true; operator opt-in via payload converge: true; false/null = single-pass (OFF by default).
 - convergence: {round: N, last_verdict_A: APPROVE|REQUEST_CHANGES|null, last_verdict_B: APPROVE|REQUEST_CHANGES|null, status: running|converged|escalated}  # Phase 4.5 convergence loop state; null when converge is false/null. Mirrors the review-pr skill's convergence block.
 
