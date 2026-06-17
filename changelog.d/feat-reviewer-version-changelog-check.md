@@ -1,0 +1,2 @@
+### Added
+- Reviewer now flags a user-facing PR that did not bump the project version or update the changelog — but only when the repo actually has both a version manifest and a changelog convention, skipping silently otherwise. Default severity is a non-blocking suggestion; a repo can make it blocking via `.team-harness/review-policy.md`. Automated-version repos (release-please, semantic-release, changesets) are exempt.
