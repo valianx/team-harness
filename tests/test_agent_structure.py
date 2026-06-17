@@ -26615,6 +26615,181 @@ check(
 # Marker: apply-review-direct-mode
 
 # ---------------------------------------------------------------------------
+# Suite 113 — worktree-isolation-ahead (v2.102.0)
+#
+# Pins the worktree start-gate re-keying off origin/main position so the
+# new "ahead of origin/main" condition cannot silently regress. All content
+# checks are token-presence asserts; anchor-scoped _slice_section is used
+# where the content lives inside a named section.
+#
+# AC coverage:
+#   AC-1  — agents/orchestrator.md: start-gate paragraph contains "ahead of
+#            origin/main" AND "at/behind"
+#   AC-2  — docs/worktree-discipline.md: Rule 1 table contains "ahead of
+#            origin/main" AND "at/behind"; U1 + fetch-and-base blocks intact
+#            (cross-check via Suite 93 token preservation)
+#   AC-3  — hooks/worktree-guard.sh: advisory reminder contains "ahead of
+#            origin/main"
+#   AC-4  — Suite 93 cross-check: "Rule 1", "origin/main", "worktree", and
+#            "dirty" or "non-main" still present in docs/worktree-discipline.md
+#   AC-5  — plugin.json + marketplace.json both >= (2, 102, 0)
+#
+# Self-referential guards:
+#   h1 — docs/testing.md registers 'Suite 113' + 'worktree-isolation-ahead'
+#   h2 — CLAUDE.md does NOT contain 'Suite 113' (§11 hygiene contract)
+#
+# Marker: worktree-isolation-ahead
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 113: worktree-isolation-ahead structural contract (v2.102.0) ===")
+
+_s113_discipline_path = REPO_ROOT / "docs" / "worktree-discipline.md"
+_s113_discipline      = read(_s113_discipline_path) if _s113_discipline_path.exists() else ""
+_s113_guard_sh_path   = HOOKS_DIR / "worktree-guard.sh"
+_s113_guard_sh        = read(_s113_guard_sh_path) if _s113_guard_sh_path.exists() else ""
+_s113_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
+_s113_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
+_s113_claude          = read(REPO_ROOT / "CLAUDE.md")
+_s113_plugin_json     = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s113_marketplace     = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+_s113_VER_FLOOR       = (2, 102, 0)
+
+# --- AC-1 / AC-2: "ahead of origin/main" token in discipline doc, hook, orchestrator ---
+
+check(
+    "suite113(ac2-discipline-ahead-token): docs/worktree-discipline.md contains "
+    "'ahead of origin/main'",
+    "ahead of origin/main" in _s113_discipline,
+    "docs/worktree-discipline.md must contain the literal substring 'ahead of origin/main' "
+    "(start-gate re-keying, issue #352)",
+)
+check(
+    "suite113(ac3-guard-sh-ahead-token): hooks/worktree-guard.sh advisory reminder "
+    "contains 'ahead of origin/main'",
+    "ahead of origin/main" in _s113_guard_sh,
+    "hooks/worktree-guard.sh advisory reminder must contain 'ahead of origin/main' "
+    "(position-based condition, not branch-name proxy)",
+)
+check(
+    "suite113(ac1-orchestrator-ahead-token): agents/orchestrator.md start-gate paragraph "
+    "contains 'ahead of origin/main'",
+    "ahead of origin/main" in _s113_orchestrator,
+    "agents/orchestrator.md must contain 'ahead of origin/main' in the single-task "
+    "start-gate paragraph (issue #352)",
+)
+
+# --- AC-1 / AC-2: "at/behind" token in discipline doc and orchestrator ---
+
+check(
+    "suite113(ac2-discipline-atbehind-token): docs/worktree-discipline.md contains 'at/behind'",
+    "at/behind" in _s113_discipline,
+    "docs/worktree-discipline.md must contain 'at/behind' (branch-in-place permitted "
+    "only when clean AND at/behind origin/main)",
+)
+check(
+    "suite113(ac1-orchestrator-atbehind-token): agents/orchestrator.md contains 'at/behind'",
+    "at/behind" in _s113_orchestrator,
+    "agents/orchestrator.md must contain 'at/behind' in the single-task start-gate paragraph",
+)
+
+# --- AC-4: Suite 93 cross-check — tokens that Suite 93 asserts must still be present ---
+
+check(
+    "suite113(ac4-suite93-rule1-preserved): docs/worktree-discipline.md still contains "
+    "'Rule 1' (Suite 93 ac1-five-rules / ac1-start-gate-decision cross-check)",
+    "Rule 1" in _s113_discipline,
+    "docs/worktree-discipline.md must still contain 'Rule 1' — Suite 93 asserts this; "
+    "the position re-keying adds 'ahead of origin/main' but must not remove Rule 1",
+)
+check(
+    "suite113(ac4-suite93-origin-main-preserved): docs/worktree-discipline.md still contains "
+    "'origin/main' (Suite 93 ac1-start-gate-decision cross-check)",
+    "origin/main" in _s113_discipline,
+    "docs/worktree-discipline.md must still contain 'origin/main' — Suite 93 asserts this",
+)
+check(
+    "suite113(ac4-suite93-worktree-preserved): docs/worktree-discipline.md still contains "
+    "'worktree' (Suite 93 ac1-start-gate-decision cross-check)",
+    "worktree" in _s113_discipline,
+    "docs/worktree-discipline.md must still contain 'worktree' — Suite 93 asserts this",
+)
+check(
+    "suite113(ac4-suite93-dirty-or-non-main-preserved): docs/worktree-discipline.md still "
+    "contains 'dirty' or 'non-main' (Suite 93 ac1-start-gate-decision cross-check)",
+    "dirty" in _s113_discipline or "non-main" in _s113_discipline,
+    "docs/worktree-discipline.md must still contain 'dirty' or 'non-main' — "
+    "Suite 93 asserts at least one of these tokens",
+)
+
+# --- AC-5: plugin.json + marketplace.json version floor ---
+
+_s113_marketplace_version = (
+    _s113_marketplace.get("plugins", [{}])[0].get("version", "")
+    if _s113_marketplace.get("plugins")
+    else ""
+)
+
+check(
+    "suite113(ac5-plugin-json-floor): .claude-plugin/plugin.json version >= 2.102.0",
+    _s59_ver_tuple(_s113_plugin_json.get("version", "0.0.0")) >= _s113_VER_FLOOR,
+    f"plugin.json version must be >= 2.102.0 (worktree-isolation-ahead release floor), "
+    f"got '{_s113_plugin_json.get('version', '')}'",
+)
+check(
+    "suite113(ac5-marketplace-json-floor): .claude-plugin/marketplace.json "
+    "plugins[0].version >= 2.102.0",
+    _s59_ver_tuple(_s113_marketplace_version or "0.0.0") >= _s113_VER_FLOOR,
+    f"marketplace.json plugins[0].version must be >= 2.102.0, "
+    f"got '{_s113_marketplace_version}'",
+)
+
+# --- Self-referential guards ---
+
+check(
+    "suite113(h1-registry): docs/testing.md registers 'Suite 113' and "
+    "'worktree-isolation-ahead' marker",
+    "Suite 113" in _s113_testing_md and "worktree-isolation-ahead" in _s113_testing_md,
+    "docs/testing.md must name Suite 113 and the worktree-isolation-ahead marker "
+    "(canonical suite registry)",
+)
+check(
+    "suite113(h2-hygiene): CLAUDE.md does NOT contain 'Suite 113'",
+    "Suite 113" not in _s113_claude,
+    "CLAUDE.md must not mention Suite 113 — only docs/testing.md is the canonical "
+    "registry (§11 hygiene contract)",
+)
+
+# No-agent-call guard: Suite 113 non-comment source must not invoke agent-dispatch APIs
+_s113_own_source = read(Path(__file__))
+_s113_non_comment_lines = [
+    line for line in _s113_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s113_non_comment_text = "\n".join(_s113_non_comment_lines)
+_s113_suite_start  = _s113_non_comment_text.rfind("Suite 113")
+_s113_agent_tok    = "Age" + "nt("
+_s113_subagent_tok = "subagent" + "_type"
+check(
+    "suite113(no-agent-call): Suite 113 non-comment source contains no agent-invocation tokens "
+    "(free structural suite guarantee)",
+    _s113_agent_tok not in _s113_non_comment_text[_s113_suite_start:]
+    and _s113_subagent_tok not in _s113_non_comment_text[_s113_suite_start:],
+    "Suite 113 is a free structural suite — its non-comment source must not invoke "
+    "the agent-dispatch APIs",
+)
+
+check(
+    "suite113(self-ref): test file contains 'Suite 113', '_slice_section', "
+    "and 'worktree-isolation-ahead'",
+    "Suite 113" in _s113_own_source
+    and "_slice_section" in _s113_own_source
+    and "worktree-isolation-ahead" in _s113_own_source,
+    "test file must self-reference Suite 113 + _slice_section + worktree-isolation-ahead marker",
+)
+
+# Marker: worktree-isolation-ahead
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

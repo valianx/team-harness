@@ -10,8 +10,9 @@
 #
 # PURPOSE:
 #   Prompt the agent (and indirectly the operator) to confirm the worktree
-#   discipline start-gate: clean+on-main → branch in place; dirty or non-main
-#   → create a worktree. Advisory only — never blocks.
+#   discipline start-gate: clean AND at/behind origin/main → branch in place;
+#   uncommitted changes OR ahead of origin/main → create a worktree. Advisory
+#   only — never blocks.
 #
 # SCOPE BOUNDARY:
 #   This hook fires ONLY on commands that Claude's own Bash tool is about to run.
@@ -125,4 +126,4 @@ fi
 # ---------------------------------------------------------------------------
 # Step 5 — Emit advisory ask with start-gate reminder
 # ---------------------------------------------------------------------------
-ask "worktree-guard: agent-issued branch/worktree operation detected. Before proceeding, confirm the start-gate decision (docs/worktree-discipline.md): (1) run \`git status\` and \`git worktree list\`; (2) if clean AND on main → branch in place is permitted; if dirty OR on a non-main branch → create a worktree instead; (3) always cut from fresh origin/main (\`git fetch origin main\` first). NOTE: this hook only sees agent-issued commands — it cannot cover a human's own-terminal git operations (worktree-guard.sh; see docs/worktree-discipline.md)"
+ask "worktree-guard: agent-issued branch/worktree operation detected. Before proceeding, confirm the start-gate decision (docs/worktree-discipline.md): (1) run \`git status\` and \`git worktree list\`; (2) \`git fetch origin main\` then \`git rev-list --count origin/main..HEAD\` — if the tree is clean AND at/behind origin/main (count=0) → branch in place is permitted; if uncommitted changes OR ahead of origin/main (count>0, incl. on a non-main branch) → create a worktree instead; (3) always cut from fresh origin/main (\`git worktree add -b feat/<name> <path> origin/main\`). NOTE: this hook only sees agent-issued commands — it cannot cover a human's own-terminal git operations (worktree-guard.sh; see docs/worktree-discipline.md)"
