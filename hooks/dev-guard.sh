@@ -25,6 +25,10 @@
 #      - gh pr review / gh pr review --dismiss
 #      - gh pr comment
 #      - gh api -X PUT|POST|PATCH|DELETE ... /pulls/.../merge|reviews|comments
+#      - gh api graphql with a PR-write mutation name (resolveReviewThread,
+#        unresolveReviewThread, addPullRequestReviewThreadReply,
+#        addPullRequestReview, submitPullRequestReview, mergePullRequest);
+#        read-only reviewThreads listing queries stay nodecision
 #      - curl/wget with mutating method against api.github.com or those paths
 #   3. ClickUp MCP outward writes (via mcp__.*__clickup_(update_task|create_task|...))
 #
@@ -222,6 +226,16 @@ fi
 # 2e. gh api with mutating HTTP method against PR endpoints
 if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls' 2>/dev/null; then
     ask "outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+fi
+
+# 2e-bis. gh api graphql with a PR-write mutation name (reply/resolve/review).
+# Read-only reviewThreads listing queries carry no mutation name -> stay nodecision
+# (parallel to gh pr view --comments, which is also ungated).
+# GraphQL always POSTs to /graphql with no -X flag, so the REST pattern (2e)
+# does not match these commands; this branch closes the coverage gap (SEC-001).
+if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])gh\s+api\s+graphql' 2>/dev/null \
+   && printf '%s' "$cmd" | grep -qE '(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)' 2>/dev/null; then
+    ask "outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
 # 2f. curl/wget with mutating method against api.github.com

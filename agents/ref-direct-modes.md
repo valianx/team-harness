@@ -740,12 +740,22 @@ reviewer comments. Read the PR diff for current code state.
 
 For each reviewer comment, apply `agents/_shared/apply-review-disposition.md` in full:
 classify (Step 1), run the verification filter for CHANGE comments that delete or
-loosen (Step 2), apply deletion discipline (Step 3), resolve rather than obey (Step 4),
-and emit the per-comment output (Step 5). Apply the `agents/_shared/finding-connection.md`
-cross-check at Step 2.4. Do NOT restate the disposition here — reference and follow it.
+loosen (Step 2), apply deletion discipline (Step 3), resolve the concern rather than
+obey the instruction (Step 4), and emit the per-comment output (Step 5). Apply the
+`agents/_shared/finding-connection.md` cross-check at Step 2.4. Do NOT restate the
+disposition here — reference and follow it.
+
+After producing the per-comment output, execute the thread actions defined in
+`apply-review-disposition.md § Step 6`: reply to each inline thread with its
+per-comment disposition, and resolve the thread WHEN Decision is APPLIED. Use the
+`gh` / GraphQL commands documented in `agents/_shared/gh-fallback.md §§ "Tier B —
+list review threads (map comment → thread id)"`, `"Tier B — reply to a review
+thread"`, and `"Tier B — resolve a review thread"`.
 
 ### Step 4 — Report
 
-Surface the per-comment dispositions to the operator. Any code changes that result are
-applied to the PR branch under the standard worktree + branch-author discipline. This
-direct mode does NOT emit a STAGE-GATE STOP block — it is a focused, on-demand action.
+Surface the per-comment dispositions to the operator, including the thread actions
+taken (reply sent, thread resolved, or thread left open with the reason). Any code
+changes that result are applied to the PR branch under the standard worktree +
+branch-author discipline. This direct mode does NOT emit a STAGE-GATE STOP block —
+it is a focused, on-demand action.
