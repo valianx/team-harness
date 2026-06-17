@@ -325,6 +325,25 @@ Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82
 ### Suite 113 — worktree-isolation-ahead
 
 14 checks. Structural assertions for the worktree start-gate re-keying off `origin/main` position (issue #352, v2.102.0). File: `tests/test_agent_structure.py`. Checks: (1) `docs/worktree-discipline.md` contains the literal substring `ahead of origin/main`; (2) `hooks/worktree-guard.sh` contains `ahead of origin/main`; (3) `agents/orchestrator.md` contains `ahead of origin/main`; (4) `docs/worktree-discipline.md` contains `at/behind`; (5) `agents/orchestrator.md` contains `at/behind`; (6–9) cross-check that Suite 93 tokens still present in `docs/worktree-discipline.md` (`Rule 1`, `origin/main`, `worktree`, and `dirty` or `non-main`); (10) `docs/testing.md` contains `Suite 113`; (11) `CLAUDE.md` does NOT contain `Suite 113` (§11 hygiene contract); (12) version-floor: `.claude-plugin/plugin.json` version `>= (2, 102, 0)` via `_s59_ver_tuple`; (13) `.claude-plugin/marketplace.json` `plugins[0].version` `>= (2, 102, 0)`; (14) self-ref check — test file contains `Suite 113`, `_slice_section`, and `worktree-isolation-ahead`. All content checks for anchored sections use `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Pure text/JSON reads — no agent invocation, no paid spend. Written by implementer (2026-06-17). Marker: `worktree-isolation-ahead`.
+### Suite 114 — batch-consolidation-default
+
+21 checks. Structural assertions for the batch-consolidation-default contract (v2.102.0, issue #354). File: `tests/test_agent_structure.py`. Pins the named consolidation default, the operator opt-out, the genuine-blocker closed-list naming, the same-delivery-flow alignment, and the reconciled wording at all four surfaces so none of the structural invariants can silently regress. All checks are anchor-scoped via `_slice_section` (anti-false-green: missing anchor → empty slice → check fails), mirroring Suite 93.
+
+(AC-1, 4 checks) `agents/orchestrator.md § Multi-Task Orchestration`: (a1) `## Multi-Task Orchestration` anchor present + slice non-empty; (a2) `Consolidation default` named clause present in the slice; (a3) ONE consolidated PR stated as the default; (a4) prohibition on one-PR-per-batched-task present.
+
+(AC-2, 6 checks) Opt-out + closed-list: (b1) `keep them as separate PRs` typed phrase in orchestrator slice; (b2) `separate PRs` in orchestrator slice; (b3) `coexistence window` named in orchestrator slice; (b4) `production signal` named in orchestrator slice; (b5) `cross-repo deploy gate` named in orchestrator slice; (b6) `plan-reviewer.md` + `Rule 1` reference in orchestrator slice (pointer to the closed-list source).
+
+(AC-6, 2 checks) Same delivery flow: (c1) `same delivery flow` phrase in orchestrator slice; (c2) `worktree-discipline.md` + `Rule 3` in orchestrator slice (teardown lifecycle alignment).
+
+(AC-3a, 4 checks) `agents/ref-special-flows.md`: (d1) `### Batch consolidation vs the anti-split invariant` anchor present + slice non-empty; (d2) anti-split rule (`never split` / `never SPLIT`) in the slice; (d3) opt-out (`separate PRs`) in the slice; (d4) `same delivery flow` in the slice.
+
+(AC-3b, 2 checks) `docs/knowledge.md`: (e1) `Consolidation default` or `Batch consolidation default` present (companion `[decision]` bullet); (e2) bullet references `orchestrator.md` with the consolidation anchor.
+
+(AC-3c, 3 checks) `agents/plan-reviewer.md § Rule 1`: (f1) `### Rule 1` anchor + slice non-empty; (f2) `complementary` + (`batch` or `consolidat`) — clause states Rule 1 is complementary to batch consolidation; (f3) `split` + `direction` — Rule 1 is identified as the split-direction rule.
+
+(AC-5, 3 checks) Version sync: (g1) `.claude-plugin/plugin.json` version `>= (2, 102, 0)` (forward-compatible floor, `_s59_ver_tuple`); (g2) `.claude-plugin/marketplace.json` `plugins[0].version >= (2, 102, 0)`; (g3) both versions are equal.
+
+(Self-ref, 2 checks) (h1) `docs/testing.md` registers `Suite 114` + `batch-consolidation-default` marker; (h2) `CLAUDE.md` does NOT contain `Suite 114` (§11 hygiene contract). Suite 114 pins NO CLAUDE.md byte size (the existing voice suite owns that guard). Pure text/JSON reads — no agent invocation, no paid spend. Written by implementer (2026-06-17). Marker: `batch-consolidation-default`.
 
 ### Suite 112 — apply-review-direct-mode
 
