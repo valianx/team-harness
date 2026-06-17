@@ -27045,6 +27045,356 @@ check(
 # Marker: batch-consolidation-default
 
 # ---------------------------------------------------------------------------
+# Suite 115 — apply-review-thread-actions
+# ---------------------------------------------------------------------------
+# Structural assertions for the mandatory-adherence + inline-thread reply/resolve
+# + DEFERRED decision state feature (issue #356, v2.104.0).
+#
+# Pins:
+#   AC-1  mandatory-adherence clause in apply-review-disposition.md
+#   AC-2  gh-fallback reply section + thread listing section
+#   AC-3  mapping table (APPLIED→resolve; DEFERRED/REJECTED/NEEDS-CLARIFICATION→open)
+#   AC-4  resolve ≠ dismiss invariant in both disposition and gh-fallback
+#   AC-5  DEFERRED in Decision enum + follow-up-reference requirement + Step-5 template
+#   AC-6  Step-4 concern-resolution rename + Step-6 thread-resolution coexist
+#   AC-7  gh-fallback resolve section states NO REST equivalent; list section exists
+#   AC-8  (this suite) version-floor, self-ref, §11 hygiene
+#
+# All content checks use the anchor-scoped 3-arg _slice_section idiom
+# (anti-false-green: missing anchor → empty slice → check fails).
+#
+# Pure text/JSON reads — no agent invocation, no paid spend.
+# Written by implementer (2026-06-17).
+# Marker: apply-review-thread-actions
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 115: apply-review-thread-actions structural contract ===")
+
+_s115_disposition     = read(AGENTS_DIR / "_shared" / "apply-review-disposition.md")
+_s115_gh_fallback     = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
+_s115_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
+_s115_ref_modes       = read(AGENTS_DIR / "ref-direct-modes.md")
+_s115_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
+_s115_claude_md       = read(REPO_ROOT / "CLAUDE.md")
+_s115_plugin_json     = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+_s115_marketplace     = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+
+_S115_VER_FLOOR       = (2, 104, 0)
+
+# Anchors for anchor-scoped slices
+_S115_MAND_ANCHOR     = "## Mandatory adherence"
+_S115_STEP1_ANCHOR    = "## Step 1 — Two-axis classification"
+_S115_STEP4_ANCHOR    = "## Step 4 — Resolve the concern, don't obey the instruction"
+_S115_STEP5_ANCHOR    = "## Step 5 — Per-comment output"
+_S115_STEP6_ANCHOR    = "## Step 6 — Reply and resolve on the thread"
+_S115_STOP_H2         = ("\n## ", "\n---\n")
+_S115_STOP_EOF        = ("\n## ",)
+
+_S115_GH_LIST_ANCHOR  = "### Tier B — list review threads (map comment → thread id)"
+_S115_GH_REPLY_ANCHOR = "### Tier B — reply to a review thread"
+_S115_GH_RESOLVE_ANCHOR = "### Tier B — resolve a review thread"
+_S115_GH_STOP_H3      = ("\n### ", "\n## ")
+
+_S115_PR_INCORP       = "## PR Comment Incorporation"
+_S115_AR_ANCHOR       = "## Apply-Review Mode"
+_S115_STOP_RULE       = ("\n---\n", "\n## ")
+
+_s115_mand_slice      = _slice_section(_s115_disposition, _S115_MAND_ANCHOR, _S115_STOP_H2)
+_s115_step1_slice     = _slice_section(_s115_disposition, _S115_STEP1_ANCHOR, _S115_STOP_H2)
+_s115_step4_slice     = _slice_section(_s115_disposition, _S115_STEP4_ANCHOR, _S115_STOP_H2)
+_s115_step5_slice     = _slice_section(_s115_disposition, _S115_STEP5_ANCHOR, _S115_STOP_H2)
+_s115_step6_slice     = _slice_section(_s115_disposition, _S115_STEP6_ANCHOR, _S115_STOP_EOF)
+_s115_gh_list_slice   = _slice_section(_s115_gh_fallback, _S115_GH_LIST_ANCHOR, _S115_GH_STOP_H3)
+_s115_gh_reply_slice  = _slice_section(_s115_gh_fallback, _S115_GH_REPLY_ANCHOR, _S115_GH_STOP_H3)
+_s115_gh_resolve_slice = _slice_section(_s115_gh_fallback, _S115_GH_RESOLVE_ANCHOR, _S115_GH_STOP_H3)
+_s115_orch_pr_incorp  = _slice_section(_s115_orchestrator, _S115_PR_INCORP, _S115_STOP_H2)
+_s115_ref_ar_slice    = _slice_section(_s115_ref_modes, _S115_AR_ANCHOR, _S115_STOP_RULE)
+
+# --- AC-1: mandatory-adherence clause ----------------------------------------
+
+check(
+    "suite115(ac1a-mand-anchor): apply-review-disposition.md has ## Mandatory adherence section",
+    bool(_s115_mand_slice),
+    "apply-review-disposition.md must contain a '## Mandatory adherence' section",
+)
+check(
+    "suite115(ac1b-mand-steps-always): mandatory-adherence clause states Steps 1-5 are ALWAYS executed",
+    bool(_s115_mand_slice)
+    and ("Steps 1" in _s115_mand_slice or "Steps 1–5" in _s115_mand_slice)
+    and ("ALWAYS" in _s115_mand_slice or "always" in _s115_mand_slice),
+    "mandatory-adherence clause must state that Steps 1-5 are ALWAYS executed for every comment",
+)
+check(
+    "suite115(ac1c-mand-no-adhoc): mandatory-adherence clause states no ad-hoc path",
+    bool(_s115_mand_slice) and "ad-hoc" in _s115_mand_slice,
+    "mandatory-adherence clause must state there is no ad-hoc path",
+)
+check(
+    "suite115(ac1d-orch-ref-mandatory): orchestrator PR Comment Incorporation section "
+    "references mandatory adherence",
+    bool(_s115_orch_pr_incorp)
+    and ("Mandatory adherence" in _s115_orch_pr_incorp
+         or "mandatory adherence" in _s115_orch_pr_incorp),
+    "orchestrator.md ## PR Comment Incorporation must reference 'Mandatory adherence'",
+)
+
+# --- AC-2: gh-fallback reply and listing sections ----------------------------
+
+check(
+    "suite115(ac2a-gh-list-anchor): gh-fallback.md has '### Tier B — list review threads' section",
+    bool(_s115_gh_list_slice),
+    "gh-fallback.md must contain a '### Tier B — list review threads (map comment → thread id)' section",
+)
+check(
+    "suite115(ac2b-gh-list-graphql): listing section documents the reviewThreads GraphQL query",
+    bool(_s115_gh_list_slice)
+    and "reviewThreads" in _s115_gh_list_slice
+    and "first: 100" in _s115_gh_list_slice,
+    "gh-fallback.md listing section must document reviewThreads(first: 100) GraphQL query",
+)
+check(
+    "suite115(ac2c-gh-reply-anchor): gh-fallback.md has '### Tier B — reply to a review thread' section",
+    bool(_s115_gh_reply_slice),
+    "gh-fallback.md must contain a '### Tier B — reply to a review thread' section",
+)
+check(
+    "suite115(ac2d-gh-reply-graphql): reply section documents addPullRequestReviewThreadReply",
+    bool(_s115_gh_reply_slice)
+    and "addPullRequestReviewThreadReply" in _s115_gh_reply_slice,
+    "gh-fallback.md reply section must document the addPullRequestReviewThreadReply GraphQL mutation",
+)
+check(
+    "suite115(ac2e-gh-reply-curl-fallback): reply section documents REST /replies curl fallback",
+    bool(_s115_gh_reply_slice)
+    and "/replies" in _s115_gh_reply_slice,
+    "gh-fallback.md reply section must document the REST /replies curl fallback path",
+)
+
+# --- AC-3: mapping table (APPLIED→resolve; DEFERRED/REJECTED/NEEDS-CLARIFICATION→open) ---
+
+check(
+    "suite115(ac3a-step6-anchor): apply-review-disposition.md has ## Step 6 section",
+    bool(_s115_step6_slice),
+    "apply-review-disposition.md must contain a '## Step 6 — Reply and resolve on the thread' section",
+)
+check(
+    "suite115(ac3b-applied-resolve): Step 6 maps APPLIED to thread resolution",
+    bool(_s115_step6_slice)
+    and "APPLIED" in _s115_step6_slice
+    and "resolveReviewThread" in _s115_step6_slice,
+    "Step 6 mapping table must map APPLIED to resolveReviewThread (thread resolution)",
+)
+check(
+    "suite115(ac3c-deferred-open): Step 6 maps DEFERRED to leave open",
+    bool(_s115_step6_slice)
+    and "DEFERRED" in _s115_step6_slice
+    and "open" in _s115_step6_slice.lower(),
+    "Step 6 mapping table must map DEFERRED to leaving the thread open",
+)
+check(
+    "suite115(ac3d-rejected-open): Step 6 maps REJECTED to leave open",
+    bool(_s115_step6_slice)
+    and "REJECTED" in _s115_step6_slice,
+    "Step 6 mapping table must include REJECTED mapped to leaving the thread open",
+)
+check(
+    "suite115(ac3e-nc-open): Step 6 maps NEEDS-CLARIFICATION to leave open",
+    bool(_s115_step6_slice)
+    and "NEEDS-CLARIFICATION" in _s115_step6_slice,
+    "Step 6 mapping table must include NEEDS-CLARIFICATION mapped to leaving the thread open",
+)
+check(
+    "suite115(ac3f-never-mass-resolve): Step 6 states 'never mass-resolve'",
+    bool(_s115_step6_slice) and "never mass-resolve" in _s115_step6_slice.lower(),
+    "Step 6 must state 'never mass-resolve' verbatim",
+)
+check(
+    "suite115(ac3g-never-resolve-unfinished): Step 6 states 'never resolve' unfinished work",
+    bool(_s115_step6_slice)
+    and ("never resolve" in _s115_step6_slice.lower()
+         or "Never resolve" in _s115_step6_slice),
+    "Step 6 must state 'never resolve a thread with unfinished work' verbatim",
+)
+
+# --- AC-4: resolve ≠ dismiss invariant ---------------------------------------
+
+check(
+    "suite115(ac4a-disp-resolve-ne-dismiss): disposition states resolve ≠ dismiss",
+    "resolve" in _s115_disposition
+    and "dismiss" in _s115_disposition
+    and "CHANGES_REQUESTED" in _s115_disposition,
+    "apply-review-disposition.md must state that resolving a thread does NOT dismiss "
+    "a CHANGES_REQUESTED review (resolve ≠ dismiss invariant)",
+)
+check(
+    "suite115(ac4b-gh-resolve-ne-dismiss): gh-fallback resolve section repeats resolve ≠ dismiss",
+    bool(_s115_gh_resolve_slice)
+    and "dismiss" in _s115_gh_resolve_slice
+    and "CHANGES_REQUESTED" in _s115_gh_resolve_slice,
+    "gh-fallback.md resolve section must repeat the resolve ≠ dismiss invariant "
+    "(CHANGES_REQUESTED persists after thread resolution)",
+)
+
+# --- AC-5: DEFERRED decision state -------------------------------------------
+
+check(
+    "suite115(ac5a-deferred-in-step1): DEFERRED in the Step-1 Decision enum listing",
+    bool(_s115_step1_slice) and "DEFERRED" in _s115_step1_slice,
+    "Step 1 Decision enum must include DEFERRED as a valid decision value",
+)
+check(
+    "suite115(ac5b-deferred-definition): disposition defines DEFERRED vs REJECTED distinction",
+    "DEFERRED" in _s115_disposition
+    and "REJECTED" in _s115_disposition
+    and ("agreement" in _s115_disposition or "agree" in _s115_disposition)
+    and ("disagree" in _s115_disposition or "disagreement" in _s115_disposition),
+    "disposition must define DEFERRED (agreement-plus-postponement) and contrast it "
+    "with REJECTED (disagreement)",
+)
+check(
+    "suite115(ac5c-deferred-followup-required): disposition states follow-up reference is required",
+    "DEFERRED" in _s115_disposition
+    and "follow-up" in _s115_disposition
+    and "required" in _s115_disposition,
+    "disposition must state that a DEFERRED decision requires a tracked follow-up reference",
+)
+check(
+    "suite115(ac5d-step5-followup-line): Step 5 output template has Follow-up line",
+    bool(_s115_step5_slice) and "Follow-up" in _s115_step5_slice,
+    "Step 5 per-comment output template must include a 'Follow-up (if DEFERRED):' line",
+)
+check(
+    "suite115(ac5e-step5-thread-action-line): Step 5 output template has Thread action line",
+    bool(_s115_step5_slice) and "Thread action" in _s115_step5_slice,
+    "Step 5 per-comment output template must include a 'Thread action:' line",
+)
+
+# --- AC-6: Step-4 concern-rename + Step-6 coexist without collision ----------
+
+check(
+    "suite115(ac6a-step4-renamed): Step 4 heading is 'Resolve the concern, don't obey the instruction'",
+    "## Step 4 — Resolve the concern, don't obey the instruction" in _s115_disposition,
+    "Step 4 heading must be renamed to 'Resolve the concern, don't obey the instruction' "
+    "(disambiguates concern-resolution from GitHub thread-resolution)",
+)
+check(
+    "suite115(ac6b-step6-exists): Step 6 heading exists alongside renamed Step 4",
+    "## Step 6 — Reply and resolve on the thread" in _s115_disposition,
+    "Step 6 heading '## Step 6 — Reply and resolve on the thread' must exist "
+    "alongside the renamed Step 4 (both coexist without semantic collision)",
+)
+check(
+    "suite115(ac6c-step4-distinction): Step 4 states the distinction from Step 6 (CODE vs GITHUB)",
+    bool(_s115_step4_slice)
+    and ("Step 6" in _s115_step4_slice
+         or "thread" in _s115_step4_slice.lower()),
+    "Step 4 must state the distinction between concern-resolution (Step 4, about code) "
+    "and GitHub thread-resolution (Step 6, about GitHub state)",
+)
+
+# --- AC-7: gh-fallback resolve states NO REST equivalent; list section exists --
+
+check(
+    "suite115(ac7a-gh-resolve-anchor): gh-fallback.md has '### Tier B — resolve a review thread' section",
+    bool(_s115_gh_resolve_slice),
+    "gh-fallback.md must contain a '### Tier B — resolve a review thread' section",
+)
+check(
+    "suite115(ac7b-gh-resolve-no-rest): resolve section explicitly states NO REST equivalent",
+    bool(_s115_gh_resolve_slice)
+    and ("no REST equivalent" in _s115_gh_resolve_slice
+         or "NO REST equivalent" in _s115_gh_resolve_slice
+         or "no rest equivalent" in _s115_gh_resolve_slice.lower()),
+    "gh-fallback.md resolve section must explicitly state there is NO REST equivalent "
+    "for resolveReviewThread",
+)
+check(
+    "suite115(ac7c-gh-resolve-graphql): resolve section documents resolveReviewThread mutation",
+    bool(_s115_gh_resolve_slice)
+    and "resolveReviewThread" in _s115_gh_resolve_slice,
+    "gh-fallback.md resolve section must document the resolveReviewThread GraphQL mutation",
+)
+check(
+    "suite115(ac7d-gh-resolve-403-degrade): resolve section documents 403 degrade path",
+    bool(_s115_gh_resolve_slice)
+    and "403" in _s115_gh_resolve_slice
+    and "X-Accepted-GitHub-Permissions" in _s115_gh_resolve_slice,
+    "gh-fallback.md resolve section must document the attempt-and-degrade-on-403 path "
+    "with X-Accepted-GitHub-Permissions header diagnosis",
+)
+check(
+    "suite115(ac7e-gh-list-no-rest): listing section states REST cannot return thread IDs",
+    bool(_s115_gh_list_slice)
+    and ("cannot" in _s115_gh_list_slice.lower() or "no REST" in _s115_gh_list_slice
+         or "no thread" in _s115_gh_list_slice.lower()),
+    "gh-fallback.md listing section must state that curl/REST cannot return thread IDs "
+    "or isResolved — GraphQL-only operation",
+)
+
+# --- Registry / hygiene / version / self-ref ---------------------------------
+
+check(
+    "suite115(h1-registry): docs/testing.md registers 'Suite 115' and "
+    "'apply-review-thread-actions' marker",
+    "Suite 115" in _s115_testing_md and "apply-review-thread-actions" in _s115_testing_md,
+    "docs/testing.md must name Suite 115 and the apply-review-thread-actions marker "
+    "(canonical suite registry)",
+)
+check(
+    "suite115(h2-hygiene): CLAUDE.md does NOT contain 'Suite 115'",
+    "Suite 115" not in _s115_claude_md,
+    "CLAUDE.md must not mention Suite 115 — only docs/testing.md is the canonical "
+    "registry (§11 hygiene contract)",
+)
+check(
+    "suite115(h3-ver-plugin-json): .claude-plugin/plugin.json version >= 2.104.0",
+    _s59_ver_tuple(_s115_plugin_json.get("version", "0.0.0")) >= _S115_VER_FLOOR,
+    f"plugin.json version must be >= 2.104.0 (apply-review-thread-actions release floor), "
+    f"got '{_s115_plugin_json.get('version', '')}'",
+)
+check(
+    "suite115(h4-ver-marketplace): .claude-plugin/marketplace.json plugins[0].version >= 2.104.0",
+    _s59_ver_tuple(
+        _s115_marketplace.get("plugins", [{}])[0].get("version", "0.0.0")
+    ) >= _S115_VER_FLOOR,
+    "marketplace.json plugins[0].version must be >= 2.104.0",
+)
+check(
+    "suite115(h5-versions-match): plugin.json and marketplace.json versions are equal",
+    _s115_plugin_json.get("version", "PLUGIN_MISSING")
+    == _s115_marketplace.get("plugins", [{}])[0].get("version", "MARKET_MISSING"),
+    "plugin.json version must equal marketplace.json plugins[0].version",
+)
+
+# (no-agent-call guard) suite115 non-comment source contains no agent-invocation tokens
+_s115_own_source = read(Path(__file__))
+_s115_non_comment_lines = [
+    line for line in _s115_own_source.splitlines()
+    if not line.lstrip().startswith("#")
+]
+_s115_non_comment_text = "\n".join(_s115_non_comment_lines)
+_s115_suite_start  = _s115_non_comment_text.rfind("Suite 115")
+_s115_agent_tok    = "Age" + "nt("
+_s115_subagent_tok = "subagent" + "_type"
+check(
+    "suite115(h6-no-agent-call): Suite 115 non-comment source contains no agent-invocation tokens "
+    "(free structural suite guarantee)",
+    _s115_agent_tok not in _s115_non_comment_text[_s115_suite_start:]
+    and _s115_subagent_tok not in _s115_non_comment_text[_s115_suite_start:],
+    "Suite 115 is a free structural suite — its non-comment source must not invoke the agent-dispatch APIs",
+)
+check(
+    "suite115(h7-self-ref): test file contains 'Suite 115', '_slice_section', "
+    "and 'apply-review-thread-actions'",
+    "Suite 115" in _s115_own_source
+    and "_slice_section" in _s115_own_source
+    and "apply-review-thread-actions" in _s115_own_source,
+    "test file must self-reference Suite 115 + _slice_section + the apply-review-thread-actions marker",
+)
+
+# Marker: apply-review-thread-actions
+
+# ---------------------------------------------------------------------------
 # Suite 116 — reviewer-version-changelog-check (v2.105.0)
 #
 # Pins the conditional project-version + changelog convention check added to
