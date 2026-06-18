@@ -150,7 +150,7 @@ All commands run from the repo root.
 - **orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `orchestrator`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. See `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. See `docs/conventions.md`.
-- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index. Full contracts: `agents/orchestrator.md § Parallel Multi-Project Dispatch`; `docs/discover-phase.md § 11`.
+- **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index. detect + confirm gate; parallel multi-project dispatch (v2.61.0) fans out Stage-2 lanes when ≥2 projects clear STAGE-GATE-1 (`--serial` always wins). Full contracts: `agents/orchestrator.md § Parallel Multi-Project Dispatch`; `docs/discover-phase.md § 11`.
 - **Human-first document format.** Every workspace doc: `## Review Summary` (scannable in 2 min) then `## Technical Detail` (agent-to-agent content). Both modes.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on it without re-reading full workspaces.
 - **Installer always overwrites embedded files.** Direct edits to `~/.claude/agents/*.md` are replaced on every install. Hash-match files are skipped. See `docs/conventions.md` for the full overwrite + preservation contract.
@@ -161,7 +161,7 @@ All commands run from the repo root.
 - **KG content is technical-only.** Never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
 - **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per completed task (Step 11.5). Best-effort: unreachable MCP or no learning → log and skip.
 - **Delivery post-create check (Step 11.4).** Queries merge state + CI after `gh pr create`; `CONFLICTING`/failing-CI reported explicitly. Full contract in `agents/delivery.md`.
-- **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`. Full contract: `docs/observability.md`.
+- **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`. Exception: Tier 0 fixes (`workspaces: NONE`) are exempt. Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs against context7 before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** For `type: fix`/`hotfix`. Full flow: `agents/ref-special-flows.md § Bug-fix Flow`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
@@ -173,7 +173,7 @@ All commands run from the repo root.
 - **Milestone standard.** milestones = commits, NOT PRs; one task = one PR; same-repo batch defaults to ONE consolidated PR. See `agents/ref-special-flows.md § Milestone-Build Flow`.
 - **Hook enforcement floors.** `policy-block.sh` + `checkpoint-guard.sh`. See `docs/reasoning-checkpoint.md`.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
-- **Worktree discipline.** Each concurrent effort in its own `git worktree`. Full 5-rule contract: `docs/worktree-discipline.md`.
+- **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
 - **Parallel batch implementation.** ADDITIVE items concurrently; consolidated into ONE PR. See `docs/parallel-batch-implementation.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
