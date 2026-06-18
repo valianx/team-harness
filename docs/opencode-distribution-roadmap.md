@@ -72,6 +72,18 @@ ioContract: normalized-v1           # which shim contract version this body spea
 
 **Deferred build note.** Projection requires ≥2 runtimes; only Claude Code is present. When a second runtime target lands, the first build step is a `claude-code` identity adapter (proving the canonical body round-trips unchanged) followed by the first non-identity adapter for the new runtime.
 
+### Security contract the build MUST satisfy
+
+The following requirements derive from finding **SEC-07** in the 2026-06-15 security re-validation. They are implementer-facing — the future build must satisfy them; nothing here is yet enforced (no code exists).
+
+- **SEC-07 — Schema-validate inbound payloads before any body trusts them.** The shim MUST validate the inbound object against the `normalized-v1` schema before forwarding to any body. A type mismatch, unparseable input, or structurally invalid payload is a hard reject (fail-closed) — never a partially-parsed passthrough to a security-decision body.
+- **SEC-07 — Enforce size and nesting-depth bounds before parsing.** The build MUST impose a maximum payload size and maximum nesting depth prior to any parse step, so a hostile or pathological `tool.input` cannot cause resource exhaustion in the parser (CWE-770).
+- **SEC-07 — Treat all payload values as untrusted data.** The shim passes values through; the *body* decides whether to trust them. The shim MUST NOT interpret `tool.input.command` or any other payload field — including as part of any routing, shortcutting, or early-exit logic.
+- **SEC-07 — Wrong type = hard reject, not coercion.** A key present with the wrong type (e.g., `event` is an object, not a string) MUST cause an immediate reject, not a type coercion. The existing `null`-for-absent invariant (absent keys emitted as `null`, never omitted) is reaffirmed and must hold on every branch.
+- **SEC-07 — Pin a safe-by-default JSON parser.** For a TypeScript/Bun shim implementation, the build MUST use a safe JSON parse with no prototype-pollution-prone object merge (e.g., avoid `Object.assign({}, parsed)` if `parsed` contains a `__proto__` key). This is the TS/Bun-specific realization of the "no pollutable merge" guard.
+
+*These are design guards for a future implementer. No code exists at this writing; severity reflects the consequence of each gap if it reaches a built artifact unaddressed.*
+
 ---
 
 ## Item 2 — Two-layer install manifest + managed-ownership state
@@ -135,6 +147,16 @@ ioContract: normalized-v1           # which shim contract version this body spea
 
 **Deferred build note.** Build belongs to the opencode installer. The frozen Go installer is not modified. The first build milestone is the `plan` reader (pure, no writes), then `apply`, then `uninstall`.
 
+### Security contract the build MUST satisfy
+
+The following requirements derive from findings **SEC-04**, **SEC-05**, and **SEC-06** in the 2026-06-15 security re-validation. Each guard is implementer-facing — the future build must satisfy them; nothing here is yet enforced.
+
+- **SEC-04 — Write-time secret-scan before persisting any manifest or ledger entry.** The manifest/ledger writer MUST run a secret-scan (reusing the `policy-block.sh` pattern class) over every value before persisting, and MUST fail-closed on a high-confidence match. The "manifests carry flags and ownership tags only — never secrets" invariant must be *enforced at write time*, not left as prose discipline. Manifests and ledger files are committed/synced artifacts subject to the same secret floor as any other written file.
+- **SEC-05 — Ledger records key NAMES only; never key values, secret material, or expanded user-home absolute paths.** The `configKeys` field in every ledger entry MUST record ownership *identity* (the key name, not its value). Extending the ledger for idempotency or diffing MUST NOT capture the value alongside the key — operator-owned keys explicitly include the MCP bearer and the context7 API key; a value-recording ledger would persist them into an append-only file. Path entries MUST use `{config_root}`-templated placeholders rather than expanded user-home absolute paths.
+- **SEC-06 — Uninstall is fail-closed against ledger integrity loss.** A malformed, truncated, or absent ledger entry MUST be skipped — never deleted heuristically. The `uninstall` command MUST NOT delete any key or file that is not provably present in a well-formed ledger entry. A corrupt or missing ledger MUST surface to the operator via the `plan` dry-run rather than triggering any heuristic deletion. The JSONL one-object-per-line shape MUST be mandated so a truncated tail line does not poison earlier entries — the build MUST implement skip-the-bad-line parsing.
+
+*These are design guards for a future implementer. No code exists at this writing; severity reflects the consequence of each gap if it reaches a built artifact unaddressed.*
+
 ---
 
 ## Item 3 — Single data-home resolver
@@ -164,3 +186,71 @@ ioContract: normalized-v1           # which shim contract version this body spea
 - **What lives under it:** the ownership ledger (Item 2), the install manifests' applied-state cache, and — when `logs-mode: local` — the default workspaces root, unless an explicit `logs-path` overrides it. (Obsidian mode's vault path is unaffected; it is operator-owned config.)
 
 **Deferred build note.** This is a self-contained pure function with a unit-testable resolution table; it is the recommended first build artifact of the opencode effort because Items 1 and 2 consume its output.
+
+### Security contract the build MUST satisfy
+
+The following requirements derive from findings **SEC-01**, **SEC-02**, **SEC-03**, and **SEC-08** in the 2026-06-15 security re-validation. The resolver is the highest-risk surface because Items 1 and 2 both consume its output and inherit its weaknesses. These guards are implementer-facing; the future build must satisfy them.
+
+- **SEC-01 — Canonicalize the resolved root and refuse to operate on a symlinked path.** The resolver MUST resolve all symlinks in the resolved root path (`realpath`/`O_NOFOLLOW` semantics) and MUST either refuse to operate on any root whose final or intermediate component is a symlink not owned by the current user, or operate only on the fully-resolved real path after verifying ownership. State-file writes under the root MUST use `O_NOFOLLOW` (or the platform equivalent). On Windows, the ACL-equivalent step MUST also reject reparse points and junctions in the resolved path.
+- **SEC-02 — Create the root atomically with the restrictive mode; verify-or-fail-closed on a pre-existing root.** The directory MUST be created with mode `0700` in a single atomic operation. Because `mkdir` honors mode atomically only modulo umask, the build MUST also mandate a `0077` umask around the create OR an explicit `fchmod` on a handle opened to the just-created directory — not a path re-lookup after the fact. If the root already exists, the resolver MUST verify it is a directory, owned by the current user, with no group/other permissions, and MUST fail-closed (refuse, surface to operator) rather than silently `chmod`-correct a directory it does not own.
+- **SEC-03 — The `0700`/`0600` mandate binds every resolution branch; the Windows ACL contract is concrete, not implied.** Every branch of the resolution order (XDG, `%LOCALAPPDATA%`, `%APPDATA%`, home-relative fallback) MUST produce a leaf directory that is always tightened to `0700` and state files to `0600`, regardless of where in the ancestor chain directory creation began. Intermediate directories created by the resolver inherit the OS default, but the leaf is always tightened. The Windows ACL contract MUST be spelled out: strip inherited ACEs, grant only the current user SID full control, deny Everyone/Authenticated-Users any ACE. A post-create verification step MUST assert the achieved mode or ACL matches the mandate and MUST fail-closed if it does not.
+- **SEC-08 — After single-pass expansion, normalize the path and reject any residual `..` traversal segment.** "Absolute after one expansion" does not by itself prevent absolute paths containing `..` components that traverse outside the intended boundary. The build MUST normalize the expanded path and reject any residual `..` segment. Single-pass expansion MUST be documented as a *security requirement* (not an ergonomic choice) so a future maintainer does not relax it to recursive expansion. An explicit `TEAM_HARNESS_DATA_HOME` or `TH_DATA_HOME` override remains subject to the SEC-01 symlink and SEC-03 ownership/permission checks — overriding the env var does not exempt the resolved path from the safety checks applied to auto-detected roots.
+
+*These are design guards for a future implementer. No code exists at this writing; severity reflects the consequence of each gap if it reaches a built artifact unaddressed.*
+
+---
+
+## Cross-Harness Compatibility Matrix
+
+The table below records the per-asset-type cross-harness compatibility cost, derived from direct research into how the second target harness consumes CC-formatted assets. This is durable design knowledge that informs the authoring mandate and the migration guide.
+
+| Asset | Target harness native format | Reads CC files directly? | Transform cost |
+|---|---|---|---|
+| **Skills** (`SKILL.md`) | Same `SKILL.md` + frontmatter | **Yes** — discovers `.claude/skills/` directly | **None** — already cross-harness |
+| **Rules / context** (`CLAUDE.md`) | `AGENTS.md` (cross-tool standard) | **Yes** — falls back to `CLAUDE.md` when no `AGENTS.md` exists | **Near-zero** — optionally add `AGENTS.md` as an entry point |
+| **Agents** (`.md` + frontmatter) | Same Markdown + frontmatter; CC-compatible agent directories are partially read | Partially — structure matches, but `permission`/`model`/`mode` fields differ | **Light** — emit-time frontmatter delta (tool permissions → `permission` object, provider-prefixed model IDs, explicit `mode`) |
+| **Commands** (`.md`) | Markdown + frontmatter in `.opencode/commands/`; `$ARGUMENTS` placeholder | Partially — `$ARGUMENTS` vs `{input}`, relocation to `.opencode/commands/` | **Light** — frontmatter delta + path relocation |
+| **Hooks** | TypeScript/JS plugins on Bun (async event callbacks, 23+ events), in `.opencode/plugins/` | **No** — no shell-script hook execution; the official migrator skips hooks entirely | **Hard** — rewrite to a TS plugin (Decision A = TypeScript) |
+
+**Two facts collapse most of the assumed conversion work:**
+
+1. Skills and rules are effectively cross-harness today with zero or near-zero effort — the second harness natively ingests CC skill directories and falls back to `CLAUDE.md` for rules. A pure runtime shim is unnecessary for these asset types.
+2. Hooks are the only surface with a fundamental execution-model gap. The gap is not an I/O-format difference — it is "Bash script" vs "TypeScript plugin on Bun." A format-shim cannot bridge execution models; the hook must be rewritten or bridged through a materialized TS artifact.
+
+**Hybrid/materialization reality.** Shipping multi-harness projects converge on a hybrid approach: a shared canonical source plus thin per-provider adapters, with some artifacts materialized (committed) rather than generated purely at install via a runtime shim. For agents and commands, a thin emit-time frontmatter transform suffices; the body is unchanged and no runtime shim is needed. For hooks, a materialized TS artifact is unavoidable. This softens the roadmap's prior "pure runtime shim, nothing committed per-runtime" framing: minimize per-runtime materialization; some is unavoidable for the hook surface.
+
+---
+
+## Cross-Harness Authoring Mandate
+
+This mandate is grounded in the per-asset-type matrix above. It is binding as authoring and review discipline today; it is NOT dual-runtime test-enforced today because the projection layer and the hook migration are future work.
+
+### The rule
+
+Every new distributed implementation in this repository must be authorable for both Claude Code and the target second harness, at the cost the matrix assigns to its asset type:
+
+- **Skills and rules** incur no or near-zero cross-harness effort. Author once; both harnesses read them.
+- **Agents and commands** are authored against the canonical frontmatter. The emit-time frontmatter delta (permission objects, provider-prefixed model IDs, `$ARGUMENTS` placeholder) is applied by the projector at emit time — not hand-duplicated into a per-harness copy.
+- **Hooks are authored in TypeScript (Decision A = A2, CLOSED).** A single TS/JS body runs natively on Claude Code (Node — already a CC runtime dependency) and opencode (Bun). A Bash hook body is no longer the authoring target for any new hook in this repository. The existing 18 Bash hooks are a future migration tracked in `docs/opencode-migration-guide.md`.
+
+### Actionable now (enforceable as review discipline today)
+
+The following are checkable on every pull request today, even without the target harness present in-repo:
+
+- Author skills in their existing `SKILL.md` format with cross-harness-compatible frontmatter — they already satisfy both harnesses.
+- Author rules in `CLAUDE.md` (and optionally in `AGENTS.md`); keep rule content free of CC-specific invocation syntax.
+- Keep agent and command bodies free of runtime-specific frontmatter values. Emit-time delta owns those values; the body must not assume them.
+- **Author all new hooks in TypeScript/JavaScript, not Bash.** Decision A is closed. No new Bash hook should be added to `hooks/` from this point forward; the migration guide documents the rewrite process for the existing hooks.
+
+### Deferred to the build (NOT enforced today)
+
+The following are deferred until the opencode integration effort begins and the second harness is present in-repo:
+
+- Actual dual-runtime projection and the first non-identity adapter (Item 1 build).
+- The materialized `.opencode/` directory structure.
+- Rewriting the existing 18 Bash hooks to TypeScript (process documented in `docs/opencode-migration-guide.md`).
+- Dual-runtime test execution — running the hook suite on both Node (Claude Code) and Bun (target harness) in CI.
+
+### Honest enforceability statement
+
+The mandate is binding as authoring and review discipline today. What is verifiable today is the rule's presence and shape (structural test, Suite 105); what is NOT verifiable today is dual-runtime hook execution, because the projection layer and the hook migration are future work. The migration guide documents the migration process so the deferred work is fully specified before it begins.

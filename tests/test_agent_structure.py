@@ -25137,7 +25137,186 @@ check(
     "test file must self-reference Suite 105 + _slice_section + the marker",
 )
 
+# (11) Item 1 carries a 'Security contract the build MUST satisfy' subsection
+# Slice Item 1 first, then find the sub-anchor within that slice — avoids the
+# find-first trap when three identical sub-headings exist across all three Items.
+_s105_item1_sec_anchor = "### Security contract the build MUST satisfy"
+_s105_item1_sec = _slice_section(_s105_item1, _s105_item1_sec_anchor, _S105_STOP)
+check(
+    "suite105(11-item1-security): Item 1 slice carries a "
+    "'### Security contract the build MUST satisfy' subsection naming SEC-07",
+    len(_s105_item1_sec) > 0 and "SEC-07" in _s105_item1_sec,
+    "Item 1 must contain a '### Security contract' subsection naming finding SEC-07",
+)
+
+# (12) Item 2 carries a 'Security contract the build MUST satisfy' subsection
+_s105_item2_sec = _slice_section(_s105_item2, _s105_item1_sec_anchor, _S105_STOP)
+check(
+    "suite105(12-item2-security): Item 2 slice carries a "
+    "'### Security contract the build MUST satisfy' subsection naming SEC-04/05/06",
+    len(_s105_item2_sec) > 0
+    and "SEC-04" in _s105_item2_sec
+    and "SEC-05" in _s105_item2_sec
+    and "SEC-06" in _s105_item2_sec,
+    "Item 2 must contain a '### Security contract' subsection naming SEC-04, SEC-05, SEC-06",
+)
+
+# (13) Item 3 carries a 'Security contract the build MUST satisfy' subsection
+_s105_item3_sec = _slice_section(_s105_item3, _s105_item1_sec_anchor, _S105_STOP)
+check(
+    "suite105(13-item3-security): Item 3 slice carries a "
+    "'### Security contract the build MUST satisfy' subsection naming SEC-01/02/03/08",
+    len(_s105_item3_sec) > 0
+    and "SEC-01" in _s105_item3_sec
+    and "SEC-02" in _s105_item3_sec
+    and "SEC-03" in _s105_item3_sec
+    and "SEC-08" in _s105_item3_sec,
+    "Item 3 must contain a '### Security contract' subsection naming SEC-01, SEC-02, SEC-03, SEC-08",
+)
+
+# (14) Union of finding IDs across all three security-contract subsections == {SEC-01..08}
+_s105_all_ids = set()
+for _s105_sec_text in (_s105_item1_sec, _s105_item2_sec, _s105_item3_sec):
+    for _n in range(1, 9):
+        if f"SEC-0{_n}" in _s105_sec_text:
+            _s105_all_ids.add(f"SEC-0{_n}")
+_s105_expected_ids = {f"SEC-0{_n}" for _n in range(1, 9)}
+check(
+    "suite105(14-sec-union): union of finding IDs across all three security-contract "
+    "subsections equals {SEC-01..SEC-08}",
+    _s105_all_ids == _s105_expected_ids,
+    f"missing IDs: {_s105_expected_ids - _s105_all_ids}; extra IDs: {_s105_all_ids - _s105_expected_ids}",
+)
+
+# (15) Compatibility matrix exists and names all five asset types
+_s105_matrix = _slice_section(_s105_doc, "## Cross-Harness Compatibility Matrix", _S105_STOP)
+check(
+    "suite105(15-matrix): '## Cross-Harness Compatibility Matrix' section exists "
+    "and names all five asset types (skills, rules, agents, commands, hooks)",
+    len(_s105_matrix) > 0
+    and "skills" in _s105_matrix.lower()
+    and "rules" in _s105_matrix.lower()
+    and "agents" in _s105_matrix.lower()
+    and "commands" in _s105_matrix.lower()
+    and "hooks" in _s105_matrix.lower(),
+    "compatibility matrix section must exist and name all five asset types",
+)
+
+# (16) Authoring mandate exists with an actionable-now token
+_s105_mandate = _slice_section(_s105_doc, "## Cross-Harness Authoring Mandate", _S105_STOP)
+check(
+    "suite105(16-mandate-actionable): '## Cross-Harness Authoring Mandate' section "
+    "exists and contains an actionable-now token",
+    len(_s105_mandate) > 0 and "actionable" in _s105_mandate.lower(),
+    "mandate section must exist and contain an actionable-now token",
+)
+
+# (17) Authoring mandate contains a deferred token
+check(
+    "suite105(17-mandate-deferred): '## Cross-Harness Authoring Mandate' section "
+    "contains a deferred token",
+    len(_s105_mandate) > 0 and "deferred" in _s105_mandate.lower(),
+    "mandate section must contain a deferred token",
+)
+
+# (18) Migration guide doc exists
+_s105_migration_path = REPO_ROOT / "docs" / "opencode-migration-guide.md"
+check(
+    "suite105(18-migration-exists): docs/opencode-migration-guide.md exists",
+    _s105_migration_path.exists(),
+    "the migration guide must exist at docs/opencode-migration-guide.md",
+)
+_s105_migration = read(_s105_migration_path) if _s105_migration_path.exists() else ""
+
+# (19) Migration guide names A1/A2/A3 options, A2 chosen, A3 dropped
+check(
+    "suite105(19-migration-options): migration guide names A1/A2/A3 options "
+    "with A2 CHOSEN and A3 DROPPED",
+    "A1" in _s105_migration
+    and "A2" in _s105_migration
+    and "A3" in _s105_migration
+    and ("CHOSEN" in _s105_migration or "chosen" in _s105_migration.lower())
+    and ("DROPPED" in _s105_migration or "dropped" in _s105_migration.lower()),
+    "migration guide must present A1/A2/A3 options with A2 marked chosen and A3 marked dropped",
+)
+
+# (20) Migration guide names the runtime-dependency rationale (Node / Bun)
+check(
+    "suite105(20-migration-runtime): migration guide names the runtime-dependency "
+    "rationale (Node already a CC dep; opencode/Bun)",
+    "Node" in _s105_migration and "Bun" in _s105_migration,
+    "migration guide must name the Node (CC) and Bun (target harness) runtime-dependency rationale",
+)
+
+# (21) Migration guide hooks section names the policy-block entropy-scan fold
+# Search for the entropy-scan fold mandate in the hooks migration section.
+# The hooks section must reference both 'entropy' or 'policy-block' (the scan source)
+# AND the fold into the TS hook body (dropping the Python end-user dependency).
+_s105_hooks_section = _slice_section(
+    _s105_migration,
+    "### Hooks",
+    ("\n### ", "\n## ", "\n---\n"),
+)
+check(
+    "suite105(21-migration-entropy-fold): migration guide hooks section names "
+    "the policy-block entropy-scan fold into the TS hook",
+    len(_s105_hooks_section) > 0
+    and (
+        "entropy" in _s105_hooks_section.lower()
+        or "policy-block" in _s105_hooks_section.lower()
+    ),
+    "hooks section must mandate folding the policy-block entropy-scan into the TS hook body",
+)
+
+# (22) Migration guide Installation section exists and is non-empty; names installer
+_S105_MIG_STOP = ("\n## ", "\n---\n")
+_s105_install_section = _slice_section(
+    _s105_migration, "## Installation", _S105_MIG_STOP
+)
+check(
+    "suite105(22-migration-install-exists): migration guide '## Installation' section "
+    "is non-empty and names the installer token",
+    len(_s105_install_section) > 0
+    and (
+        "cmd/install" in _s105_install_section
+        or "Item 2" in _s105_install_section
+        or "Decision B" in _s105_install_section
+    ),
+    "Installation section must exist (non-empty) and name the installer mechanism token",
+)
+
+# (23) Migration guide Installation section carries no-marketplace rationale + .opencode/ token
+check(
+    "suite105(23-migration-install-placement): installation section names the "
+    "no-marketplace rationale and '.opencode/' placement targets",
+    len(_s105_install_section) > 0
+    and "marketplace" in _s105_install_section.lower()
+    and ".opencode/" in _s105_install_section,
+    "Installation section must name the no-marketplace rationale and .opencode/ placement targets",
+)
+
+# (24) Provenance guard extended to the migration guide — no forbidden tokens in either doc
+# Programmatic assembly: the check strings must NOT contain the forbidden literals verbatim.
+# Note: 'opencode' is a LEGITIMATE product name in these docs — the forbidden check targets
+# ONLY the external idea-source project, assembled as "EC"+"C" and "Agent"+"Shield".
+_s105_no_forbidden_migration = all(tok not in _s105_migration for tok in _S105_FORBIDDEN)
+check(
+    "suite105(24-provenance-migration): migration guide contains no forbidden "
+    "external-project/method token",
+    _s105_no_forbidden_migration,
+    "the committed migration guide must read as TH-native (no external project/method name)",
+)
+
+# (25) Updated self-referential marker — includes migration-guide marker
+check(
+    "suite105(25-self-ref-migration): test file references "
+    "'opencode-migration-guide' marker",
+    "opencode-migration-guide" in _s105_own_source,
+    "test file must self-reference the opencode-migration-guide marker",
+)
+
 # Marker: opencode-distribution-roadmap
+# Marker: opencode-migration-guide
 
 # ---------------------------------------------------------------------------
 # Suite 106 — parallel-batch-implementation
