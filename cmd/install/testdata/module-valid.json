@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "module": "core-agents",
+  "description": "Core agent components for team-harness",
+  "defaultInstall": "always",
+  "components": ["orchestrator-agent", "architect-agent"]
+}
