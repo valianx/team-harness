@@ -6,11 +6,14 @@ OS-native notification scripts plus the `config.json` template that wires them i
 
 | File | Purpose |
 |---|---|
-| `notify-windows.sh` | Windows toast notification via PowerShell. |
-| `notify-mac.sh` | macOS notification via `osascript`. |
-| `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). |
-| `notify-stage.sh` | Wrapper invoked by the orchestrator at stage boundaries (4 toasts/pipeline). Detects OS and routes to the matching `notify-{os}.sh`. |
-| `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). |
+| `notify-windows.sh` | Windows toast notification via PowerShell. Gated by `TH_HOOK_PROFILE`. |
+| `notify-mac.sh` | macOS notification via `osascript`. Gated by `TH_HOOK_PROFILE`. |
+| `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). Gated by `TH_HOOK_PROFILE`. |
+| `notify-stage.sh` | Wrapper invoked by the orchestrator at stage boundaries (4 toasts/pipeline). Detects OS and routes to the matching `notify-{os}.sh`. Gated by `TH_HOOK_PROFILE`. |
+| `subagent-trace.sh` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
+| `precompact-snapshot.sh` | PreCompact fail-open state snapshot. Copies `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling before context compaction so `/th:recover` can restore in-flight state. Appends a breadcrumb to `00-precompact.jsonl`. Never blocks compaction; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
+| `_hook-profile.sh` | Shared sourced helper — TH_HOOK_PROFILE resolver. Provides `th_hook_profile()` (normalizes the env var) and `th_observability_enabled <class>` (exits 0/1). Sourced only by observability/notification hooks; never by enforcement floors. |
+| `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). Always-on (never gated by `TH_HOOK_PROFILE`). |
 | `config.json` | Per-OS hook template — copy the section for your OS into `~/.claude/settings.json`. |
 
 All scripts are Bash and cross-platform:
@@ -44,6 +47,68 @@ The default preset is **`ultra-quiet`** — fires **only** when the user needs t
 |---|---|---|---|
 | `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block.sh` silently. |
 | `Notification` | `idle_prompt` only | Claude finished a turn and is waiting for the user. | High signal: you need to act for Claude to continue. One notification per user-blocking pause. |
+| `SubagentStop` | `th:.*` | When a Team Harness pipeline subagent finishes. | Observability backstop: deterministic proof that a `th:*` subagent boundary occurred. See below. |
+| `PreCompact` | `manual\|auto` | Before context compaction runs. | State snapshot: enables `/th:recover` to restore in-flight state after an auto-compact. See below. |
+
+### SubagentStop + PreCompact (observability/state hooks)
+
+**`subagent-trace.sh` (SubagentStop, matcher `th:.*`)** appends a coarse
+`subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a Team Harness
+pipeline subagent finishes. This is a **backstop**, not a replacement for the
+orchestrator's rich `phase.end` events:
+
+- The SubagentStop payload carries only `agent_type`, `agent_id`, and `cwd`
+  (no tokens, no duration, no result). The hook provides deterministic proof a
+  subagent boundary occurred — useful when the orchestrator drops a `phase.end`.
+- It writes its breadcrumb to `00-subagent-trace.jsonl` (NOT `00-execution-events`),
+  preserving the orchestrator's exclusive-writer contract.
+- Fail-OPEN: the hook exits 0 on every path, never blocks the subagent, and emits
+  nothing on stdout. Non-`th:` subagents are silently skipped.
+
+**`precompact-snapshot.sh` (PreCompact, matcher `manual|auto`)** copies
+`00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling
+(overwrite-in-place, never an ever-growing set) before context compaction.
+
+- It writes a breadcrumb to `00-precompact.jsonl` (NOT `00-execution-events`).
+- It copies ONLY `00-state.md` — no transcripts, no config files, no events files.
+- Data exposure (SEC-DR-001): **no new secret value** — the snapshot is
+  byte-identical to `00-state.md` and bounded to that one file; the vault is a
+  pre-existing surface it inherits but does not widen.
+- Fail-OPEN: exits 0 on every path, never blocks compaction, never emits stdout.
+- Zero/many `00-state.md` files in the workspace → silent exit 0 (do not guess).
+
+**Why Stop/PostToolUse/SessionEnd are intentionally not wired:**
+
+- `Stop` fires on every turn response — dozens per active hour. Re-introduces the
+  per-turn noise the `ultra-quiet` preset removed. No pipeline-phase meaning.
+- `PostToolUse` fires after every successful tool call. Pipeline tester/qa/security
+  already validate tool output at stage boundaries; a generic hook duplicates that.
+- `SessionEnd` overlaps `/th:save-session` + delivery KG capture; the payload
+  offers no pipeline-phase signal and cannot affect termination.
+
+### `TH_HOOK_PROFILE` (minimal/standard/strict)
+
+Set the `TH_HOOK_PROFILE` environment variable to control the observability/
+notification hooks. The enforcement floors (`policy-block.sh`, `dev-guard.sh`,
+`gcp-guard.sh`, `worktree-guard.sh`, `checkpoint-guard.sh`) and
+`session-start.sh` / `language-user-prompt.sh` are **always-on** regardless of
+this setting — no profile value can disable, skip, or downgrade any enforcement
+hook.
+
+| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) |
+|---------|--------------------------------------|--------------------------------------|
+| `minimal` | suppressed | suppressed |
+| `standard` (default when unset) | **enabled** | **enabled** |
+| `strict` | **enabled** | **enabled** |
+
+`standard` preserves exactly today's behavior for all existing installs.
+`minimal` is the quietest operator experience — all notifications and observability
+hooks are silent. `strict` is the most-verbose level (today identical to
+`standard` in effect; reserved as a forward extension point).
+
+The profile is read via `_hook-profile.sh`, a shared sourced helper. Only
+observability/notification hooks source it. Enforcement floors never source it
+and are structurally unable to be gated by it.
 
 **What was removed from the previous default (and why).** Earlier versions of this repo also wired:
 

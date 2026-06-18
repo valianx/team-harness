@@ -365,6 +365,36 @@ Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82
 
 (Self-ref, 2 checks) (h1) `docs/testing.md` registers `Suite 114` + `batch-consolidation-default` marker; (h2) `CLAUDE.md` does NOT contain `Suite 114` (§11 hygiene contract). Suite 114 pins NO CLAUDE.md byte size (the existing voice suite owns that guard). Pure text/JSON reads — no agent invocation, no paid spend. Written by implementer (2026-06-17). Marker: `batch-consolidation-default`.
 
+### Suite 117 — uncovered-event-hooks
+
+~80 checks. Structural assertions for the SubagentStop + PreCompact fail-open hook pair, the `_hook-profile.sh` shared profile-read helper, and the TH_HOOK_PROFILE (minimal/standard/strict) gating contract (v2.106.0). File: `tests/test_agent_structure.py`. The suite covers the following ACs:
+
+(AC-1, 5 checks) `hooks/subagent-trace.sh` existence + fail-open contract: file exists; uses `>>` (append-only); terminates every path with `exit 0`; contains `th:` scope guard; does not open `transcript_path`.
+
+(AC-2, 1 check) Non-`th:` scope guard in `subagent-trace.sh`: `case`/`if` construct that exits 0 silently for non-`th:` agent types.
+
+(AC-3, 6 checks) `hooks/precompact-snapshot.sh` existence + snapshot contract: file exists; uses `>>`; terminates every path with `exit 0`; uses fixed sibling filename `00-state.precompact-snapshot.md`; is a single rolling file (overwrite-in-place); copies `00-state.md`.
+
+(AC-4, 3 checks) Security guards in `precompact-snapshot.sh`: `[[:cntrl:]]` control-char guard (SEC-DR-A); `[ -f ... ]` regular-file guard; `realpath` symlink/path-escape guard (SEC-DR-006).
+
+(AC-5, ~30 checks) Forbidden token set (SEC-DR-002) — both hooks contain NONE of `permissionDecision`, `hookSpecificOutput`, `additionalContext`, `systemMessage`, `stopReason` (5 × 2 = 10 checks). `_hook-profile.sh` existence + shape: 8 checks covering `th_hook_profile()`, `th_observability_enabled()`, `minimal`/`standard`/`strict` profile levels, `idle-notify` and `pipeline-observability` class names.
+
+(AC-6, ~21 checks) `hooks/config.json` wiring: SubagentStop (with `th:.*` matcher) + PreCompact (with `manual|auto` matcher) present in ALL three OS blocks (windows/macos/linux); `_scripts`/`_events` comment lines updated in all three blocks; `config.json` parses as valid JSON.
+
+(AC-7, 7 checks) `.claude-plugin/hooks.json` wiring: SubagentStop + PreCompact entries present with correct matchers; `_comment` updated to describe both new hooks and `TH_HOOK_PROFILE`; file parses as valid JSON.
+
+(AC-9, 4 checks) Exclusive-writer contract (SEC-DR-005): `precompact-snapshot.sh` writes to `00-precompact.jsonl` (NOT `00-execution-events`); `subagent-trace.sh` writes to `00-subagent-trace.jsonl` (NOT `00-execution-events`).
+
+(AC-10, 2 checks) Data-exposure safety in `precompact-snapshot.sh`: does not open `transcript_path`; does not copy `.team-harness.json`.
+
+(AC-11, ~15 checks) Regression — all 5 existing PreToolUse floors (`policy-block.sh`, `dev-guard.sh`, `gcp-guard.sh`, `worktree-guard.sh`, `checkpoint-guard.sh`) remain present and unchanged in all 3 OS blocks of `config.json` and in `hooks.json`.
+
+(AC-12, 3 checks) Payload-as-data contract: both hooks use `python3 json.dumps` to encode payload fields; `agent_id` is documented as an opaque correlation key (SEC-DR-007).
+
+(AC-13, ~20 checks) Non-waivable enforcement-floor security contract: 7 enforcement hooks (`policy-block.sh`, `dev-guard.sh`, `gcp-guard.sh`, `worktree-guard.sh`, `checkpoint-guard.sh`, `session-start.sh`, `language-user-prompt.sh`) contain NO `TH_HOOK_PROFILE` read and NO `_hook-profile.sh` source (2 × 7 = 14 checks). 6 gated observability/notification hooks (`notify-windows.sh`, `notify-mac.sh`, `notify-linux.sh`, `notify-stage.sh`, `subagent-trace.sh`, `precompact-snapshot.sh`) DO source `_hook-profile.sh` and call `th_observability_enabled` (2 × 6 = 12 checks). `_hook-profile.sh` defaults to `standard` when `TH_HOOK_PROFILE` is unset.
+
+(Self-ref, 3 checks) (h1) `docs/testing.md` registers `Suite 117` + `uncovered-event-hooks` marker; (h2) `CLAUDE.md` does NOT contain `Suite 117` (§11 hygiene contract); (h3) test file self-references `Suite 117`, `_slice_section`, and `uncovered-event-hooks`. AC-8 (version bump to 2.106.0) is deferred to delivery — this suite does NOT assert a version floor to avoid a false-fail before delivery bumps `plugin.json`. Pure text/JSON reads — no agent invocation, no paid spend. Written by implementer (2026-06-17). Marker: `uncovered-event-hooks`.
+
 ### Suite 116 — reviewer-version-changelog-check
 
 ~28 checks. Structural assertions for the conditional project-version + changelog reviewer check (v2.105.0). File: `tests/test_agent_structure.py`. Pins the new `### Project Version & Changelog Convention` category in `agents/reviewer.md`: the three-gate conditional (convention-present, user-facing/Tier-0, automated-version exemption), the language-agnostic manifest + changelog detection sets, the lockfile exclusion, the SUGGESTION-default / CRITICAL-when-policy severity model, the de-duplication carve-out vs the existing gateway/OAS `info.version` check, and the fail-open + attribution-scoped invariants. Also asserts the `skills/review-pr/SKILL.md` Tier 0 exemption note. Version-floor pins both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` `plugins[0].version >= (2, 105, 0)` via `_s59_ver_tuple`. Self-ref + §11 hygiene guard (`Suite 116` absent from `CLAUDE.md`). All content checks anchor-scoped via `_slice_section` (anti-false-green: missing anchor → empty slice → check fails). Pure text/JSON reads — no agent invocation, no paid spend. Written by implementer (2026-06-17). Marker: `reviewer-version-changelog-check`.

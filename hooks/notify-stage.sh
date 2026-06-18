@@ -9,6 +9,11 @@
 #
 # Exit 0 on every path — never bubbles errors back to the orchestrator.
 
+# Profile gate: suppress stage toasts under TH_HOOK_PROFILE=minimal.
+# shellcheck source=./_hook-profile.sh
+. "$(dirname "$0")/_hook-profile.sh" 2>/dev/null || true
+th_observability_enabled "idle-notify" || exit 0
+
 PAYLOAD=$(cat)
 
 # Extract fields from the payload using python3 (same pattern as notify-*.sh siblings).

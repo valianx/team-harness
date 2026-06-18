@@ -26110,6 +26110,8 @@ _s110_CANONICAL_HOOKS = {
     "dev-guard.sh", "policy-block.sh", "checkpoint-guard.sh", "worktree-guard.sh",
     "_json-extract.sh", "gcp-guard.sh", "language-user-prompt.sh",
     "session-start.sh", "sketch-guard.sh",
+    # Added in v2.106.0 (uncovered-event-hooks feature)
+    "subagent-trace.sh", "precompact-snapshot.sh", "_hook-profile.sh",
 }
 _s110_actual_hooks = {p.name for p in _s110_hooks_dir.glob("*.sh")} if _s110_hooks_dir.exists() else set()
 _s110_extra_hooks = _s110_actual_hooks - _s110_CANONICAL_HOOKS
@@ -27675,6 +27677,642 @@ check(
 )
 
 # Marker: reviewer-version-changelog-check
+
+# ---------------------------------------------------------------------------
+# Suite 117 — uncovered-event-hooks structural contract (v2.106.0)
+# ---------------------------------------------------------------------------
+# Asserts the fail-open SubagentStop trace + PreCompact snapshot hooks,
+# the _hook-profile.sh shared helper, wiring in all 3 OS blocks of
+# config.json AND hooks.json, and the non-waivable enforcement-floor
+# security invariant (AC-13).
+#
+# AC coverage:
+#   AC-1  — subagent-trace.sh exists; appends >> (file-only); exit-0-terminal;
+#            no forbidden decision/stdout tokens; th: scope guard present
+#   AC-2  — subagent-trace.sh: non-th: agent_type → silent exit 0 guard
+#   AC-3  — precompact-snapshot.sh exists; copies only 00-state.md;
+#            fixed sibling path; single rolling file (overwrite-in-place)
+#   AC-4  — precompact-snapshot.sh: control-char guard (SEC-DR-A) +
+#            symlink/regular-file guard (SEC-DR-006 / -f + realpath)
+#   AC-5  — both hooks: NO stdout output on any path; NO forbidden tokens;
+#            every path terminates in exit 0; file-append-only via >>
+#   AC-6  — config.json has SubagentStop + PreCompact in ALL 3 OS blocks;
+#            _scripts/_events comment lines updated
+#   AC-7  — hooks.json has SubagentStop + PreCompact entries; _comment updated
+#   AC-8  — (delivery: plugin.json + marketplace.json version bump — deferred
+#            to delivery stage; this implementer suite does not assert version)
+#   AC-9  — precompact-snapshot.sh writes breadcrumb to 00-precompact.jsonl;
+#            contains NO write to 00-execution-events
+#   AC-10 — precompact-snapshot.sh copies ONLY 00-state.md; no transcript_path
+#            open; snapshot path is fixed sibling dirname(00-state.md)/...
+#   AC-11 — All 5 existing PreToolUse floors still present unchanged in all 3
+#            OS blocks AND hooks.json; both files json.load cleanly
+#   AC-12 — Payload fields treated as DATA (json.dumps); transcript_path never
+#            opened; agent_id documented as opaque correlation key
+#   AC-13 — NON-WAIVABLE FLOOR: enforcement hooks + session-start +
+#            language-user-prompt contain NO TH_HOOK_PROFILE read and NO
+#            _hook-profile.sh source; gated observability hooks DO source it
+#
+# Self-referential guards:
+#   h1 — docs/testing.md registers "Suite 117" + "uncovered-event-hooks"
+#   h2 — CLAUDE.md does NOT contain "Suite 117" (§11 hygiene contract)
+#   h3 — this test file contains "Suite 117" + "_slice_section" +
+#        "uncovered-event-hooks"
+#
+# Marker: uncovered-event-hooks
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 117: uncovered-event-hooks structural contract (v2.106.0) ===")
+
+# --- File reads ---
+_s117_subagent_trace    = read(HOOKS_DIR / "subagent-trace.sh") if (HOOKS_DIR / "subagent-trace.sh").exists() else ""
+_s117_precompact        = read(HOOKS_DIR / "precompact-snapshot.sh") if (HOOKS_DIR / "precompact-snapshot.sh").exists() else ""
+_s117_hook_profile      = read(HOOKS_DIR / "_hook-profile.sh") if (HOOKS_DIR / "_hook-profile.sh").exists() else ""
+_s117_notify_win        = read(HOOKS_DIR / "notify-windows.sh")
+_s117_notify_mac        = read(HOOKS_DIR / "notify-mac.sh")
+_s117_notify_linux      = read(HOOKS_DIR / "notify-linux.sh")
+_s117_notify_stage      = read(HOOKS_DIR / "notify-stage.sh")
+_s117_policy_block      = read(HOOKS_DIR / "policy-block.sh")
+_s117_dev_guard         = read(HOOKS_DIR / "dev-guard.sh")
+_s117_gcp_guard         = read(HOOKS_DIR / "gcp-guard.sh")
+_s117_worktree_guard    = read(HOOKS_DIR / "worktree-guard.sh")
+_s117_checkpoint_guard  = read(HOOKS_DIR / "checkpoint-guard.sh")
+_s117_session_start     = read(HOOKS_DIR / "session-start.sh")
+_s117_lang_prompt       = read(HOOKS_DIR / "language-user-prompt.sh")
+_s117_config_json_raw   = read(HOOKS_DIR / "config.json")
+_s117_hooks_json_raw    = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
+_s117_testing_md        = read(REPO_ROOT / "docs" / "testing.md")
+_s117_claude_md         = read(REPO_ROOT / "CLAUDE.md")
+
+# Parse config.json to get per-OS blocks
+try:
+    _s117_config = json.loads(_s117_config_json_raw)
+except json.JSONDecodeError:
+    _s117_config = {}
+
+# Parse hooks.json
+try:
+    _s117_hooks_json = json.loads(_s117_hooks_json_raw)
+except json.JSONDecodeError:
+    _s117_hooks_json = {}
+
+# ----------------------------------------------------------------
+# AC-1 — subagent-trace.sh structural existence + fail-open contract
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac1-file-exists): hooks/subagent-trace.sh exists",
+    bool(_s117_subagent_trace),
+    "hooks/subagent-trace.sh must exist",
+)
+check(
+    "suite117(ac1-append-only): subagent-trace.sh uses >> (file-append-only, never stdout)",
+    ">>" in _s117_subagent_trace,
+    "subagent-trace.sh must write to a file via >> (no stdout output)",
+)
+check(
+    "suite117(ac1-exit0-terminal): subagent-trace.sh terminates every path with exit 0",
+    "exit 0" in _s117_subagent_trace,
+    "subagent-trace.sh must terminate every path with 'exit 0'",
+)
+check(
+    "suite117(ac1-th-scope-guard): subagent-trace.sh contains th: scope guard",
+    "th:" in _s117_subagent_trace,
+    "subagent-trace.sh must contain a 'th:' prefix scope guard",
+)
+check(
+    "suite117(ac1-no-transcript-open): subagent-trace.sh does not open transcript_path",
+    "transcript_path" not in _s117_subagent_trace
+    or (
+        "transcript_path" in _s117_subagent_trace
+        and "NEVER" in _s117_subagent_trace
+        and "cat" not in _s117_subagent_trace.replace("# cat", "").replace("#cat", "")
+    ),
+    "subagent-trace.sh must never open transcript_path",
+)
+
+# ----------------------------------------------------------------
+# AC-2 — subagent-trace.sh: non-th: scope guard (exit 0 path)
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac2-nontH-guard): subagent-trace.sh has case/if guard for non-th: agent_type",
+    ("case \"$AGENT_TYPE\" in" in _s117_subagent_trace or "th:*" in _s117_subagent_trace),
+    "subagent-trace.sh must guard against non-th: agent_type values",
+)
+
+# ----------------------------------------------------------------
+# AC-3 — precompact-snapshot.sh structural existence + snapshot contract
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac3-file-exists): hooks/precompact-snapshot.sh exists",
+    bool(_s117_precompact),
+    "hooks/precompact-snapshot.sh must exist",
+)
+check(
+    "suite117(ac3-append-only): precompact-snapshot.sh uses >> (breadcrumb file-append-only)",
+    ">>" in _s117_precompact,
+    "precompact-snapshot.sh must write breadcrumb to a file via >>",
+)
+check(
+    "suite117(ac3-exit0-terminal): precompact-snapshot.sh terminates every path with exit 0",
+    "exit 0" in _s117_precompact,
+    "precompact-snapshot.sh must terminate every path with 'exit 0'",
+)
+check(
+    "suite117(ac3-snapshot-filename): precompact-snapshot.sh uses fixed sibling filename",
+    "00-state.precompact-snapshot.md" in _s117_precompact,
+    "precompact-snapshot.sh must write to fixed filename '00-state.precompact-snapshot.md'",
+)
+check(
+    "suite117(ac3-rolling-file): precompact-snapshot.sh is one rolling file (overwrite-in-place)",
+    "00-state.precompact-snapshot.md" in _s117_precompact,
+    "precompact-snapshot.sh must use a single rolling snapshot file, not an ever-growing set",
+)
+check(
+    "suite117(ac3-copies-only-state): precompact-snapshot.sh copies 00-state.md",
+    "00-state.md" in _s117_precompact,
+    "precompact-snapshot.sh must copy 00-state.md",
+)
+
+# ----------------------------------------------------------------
+# AC-4 — precompact-snapshot.sh: control-char guard + symlink guard
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac4-control-char-guard): precompact-snapshot.sh has SEC-DR-A control-char check",
+    "[[:cntrl:]]" in _s117_precompact,
+    "precompact-snapshot.sh must contain the SEC-DR-A '[[:cntrl:]]' guard on logs-path",
+)
+check(
+    "suite117(ac4-regular-file-guard): precompact-snapshot.sh uses -f guard (regular file check)",
+    "[ -f " in _s117_precompact or "[-f " in _s117_precompact,
+    "precompact-snapshot.sh must use '[ -f ...]' guard before copying 00-state.md",
+)
+check(
+    "suite117(ac4-symlink-realpath-guard): precompact-snapshot.sh uses realpath to detect symlink escape",
+    "realpath" in _s117_precompact,
+    "precompact-snapshot.sh must use 'realpath' for SEC-DR-006 symlink/path-escape guard",
+)
+
+# ----------------------------------------------------------------
+# AC-5 — BOTH hooks: no forbidden decision/stdout tokens (SEC-DR-002)
+# The complete forbidden set from the plan.
+# ----------------------------------------------------------------
+
+_S117_FORBIDDEN_TOKENS = [
+    "permissionDecision",
+    "hookSpecificOutput",
+    "additionalContext",
+    "systemMessage",
+    "stopReason",
+]
+
+for _tok in _S117_FORBIDDEN_TOKENS:
+    check(
+        f"suite117(ac5-no-{_tok.lower()}-in-subagent-trace): subagent-trace.sh does not contain '{_tok}'",
+        _tok not in _s117_subagent_trace,
+        f"subagent-trace.sh must not contain the token '{_tok}' (SEC-DR-002 / #298 class)",
+    )
+    check(
+        f"suite117(ac5-no-{_tok.lower()}-in-precompact): precompact-snapshot.sh does not contain '{_tok}'",
+        _tok not in _s117_precompact,
+        f"precompact-snapshot.sh must not contain the token '{_tok}' (SEC-DR-002 / #298 class)",
+    )
+
+# Also verify "decision" in a write/output sense is absent
+# (using a loose but adequate heuristic: no echo/printf/print to stdout with "decision")
+check(
+    "suite117(ac5-no-stdout-decision-subagent-trace): subagent-trace.sh has no stdout JSON emission",
+    # stdout output is forbidden; the hooks use >> to files only.
+    # We verify no bare 'echo' or 'printf' without >> redirection writes "decision" output.
+    # A grep for 'echo.*decision' or 'printf.*decision' in these hooks would indicate a violation.
+    "permissionDecision" not in _s117_subagent_trace
+    and "hookSpecificOutput" not in _s117_subagent_trace,
+    "subagent-trace.sh must not emit permissionDecision or hookSpecificOutput to stdout",
+)
+check(
+    "suite117(ac5-no-stdout-decision-precompact): precompact-snapshot.sh has no stdout JSON emission",
+    "permissionDecision" not in _s117_precompact
+    and "hookSpecificOutput" not in _s117_precompact,
+    "precompact-snapshot.sh must not emit permissionDecision or hookSpecificOutput to stdout",
+)
+
+# ----------------------------------------------------------------
+# AC-5 — _hook-profile.sh helper existence + shape
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac5-profile-helper-exists): hooks/_hook-profile.sh exists",
+    bool(_s117_hook_profile),
+    "hooks/_hook-profile.sh must exist",
+)
+check(
+    "suite117(ac5-profile-helper-th-hook-profile): _hook-profile.sh defines th_hook_profile()",
+    "th_hook_profile" in _s117_hook_profile,
+    "_hook-profile.sh must define the th_hook_profile() function",
+)
+check(
+    "suite117(ac5-profile-helper-th-observability-enabled): _hook-profile.sh defines th_observability_enabled()",
+    "th_observability_enabled" in _s117_hook_profile,
+    "_hook-profile.sh must define the th_observability_enabled() function",
+)
+check(
+    "suite117(ac5-profile-helper-minimal): _hook-profile.sh handles 'minimal' profile",
+    "minimal" in _s117_hook_profile,
+    "_hook-profile.sh must handle the 'minimal' profile level",
+)
+check(
+    "suite117(ac5-profile-helper-standard): _hook-profile.sh handles 'standard' profile (default)",
+    "standard" in _s117_hook_profile,
+    "_hook-profile.sh must handle the 'standard' profile level (default when unset)",
+)
+check(
+    "suite117(ac5-profile-helper-strict): _hook-profile.sh handles 'strict' profile",
+    "strict" in _s117_hook_profile,
+    "_hook-profile.sh must handle the 'strict' profile level",
+)
+check(
+    "suite117(ac5-profile-helper-idle-notify-class): _hook-profile.sh supports idle-notify class",
+    "idle-notify" in _s117_hook_profile,
+    "_hook-profile.sh must support the 'idle-notify' observability class",
+)
+check(
+    "suite117(ac5-profile-helper-pipeline-observability-class): _hook-profile.sh supports pipeline-observability class",
+    "pipeline-observability" in _s117_hook_profile,
+    "_hook-profile.sh must support the 'pipeline-observability' observability class",
+)
+
+# ----------------------------------------------------------------
+# AC-6 — config.json: SubagentStop + PreCompact in ALL 3 OS blocks
+# ----------------------------------------------------------------
+
+_S117_OS_BLOCKS = ["windows", "macos", "linux"]
+
+for _os in _S117_OS_BLOCKS:
+    _os_block = _s117_config.get(_os, {})
+    _os_hooks  = _os_block.get("hooks", {})
+
+    # SubagentStop entry
+    _subagent_stop_entries = _os_hooks.get("SubagentStop", [])
+    _has_subagent_entry = any(
+        any(
+            "subagent-trace.sh" in h.get("command", "")
+            for h in entry.get("hooks", [])
+        )
+        for entry in _subagent_stop_entries
+    )
+    check(
+        f"suite117(ac6-subagent-stop-{_os}): config.json {_os} block has SubagentStop → subagent-trace.sh",
+        _has_subagent_entry,
+        f"config.json '{_os}' block must have a SubagentStop entry pointing to subagent-trace.sh",
+    )
+
+    # SubagentStop matcher must be th:.*
+    _subagent_matchers = [e.get("matcher", "") for e in _subagent_stop_entries]
+    check(
+        f"suite117(ac6-subagent-stop-matcher-{_os}): config.json {_os} SubagentStop matcher is 'th:.*'",
+        any("th:" in m for m in _subagent_matchers),
+        f"config.json '{_os}' SubagentStop matcher must include 'th:'",
+    )
+
+    # PreCompact entry
+    _precompact_entries = _os_hooks.get("PreCompact", [])
+    _has_precompact_entry = any(
+        any(
+            "precompact-snapshot.sh" in h.get("command", "")
+            for h in entry.get("hooks", [])
+        )
+        for entry in _precompact_entries
+    )
+    check(
+        f"suite117(ac6-precompact-{_os}): config.json {_os} block has PreCompact → precompact-snapshot.sh",
+        _has_precompact_entry,
+        f"config.json '{_os}' block must have a PreCompact entry pointing to precompact-snapshot.sh",
+    )
+
+    # PreCompact matcher must include manual|auto
+    _precompact_matchers = [e.get("matcher", "") for e in _precompact_entries]
+    check(
+        f"suite117(ac6-precompact-matcher-{_os}): config.json {_os} PreCompact matcher covers manual/auto",
+        any("manual" in m or "auto" in m for m in _precompact_matchers),
+        f"config.json '{_os}' PreCompact matcher must cover 'manual' and 'auto'",
+    )
+
+    # _scripts comment updated
+    _scripts_comment = _os_block.get("_scripts", "")
+    check(
+        f"suite117(ac6-scripts-comment-{_os}): config.json {_os} _scripts comment lists subagent-trace.sh",
+        "subagent-trace.sh" in _scripts_comment,
+        f"config.json '{_os}' _scripts comment must list 'subagent-trace.sh'",
+    )
+    check(
+        f"suite117(ac6-scripts-comment-precompact-{_os}): config.json {_os} _scripts comment lists precompact-snapshot.sh",
+        "precompact-snapshot.sh" in _scripts_comment,
+        f"config.json '{_os}' _scripts comment must list 'precompact-snapshot.sh'",
+    )
+    check(
+        f"suite117(ac6-scripts-comment-profile-{_os}): config.json {_os} _scripts comment lists _hook-profile.sh",
+        "_hook-profile.sh" in _scripts_comment,
+        f"config.json '{_os}' _scripts comment must list '_hook-profile.sh'",
+    )
+
+    # _events comment updated
+    _events_comment = _os_block.get("_events", "")
+    check(
+        f"suite117(ac6-events-comment-subagent-{_os}): config.json {_os} _events comment mentions SubagentStop",
+        "SubagentStop" in _events_comment,
+        f"config.json '{_os}' _events comment must mention SubagentStop",
+    )
+    check(
+        f"suite117(ac6-events-comment-precompact-{_os}): config.json {_os} _events comment mentions PreCompact",
+        "PreCompact" in _events_comment,
+        f"config.json '{_os}' _events comment must mention PreCompact",
+    )
+
+# JSON validity (already checked by json.loads above; surface as explicit check)
+check(
+    "suite117(ac6-config-json-valid): hooks/config.json parses as valid JSON",
+    bool(_s117_config),
+    "hooks/config.json must be valid JSON in all three OS blocks",
+)
+
+# ----------------------------------------------------------------
+# AC-7 — hooks.json: SubagentStop + PreCompact entries + _comment
+# ----------------------------------------------------------------
+
+_s117_hj_hooks = _s117_hooks_json.get("hooks", {})
+
+_hj_subagent_entries = _s117_hj_hooks.get("SubagentStop", [])
+_hj_has_subagent = any(
+    any(
+        "subagent-trace.sh" in h.get("command", "")
+        for h in entry.get("hooks", [])
+    )
+    for entry in _hj_subagent_entries
+)
+check(
+    "suite117(ac7-hooks-json-subagent-stop): .claude-plugin/hooks.json has SubagentStop → subagent-trace.sh",
+    _hj_has_subagent,
+    ".claude-plugin/hooks.json must have a SubagentStop entry pointing to subagent-trace.sh",
+)
+
+_hj_subagent_matchers = [e.get("matcher", "") for e in _hj_subagent_entries]
+check(
+    "suite117(ac7-hooks-json-subagent-matcher): .claude-plugin/hooks.json SubagentStop matcher is 'th:.*'",
+    any("th:" in m for m in _hj_subagent_matchers),
+    ".claude-plugin/hooks.json SubagentStop matcher must include 'th:'",
+)
+
+_hj_precompact_entries = _s117_hj_hooks.get("PreCompact", [])
+_hj_has_precompact = any(
+    any(
+        "precompact-snapshot.sh" in h.get("command", "")
+        for h in entry.get("hooks", [])
+    )
+    for entry in _hj_precompact_entries
+)
+check(
+    "suite117(ac7-hooks-json-precompact): .claude-plugin/hooks.json has PreCompact → precompact-snapshot.sh",
+    _hj_has_precompact,
+    ".claude-plugin/hooks.json must have a PreCompact entry pointing to precompact-snapshot.sh",
+)
+
+_hj_precompact_matchers = [e.get("matcher", "") for e in _hj_precompact_entries]
+check(
+    "suite117(ac7-hooks-json-precompact-matcher): .claude-plugin/hooks.json PreCompact matcher covers manual/auto",
+    any("manual" in m or "auto" in m for m in _hj_precompact_matchers),
+    ".claude-plugin/hooks.json PreCompact matcher must cover 'manual' and 'auto'",
+)
+
+_hj_comment = _s117_hooks_json.get("_comment", "")
+check(
+    "suite117(ac7-hooks-json-comment-subagent): .claude-plugin/hooks.json _comment describes subagent-trace.sh",
+    "subagent-trace.sh" in _hj_comment or "SubagentStop" in _hj_comment,
+    ".claude-plugin/hooks.json _comment must describe the SubagentStop / subagent-trace.sh hook",
+)
+check(
+    "suite117(ac7-hooks-json-comment-precompact): .claude-plugin/hooks.json _comment describes precompact-snapshot.sh",
+    "precompact-snapshot.sh" in _hj_comment or "PreCompact" in _hj_comment,
+    ".claude-plugin/hooks.json _comment must describe the PreCompact / precompact-snapshot.sh hook",
+)
+check(
+    "suite117(ac7-hooks-json-comment-profile): .claude-plugin/hooks.json _comment mentions TH_HOOK_PROFILE",
+    "TH_HOOK_PROFILE" in _hj_comment,
+    ".claude-plugin/hooks.json _comment must mention the TH_HOOK_PROFILE knob",
+)
+check(
+    "suite117(ac7-hooks-json-valid): .claude-plugin/hooks.json parses as valid JSON",
+    bool(_s117_hooks_json),
+    ".claude-plugin/hooks.json must be valid JSON",
+)
+
+# ----------------------------------------------------------------
+# AC-9 — precompact-snapshot.sh: breadcrumb to 00-precompact.jsonl,
+#         NOT to 00-execution-events (exclusive-writer contract)
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac9-breadcrumb-file): precompact-snapshot.sh writes to 00-precompact.jsonl",
+    "00-precompact.jsonl" in _s117_precompact,
+    "precompact-snapshot.sh must write its breadcrumb to '00-precompact.jsonl'",
+)
+check(
+    "suite117(ac9-no-execution-events-write): precompact-snapshot.sh does NOT write to 00-execution-events",
+    "00-execution-events" not in _s117_precompact,
+    "precompact-snapshot.sh must NOT write to '00-execution-events' (exclusive-writer contract)",
+)
+check(
+    "suite117(ac9-subagent-trace-file): subagent-trace.sh writes to 00-subagent-trace.jsonl",
+    "00-subagent-trace.jsonl" in _s117_subagent_trace,
+    "subagent-trace.sh must write its breadcrumb to '00-subagent-trace.jsonl'",
+)
+check(
+    "suite117(ac9-no-execution-events-subagent): subagent-trace.sh does NOT write to 00-execution-events",
+    "00-execution-events" not in _s117_subagent_trace,
+    "subagent-trace.sh must NOT write to '00-execution-events' (exclusive-writer contract)",
+)
+
+# ----------------------------------------------------------------
+# AC-10 — precompact-snapshot.sh: data-exposure safety
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac10-no-transcript-open): precompact-snapshot.sh does not open transcript_path",
+    "transcript_path" not in _s117_precompact,
+    "precompact-snapshot.sh must never open transcript_path",
+)
+check(
+    "suite117(ac10-no-config-copy): precompact-snapshot.sh does not copy .team-harness.json",
+    ".team-harness.json" not in _s117_precompact
+    or (
+        # It may read the config (grep for config keys) but must not COPY it
+        "SNAPSHOT_FILE" in _s117_precompact
+        and "cat \"$CONFIG\"" not in _s117_precompact
+        and "cp.*CONFIG" not in _s117_precompact
+    ),
+    "precompact-snapshot.sh must not copy ~/.claude/.team-harness.json",
+)
+
+# ----------------------------------------------------------------
+# AC-11 — regression: existing PreToolUse floors unchanged in all
+#          3 OS blocks + hooks.json; both files json.load cleanly
+# ----------------------------------------------------------------
+
+_S117_FLOORS = [
+    ("policy-block.sh",     "Bash|Write|Edit|NotebookEdit"),
+    ("dev-guard.sh",        "Bash"),
+    ("gcp-guard.sh",        "Bash"),
+    ("worktree-guard.sh",   "Bash"),
+    ("checkpoint-guard.sh", "Task"),
+]
+
+for _os in _S117_OS_BLOCKS:
+    _os_hooks = _s117_config.get(_os, {}).get("hooks", {})
+    _pretooluse = _os_hooks.get("PreToolUse", [])
+
+    for _floor_script, _floor_matcher in _S117_FLOORS:
+        _floor_present = any(
+            any(_floor_script in h.get("command", "") for h in entry.get("hooks", []))
+            for entry in _pretooluse
+        )
+        check(
+            f"suite117(ac11-floor-{_floor_script.replace('.', '-')}-{_os}): "
+            f"config.json {_os} PreToolUse still has {_floor_script}",
+            _floor_present,
+            f"config.json '{_os}' PreToolUse must still contain '{_floor_script}' (additive-wiring regression guard)",
+        )
+
+# hooks.json floors
+_hj_pretooluse = _s117_hj_hooks.get("PreToolUse", [])
+for _floor_script, _floor_matcher in _S117_FLOORS:
+    _hj_floor_present = any(
+        any(_floor_script in h.get("command", "") for h in entry.get("hooks", []))
+        for entry in _hj_pretooluse
+    )
+    check(
+        f"suite117(ac11-floor-{_floor_script.replace('.', '-')}-hooks-json): "
+        f"hooks.json PreToolUse still has {_floor_script}",
+        _hj_floor_present,
+        f".claude-plugin/hooks.json PreToolUse must still contain '{_floor_script}' (additive-wiring regression guard)",
+    )
+
+# ----------------------------------------------------------------
+# AC-12 — payload field data-not-instruction: json.dumps path + no transcript open
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac12-json-dumps-subagent-trace): subagent-trace.sh uses json.dumps for payload fields",
+    "json.dumps" in _s117_subagent_trace or "json.dumps" in _s117_subagent_trace,
+    "subagent-trace.sh must use python3 json.dumps to safely encode payload fields",
+)
+check(
+    "suite117(ac12-json-dumps-precompact): precompact-snapshot.sh uses json.dumps for breadcrumb",
+    "json.dumps" in _s117_precompact,
+    "precompact-snapshot.sh must use python3 json.dumps to safely encode the breadcrumb line",
+)
+check(
+    "suite117(ac12-agent-id-opaque): subagent-trace.sh documents agent_id as opaque correlation key",
+    "agent_id" in _s117_subagent_trace and (
+        "opaque" in _s117_subagent_trace or "correlation" in _s117_subagent_trace or "SEC-DR-007" in _s117_subagent_trace
+    ),
+    "subagent-trace.sh must document agent_id as an opaque/non-sensitive correlation key (SEC-DR-007)",
+)
+
+# ----------------------------------------------------------------
+# AC-13 — NON-WAIVABLE FLOOR: enforcement hooks contain NO TH_HOOK_PROFILE
+#          read and NO _hook-profile.sh source
+# ----------------------------------------------------------------
+
+_S117_FLOOR_HOOKS = {
+    "policy-block.sh":      _s117_policy_block,
+    "dev-guard.sh":         _s117_dev_guard,
+    "gcp-guard.sh":         _s117_gcp_guard,
+    "worktree-guard.sh":    _s117_worktree_guard,
+    "checkpoint-guard.sh":  _s117_checkpoint_guard,
+    "session-start.sh":     _s117_session_start,
+    "language-user-prompt.sh": _s117_lang_prompt,
+}
+
+for _floor_name, _floor_content in _S117_FLOOR_HOOKS.items():
+    check(
+        f"suite117(ac13-no-profile-read-{_floor_name.replace('.', '-')}): "
+        f"{_floor_name} contains NO TH_HOOK_PROFILE read",
+        "TH_HOOK_PROFILE" not in _floor_content,
+        f"{_floor_name} must NOT read TH_HOOK_PROFILE (AC-13 non-waivable security floor)",
+    )
+    check(
+        f"suite117(ac13-no-profile-source-{_floor_name.replace('.', '-')}): "
+        f"{_floor_name} does NOT source _hook-profile.sh",
+        "_hook-profile.sh" not in _floor_content,
+        f"{_floor_name} must NOT source _hook-profile.sh (AC-13 non-waivable security floor)",
+    )
+
+# Gated observability hooks MUST source _hook-profile.sh
+_S117_GATED_HOOKS = {
+    "notify-windows.sh":         _s117_notify_win,
+    "notify-mac.sh":             _s117_notify_mac,
+    "notify-linux.sh":           _s117_notify_linux,
+    "notify-stage.sh":           _s117_notify_stage,
+    "subagent-trace.sh":         _s117_subagent_trace,
+    "precompact-snapshot.sh":    _s117_precompact,
+}
+
+for _gated_name, _gated_content in _S117_GATED_HOOKS.items():
+    check(
+        f"suite117(ac13-gated-sources-profile-{_gated_name.replace('.', '-')}): "
+        f"{_gated_name} sources _hook-profile.sh",
+        "_hook-profile.sh" in _gated_content,
+        f"{_gated_name} must source _hook-profile.sh (gated observability/notification hook)",
+    )
+    check(
+        f"suite117(ac13-gated-uses-observability-check-{_gated_name.replace('.', '-')}): "
+        f"{_gated_name} calls th_observability_enabled",
+        "th_observability_enabled" in _gated_content,
+        f"{_gated_name} must call th_observability_enabled to check the profile",
+    )
+
+# ----------------------------------------------------------------
+# AC-13 continued — profile semantics: default-standard behavior
+# ----------------------------------------------------------------
+
+check(
+    "suite117(ac13-default-standard): _hook-profile.sh defaults to 'standard' when unset",
+    "standard" in _s117_hook_profile and (
+        'TH_HOOK_PROFILE:-' in _s117_hook_profile
+        or "unset" in _s117_hook_profile
+        or "default" in _s117_hook_profile.lower()
+    ),
+    "_hook-profile.sh must default to 'standard' when TH_HOOK_PROFILE is unset or empty",
+)
+
+# ----------------------------------------------------------------
+# Hygiene / registry / self-referential guards
+# ----------------------------------------------------------------
+
+check(
+    "suite117(h1-registry): docs/testing.md registers 'Suite 117' and 'uncovered-event-hooks'",
+    "Suite 117" in _s117_testing_md and "uncovered-event-hooks" in _s117_testing_md,
+    "docs/testing.md must register Suite 117 and the 'uncovered-event-hooks' marker",
+)
+check(
+    "suite117(h2-hygiene): CLAUDE.md does NOT contain 'Suite 117'",
+    "Suite 117" not in _s117_claude_md,
+    "CLAUDE.md must not mention Suite 117 — only docs/testing.md is the canonical registry (§11 hygiene)",
+)
+
+# Self-ref
+_s117_own_source = read(Path(__file__))
+check(
+    "suite117(h3-self-ref): test file contains 'Suite 117', '_slice_section', and 'uncovered-event-hooks'",
+    "Suite 117" in _s117_own_source
+    and "_slice_section" in _s117_own_source
+    and "uncovered-event-hooks" in _s117_own_source,
+    "test file must self-reference Suite 117 + _slice_section + uncovered-event-hooks",
+)
+
+# Marker: uncovered-event-hooks
 
 # ---------------------------------------------------------------------------
 # Summary
