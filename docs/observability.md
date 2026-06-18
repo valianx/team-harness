@@ -72,6 +72,72 @@ The orchestrator is the exclusive writer of `00-execution-events.*` during
 pipeline runs. In that context, agents return operation metadata in their status
 blocks; the orchestrator propagates it.
 
+## Hook-authored observability files (complement to the orchestrator stream)
+
+Two hook-level observability files exist **alongside** (never inside) the
+orchestrator-owned `00-execution-events.*` stream. Both preserve the
+exclusive-writer contract by writing to their own dedicated sibling files.
+
+### 00-subagent-trace.jsonl — SubagentStop backstop (coarse)
+
+Written by `hooks/subagent-trace.sh` (SubagentStop event, matcher `th:.*`).
+Appended to **only** when a Team Harness pipeline subagent (`th:architect`,
+`th:implementer`, etc.) finishes. The file sits beside the orchestrator's trace
+files in the resolved workspace:
+
+- **local mode:** `workspaces/00-subagent-trace.jsonl`
+- **obsidian mode:** `{logs-path}/{logs-subfolder}/00-subagent-trace.jsonl`
+
+Line schema:
+```json
+{"ts":"<ISO>","event":"subagent.stop","agent_type":"th:<agent>","agent_id":"<opaque>","cwd":"<repo-root>"}
+```
+
+**What this is NOT.** This is a coarse backstop — a deterministic proof that a
+subagent boundary occurred. It does NOT carry tokens, duration, result, or
+per-phase context. The orchestrator's `phase.end` events in `00-execution-events`
+remain the authoritative rich observability record. The SubagentStop payload
+simply does not carry that data.
+
+**Gated by `TH_HOOK_PROFILE`.** Setting `TH_HOOK_PROFILE=minimal` suppresses
+this hook (and all other observability/notification hooks). The default when
+the variable is unset is `standard`, which enables it.
+
+### 00-precompact.jsonl — PreCompact breadcrumb
+
+Written by `hooks/precompact-snapshot.sh` (PreCompact event, matcher
+`manual|auto`). Appended to when the hook successfully snapshots `00-state.md`
+before context compaction. The file sits in the same directory as the snapshot:
+
+- **local mode:** `workspaces/{feature}/00-precompact.jsonl`
+- **obsidian mode:** `{logs-path}/{logs-subfolder}/{date}_{feature}/00-precompact.jsonl`
+
+Line schema:
+```json
+{"ts":"<ISO>","event":"precompact.snapshot","trigger":"manual|auto","status":"success"}
+```
+
+The companion snapshot file is `00-state.precompact-snapshot.md`, written as a
+single rolling overwrite-in-place beside `00-state.md`. One rolling file, never
+an ever-growing set.
+
+**What this captures.** A byte-identical copy of `00-state.md` at the moment
+PreCompact fires. It enables `/th:recover` to restore in-flight pipeline state
+when a context auto-compact happens mid-pipeline before state is fully flushed.
+The snapshot copies ONLY `00-state.md` — no transcripts, no config files, no
+`00-execution-events`, no tool output.
+
+**Data exposure note (SEC-DR-001).** The snapshot introduces **no new secret
+value**: it is a byte-identical copy of `00-state.md`, bounded to that one file —
+nothing new is read or written that the workspace did not already hold. In
+obsidian mode the vault is a pre-existing, long-lived, possibly-synced surface
+that the pipeline already writes every `00-*.md` into; the snapshot inherits that
+same surface and does NOT widen it. In local mode the snapshot is under
+`workspaces/`, already covered by the `/workspaces` `.gitignore` entry.
+
+**Gated by `TH_HOOK_PROFILE`.** Same as the SubagentStop hook above — suppressed
+under `minimal`, enabled under `standard` (default) and `strict`.
+
 Standalone skills (`/th:setup`, `/th:lint`, `/th:kg`) that execute outside
 a pipeline context write their own `operation.*` events only when a workspace
 and events file exist. When no workspace exists (one-shot invocation), these

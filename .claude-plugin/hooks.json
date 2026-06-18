@@ -1,5 +1,5 @@
 {
-  "_comment": "Plugin-mode hooks (loaded by Claude Code plugin runtime). Uses ${CLAUDE_PLUGIN_ROOT} — a plugin runtime variable that resolves to the plugin's install cache directory. For Go installer mode, use hooks/config.json instead (uses ~/.claude/hooks/ paths). SessionStart (matcher startup|resume|clear) runs hooks/session-start.sh — the unified loader that surfaces dev-mode banner+disposition, configured default language, and obsidian workspace base-path all in one combined JSON; UserPromptSubmit re-asserts the configured language as a terse per-turn reminder adjacent to each operator message; policy gate (PreToolUse Bash|Write|Edit|NotebookEdit) fires on every write/exec tool to secret-scan content; outward-action gate (PreToolUse Bash) gates dev-mode outward actions — separate entry from policy-block so dev-guard never fires on Edit/Write/NotebookEdit; gcp verb-classifying gate (PreToolUse Bash) gates gcloud mutating/destructive/catastrophic verbs — separate entry so gcp-guard only fires on Bash; worktree advisory gate (PreToolUse Bash) emits start-gate reminder on agent-issued git checkout -b / switch -c / worktree add — fail-open, cannot cover human own-terminal ops; reasoning-checkpoint guard (PreToolUse Task) gates phase dispatch; notification (Notification) fires only on idle_prompt.",
+  "_comment": "Plugin-mode hooks (loaded by Claude Code plugin runtime). Uses ${CLAUDE_PLUGIN_ROOT} — a plugin runtime variable that resolves to the plugin's install cache directory. For Go installer mode, use hooks/config.json instead (uses ~/.claude/hooks/ paths). SessionStart (matcher startup|resume|clear) runs hooks/session-start.sh — the unified loader that surfaces dev-mode banner+disposition, configured default language, and obsidian workspace base-path all in one combined JSON; UserPromptSubmit re-asserts the configured language as a terse per-turn reminder adjacent to each operator message; policy gate (PreToolUse Bash|Write|Edit|NotebookEdit) fires on every write/exec tool to secret-scan content; outward-action gate (PreToolUse Bash) gates dev-mode outward actions — separate entry from policy-block so dev-guard never fires on Edit/Write/NotebookEdit; gcp verb-classifying gate (PreToolUse Bash) gates gcloud mutating/destructive/catastrophic verbs — separate entry so gcp-guard only fires on Bash; worktree advisory gate (PreToolUse Bash) emits start-gate reminder on agent-issued git checkout -b / switch -c / worktree add — fail-open, cannot cover human own-terminal ops; reasoning-checkpoint guard (PreToolUse Task) gates phase dispatch; notification (Notification) fires only on idle_prompt; SubagentStop (matcher th:.*) runs hooks/subagent-trace.sh — fail-open coarse backstop that appends a deterministic subagent.stop breadcrumb to 00-subagent-trace.jsonl whenever a th:* pipeline subagent finishes (complements, never replaces, the orchestrator's phase.end); PreCompact (matcher manual|auto) runs hooks/precompact-snapshot.sh — fail-open state snapshot that copies 00-state.md to a rolling sibling before context compaction so /th:recover survives a mid-pipeline compact; both new hooks are gated by TH_HOOK_PROFILE (minimal suppresses both; standard/strict enable both; default unset == standard); enforcement floors (policy-block, dev-guard, gcp-guard, worktree-guard, checkpoint-guard) are always-on and NEVER gated by TH_HOOK_PROFILE; _hook-profile.sh is the shared profile-read helper sourced only by observability/notification hooks.",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -93,6 +93,30 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/notify-stage.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "th:.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/subagent-trace.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/precompact-snapshot.sh",
             "timeout": 5
           }
         ]
