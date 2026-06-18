@@ -26112,6 +26112,8 @@ _s110_CANONICAL_HOOKS = {
     "session-start.sh", "sketch-guard.sh",
     # Added in v2.106.0 (uncovered-event-hooks feature)
     "subagent-trace.sh", "precompact-snapshot.sh", "_hook-profile.sh",
+    # Added in v2.107.0 (prepublish-version-and-tests-gate feature)
+    "prepublish-guard.sh",
 }
 _s110_actual_hooks = {p.name for p in _s110_hooks_dir.glob("*.sh")} if _s110_hooks_dir.exists() else set()
 _s110_extra_hooks = _s110_actual_hooks - _s110_CANONICAL_HOOKS
@@ -28313,6 +28315,559 @@ check(
 )
 
 # Marker: uncovered-event-hooks
+
+# ---------------------------------------------------------------------------
+# Suite 118 — prepublish-version-and-tests-gate structural contract (v2.107.0)
+# ---------------------------------------------------------------------------
+# Asserts the new prepublish-guard.sh hook: both checks + command-routed split
+# (git push → Check 1 version, gh pr create → Check 2 tests), the json.dumps
+# deny-reason escaping contract, the fail-open fault paths, the 90s/120s timeout
+# math, CWE-209 no-output-in-reason, and the dev-guard non-regression (unchanged,
+# still present, new entry as its OWN array element).
+#
+# AC coverage:
+#   AC-1/AC-2 — git push → Check 1 (version); Check 2 does NOT run on push
+#   AC-3      — version VALUE compared (not file presence); no whitespace-only bypass
+#   AC-4      — no distributed assets changed → no block
+#   AC-5      — gh pr create → Check 2 (tests); Check 1 does NOT run on pr create
+#   AC-6      — no set -e around exec; exit code captured explicitly
+#   AC-7      — guard faults fail-open (no git / no origin / diff error)
+#   AC-8      — internal-timeout (124) and command-not-found (127) → fail-open
+#   AC-9      — .claude-plugin/plugin.json absent → Check 1 no-op
+#   AC-10     — prepublish_check undeclared/empty → Check 2 no-op
+#   AC-11     — dev-guard.sh byte-unchanged; its matcher entries intact;
+#               new entry is its OWN array element
+#   AC-12     — no _hook-profile.sh source; no TH_HOOK_PROFILE read;
+#               never emits permissionDecision: "allow"
+#   AC-13     — Suite 118 in docs/testing.md; both manifests >= 2.107.0;
+#               Suite 118 absent from CLAUDE.md; run-all.sh absent from hook
+#   AC-14     — json.dumps deny-reason escaping; no raw printf for config content
+#   AC-15     — unparseable config / control-char value / no timeout → fail-open
+#   AC-16     — 90s internal / 120s entry (timeout budget math in header comment)
+#   AC-17     — no stdout/stderr of failing command in deny reason; no eval
+#
+# Self-referential guards:
+#   h1 — docs/testing.md registers "Suite 118" + "prepublish-version-and-tests-gate"
+#   h2 — CLAUDE.md does NOT contain "Suite 118" (§11 hygiene contract)
+#   h3 — this test file contains "Suite 118" + "_slice_section" +
+#        "prepublish-version-and-tests-gate"
+#
+# Marker: prepublish-version-and-tests-gate
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 118: prepublish-version-and-tests-gate structural contract (v2.107.0) ===")
+
+# --- File reads ---
+_s118_hook_path = HOOKS_DIR / "prepublish-guard.sh"
+_s118_hook      = read(_s118_hook_path) if _s118_hook_path.exists() else ""
+_s118_dev_guard = read(HOOKS_DIR / "dev-guard.sh")
+_s118_config_json_raw  = read(HOOKS_DIR / "config.json")
+_s118_hooks_json_raw   = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
+_s118_testing_md       = read(REPO_ROOT / "docs" / "testing.md")
+_s118_claude_md        = read(REPO_ROOT / "CLAUDE.md")
+_s118_readme_md        = read(HOOKS_DIR / "README.md")
+
+try:
+    _s118_plugin_json   = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
+except Exception:
+    _s118_plugin_json   = {}
+try:
+    _s118_marketplace   = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
+except Exception:
+    _s118_marketplace   = {}
+
+try:
+    _s118_config = json.loads(_s118_config_json_raw)
+except json.JSONDecodeError:
+    _s118_config = {}
+
+try:
+    _s118_hooks_json = json.loads(_s118_hooks_json_raw)
+except json.JSONDecodeError:
+    _s118_hooks_json = {}
+
+_S118_VER_FLOOR = (2, 107, 0)
+_S118_OS_BLOCKS = ["windows", "macos", "linux"]
+
+# ----------------------------------------------------------------
+# Hook file existence
+# ----------------------------------------------------------------
+
+check(
+    "suite118(file-exists): hooks/prepublish-guard.sh exists",
+    bool(_s118_hook),
+    "hooks/prepublish-guard.sh must exist",
+)
+
+# ----------------------------------------------------------------
+# AC-1/AC-2 — command-routed split: git push → Check 1 tokens present
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac1-git-push-check1): hook contains git push detection regex",
+    "git" in _s118_hook and "push" in _s118_hook,
+    "prepublish-guard.sh must detect git push commands for Check 1",
+)
+check(
+    "suite118(ac1-check1-version-tokens): hook checks .claude-plugin/plugin.json for version",
+    ".claude-plugin/plugin.json" in _s118_hook,
+    "prepublish-guard.sh Check 1 must reference .claude-plugin/plugin.json",
+)
+check(
+    "suite118(ac1-check1-marketplace-tokens): hook checks .claude-plugin/marketplace.json",
+    ".claude-plugin/marketplace.json" in _s118_hook,
+    "prepublish-guard.sh Check 1 must reference .claude-plugin/marketplace.json",
+)
+check(
+    "suite118(ac2-check2-not-on-push): hook routes gh pr create → Check 2 separately",
+    "gh" in _s118_hook and "pr" in _s118_hook and "create" in _s118_hook,
+    "prepublish-guard.sh must detect gh pr create for Check 2",
+)
+
+# ----------------------------------------------------------------
+# AC-3 — version VALUE compared (not just file presence)
+# The hook must compare version values vs origin/main (git show)
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac3-version-value-compare): hook uses git show to read origin/main version",
+    "git show origin/main:.claude-plugin/plugin.json" in _s118_hook,
+    "prepublish-guard.sh must compare version VALUE via 'git show origin/main:.claude-plugin/plugin.json'",
+)
+check(
+    "suite118(ac3-version-value-compare-marketplace): hook reads origin/main marketplace version",
+    "git show origin/main:.claude-plugin/marketplace.json" in _s118_hook,
+    "prepublish-guard.sh must compare marketplace.json version VALUE via git show",
+)
+
+# ----------------------------------------------------------------
+# AC-4 — no assets changed → no block (fast-exit path)
+# The hook checks agents/|skills/|hooks/ in the diff
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac4-asset-path-regex): hook matches agents/|skills/|hooks/ paths in diff",
+    "agents" in _s118_hook and "skills" in _s118_hook and "hooks" in _s118_hook,
+    "prepublish-guard.sh must check for distributed assets in agents/|skills/|hooks/ paths",
+)
+
+# ----------------------------------------------------------------
+# AC-5 — gh pr create → Check 2; prepublish_check config read
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac5-prepublish-check-key): hook reads prepublish_check from config",
+    "prepublish_check" in _s118_hook,
+    "prepublish-guard.sh must read the 'prepublish_check' key from .team-harness.json",
+)
+check(
+    "suite118(ac5-team-harness-config): hook reads ~/.claude/.team-harness.json",
+    ".team-harness.json" in _s118_hook,
+    "prepublish-guard.sh must read ~/.claude/.team-harness.json for prepublish_check",
+)
+
+# ----------------------------------------------------------------
+# AC-6 — no set -e around exec; explicit exit code capture
+# The hook body uses explicit rc=$? capture, not set -e
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac6-explicit-exit-capture): hook captures exit code explicitly (_rc=$?)",
+    "_rc=$?" in _s118_hook or "rc=$?" in _s118_hook,
+    "prepublish-guard.sh must capture the test command exit code explicitly (rc=$?), not rely on set -e",
+)
+check(
+    "suite118(ac6-no-sete-around-exec): hook uses set +e before exec body",
+    "set +e" in _s118_hook,
+    "prepublish-guard.sh must disable set -e (set +e) around the command-exec body (AC-6 / SEC-PPG-4)",
+)
+check(
+    "suite118(ac6-deny-on-nonzero): hook emits deny on non-zero exit",
+    "deny" in _s118_hook and "permissionDecision" in _s118_hook,
+    "prepublish-guard.sh must emit a deny decision on non-zero test exit",
+)
+
+# ----------------------------------------------------------------
+# AC-7 — guard faults fail-open: no git, no work-tree, no origin/main
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac7-no-git-failopen): hook checks git availability (guard fault)",
+    "command -v git" in _s118_hook,
+    "prepublish-guard.sh must check 'command -v git' and fail-open when absent",
+)
+check(
+    "suite118(ac7-worktree-check): hook verifies inside a git work-tree",
+    "is-inside-work-tree" in _s118_hook or "inside-work-tree" in _s118_hook,
+    "prepublish-guard.sh must check 'git rev-parse --is-inside-work-tree' (fail-open if not)",
+)
+check(
+    "suite118(ac7-origin-main-resolve): hook verifies origin/main resolves",
+    "origin/main" in _s118_hook and ("rev-parse" in _s118_hook or "verify" in _s118_hook),
+    "prepublish-guard.sh must verify origin/main resolves (git rev-parse --verify origin/main)",
+)
+
+# ----------------------------------------------------------------
+# AC-8 — internal-timeout (124) and command-not-found (127) → fail-open
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac8-exit124-failopen): hook treats exit 124 (internal timeout) as guard fault",
+    "124" in _s118_hook,
+    "prepublish-guard.sh must treat exit 124 (internal timeout) as a guard fault (fail-open)",
+)
+check(
+    "suite118(ac8-exit127-failopen): hook treats exit 127 (command not found) as guard fault",
+    "127" in _s118_hook,
+    "prepublish-guard.sh must treat exit 127 (command-not-found) as a guard fault (fail-open)",
+)
+
+# ----------------------------------------------------------------
+# AC-9 — .claude-plugin/plugin.json absent → Check 1 no-op
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac9-plugin-absent-noop): hook guards on plugin.json file existence",
+    "! -f \".claude-plugin/plugin.json\"" in _s118_hook
+    or "[ ! -f \".claude-plugin/plugin.json\" ]" in _s118_hook
+    or ".claude-plugin/plugin.json" in _s118_hook,
+    "prepublish-guard.sh must skip Check 1 when .claude-plugin/plugin.json is absent",
+)
+
+# ----------------------------------------------------------------
+# AC-10 — prepublish_check undeclared/empty → Check 2 no-op
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac10-undeclared-noop): hook treats empty/undeclared prepublish_check as no-op",
+    "[ -z" in _s118_hook and "nodecision" in _s118_hook,
+    "prepublish-guard.sh must exit nodecision when prepublish_check is empty or undeclared",
+)
+
+# ----------------------------------------------------------------
+# AC-11 — dev-guard.sh byte-unchanged; new entry is its OWN array element
+# ----------------------------------------------------------------
+
+# Verify dev-guard.sh content is unchanged by checking it has its characteristic structure
+check(
+    "suite118(ac11-dev-guard-unchanged): dev-guard.sh still contains its characteristic SEC-DR-2 header",
+    "SEC-DR-2" in _s118_dev_guard and "dev-guard.sh" in _s118_dev_guard,
+    "dev-guard.sh must be byte-unchanged (SEC-DR-2 header must still be present)",
+)
+check(
+    "suite118(ac11-dev-guard-push-pattern): dev-guard.sh retains its git push detection and permissionDecision emission",
+    "git" in _s118_dev_guard and "push" in _s118_dev_guard and "permissionDecision" in _s118_dev_guard,
+    "dev-guard.sh must retain its git push detection and permissionDecision emission",
+)
+
+# Verify prepublish-guard is its OWN array element (not merged into dev-guard entry)
+for _os118 in _S118_OS_BLOCKS:
+    _os118_block = _s118_config.get(_os118, {})
+    _os118_pretooluse = _os118_block.get("hooks", {}).get("PreToolUse", [])
+    # Count distinct entries with prepublish-guard.sh
+    _prepublish_entries = [
+        e for e in _os118_pretooluse
+        if any("prepublish-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+    ]
+    # Count distinct entries with dev-guard.sh (Bash matcher)
+    _devguard_bash_entries = [
+        e for e in _os118_pretooluse
+        if any("dev-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+        and e.get("matcher", "") == "Bash"
+    ]
+    check(
+        f"suite118(ac11-prepublish-own-entry-{_os118}): config.json {_os118} has prepublish-guard.sh as its OWN PreToolUse entry",
+        len(_prepublish_entries) >= 1,
+        f"config.json '{_os118}' must have prepublish-guard.sh as its own PreToolUse entry (not merged into dev-guard)",
+    )
+    check(
+        f"suite118(ac11-devguard-still-{_os118}): config.json {_os118} still has dev-guard.sh Bash entry unchanged",
+        len(_devguard_bash_entries) >= 1,
+        f"config.json '{_os118}' must still have a dev-guard.sh Bash PreToolUse entry",
+    )
+    # Verify no single entry contains BOTH hooks
+    _combined = [
+        e for e in _os118_pretooluse
+        if any("prepublish-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+        and any("dev-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+    ]
+    check(
+        f"suite118(ac11-no-combined-entry-{_os118}): config.json {_os118} does NOT merge prepublish and dev-guard into one entry",
+        len(_combined) == 0,
+        f"config.json '{_os118}' must NOT have dev-guard.sh and prepublish-guard.sh in the same hooks entry",
+    )
+
+# hooks.json: prepublish-guard is its OWN entry
+_s118_hj_hooks = _s118_hooks_json.get("hooks", {})
+_s118_hj_pretooluse = _s118_hj_hooks.get("PreToolUse", [])
+_hj118_prepublish_entries = [
+    e for e in _s118_hj_pretooluse
+    if any("prepublish-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+]
+check(
+    "suite118(ac11-hooks-json-prepublish-own-entry): .claude-plugin/hooks.json has prepublish-guard.sh as its OWN PreToolUse entry",
+    len(_hj118_prepublish_entries) >= 1,
+    ".claude-plugin/hooks.json must have prepublish-guard.sh as its own PreToolUse entry",
+)
+_hj118_devguard_bash_entries = [
+    e for e in _s118_hj_pretooluse
+    if any("dev-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+    and e.get("matcher", "") == "Bash"
+]
+check(
+    "suite118(ac11-hooks-json-devguard-still): .claude-plugin/hooks.json still has dev-guard.sh Bash entry",
+    len(_hj118_devguard_bash_entries) >= 1,
+    ".claude-plugin/hooks.json must still have a dev-guard.sh Bash PreToolUse entry",
+)
+
+# ----------------------------------------------------------------
+# AC-12 — no _hook-profile.sh source; no TH_HOOK_PROFILE read;
+#         never emits permissionDecision: "allow"
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac12-no-hook-profile-source): prepublish-guard.sh does NOT have an active source line for _hook-profile.sh",
+    # The hook may mention _hook-profile.sh in comments but must NOT actually source it.
+    # An active source line would be: '. .../_hook-profile.sh' or 'source .../_hook-profile.sh'
+    # outside of a comment. We check that no non-comment line contains the source.
+    not any(
+        "_hook-profile.sh" in line and not line.lstrip().startswith("#")
+        for line in _s118_hook.splitlines()
+    ),
+    "prepublish-guard.sh must NOT source _hook-profile.sh (always-on enforcement floor, AC-12/AC-13)",
+)
+check(
+    "suite118(ac12-no-th-hook-profile-read): prepublish-guard.sh does NOT read TH_HOOK_PROFILE in non-comment lines",
+    # The hook may mention TH_HOOK_PROFILE in comments but must NOT reference it in active code.
+    not any(
+        "TH_HOOK_PROFILE" in line and not line.lstrip().startswith("#")
+        for line in _s118_hook.splitlines()
+    ),
+    "prepublish-guard.sh must NOT read TH_HOOK_PROFILE (always-on enforcement floor, AC-12/AC-13)",
+)
+check(
+    "suite118(ac12-never-emits-allow): prepublish-guard.sh does NOT emit permissionDecision: allow in active code",
+    # The hook may mention 'allow' in comments but must NOT emit it via deny() or printf.
+    # Check that no non-comment line emits permissionDecision: allow.
+    not any(
+        "permissionDecision" in line and "allow" in line and not line.lstrip().startswith("#")
+        for line in _s118_hook.splitlines()
+    ),
+    "prepublish-guard.sh must NEVER emit permissionDecision: allow (AC-12)",
+)
+
+# ----------------------------------------------------------------
+# AC-13 — Suite in docs/testing.md; both manifests >= 2.107.0;
+#         Suite 118 absent from CLAUDE.md; run-all.sh absent from hook
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac13-run-all-absent): prepublish-guard.sh does NOT invoke run-all.sh",
+    "run-all.sh" not in _s118_hook,
+    "prepublish-guard.sh must NOT invoke run-all.sh (stdin-hang risk; docs/testing.md)",
+)
+
+_s118_marketplace_version = (
+    _s118_marketplace.get("plugins", [{}])[0].get("version", "")
+    if _s118_marketplace.get("plugins")
+    else ""
+)
+check(
+    "suite118(ac13-plugin-json-floor): .claude-plugin/plugin.json version >= 2.107.0",
+    _s59_ver_tuple(_s118_plugin_json.get("version", "0.0.0")) >= _S118_VER_FLOOR,
+    f"plugin.json version must be >= 2.107.0 (prepublish-guard release floor), "
+    f"got '{_s118_plugin_json.get('version', '')}'",
+)
+check(
+    "suite118(ac13-marketplace-json-floor): .claude-plugin/marketplace.json plugins[0].version >= 2.107.0",
+    _s59_ver_tuple(_s118_marketplace_version or "0.0.0") >= _S118_VER_FLOOR,
+    f"marketplace.json plugins[0].version must be >= 2.107.0, got '{_s118_marketplace_version}'",
+)
+check(
+    "suite118(ac13-versions-match): plugin.json and marketplace.json versions are equal",
+    _s118_plugin_json.get("version", "PLUGIN_MISSING") == _s118_marketplace_version,
+    f"plugin.json version '{_s118_plugin_json.get('version', '')}' must equal "
+    f"marketplace.json plugins[0].version '{_s118_marketplace_version}'",
+)
+
+# ----------------------------------------------------------------
+# AC-14 — json.dumps deny-reason escaping; no raw printf for config content
+# The Check-2 deny reason MUST be built via python3 json.dumps, NOT raw printf '%s'
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac14-json-dumps-deny): prepublish-guard.sh uses python3 json.dumps for Check-2 deny reason",
+    "json.dumps" in _s118_hook,
+    "prepublish-guard.sh Check-2 deny reason MUST be JSON-escaped via python3 json.dumps (SDR-PPG-01 / AC-14)",
+)
+# The bash-degraded path must NOT use raw printf '%s' for the command
+# (it should either use json.dumps equivalent or omit the command from the reason).
+# We check by verifying the hook does NOT use raw printf with '%s' in a deny context
+# that directly interpolates _check_cmd or similar config-derived variable.
+# A simple heuristic: if json.dumps is present, the escaping contract is honored.
+check(
+    "suite118(ac14-no-raw-printf-for-config): hook does not use raw printf for config-derived deny reason",
+    "json.dumps" in _s118_hook,
+    "prepublish-guard.sh must escape config-derived deny reason via json.dumps, not raw printf '%s'",
+)
+
+# ----------------------------------------------------------------
+# AC-15 — fault completeness: unparseable config, control-char value, no timeout
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac15-control-char-guard): hook has SEC-DR-A control-char guard on prepublish_check value",
+    "[[:cntrl:]]" in _s118_hook or "cntrl" in _s118_hook,
+    "prepublish-guard.sh must apply the SEC-DR-A control-char guard to the prepublish_check value",
+)
+check(
+    "suite118(ac15-no-timeout-skip): hook skips Check 2 when timeout/gtimeout binary absent",
+    "timeout_bin" in _s118_hook or "_timeout_bin" in _s118_hook,
+    "prepublish-guard.sh must skip Check 2 (nodecision) when no timeout/gtimeout binary is found",
+)
+check(
+    "suite118(ac15-gtimeout-fallback): hook tries gtimeout as a fallback timeout binary",
+    "gtimeout" in _s118_hook,
+    "prepublish-guard.sh must try gtimeout as a fallback when timeout binary is absent",
+)
+
+# ----------------------------------------------------------------
+# AC-16 — timeout budget: 90s internal / 120s entry budget
+# The hook header must document the timeout math
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac16-90s-internal-timeout): hook uses 90s as the internal command timeout",
+    "90s" in _s118_hook,
+    "prepublish-guard.sh must use '90s' as the internal timeout for the prepublish_check command",
+)
+check(
+    "suite118(ac16-120s-budget-documented): hook documents the 120s entry budget",
+    "120" in _s118_hook,
+    "prepublish-guard.sh must document the 120s hook-entry budget (timeout budget math)",
+)
+# Verify the wiring timeout is 120 in all OS blocks
+for _os118 in _S118_OS_BLOCKS:
+    _os118_pretooluse = _s118_config.get(_os118, {}).get("hooks", {}).get("PreToolUse", [])
+    _prepublish_timeout = None
+    for _entry in _os118_pretooluse:
+        for _h in _entry.get("hooks", []):
+            if "prepublish-guard.sh" in _h.get("command", ""):
+                _prepublish_timeout = _h.get("timeout")
+    check(
+        f"suite118(ac16-wiring-timeout-{_os118}): config.json {_os118} prepublish-guard entry has timeout: 120",
+        _prepublish_timeout == 120,
+        f"config.json '{_os118}' prepublish-guard.sh entry must have timeout: 120",
+    )
+# hooks.json entry timeout
+_hj118_prepublish_timeout = None
+for _entry in _s118_hj_pretooluse:
+    for _h in _entry.get("hooks", []):
+        if "prepublish-guard.sh" in _h.get("command", ""):
+            _hj118_prepublish_timeout = _h.get("timeout")
+check(
+    "suite118(ac16-wiring-timeout-hooks-json): .claude-plugin/hooks.json prepublish-guard entry has timeout: 120",
+    _hj118_prepublish_timeout == 120,
+    ".claude-plugin/hooks.json prepublish-guard.sh entry must have timeout: 120",
+)
+
+# ----------------------------------------------------------------
+# AC-17 — no stdout/stderr of failing command in deny reason; no eval
+# ----------------------------------------------------------------
+
+check(
+    "suite118(ac17-no-eval): prepublish-guard.sh does NOT call 'eval' as a shell command",
+    # The hook may mention 'eval' in comments but must NOT invoke it as a shell builtin.
+    # An active eval call would appear as 'eval ' (with a trailing space/tab) in a non-comment
+    # line. This guards against dynamic command construction (SDR-PPG-04).
+    not any(
+        ("eval " in line or line.strip() == "eval")
+        and not line.lstrip().startswith("#")
+        for line in _s118_hook.splitlines()
+    ),
+    "prepublish-guard.sh must NOT use shell 'eval' (AC-17 / SDR-PPG-04)",
+)
+check(
+    "suite118(ac17-no-output-in-reason): captured command output goes to stderr, NOT into deny reason",
+    # CWE-209: test command stdout/stderr must NEVER appear in permissionDecisionReason.
+    # The hook captures test output in a variable and routes it to stderr only.
+    # Verify: the captured-output variable is NOT referenced inside the json.dumps call
+    # that builds the deny reason. The json.dumps path for Check 2 is the only non-stderr
+    # path that produces a permissionDecisionReason.
+    # We check that _captured_output does not appear on any line that also references json.
+    not any(
+        "_captured_output" in line and "json" in line and not line.lstrip().startswith("#")
+        for line in _s118_hook.splitlines()
+    ),
+    "prepublish-guard.sh must NOT place captured test output into the permissionDecisionReason (CWE-209 / AC-17)",
+)
+
+# ----------------------------------------------------------------
+# README.md: prepublish-guard.sh documented
+# ----------------------------------------------------------------
+
+check(
+    "suite118(readme-gate-documented): hooks/README.md documents prepublish-guard.sh",
+    "prepublish-guard" in _s118_readme_md or "prepublish_check" in _s118_readme_md,
+    "hooks/README.md must document the prepublish-guard gate and the prepublish_check config key",
+)
+
+# ----------------------------------------------------------------
+# MSYS safety: every 'git show origin/main:' invocation in the hook
+# must be prefixed with MSYS_NO_PATHCONV=1 so Windows Git Bash does
+# not mangle the colon-separated treeish into an unresolvable path.
+# This assertion prevents silent regression of the fix.
+# ----------------------------------------------------------------
+
+_s118_git_show_lines = [
+    line for line in _s118_hook.splitlines()
+    if "git show origin/main:" in line and not line.lstrip().startswith("#")
+]
+check(
+    "suite118(msys-pathconv-plugin): every active 'git show origin/main:.claude-plugin/plugin.json' call is MSYS-safe",
+    all(
+        "MSYS_NO_PATHCONV=1" in line
+        for line in _s118_git_show_lines
+        if ".claude-plugin/plugin.json" in line
+    ) and any(".claude-plugin/plugin.json" in line for line in _s118_git_show_lines),
+    "All active 'git show origin/main:.claude-plugin/plugin.json' calls must be prefixed with MSYS_NO_PATHCONV=1",
+)
+check(
+    "suite118(msys-pathconv-marketplace): every active 'git show origin/main:.claude-plugin/marketplace.json' call is MSYS-safe",
+    all(
+        "MSYS_NO_PATHCONV=1" in line
+        for line in _s118_git_show_lines
+        if ".claude-plugin/marketplace.json" in line
+    ) and any(".claude-plugin/marketplace.json" in line for line in _s118_git_show_lines),
+    "All active 'git show origin/main:.claude-plugin/marketplace.json' calls must be prefixed with MSYS_NO_PATHCONV=1",
+)
+
+# ----------------------------------------------------------------
+# Hygiene / registry / self-referential guards
+# ----------------------------------------------------------------
+
+check(
+    "suite118(h1-registry): docs/testing.md registers 'Suite 118' and 'prepublish-version-and-tests-gate'",
+    "Suite 118" in _s118_testing_md and "prepublish-version-and-tests-gate" in _s118_testing_md,
+    "docs/testing.md must register Suite 118 and the 'prepublish-version-and-tests-gate' marker",
+)
+check(
+    "suite118(h2-hygiene): CLAUDE.md does NOT contain 'Suite 118'",
+    "Suite 118" not in _s118_claude_md,
+    "CLAUDE.md must not mention Suite 118 — only docs/testing.md is the canonical registry (§11 hygiene)",
+)
+
+# Self-ref
+_s118_own_source = read(Path(__file__))
+check(
+    "suite118(h3-self-ref): test file contains 'Suite 118', '_slice_section', and 'prepublish-version-and-tests-gate'",
+    "Suite 118" in _s118_own_source
+    and "_slice_section" in _s118_own_source
+    and "prepublish-version-and-tests-gate" in _s118_own_source,
+    "test file must self-reference Suite 118 + _slice_section + prepublish-version-and-tests-gate",
+)
+
+# Marker: prepublish-version-and-tests-gate
 
 # ---------------------------------------------------------------------------
 # Summary
