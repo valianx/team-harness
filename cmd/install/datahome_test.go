@@ -514,7 +514,7 @@ func TestContainsDotDotSegment(t *testing.T) {
 		{"/tmp/../etc/passwd", false}, // Clean already resolved this
 		{"../../etc", true},
 		{"/safe/path/../../../etc", false}, // Clean resolved it
-		{string(filepath.Separator) + filepath.Join("..", "etc"), true},
+		{string(filepath.Separator) + filepath.Join("..", "etc"), false}, // rooted ".." collapses at the volume root on both OSes -> no residual ".." (escaped path is caught fail-closed by SEC-01/03 ownership checks)
 	}
 	for _, tc := range cases {
 		// Apply Clean first (as secureAndVerify does).
