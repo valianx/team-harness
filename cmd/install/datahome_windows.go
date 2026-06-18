@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -15,7 +16,16 @@ import (
 // lstatWalkPreResolution walks every ancestor component of path (root → leaf)
 // and rejects:
 //   - any component that is a reparse point or junction (SEC-01, CWE-59)
-//   - any component not owned by the current process user (SEC-01)
+//   - any component at or below the user's home directory that is not owned by
+//     the current process user (SEC-01)
+//
+// On Windows, system directories above the user's home directory (C:\, C:\Users)
+// are legitimately owned by SYSTEM (S-1-5-18) or TrustedInstaller — asserting
+// current-user ownership on those components would always reject valid paths.
+// The ownership check is therefore restricted to path components that fall at or
+// below the user home directory level.  The reparse-point check (SEC-01, CWE-59)
+// still applies to ALL components because a junction anywhere in the chain is an
+// attack vector regardless of ownership.
 //
 // This walk runs on the PRE-resolution path, BEFORE filepath.EvalSymlinks is
 // called.  Performing the check post-EvalSymlinks would be vacuous because
@@ -25,6 +35,16 @@ func lstatWalkPreResolution(normalized string) error {
 	currentSID, err := currentUserSID()
 	if err != nil {
 		return fmt.Errorf("cannot determine current user SID: %w", err)
+	}
+
+	// Determine the user home directory so we can scope the ownership check.
+	// If we cannot determine the home directory, we skip ownership checks for
+	// system-level ancestors rather than failing (home-detection failure is not
+	// a security event — the DACL check on the leaf handles the key invariant).
+	homeDir, _ := os.UserHomeDir()
+	homeDirClean := ""
+	if homeDir != "" {
+		homeDirClean = filepath.Clean(homeDir)
 	}
 
 	vol := filepath.VolumeName(normalized)
@@ -46,23 +66,53 @@ func lstatWalkPreResolution(normalized string) error {
 		}
 
 		// Reject reparse points / junctions using GetFileAttributes (SEC-01).
+		// This check applies to ALL components — a junction anywhere in the chain
+		// is a traversal attack vector regardless of whether it is above or below
+		// the user's home directory.
 		if hasReparsePoint(component) {
 			return fmt.Errorf("path component %q is a reparse point or junction — refusing (SEC-01)", component)
 		}
 
-		// Reject components not owned by the current process user (SEC-01).
-		if err := assertCurrentUserOwns(component, currentSID); err != nil {
-			return fmt.Errorf("path component %q ownership check failed (SEC-01): %w", component, err)
+		// Reject components at or below the user home directory that are not
+		// owned by the current process user (SEC-01).
+		// System directories above the user home (e.g. C:\, C:\Users) are
+		// legitimately owned by SYSTEM — do not check those.
+		if homeDirClean != "" && isAtOrBelowPath(component, homeDirClean) {
+			if err := assertCurrentUserOwns(component, currentSID); err != nil {
+				return fmt.Errorf("path component %q ownership check failed (SEC-01): %w", component, err)
+			}
 		}
 	}
 	return nil
 }
 
+// isAtOrBelowPath reports whether target is the same as base or a subdirectory
+// of base.  Both paths must be cleaned before calling this function.
+func isAtOrBelowPath(target, base string) bool {
+	if target == base {
+		return true
+	}
+	// Ensure we match on a separator boundary, not a partial segment name.
+	// e.g. base="C:\Users\mario", target="C:\Users\mario2" must return false.
+	return len(target) > len(base) &&
+		target[len(base)] == filepath.Separator &&
+		strings.HasPrefix(target, base)
+}
+
 // splitPathComponentsWin returns absolute path prefixes for each component in
 // the path, from the volume root toward the leaf.
+//
+// fix(installer): initialise acc with vol + Separator so that the first
+// filepath.Join call produces an absolute path ("C:\Users", not "C:Users").
+// The bare volume "C:" joined with a segment produces a volume-relative path
+// on Windows, not an absolute one.
 func splitPathComponentsWin(vol, rest string) []string {
 	var components []string
-	acc := vol
+	// Start with the volume root (e.g. "C:\") so that filepath.Join produces
+	// absolute paths for every subsequent segment.  Without the trailing
+	// separator, filepath.Join("C:", "Users") → "C:Users" (volume-relative),
+	// not "C:\Users" (absolute).
+	acc := vol + string(filepath.Separator)
 	for _, seg := range splitSegments(rest) {
 		if seg == "" {
 			continue
