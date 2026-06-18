@@ -14,6 +14,7 @@ OS-native notification scripts plus the `config.json` template that wires them i
 | `precompact-snapshot.sh` | PreCompact fail-open state snapshot. Copies `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling before context compaction so `/th:recover` can restore in-flight state. Appends a breadcrumb to `00-precompact.jsonl`. Never blocks compaction; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
 | `_hook-profile.sh` | Shared sourced helper — TH_HOOK_PROFILE resolver. Provides `th_hook_profile()` (normalizes the env var) and `th_observability_enabled <class>` (exits 0/1). Sourced only by observability/notification hooks; never by enforcement floors. |
 | `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). Always-on (never gated by `TH_HOOK_PROFILE`). |
+| `prepublish-guard.sh` | PreToolUse pre-publish papercut gate. `git push` → Check 1 (version-bump guard); `gh pr create` → Check 2 (`prepublish_check` test guard). Block-on-condition / open-on-fault. Always-on enforcement floor (never gated by `TH_HOOK_PROFILE`). See § Pre-publish gate below. |
 | `config.json` | Per-OS hook template — copy the section for your OS into `~/.claude/settings.json`. |
 
 All scripts are Bash and cross-platform:
@@ -46,6 +47,7 @@ The default preset is **`ultra-quiet`** — fires **only** when the user needs t
 | Event | Matcher | When it fires | Why it's in the default set |
 |---|---|---|---|
 | `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block.sh` silently. |
+| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard.sh`). |
 | `Notification` | `idle_prompt` only | Claude finished a turn and is waiting for the user. | High signal: you need to act for Claude to continue. One notification per user-blocking pause. |
 | `SubagentStop` | `th:.*` | When a Team Harness pipeline subagent finishes. | Observability backstop: deterministic proof that a `th:*` subagent boundary occurred. See below. |
 | `PreCompact` | `manual\|auto` | Before context compaction runs. | State snapshot: enables `/th:recover` to restore in-flight state after an auto-compact. See below. |
@@ -247,6 +249,66 @@ The `PreToolUse` hook routes through `policy-block.sh`. It reads the tool call J
 **Bypassing for a specific case.** If you genuinely need a denied command (e.g., a one-off cleanup script), run it manually outside Claude. Editing `policy-block.sh` to scope an exception is also fine, but commit the exception so the rest of the team sees it.
 
 **Performance.** python3 path: single-digit milliseconds (one Python process, regex match). Bash degraded path: sub-millisecond (pure grep/sed). Timeout is 5s in both cases.
+
+## Pre-publish gate (`prepublish-guard.sh`)
+
+The `PreToolUse` hook `prepublish-guard.sh` catches two recurring papercuts at the earliest possible moment. It fires only on `git push` (Check 1) and `gh pr create` (Check 2); all other Bash commands exit immediately with no decision.
+
+### Gate design: block-on-condition / open-on-fault
+
+- **BLOCK** (`permissionDecision: deny`): fires only when the checked condition is confirmed — missing version bump on push, or non-zero test exit at PR-creation.
+- **FAIL-OPEN** (`nodecision` + one-line stderr warning): fires on every guard-evaluation fault: `git` absent, not inside a work-tree, `origin/main` does not resolve, `git diff` error, config file unparseable, `prepublish_check` value rejected by the control-char guard, `timeout`/`gtimeout` binary absent, internal-timeout (exit 124), command-not-found (exit 127). A guard fault NEVER blocks the operator.
+
+This hook is a strictly **additive sibling** to `dev-guard.sh`. Both hooks co-match `git push` and `gh pr create` as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard.sh`'s `ask` into an allow.
+
+### Check 1 — Version-bump guard (fires on `git push`)
+
+If the diff against `origin/main` touches any path under `agents/`, `skills/`, or `hooks/` (distributed plugin assets), then BOTH `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` `version` values must have changed vs `origin/main`. The rule compares the `version` VALUE (not mere file presence), so a whitespace-only touch that leaves the version byte-identical still triggers the block.
+
+**Generic safety:** when `.claude-plugin/plugin.json` does not exist in the repository root, Check 1 is a no-op. Pushes in non-team-harness repos are never blocked.
+
+**Remedy line:** the deny reason names both files and references CLAUDE.md §6.3.
+
+**Why at push?** The version check is cheap (two local git plumbing calls against an already-fetched `origin/main`) and catches a forgotten bump at the earliest moment commits leave the machine.
+
+### Check 2 — Test guard (fires on `gh pr create`)
+
+Reads the `prepublish_check` key from `~/.claude/.team-harness.json`. If declared and non-empty, runs the command under an internal 90s timeout:
+
+```bash
+timeout 90s bash -lc "$prepublish_check"
+```
+
+**Recommended value for team-harness:** `python3 tests/test_agent_structure.py` (the structural suite — completes in a few seconds).
+
+**To enable:** add `prepublish_check` to `~/.claude/.team-harness.json`:
+
+```json
+{
+  "prepublish_check": "python3 tests/test_agent_structure.py"
+}
+```
+
+**Fail-open completeness:** undeclared/empty key → no-op; config file unparseable → no-op; value containing control characters → no-op (never exec'd); `timeout`/`gtimeout` binary absent → Check 2 skipped entirely (no unbounded exec).
+
+**Why at PR-creation?** The declared test command runs once per `gh pr create`, not on every push. For team-harness the structural suite is a few seconds; cost is bounded by the operator-declared command + the 90s internal timeout.
+
+**Deny reason:** names the (JSON-escaped) command and the exit code — never the captured stdout/stderr of the test command (CWE-209 information-disclosure prevention). The bash-degraded path (no `python3`) omits the command entirely.
+
+### Timeout budget (SDR-PPG-03)
+
+The hook-entry `timeout` is `120s` in all wiring blocks. The internal test-command timeout is `90s`. Check 1 and Check 2 never run in the same hook invocation (command-routed), so the 30s headroom is reserved entirely for stdin drain + command extraction + process-spawn latency. The internal timeout provably fires before the entry timeout.
+
+### Web-UI PR-creation boundary
+
+A PR opened via the GitHub web UI bypasses Check 2 — no `gh pr create` Bash command is issued, so the hook never fires. A prior `git push` still triggers Check 1 (the version-bump papercut is still caught). This is an accepted, honest boundary: the test check is available only on the `gh pr create` code path.
+
+### Security properties
+
+- The `prepublish_check` value lives in the operator's own `~/.claude/.team-harness.json` and is excluded from the session-override whitelist (no untrusted write path). Executing it is equivalent in privilege to the operator running it in their own terminal.
+- The command is exec'd as `timeout 90s bash -lc "$prepublish_check"` with the variable quoted. `eval` appears nowhere.
+- The deny reason embeds the command via `python3 json.dumps` escaping, never raw `printf '%s'` interpolation (prevents JSON-structure injection from values containing `"`, `\`, or `}`).
+- The `prepublish_check` value is never fed to `grep`/`sed` as a pattern.
 
 ## Opt-in: notify when Claude finishes a turn
 
