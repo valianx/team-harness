@@ -38,14 +38,21 @@ func lstatWalkPreResolution(normalized string) error {
 	}
 
 	// Determine the user home directory so we can scope the ownership check.
-	// If we cannot determine the home directory, we skip ownership checks for
-	// system-level ancestors rather than failing (home-detection failure is not
-	// a security event — the DACL check on the leaf handles the key invariant).
-	homeDir, _ := os.UserHomeDir()
-	homeDirClean := ""
-	if homeDir != "" {
-		homeDirClean = filepath.Clean(homeDir)
+	// The home boundary is required to distinguish system-owned ancestors (e.g.
+	// C:\, C:\Users — legitimately owned by SYSTEM) from user-space components
+	// (at-or-below %USERPROFILE%) which must be owned by the current user.
+	// fix(installer): fail-closed when the boundary is unresolvable (INFO-W1).
+	// Without a known boundary, every at-or-below test would evaluate false and
+	// the ownership check would be silently disabled for all components — a
+	// fail-OPEN deviation from the resolver's fail-closed posture.
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine user home directory for ownership-scope boundary: %w", err)
 	}
+	if homeDir == "" {
+		return fmt.Errorf("user home directory is empty — cannot establish ownership-scope boundary (INFO-W1)")
+	}
+	homeDirClean := filepath.Clean(homeDir)
 
 	vol := filepath.VolumeName(normalized)
 	rest := normalized[len(vol):]

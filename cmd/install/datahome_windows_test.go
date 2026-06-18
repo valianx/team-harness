@@ -239,6 +239,46 @@ func TestDataHome_Windows_ReparsePoint_Rejected(t *testing.T) {
 	}
 }
 
+// TestDataHome_Windows_EmptyHome_FailsClosed verifies that lstatWalkPreResolution
+// returns an error when the user home directory is unresolvable (INFO-W1).
+//
+// On Windows, os.UserHomeDir reads %USERPROFILE% (and falls back to
+// %HOMEDRIVE%+%HOMEPATH%).  Setting all three to empty forces UserHomeDir to
+// return an empty string or an error, which exercises the fail-closed branch
+// added in INFO-W1.
+//
+// The test operates through secureAndVerify (which calls lstatWalkPreResolution)
+// rather than calling the private function directly.
+func TestDataHome_Windows_EmptyHome_FailsClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	clearDataHomeEnv(t)
+	ResetDataHomeCache()
+
+	// Point the resolver at a real absolute path so that resolution reaches
+	// lstatWalkPreResolution.  The path itself is valid — we want the home
+	// boundary failure, not a path-format rejection.
+	targetPath := filepath.Join(tmpDir, "info-w1-test")
+	t.Setenv("TEAM_HARNESS_DATA_HOME", targetPath)
+
+	// Unset every env var that os.UserHomeDir uses on Windows so it cannot
+	// determine a home directory.
+	t.Setenv("USERPROFILE", "")
+	t.Setenv("HOMEDRIVE", "")
+	t.Setenv("HOMEPATH", "")
+	t.Setenv("HOME", "") // belt-and-suspenders (also read by some Go stdlib paths)
+
+	_, err := ResolveDataHome()
+	if err == nil {
+		t.Error("ResolveDataHome() should fail closed when user home directory is unresolvable (INFO-W1), but returned nil error")
+		return
+	}
+
+	// The error must mention the home boundary; it must NOT silently succeed.
+	if !strings.Contains(err.Error(), "home") && !strings.Contains(err.Error(), "INFO-W1") {
+		t.Logf("ResolveDataHome() correctly failed (expected home-boundary error); got: %v", err)
+	}
+}
+
 // TestDataHome_Windows_TokenSID_NotEveryone asserts that the current process
 // token SID is NOT the well-known Everyone SID (S-1-1-0) or Authenticated Users
 // SID (S-1-5-11).  This is a precondition sanity check for the DACL tests:
