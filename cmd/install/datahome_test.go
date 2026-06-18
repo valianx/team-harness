@@ -40,8 +40,14 @@ func clearDataHomeEnv(t *testing.T) {
 	} {
 		t.Setenv(key, "")
 	}
-	// Also clear ~/.claude detection by pointing HOME away from the real home
-	// when we do not want the Claude Code branch to fire.
+	// Redirect HOME / USERPROFILE to a fresh temp dir so that the Branch-3
+	// filesystem probe (~/.claude directory check in claudeCodeRoot() Probe 2)
+	// does not fire on a developer machine that has a real ~/.claude.
+	// Without this, conformance rows with runtimeProbe:"none" resolve via Branch 3
+	// instead of the intended Branch 4/5 because ~/.claude exists at the real home.
+	emptyHome := t.TempDir()
+	t.Setenv("HOME", emptyHome)
+	t.Setenv("USERPROFILE", emptyHome) // Windows: os.UserHomeDir reads USERPROFILE
 }
 
 // ---------------------------------------------------------------------------
