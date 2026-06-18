@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Branch1_TEAM_HARNESS_DATA_HOME_wins_over_alias",
+    "env": {
+      "TEAM_HARNESS_DATA_HOME": "{tmpdir}/explicit-root",
+      "TH_DATA_HOME": "{tmpdir}/alias-root"
+    },
+    "os": "all",
+    "runtimeProbe": "none",
+    "expectedSuffix": "explicit-root",
+    "note": "TEAM_HARNESS_DATA_HOME (Branch 1) wins over TH_DATA_HOME (Branch 2) when both are set."
+  },
+  {
+    "name": "Branch1_TEAM_HARNESS_DATA_HOME_wins_over_claude_root",
+    "env": {
+      "TEAM_HARNESS_DATA_HOME": "{tmpdir}/explicit-root",
+      "CLAUDE_DATA_DIR": "{tmpdir}/claude-root"
+    },
+    "os": "all",
+    "runtimeProbe": "claude-code",
+    "expectedSuffix": "explicit-root",
+    "note": "TEAM_HARNESS_DATA_HOME (Branch 1) wins over runtime-native root (Branch 3)."
+  },
+  {
+    "name": "Branch2_TH_DATA_HOME_alias",
+    "env": {
+      "TH_DATA_HOME": "{tmpdir}/alias-root"
+    },
+    "os": "all",
+    "runtimeProbe": "none",
+    "expectedSuffix": "alias-root",
+    "note": "TH_DATA_HOME (Branch 2) resolves when TEAM_HARNESS_DATA_HOME is unset."
+  },
+  {
+    "name": "Branch3_claude_code_root_via_env",
+    "env": {
+      "CLAUDE_DATA_DIR": "{tmpdir}/claude-root"
+    },
+    "os": "all",
+    "runtimeProbe": "claude-code",
+    "expectedSuffix": "claude-root/team-harness",
+    "note": "CLAUDE_DATA_DIR triggers Branch 3 (runtime-native config root)."
+  },
+  {
+    "name": "Branch4_linux_xdg_data_home_set",
+    "env": {
+      "XDG_DATA_HOME": "{tmpdir}/xdg"
+    },
+    "os": "linux",
+    "runtimeProbe": "none",
+    "expectedSuffix": "xdg/team-harness",
+    "note": "XDG_DATA_HOME set and absolute → Branch 4 Linux sub-branch."
+  },
+  {
+    "name": "Branch4_linux_xdg_data_home_unset",
+    "env": {},
+    "os": "linux",
+    "runtimeProbe": "none",
+    "expectedSuffix": ".local/share/team-harness",
+    "note": "XDG_DATA_HOME unset → ~/.local/share/team-harness (Branch 4 Linux fallback sub-branch)."
+  },
+  {
+    "name": "Branch4_macos_library",
+    "env": {},
+    "os": "darwin",
+    "runtimeProbe": "none",
+    "expectedSuffix": "Library/Application Support/team-harness",
+    "note": "macOS → ~/Library/Application Support/team-harness (Branch 4 macOS sub-branch)."
+  },
+  {
+    "name": "Branch4_windows_localappdata",
+    "env": {
+      "LOCALAPPDATA": "{tmpdir}/localappdata"
+    },
+    "os": "windows",
+    "runtimeProbe": "none",
+    "expectedSuffix": "localappdata/team-harness",
+    "note": "LOCALAPPDATA set → Branch 4 Windows primary sub-branch."
+  },
+  {
+    "name": "Branch4_windows_appdata_fallback",
+    "env": {
+      "APPDATA": "{tmpdir}/appdata"
+    },
+    "os": "windows",
+    "runtimeProbe": "none",
+    "expectedSuffix": "appdata/team-harness",
+    "note": "LOCALAPPDATA unset, APPDATA set → Branch 4 Windows secondary sub-branch."
+  },
+  {
+    "name": "Branch5_home_fallback",
+    "env": {},
+    "os": "all",
+    "runtimeProbe": "none",
+    "expectedSuffix": ".team-harness",
+    "note": "No env, no runtime root, no OS-default → ~/.team-harness (Branch 5 fallback)."
+  }
+]
