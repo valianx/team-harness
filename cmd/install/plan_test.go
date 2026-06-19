@@ -62,7 +62,7 @@ func TestComputePlan_WritesNothing(t *testing.T) {
 		ledgerMtimeBefore = fi.ModTime()
 	}
 
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"test-comp"}, placer, mockFS)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"test-comp"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestComputePlan_HashMatchBucket(t *testing.T) {
 	}
 
 	placer := newClaudeCodePlacerAt(configRoot)
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"c"}, placer, mockFS)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"c"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestComputePlan_UpdateBucket(t *testing.T) {
 	}
 
 	placer := newClaudeCodePlacerAt(configRoot)
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"c"}, placer, mockFS)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"c"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestComputePlan_ToRemove(t *testing.T) {
 	placer := newClaudeCodePlacerAt(configRoot)
 
 	// selected = empty — comp-old is ledger-owned but not selected → ToRemove.
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{}, []string{}, placer, mockFS)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{}, []string{}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestComputePlan_LedgerErrorsSurfaced(t *testing.T) {
 	m := ModuleManifest{SchemaVersion: 1, Module: "m", DefaultInstall: "always", Components: []string{}}
 	placer := newClaudeCodePlacerAt(configRoot)
 
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{}, []string{}, placer, fstest.MapFS{})
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{}, []string{}, placer, fstest.MapFS{}, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}

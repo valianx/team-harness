@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -144,6 +145,67 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 	return report, nil
 }
 
+// deleteConfigKey removes a single key (possibly dotted, e.g. "mcp.memory")
+// from raw (a top-level json.RawMessage map). Returns true if the key was present
+// and removed.
+//
+// For dotted keys, it walks the parent chain and deletes only the named leaf,
+// preserving all sibling keys. The parent object is pruned ONLY if it becomes
+// empty after the leaf is removed (SEC-DR-2 leaf-exact delete contract).
+func deleteConfigKey(raw map[string]json.RawMessage, key string) bool {
+	parts := strings.SplitN(key, ".", 2)
+	if len(parts) == 1 {
+		// Top-level key.
+		if _, ok := raw[key]; ok {
+			delete(raw, key)
+			return true
+		}
+		return false
+	}
+
+	// Dotted key — descend one level.
+	parent := parts[0]
+	leaf := parts[1]
+
+	parentRaw, ok := raw[parent]
+	if !ok {
+		return false
+	}
+
+	var parentMap map[string]json.RawMessage
+	if err := json.Unmarshal(parentRaw, &parentMap); err != nil {
+		return false
+	}
+
+	// Recursively delete the leaf within the parent map.
+	// For now, support exactly one level of nesting (sufficient for mcp.memory).
+	leafParts := strings.SplitN(leaf, ".", 2)
+	if len(leafParts) == 1 {
+		if _, ok := parentMap[leaf]; !ok {
+			return false
+		}
+		delete(parentMap, leaf)
+	} else {
+		// Two levels deep — recurse into a nested structure.
+		if !deleteConfigKey(parentMap, leaf) {
+			return false
+		}
+	}
+
+	// Prune the parent only when it becomes empty.
+	if len(parentMap) == 0 {
+		delete(raw, parent)
+	} else {
+		// Re-encode the parent map without the removed leaf.
+		encoded, err := json.Marshal(parentMap)
+		if err != nil {
+			return false
+		}
+		raw[parent] = json.RawMessage(encoded)
+	}
+	return true
+}
+
 // deleteFiles removes the given concrete paths. Already-absent files are
 // skipped (idempotent). The removed paths are appended to r.FilesRemoved.
 func deleteFiles(paths []string, r *RemovedComponent) error {
@@ -185,11 +247,12 @@ func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent
 		}
 	}
 
-	// Delete the owned keys.
+	// Delete the owned keys. Keys may be dotted (e.g. "mcp.memory") requiring a
+	// nested lookup, or top-level (e.g. "logs-mode"). SEC-DR-2: leaf-exact delete
+	// — never remove a parent key (e.g. "mcp") unless all sibling leaves are gone.
 	removed := make([]string, 0, len(keys))
 	for _, k := range keys {
-		if _, present := raw[k]; present {
-			delete(raw, k)
+		if deleteConfigKey(raw, k) {
 			removed = append(removed, k)
 		}
 	}

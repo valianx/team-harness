@@ -1,0 +1,267 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+)
+
+// ---------------------------------------------------------------------------
+// Suite: Transform conformance fixture (AC-2, AC-3, AC-4)
+// ---------------------------------------------------------------------------
+
+// conformanceCase is one entry in testdata/transform-conformance.json.
+type conformanceCase struct {
+	Name           string `json:"name"`
+	Surface        string `json:"surface"`  // "agent" or "command"
+	Input          string `json:"input"`
+	ExpectedOutput string `json:"expectedOutput"`
+	ExpectError    bool   `json:"expectError"`
+	Note           string `json:"note"`
+}
+
+// TestTransformConformance_FixtureGo asserts every case in the shared
+// transform-conformance.json fixture against transformToOpencode.
+//
+// This is half of the cross-language drift contract (AC-3). The other half is
+// the node-side assertion in tools/harness-migrate/ which runs migrate.mjs
+// against the same fixture and confirms the output is identical.
+func TestTransformConformance_FixtureGo(t *testing.T) {
+	data, err := os.ReadFile("testdata/transform-conformance.json")
+	if err != nil {
+		t.Fatalf("read conformance fixture: %v", err)
+	}
+
+	var cases []conformanceCase
+	if err := json.Unmarshal(data, &cases); err != nil {
+		t.Fatalf("parse conformance fixture: %v", err)
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.Name, func(t *testing.T) {
+			kind := TransformKindAgent
+			if tc.Surface == "command" {
+				kind = TransformKindCommand
+			}
+
+			got, err := transformToOpencode([]byte(tc.Input), kind)
+			if tc.ExpectError {
+				if err == nil {
+					t.Errorf("expected error but got none; output:\n%s", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Normalize line endings for comparison (Windows-safe).
+			gotStr := strings.ReplaceAll(string(got), "\r\n", "\n")
+			wantStr := strings.ReplaceAll(tc.ExpectedOutput, "\r\n", "\n")
+
+			if gotStr != wantStr {
+				t.Errorf("output mismatch:\nwant:\n%s\ngot:\n%s", wantStr, gotStr)
+			}
+		})
+	}
+}
+
+// TestTransform_SkillIdentity asserts that skill/hook kinds pass through unchanged.
+func TestTransform_SkillIdentity(t *testing.T) {
+	input := "---\nname: my-skill\n---\nSkill body.\n"
+	got, err := transformToOpencode([]byte(input), "skill")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(got) != input {
+		t.Errorf("skill transform should be identity; got %q", got)
+	}
+
+	got2, err := transformToOpencode([]byte(input), "hook")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(got2) != input {
+		t.Errorf("hook transform should be identity; got %q", got2)
+	}
+}
+
+// TestTransform_EffortDropped asserts that effort: is not present in the output
+// of an agent transform (S-4, AC-2).
+func TestTransform_EffortDropped(t *testing.T) {
+	input := "---\nname: test\nmodel: sonnet\neffort: high\ntools: Read\n---\n"
+	got, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(got), "effort") {
+		t.Error("transformed output must not contain 'effort' key (S-4)")
+	}
+}
+
+// TestTransform_ModelPrefixIdempotent asserts that already-prefixed models
+// are not double-prefixed.
+func TestTransform_ModelPrefixIdempotent(t *testing.T) {
+	input := "---\nmodel: anthropic/claude-opus-4-8\ntools: Read\n---\n"
+	got, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	count := strings.Count(string(got), "anthropic/")
+	if count != 1 {
+		t.Errorf("expected exactly 1 'anthropic/' prefix, got %d in:\n%s", count, got)
+	}
+}
+
+// TestTransform_BlankModelSkipped asserts that a missing model field does not
+// produce a model: line in the output.
+func TestTransform_BlankModelSkipped(t *testing.T) {
+	input := "---\nname: test\ntools: Read\n---\n"
+	got, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(got), "\nmodel:") {
+		t.Error("model line should not appear when model is not set in source")
+	}
+}
+
+// TestTransform_ModeByRole_Orchestrator asserts the installer-layer mode-by-role
+// override: applying applyModeByRole to an already-transformed orchestrator file
+// replaces mode: subagent with mode: primary (AC-12 / S-5).
+//
+// This test is deliberately separate from the conformance fixture — the generic
+// transform always injects mode: subagent (fixture-bound / migrate.mjs parity);
+// the role override is an installer-specific post-projection step.
+func TestTransform_ModeByRole_Orchestrator(t *testing.T) {
+	input := "---\nname: orchestrator\nmodel: sonnet\ntools: Read\n---\nBody.\n"
+	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err != nil {
+		t.Fatalf("transform error: %v", err)
+	}
+
+	// After the generic transform, mode should be subagent.
+	if !strings.Contains(string(transformed), "mode: subagent") {
+		t.Error("generic transform should set mode: subagent for orchestrator")
+	}
+
+	// Apply the mode-by-role override.
+	final, err := applyModeByRole(transformed, "orchestrator")
+	if err != nil {
+		t.Fatalf("applyModeByRole error: %v", err)
+	}
+	if !strings.Contains(string(final), "mode: primary") {
+		t.Error("after applyModeByRole, orchestrator should have mode: primary")
+	}
+	if strings.Contains(string(final), "mode: subagent") {
+		t.Error("after applyModeByRole, 'mode: subagent' should be replaced in orchestrator")
+	}
+}
+
+// TestTransform_ModeByRole_NonOrchestrator asserts that applyModeByRole leaves
+// non-orchestrator agents unchanged (mode: subagent preserved).
+func TestTransform_ModeByRole_NonOrchestrator(t *testing.T) {
+	input := "---\nname: architect\nmodel: opus\ntools: Read\n---\nBody.\n"
+	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err != nil {
+		t.Fatalf("transform error: %v", err)
+	}
+
+	final, err := applyModeByRole(transformed, "architect")
+	if err != nil {
+		t.Fatalf("applyModeByRole error: %v", err)
+	}
+
+	// Should still have mode: subagent.
+	if !strings.Contains(string(final), "mode: subagent") {
+		t.Error("non-orchestrator agent should retain mode: subagent after applyModeByRole")
+	}
+}
+
+// TestTransform_InjectionReject_Body asserts fail-closed for inline injection
+// in the body (AC-4a).
+func TestTransform_InjectionReject_Body(t *testing.T) {
+	input := "---\nname: bad\nmodel: sonnet\ntools: Read\n---\nSome !`evil` here.\n"
+	_, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err == nil {
+		t.Error("expected error for inline injection in body, got nil")
+	}
+}
+
+// TestTransform_InjectionReject_FencedBody asserts fail-closed for fenced
+// injection in the body (AC-4b).
+func TestTransform_InjectionReject_FencedBody(t *testing.T) {
+	input := "---\nname: bad\nmodel: sonnet\ntools: Read\n---\n```!evil\n```\n"
+	_, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err == nil {
+		t.Error("expected error for fenced injection in body, got nil")
+	}
+}
+
+// TestTransform_InjectionReject_FrontmatterString asserts fail-closed for
+// injection in a top-level frontmatter string value (AC-4b).
+func TestTransform_InjectionReject_FrontmatterString(t *testing.T) {
+	input := "---\nname: bad\ndescription: Run !`evil`\nmodel: sonnet\ntools: Read\n---\n"
+	_, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err == nil {
+		t.Error("expected error for injection in frontmatter string value, got nil")
+	}
+}
+
+// TestTransform_PollutionKeyReject_Proto asserts __proto__ at top level is
+// rejected (AC-4 / SEC-DR-4).
+func TestTransform_PollutionKeyReject_Proto(t *testing.T) {
+	input := "---\n__proto__: {isAdmin: true}\nmodel: sonnet\ntools: Read\n---\n"
+	_, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err == nil {
+		t.Error("expected error for __proto__ pollution key, got nil")
+	}
+}
+
+// TestTransform_PollutionKeyReject_Constructor asserts constructor at top level
+// is rejected (AC-4 / SEC-DR-4).
+func TestTransform_PollutionKeyReject_Constructor(t *testing.T) {
+	input := "---\nconstructor: evil\nmodel: sonnet\ntools: Read\n---\n"
+	_, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err == nil {
+		t.Error("expected error for constructor pollution key, got nil")
+	}
+}
+
+// TestTransform_PollutionKeyReject_Prototype asserts prototype at top level is
+// rejected (AC-4 / SEC-DR-4).
+func TestTransform_PollutionKeyReject_Prototype(t *testing.T) {
+	input := "---\nprototype: evil\nmodel: sonnet\ntools: Read\n---\n"
+	_, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err == nil {
+		t.Error("expected error for prototype pollution key, got nil")
+	}
+}
+
+// TestTransform_ThOriginPresent asserts that the th-origin marker is set to
+// "opencode" in every agent transform output.
+func TestTransform_ThOriginPresent(t *testing.T) {
+	input := "---\nname: architect\nmodel: opus\ntools: Read\n---\nBody.\n"
+	got, err := transformToOpencode([]byte(input), TransformKindAgent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(got), "th-origin: opencode") {
+		t.Error("th-origin: opencode not present in transform output")
+	}
+}
+
+// TestTransform_CommandArgumentHintDropped asserts that argument-hint is not
+// carried forward in the command transform (no opencode equivalent).
+func TestTransform_CommandArgumentHintDropped(t *testing.T) {
+	input := "---\nname: cmd\nmodel: sonnet\nargument-hint: '<branch>'\nallowed-tools: Bash\n---\nBody.\n"
+	got, err := transformToOpencode([]byte(input), TransformKindCommand)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(got), "argument-hint") {
+		t.Error("argument-hint must be dropped in command transform (no opencode equivalent)")
+	}
+}

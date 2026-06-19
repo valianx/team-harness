@@ -224,6 +224,22 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 18: harness-migrate cross-language conformance (AC-3)"
+echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    echo "transform-conformance: SKIP (node not found — install Node.js to run this suite)"
+else
+    if node "$TESTS_DIR/../tools/harness-migrate/test_transform_conformance.mjs"; then
+        echo "transform-conformance: PASS"
+    else
+        echo "transform-conformance: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

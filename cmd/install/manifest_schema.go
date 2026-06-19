@@ -44,6 +44,18 @@ type ComponentManifest struct {
 // No component may declare ownership of these keys (C-1).
 var reservedOperatorNamespaces = []string{"mcpServers"}
 
+// mcpLeafAllowlist is the set of EXACT leaf keys under the "mcp" namespace
+// that TH components are permitted to declare ownership of. All other keys
+// under "mcp" (including bare "mcp" and any "mcp.<other>") are rejected.
+//
+// SEC-DR-2 leaf-exact allowlist: TH owns mcp.memory + mcp.context7;
+// the operator owns everything else under mcp. This must be symmetric in
+// BOTH validateComponentManifest AND validateOwnershipTags.
+var mcpLeafAllowlist = map[string]bool{
+	"mcp.memory":  true,
+	"mcp.context7": true,
+}
+
 // configKeyPattern is the structural gate for configKey names (SEC-05 / SEC-DR-P3-3).
 // A valid configKey is a bare dotted key name: letters, digits, underscores,
 // hyphens, and dots. No '=', no whitespace, no quotes.
@@ -181,9 +193,10 @@ func validateComponentManifest(c ComponentManifest, moduleByName map[string]Modu
 		return fmt.Errorf("component %q: references unknown module %q", c.Component, c.Module)
 	}
 
-	validKind := map[string]bool{"agent": true, "skill": true, "hook": true}
+	// S-7: command kind added so future command components validate.
+	validKind := map[string]bool{"agent": true, "skill": true, "hook": true, "command": true}
 	if !validKind[c.Kind] {
-		return fmt.Errorf("component %q: invalid kind %q (want agent|skill|hook)", c.Component, c.Kind)
+		return fmt.Errorf("component %q: invalid kind %q (want agent|skill|hook|command)", c.Component, c.Kind)
 	}
 
 	validCost := map[string]bool{"low": true, "medium": true, "high": true}
@@ -219,14 +232,42 @@ func validateComponentManifest(c ComponentManifest, moduleByName map[string]Modu
 		if !configKeyPattern.MatchString(k) {
 			return fmt.Errorf("component %q: Emits.ConfigKeys entry %q fails structural pattern ^[A-Za-z0-9_.-]+$ (SEC-05)", c.Component, k)
 		}
-		// Forbid ownership of keys in the reserved operator-owned namespace.
-		for _, ns := range reservedOperatorNamespaces {
-			if k == ns || strings.HasPrefix(k, ns+".") {
-				return fmt.Errorf("component %q: Emits.ConfigKeys entry %q is in reserved operator namespace %q — components cannot own ~/.claude.json keys (C-1)", c.Component, k, ns)
-			}
+		if err := validateConfigKeyNamespace(c.Component, k); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+// validateConfigKeyNamespace applies the SEC-05 reserved-namespace + leaf-exact
+// allowlist check to a single configKey name.
+//
+// Rules (SEC-DR-2):
+//   - "mcpServers" and any "mcpServers.*" are ALWAYS forbidden (C-1).
+//   - Bare "mcp" is forbidden.
+//   - "mcp.<x>" is forbidden UNLESS x is in mcpLeafAllowlist
+//     ("mcp.memory", "mcp.context7").
+//   - All other top-level keys are permitted.
+//
+// This gate is symmetric with validateOwnershipTags in ledger.go.
+func validateConfigKeyNamespace(component, k string) error {
+	// Forbid the legacy claude.json namespace unconditionally.
+	for _, ns := range reservedOperatorNamespaces {
+		if k == ns || strings.HasPrefix(k, ns+".") {
+			return fmt.Errorf("component %q: Emits.ConfigKeys entry %q is in reserved operator namespace %q — components cannot own ~/.claude.json keys (C-1)", component, k, ns)
+		}
+	}
+
+	// SEC-DR-2: leaf-exact allowlist within the "mcp" namespace.
+	if k == "mcp" {
+		return fmt.Errorf("component %q: Emits.ConfigKeys entry %q — bare 'mcp' key is operator-owned; declare specific leaves (mcp.memory or mcp.context7) (SEC-DR-2)", component, k)
+	}
+	if strings.HasPrefix(k, "mcp.") {
+		if !mcpLeafAllowlist[k] {
+			return fmt.Errorf("component %q: Emits.ConfigKeys entry %q — only mcp.memory and mcp.context7 are declarable by TH components; %q is operator-owned (SEC-DR-2)", component, k, k)
+		}
+	}
 	return nil
 }
 

@@ -37,12 +37,27 @@ type PlanDiff struct {
 // to-create / to-update / to-skip-hash-match / to-remove. It writes nothing.
 // LedgerErrors from readLedger are carried into the diff so the operator sees
 // integrity problems in the dry-run (SEC-06 binding).
+//
+// The transform parameter is applied to each component's source bytes BEFORE
+// hashBytes is computed (S-1 idempotency fix). For the claude-code runtime,
+// pass nil (identity). For the opencode runtime, pass opencodeRuntimeTransform
+// which applies the generic CC→opencode transform AND the mode-by-role override
+// using the source path to identify the orchestrator. This ensures PlannedFile.SrcHash
+// is the hash of the transformed bytes and ApplyPlan writes the same transformed
+// bytes — a second apply will find dstHash == srcHash and produce no writes.
+//
+// Transform signature: func(src, kind, sourcePath) ([]byte, error)
+//   - src:        embedded source bytes
+//   - kind:       component kind ("agent", "skill", "hook", "command")
+//   - sourcePath: embedded FS path (e.g. "agents/orchestrator.md") — used by
+//                 the opencode transform to identify mode-by-role targets
 func ComputePlan(
 	modules []ModuleManifest,
 	components []ComponentManifest,
 	selected []string,
 	placer Placer,
 	embeddedFS fs.FS,
+	transform func(src []byte, kind, sourcePath string) ([]byte, error),
 ) (PlanDiff, error) {
 	selectedSet := make(map[string]bool, len(selected))
 	for _, s := range selected {
@@ -88,6 +103,18 @@ func ComputePlan(
 		if err != nil {
 			return PlanDiff{}, fmt.Errorf("plan: cannot read source %q for component %q: %w", c.Source, compID, err)
 		}
+
+		// S-1: apply the runtime transform BEFORE hashing so that SrcHash is
+		// the hash of the bytes that will be written on disk. A nil transform is
+		// treated as identity (claude-code path). The source path (c.Source) is
+		// passed so the transform can apply mode-by-role logic for agents.
+		if transform != nil {
+			srcData, err = transform(srcData, c.Kind, c.Source)
+			if err != nil {
+				return PlanDiff{}, fmt.Errorf("plan: transform component %q (source %q): %w", compID, c.Source, err)
+			}
+		}
+
 		srcHash := hashBytes(srcData)
 
 		for _, tpl := range c.Emits.Files {

@@ -1,0 +1,128 @@
+[
+  {
+    "name": "agent_bare_model_prefix",
+    "surface": "agent",
+    "input": "---\nname: architect\ndescription: Software architect\nmodel: opus\ntools: Read, Edit, Bash\n---\nBody text here.\n",
+    "expectedOutput": "---\nname: architect\ndescription: Software architect\nmodel: anthropic/opus\npermission: {allow: [Read, Edit, Bash], ask: [], deny: []}\nmode: subagent\nth-origin: opencode\n---\nBody text here.\n"
+  },
+  {
+    "name": "agent_already_prefixed_model_idempotent",
+    "surface": "agent",
+    "input": "---\nname: architect\nmodel: anthropic/claude-opus-4-8\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: architect\nmodel: anthropic/claude-opus-4-8\npermission: {allow: [Read], ask: [], deny: []}\nmode: subagent\nth-origin: opencode\n---\nBody.\n"
+  },
+  {
+    "name": "agent_multi_tools",
+    "surface": "agent",
+    "input": "---\ndescription: Implementer\nmodel: sonnet\ntools: Read, Edit, Write, Bash, Glob\n---\n",
+    "expectedOutput": "---\ndescription: Implementer\nmodel: anthropic/sonnet\npermission: {allow: [Read, Edit, Write, Bash, Glob], ask: [], deny: []}\nmode: subagent\nth-origin: opencode\n---\n"
+  },
+  {
+    "name": "agent_empty_tools",
+    "surface": "agent",
+    "input": "---\nname: init\nmodel: haiku\ntools: \n---\nBody.\n",
+    "expectedOutput": "---\nname: init\nmodel: anthropic/haiku\npermission: {allow: [], ask: [], deny: []}\nmode: subagent\nth-origin: opencode\n---\nBody.\n"
+  },
+  {
+    "name": "agent_effort_dropped",
+    "surface": "agent",
+    "input": "---\nname: orchestrator\nmodel: sonnet\neffort: high\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: orchestrator\nmodel: anthropic/sonnet\npermission: {allow: [Read], ask: [], deny: []}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "S-4: effort is dropped — opencode has no effort field. This case asserts the drop so a future reader does not restore it."
+  },
+  {
+    "name": "agent_color_passthrough",
+    "surface": "agent",
+    "input": "---\nname: architect\nmodel: opus\ncolor: purple\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: architect\nmodel: anthropic/opus\npermission: {allow: [Read], ask: [], deny: []}\nmode: subagent\ncolor: purple\nth-origin: opencode\n---\nBody.\n"
+  },
+  {
+    "name": "agent_blanket_mode_subagent",
+    "surface": "agent",
+    "input": "---\nname: orchestrator\nmodel: sonnet\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: orchestrator\nmodel: anthropic/sonnet\npermission: {allow: [Read], ask: [], deny: []}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "Generic transform injects mode: subagent for ALL agents — including orchestrator. The mode-by-role override (orchestrator → primary) is an installer layer applied AFTER this generic transform and is NOT reflected here (AC-12)."
+  },
+  {
+    "name": "command_string_allowed_tools",
+    "surface": "command",
+    "input": "---\nname: my-command\ndescription: A command\nmodel: sonnet\nallowed-tools: Read Edit Bash\n---\nBody.\n",
+    "expectedOutput": "---\nname: my-command\ndescription: A command\nmodel: anthropic/sonnet\npermission: {allow: [Read, Edit, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n"
+  },
+  {
+    "name": "command_array_allowed_tools",
+    "surface": "command",
+    "input": "---\nname: deploy\ndescription: Deploy command\nmodel: sonnet\nallowed-tools: [Read, Bash]\n---\nBody.\n",
+    "expectedOutput": "---\nname: deploy\ndescription: Deploy command\nmodel: anthropic/sonnet\npermission: {allow: [Read, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n"
+  },
+  {
+    "name": "reject_inline_injection_in_body",
+    "surface": "agent",
+    "input": "---\nname: bad\nmodel: sonnet\ntools: Read\n---\nSome text !`evil` more text.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: inline bang-backtick injection in body is rejected fail-closed."
+  },
+  {
+    "name": "reject_fenced_injection_in_body",
+    "surface": "agent",
+    "input": "---\nname: bad\nmodel: sonnet\ntools: Read\n---\n```!evil\n```\n",
+    "expectError": true,
+    "note": "SEC-DR-4: fenced triple-backtick-bang injection in body is rejected fail-closed."
+  },
+  {
+    "name": "reject_injection_in_toplevel_string_value",
+    "surface": "agent",
+    "input": "---\nname: bad\ndescription: Run !`evil` here\nmodel: sonnet\ntools: Read\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: injection in a top-level frontmatter string value is rejected."
+  },
+  {
+    "name": "reject_injection_in_nested_object_value",
+    "surface": "agent",
+    "input": "---\nname: bad\nmodel: sonnet\ntools: Read\npermission: {allow: [!`evil`]}\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: injection in a nested object value (recursive check) is rejected."
+  },
+  {
+    "name": "reject_pollution_key_proto_toplevel",
+    "surface": "agent",
+    "input": "---\nname: bad\n__proto__: {isAdmin: true}\nmodel: sonnet\ntools: Read\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: __proto__ at top level is rejected."
+  },
+  {
+    "name": "reject_pollution_key_constructor_toplevel",
+    "surface": "agent",
+    "input": "---\nname: bad\nconstructor: evil\nmodel: sonnet\ntools: Read\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: constructor at top level is rejected."
+  },
+  {
+    "name": "reject_pollution_key_prototype_toplevel",
+    "surface": "agent",
+    "input": "---\nname: bad\nprototype: evil\nmodel: sonnet\ntools: Read\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: prototype at top level is rejected."
+  },
+  {
+    "name": "reject_pollution_key_proto_nested",
+    "surface": "agent",
+    "input": "---\nname: bad\nmodel: sonnet\ntools: Read\nextras:\n  __proto__: injected\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: __proto__ nested inside a block-style frontmatter object is rejected (recursive guard). Both Go and JS parsers handle block-style nesting and must reject identically."
+  },
+  {
+    "name": "reject_pollution_key_constructor_nested",
+    "surface": "agent",
+    "input": "---\nname: bad\nmodel: sonnet\ntools: Read\nextras:\n  constructor: evil\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: constructor nested inside a block-style frontmatter object is rejected (recursive guard). Both Go and JS parsers handle block-style nesting and must reject identically."
+  },
+  {
+    "name": "reject_pollution_key_prototype_nested",
+    "surface": "agent",
+    "input": "---\nname: bad\nmodel: sonnet\ntools: Read\nextras:\n  prototype: evil\n---\nBody.\n",
+    "expectError": true,
+    "note": "SEC-DR-4: prototype nested inside a block-style frontmatter object is rejected (recursive guard). Both Go and JS parsers handle block-style nesting and must reject identically."
+  }
+]

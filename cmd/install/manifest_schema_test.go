@@ -235,3 +235,102 @@ func TestValidateManifests_DuplicateComponentID(t *testing.T) {
 		t.Error("expected error for duplicate component id in module, got nil")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// SEC-DR-2: leaf-exact allowlist within mcp namespace (AC-9)
+// ---------------------------------------------------------------------------
+
+// TestValidateConfigKeyNamespace_McpAllowlistedLeavesAccepted verifies AC-9:
+// mcp.memory and mcp.context7 are the ONLY leaves TH components may declare
+// under the mcp namespace, and they are accepted.
+func TestValidateConfigKeyNamespace_McpAllowlistedLeavesAccepted(t *testing.T) {
+	for _, k := range []string{"mcp.memory", "mcp.context7"} {
+		if err := validateConfigKeyNamespace("test-comp", k); err != nil {
+			t.Errorf("allowlisted key %q should be accepted, got error: %v", k, err)
+		}
+	}
+}
+
+// TestValidateConfigKeyNamespace_BareMcpRejected verifies AC-9: bare "mcp"
+// is rejected (operator-owned; TH must declare specific leaves).
+func TestValidateConfigKeyNamespace_BareMcpRejected(t *testing.T) {
+	if err := validateConfigKeyNamespace("test-comp", "mcp"); err == nil {
+		t.Error("bare 'mcp' key should be rejected (SEC-DR-2), got nil")
+	}
+}
+
+// TestValidateConfigKeyNamespace_McpEvilRejected verifies AC-9 negative test:
+// mcp.evil (non-allowlisted leaf under mcp) is rejected (SEC-DR-2).
+func TestValidateConfigKeyNamespace_McpEvilRejected(t *testing.T) {
+	if err := validateConfigKeyNamespace("test-comp", "mcp.evil"); err == nil {
+		t.Error("mcp.evil should be rejected by SEC-DR-2 leaf-exact allowlist, got nil")
+	}
+}
+
+// TestValidateConfigKeyNamespace_McpOtherServersRejected verifies that
+// mcp.<operator-server> keys are not declarable by TH components.
+func TestValidateConfigKeyNamespace_McpOtherServersRejected(t *testing.T) {
+	for _, k := range []string{"mcp.custom", "mcp.brave-search", "mcp.filesystem"} {
+		if err := validateConfigKeyNamespace("test-comp", k); err == nil {
+			t.Errorf("operator mcp key %q should be rejected (SEC-DR-2), got nil", k)
+		}
+	}
+}
+
+// TestValidateConfigKeyNamespace_McpServersNamespaceStillRejected verifies C-1:
+// the existing mcpServers.* namespace (claude.json) is still fully rejected.
+func TestValidateConfigKeyNamespace_McpServersNamespaceStillRejected(t *testing.T) {
+	for _, k := range []string{"mcpServers", "mcpServers.memory", "mcpServers.context7"} {
+		if err := validateConfigKeyNamespace("test-comp", k); err == nil {
+			t.Errorf("mcpServers key %q should be rejected (C-1), got nil", k)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// R2-1: {env:VAR} reference syntax in opencode.json (AC-5 / AC-14)
+// ---------------------------------------------------------------------------
+
+// TestOpencodeJSON_EnvVarReferenceSyntax verifies R2-1: the {env:VAR} references
+// are written in the correct opencode syntax — not as literal secret values and
+// not as a different interpolation format.
+func TestOpencodeJSON_EnvVarReferenceSyntax(t *testing.T) {
+	memURL := "https://mcp.example.com/mcp"
+	entry := buildOpencodeMemoryEntry(memURL)
+	if entry == nil {
+		t.Fatal("buildOpencodeMemoryEntry returned nil for non-empty URL")
+	}
+
+	headers, ok := entry["headers"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("headers field missing or not a map; got %T", entry["headers"])
+	}
+
+	auth, ok := headers["Authorization"].(string)
+	if !ok {
+		t.Fatalf("Authorization header missing or not a string; got %T", headers["Authorization"])
+	}
+
+	// R2-1: must be the exact {env:MEMORY_MCP_BEARER} reference (not a literal secret).
+	const wantAuth = "{env:MEMORY_MCP_BEARER}"
+	if auth != wantAuth {
+		t.Errorf("Authorization header = %q, want %q", auth, wantAuth)
+	}
+
+	// Verify the context7 entry similarly.
+	ctx7Entry := buildOpencodeContext7Entry("https://mcp.context7.com/mcp")
+	ctx7Headers, ok := ctx7Entry["headers"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("context7 headers field missing or not a map; got %T", ctx7Entry["headers"])
+	}
+
+	ctx7Key, ok := ctx7Headers["CONTEXT7_API_KEY"].(string)
+	if !ok {
+		t.Fatalf("CONTEXT7_API_KEY header missing or not a string; got %T", ctx7Headers["CONTEXT7_API_KEY"])
+	}
+
+	const wantCtx7 = "{env:CONTEXT7_API_KEY}"
+	if ctx7Key != wantCtx7 {
+		t.Errorf("CONTEXT7_API_KEY header = %q, want %q", ctx7Key, wantCtx7)
+	}
+}

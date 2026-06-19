@@ -206,7 +206,7 @@ function parseFrontmatter(content) {
             obj[innerKey] = innerArr;
             continue;
           }
-          obj[innerKey] = parseScalar(innerRest);
+          obj[innerKey] = parseTopLevelValue(innerRest);
         }
         i++;
       }
@@ -214,11 +214,90 @@ function parseFrontmatter(content) {
       continue;
     }
 
-    fm[key] = parseScalar(rest);
+    fm[key] = parseTopLevelValue(rest);
     i++;
   }
 
   return { frontmatter: fm, body };
+}
+
+/**
+ * Parse a frontmatter value that may be a scalar, inline flow sequence, or
+ * inline flow mapping. Extends parseScalar to handle the {…} and […] forms
+ * that appear both in CC and opencode fixture files.
+ *
+ * This is used for top-level and inner-object values where the rest of the
+ * line is non-empty (i.e. not an indented block sequence or block mapping).
+ */
+function parseTopLevelValue(s) {
+  if (s.startsWith("{") && s.endsWith("}")) {
+    // Inline flow mapping — parse as a null-prototype object to match the
+    // same invariant as the block-nesting path.
+    const inner = s.slice(1, s.length - 1);
+    return parseFlowMappingToNullProto(inner);
+  }
+  if (s.startsWith("[") && s.endsWith("]")) {
+    // Inline flow sequence.
+    const inner = s.slice(1, s.length - 1);
+    return parseInlineFlowSequence(inner);
+  }
+  return parseScalar(s);
+}
+
+/**
+ * Parse the interior of a YAML flow mapping "k: v, k: v" into a
+ * null-prototype object (matching the block-nesting path in parseFrontmatter).
+ */
+function parseFlowMappingToNullProto(inner) {
+  const obj = Object.create(null);
+  const parts = splitFlowComma(inner);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const colonIdx = trimmed.indexOf(":");
+    if (colonIdx < 0) continue;
+    const k = trimmed.slice(0, colonIdx).trim();
+    const v = trimmed.slice(colonIdx + 1).trimStart();
+    obj[k] = parseTopLevelValue(v);
+  }
+  return obj;
+}
+
+/**
+ * Parse the interior of a YAML flow sequence "a, b, c" into an array.
+ * Respects nested brackets so comma-splitting is bracket-aware.
+ */
+function parseInlineFlowSequence(inner) {
+  if (!inner.trim()) return [];
+  const parts = splitFlowComma(inner);
+  const out = [];
+  for (const p of parts) {
+    const t = p.trim();
+    if (!t) continue;
+    out.push(parseTopLevelValue(t));
+  }
+  return out;
+}
+
+/**
+ * Split a comma-separated flow-sequence or flow-mapping interior by commas,
+ * respecting nested bracket depth so nested sequences/mappings are not split.
+ */
+function splitFlowComma(s) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "[" || c === "{") depth++;
+    else if (c === "]" || c === "}") depth--;
+    else if (c === "," && depth === 0) {
+      parts.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(s.slice(start));
+  return parts;
 }
 
 function parseScalar(s) {
@@ -265,15 +344,42 @@ function serializeFrontmatter(fm, body) {
 }
 
 // ---------------------------------------------------------------------------
-// Prototype-pollution guard (mirrors shim.ts:rejectPollutionKeys)
+// Prototype-pollution guard (mirrors transform.go:rejectPollutionKeysRecursive)
 // ---------------------------------------------------------------------------
 
+/**
+ * Reject prototype-pollution keys (__proto__, constructor, prototype) at every
+ * object level — recursive, matching the Go port (transform.go:220-233).
+ *
+ * Top-level check: iterate POLLUTION_KEYS and test hasOwnProperty (fast path).
+ * Nested check: recurse into any value that is a plain object or array.
+ *   - Object values: recurse directly.
+ *   - Array items that are plain objects: recurse into each item.
+ *
+ * This mirrors the Go rejectPollutionKeysRecursive which recurses into
+ * map[string]interface{} nested values (transform.go:226-230).
+ */
 function rejectPollutionKeys(obj) {
+  // fast path: check the top-level keys first
   for (const key of POLLUTION_KEYS) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       throw new ContainmentError(
         `Prototype-pollution key detected in frontmatter: '${key}'`
       );
+    }
+  }
+  // recurse into nested objects and array-of-object items
+  for (const value of Object.values(obj)) {
+    if (value !== null && typeof value === "object") {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+            rejectPollutionKeys(item);
+          }
+        }
+      } else {
+        rejectPollutionKeys(value);
+      }
     }
   }
 }
