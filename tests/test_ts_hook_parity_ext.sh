@@ -102,6 +102,116 @@ print('ask' if ent >= 3.5 else 'none')
         FAIL=$((FAIL + 1)); FAILURES+=("AC-9: entropy boundary mismatch (TS=$ts_high expected=$expected_entropy)")
         echo "  [FAIL] AC-9: entropy boundary: TS=$ts_high expected=$expected_entropy"
     fi
+
+    # ---------------------------------------------------------------------------
+    # AC-9 SEC-DR-E: Hard-boundary fixtures (just below / just above the 3.5 threshold).
+    #
+    # Strings are constructed from uniform character distributions whose entropy
+    # is analytically derivable:
+    #
+    #   BELOW: 11 unique chars, each appearing 2× = 22 chars
+    #          H = log2(11) = 3.4594… < 3.5 → should NOT trigger (none)
+    #
+    #   ABOVE: 12 unique chars (a-h appear 2×, i-l appear 1×), total 20 chars
+    #          H = 3.5219… > 3.5 → SHOULD trigger (ask)
+    #
+    # These values are stable under IEEE-754 double arithmetic on both Python and
+    # JS (both use the same underlying FP instruction for log2); no last-bit drift
+    # is possible at these character-frequency distributions.
+    # ---------------------------------------------------------------------------
+
+    # SEC-DR-E boundary BELOW (H = log2(11) = 3.4594... < 3.5) → none
+    # Value: 11 unique ASCII chars each appearing exactly twice (22 chars total)
+    boundary_below_val="abcdefghijkabcdefghijk"
+    boundary_below_H=$(python3 -c "
+import math, sys
+val = sys.argv[1]
+freq = {}
+for c in val: freq[c] = freq.get(c,0)+1
+n = len(val)
+print(f'{-sum((f/n)*math.log2(f/n) for f in freq.values()):.6f}')
+" "$boundary_below_val" 2>/dev/null || echo "3.459432")
+    boundary_below_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'API_KEY='+sys.argv[1]}}))" "$boundary_below_val")
+    boundary_below_out=$(echo "$boundary_below_p" | node "$PB_TS_CJS" 2>/dev/null)
+    boundary_below_dec=$(ext_decision "$boundary_below_out")
+    if [ "$boundary_below_dec" = "none" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: boundary-BELOW (H=$boundary_below_H < 3.5) → none"
+    else
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: boundary-below got=$boundary_below_dec expected=none (H=$boundary_below_H)")
+        echo "  [FAIL] AC-9 SEC-DR-E: boundary-BELOW (H=$boundary_below_H) expected=none got=$boundary_below_dec"
+    fi
+
+    # SEC-DR-E boundary ABOVE (H = 3.5219... > 3.5) → ask
+    # Value: 12 unique ASCII chars (a-h appear 2×, i-l appear 1×), total 20 chars
+    boundary_above_val="abcdefghijklabcdefgh"
+    boundary_above_H=$(python3 -c "
+import math, sys
+val = sys.argv[1]
+freq = {}
+for c in val: freq[c] = freq.get(c,0)+1
+n = len(val)
+print(f'{-sum((f/n)*math.log2(f/n) for f in freq.values()):.6f}')
+" "$boundary_above_val" 2>/dev/null || echo "3.521928")
+    boundary_above_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'API_KEY='+sys.argv[1]}}))" "$boundary_above_val")
+    boundary_above_out=$(echo "$boundary_above_p" | node "$PB_TS_CJS" 2>/dev/null)
+    boundary_above_dec=$(ext_decision "$boundary_above_out")
+    if [ "$boundary_above_dec" = "ask" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: boundary-ABOVE (H=$boundary_above_H > 3.5) → ask"
+    else
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: boundary-above got=$boundary_above_dec expected=ask (H=$boundary_above_H)")
+        echo "  [FAIL] AC-9 SEC-DR-E: boundary-ABOVE (H=$boundary_above_H) expected=ask got=$boundary_above_dec"
+    fi
+
+    # ---------------------------------------------------------------------------
+    # AC-9 SEC-DR-E: Python re vs JS RegExp divergence fixtures.
+    #
+    # Tests MULTILINE (^ in JS /m flag matches start-of-line, same as re.MULTILINE)
+    # and compound-name prefixes (\w+_ before the keyword, e.g. SMTP_TOKEN, DB_PASSWORD).
+    # Both engines must agree on these cases, matching the entropy-gated ask path.
+    # Uses the above-boundary value (H=3.5219) for all divergence fixtures.
+    # ---------------------------------------------------------------------------
+
+    # MULTILINE: high-entropy token appears after a newline (^ start-of-line anchor)
+    # Python re.MULTILINE matches ^ at start of each line; JS /m flag does the same.
+    multiline_content="first_line_prefix
+API_KEY=${boundary_above_val}"
+    multiline_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':sys.argv[1]}}))" "$multiline_content")
+    multiline_bash_out=$(echo "$multiline_p" | bash "$PB_BASH_HOOK" 2>/dev/null)
+    multiline_ts_out=$(echo "$multiline_p" | node "$PB_TS_CJS" 2>/dev/null)
+    multiline_bash_dec=$(ext_decision "$multiline_bash_out")
+    multiline_ts_dec=$(ext_decision "$multiline_ts_out")
+    if [ "$multiline_bash_dec" = "$multiline_ts_dec" ] && [ "$multiline_ts_dec" = "ask" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: MULTILINE parity (newline before API_KEY) Bash=$multiline_bash_dec TS=$multiline_ts_dec"
+    else
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: MULTILINE parity mismatch Bash=$multiline_bash_dec TS=$multiline_ts_dec")
+        echo "  [FAIL] AC-9 SEC-DR-E: MULTILINE parity Bash=$multiline_bash_dec TS=$multiline_ts_dec (both expected ask)"
+    fi
+
+    # Compound-name prefix: SMTP_TOKEN= (\\w+_ before TOKEN keyword)
+    smtp_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'SMTP_TOKEN='+sys.argv[1]}}))" "$boundary_above_val")
+    smtp_bash_out=$(echo "$smtp_p" | bash "$PB_BASH_HOOK" 2>/dev/null)
+    smtp_ts_out=$(echo "$smtp_p" | node "$PB_TS_CJS" 2>/dev/null)
+    smtp_bash_dec=$(ext_decision "$smtp_bash_out")
+    smtp_ts_dec=$(ext_decision "$smtp_ts_out")
+    if [ "$smtp_bash_dec" = "$smtp_ts_dec" ] && [ "$smtp_ts_dec" = "ask" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: compound-name SMTP_TOKEN parity Bash=$smtp_bash_dec TS=$smtp_ts_dec"
+    else
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: compound SMTP_TOKEN parity mismatch Bash=$smtp_bash_dec TS=$smtp_ts_dec")
+        echo "  [FAIL] AC-9 SEC-DR-E: compound-name SMTP_TOKEN parity Bash=$smtp_bash_dec TS=$smtp_ts_dec (both expected ask)"
+    fi
+
+    # Compound-name prefix: DB_PASSWORD= (\\w+_ before PASSWORD keyword)
+    dbpw_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'DB_PASSWORD='+sys.argv[1]}}))" "$boundary_above_val")
+    dbpw_bash_out=$(echo "$dbpw_p" | bash "$PB_BASH_HOOK" 2>/dev/null)
+    dbpw_ts_out=$(echo "$dbpw_p" | node "$PB_TS_CJS" 2>/dev/null)
+    dbpw_bash_dec=$(ext_decision "$dbpw_bash_out")
+    dbpw_ts_dec=$(ext_decision "$dbpw_ts_out")
+    if [ "$dbpw_bash_dec" = "$dbpw_ts_dec" ] && [ "$dbpw_ts_dec" = "ask" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: compound-name DB_PASSWORD parity Bash=$dbpw_bash_dec TS=$dbpw_ts_dec"
+    else
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: compound DB_PASSWORD parity mismatch Bash=$dbpw_bash_dec TS=$dbpw_ts_dec")
+        echo "  [FAIL] AC-9 SEC-DR-E: compound-name DB_PASSWORD parity Bash=$dbpw_bash_dec TS=$dbpw_ts_dec (both expected ask)"
+    fi
 fi
 
 # ---------------------------------------------------------------------------

@@ -27,12 +27,13 @@ function makeStateReader(): StateReader {
       }
     },
 
-    findFiles(dir: string, name: string): string[] {
+    findFiles(dir: string, name: string, maxDepth: number): string[] {
       try {
         const results: string[] = [];
-        const stack: string[] = [dir];
+        // Stack entries carry the directory path and the current depth level.
+        const stack: Array<{ dir: string; depth: number }> = [{ dir, depth: 0 }];
         while (stack.length > 0) {
-          const current = stack.pop()!;
+          const { dir: current, depth } = stack.pop()!;
           let entries: fs.Dirent[];
           try {
             entries = fs.readdirSync(current, { withFileTypes: true });
@@ -42,7 +43,10 @@ function makeStateReader(): StateReader {
           for (const e of entries) {
             const fullPath = path.join(current, e.name);
             if (e.isDirectory()) {
-              stack.push(fullPath);
+              // Only descend if we have not yet reached the caller's depth limit.
+              if (depth < maxDepth) {
+                stack.push({ dir: fullPath, depth: depth + 1 });
+              }
             } else if (e.name === name) {
               results.push(fullPath);
             }
@@ -54,11 +58,12 @@ function makeStateReader(): StateReader {
       }
     },
 
-    mtime(filePath: string): number | null {
+    // fix(checkpoint-guard): return 0 on error per StateReader contract (null → NaN in sort)
+    mtime(filePath: string): number {
       try {
         return fs.statSync(filePath).mtimeMs;
       } catch {
-        return null;
+        return 0;
       }
     },
 

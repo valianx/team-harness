@@ -40,14 +40,19 @@ export class ShimRejectError extends Error {
 // SEC-07 helpers — all operate on the RAW string, before JSON.parse
 // ---------------------------------------------------------------------------
 
-/** O(n) length check on the raw string, before JSON.parse. */
+/** O(n) length check on the raw string, before JSON.parse.
+ *  Uses byte count (UTF-8) so the gate aligns with MAX_PAYLOAD_BYTES semantics.
+ *  Buffer.byteLength (Node) and TextEncoder (both Node ≥11 and Bun) both return
+ *  the UTF-8 byte length — no allocation of a new buffer, just a walk of the string. */
 function checkSize(raw: string): void {
-  // Each JS char is at most 3 UTF-8 bytes; use char count as a conservative proxy.
-  // For a true byte count we'd use Buffer / TextEncoder — but for the size GATE,
-  // char count is safe (always ≤ byte count for valid UTF-8 when char count hits the limit).
-  if (raw.length > MAX_PAYLOAD_BYTES) {
+  // fix(shim): count UTF-8 bytes, not JS char units (multi-byte chars were under-counted)
+  const byteLen =
+    typeof Buffer !== "undefined"
+      ? Buffer.byteLength(raw, "utf8")
+      : new TextEncoder().encode(raw).byteLength;
+  if (byteLen > MAX_PAYLOAD_BYTES) {
     throw new ShimRejectError(
-      `SEC-07: payload exceeds max size (${raw.length} chars > ${MAX_PAYLOAD_BYTES})`
+      `SEC-07: payload exceeds max size (${byteLen} bytes > ${MAX_PAYLOAD_BYTES})`
     );
   }
 }
