@@ -1,0 +1,24 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/gcp-guard.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/gcp-guard.cc.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: PreToolUse
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: Bash (all Bash commands that contain gcloud).
+# Timeout: 5s.
+# Fail mode: fail-closed-for-covered (catastrophic→deny, destructive/mutating→ask).
+# Verb classes: read-only(1), mutating(2), destructive(3), catastrophic(4).
+# Strongest-class-wins across all gcloud invocations in a command.
+notes: >
+  gcp-guard is the GCP infrastructure protection gate. The 4-class verb classifier
+  mirrors gcp-guard.sh's strict/fix(sec-001+sec-002) strengthening pass.
+  Additive strengthening catches catastrophic verbs past word 5 (e.g., bash -c gcloud...delete).
+  Unparseable gcloud presence → scan raw input for catastrophic/destructive tokens.

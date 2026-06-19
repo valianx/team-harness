@@ -1,0 +1,21 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/session-start.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/session-start.cc.ts  # Re-use CC entry shape; opencode maps SessionStart separately
+  frontmatterDialect: none
+events:
+  # SessionStart → opencode session:start (if/when opencode exposes this event).
+  # Until then, the CC Bash sh path continues to serve SessionStart on CC.
+  SessionStart: "session:start"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - session:start  # opencode may not expose SessionStart; fail-open (no session block)
+notes: >
+  session-start on opencode: NEVER blocks. If opencode does not expose session:start,
+  the session proceeds without the orchestrator disposition injection for opencode —
+  that is safe (the disposition is an advisory, not a security gate).

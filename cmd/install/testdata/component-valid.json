@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "component": "orchestrator-agent",
+  "module": "core-agents",
+  "kind": "agent",
+  "source": "agents/orchestrator.md",
+  "cost": "high",
+  "stability": "stable",
+  "defaultInstall": true,
+  "emits": {
+    "files": ["{config_root}/agents/orchestrator.md"],
+    "configKeys": ["logs-mode", "logs-path"]
+  }
+}

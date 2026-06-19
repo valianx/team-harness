@@ -109,7 +109,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.109.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.110.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -143,36 +143,38 @@ All commands run from the repo root.
 
 ## 5. Architectural Conventions
 
+> Extended detail for conventions without a dedicated docs/ file: see `docs/conventions.md`.
+
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
-- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`). `architect`, `agent-builder`, and the analysis/coordination tier use `opus`; `init`, `acceptance-checker`, `translator`, and `researcher` run on `haiku`; others generally use `sonnet`.
+- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`). `architect`, `agent-builder`, and the analysis/coordination tier use `opus`; `init`, `acceptance-checker`, `translator`, and `researcher` run on `haiku`; others use `sonnet`.
 - **orchestrator is the hub.** Skills never invoke agents directly — they build a task payload and route to `orchestrator`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
-- **Workspaces as the shared board.** A workspace is the shared working directory for a single pipeline session. Each pipeline run creates its own isolated workspace. Agents communicate through files in `workspaces/{feature-name}/` (each reads prior agents' output, writes its own); the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored.
-- **Dual-mode workspaces.** Output to local `./workspaces/` (default) or a configured Obsidian vault (`work-logs/{repo-name}/{date}_{feature}/`), via `logs-mode` in `~/.claude/.team-harness.json`. The orchestrator resolves the base path once at start and passes it to every agent. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent).
+- **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. See `docs/conventions.md`.
+- **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. See `docs/conventions.md`.
 - **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index. detect + confirm gate; parallel multi-project dispatch (v2.61.0) fans out Stage-2 lanes when ≥2 projects clear STAGE-GATE-1 (`--serial` always wins). Full contracts: `agents/orchestrator.md § Parallel Multi-Project Dispatch`; `docs/discover-phase.md § 11`.
-- **Human-first document format.** Every workspace doc file uses a two-section layout: `## Review Summary` (human-readable decisions, risks, trade-offs — scannable in under 2 minutes) followed by `## Technical Detail` (full content for agent-to-agent communication). This applies in both local and Obsidian modes.
-- **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on the block without re-reading full workspaces on happy paths.
-- **Installer always overwrites embedded files.** Agents, skills, and hooks are canonical bytes from the repo; direct edits to `~/.claude/agents/*.md` (or skills/hooks) are not a supported customization path and are replaced on every install. Unchanged files (hash-match) are skipped. `~/.claude.json` is backed up before every merge. Operator-specific identity (`mcpServers.memory` URL/bearer, context7 API key) uses a Keep/Change preservation menu and is never silently clobbered.
+- **Human-first document format.** Every workspace doc: `## Review Summary` (scannable in 2 min) then `## Technical Detail` (agent-to-agent content). Both modes.
+- **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on it without re-reading full workspaces.
+- **Installer always overwrites embedded files.** Direct edits to `~/.claude/agents/*.md` are replaced on every install. Hash-match files are skipped. See `docs/conventions.md` for the full overwrite + preservation contract.
 - **Session-scoped config override whitelist** — overridable (chat → `00-state.md` only): `logs-mode`, `logs-path`, `logs-subfolder`, `clickup.workspace_id`. Excluded → /th:setup: MCP URL, context7, model, effort.
-- **Chat-settable persistent key — `language`** — ISO 639-1 in `.team-harness.json`; not in session-override whitelist. Write needs persistence marker + Y/n confirmation gate; without it → session-override only.
-- **Single config file — `~/.claude/.team-harness.json`.** All Team Harness settings in one file: `logs-mode`/`logs-path`/`logs-subfolder`, installer manifest, version metadata, skill-specific keys (e.g. ClickUp under `clickup`). Skills MUST NOT create their own config files in `~/.claude/` — use namespaced keys inside `.team-harness.json`. Every write is a merge (read full doc, replace only owned key, write whole doc back); never partial payload. Exception: `~/.claude/settings.json` (Claude Code's own file, owned by the harness).
-- **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux. Avoid Unix-only tools or shell-specific syntax in agent prompts.
-- **KG content is technical-only.** The knowledge graph must never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
-- **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per completed task (Step 11.5) — synthesised from workspaces + CHANGELOG, describes reusable learning, not what changed. Best-effort: unreachable MCP or no learning → log and skip.
-- **Delivery post-create check (Step 11.4).** After `gh pr create`, queries merge state + CI with bounded backoff; `CONFLICTING`/failing-CI reported explicitly (never as clean); graceful skip when `gh` absent.
-- **Pipeline observability is mandatory.** Every pipeline run produces `00-execution-events.jsonl` (local) or `00-execution-events.md` (obsidian) and `00-pipeline-summary.md`. Not best-effort. Exception: Tier 0 fixes (`workspaces: NONE`) are exempt. Full contract: `docs/observability.md`.
-- **Documentation freshness via context7.** Verify third-party library APIs/config against context7 before generating code — training knowledge may be stale. Agents emit `context7_consult: hit:N miss:N skipped:M` in their status block. Mandatory triggers: `docs/context7-usage.md §2`.
-- **Bug-fix flow forces security review and mandatory regression test.** For `type: fix`/`hotfix`, `security-sensitive: true` is forced; regression test authoring (Phase 2.0) is mandatory. Full flow: `agents/ref-special-flows.md § Bug-fix Flow § Tier System`.
-- **Patch mode + selective verifier re-run.** Localized verifier failure: producer edits named elements only; orchestrator re-runs only the affected domain; coherence gate follows. Default is structural (full re-dispatch). Full contract: `docs/patch-mode.md`.
-- **Plan-review panel centralization** — `plan-review` runs up to 3 reviewers into ONE `01-plan.md`; worst-of combined verdict; preserve-in-place sub-verdicts; vacuous-success guard. See `agents/ref-direct-modes.md`.
-- **Discover phase + intake survey + spec co-authoring + approach checkpoint.** Default intake is patient — architect fires on advance signal only; fast-path for clear tasks. Intake survey captures meta-decisions (shape, effort, autonomy, scope-hint) in `00-state.md`. Depth DIAL, not a stage switch; security floors non-surveyable. E2: spec co-authoring (`00-spec-seed.md`, bidirectional dissent) + approach checkpoint (`approach_freedom:high|low`). See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
-- **Orchestrator disposition — unconditional, top-level (SEC-DR-2 re-founding, v2.89.0).** The top-level agent IS the orchestrator — this is the CC native architecture, not a mode. No filesystem marker is required. Inline orchestration at top level is PERMITTED at all times. Outward actions gated by `dev-guard.sh` unconditionally (no marker needed). `developer-mode` output style is the optional strong floor (`keep-coding-instructions: false`). `force-for-plugin` NOT set. Security floors non-waivable. See `docs/dev-mode.md`.
-- **Obsidian interlinking.** Step 11.6 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`. Plan consolidation (no forks, 3h): `agents/_shared/plan-consolidation.md`.
-- **Obsidian-mode diagram embed.** In `logs-mode: obsidian`, D2 (SVG via `d2`) and LikeC4 (PNG via `npx likec4 export png`) render into the vault workspace and append `![[…]]` embed(s) to `05-diagram.md`. CLI absent → source + not-rendered marker (`render: skipped`). Local mode and Excalidraw path unchanged.
-- **Milestone standard.** milestones = commits, NOT PRs/deliverables; a single task is never split across PRs; a same-repo batch defaults to ONE consolidated PR. Stage files flat whole-task (no `-m{N}`/`-b`/`02b-*` suffixes). See `agents/ref-special-flows.md § Milestone-Build Flow`.
-- **Hook enforcement floors.** `policy-block.sh` secret-scans write content + commit-`Bash` (deny high-confidence, ask medium+entropy; `.env.example` allowlisted; codifies §6.5). `checkpoint-guard.sh` covers B1/B2/B3 (B1: `th:architect`; B2/B3: boundary-keyed). See `docs/reasoning-checkpoint.md`.
+- **Chat-settable persistent key — `language`** — ISO 639-1 in `.team-harness.json`; not in override whitelist. Write needs persistence marker + Y/n gate; without it → session-override only.
+- **Single config file — `~/.claude/.team-harness.json`.** Skills MUST NOT create their own config files in `~/.claude/`; use namespaced keys. Every write is a merge — never a partial payload. See `docs/conventions.md`.
+- **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux.
+- **KG content is technical-only.** Never store personal data, user profiles, preferences, tokens, or stakeholder names. See `docs/kg-content-policy.md`.
+- **KG passive capture on delivery.** The `delivery` agent persists one `process-insight` node per completed task (Step 11.5). Best-effort: unreachable MCP or no learning → log and skip.
+- **Delivery post-create check (Step 11.4).** Queries merge state + CI after `gh pr create`; `CONFLICTING`/failing-CI reported explicitly. Full contract in `agents/delivery.md`.
+- **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`. Exception: Tier 0 fixes (`workspaces: NONE`) are exempt. Full contract: `docs/observability.md`.
+- **Documentation freshness via context7.** Verify third-party APIs against context7 before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
+- **Bug-fix flow forces security review + regression test.** For `type: fix`/`hotfix`. Full flow: `agents/ref-special-flows.md § Bug-fix Flow`.
+- **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
+- **Plan-review panel centralization** — worst-of combined verdict; vacuous-success guard. See `agents/ref-direct-modes.md`.
+- **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
+- **Orchestrator disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the orchestrator; no marker required; outward actions gated by `dev-guard.sh`. See `docs/dev-mode.md`.
+- **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.
+- **Obsidian-mode diagram embed.** D2/LikeC4 render to vault + `![[…]]` embed in `05-diagram.md`. See `docs/conventions.md`.
+- **Milestone standard.** milestones = commits, NOT PRs; one task = one PR; same-repo batch defaults to ONE consolidated PR. See `agents/ref-special-flows.md § Milestone-Build Flow`.
+- **Hook enforcement floors.** `policy-block.sh` + `checkpoint-guard.sh`. See `docs/reasoning-checkpoint.md`.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
-- **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Start-gate: clean+main → branch in place; dirty or non-main → worktree. Always fetch + base from `origin/main`. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
-- **Parallel batch implementation.** ADDITIVE items may be implemented concurrently (one worktree per item) and consolidated into ONE PR: item-local wholesale, shared-serial in reserved order, per-item `python3 tests/test_agent_structure.py`, then `run-all.sh` once. See `docs/parallel-batch-implementation.md`.
+- **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
+- **Parallel batch implementation.** ADDITIVE items concurrently; consolidated into ONE PR. See `docs/parallel-batch-implementation.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
@@ -201,7 +203,8 @@ All commands run from the repo root.
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same PR — do not let CLAUDE.md drift from the repo.
 - If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`, `[pattern]`, `[stack]`, `[constraint]`).
 - If the repo has an OpenAPI spec (`openapi/openapi.yaml` or similar) and the change touches endpoints, bump `info.version` in the same commit as the spec change — never in a separate commit.
-- **If the change touches distributed plugin assets — `agents/`, `skills/`, or `hooks/` — you MUST bump the plugin version in `.claude-plugin/plugin.json` AND the `th` entry in `.claude-plugin/marketplace.json` (matched semver) as part of shipping it.** The marketplace serves by version: without a bump, `claude plugin update` sees no change and the new agents/skills/hooks sit on `main` but never reach any installed `~/.claude/`. Match the bump to the change (patch / minor / major). This applies whether the change ships via the orchestrator pipeline (the `delivery` agent does it) or a manual merge.
+- **If the change touches distributed plugin assets — `agents/`, `skills/`, or `hooks/` — you MUST bump the plugin version in `.claude-plugin/plugin.json` AND the `th` entry in `.claude-plugin/marketplace.json` (matched semver) as part of shipping it.** Match the bump to the change (patch / minor / major). Without a bump, `claude plugin update` sees no change and installed `~/.claude/` copies never update.
+- **New hooks must be authored in TypeScript, not Bash** (Decision A = closed). See `docs/opencode-distribution-roadmap.md` § Cross-Harness Authoring Mandate.
 
 ### 6.4 Governance (when to stop and escalate to a human)
 

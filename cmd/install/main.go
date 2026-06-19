@@ -56,6 +56,13 @@ func printDeprecationBanner() {
 
 func main() {
 	parseFlags()
+
+	// plan|apply|uninstall subcommands are handled before the interactive install.
+	// The no-arg path falls through to the existing legacy interactive install.
+	if dispatchSubcommand() {
+		return
+	}
+
 	printDeprecationBanner()
 	resolveClaudePaths()
 	resolveSettingsJSON()

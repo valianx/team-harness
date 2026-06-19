@@ -1,0 +1,23 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/dev-guard.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/dev-guard.cc.ts
+  frontmatterDialect: none
+# Claude Code identity adapter: CC event names map 1:1 (identity).
+events:
+  PreToolUse: PreToolUse
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Two CC wiring entries (mirrors hooks/config.json dual registration):
+# Entry 1: matcher "Bash" (outward Bash actions)
+# Entry 2: matcher "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)"
+#           (ClickUp MCP outward writes — handled inside the body via tool.name match)
+notes: >
+  dev-guard is the unconditional outward-action gate (SEC-DR-2 re-founding).
+  ask→deny mapping: native CC ask emits permissionDecision:"ask" and the runtime
+  prompts the operator interactively. There is no capability gap on CC.

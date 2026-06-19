@@ -164,13 +164,62 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 15: hooks/prepublish-guard.sh — bump-floor advisory (registry Suite 120)"
+echo "# Suite 15: TypeScript hook parity (Bash <-> TS decision parity)"
+echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    echo "ts-hook-parity: SKIP (node not found)"
+elif ! command -v npm >/dev/null 2>&1; then
+    echo "ts-hook-parity: SKIP (npm not found)"
+else
+    # Build the TS bundles first (dist/ is gitignored; must be built before testing).
+    TS_DIR="$TESTS_DIR/../hooks/ts"
+    if [ -f "$TS_DIR/package.json" ]; then
+        echo "  Building TS bundles (npm --prefix hooks/ts run build)..."
+        if npm --prefix "$TS_DIR" run build >/dev/null 2>&1; then
+            echo "  Build complete. Running parity harness..."
+            if bash "$TESTS_DIR/test_ts_hook_parity.sh"; then
+                echo "ts-hook-parity: PASS"
+            else
+                echo "ts-hook-parity: FAIL"
+                FAILED=$((FAILED + 1))
+            fi
+        else
+            # Build failed — report as FAIL so CI catches it (presence of node+npm
+            # means the build environment supports TS hooks and a build failure is real).
+            echo "ts-hook-parity: FAIL (build failed — run 'npm --prefix hooks/ts run build' for details)"
+            FAILED=$((FAILED + 1))
+        fi
+    else
+        echo "ts-hook-parity: SKIP (hooks/ts/package.json not found)"
+    fi
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 16: hooks/prepublish-guard.sh — bump-floor advisory (registry Suite 120)"
 echo "############################################################"
 if bash "$TESTS_DIR/test_prepublish_bump_floor.sh"; then
     echo "prepublish-bump-floor: PASS"
 else
     echo "prepublish-bump-floor: FAIL"
     FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 17: harness-migrate bidirectional transform (AC-1..AC-11)"
+echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    echo "harness-migrate: SKIP (node not found — install Node.js to run this suite)"
+else
+    if node "$TESTS_DIR/../tools/harness-migrate/test_harness_migrate.mjs"; then
+        echo "harness-migrate: PASS"
+    else
+        echo "harness-migrate: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
 fi
 
 echo

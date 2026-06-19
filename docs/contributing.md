@@ -46,6 +46,19 @@ Per [`CLAUDE.md` §14](../CLAUDE.md):
 - Installer / hooks / MCP server changes → `architect` then `security` review (elevated privileges on the user's machine).
 - Pipeline phase changes → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
+## opencode build (beta)
+
+Team Harness runs under both Claude Code and opencode. Authoring rules for the
+dual-runtime build:
+
+- **New hooks → TypeScript** (`hooks/ts/`), not Bash (CLAUDE.md §6.3). One TS body
+  runs on Node (Claude Code) and Bun (opencode) via the `normalized-v1` shim; parity
+  is enforced by `tests/test_ts_hook_parity.sh` (run-all Suite 15).
+- **Project assets between harness formats** with `/harness-migrate` (`tools/harness-migrate/`), not by hand.
+
+Process detail: [migration guide](./opencode-migration-guide.md) ·
+[distribution roadmap](./opencode-distribution-roadmap.md).
+
 ## Release process
 
 The release flow is operator-side. `delivery` bumps the `version` constant in `cmd/install/main.go` and adds a `[X.Y.Z]` block to `CHANGELOG.md`, but does **not** run `git tag` — the human decides when to publish.

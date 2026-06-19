@@ -1,0 +1,19 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/prepublish-guard.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/prepublish-guard.opencode.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: "tool:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - ask  # opencode has no interactive confirm; ask→throw for a gated push/PR
+notes: >
+  prepublish-guard on opencode: ShimRejectError → throw (fail-closed for a potential
+  covered push/PR action). Deny → throw (block). ask→throw (fail-closed).
+  The body's open-on-fault behavior is preserved inside evaluate().

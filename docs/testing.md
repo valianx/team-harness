@@ -487,21 +487,36 @@ Informational entry in `tests/run-all.sh`. Runs `python3 tests/harness_scorecard
 
 Checks: (1) `skills/lint/SKILL.md` contains `## Check 9 — Skill overlap` section; (2) Check 9 slice contains `SEARCH-BEFORE-CREATE` and `dedup`; (3) Check 9 names the three overlap dimensions (`name`, `description`, `keyword`/`trigger`); (4) Check 9 declares `--against` search-before-create mode arg; (5) Check 9 slice contains `REPORT-only` and `never FAIL`/`advisory`; (6) Check 9 carries the expected-overlap `allowlist` naming the diagram family; (7) `skills/lint/SKILL.md` contains `## Check 10 — Skill quality quick-scan` section; (8) Check 10 slice contains all five Q1–Q5 criteria (`single responsibility`, `Voice`, `Output discipline`, `orphaned`, `routing`); (9) Check 10 declares `--changed` changed-only mode; (10) Check 10 slice declares `WARN` and `never FAIL`/`advisory`; (11) lint SKILL.md contains `--against` and `--changed` at file level; (12) lint SKILL.md contains `/ 10 checks passed` (positive) AND does NOT contain `/ 8 checks passed` (negative — prevents denominator drift); (13) lint SKILL.md contains `Check 9:` and `Check 10:` in its Output Format; (14) lint SKILL.md preserves the standalone guard (`do NOT invoke the` + `orchestrator`); (15) `agents/agent-builder.md` contains `SEARCH-BEFORE-CREATE`, `--against`, and `extend the existing skill`; (16) agent-builder SEARCH-BEFORE-CREATE slice contains `REPORT-only`/`never deletes` and `Check 9`; (17) `skills/README.md` lists `/th:lint` as Standalone; (18) provenance guard — lint SKILL.md and agent-builder.md contain no external-project/method tokens (assembled programmatically: `"EC"+"C"` and `"Agent"+"Shield"`); (19) `docs/testing.md` registers `Suite 104` + `skill-audit-lens` marker; (20) `CLAUDE.md` does NOT contain `Suite 104` (§11 hygiene contract); (21) test file self-references `Suite 104`, `_slice_section`, and `skill-audit-lens`. Both Check 9 and Check 10 are REPORT-only (never FAIL) — the denominator check (12) is a paired positive+negative assertion to prevent denominator drift. Pure text/file reads — no agent invocation, no paid spend. Written by implementer (2026-06-15). Marker: `skill-audit-lens`.
 
-### Suite 105 — opencode-distribution-roadmap
+### Suite 105 — opencode-distribution-roadmap + opencode-migration-guide
 
-10 checks. Thin doc-structure guard for the forward-looking opencode distribution-layer
-design spec (Tier-4, design only — no installer code). File: `tests/test_agent_structure.py`.
-Pure text/file reads — no agent invocation, no paid spend. Asserts: (1) `docs/opencode-distribution-roadmap.md`
-exists; (2) it carries a `design only` status banner referencing the frozen `cmd/install`;
-(3) it contains a buildable-now-vs-defer assessment naming all three items; (4) Item 1 defines
-the adapter descriptor + shim normalization contract; (5) Item 2 defines the two-layer
-manifest + plan/apply split + ownership-based uninstall; (6) Item 3 names the TH-native
-`TEAM_HARNESS_DATA_HOME` env var + a resolution order; (7) provenance guard — the committed
-doc carries no external-project/method token (TH-native only); (8) `docs/testing.md` registers
-Suite 105 + marker; (9) `CLAUDE.md` does NOT contain `Suite 105` (§11 hygiene contract);
-(10) test file self-references Suite 105 + `_slice_section` + marker. All content checks use
+25 checks. Doc-structure guard for the opencode distribution-layer design spec and the
+accompanying migration guide (Tier-4, design only — no installer code). File:
+`tests/test_agent_structure.py`. Pure text/file reads — no agent invocation, no paid spend.
+Asserts: (1) `docs/opencode-distribution-roadmap.md` exists; (2) it carries a `design only`
+status banner referencing the frozen `cmd/install`; (3) it contains a buildable-now-vs-defer
+assessment naming all three items; (4) Item 1 defines the adapter descriptor + shim
+normalization contract; (5) Item 2 defines the two-layer manifest + plan/apply split +
+ownership-based uninstall; (6) Item 3 names the TH-native `TEAM_HARNESS_DATA_HOME` env var
++ a resolution order; (7) provenance guard — the committed roadmap doc carries no
+external-project/method token (TH-native only); (8) `docs/testing.md` registers Suite 105
++ marker; (9) `CLAUDE.md` does NOT contain `Suite 105` (§11 hygiene contract); (10) test
+file self-references Suite 105 + `_slice_section` + `opencode-distribution-roadmap` marker;
+(11-13) each of Item 1/2/3 carries a `### Security contract the build MUST satisfy`
+subsection — sliced per-Item independently to avoid the find-first trap on three identical
+sub-headings — naming its assigned finding IDs (Item 1 = SEC-07; Item 2 = SEC-04/05/06;
+Item 3 = SEC-01/02/03/08); (14) union of finding IDs across all three subsections equals
+exactly {SEC-01..SEC-08}; (15) `## Cross-Harness Compatibility Matrix` section exists and
+names all five asset types (skills, rules, agents, commands, hooks); (16-17) `## Cross-Harness
+Authoring Mandate` section exists with both an actionable-now token and a deferred token;
+(18) `docs/opencode-migration-guide.md` exists; (19) migration guide names A1/A2/A3 options
+with A2 CHOSEN and A3 DROPPED; (20) migration guide names the runtime-dependency rationale
+(Node/Bun); (21) migration guide hooks section names the policy-block entropy-scan fold
+into the TS hook body; (22-23) migration guide `## Installation / distribution on opencode`
+section is non-empty and names the installer mechanism token + no-marketplace rationale +
+`.opencode/` placement targets; (24) provenance guard extended to migration guide; (25) test
+file self-references the `opencode-migration-guide` marker. All content checks use
 anchor-scoped `_slice_section` (anti-false-green: missing anchor → empty slice → check fails).
-Marker: `opencode-distribution-roadmap`.
+Markers: `opencode-distribution-roadmap`, `opencode-migration-guide`.
 
 ### Suite 106 — parallel-batch-implementation
 

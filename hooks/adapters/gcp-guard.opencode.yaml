@@ -1,0 +1,19 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/gcp-guard.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/gcp-guard.opencode.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: "tool:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - ask  # opencode has no interactive confirm; ask→throw (fail-closed for GCP gate)
+notes: >
+  ask→throw mapping (fail-closed): gcp-guard is a security gate; mutating/destructive
+  gcloud ops map to throw on opencode. ShimRejectError → throw (unknown payload
+  mentioning gcloud must be gated). Catastrophic → throw with permanent-block reason.

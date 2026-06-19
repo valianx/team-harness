@@ -65,6 +65,27 @@ not a second source of truth.
 See [`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) for the complete
 agreements, governance escalation rules, and the anti-pattern list.
 
+## Contributing to the opencode build (beta)
+
+Team Harness targets both Claude Code and opencode. Most surfaces are cross-harness
+with no extra work — agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are read
+by both runtimes as-is. Two rules apply when a change touches the runtime-specific
+surfaces:
+
+- **New hooks are authored in TypeScript, not Bash** (CLAUDE.md §6.3, Decision A). A
+  single TypeScript hook body runs on Claude Code (Node) and opencode (Bun) through
+  the `normalized-v1` shim in `hooks/ts/`; Bash↔TS decision parity is enforced by
+  `tests/test_ts_hook_parity.sh` (run-all Suite 15). See
+  [`docs/opencode-distribution-roadmap.md`](./docs/opencode-distribution-roadmap.md)
+  § Cross-Harness Authoring Mandate.
+- **Project this repo's own assets between harness formats** with the repo-local
+  `/harness-migrate <to-opencode|to-claude-code>` command (`tools/harness-migrate/`)
+  — never by hand-editing frontmatter. It is a contributor tool, not a distributed
+  asset.
+
+Background and the per-asset-type process:
+[`docs/opencode-migration-guide.md`](./docs/opencode-migration-guide.md).
+
 ## Verifying your change
 
 ```

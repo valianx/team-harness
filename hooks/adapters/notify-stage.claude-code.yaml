@@ -1,0 +1,22 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/notify-stage.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/notify-stage.cc.ts  # Stub — notify-stage is orchestrator-invoked
+  frontmatterDialect: none
+# SPECIAL: notify-stage is NOT a CC PreToolUse hook — it is orchestrator-invoked.
+# There is no CC hook event for it. The CC Bash sh path (notify-stage.sh) continues.
+events: {}
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Profile gate: idle-notify class.
+# OS detection: windows/mac/linux → route to matching notify-{os}.sh sibling.
+notes: >
+  notify-stage is ORCHESTRATOR-INVOKED, not a CC hook event. The Bash notify-stage.sh
+  continues to serve this path. The TS body exists for completeness and for the
+  opencode plugin model (if opencode exposes a notification event in the future).
+  The CC entry for notify-stage is a no-op stub.

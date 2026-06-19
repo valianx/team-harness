@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "component": "architect-agent",
+  "module": "core-agents",
+  "kind": "agent",
+  "source": "agents/architect.md",
+  "cost": "high",
+  "stability": "stable",
+  "defaultInstall": true,
+  "emits": {
+    "files": ["{config_root}/agents/architect.md"],
+    "configKeys": []
+  }
+}
