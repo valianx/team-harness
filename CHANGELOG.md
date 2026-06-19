@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.109.0] - 2026-06-19
+
+### Added
+
+- **prepublish-guard bump-floor advisory** — `hooks/prepublish-guard.sh` now derives a version-bump floor from `git diff --name-status origin/main...HEAD` (a new `agents/`/`skills/`/`hooks/` file → MINOR, a deleted/renamed one → MAJOR-candidate, edits → PATCH) and emits a non-blocking stderr advisory when the applied bump is below the floor, or when a docs/tests/CI-only change carries a MINOR-or-higher bump (over-bump). Advisory only — it never blocks the push; the existing shipped-asset-no-bump hard block is unchanged. Complements the operator-facing changelog gate and PATCH-default SemVer rules in the `delivery` agent.
+
 ## [2.108.1] - 2026-06-19
 
 ### Fixed

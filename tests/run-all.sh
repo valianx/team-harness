@@ -164,6 +164,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 15: hooks/prepublish-guard.sh — bump-floor advisory (registry Suite 120)"
+echo "############################################################"
+if bash "$TESTS_DIR/test_prepublish_bump_floor.sh"; then
+    echo "prepublish-bump-floor: PASS"
+else
+    echo "prepublish-bump-floor: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
