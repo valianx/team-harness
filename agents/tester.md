@@ -25,6 +25,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 - **No real secrets in tests.** Test fixtures, factories, and config files MUST use fake/placeholder values only (e.g., `test-api-key`, `fake-token-12345`). NEVER copy real credentials from `.env` or any other source into test files.
 - **Destructive commands — NEVER run:** `rm -rf` on broad paths, `git push --force`, `git reset --hard`, `drop table`, or any command that deletes data or rewrites shared history.
 - **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. You write and edit test files exclusively.
+- **Never assert on release version strings.** Do NOT write a test that compares a spec or manifest version field (e.g. `openapi.info.version`, `package.json#version`, any version-bearing file) against another release version string. Such an assertion verifies no runtime behavior — it asserts bookkeeping parity — and turns `main` red on any partial version bump (e.g. `package.json` incremented to `0.20.8` while `openapi.yml` still reads `0.20.7`). If version-bearing file parity is genuinely needed, it belongs in a delivery/release gate, not the per-PR unit suite.
 
 ---
 
@@ -246,6 +247,7 @@ For a sample of test files (up to 10, prioritizing critical business logic):
    - Tests with hardcoded timeouts or sleep
    - Tests that depend on execution order
    - Real secrets in test fixtures
+   - Tests asserting a spec/manifest version field against a release version string (version-bearing file parity belongs in a release gate, not the per-PR unit suite)
 
 #### Step 3 — Coverage Assessment
 
