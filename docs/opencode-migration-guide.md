@@ -21,7 +21,7 @@
 - **Tool permissions:** CC-style `tools` allowlist → explicit `permission` object with `allow`, `ask`, and `deny` arrays.
 - **Model identifiers:** bare model names → provider-prefixed identifiers (e.g., `claude-opus-4-5` → `anthropic/claude-opus-4-5`).
 - **Mode:** add explicit `mode` field if absent.
-- **Input placeholder:** `{input}` → `$ARGUMENTS` for command files.
+- **Argument placeholder:** `$ARGUMENTS` is the canonical placeholder on both harnesses (verified against live Claude Code and opencode docs). The transform is **identity** — no rewrite is needed. (A prior draft of this guide listed `{input}` → `$ARGUMENTS`, but `{input}` is not a token in either live harness.)
 - **Relocation:** agent files → `.opencode/agents/`; command files → `.opencode/commands/`.
 
 This transform is reversible and idempotent. The canonical body remains in `agents/` unchanged; the projected copy lands in the target harness directory.

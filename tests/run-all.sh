@@ -208,6 +208,22 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 17: harness-migrate bidirectional transform (AC-1..AC-11)"
+echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    echo "harness-migrate: SKIP (node not found — install Node.js to run this suite)"
+else
+    if node "$TESTS_DIR/../tools/harness-migrate/test_harness_migrate.mjs"; then
+        echo "harness-migrate: PASS"
+    else
+        echo "harness-migrate: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
