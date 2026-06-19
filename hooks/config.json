@@ -1,12 +1,10 @@
 {
   "_comment": "Copy the 'hooks' section for your OS into ~/.claude/settings.json. Default is the 'ultra-quiet' preset: notifications fire ONLY on idle_prompt (Claude is waiting for your input), plus a PreToolUse policy gate that blocks destructive commands and writes to sensitive files. The older 'permission_prompt' and 'PostToolUseFailure *' triggers were removed because they fire while work continues — they accumulate in the Windows Action Center / system tray and produce noise without requiring user action. For louder presets (notify on every Stop, on permission_prompt, etc.) see the 'Tuning presets' section of hooks/README.md.",
-  "_ts_hooks": "Phase 4 (opencode-ts-hooks): TS .cjs entries added as dual-redundancy secondary hooks alongside existing Bash hooks. Bash hooks remain primary (listed first; legacy tests check first entry). TS entries fire second and apply the same logic independently. SessionStart remains session-start.sh (single-entry constraint). Node is already a CC runtime dependency — no new end-user dependency.",
 
   "windows": {
-    "_requires": "node (included with Claude Code)",
-    "_scripts": "hooks/policy-block.sh, hooks/dev-guard.sh, hooks/gcp-guard.sh, hooks/worktree-guard.sh, hooks/checkpoint-guard.sh, hooks/prepublish-guard.sh, hooks/subagent-trace.sh, hooks/precompact-snapshot.sh, hooks/_hook-profile.sh (sourced by Bash hooks), hooks/notify-windows.sh (notification only), hooks/notify-stage.sh (orchestrator-invoked)",
-    "_scripts_ts": "hooks/ts/dist/policy-block.cjs, hooks/ts/dist/dev-guard.cjs, hooks/ts/dist/gcp-guard.cjs, hooks/ts/dist/worktree-guard.cjs, hooks/ts/dist/prepublish-guard.cjs, hooks/ts/dist/checkpoint-guard.cjs, hooks/ts/dist/subagent-trace.cjs, hooks/ts/dist/precompact-snapshot.cjs (dual-redundancy; added as secondary entries alongside Bash primaries)",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; prepublish-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only) + SubagentStop (th:.* → subagent-trace) + PreCompact (manual|auto → precompact-snapshot)",
+    "_requires": "powershell.exe (included in Windows) + python3 (in PATH)",
+    "_scripts": "notify-windows.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh, prepublish-guard.sh, session-start.sh, language-user-prompt.sh, subagent-trace.sh, precompact-snapshot.sh, _hook-profile.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; prepublish-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only) + SubagentStop (th:.* → subagent-trace.sh) + PreCompact (manual|auto → precompact-snapshot.sh)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -14,15 +12,6 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/language-user-prompt.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/language-user-prompt.cjs",
               "timeout": 5
             }
           ]
@@ -52,31 +41,11 @@
           ]
         },
         {
-          "matcher": "Bash|Write|Edit|NotebookEdit",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/policy-block.cjs",
-              "timeout": 5
-            }
-          ]
-        },
-        {
           "matcher": "Bash",
           "hooks": [
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/dev-guard.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/dev-guard.cjs",
               "timeout": 5
             }
           ]
@@ -96,27 +65,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/gcp-guard.cjs",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
               "command": "bash ~/.claude/hooks/worktree-guard.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/worktree-guard.cjs",
               "timeout": 5
             }
           ]
@@ -132,16 +81,6 @@
           ]
         },
         {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/prepublish-guard.cjs",
-              "timeout": 120
-            }
-          ]
-        },
-        {
           "matcher": "Task",
           "hooks": [
             {
@@ -152,21 +91,11 @@
           ]
         },
         {
-          "matcher": "Task",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/checkpoint-guard.cjs",
-              "timeout": 10
-            }
-          ]
-        },
-        {
           "matcher": "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)",
           "hooks": [
             {
               "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/dev-guard.cjs",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
               "timeout": 5
             }
           ]
@@ -194,16 +123,6 @@
               "timeout": 5
             }
           ]
-        },
-        {
-          "matcher": "th:.*",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/subagent-trace.cjs",
-              "timeout": 5
-            }
-          ]
         }
       ],
       "PreCompact": [
@@ -216,26 +135,15 @@
               "timeout": 5
             }
           ]
-        },
-        {
-          "matcher": "manual|auto",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/precompact-snapshot.cjs",
-              "timeout": 5
-            }
-          ]
         }
       ]
     }
   },
 
   "macos": {
-    "_requires": "node (included with Claude Code)",
-    "_scripts": "hooks/policy-block.sh, hooks/dev-guard.sh, hooks/gcp-guard.sh, hooks/worktree-guard.sh, hooks/checkpoint-guard.sh, hooks/prepublish-guard.sh, hooks/subagent-trace.sh, hooks/precompact-snapshot.sh, hooks/_hook-profile.sh (sourced by Bash hooks), hooks/notify-mac.sh (notification only), hooks/notify-stage.sh (orchestrator-invoked)",
-    "_scripts_ts": "hooks/ts/dist/policy-block.cjs, hooks/ts/dist/dev-guard.cjs, hooks/ts/dist/gcp-guard.cjs, hooks/ts/dist/worktree-guard.cjs, hooks/ts/dist/prepublish-guard.cjs, hooks/ts/dist/checkpoint-guard.cjs, hooks/ts/dist/subagent-trace.cjs, hooks/ts/dist/precompact-snapshot.cjs (dual-redundancy; added as secondary entries alongside Bash primaries)",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; prepublish-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only) + SubagentStop (th:.* → subagent-trace) + PreCompact (manual|auto → precompact-snapshot)",
+    "_requires": "osascript (included in macOS) + python3",
+    "_scripts": "notify-mac.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh, prepublish-guard.sh, session-start.sh, language-user-prompt.sh, subagent-trace.sh, precompact-snapshot.sh, _hook-profile.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; prepublish-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only) + SubagentStop (th:.* → subagent-trace.sh) + PreCompact (manual|auto → precompact-snapshot.sh)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -243,15 +151,6 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/language-user-prompt.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/language-user-prompt.cjs",
               "timeout": 5
             }
           ]
@@ -281,31 +180,11 @@
           ]
         },
         {
-          "matcher": "Bash|Write|Edit|NotebookEdit",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/policy-block.cjs",
-              "timeout": 5
-            }
-          ]
-        },
-        {
           "matcher": "Bash",
           "hooks": [
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/dev-guard.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/dev-guard.cjs",
               "timeout": 5
             }
           ]
@@ -325,27 +204,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/gcp-guard.cjs",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
               "command": "bash ~/.claude/hooks/worktree-guard.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/worktree-guard.cjs",
               "timeout": 5
             }
           ]
@@ -361,16 +220,6 @@
           ]
         },
         {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/prepublish-guard.cjs",
-              "timeout": 120
-            }
-          ]
-        },
-        {
           "matcher": "Task",
           "hooks": [
             {
@@ -381,21 +230,11 @@
           ]
         },
         {
-          "matcher": "Task",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/checkpoint-guard.cjs",
-              "timeout": 10
-            }
-          ]
-        },
-        {
           "matcher": "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)",
           "hooks": [
             {
               "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/dev-guard.cjs",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
               "timeout": 5
             }
           ]
@@ -423,16 +262,6 @@
               "timeout": 5
             }
           ]
-        },
-        {
-          "matcher": "th:.*",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/subagent-trace.cjs",
-              "timeout": 5
-            }
-          ]
         }
       ],
       "PreCompact": [
@@ -445,26 +274,15 @@
               "timeout": 5
             }
           ]
-        },
-        {
-          "matcher": "manual|auto",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/precompact-snapshot.cjs",
-              "timeout": 5
-            }
-          ]
         }
       ]
     }
   },
 
   "linux": {
-    "_requires": "node (included with Claude Code), libnotify (notify-send, for notifications only)",
-    "_scripts": "hooks/policy-block.sh, hooks/dev-guard.sh, hooks/gcp-guard.sh, hooks/worktree-guard.sh, hooks/checkpoint-guard.sh, hooks/prepublish-guard.sh, hooks/subagent-trace.sh, hooks/precompact-snapshot.sh, hooks/_hook-profile.sh (sourced by Bash hooks), hooks/notify-linux.sh (notification only), hooks/notify-stage.sh (orchestrator-invoked)",
-    "_scripts_ts": "hooks/ts/dist/policy-block.cjs, hooks/ts/dist/dev-guard.cjs, hooks/ts/dist/gcp-guard.cjs, hooks/ts/dist/worktree-guard.cjs, hooks/ts/dist/prepublish-guard.cjs, hooks/ts/dist/checkpoint-guard.cjs, hooks/ts/dist/subagent-trace.cjs, hooks/ts/dist/precompact-snapshot.cjs (dual-redundancy; added as secondary entries alongside Bash primaries)",
-    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; prepublish-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only) + SubagentStop (th:.* → subagent-trace) + PreCompact (manual|auto → precompact-snapshot)",
+    "_requires": "libnotify (notify-send) + python3",
+    "_scripts": "notify-linux.sh, policy-block.sh, checkpoint-guard.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh, prepublish-guard.sh, session-start.sh, language-user-prompt.sh, subagent-trace.sh, precompact-snapshot.sh, _hook-profile.sh",
+    "_events": "SessionStart + UserPromptSubmit + PreToolUse (policy-block: Bash|Write|Edit|NotebookEdit; dev-guard: Bash + ClickUp MCP writes; gcp-guard: Bash; worktree-guard: Bash; prepublish-guard: Bash; checkpoint-guard: Task) + Notification (idle_prompt only) + SubagentStop (th:.* → subagent-trace.sh) + PreCompact (manual|auto → precompact-snapshot.sh)",
     "hooks": {
       "UserPromptSubmit": [
         {
@@ -472,15 +290,6 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/language-user-prompt.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/language-user-prompt.cjs",
               "timeout": 5
             }
           ]
@@ -510,31 +319,11 @@
           ]
         },
         {
-          "matcher": "Bash|Write|Edit|NotebookEdit",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/policy-block.cjs",
-              "timeout": 5
-            }
-          ]
-        },
-        {
           "matcher": "Bash",
           "hooks": [
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/dev-guard.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/dev-guard.cjs",
               "timeout": 5
             }
           ]
@@ -554,27 +343,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/gcp-guard.cjs",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
               "command": "bash ~/.claude/hooks/worktree-guard.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/worktree-guard.cjs",
               "timeout": 5
             }
           ]
@@ -590,16 +359,6 @@
           ]
         },
         {
-          "matcher": "Bash",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/prepublish-guard.cjs",
-              "timeout": 120
-            }
-          ]
-        },
-        {
           "matcher": "Task",
           "hooks": [
             {
@@ -610,21 +369,11 @@
           ]
         },
         {
-          "matcher": "Task",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/checkpoint-guard.cjs",
-              "timeout": 10
-            }
-          ]
-        },
-        {
           "matcher": "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)",
           "hooks": [
             {
               "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/dev-guard.cjs",
+              "command": "bash ~/.claude/hooks/dev-guard.sh",
               "timeout": 5
             }
           ]
@@ -652,16 +401,6 @@
               "timeout": 5
             }
           ]
-        },
-        {
-          "matcher": "th:.*",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/subagent-trace.cjs",
-              "timeout": 5
-            }
-          ]
         }
       ],
       "PreCompact": [
@@ -671,16 +410,6 @@
             {
               "type": "command",
               "command": "bash ~/.claude/hooks/precompact-snapshot.sh",
-              "timeout": 5
-            }
-          ]
-        },
-        {
-          "matcher": "manual|auto",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "node ~/.claude/hooks/ts/dist/precompact-snapshot.cjs",
               "timeout": 5
             }
           ]
