@@ -52,7 +52,7 @@ func TestApplyPlan_CreatesFilesAndAppendsLedger(t *testing.T) {
 	m, c := buildTestManifestPair("agents/test.md", "test-comp", "{config_root}/agents/test.md")
 	placer := newClaudeCodePlacerAt(configRoot)
 
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"test-comp"}, placer, mockFS)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"test-comp"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestApplyPlan_Idempotent(t *testing.T) {
 	placer := newClaudeCodePlacerAt(configRoot)
 
 	// First apply.
-	diff1, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"idempotent-comp"}, placer, mockFS)
+	diff1, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"idempotent-comp"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("first ComputePlan: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestApplyPlan_Idempotent(t *testing.T) {
 	countAfterFirst := len(entriesAfterFirst)
 
 	// Second apply on unchanged tree.
-	diff2, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"idempotent-comp"}, placer, mockFS)
+	diff2, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{"idempotent-comp"}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("second ComputePlan: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestApplyPlan_RemoveAppendsClosure(t *testing.T) {
 	m := ModuleManifest{SchemaVersion: 1, Module: "m", DefaultInstall: "always", Components: []string{}}
 	placer := newClaudeCodePlacerAt(configRoot)
 
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{}, []string{}, placer, fstest.MapFS{})
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{}, []string{}, placer, fstest.MapFS{}, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}

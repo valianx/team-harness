@@ -11,7 +11,24 @@ import (
 	"time"
 )
 
+// ledgerFilename is the default (claude-code) ownership ledger file.
 const ledgerFilename = "ownership-ledger.jsonl"
+
+// ledgerFilenameOpencode is the opencode runtime's ownership ledger file.
+// Runtime-scoped filenames prevent a claude-code uninstall from removing
+// opencode-owned files and vice-versa (Step 12 in the Work Plan).
+const ledgerFilenameOpencode = "ownership-ledger-opencode.jsonl"
+
+// activeLedgerFilename is the ledger filename for the current runtime.
+// Initialized to the default (claude-code); call setActiveLedgerFilename
+// before any ledger I/O when using the opencode runtime.
+var activeLedgerFilename = ledgerFilename
+
+// setActiveLedgerFilename configures the ledger filename for the current
+// runtime. Must be called before appendLedger / readLedger / isLedgerAbsent.
+func setActiveLedgerFilename(name string) {
+	activeLedgerFilename = name
+}
 
 // LedgerEntry is one line of the ownership ledger. Self-contained: a malformed
 // neighbour line never affects this entry's interpretation (SEC-06).
@@ -48,7 +65,7 @@ func (e ledgerError) Error() string {
 // ownership-ledger.jsonl. ApplyPlan and Uninstall MUST call this function and
 // MUST NOT construct or write JSONL lines directly (SEC-DR-P3-2).
 func appendLedger(entries []LedgerEntry) error {
-	f, err := OpenStateFile(ledgerFilename)
+	f, err := OpenStateFile(activeLedgerFilename)
 	if err != nil {
 		return fmt.Errorf("open ledger for append: %w", err)
 	}
@@ -107,11 +124,9 @@ func validateOwnershipTags(tags OwnershipTags) error {
 		if !configKeyPattern.MatchString(k) {
 			return fmt.Errorf("ConfigKeys entry %q fails structural pattern ^[A-Za-z0-9_.-]+$", k)
 		}
-		// Forbid reserved operator-owned namespace.
-		for _, ns := range reservedOperatorNamespaces {
-			if k == ns || strings.HasPrefix(k, ns+".") {
-				return fmt.Errorf("ConfigKeys entry %q is in reserved operator namespace %q (C-1)", k, ns)
-			}
+		// Apply the same namespace gate as validateComponentManifest (SEC-DR-2 symmetry).
+		if err := validateConfigKeyNamespace("ledger", k); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -131,7 +146,7 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 		// Absent/unresolvable data-home is treated as absent ledger.
 		return nil, nil
 	}
-	p := filepath.Join(root, ledgerFilename)
+	p := filepath.Join(root, activeLedgerFilename)
 	f, err := os.Open(p)
 	if err != nil {
 		// Absent ledger is not an error here; callers distinguish absent vs malformed.
@@ -192,7 +207,7 @@ func isLedgerAbsent() bool {
 	if err != nil {
 		return true
 	}
-	p := filepath.Join(root, ledgerFilename)
+	p := filepath.Join(root, activeLedgerFilename)
 	_, err = os.Stat(p)
 	return os.IsNotExist(err)
 }

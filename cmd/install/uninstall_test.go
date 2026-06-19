@@ -23,7 +23,7 @@ func buildAndApplyComponent(t *testing.T, configRoot, compID, agentName string) 
 	}
 	m, c := buildTestManifestPair("agents/"+agentName+".md", compID, "{config_root}/agents/"+agentName+".md")
 	placer := newClaudeCodePlacerAt(configRoot)
-	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{compID}, placer, mockFS)
+	diff, err := ComputePlan([]ModuleManifest{m}, []ComponentManifest{c}, []string{compID}, placer, mockFS, nil)
 	if err != nil {
 		t.Fatalf("ComputePlan: %v", err)
 	}
@@ -481,6 +481,182 @@ func TestPlacer_NoOpencodeCode(t *testing.T) {
 			t.Errorf("placer.go contains Phase-4 opencode code %q — Phase 3 must only contain claudeCodePlacer", tok)
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// SEC-DR-2: leaf-exact dotted-key delete with operator-sibling preservation
+// ---------------------------------------------------------------------------
+
+// TestUninstall_McpLeafExactDelete_PreservesOperatorSibling verifies the highest-
+// criticality SEC-DR-2 operation: an opencode uninstall with an operator-authored
+// mcp.custom entry present in the settings doc removes ONLY mcp.memory and
+// mcp.context7 (and prunes the empty mcp parent only when no siblings remain)
+// while preserving mcp.custom and all other keys byte-for-byte.
+//
+// Two sub-cases are covered:
+//   (A) doc contains mcp.memory + mcp.context7 (TH-owned) + mcp.custom (operator)
+//       → after uninstall: mcp.custom intact; mcp NOT pruned (has survivor)
+//   (B) doc contains ONLY mcp.memory (TH-owned), no operator sibling
+//       → after uninstall: mcp object pruned entirely (empty parent removed)
+func TestUninstall_McpLeafExactDelete_PreservesOperatorSibling(t *testing.T) {
+	t.Run("sibling_preserved", func(t *testing.T) {
+		dataDir, cleanup := ledgerTestEnv(t)
+		defer cleanup()
+
+		configRoot := t.TempDir()
+		placer := newClaudeCodePlacerAt(configRoot)
+
+		// Build an opencode.json-shaped settings doc:
+		//   mcp.memory  (TH-owned)
+		//   mcp.context7 (TH-owned)
+		//   mcp.custom  (operator — must survive)
+		//   logs-mode   (top-level, must survive)
+		settingsDoc := map[string]json.RawMessage{
+			"mcp": json.RawMessage(`{
+  "memory":   {"type": "http", "url": "https://mcp.example.com/mcp"},
+  "context7": {"type": "http", "url": "https://context7.example.com/mcp"},
+  "custom":   {"type": "http", "url": "https://operator.example.com/custom"}
+}`),
+			"logs-mode": json.RawMessage(`"local"`),
+		}
+		settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
+		settingsBytes = append(settingsBytes, '\n')
+		settingsPath := placer.SettingsDocPath()
+		if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(settingsPath, settingsBytes, 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		// Pre-populate ledger: TH owns mcp.memory + mcp.context7.
+		entry := LedgerEntry{
+			Op:        "install",
+			Component: "opencode-mcp",
+			Owns: OwnershipTags{
+				Files:      []string{},
+				ConfigKeys: []string{"mcp.memory", "mcp.context7"},
+			},
+			SchemaVersion: 1,
+			TS:            "2026-06-19T00:00:00Z",
+		}
+		raw, _ := json.Marshal(entry)
+		writeLedgerLines(t, dataDir, []string{string(raw)})
+
+		// Run uninstall.
+		report, err := Uninstall([]string{"opencode-mcp"}, placer)
+		if err != nil {
+			t.Fatalf("Uninstall: %v", err)
+		}
+		if report.LedgerIntegrityWarning != "" {
+			t.Errorf("unexpected LedgerIntegrityWarning: %s", report.LedgerIntegrityWarning)
+		}
+
+		// Verify the keys removed.
+		if len(report.Removed) != 1 {
+			t.Fatalf("expected 1 RemovedComponent, got %d", len(report.Removed))
+		}
+		removed := report.Removed[0]
+		if len(removed.KeysRemoved) != 2 {
+			t.Errorf("KeysRemoved count=%d, want 2 (mcp.memory + mcp.context7)", len(removed.KeysRemoved))
+		}
+
+		// Read back the settings doc and parse the mcp object.
+		updated, err := os.ReadFile(settingsPath)
+		if err != nil {
+			t.Fatalf("read settings doc: %v", err)
+		}
+		var updatedMap map[string]json.RawMessage
+		if err := json.Unmarshal(updated, &updatedMap); err != nil {
+			t.Fatalf("parse updated settings doc: %v", err)
+		}
+
+		// mcp must still be present (has surviving operator sibling).
+		mcpRaw, ok := updatedMap["mcp"]
+		if !ok {
+			t.Fatal("mcp key must not be pruned — operator sibling mcp.custom still exists")
+		}
+		var mcpMap map[string]json.RawMessage
+		if err := json.Unmarshal(mcpRaw, &mcpMap); err != nil {
+			t.Fatalf("parse mcp object: %v", err)
+		}
+
+		// TH-owned leaves must be gone.
+		if _, found := mcpMap["memory"]; found {
+			t.Error("mcp.memory must be deleted by uninstall")
+		}
+		if _, found := mcpMap["context7"]; found {
+			t.Error("mcp.context7 must be deleted by uninstall")
+		}
+
+		// Operator sibling must survive intact.
+		if _, found := mcpMap["custom"]; !found {
+			t.Error("mcp.custom (operator-authored) must be preserved byte-for-byte")
+		}
+
+		// top-level logs-mode must survive.
+		if _, found := updatedMap["logs-mode"]; !found {
+			t.Error("logs-mode (top-level, non-owned) must be preserved")
+		}
+	})
+
+	t.Run("empty_parent_pruned", func(t *testing.T) {
+		dataDir, cleanup := ledgerTestEnv(t)
+		defer cleanup()
+
+		configRoot := t.TempDir()
+		placer := newClaudeCodePlacerAt(configRoot)
+
+		// Settings doc: mcp.memory only — no operator sibling.
+		settingsDoc := map[string]json.RawMessage{
+			"mcp": json.RawMessage(`{"memory": {"type": "http", "url": "https://mcp.example.com/mcp"}}`),
+		}
+		settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
+		settingsBytes = append(settingsBytes, '\n')
+		settingsPath := placer.SettingsDocPath()
+		if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(settingsPath, settingsBytes, 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		// Ledger: owns mcp.memory only.
+		entry := LedgerEntry{
+			Op:        "install",
+			Component: "opencode-mcp-single",
+			Owns: OwnershipTags{
+				Files:      []string{},
+				ConfigKeys: []string{"mcp.memory"},
+			},
+			SchemaVersion: 1,
+			TS:            "2026-06-19T00:00:00Z",
+		}
+		raw, _ := json.Marshal(entry)
+		writeLedgerLines(t, dataDir, []string{string(raw)})
+
+		report, err := Uninstall([]string{"opencode-mcp-single"}, placer)
+		if err != nil {
+			t.Fatalf("Uninstall: %v", err)
+		}
+		if report.LedgerIntegrityWarning != "" {
+			t.Errorf("unexpected LedgerIntegrityWarning: %s", report.LedgerIntegrityWarning)
+		}
+
+		updated, err := os.ReadFile(settingsPath)
+		if err != nil {
+			t.Fatalf("read settings doc: %v", err)
+		}
+		var updatedMap map[string]json.RawMessage
+		if err := json.Unmarshal(updated, &updatedMap); err != nil {
+			t.Fatalf("parse updated settings doc: %v", err)
+		}
+
+		// mcp parent must be pruned entirely (no siblings remain).
+		if _, found := updatedMap["mcp"]; found {
+			t.Error("mcp parent must be pruned when all its leaves are deleted and none survive")
+		}
+	})
 }
 
 // TestUninstall_RemoveEntry_NeverTripsSecretScan verifies AC-10 contract:
