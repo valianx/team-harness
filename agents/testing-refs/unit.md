@@ -8,7 +8,7 @@
 - Unit tests verify the behavior of a **single function, hook, reducer, or utility** in isolation — no network, no database, no filesystem.
 - They sit at the base of the pyramid: fast (milliseconds per test), zero external dependencies, runnable offline.
 - When to choose unit over integration: the subject has no meaningful orchestration concern — it transforms input to output or manages local state. If mocking away all dependencies leaves a trivially thin test, the meaningful behavior is in the composition — write an integration test instead.
-- Anti-patterns: testing implementation details (internal state shape, private method call counts); using real I/O; one giant test per module instead of one test per behavior.
+- Anti-patterns: testing implementation details (internal state shape, private method call counts); using real I/O; one giant test per module instead of one test per behavior; asserting a spec/manifest version field against a release version string (version-bearing file parity belongs in a release gate, not the unit suite).
 - Each test must be independent and runnable in any order — no shared mutable state between tests.
 
 ## react-nextjs

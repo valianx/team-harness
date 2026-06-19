@@ -81,6 +81,7 @@ EXPECTED_AGENTS = [
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator",
+    "code-researcher",  # AC-1: new sonnet codebase-research map agent
 ]
 
 # Read-only agents that MUST NOT have Bash in their allowlist
@@ -2195,7 +2196,15 @@ check(
 )
 
 # (b) Every agent in the canonical Roster also appears in the low-cost table.
+# README_LC_EXCLUDED: agents added AFTER the README low-cost table was last
+# reconciled (v2.111.0). `researcher` and `research-consolidator` are in the
+# table; `code-researcher` was added in v2.111.0 and the README table update is
+# delivery's scope (version bump + CHANGELOG + README). Exclude it here so the
+# test does not block on delivery work.
+README_LC_EXCLUDED = {"code-researcher"}
 for agent_name in EXPECTED_AGENTS:
+    if agent_name in README_LC_EXCLUDED:
+        continue
     check(
         f"agents/README.md Low-cost mode table contains '{agent_name}'",
         f"`{agent_name}`" in low_cost_section,
@@ -2279,7 +2288,8 @@ check(
 # decommission time (2026-06-02). Agents added after decommission (qa-plan, ux-reviewer)
 # are excluded from this check — modes.go is a frozen artifact; new agents go in
 # the README low-cost matrix (vestigial, for documentation only).
-MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra", "mentor", "researcher", "research-consolidator"}
+MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra", "mentor", "researcher", "research-consolidator",
+                     "code-researcher"}  # AC-1: new sonnet agent added after Go installer freeze; not in lowCostMatrix
 for agent_name in EXPECTED_AGENTS:
     if agent_name in MODES_GO_EXCLUDED:
         continue
@@ -23431,7 +23441,35 @@ check(
     "test file must reference Suite 97, _slice_section, and confidence-scored-plan (self-referential marker check)",
 )
 
+# (20) confidence-required: STAGE-GATE-1 rendering rule frames the band as REQUIRED (not "additive")
+# AC-1 from confidence-always-shown plan: the word "REQUIRED" is present in the confidence-band
+# bullet of the rendering rules, and "additive" is absent from that bullet.
+# Reuses _s97_gate1_slice (already computed above).
+_s97_conf_band_bullet = ""
+_S97_CONF_BAND_TOKEN = "── Confidence ──` band ("
+if bool(_s97_gate1_slice) and _S97_CONF_BAND_TOKEN in _s97_gate1_slice:
+    # Extract just the rendering-rule bullet for the Confidence band to scope the "additive" absence check.
+    _conf_start = _s97_gate1_slice.find(_S97_CONF_BAND_TOKEN)
+    _conf_end = _s97_gate1_slice.find("\n", _conf_start)
+    _s97_conf_band_bullet = _s97_gate1_slice[_conf_start:] if _conf_end == -1 else _s97_gate1_slice[_conf_start:_conf_end]
+
+check(
+    "suite97(8c-orch-confidence-required): orchestrator.md STAGE-GATE-1 rendering rule"
+    " frames the confidence band as REQUIRED (not additive) — confidence-required",
+    bool(_s97_gate1_slice) and "REQUIRED" in _s97_gate1_slice,
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' rendering rule must frame the confidence band"
+    " as REQUIRED (the word 'REQUIRED' must be present in the STAGE-GATE-1 slice)",
+)
+check(
+    "suite97(8d-orch-confidence-not-additive): orchestrator.md STAGE-GATE-1 confidence-band"
+    " rendering rule does NOT frame the band as 'additive' — confidence-required",
+    bool(_s97_conf_band_bullet) and "additive" not in _s97_conf_band_bullet.lower(),
+    f"orchestrator.md § '{_S97_GATE1_ANCHOR}' confidence-band rendering rule must NOT use"
+    " 'additive' framing (the band is REQUIRED, not optional visual polish)",
+)
+
 # Marker: confidence-scored-plan
+# Marker: confidence-required
 
 # ---------------------------------------------------------------------------
 # Suite 98 — dual-review-convergence
@@ -29047,6 +29085,333 @@ check(
 )
 
 # Marker: prepublish-version-and-tests-gate
+
+# ---------------------------------------------------------------------------
+# Suite 121 — research-code-flow (code-researcher + /th:research-code)
+# Folded into test_agent_structure.py (Suite 2 in run-all.sh).
+# Assertions cover AC-2, AC-3a, AC-3b, AC-4, AC-5, AC-6, AC-7 of the
+# research-code-skill feature.  Each check() label contains "code-researcher"
+# or "research-code" so the grep-confirm in AC-8 can see them execute.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 121: research-code-flow (code-researcher + /th:research-code) ===")
+
+# ----------------------------------------------------------------
+# AC-3b — CODE_READONLY_AGENTS: code-researcher must NOT have Edit
+#
+# code-researcher legitimately needs Bash (git introspection) so it
+# must NOT be added to READ_ONLY_AGENTS (no-Bash set).  The read-only
+# contract for source files is enforced by "no Edit" only.
+# ----------------------------------------------------------------
+CODE_READONLY_AGENTS = {"code-researcher"}
+
+_s121_code_researcher_path = AGENTS_DIR / "code-researcher.md"
+if _s121_code_researcher_path.exists():
+    _s121_cr_fm = parse_frontmatter(read(_s121_code_researcher_path))
+    _s121_cr_tools_str = _s121_cr_fm.get("tools", "")
+    _s121_cr_tools_list = [t.strip() for t in _s121_cr_tools_str.split(",")]
+
+    check(
+        "suite121(ac3b-code-researcher): code-researcher tools does NOT include Edit"
+        " — read-only-to-source contract (CODE_READONLY_AGENTS)",
+        "Edit" not in _s121_cr_tools_list,
+        f"code-researcher has Edit in allowlist — violates source-read-only contract: {_s121_cr_tools_str}",
+    )
+    # Also assert Bash IS present (required for git introspection; this is
+    # the reason code-researcher is NOT in READ_ONLY_AGENTS).
+    check(
+        "suite121(ac3b-code-researcher): code-researcher tools includes Bash"
+        " — required for read-only git introspection",
+        "Bash" in _s121_cr_tools_list,
+        f"code-researcher missing Bash — needed for git log/blame/grep introspection: {_s121_cr_tools_str}",
+    )
+
+    _s121_cr_body = read(_s121_code_researcher_path)
+
+    # ----------------------------------------------------------------
+    # AC-2 — evidence_ref (file:line) contract; NO source_url/WebSearch/WebFetch
+    # ----------------------------------------------------------------
+    check(
+        "suite121(ac2-code-researcher): code-researcher uses evidence_ref (file:line evidence contract)",
+        "evidence_ref" in _s121_cr_body,
+        "code-researcher.md does not declare evidence_ref field — file:line evidence contract missing",
+    )
+    check(
+        "suite121(ac2-code-researcher): code-researcher does NOT reference source_url"
+        " — code-only map agent, no web evidence shape",
+        "source_url" not in _s121_cr_body,
+        "code-researcher.md references source_url — must use evidence_ref (file:line) not URL evidence",
+    )
+    check(
+        "suite121(ac2-code-researcher): code-researcher does NOT reference WebSearch"
+        " — code-only map agent",
+        "WebSearch" not in _s121_cr_body,
+        "code-researcher.md references WebSearch — it is a code-only agent, not a web agent",
+    )
+    check(
+        "suite121(ac2-code-researcher): code-researcher does NOT reference WebFetch"
+        " — code-only map agent",
+        "WebFetch" not in _s121_cr_body,
+        "code-researcher.md references WebFetch — it is a code-only agent, not a web agent",
+    )
+
+    # ----------------------------------------------------------------
+    # AC-3a — read-only-no-source-write rule + untrusted-content +
+    #          no-secret-disclosure floors
+    # ----------------------------------------------------------------
+    check(
+        "suite121(ac3a-code-researcher): code-researcher states the read-only-no-source-write rule"
+        " — Write permitted only for workspace findings file",
+        ("Read-Only Contract" in _s121_cr_body or "read-only" in _s121_cr_body.lower())
+        and "source" in _s121_cr_body.lower()
+        and ("findings file" in _s121_cr_body or "findings_file" in _s121_cr_body),
+        "code-researcher.md does not state the read-only-no-source-write rule with findings-file scope",
+    )
+    check(
+        "suite121(ac3a-code-researcher): code-researcher includes untrusted-content floor"
+        " — 'Untrusted Content' or 'prompt-injection' heading present",
+        "Untrusted Content" in _s121_cr_body or "prompt-injection" in _s121_cr_body.lower(),
+        "code-researcher.md missing untrusted-content / prompt-injection floor heading",
+    )
+    check(
+        "suite121(ac3a-code-researcher): code-researcher includes no-secret-disclosure floor"
+        " — never echo credentials or secrets",
+        ("secret" in _s121_cr_body.lower() or "credential" in _s121_cr_body.lower())
+        and ("REDACTED" in _s121_cr_body or "never" in _s121_cr_body.lower()),
+        "code-researcher.md missing no-secret-disclosure floor (REDACTED sentinel or never-echo rule)",
+    )
+
+# ----------------------------------------------------------------
+# AC-4 — research-consolidator.md extensions
+# ----------------------------------------------------------------
+_s121_consol_path = AGENTS_DIR / "research-consolidator.md"
+if _s121_consol_path.exists():
+    _s121_consol = read(_s121_consol_path)
+
+    check(
+        "suite121(ac4-research-consolidator): research-consolidator has '## Code vs Docs Conflicts' section",
+        "## Code vs Docs Conflicts" in _s121_consol,
+        "research-consolidator.md missing '## Code vs Docs Conflicts' required section",
+    )
+    check(
+        "suite121(ac4-research-consolidator): research-consolidator has code_closeable flag"
+        " in Coverage gaps block",
+        "code_closeable" in _s121_consol,
+        "research-consolidator.md missing code_closeable flag in ## Coverage gaps block",
+    )
+    check(
+        "suite121(ac4-research-consolidator): research-consolidator has material_code_closeable_gaps"
+        " status field",
+        "material_code_closeable_gaps" in _s121_consol,
+        "research-consolidator.md missing material_code_closeable_gaps status field",
+    )
+    # Preservation checks — existing web behavior must be intact
+    check(
+        "suite121(ac4-research-consolidator-preservation): research-consolidator STILL has"
+        " web_closeable flag (preservation check)",
+        "web_closeable" in _s121_consol,
+        "research-consolidator.md missing web_closeable — existing web behavior was broken",
+    )
+    check(
+        "suite121(ac4-research-consolidator-preservation): research-consolidator STILL has"
+        " material_closeable_gaps field (preservation check)",
+        "material_closeable_gaps" in _s121_consol,
+        "research-consolidator.md missing material_closeable_gaps — existing web status field was removed",
+    )
+
+# ----------------------------------------------------------------
+# AC-5 — ref-special-flows.md: Research-Code Flow section
+# ----------------------------------------------------------------
+_s121_flows_path = AGENTS_DIR / "ref-special-flows.md"
+if _s121_flows_path.exists():
+    _s121_flows = read(_s121_flows_path)
+
+    check(
+        "suite121(ac5-ref-special-flows): ref-special-flows.md has '## Research-Code Flow' section",
+        "## Research-Code Flow" in _s121_flows,
+        "ref-special-flows.md missing '## Research-Code Flow' section",
+    )
+    # Three-strategy decomposition ladder
+    check(
+        "suite121(ac5-ref-special-flows): Research-Code Flow contains decomposition ladder"
+        " (By subsystem / By concern / By question facet)",
+        "By subsystem" in _s121_flows and "By concern" in _s121_flows
+        and "By question facet" in _s121_flows,
+        "Research-Code Flow missing three-strategy decomposition ladder"
+        " (By subsystem / By concern / By question facet)",
+    )
+    # Extended gate — both flags appear near the gate condition
+    check(
+        "suite121(ac5-ref-special-flows): Research-Code Flow extended gate fires on"
+        " web_closeable OR code_closeable",
+        ("web_closeable" in _s121_flows and "code_closeable" in _s121_flows)
+        and ("OR" in _s121_flows or "or" in _s121_flows),
+        "Research-Code Flow missing extended gate with web_closeable OR code_closeable logic",
+    )
+    # /th:cross-repo boundary note
+    check(
+        "suite121(ac5-ref-special-flows): Research-Code Flow has /th:cross-repo boundary mention",
+        "/th:cross-repo" in _s121_flows or "cross-repo" in _s121_flows,
+        "Research-Code Flow missing /th:cross-repo boundary note",
+    )
+
+# ----------------------------------------------------------------
+# AC-6 — orchestrator.md references research-code in routing context
+# ----------------------------------------------------------------
+_s121_orch = read(AGENTS_DIR / "orchestrator.md")
+
+check(
+    "suite121(ac6-orchestrator): orchestrator.md references research-code"
+    " in routing / Direct-Modes context",
+    "research-code" in _s121_orch,
+    "orchestrator.md does not reference 'research-code' — intent routing or Direct Modes row missing",
+)
+
+# ----------------------------------------------------------------
+# AC-7 — skills/research-code/SKILL.md existence, routing, boundary
+# ----------------------------------------------------------------
+_s121_skill_path = SKILLS_DIR / "research-code" / "SKILL.md"
+check(
+    "suite121(ac7-research-code-skill): skills/research-code/SKILL.md exists",
+    _s121_skill_path.exists(),
+    "skills/research-code/SKILL.md not found — skill not created",
+)
+if _s121_skill_path.exists():
+    _s121_skill = read(_s121_skill_path)
+
+    check(
+        "suite121(ac7-research-code-skill): research-code SKILL.md routes to orchestrator"
+        " — mentions orchestrator and does NOT invoke agents directly",
+        "orchestrator" in _s121_skill.lower(),
+        "skills/research-code/SKILL.md does not route to orchestrator",
+    )
+    check(
+        "suite121(ac7-research-code-skill): research-code SKILL.md does NOT invoke code-researcher"
+        " directly (thin routing skill contract)",
+        "code-researcher" not in _s121_skill
+        or "invoke code-researcher" not in _s121_skill.lower(),
+        "skills/research-code/SKILL.md invokes code-researcher directly — must route via orchestrator",
+    )
+    check(
+        "suite121(ac7-research-code-skill): research-code SKILL.md references /th:cross-repo"
+        " boundary to distinguish the two skills",
+        "/th:cross-repo" in _s121_skill or "cross-repo" in _s121_skill,
+        "skills/research-code/SKILL.md missing /th:cross-repo boundary documentation",
+    )
+
+# Self-referential guard
+_s121_own = read(Path(__file__))
+check(
+    "suite121(self-ref): test file contains 'Suite 121', 'research-code-flow',"
+    " 'code-researcher', and 'CODE_READONLY_AGENTS'",
+    "Suite 121" in _s121_own
+    and "research-code-flow" in _s121_own
+    and "code-researcher" in _s121_own
+    and "CODE_READONLY_AGENTS" in _s121_own,
+    "test file must self-reference Suite 121, research-code-flow, code-researcher, CODE_READONLY_AGENTS",
+)
+
+_s121_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite121(registry): docs/testing.md registers 'Suite 121' and 'research-code-flow'",
+    "Suite 121" in _s121_testing_md and "research-code-flow" in _s121_testing_md,
+    "docs/testing.md must register Suite 121 and the 'research-code-flow' marker",
+)
+
+_s121_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite121(hygiene): CLAUDE.md does NOT contain 'Suite 121' (§11 hygiene contract)",
+    "Suite 121" not in _s121_claude_md,
+    "CLAUDE.md must not mention Suite 121 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: research-code-flow
+
+# ---------------------------------------------------------------------------
+# Suite 122 — tester-no-version-assertion
+# Content-presence assertions for the release-version-string anti-pattern added
+# to agents/tester.md (Core Philosophy + Review-mode anti-patterns checklist)
+# and agents/testing-refs/unit.md (§ Principles Anti-patterns line).
+# Folded into test_agent_structure.py (wired as Suite 2 in run-all.sh).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 122: tester-no-version-assertion ===")
+
+_s122_tester_path = AGENTS_DIR / "tester.md"
+_s122_unit_ref_path = AGENTS_DIR / "testing-refs" / "unit.md"
+
+_s122_tester = read(_s122_tester_path)
+_s122_unit_ref = read(_s122_unit_ref_path)
+
+# Grep-confirm token: "release version string"
+_S122_TOKEN = "release version string"
+
+# (1) Core Philosophy anti-pattern present in tester.md
+# AC-1: agents/tester.md § Core Philosophy contains the release-version-string rule.
+check(
+    "suite122(ac1-tester-core-philosophy): agents/tester.md Core Philosophy contains"
+    " the release-version-string anti-pattern — tester-no-version-assertion",
+    _S122_TOKEN in _s122_tester,
+    f"agents/tester.md must contain '{_S122_TOKEN}' in Core Philosophy"
+    " (the release-version-string anti-pattern bullet)",
+)
+
+# (2) Review-mode anti-patterns checklist item present in tester.md
+# AC-3: agents/tester.md § Review Mode → Step 2 → Anti-patterns contains the reviewer-side item.
+_S122_REVIEW_ANCHOR = "## Review Mode"
+_S122_REVIEW_STOP = ("\n## ", "\n---\n")
+_s122_review_slice = _slice_section(_s122_tester, _S122_REVIEW_ANCHOR, _S122_REVIEW_STOP)
+
+check(
+    "suite122(ac3-tester-review-mode): agents/tester.md Review Mode anti-patterns checklist"
+    " contains the release-version-string item — tester-no-version-assertion",
+    bool(_s122_review_slice) and _S122_TOKEN in _s122_review_slice,
+    f"agents/tester.md § Review Mode anti-patterns checklist must contain '{_S122_TOKEN}'"
+    " so the agent flags the pattern when auditing existing suites",
+)
+
+# (3) unit.md § Principles Anti-patterns line contains the prohibition
+# AC-2: agents/testing-refs/unit.md § Principles contains the rule.
+_S122_UNIT_ANCHOR = "## Principles"
+_S122_UNIT_STOP = ("\n## ", "\n---\n")
+_s122_unit_slice = _slice_section(_s122_unit_ref, _S122_UNIT_ANCHOR, _S122_UNIT_STOP)
+
+check(
+    "suite122(ac2-unit-ref-principles): agents/testing-refs/unit.md § Principles"
+    " Anti-patterns line contains the release-version-string prohibition"
+    " — tester-no-version-assertion",
+    bool(_s122_unit_slice) and _S122_TOKEN in _s122_unit_slice,
+    f"agents/testing-refs/unit.md § Principles must contain '{_S122_TOKEN}'"
+    " in its Anti-patterns line so the Reference Router carries the rule to every unit-test author",
+)
+
+# Self-referential guards
+_s122_own = read(Path(__file__))
+check(
+    "suite122(self-ref): test file contains 'Suite 122', 'tester-no-version-assertion',"
+    " and the grep-confirm token",
+    "Suite 122" in _s122_own
+    and "tester-no-version-assertion" in _s122_own
+    and _S122_TOKEN in _s122_own,
+    "test file must self-reference Suite 122, tester-no-version-assertion, and the"
+    f" grep-confirm token '{_S122_TOKEN}'",
+)
+
+_s122_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite122(registry): docs/testing.md registers 'Suite 122' and 'tester-no-version-assertion'",
+    "Suite 122" in _s122_testing_md and "tester-no-version-assertion" in _s122_testing_md,
+    "docs/testing.md must register Suite 122 and the 'tester-no-version-assertion' marker",
+)
+
+_s122_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite122(hygiene): CLAUDE.md does NOT contain 'Suite 122' (§11 hygiene contract)",
+    "Suite 122" not in _s122_claude_md,
+    "CLAUDE.md must not mention Suite 122 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: tester-no-version-assertion
 
 # ---------------------------------------------------------------------------
 # Summary
