@@ -246,7 +246,7 @@ Insert the following block VERBATIM. Same text in every repo. No per-project ada
 
 ### 6.3 Post-work (deliverables for any user-facing change)
 
-- Add a one-line entry under `## [Unreleased]` of CHANGELOG.md in the matching subsection (Added / Changed / Fixed / Removed / Security).
+- For operator/user-facing changes (new feature, bug fix the user observes, performance, security fix, deprecation, removal): add a one-line entry under `## [Unreleased]` of CHANGELOG.md in the matching Keep-a-Changelog subsection (Added / Changed / Deprecated / Removed / Fixed / Security). For internal-only changes (refactor, test, ci, build, chore, repo-docs, internal logging, dev/build dependency bumps): add no changelog entry.
 - If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same PR — do not let CLAUDE.md drift from the repo.
 - If the change establishes a decision, pattern, or constraint that future work must respect, append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`, `[pattern]`, `[stack]`, `[constraint]`).
 - If the repo has an OpenAPI spec (`openapi/openapi.yaml` or similar) and the change touches endpoints, bump `info.version` in the same commit as the spec change — never in a separate commit.
