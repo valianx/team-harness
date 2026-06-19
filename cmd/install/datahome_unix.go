@@ -41,8 +41,13 @@ func lstatWalkPreResolution(normalized string) error {
 	currentUID := os.Getuid()
 
 	// Determine the user home boundary for ownership-check scoping.
-	// On failure, fall back to enforcing ownership on every component (safe default).
+	// fix(sec-01): fail-closed when the boundary is unresolvable (parity with datahome_windows.go INFO-W1).
+	// When homeErr != nil (e.g. $HOME absent in cron, systemd without HOME=, or sudo env reset),
+	// belowOrAtHome evaluates true for EVERY component — ownership is enforced everywhere
+	// (the stricter, safe default).  When home resolves successfully, ownership is scoped
+	// to components at or below the home boundary as designed.
 	homeDir, homeErr := os.UserHomeDir()
+	homeDirClean := filepath.Clean(homeDir) // filepath.Clean is a no-op on error (homeDir=="")
 
 	// Walk from the volume/root up to the path's parent.
 	// filepath.VolumeName is always empty on Unix.
@@ -72,7 +77,9 @@ func lstatWalkPreResolution(normalized string) error {
 		// System directories above the home (/, /home, /tmp, etc.) are expected to
 		// be root-owned on most Linux distributions — checking them would refuse
 		// legitimate installs (fix(sec-01): scope ownership walk to ≤user-home).
-		belowOrAtHome := homeErr == nil && isAtOrBelowPath(homeDir, component)
+		// When the home directory cannot be determined (homeErr != nil), enforce
+		// ownership on EVERY component — fail-closed (parity with datahome_windows.go).
+		belowOrAtHome := homeErr != nil || isAtOrBelowPath(homeDirClean, component)
 		if belowOrAtHome {
 			sys, ok := fi.Sys().(*syscall.Stat_t)
 			if !ok {
