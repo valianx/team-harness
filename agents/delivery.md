@@ -312,26 +312,48 @@ If the feature was non-trivial (had >2 AC or documented significant decisions), 
 
 ### Step 7 — Write CHANGELOG fragment
 
-**Preferred path — `changelog.d/` fragment (default for all PRs).** Write a fragment file `changelog.d/{pr-slug}.md` instead of editing `## [Unreleased]` inline. Each PR writes its own file; because each PR touches a distinct file, concurrent PRs in the same session never produce merge conflicts on CHANGELOG.md.
+**Preferred path — `changelog.d/` fragment (default for operator-facing PRs; internal-only PRs write none).** Write a fragment file `changelog.d/{pr-slug}.md` instead of editing `## [Unreleased]` inline. Each PR writes its own file; because each PR touches a distinct file, concurrent PRs in the same session never produce merge conflicts on CHANGELOG.md.
+
+**Step 7.0 — Classify the PR as operator-facing or internal-only (required before authoring any fragment).**
+
+Read the diff (`git diff main...HEAD -- . ':!workspaces'`) and the workspace docs, then ask the single governing question: *does an installed operator or end user observe this change?* Classify using Table 1 below.
+
+- **Operator-facing** — the change reaches the consumer: new feature, observable bug fix, performance change the user notices, security fix, deprecation notice, removal of a public surface, or a production dependency bump the consumer receives.
+- **Internal-only** — the change does not reach the consumer: refactor with no observable behaviour change, test-only, CI, build/build-tooling, chore, repo-internal documentation, internal logging, or a dev/build-only dependency bump.
+
+Note: a change can require a version bump (Step 9) yet earn no changelog fragment — for example, a shipped-asset behavior correction that is not operator-noteworthy. The classification gate (Step 7) and the version gate (Step 9) are independent; neither subsumes the other.
+
+| Change type | Fragment? | Keep-a-Changelog section |
+|---|---|---|
+| new feature / new public surface | **yes** | `### Added` |
+| bug fix the consumer observes | **yes** | `### Fixed` |
+| performance change (observable) | **yes** | `### Changed` |
+| security fix | **yes** | `### Security` |
+| deprecation of a public surface | **yes** | `### Deprecated` |
+| removal of a public surface | **yes** | `### Removed` |
+| production dependency bump the consumer receives | **yes** | `### Fixed` (or `### Security` if it closes a CVE) |
+| refactor (no observable change) | **no** | — |
+| test-only | **no** | — |
+| ci | **no** | — |
+| build / build-tooling | **no** | — |
+| chore / housekeeping | **no** | — |
+| repo docs (not a shipped product) | **no** | — |
+| internal logging / observability | **no** | — |
+| dev/build-only dependency bump | **no** | — |
+
+**Special case** (retained): when a `fix`/`hotfix` *is itself* a security defect (auth bypass, injection, XSS, broken access control, etc.), or the security agent reported a resolved Critical/High, route to `### Security` regardless of the row above.
+
+**If operator-facing → write the fragment.** Proceed with fragment authoring using the routing from Table 1.
+
+**If internal-only → write NO fragment.** Record the log line `changelog fragment: skipped (internal-only)` in the delivery summary and proceed to Step 8. Do not author a fragment file or modify `CHANGELOG.md` in this path.
 
 **Deriving `{pr-slug}`.** Use the feature name or branch name, lowercased and with all non-alphanumeric characters replaced by hyphens. The slug MUST match `[a-z0-9-]+` — no slashes, dots, underscores, or path separators. Examples: `feat/plan-shape-batch-economy` → `plan-shape-batch-economy`; `fix/auth-bypass` → `auth-bypass`.
 
 The fragment is a standard Keep-a-Changelog subsection block (examples below).
 
-**Routing rules (mandatory — same as before, now applied to the fragment subsection header):**
-
-| Task payload `type:` | Fragment subsection | Rationale |
-|---|---|---|
-| `feature`, `enhancement` | `### Added` | new functionality |
-| `refactor` | `### Changed` | behaviour preserved; structure changed |
-| **`fix`** | **`### Fixed`** | bug fix |
-| **`hotfix`** | **`### Fixed`** | urgent bug fix |
-| `fix` or `hotfix` AND the bug itself is a security defect (auth bypass, injection, XSS, broken access control, etc.) | **`### Security`** | Keep-a-Changelog convention for security fixes |
-| (any) AND security agent reported Critical/High that were resolved as part of this change | `### Security` | security-relevant changes get their own surface |
-
 **For `type: fix` and `type: hotfix`** the entry format is: `- {past-tense bug description}. Fixes #{issue-number-if-any}.`
 
-**Fallback — direct `[Unreleased]` edit (legacy, use only when `changelog.d/` cannot be used).** If `changelog.d/` does not exist and cannot be created (e.g., a repo that predates this convention), fall back to adding the entry under `## [Unreleased]` in `CHANGELOG.md` directly, following the same subsection routing rules above. Do NOT modify entries outside `[Unreleased]` when using the fallback path. The `changelog.d/` path is preferred; the fallback is for compatibility with older repos.
+**Fallback — direct `[Unreleased]` edit (legacy, use only when `changelog.d/` cannot be used, and only when operator-facing).** If `changelog.d/` does not exist and cannot be created (e.g., a repo that predates this convention), fall back to adding the entry under `## [Unreleased]` in `CHANGELOG.md` directly, following the same subsection routing rules above. Internal-only PRs write nothing in the fallback path either. Do NOT modify entries outside `[Unreleased]` when using the fallback path. The `changelog.d/` path is preferred; the fallback is for compatibility with older repos.
 
 ### Step 8 — Update OpenAPI (backend only, if applicable)
 
@@ -422,20 +444,34 @@ Read the first match and extract the current version. For `.claude-plugin/plugin
 
 **Version rules — analyze actual changes to determine bump:**
 
-Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!workspaces'`) and workspaces to understand the scope of changes. Classify each change, then pick the highest applicable bump:
+`skip-version: true` overrides this entire table: when the orchestrator passes `skip-version: true`, Step 9 is skipped entirely (existing Critical Rule and Step 9 gate, unchanged). The rules below apply only when a bump is being made at all.
 
-| Bump | Criteria | Examples |
-|------|----------|----------|
-| **Major** (X.0.0) | Breaking changes to public APIs, removed exports, changed function signatures incompatibly, DB migrations that break backwards compat | Removed public method, renamed API endpoint, changed return type |
-| **Minor** (0.X.0) | New features, new public API surface, new capabilities, non-breaking additions | New endpoint, new component, new CLI flag, new exported function |
-| **Patch** (0.0.X) | Bug fixes, refactors with no behavior change, docs updates, dependency updates, performance improvements, test additions | Fixed null check, optimized query, added missing validation |
+Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!workspaces'`) and workspaces to understand the scope of changes. Classify each change against Table 2, then pick the **highest applicable level** and justify the chosen level from the diff.
 
-**Decision rules:**
-- If ANY change is breaking → **major** (but warn the user before bumping — breaking changes should be intentional)
-- If ANY change adds new capability → **minor**
-- If ALL changes are fixes/refactors/docs → **patch**
-- When multiple change types coexist, the highest wins (e.g., new feature + bug fix = **minor**)
-- Do NOT default blindly — always justify the bump from the actual diff
+**PATCH is the default** for all shipped changes that add no new public/observable surface. Do not reach for MINOR unless the diff genuinely adds a new surface per the definitions below.
+
+| Change | SemVer level | Why |
+|---|---|---|
+| Adds a genuinely new public/observable surface — library: new exported fn/class; CLI: new command or optional flag; HTTP API: new endpoint/optional field; service: new invokable capability; config/plugin: new command/agent/skill/hook or new optional config key | **MINOR** | New backward-compatible functionality added to the public surface. |
+| Deprecates an existing public surface (warns it will be removed in a future MAJOR) | **MINOR** | SemVer: deprecation is the additive warning that precedes a MAJOR removal. |
+| Bug fix / behavior correction to an existing surface (corrective, no new surface) | **PATCH** | Backward-compatible internal change that fixes incorrect behavior. |
+| Performance improvement to existing behavior | **PATCH** | Backward-compatible, no new surface. |
+| Security fix in a shipped surface | **PATCH** (MINOR/MAJOR only if the fix itself changes the public API/contract) | Security fixes are backward-compatible bug fixes; ship as PATCH. |
+| Internal refactor that ships to the consumer (no observable change) | **PATCH** | It reaches the consumer, so it bumps; no new surface, so not MINOR. |
+| Production dependency bump the consumer receives | **PATCH** | Reaches the consumer as a backward-compatible fix-grade release. |
+| **ESLint edge case** — a "fix" that makes an existing tool/asset *newly reject* inputs that previously passed | **MINOR** | A fix that newly fails a previously-valid consumer workflow can break that workflow even while corrective. |
+| Removes or renames a public surface (command / endpoint / exported member / agent / skill / hook / config key) | **MAJOR** | Backward-incompatible public-surface change. |
+| Changes a default behavior of an existing surface in a way that breaks existing consumers | **MAJOR** | Strands consumers relying on the old behavior; deprecation-first is preferred. |
+| Incompatible config / signature / contract change; makes a previously-optional input required | **MAJOR** | Breaks existing callers/configs. |
+| Change the consumer never receives — repo-internal docs / tests / CI only | **none** | No consumer-observable surface; no mandatory increment. |
+
+**Decision rule** (mirrors Step 8b): read the `git diff`, classify each change against Table 2 above, pick the **highest applicable level**, justify from the diff. When multiple change types coexist, the highest wins (e.g., new feature + bug fix = MINOR).
+
+**Worked examples:**
+- A logging/observability change inside shipped code adds no new observable surface → PATCH, never MINOR.
+- Enhancing the wording or behavior of an existing command/agent/endpoint without adding a new surface → PATCH; adding a brand-new command/agent/endpoint → MINOR.
+
+**Breaking changes** (MAJOR): warn the user before bumping — breaking changes should be intentional.
 
 **Step 9.3 — If NO version file is found**, create one automatically:
 - Detect the project ecosystem (Node → `package.json`, Python → `pyproject.toml`, Rust → `Cargo.toml`, etc.)
