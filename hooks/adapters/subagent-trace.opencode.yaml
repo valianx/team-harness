@@ -1,0 +1,19 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/subagent-trace.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/subagent-trace.cc.ts
+  frontmatterDialect: none
+events:
+  # SubagentStop → opencode agent:stop (if/when opencode exposes this event).
+  SubagentStop: "agent:stop"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - agent:stop  # opencode may not expose SubagentStop; fail-open (no block, no trace)
+notes: >
+  subagent-trace on opencode: NEVER blocks. If opencode does not expose agent:stop,
+  the trace line is simply not written for opencode sessions.

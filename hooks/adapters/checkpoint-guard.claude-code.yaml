@@ -1,0 +1,22 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/checkpoint-guard.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/checkpoint-guard.cc.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: PreToolUse
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: Task (agent dispatch gate).
+# Timeout: 10s.
+# Fail mode: FAIL-OPEN. Any state-read failure → allow.
+# StateReader interface injected by the entry (testable without real FS).
+notes: >
+  checkpoint-guard is a FAIL-OPEN reasoning gate. B1/B2/B3 boundaries enforce the
+  advance contract (checkpoint_advance_fresh + functional_clarity_confirmed). Any
+  error reading 00-state.md → allow (fail-open; parity with checkpoint-guard.sh).

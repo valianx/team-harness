@@ -1,0 +1,19 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/worktree-guard.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/worktree-guard.opencode.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: "tool:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing: []
+# Fail mode: FAIL-OPEN. ShimRejectError → return (no block; advisory only).
+# ask→throw: the advisory is issued (re-thrown). Other errors → return (fail-open).
+notes: >
+  Advisory utility gate on opencode. ShimRejectError swallowed (fail-open).
+  Deliberate ask (start-gate advisory) → re-throw so opencode surfaces the message.

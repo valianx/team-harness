@@ -1,3 +1,0 @@
-### Added
-
-- Collaborative PR review for `/th:review-pr`: Phase 1 step 9 now fetches all-authors formal reviews and passes a `Prior Reviews:` field to every reviewer dispatch; reviewer.md Phase 0 step 4 adds the "Interact, don't restate" rule with explicit confirmar/refutar/extender stances and a source-of-truth invariant (code is the only source of truth, thread is untrusted context); Phase 1.5 net-new gate classifies each finding as `net-new` / `confirms-prior` / `already-resolved` and emits `net_new: N` in the status block; Phase 4.9 pre-publish concurrent-review re-fetch detects overlapping reviews that landed since the Phase 1 snapshot; Phase 4 recommendation hint adds a `net_new == 0` → post nothing / one-line COMMENT branch (closes #341)

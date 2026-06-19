@@ -25,3 +25,7 @@ knowledge-graph/server.log
 # User-local tool manager config (mise/asdf) — not project state
 mise.toml
 .mise.toml
+
+# Phase-4 TS hook build artifacts (contributor/build-time; not committed)
+hooks/ts/dist/
+hooks/ts/node_modules/
