@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.109.0] - 2026-06-19
+## [2.110.0] - 2026-06-19
 
 ### Added
 - TypeScript hook layer (`hooks/ts/`): 10 canonical hook bodies ported to TS on a shared `normalized-v1` format-shim — `dev-guard`, `policy-block`, `checkpoint-guard`, `prepublish-guard`, `gcp-guard`, `worktree-guard`, `session-start`, `language-user-prompt`, `subagent-trace`, `precompact-snapshot`, `notify-stage` (opencode Phase 4, Decision A).
@@ -75,6 +75,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `hooks/dev-guard.sh` — branch 2e-bis gates `gh api graphql` PR-write mutations (`resolveReviewThread`, `addPullRequestReviewThreadReply`, `addPullRequestReview`, `submitPullRequestReview`, `mergePullRequest`) with `ask`; read-only `reviewThreads` queries ungated. Closes SEC-001 (HIGH).
 - `hooks/policy-block.sh` — M3a: `Read` tool calls targeting secret/credential paths return `ask`; M3b: `Write`/`Edit` calls weakening linter/formatter configs return `ask`; M3c: position-aware argv tokenizer replacing naive `--no-verify` regex with quote-aware tokenizer that skips `-m`/`-F` values, detects bundled `-n` clusters scoped to `git commit`, and covers `-c core.hooksPath=`.
 - `hooks/ts/` TS hook layer: `normalized-v1` shim enforces SEC-07 (pre-parse size+depth bound, named-key-read-only, `__proto__` hard-reject, no spread/merge); `ask`→`throw` fail-closed mapping on opencode for outward/gcp gates; SEC-DR-F non-mutation invariant (no write path back to opencode `output.args`).
+
+## [2.109.0] - 2026-06-19
+
+### Added
+
+- **prepublish-guard bump-floor advisory** — `hooks/prepublish-guard.sh` now derives a version-bump floor from `git diff --name-status origin/main...HEAD` (a new `agents/`/`skills/`/`hooks/` file → MINOR, a deleted/renamed one → MAJOR-candidate, edits → PATCH) and emits a non-blocking stderr advisory when the applied bump is below the floor, or when a docs/tests/CI-only change carries a MINOR-or-higher bump (over-bump). Advisory only — it never blocks the push; the existing shipped-asset-no-bump hard block is unchanged. Complements the operator-facing changelog gate and PATCH-default SemVer rules in the `delivery` agent.
 
 ## [2.108.1] - 2026-06-19
 
