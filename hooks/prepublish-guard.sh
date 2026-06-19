@@ -23,12 +23,41 @@
 #     guard fault NEVER blocks the operator.
 #
 # CHECK 1 — VERSION BUMP (git push)
-#   Computes git diff --name-only origin/main...HEAD LOCALLY. If any path in
+#   Computes git diff --name-status origin/main...HEAD LOCALLY. If any path in
 #   the diff matches agents/|skills/|hooks/, then BOTH .claude-plugin/plugin.json
 #   AND .claude-plugin/marketplace.json version values must differ from
 #   origin/main. Compares the version VALUE (not file presence) to guard against
 #   a touch that leaves the version byte-identical (SEC-PPG-6).
 #   Generic safety: .claude-plugin/plugin.json absent → no-op (other repos).
+#
+#   OVER-BUMP ADVISORY (runs on the no-shipped-asset early-exit path):
+#   Before exiting nodecision when no agents/|skills/|hooks/ path is in the
+#   diff, reads the canonical version from .claude-plugin/plugin.json at both
+#   origin/main and HEAD. If the actual bump level is MINOR or higher, emits
+#   an advisory WARN to stderr. Fail-open: unreadable file, missing file, or
+#   unparseable version → skip advisory, nodecision silently.
+#
+#   BUMP-FLOOR SUB-STAGE (advisory, runs only on the Check-1 PASS path):
+#   After the hard-block evaluation, derives a mechanical SemVer floor from the
+#   name-status diff over shipped paths and emits an advisory WARN to stderr
+#   when the actual bump level is below the floor. The floor table:
+#
+#     D or R shipped path  → MAJOR-candidate floor
+#     A shipped path       → MINOR floor
+#     M-only shipped path  → PATCH floor
+#
+#   NOTE: floor=="none" cannot occur on the shipped-asset path because the
+#   over-bump advisory (above) handles the no-shipped-asset case before this
+#   sub-stage is ever reached.
+#
+#   The floor sub-stage ALWAYS ends at nodecision (empty stdout, exit 0). It
+#   NEVER emits permissionDecision: "ask" or "deny". WARNs go to stderr only.
+#   Fail-open: any version that does not match ^[0-9]+\.[0-9]+\.[0-9]+$ or any
+#   sub-command fault → skip the floor compare with a one-line stderr note.
+#
+#   Structural invariant: the hard-block deny path calls deny() (which exit 0s)
+#   and therefore NEVER reaches the floor sub-stage. A WARN and a block can
+#   never co-occur in the same invocation.
 #
 # CHECK 2 — TESTS (gh pr create)
 #   Reads prepublish_check (string) from ~/.claude/.team-harness.json.
@@ -93,6 +122,36 @@ deny() {
     local reason="$1"
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
     exit 0
+}
+
+# semver_delta OLD NEW → prints major|minor|patch|none|unknown to stdout.
+# Both arguments must match ^[0-9]+\.[0-9]+\.[0-9]+$ else "unknown".
+# A downgrade or non-monotonic change returns "unknown" (fail-open).
+# Pure POSIX: uses awk -F. for the split; no bc, no GNU-only flags.
+semver_delta() {
+    local _old="$1" _new="$2"
+    # Validate both strings are X.Y.Z
+    case "$_old" in
+        *[!0-9.]*) printf 'unknown'; return 0 ;;
+    esac
+    case "$_new" in
+        *[!0-9.]*) printf 'unknown'; return 0 ;;
+    esac
+    printf '%s' "$_old" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' 2>/dev/null || { printf 'unknown'; return 0; }
+    printf '%s' "$_new" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' 2>/dev/null || { printf 'unknown'; return 0; }
+
+    awk -F. -v old="$_old" -v new="$_new" '
+    BEGIN {
+        split(old, o, ".")
+        split(new, n, ".")
+        oM = o[1]+0; oMin = o[2]+0; oP = o[3]+0
+        nM = n[1]+0; nMin = n[2]+0; nP = n[3]+0
+        if (nM > oM)                           print "major"
+        else if (nM == oM && nMin > oMin)      print "minor"
+        else if (nM == oM && nMin == oMin && nP > oP) print "patch"
+        else if (nM == oM && nMin == oMin && nP == oP) print "none"
+        else                                    print "unknown"
+    }' /dev/null
 }
 
 # ---------------------------------------------------------------------------
@@ -200,15 +259,79 @@ if [ "$_is_git_push" = "true" ]; then
         nodecision
     fi
 
-    # Compute the diff. A git diff error → fail-open.
+    # Compute the diff (--name-status gives status+TAB+path per line;
+    # rename lines are R<score>TAB<old>TAB<new>). A git diff error → fail-open.
     _changed=""
-    _changed=$(git diff --name-only origin/main...HEAD 2>/dev/null) || {
+    _changed=$(git diff --name-status origin/main...HEAD 2>/dev/null) || {
         printf 'prepublish-guard: git diff failed; skipping version-bump check\n' >&2
         nodecision
     }
 
     # If no distributed assets changed, Check 1 passes.
-    if ! printf '%s' "$_changed" | grep -qE '^(agents|skills|hooks)/' 2>/dev/null; then
+    # For --name-status lines: the path is the LAST field on each line.
+    # Rename lines have three tab-separated fields; others have two.
+    # Extract the last field and match against the shipped-path regex.
+    if ! printf '%s' "$_changed" | awk -F'\t' '{print $NF}' | grep -qE '^(agents|skills|hooks)/' 2>/dev/null; then
+        # No shipped asset changed. Emit an advisory WARN if the version bump
+        # is MINOR or higher — a docs/tests/CI-only change is typically PATCH or none.
+        # Fail-open: if .claude-plugin/plugin.json is unreadable or version is
+        # non-parseable, skip the advisory and nodecision quietly.
+        _no_asset_origin=""
+        _no_asset_head=""
+
+        if MSYS_NO_PATHCONV=1 git show origin/main:.claude-plugin/plugin.json >/dev/null 2>&1; then
+            if command -v python3 >/dev/null 2>&1; then
+                _no_asset_origin=$(MSYS_NO_PATHCONV=1 git show origin/main:.claude-plugin/plugin.json 2>/dev/null \
+                    | python3 -c "
+import json, sys
+try:
+    data = json.loads(sys.stdin.read())
+    print(data.get('version', ''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+            else
+                _no_asset_origin=$(MSYS_NO_PATHCONV=1 git show origin/main:.claude-plugin/plugin.json 2>/dev/null \
+                    | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
+                    | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+            fi
+        fi
+
+        if [ -f ".claude-plugin/plugin.json" ]; then
+            if command -v python3 >/dev/null 2>&1; then
+                _no_asset_head=$(python3 -c "
+import json, sys
+try:
+    data = json.load(open('.claude-plugin/plugin.json'))
+    print(data.get('version', ''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+            else
+                _no_asset_head=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' .claude-plugin/plugin.json 2>/dev/null \
+                    | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+            fi
+        fi
+
+        if [ -n "$_no_asset_origin" ] && [ -n "$_no_asset_head" ]; then
+            _no_asset_actual=$(semver_delta "$_no_asset_origin" "$_no_asset_head" 2>/dev/null) || _no_asset_actual="unknown"
+            : "${_no_asset_actual:=unknown}"
+            if [ "$_no_asset_actual" != "unknown" ]; then
+                _no_asset_rank_actual=""
+                case "$_no_asset_actual" in
+                    none)  _no_asset_rank_actual=0 ;;
+                    patch) _no_asset_rank_actual=1 ;;
+                    minor) _no_asset_rank_actual=2 ;;
+                    major) _no_asset_rank_actual=3 ;;
+                    *)     _no_asset_rank_actual=-1 ;;
+                esac
+                if [ "$_no_asset_rank_actual" -ge 2 ] 2>/dev/null; then
+                    printf 'prepublish-guard: WARN — no distributed asset (agents/|skills/|hooks/) changed in this diff, but the version bump is %s (>= MINOR). A docs/tests/CI-only change is typically none or PATCH. Confirm the level is intentional. (advisory; push not blocked)\n' \
+                        "$_no_asset_actual" >&2
+                fi
+            fi
+        fi
+
         nodecision
     fi
 
@@ -310,7 +433,96 @@ except Exception:
         deny "prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but the plugin version was not bumped. Bump \\\"version\\\" in BOTH .claude-plugin/plugin.json AND .claude-plugin/marketplace.json (matched semver) in this push, or the marketplace serves nothing (CLAUDE.md §6.3). Push blocked."
     fi
 
-    # Check 1 passed.
+    # -----------------------------------------------------------------------
+    # Check 1 passed. Bump-floor sub-stage (advisory only).
+    #
+    # The deny path above calls deny() which exits before reaching here.
+    # This sub-stage ONLY runs on the pass path. It NEVER emits deny or ask.
+    # All WARNs go to stderr; the sub-stage always ends at nodecision below.
+    # Fail-open: any parse fault or unknown version → skip, one-line note.
+    # -----------------------------------------------------------------------
+
+    # Derive the mechanical floor from name-status over shipped paths.
+    _floor_saw_added=false
+    _floor_saw_removed_or_renamed=false
+    _floor_saw_modified=false
+
+    while IFS=$'\t' read -r _fs_status _fs_path_a _fs_path_b || [ -n "$_fs_status" ]; do
+        # For rename lines (R<score>TABoldTABnew), the destination is _fs_path_b.
+        # For all other lines, the path is _fs_path_a.
+        if [ -n "$_fs_path_b" ]; then
+            _fs_path="$_fs_path_b"
+        else
+            _fs_path="$_fs_path_a"
+        fi
+        # Only act on shipped paths.
+        printf '%s' "$_fs_path" | grep -qE '^(agents|skills|hooks)/' 2>/dev/null || continue
+        # Inspect the first character of the status field.
+        case "${_fs_status%"${_fs_status#?}"}" in
+            A) _floor_saw_added=true ;;
+            D) _floor_saw_removed_or_renamed=true ;;
+            R) _floor_saw_removed_or_renamed=true ;;
+            *) _floor_saw_modified=true ;;
+        esac
+    done <<EOF
+$_changed
+EOF
+
+    if [ "$_floor_saw_removed_or_renamed" = "true" ]; then
+        _floor="major"
+    elif [ "$_floor_saw_added" = "true" ]; then
+        _floor="minor"
+    elif [ "$_floor_saw_modified" = "true" ]; then
+        _floor="patch"
+    else
+        _floor="none"
+    fi
+
+    # Compute the actual SemVer delta from the already-read canonical versions.
+    _actual=$(semver_delta "$_plugin_origin" "$_plugin_head" 2>/dev/null) || _actual="unknown"
+    : "${_actual:=unknown}"
+
+    # Fail-open: unparseable version → skip the floor compare.
+    if [ "$_actual" = "unknown" ]; then
+        printf 'prepublish-guard: version not X.Y.Z (old=%s new=%s); skipping bump-floor check\n' \
+            "$_plugin_origin" "$_plugin_head" >&2
+        nodecision
+    fi
+
+    # Map level names to numeric ranks for comparison.
+    _rank_of() {
+        case "$1" in
+            none)  printf '0' ;;
+            patch) printf '1' ;;
+            minor) printf '2' ;;
+            major) printf '3' ;;
+            *)     printf '-1' ;;
+        esac
+    }
+
+    _rank_actual=$(_rank_of "$_actual")
+    _rank_floor=$(_rank_of "$_floor")
+
+    if [ "$_rank_actual" -lt "$_rank_floor" ] 2>/dev/null; then
+        # UNDER-BUMP: actual level is below the mechanical floor.
+        if [ "$_floor" = "major" ]; then
+            printf 'prepublish-guard: WARN — a shipped asset was DELETED or RENAMED (removed public surface) but the version bump is %s. SemVer suggests MAJOR. If the deleted/renamed file is not a public invocable surface (e.g. an internal include), ignore. (advisory; push not blocked)\n' \
+                "$_actual" >&2
+        elif [ "$_floor" = "minor" ]; then
+            printf 'prepublish-guard: WARN — a NEW shipped file was added (new invocable surface) but the version bump is %s. SemVer suggests MINOR. If the new file is not a new invocable surface (e.g. a _shared include), ignore. (advisory; push not blocked)\n' \
+                "$_actual" >&2
+        fi
+        # floor==patch with actual==none cannot occur here: Check 1 already denied
+        # "shipped touched + no version change", so on the pass path a shipped-touch
+        # always has actual >= patch. Guard is implicit — fall through to nodecision.
+    fi
+    # NOTE: the floor=="none" over-bump branch was removed — it was dead code.
+    # The early-exit at the no-shipped-asset check above handles the over-bump
+    # advisory before the shipped-path block is entered; on the shipped path,
+    # _floor is always major/minor/patch (never "none"), so that branch could
+    # never trigger here.
+    # All other cases: actual >= floor → silent (correct).
+
     nodecision
 fi
 
