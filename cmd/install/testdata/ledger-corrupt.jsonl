@@ -1,0 +1,3 @@
+{"ts":"2026-06-18T10:00:00Z","op":"install","component":"comp-a","owns":{"files":["{config_root}/agents/test.md"],"configKeys":[]},"schemaVersion":1}
+NOT VALID JSON - this line is truncated/corrupt{{
+{"ts":"2026-06-18T10:02:00Z","op":"install","component":"comp-b","owns":{"files":["{config_root}/agents/other.md"],"configKeys":["logs-mode"]},"schemaVersion":1}

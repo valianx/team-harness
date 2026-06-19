@@ -1,0 +1,3 @@
+NOT JSON AT ALL
+{broken: no quotes}
+{"schemaVersion":2,"op":"install","component":"c","owns":{"files":[],"configKeys":[]}}
