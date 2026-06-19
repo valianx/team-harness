@@ -1,8 +1,24 @@
-# bin/ — Legacy bootstrap scripts
+# bin/ — Bootstrap scripts
+
+## opencode install (live path)
+
+| Script | Platform | Usage |
+|--------|----------|-------|
+| `install-opencode.sh` | macOS / Linux | `curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh \| bash` |
+
+`install-opencode.sh` downloads the latest released Go binary, verifies its SHA256 checksum against the published `SHA256SUMS`, and runs `apply --runtime opencode --scope global`. It is **NOT deprecated** — this is the live opencode install path.
+
+See the README `### Install into opencode` section for the full env-var contract (`MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, `CONTEXT7_API_KEY`).
+
+> **Note:** A Windows PowerShell variant (`install-opencode.ps1`) is planned as an immediate follow-up. On Windows, install manually by downloading the binary from GitHub Releases and running `install apply --runtime opencode --scope global --memory-url <url>`.
+
+---
+
+## Claude Code install (legacy path)
 
 > **These scripts are the legacy install path as of v2.33.0.** The canonical install path is the Claude Code plugin. Use these scripts only for offline environments, CI pipelines, or `low-cost` mode installs.
 
-## Canonical install (recommended)
+### Canonical install (recommended)
 
 Run the following three commands inside Claude Code:
 
@@ -12,7 +28,7 @@ Run the following three commands inside Claude Code:
 /th:setup
 ```
 
-## Legacy bootstrap scripts
+### Legacy bootstrap scripts (DEPRECATED)
 
 | Script | Platform | Usage |
 |--------|----------|-------|

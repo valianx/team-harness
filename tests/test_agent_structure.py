@@ -29414,6 +29414,147 @@ check(
 # Marker: tester-no-version-assertion
 
 # ---------------------------------------------------------------------------
+# Suite 123 — install-opencode-sha256-invariants
+# Folded into test_agent_structure.py (already wired as Suite 2 in run-all.sh;
+# no new # Suite N: block needed — see docs/testing.md § "run-all hardcoded
+# suite list" note).
+# Assertions read bin/install-opencode.sh as TEXT and guard the five durable
+# integrity invariants without re-implementing the logic.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 123: install-opencode-sha256-invariants ===")
+
+_OPENCODE_SH_PATH = REPO_ROOT / "bin" / "install-opencode.sh"
+_s123_script = read(_OPENCODE_SH_PATH)
+
+# (1) TOCTOU / anti-reorder guard — chmod +x of the downloaded binary must
+#     appear AFTER the hash-comparison block. Line-index ordering in the raw
+#     text: index of "chmod +x" > index of the compare expression.
+_S123_CHMOD_TOKEN = "chmod +x"
+_S123_COMPARE_TOKEN = '"$ACTUAL" != "$EXPECTED"'
+_s123_chmod_idx = _s123_script.find(_S123_CHMOD_TOKEN)
+_s123_compare_idx = _s123_script.find(_S123_COMPARE_TOKEN)
+check(
+    "suite123(toctou): chmod +x appears AFTER the hash-comparison block"
+    " — install-opencode-sha256-invariants",
+    _s123_chmod_idx != -1
+    and _s123_compare_idx != -1
+    and _s123_chmod_idx > _s123_compare_idx,
+    f"chmod +x (at offset {_s123_chmod_idx}) must come after the hash-compare"
+    f' expression (at offset {_s123_compare_idx})'
+    " in bin/install-opencode.sh — anti-TOCTOU/anti-reorder guard",
+)
+
+# (2) Fail-closed no-hash-tool branch — when neither sha256sum nor shasum is
+#     available, the script must exit 1 (not silently proceed).
+_S123_NO_HASH_TOKEN = "no sha256sum or shasum available"
+_S123_EXIT1_TOKEN = "exit 1"
+_s123_no_hash_idx = _s123_script.find(_S123_NO_HASH_TOKEN)
+_s123_no_hash_region = _s123_script[_s123_no_hash_idx: _s123_no_hash_idx + 200] if _s123_no_hash_idx != -1 else ""
+check(
+    "suite123(fail-closed): no-hash-tool branch contains 'exit 1'"
+    " — install-opencode-sha256-invariants",
+    _s123_no_hash_idx != -1 and _S123_EXIT1_TOKEN in _s123_no_hash_region,
+    "bin/install-opencode.sh no-hash-tool branch (near 'no sha256sum or shasum available')"
+    " must contain 'exit 1' — fail-closed, not a silent skip",
+)
+
+# (3a) Anchored field match — the hash extraction uses awk '$2==a' (exact bare
+#      filename match, not a substring glob).
+_S123_AWK_ANCHOR_TOKEN = "'$2==a'"
+check(
+    "suite123(anchored-match): awk '$2==a' field match is present"
+    " — install-opencode-sha256-invariants",
+    _S123_AWK_ANCHOR_TOKEN in _s123_script,
+    "bin/install-opencode.sh must use awk '$2==a' for anchored asset-name match"
+    " — substring match is insufficient; the field-anchor prevents false matches",
+)
+
+# (3b) sha256sum -c ABSENT as an executable command — the script must use
+#      extract-and-compare, not 'sha256sum -c SHA256SUMS' (which would fail on the
+#      other asset entries). The design-rationale comment may reference the token
+#      literally, so the check excludes comment lines (those starting with '#').
+_S123_PROHIBITED_TOKEN = "sha256sum -c"
+_s123_non_comment_sha256c = [
+    line for line in _s123_script.splitlines()
+    if _S123_PROHIBITED_TOKEN in line and not line.strip().startswith("#")
+]
+check(
+    "suite123(no-sha256sum-c): 'sha256sum -c' does not appear on any non-comment line"
+    " — install-opencode-sha256-invariants",
+    len(_s123_non_comment_sha256c) == 0,
+    "bin/install-opencode.sh must NOT execute 'sha256sum -c' — it fails when SHA256SUMS"
+    " contains entries for other assets; use extract-and-compare instead."
+    " Offending lines: " + "; ".join(_s123_non_comment_sha256c[:3]),
+)
+
+# (4) Asset-absent branch — when the EXPECTED hash is empty (the platform is
+#     not in the SHA256SUMS file), the script must exit 1 immediately rather
+#     than proceeding with an unverified binary.
+_S123_ASSET_ABSENT_TOKEN = '[ -z "$EXPECTED" ]'
+_s123_asset_absent_idx = _s123_script.find(_S123_ASSET_ABSENT_TOKEN)
+_s123_asset_absent_region = (
+    _s123_script[_s123_asset_absent_idx: _s123_asset_absent_idx + 300]
+    if _s123_asset_absent_idx != -1
+    else ""
+)
+check(
+    "suite123(asset-absent): '[ -z \"$EXPECTED\" ]' branch exists and contains 'exit 1'"
+    " — install-opencode-sha256-invariants",
+    _s123_asset_absent_idx != -1 and _S123_EXIT1_TOKEN in _s123_asset_absent_region,
+    "bin/install-opencode.sh must guard against a missing SHA256SUMS entry with"
+    " '[ -z \"$EXPECTED\" ]' → exit 1 — never run an unverified binary",
+)
+
+# (5) Anti-leak: no echo/printf line directly expands $MEMORY_MCP_URL or
+#     $MEMORY_MCP_BEARER.  Each line is checked individually so a multi-line
+#     false-positive from a nearby non-echo line cannot mask a real leak.
+_S123_LEAK_VARS = ("$MEMORY_MCP_URL", "$MEMORY_MCP_BEARER")
+_s123_leak_violations = [
+    line.strip()
+    for line in _s123_script.splitlines()
+    if ("echo " in line or "printf " in line)
+    and any(var in line for var in _S123_LEAK_VARS)
+]
+check(
+    "suite123(anti-leak): no echo/printf line directly expands $MEMORY_MCP_URL or"
+    " $MEMORY_MCP_BEARER — install-opencode-sha256-invariants",
+    len(_s123_leak_violations) == 0,
+    "bin/install-opencode.sh leaks a secret variable via echo/printf: "
+    + "; ".join(_s123_leak_violations[:3]),
+)
+
+# Self-referential guards
+_s123_own = read(Path(__file__))
+check(
+    "suite123(self-ref): test file contains 'Suite 123',"
+    " 'install-opencode-sha256-invariants', and '_slice_section'"
+    " — install-opencode-sha256-invariants",
+    "Suite 123" in _s123_own
+    and "install-opencode-sha256-invariants" in _s123_own
+    and "_slice_section" in _s123_own,
+    "test file must self-reference Suite 123, install-opencode-sha256-invariants,"
+    " and _slice_section",
+)
+
+_s123_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite123(registry): docs/testing.md registers 'Suite 123' and"
+    " 'install-opencode-sha256-invariants'",
+    "Suite 123" in _s123_testing_md and "install-opencode-sha256-invariants" in _s123_testing_md,
+    "docs/testing.md must register Suite 123 and the 'install-opencode-sha256-invariants' marker",
+)
+
+_s123_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite123(hygiene): CLAUDE.md does NOT contain 'Suite 123' (§11 hygiene contract)",
+    "Suite 123" not in _s123_claude_md,
+    "CLAUDE.md must not mention Suite 123 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: install-opencode-sha256-invariants
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
