@@ -5,6 +5,8 @@
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
+> **opencode support is in beta.** Team Harness now runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; hooks ship as a dual-runtime TypeScript layer. See the [migration guide](./docs/opencode-migration-guide.md) and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
+
 ---
 
 ## Install
@@ -97,7 +99,7 @@ Full contract: docs/dev-mode.md.
 ## Requirements
 
 **Required:**
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the runtime team-harness depends on
+- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. **opencode is supported in beta** — agents, skills, and rules run as-is; hooks run through the dual-runtime TypeScript layer (see the [migration guide](./docs/opencode-migration-guide.md))
 - [context7](https://context7.com/) API key — for library docs retrieval
 - A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — there is no default URL; `/th:setup` requires an explicit value
 
