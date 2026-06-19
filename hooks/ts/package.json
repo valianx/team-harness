@@ -1,0 +1,11 @@
+{
+  "name": "th-hooks-ts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript hook bodies and shim for team-harness (Phase 4 spike)",
+  "scripts": {
+    "build": "npx esbuild entry/dev-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/dev-guard.cjs --external:node:* && echo 'build ok'",
+    "typecheck": "npx tsc --noEmit"
+  }
+}

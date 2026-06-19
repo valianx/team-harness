@@ -1,0 +1,27 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/dev-guard.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/dev-guard.opencode.ts
+  frontmatterDialect: none
+# opencode event mapping: CC PreToolUse → opencode tool:before (tool.execute.before).
+events:
+  PreToolUse: "tool:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - ask  # opencode has no interactive operator-confirm; ask→throw (fail-closed)
+# Both wiring entries are registered inside the single plugin factory:
+# Entry 1: all tool calls (gate filters by toolName in body for Bash coverage)
+# Entry 2: ClickUp MCP write verbs — detected in evaluate() via CLICKUP_WRITE_RE
+#           on tool.name; no command field (tool.input.command → null); body gates
+#           on tool.name alone, never degrades to none/allow.
+notes: >
+  ask→throw mapping (fail-closed): opencode's tool.execute.before has no
+  interactive operator-confirm path; canonical "ask" maps to throw for
+  outward/gcp gates. The cost is that opencode operators see a hard block
+  instead of an interactive confirm. This is documented as a capability gap
+  (degradeIfMissing: [ask]) and is the intentional fail-closed choice.
