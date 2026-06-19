@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.109.0] - 2026-06-19
+
+### Added
+- TypeScript hook layer (`hooks/ts/`): 10 canonical hook bodies ported to TS on a shared `normalized-v1` format-shim — `dev-guard`, `policy-block`, `checkpoint-guard`, `prepublish-guard`, `gcp-guard`, `worktree-guard`, `session-start`, `language-user-prompt`, `subagent-trace`, `precompact-snapshot`, `notify-stage` (opencode Phase 4, Decision A).
+- `normalized-v1` format-shim (`hooks/ts/shim/`): SEC-07-enforced inbound validation (max-size + pre-parse depth scan + named-key-read-only, no spread/merge, `__proto__` hard-reject) + per-runtime outbound translation (CC: `permissionDecision` JSON + `exit 0`; opencode: `return` / `throw`, with `ask`→`throw` fail-closed mapping for outward/gcp gates).
+- Non-mutation invariant (SEC-DR-F, CWE-471): shim deep-freezes the inbound `normalized-v1` view; the outbound opencode shim only `return`s/`throw`s — no write path back to opencode's mutable `output.args` exists by construction.
+- Python entropy fold ported inline to TypeScript (`policy-block.ts`): Shannon entropy + `MEDIUM_CONFIDENCE_PATTERN` + 10 `HIGH_CONFIDENCE_SECRETS` classes verbatim-ported; zero npm runtime dependency.
+- Per-`(body, runtime)` adapter descriptors (`hooks/adapters/*.{claude-code,opencode}.yaml`): `normalized-v1` I/O contract, event-name mapping, `capabilities.requires/degradeIfMissing`; opencode descriptor is the single place opencode event names appear (roadmap Item 1).
+- Bun plugin factory (`hooks/ts/opencode-plugin.ts`): single factory registering all opencode hook bodies on their mapped `tool.execute.before`/event callbacks via the adapter descriptors.
+- CC Node entry wrappers (`hooks/ts/entry/*.cc.ts`): stdin → shim.inbound → body → shim.outboundCC; catch-all converts any uncaught exception to the gate's fail-closed default (deny for enforcement gates, nodecision for advisory).
+- `tests/test_ts_hook_parity.sh` + `tests/test_ts_hook_parity_ext.sh`: gate-parity harness feeding identical stdin fixtures to both the Bash oracle and the TS gate; asserts byte-identical full decision objects (`permissionDecision` + `permissionDecisionReason`) on Node and Bun (AC-1–AC-17 including: SEC-07 size/depth/pollution, fail-closed inversion guard, dual-runtime parity, entropy hard-boundary fixtures, reason-no-leak, ClickUp no-command boundary, non-mutation proof, cold-start latency). Suite 15 in run-all.sh.
+- Install engine (opencode Item 2): two-layer JSON manifest schema (`ModuleManifest` + `ComponentManifest`) with `DisallowUnknownFields` strict parsing and cross-referential validation (`cmd/install/manifest_schema.go`)
+- Append-only JSONL ownership ledger with single write choke-point (`appendLedger`), explicit `Seek(0, io.SeekEnd)` before each write (SEC-DR-P3-1), and SEC-04 secret-scan + SEC-05 structural gate on every ledger write (`cmd/install/ledger.go`)
+- `plan`/`apply`/`uninstall` subcommands dispatched before the legacy interactive install (`cmd/install/dispatch.go`, `plan.go`, `apply.go`, `uninstall.go`)
+- `Placer` interface seam + `claudeCodePlacer` proving target; opencode adapter is an explicit deferred seam (`cmd/install/placer.go`); SEC-06 fail-closed uninstall with per-line independent JSONL parse; `UninstallReport` for blast-radius traceability.
+- Data-home resolver (`ResolveDataHome`, `OpenStateFile`) in `cmd/install/` — opencode Item 3: 5-branch resolution order, SEC-01/02/03/08 guards, Windows DACL with process-token SID, language-neutral conformance fixture.
+- `docs/opencode-distribution-roadmap.md`: cross-harness security contracts, compatibility matrix, and per-asset-type authoring mandate for the opencode distribution effort (Phase 1).
+- `docs/opencode-migration-guide.md`: step-by-step migration guide for operators moving from the CC-only harness to the dual-runtime setup.
+- `hooks/prepublish-guard.sh`: deterministic pre-publish gate (fail-open-on-fault) — Check 1 gates `git push` on plugin version bump when assets changed; Check 2 gates `gh pr create` on a declared `prepublish_check` command; `MSYS_NO_PATHCONV=1` on `git show` for Windows compatibility. Suite 118.
+- `hooks/subagent-trace.sh` — fail-open SubagentStop hook appending `subagent.stop` JSON to `workspaces/00-subagent-trace.jsonl`.
+- `hooks/precompact-snapshot.sh` — fail-open PreCompact hook copying `00-state.md` to a rolling snapshot for `/th:recover` survivability.
+- `hooks/_hook-profile.sh` + `TH_HOOK_PROFILE` knob (`minimal`/`standard`/`strict`): gates six observability/notification hooks; five enforcement floors never source it (non-waivable security floor). Suite 117.
+- `/th:apply-review <PR>` direct mode: explicit, on-demand author-side apply-review entry point.
+- `apply-review-disposition.md § Mandatory adherence` + Step 6 thread-reply/resolve contract (APPLIED→reply+resolve; DEFERRED/REJECTED→reply, leave open); `DEFERRED` decision state added. `gh-fallback.md` Tier B sections for thread listing, reply, resolve. Suite 115.
+- `agents/review-lenses/loosening-impact.md`: reviewer lens for deleted/loosened guards; `agents/_shared/apply-review-disposition.md` author-side disposition; `agents/_shared/finding-connection.md` cross-check.
+- `agents/testing-refs/browser-mode.md`: on-demand reference for Vitest Browser Mode (when to use, setup, viewport control, visual regression, ARIA live-region assertion).
+- `agents/tester.md`: Phase-0 browser-test routing rule; Gate-B responsive-intent detection; `## Test-Type Decisions` template section; `warranted_types:` status field.
+- `orchestrator.md`: `frontend_scope` propagation into Phase 2.7 + Phase 3; A1-F3 browser-readiness check; A1-F4 jsdom-only soft gate. Suite 93.
+- Opt-in english-learning correction mode: `english_learning` boolean in `.team-harness.json`; SessionStart hook injects correction directive; off by default. `/th:learn-english` toggle skill (`on`/`off`/`status`).
+- `/th:todo` standalone skill: create and manage Obsidian tasks (obsidian-tasks emoji format) via five sub-commands (`setup`, `create`, `list`, `done`, `edit`), canonical-order serialization, `🆔` id-powered idempotent done/edit.
+- Collaborative PR review: Phase 1 fetches all-author reviews; reviewer Phase 0 adds Interact-don't-restate rule; Phase 1.5 net-new gate (`net_new: N`); Phase 4.9 concurrent-review re-fetch.
+- Reviewer version + changelog check: flags a user-facing PR that did not bump the project version or update the changelog; fail-open on repos without conventions; automated-version repos exempt.
+- `/th:learn` optional Predict/Run front-step for codebase scope (PRIMM); operational-artifact scope (runbooks, IaC, CI/CD). Suite 89 +2 checks.
+- Show-the-Code by default for `/th:learn` codebase scope: real verbatim snippets with `file:line` citations in the first reply; code-grounded data-flow diagram. Suite 89 +3 checks.
+- **M1 — Prompt-injection defense floor:** canonical `## Untrusted content & prompt-injection floor` block prepended into 8 agents.
+- Standard GitHub community-health files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/`.
+- `skills/review-pr`: collapsed same-author prior-review interactive menu into uniform automatic dismiss+fresh re-review.
+- Suite 105 (opencode Phase 1 docs), Suite 114 (batch consolidation default), Suite 115 (apply-review threads), Suite 117 (uncovered event hooks), Suite 118 (prepublish-guard), Suite 119 (changelog-version-rules — registry Suite 14 in run-all.sh).
+
+### Changed
+- Worktree start-gate re-keyed off `origin/main` position: branch-in-place permitted only when clean AND at/behind `origin/main`; worktree required when uncommitted changes OR ahead of `origin/main` (issue #352).
+- Batch consolidation named as explicit default (issue #354): same-repo batch ships as ONE consolidated PR by default; operator opt-out via typed phrase; plan-reviewer Rule 1 complementary clause added.
+- **SEC-DR-2 re-founding (v2.89.0):** orchestrator disposition is the CC native architecture — no filesystem marker required; `dev-guard.sh` unconditional gate; `/dev-mode` skill and managed blocks retired; `session-start.sh` `load_orchestrator` replaces marker-gated `load_dev_mode`.
+- English-learning correction mode coupled to `language: en`: enabling the mode also sets response language to English; SessionStart hook gates directive on configured language being English or absent.
+- English-learning mode no longer flags capitalization errors; correction format shows metalinguistic labels first, corrected version last.
+- `skills/review-pr` prior-review menu collapsed into uniform automatic dismiss+fresh re-review (no new commits → one-line note + stop; new commits → dismiss + fresh review).
+- CLAUDE.md §6.3: cross-harness authoring mandate pointer (`docs/opencode-distribution-roadmap.md § Cross-Harness Authoring Mandate`) as a post-work deliverable rule.
+- `docs/conventions.md` (new): extended reference for architectural conventions offloaded from CLAUDE.md §5.
+- **M2 — Anti-cope clause** in `agents/qa.md`, `agents/qa-plan.md`, `agents/reviewer.md`: forbids effort-credit, points-for-potential, partial passes.
+- **M4 — Window-scaled compaction threshold:** orchestrator mid-pipeline compaction trigger now uses absolute thresholds keyed to the model's context window (`[1m]` marker).
+- `agents/testing-refs/e2e.md`: refreshed to Playwright 1.60 (user-facing locators first, `setViewportSize`, `v1.60.0-noble` CI image, `storageState` auth pattern).
+- `agents/testing-refs/visual.md`: Option C (Vitest Browser Mode screenshots) added; corrected Playwright default snapshot location.
+
+### Fixed
+- `hooks/policy-block.sh`: bash-native degraded floor added (DENIED_BASH + SENSITIVE_PATHS + HIGH_CONFIDENCE_SECRETS) when python3 is absent; script previously exited 127 with no decision (F-002).
+- `hooks/policy-block.sh`: normalize Windows backslash paths before SENSITIVE_PATHS matching (F-015).
+- `hooks/dev-guard.sh`: bracket-form escape-aware regex for compound command extraction so `git push` in compound commands is correctly gated (F-016).
+- `hooks/dev-guard.sh` + wiring files: second PreToolUse entry for ClickUp MCP outward writes (F-008); fixed server-segment under-match (`[^_][^_]*` → `.+`) for multi-word server names.
+- `hooks/checkpoint-guard.sh`: resolve obsidian vault root from `.team-harness.json` so gate fires in obsidian logs-mode (F-010); portable `ls -t` mtime selection (F-018); vault search scoped to repo's own work-logs subtree to prevent O(n) subprocess explosion on large vaults.
+- `skills/recover/SKILL.md` + `agents/orchestrator.md`: STAGE-GATE cleared predicate tightened to a decision-allowlist (F-009).
+- `hooks/sketch-guard.sh` invocation sites: replaced repo-relative path with 3-tier resolution chain; visible skip message instead of silent `2>/dev/null` no-op (F-038). Fixes #304.
+- delivery agent now writes a `changelog.d/` fragment only for operator-facing changes; internal-only PRs write no fragment.
+- delivery agent SemVer rules default to PATCH; MINOR reserved for genuinely new public/observable surface.
+
+### Security
+- `hooks/dev-guard.sh` — branch 2e-bis gates `gh api graphql` PR-write mutations (`resolveReviewThread`, `addPullRequestReviewThreadReply`, `addPullRequestReview`, `submitPullRequestReview`, `mergePullRequest`) with `ask`; read-only `reviewThreads` queries ungated. Closes SEC-001 (HIGH).
+- `hooks/policy-block.sh` — M3a: `Read` tool calls targeting secret/credential paths return `ask`; M3b: `Write`/`Edit` calls weakening linter/formatter configs return `ask`; M3c: position-aware argv tokenizer replacing naive `--no-verify` regex with quote-aware tokenizer that skips `-m`/`-F` values, detects bundled `-n` clusters scoped to `git commit`, and covers `-c core.hooksPath=`.
+- `hooks/ts/` TS hook layer: `normalized-v1` shim enforces SEC-07 (pre-parse size+depth bound, named-key-read-only, `__proto__` hard-reject, no spread/merge); `ask`→`throw` fail-closed mapping on opencode for outward/gcp gates; SEC-DR-F non-mutation invariant (no write path back to opencode `output.args`).
+
 ## [2.108.1] - 2026-06-19
 
 ### Fixed
