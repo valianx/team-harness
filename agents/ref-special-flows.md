@@ -70,6 +70,79 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
 
 ---
 
+## Research-Code Flow
+
+When the operator asks to investigate how the codebase works, trace a flow in real files, understand a subsystem or concern across files, or research a codebase question that may also have an external-knowledge facet:
+
+1. **Intake** — classify as `research-code` (read-only)
+2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If the Knowledge Graph MCP fails, log "KG: unavailable" and continue.
+3. **Decompose into code lanes via the three-strategy ladder (first applicable strategy wins):**
+
+   | # | Strategy | When it applies | Lane = |
+   |---|----------|-----------------|--------|
+   | 1 | **By subsystem / directory** | The repo has clear top-level boundaries and the question spans them | One disjoint path-set per lane (e.g., lane A = `agents/`, lane B = `hooks/ + tests/`) |
+   | 2 | **By concern** | The question is cross-cutting and a directory split would fragment it (e.g., "how is error-handling done?") | One concern per lane: `auth`, `data/persistence`, `error-handling`, `config`, `transport` — each lane greps the whole repo for its concern |
+   | 3 | **By question facet** | The question is a single compound question ("does X cause Y, and is Z safe?") | One sub-question per lane, each scoped to the files that answer it |
+
+   **Non-overlap rule (mandatory):** The orchestrator states each lane's boundary (its path-set or concern) explicitly in the dispatch. Boundaries MUST partition the search space — no two lanes own the same file for the same purpose. Overlap wastes sonnet spend and produces duplicate findings the consolidator then has to dedup.
+
+   **Default scope:** current repo. **Cross-repo scope:** when the operator passes ≥2 repo paths (`--multi-repo`), repo is the outermost partition key. Each lane is scoped to ONE repo. A lane that spans two repos is only valid when the question explicitly addresses a cross-repo seam, in which case that seam is its own dedicated lane.
+
+4. **Optionally compose ≤2 web lanes** (the existing haiku `researcher` agent) when the question has an external-knowledge facet — a library, framework, or spec the codebase consumes. These web lanes run in parallel alongside the code lanes. Hybrid = code lanes + optional web lanes. When no external-knowledge facet exists, use code lanes only.
+5. **Fan-out all lanes in parallel (fail-open):**
+   - Dispatch N `code-researcher` (sonnet) code lanes and up to 2 `researcher` (haiku) web lanes concurrently using the concurrent-`Task` pattern.
+   - **Fail-open lane handling:** gate on each lane's status block. If a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event in `{events_file}` and continue with the remaining lanes. The flow never blocks on a single dead lane.
+6. **Consolidate** — dispatch `research-consolidator` (sonnet) with the full list of findings files (both code-lane and web-lane paths), the topic, and output path `workspaces/{feature}/00-research.md`. The consolidator merges code evidence and web evidence into one document, surfaces `## Conflicting Sources` (web-vs-web), and `## Code vs Docs Conflicts` (code-vs-docs — the primary value of the hybrid approach). Never silently picks a winner.
+7. **Invoke `architect` in research mode** — same instruction as the Research Flow: "This is a research task. Pre-digested consolidated findings are in `workspaces/{feature}/00-research.md` — read that file as your primary evidence base. Produce your research analysis report, appending your synthesis and recommendation to `00-research.md`."
+8. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
+9. **Present** the research report to the user
+10. **Ask** the user how to proceed (implement, discard, or investigate further)
+11. **Act on user's choice** — same options as Research Flow (implement → full pipeline reclassification; discard → clean up; investigate further → bounded gap-closure loop below).
+12. **Bounded gap-closure loop (orchestrator-owned) — extended gate:** After each consolidation + synthesis round, the orchestrator reads the `## Coverage gaps` fenced block from `00-research.md` and evaluates the gate:
+
+    **Gate condition (ANY must hold, AND round cap must not be reached):**
+    `((≥1 gap with material:true AND web_closeable:true) OR (≥1 gap with material:true AND code_closeable:true)) AND research_round < 3`.
+
+    **On gate FIRE (dispatch a follow-up round):**
+    1. Increment `research_round` in `00-state.md § Current State` (starts at 1 after round 1).
+    2. Emit `research.round.start` event: `{"ts":"<ISO>","event":"research.round.start","round":<N>,"lanes":<K>}`.
+    3. Compose follow-up lanes ONLY from gate-passing gaps:
+       - For each gap with `material:true AND web_closeable:true` → dispatch one `researcher` (haiku) web lane.
+       - For each gap with `material:true AND code_closeable:true` → dispatch one `code-researcher` (sonnet) code lane.
+       - Clamp to ≤5 lanes total for the round (anti-runaway guard). If gate-passing gaps exceed 5, dispatch 5 lanes covering the most material gaps and emit `research.round.skipped` event: `{"ts":"<ISO>","event":"research.round.skipped","round":<N>,"skipped_gap_ids":[...]}`.
+    4. Dispatch web and code lanes in parallel (fail-open: `research.lane.skipped` on dead lanes).
+    5. Re-dispatch `research-consolidator` to amend the SAME `00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
+    6. Re-dispatch `architect` in research mode to re-synthesize the SAME `00-research.md` in place.
+    7. After architect returns, emit `research.gap.gate` event and re-evaluate the gate. Repeat from step 1 if the gate fires again AND `research_round < 3`.
+
+    **On gate NO-FIRE (terminate loop):** Determine the termination reason — the same three reasons as the Research Flow:
+    - `no-material-closeable-gaps` — the gaps block has no entry with both `material:true` AND either `web_closeable:true` OR `code_closeable:true`.
+    - `round-cap-reached` — `research_round` has reached 3.
+    - `all-gaps-closed` — the gaps block is `- none`.
+
+    Emit `research.gap.gate` event: `{"ts":"<ISO>","event":"research.gap.gate","verdict":"stop","material_closeable_count":<N>,"material_code_closeable_count":<M>,"round":<R>}`.
+    Emit `research.loop.terminated` event: `{"ts":"<ISO>","event":"research.loop.terminated","reason":"<termination-reason>","round":<R>}`.
+
+    The architect writes a mandatory `## Residual Gaps` section to `00-research.md` naming the termination reason and listing every still-open gap — including code-only-residual gaps (gaps where `material:true` but neither `web_closeable` nor `code_closeable`, or gaps that code lanes tried to close but could not). The bounded stop is never silent.
+
+    **Structural signals (mandatory):** same set as Research Flow — `research_round`, `research.round.start`, `research.gap.gate`, `research.round.skipped`, `research.loop.terminated` — all apply unchanged.
+
+### `/th:cross-repo` boundary (explicitly distinct)
+
+`/th:research-code --multi-repo <paths>` and `/th:cross-repo` are NOT the same:
+
+| Dimension | `/th:research-code --multi-repo` | `/th:cross-repo` |
+|-----------|----------------------------------|-----------------|
+| **Purpose** | Evidence-gathering research: "what does this code actually do, across these repos?" | Flow/invariant auditor: "does this system obey its contracts and invariants?" |
+| **Route** | Routes through the orchestrator (this flow); produces one consolidated `00-research.md` | Standalone skill; does NOT route through the orchestrator; uses tmux fan-out |
+| **Output** | One `00-research.md` with hybrid evidence + conflict detection + gap-closure loop | Per-repo architect+security+qa+tester audits; `00-consolidated.md`; profile/contract validation |
+| **Agents** | `code-researcher` (sonnet) + optional `researcher` (haiku) + `research-consolidator` + `architect` | `architect`, `security`, `qa`, `tester` (per repo); separate workspaces per repo |
+| **When to use** | "How does the retry logic work across the gateway and the worker services?" | "Does the payment service honor the idempotency contract declared in the API profile?" |
+
+Use `/th:research-code --multi-repo` when the question is about understanding code behavior. Use `/th:cross-repo` when the question is about contract compliance and invariant validation.
+
+---
+
 ## Spike Flow
 
 When the user wants to quickly test a technical hypothesis without full pipeline ceremony:

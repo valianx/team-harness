@@ -963,6 +963,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | diagrama, diagram, "visualizar arquitectura" | `diagram` | read-only |
    | aprender, learn, enseñar, explicar, "explain how X works", "teach me", "explícame", "cómo funciona X", "how does X work", "walk me through" | `learn` | read-only |
    | investigar, research, "explorar tecnología", "qué opciones hay" | `research` | read-only |
+   | "investigar el código", "research the codebase", "cómo funciona X en el repo", "trace this flow in the code", "cómo está implementado X", "how is X implemented", "rastrear este flujo en el código" | `research-code` | read-only |
    | diseñar, design, "proponer arquitectura" | `design` | read-only |
    | auditar arquitectura, "salud del proyecto", health check | `audit` | read-only |
    | definir criterios, define AC, "qué debería cumplir" | `define-ac` | read-only |
@@ -1778,8 +1779,11 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
  {verbatim contents of ## Review Summary from 01-plan.md, line-wrapped}
 
  ── Confidence ──────────────────────────
- {render the **Confidence:** line from ### Confidence Score in ## Review Summary;
-  if absent: "Confidence: not stated"}
+ {REQUIRED — always rendered. Scan the verbatim Review Summary copy for a line
+  matching **Confidence:** N/10 (single-pass) and render it here. If no such
+  line is present (hotfix / Tier-1-fix / architect ran without the contract):
+  render "Confidence: not stated". The band MUST appear on every plan
+  presentation; never omit it.}
 
  ── PR Summary ─────────────────────────
  {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
@@ -1806,7 +1810,7 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
 
 **Rendering rules:**
 - Preserve markdown bullets and table syntax as-is — terminal users see them rendered by Claude Code, file-output users get faithful markdown.
-- **`── Confidence ──` band (additive, STAGE-GATE-1 only).** The Confidence Score is already present inside the `## Review Summary` verbatim copy above. The `── Confidence ──` band makes it prominent as a dedicated visual band for the reviewer. To populate it: scan the verbatim Review Summary copy for a line matching `**Confidence:** N/10 (single-pass)` and render it in the band. If no such line is found (architect ran without the contract, or task type is hotfix/Tier-1-fix), render `Confidence: not stated`. The band adds no new orchestrator read — it draws from the Review Summary copy already in memory.
+- **`── Confidence ──` band (REQUIRED, STAGE-GATE-1 only).** The orchestrator MUST always render this band on every plan presentation — it is a required element, not optional visual polish. To populate it: scan the verbatim Review Summary copy (already in memory — no new read) for a line matching `**Confidence:** N/10 (single-pass)` and render it in the band. If no such line is present (architect ran without the contract, or task type is hotfix/Tier-1-fix), render `Confidence: not stated`. The fallback guarantees the band is always shown even when no architect-authored score exists.
 - If `## Review Summary` is missing in `01-plan.md`: this guard is **type-aware**.
   - For `type: feature`, `type: refactor`, `type: enhancement`, or `type: fix` (Tier 2-4): do NOT emit the gate — the plan-reviewer should have failed first; if somehow it did not, log an error and route back to architect.
   - For `type: hotfix` or `type: fix` Tier 1 (orchestrator-self-authored, no architect): do NOT route to architect (the architect is not dispatched in this flow — routing there would create a loop). Instead, route to the orchestrator-self-authored step above: the orchestrator writes `01-plan.md § Review Summary` from the Phase 0b bug-report payload and re-emits the gate. This is the **self-authored** path; it never routes to the architect.
@@ -4258,6 +4262,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 |------|-------|--------------|------|
 | learn | `mentor` | none | answer in chat with short inline diagrams (conversational-first; no document by default); dispatch `mentor` leaf ONLY for the optional end-of-session pack or genuinely deep background research; multi-turn drill-downs re-dispatch mentor as needed (see `ref-special-flows.md` § Learn (Teaching) Flow) |
 | research | `architect` (research mode) | none | create workspaces → set `research_round: 1` in `00-state.md § Current State` → fan-out `researcher` lanes → invoke `research-consolidator` → invoke `architect` → evaluate gap gate → run bounded gap-closure loop per `ref-special-flows.md § Research Flow` Step 9 → present `00-research.md` |
+| research-code | `code-researcher` (sonnet, read-only) + optional `researcher` (haiku) + `research-consolidator` + `architect` | none | create workspaces → set `research_round: 1` in `00-state.md § Current State` → decompose question into non-overlapping code lanes via the three-strategy ladder (subsystem / concern / question-facet) → optionally compose ≤2 web lanes → fan-out all lanes in parallel (fail-open) → invoke `research-consolidator` (merges code + web evidence, produces `## Code vs Docs Conflicts`) → invoke `architect` → evaluate extended gap gate (`material AND (web_closeable OR code_closeable)`) → run bounded gap-closure loop per `ref-special-flows.md § Research-Code Flow` → present `00-research.md` |
 | review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the five-layer guard: Layers 1-3 (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify); **Layer 4** (mode-transition gate — corrective language NEVER auto-routes, requires explicit confirmation); **Layer 5** (branch-author guard — fail-closed if author-of-PR or operator identity is indeterminate). **Publish gate:** before ANY `gh pr review`/`POST reviews`, `PUT reviews/:id`, reply, or dismiss verb, present the full draft to the operator and wait for explicit approval (`ref-direct-modes.md § Publish Gate`); `--auto-publish` opt-in skips the preview. **`review_context` state:** write `review_context: { pr: {N}, status: in-progress, author: {login} }` to `00-state.md` when entering review mode; clear it on a confirmed mode-transition or session close. |
 | init | `init` | none | invoke → report generated files |
 | design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
@@ -4283,7 +4288,7 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 **For modes with "see ref-direct-modes.md" or "see ref-special-flows.md":** Read the referenced file on-demand before executing. These files are in the same directory as this file and contain step-by-step instructions:
 
 - **`ref-direct-modes.md`** — Diagram (Excalidraw), LikeC4 Diagram, D2 Diagram, Review, Translate, Test, Test-Pipeline, Apply-Review mode
-- **`ref-special-flows.md`** — Research, Spike, Plan, Parallel Dispatch, Hotfix, Security-Sensitive, Database Changes, Refactor, User-Initiated Simple mode
+- **`ref-special-flows.md`** — Research, Research-Code, Spike, Plan, Parallel Dispatch, Hotfix, Security-Sensitive, Database Changes, Refactor, User-Initiated Simple mode
 
 ---
 
