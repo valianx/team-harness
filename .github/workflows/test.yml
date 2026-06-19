@@ -40,4 +40,10 @@ jobs:
           go-version-file: go.mod
 
       - name: go test ./cmd/install
+        env:
+          # ${{ runner.temp }} is /home/runner/work/_temp — user-owned on GitHub-hosted
+          # ubuntu runners.  The default /tmp is root-owned (UID 0), which causes the
+          # SEC-01 ancestor-ownership walk in datahome_unix.go to refuse t.TempDir()
+          # paths because /tmp is not owned by the runner user (UID 1001).
+          TMPDIR: ${{ runner.temp }}
         run: go test ./cmd/install/ -count=1

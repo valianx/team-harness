@@ -15,7 +15,19 @@ import (
 // lstatWalkPreResolution walks every ancestor component of path (root → leaf)
 // and rejects:
 //   - any component that is a symbolic link (SEC-01, CWE-59)
-//   - any component not owned by the current process user (SEC-01)
+//   - any component AT OR BELOW the user's home directory that is not owned
+//     by the current process user (SEC-01)
+//
+// Ownership enforcement is scoped to components at or below the user home
+// boundary.  System directories above the home (e.g. /, /home, /tmp) are
+// expected to be root-owned and are not an attack vector for this use case —
+// an attacker who controls a component above the home already controls the
+// machine.  Checking ownership above the home boundary would incorrectly
+// refuse legitimate installs on Linux (where /home and /tmp are root-owned).
+//
+// The symlink check (CWE-59) is applied to ALL components regardless of
+// whether they are above or below the home boundary — a symlink anywhere
+// in the path is still refused.
 //
 // This walk runs on the PRE-resolution path, BEFORE filepath.EvalSymlinks is
 // called.  Performing the check post-EvalSymlinks would be vacuous because
@@ -27,6 +39,10 @@ import (
 // at the syscall.
 func lstatWalkPreResolution(normalized string) error {
 	currentUID := os.Getuid()
+
+	// Determine the user home boundary for ownership-check scoping.
+	// On failure, fall back to enforcing ownership on every component (safe default).
+	homeDir, homeErr := os.UserHomeDir()
 
 	// Walk from the volume/root up to the path's parent.
 	// filepath.VolumeName is always empty on Unix.
@@ -46,22 +62,46 @@ func lstatWalkPreResolution(normalized string) error {
 			return fmt.Errorf("cannot lstat path component %q: %w", component, err)
 		}
 
-		// Reject symlinks (SEC-01).
+		// Reject symlinks (SEC-01) — applied to every component regardless of
+		// whether it is above or below the home boundary.
 		if fi.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("path component %q is a symbolic link — refusing (SEC-01)", component)
 		}
 
-		// Reject non-current-user-owned components (SEC-01).
-		sys, ok := fi.Sys().(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("cannot determine owner of path component %q", component)
-		}
-		if int(sys.Uid) != currentUID {
-			return fmt.Errorf("path component %q is owned by UID %d, not current user UID %d — refusing (SEC-01)",
-				component, sys.Uid, currentUID)
+		// Ownership check: only enforce for components at or below the user home.
+		// System directories above the home (/, /home, /tmp, etc.) are expected to
+		// be root-owned on most Linux distributions — checking them would refuse
+		// legitimate installs (fix(sec-01): scope ownership walk to ≤user-home).
+		belowOrAtHome := homeErr == nil && isAtOrBelowPath(homeDir, component)
+		if belowOrAtHome {
+			sys, ok := fi.Sys().(*syscall.Stat_t)
+			if !ok {
+				return fmt.Errorf("cannot determine owner of path component %q", component)
+			}
+			if int(sys.Uid) != currentUID {
+				return fmt.Errorf("path component %q is owned by UID %d, not current user UID %d — refusing (SEC-01)",
+					component, sys.Uid, currentUID)
+			}
 		}
 	}
 	return nil
+}
+
+// isAtOrBelowPath reports whether target is equal to base or is a descendant of base.
+// Both paths should be cleaned (filepath.Clean) before calling this function.
+func isAtOrBelowPath(base, target string) bool {
+	if base == "" {
+		return false
+	}
+	if target == base {
+		return true
+	}
+	// Ensure the base ends with a separator so "/home/user2" is not a prefix of "/home/user".
+	prefix := base
+	if len(prefix) > 0 && prefix[len(prefix)-1] != filepath.Separator {
+		prefix += string(filepath.Separator)
+	}
+	return len(target) > len(prefix) && target[:len(prefix)] == prefix
 }
 
 // splitPathComponents returns a slice of absolute path prefixes for each

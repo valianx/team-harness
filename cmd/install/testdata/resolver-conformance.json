@@ -90,9 +90,9 @@
   {
     "name": "Branch5_home_fallback",
     "env": {},
-    "os": "all",
+    "os": "windows",
     "runtimeProbe": "none",
     "expectedSuffix": ".team-harness",
-    "note": "No env, no runtime root, no OS-default → ~/.team-harness (Branch 5 fallback)."
+    "note": "No env, no runtime root, no OS-default → ~/.team-harness (Branch 5 fallback). Windows only: on Linux/macOS Branch 4 always fires via XDG/.local/share or Library paths and Branch 5 is unreachable when env vars are cleared."
   }
 ]

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -248,20 +249,37 @@ func TestTransformAgentFile_LowCostMode_ModelIDKey_NotRewritten(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAgentNameFromPath(t *testing.T) {
-	cases := []struct {
+	// POSIX-path cases run on all platforms.
+	posixCases := []struct {
 		path string
 		want string
 	}{
 		{"/home/user/.claude/agents/architect.md", "architect"},
-		{`C:\Users\user\.claude\agents\orchestrator.md`, "orchestrator"},
 		{"delivery.md", "delivery"},
 		{"plan-reviewer.md", "plan-reviewer"},
 		{"noextension", "noextension"},
 	}
-	for _, tc := range cases {
+	for _, tc := range posixCases {
 		got := agentNameFromPath(tc.path)
 		if got != tc.want {
 			t.Errorf("agentNameFromPath(%q) = %q, want %q", tc.path, got, tc.want)
+		}
+	}
+
+	// Windows-style backslash paths: filepath.Base does not split backslashes on
+	// Linux, so this case is gated to Windows only.
+	if runtime.GOOS == "windows" {
+		windowsCases := []struct {
+			path string
+			want string
+		}{
+			{`C:\Users\user\.claude\agents\orchestrator.md`, "orchestrator"},
+		}
+		for _, tc := range windowsCases {
+			got := agentNameFromPath(tc.path)
+			if got != tc.want {
+				t.Errorf("agentNameFromPath(%q) = %q, want %q", tc.path, got, tc.want)
+			}
 		}
 	}
 }
