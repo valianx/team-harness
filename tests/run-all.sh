@@ -153,7 +153,18 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 14: TypeScript hook parity (Bash <-> TS decision parity)"
+echo "# Suite 14: changelog/version discipline — content-presence guard (registry Suite 119)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_changelog_version_rules.py"; then
+    echo "changelog-version-rules: PASS"
+else
+    echo "changelog-version-rules: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 15: TypeScript hook parity (Bash <-> TS decision parity)"
 echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then

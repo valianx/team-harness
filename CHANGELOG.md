@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.108.1] - 2026-06-19
+
+### Fixed
+
+- delivery agent now writes a `changelog.d/` fragment only for operator-facing changes (new feature, bug fix, performance, security fix, deprecation, removal, production dependency bump); internal-only PRs (refactor, test, ci, build, chore, repo-docs, internal logging, dev/build dependency bumps) write no fragment and log `changelog fragment: skipped (internal-only)`.
+- delivery agent SemVer rules now default to PATCH and reserve MINOR for genuinely new public/observable surface (new command / agent / skill / hook / exported function / endpoint / optional config key per project type); logging, wording, and behavior-correction changes to existing surfaces no longer inflate to MINOR.
+- `init.md` §6.3 generated changelog bullet now carries the same operator-facing-vs-internal gate so newly initialized repos inherit the corrected convention from the start.
+
 ## [2.94.0] - 2026-06-15
 
 ### Added
