@@ -1,0 +1,25 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/session-start.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/session-start.cc.ts
+  frontmatterDialect: none
+events:
+  SessionStart: SessionStart
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: startup|resume|clear
+# Timeout: 5s
+# Output format: { "additionalContext": "<string>" } on stdout (NOT a permissionDecision).
+# 4 loads: orchestrator (unconditional), language, english_learning, workspace_mode.
+# NEVER blocks. FAIL-OPEN: any error → empty stdout (no additionalContext).
+# Security: SEC-DR-A full-string validation (^[a-z]{2}$); SEC-DR-B fixed-template emit.
+# DOES NOT import hook-profile (enforcement floor).
+notes: >
+  SessionStart hooks emit additionalContext, not a permissionDecision. The CC entry
+  writes { "additionalContext": "..." } to stdout. NEVER blocks session start.
+  Load 1 (orchestrator) is UNCONDITIONAL per SEC-DR-2 re-founding (v2.89.0).

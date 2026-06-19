@@ -3,9 +3,19 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "TypeScript hook bodies and shim for team-harness (Phase 4 spike)",
+  "description": "TypeScript hook bodies and shim for team-harness (Phase 4 spike + rewrite)",
   "scripts": {
-    "build": "npx esbuild entry/dev-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/dev-guard.cjs --external:node:* && echo 'build ok'",
+    "build:dev-guard": "npx esbuild entry/dev-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/dev-guard.cjs --external:node:*",
+    "build:policy-block": "npx esbuild entry/policy-block.cc.ts --bundle --platform=node --format=cjs --outfile=dist/policy-block.cjs --external:node:*",
+    "build:checkpoint-guard": "npx esbuild entry/checkpoint-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/checkpoint-guard.cjs --external:node:*",
+    "build:prepublish-guard": "npx esbuild entry/prepublish-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/prepublish-guard.cjs --external:node:*",
+    "build:gcp-guard": "npx esbuild entry/gcp-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/gcp-guard.cjs --external:node:*",
+    "build:worktree-guard": "npx esbuild entry/worktree-guard.cc.ts --bundle --platform=node --format=cjs --outfile=dist/worktree-guard.cjs --external:node:*",
+    "build:session-start": "npx esbuild entry/session-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/session-start.cjs --external:node:*",
+    "build:language-user-prompt": "npx esbuild entry/language-user-prompt.cc.ts --bundle --platform=node --format=cjs --outfile=dist/language-user-prompt.cjs --external:node:*",
+    "build:subagent-trace": "npx esbuild entry/subagent-trace.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-trace.cjs --external:node:*",
+    "build:precompact-snapshot": "npx esbuild entry/precompact-snapshot.cc.ts --bundle --platform=node --format=cjs --outfile=dist/precompact-snapshot.cjs --external:node:*",
+    "build": "npm run build:dev-guard && npm run build:policy-block && npm run build:checkpoint-guard && npm run build:prepublish-guard && npm run build:gcp-guard && npm run build:worktree-guard && npm run build:session-start && npm run build:language-user-prompt && npm run build:subagent-trace && npm run build:precompact-snapshot && echo 'all builds ok'",
     "typecheck": "npx tsc --noEmit"
   }
 }

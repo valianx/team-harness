@@ -661,6 +661,18 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Sections 8-12 — rewrite gate parity (AC-9, AC-10, AC-11)
+# Sourced from the extension file to keep the main harness file reviewable.
+# ---------------------------------------------------------------------------
+EXT_FILE="$REPO_ROOT/tests/test_ts_hook_parity_ext.sh"
+if [ -f "$EXT_FILE" ]; then
+    # shellcheck source=./test_ts_hook_parity_ext.sh
+    source "$EXT_FILE"
+else
+    echo "  [NOTE] Extension file not found: $EXT_FILE — skipping rewrite gate checks"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

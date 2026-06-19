@@ -1,0 +1,25 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/prepublish-guard.ts
+kind: hook
+runtime: claude-code
+emit:
+  path: hooks/ts/entry/prepublish-guard.cc.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: PreToolUse
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - node
+  degradeIfMissing: []
+# Matcher: Bash (git push + gh pr create routes).
+# Timeout: 120s (matches prepublish-guard.sh timeout).
+# Fail mode: fail-OPEN on every evaluation fault; NEVER emits allow.
+# PrepublishReader interface injected by the entry.
+# Check 1 (git push): version-bump guard.
+# Check 2 (gh pr create): prepublish_check runner (90s budget, bash -lc, no eval).
+notes: >
+  prepublish-guard is a papercut gate: block-on-condition, open-on-fault.
+  MSYS_NO_PATHCONV=1 git show is used on Windows (preserved from Bash original).
+  SEC-DR-A control-char guard on prepublish_check value.
+  SDR-PPG-01: JSON-escaped command in deny reason; captured stdout never in reason (CWE-209).

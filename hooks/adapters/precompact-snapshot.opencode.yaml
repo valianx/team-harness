@@ -1,0 +1,19 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/precompact-snapshot.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/precompact-snapshot.cc.ts
+  frontmatterDialect: none
+events:
+  # PreCompact → opencode context:compact (if/when opencode exposes this event).
+  PreCompact: "context:compact"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - context:compact  # opencode may not expose PreCompact; fail-open (no snapshot)
+notes: >
+  precompact-snapshot on opencode: NEVER blocks. If opencode does not expose
+  context:compact, the snapshot is simply not written for opencode sessions.

@@ -1,0 +1,20 @@
+schemaVersion: "1"
+body: hooks/ts/bodies/policy-block.ts
+kind: hook
+runtime: opencode
+emit:
+  path: hooks/ts/entry/policy-block.opencode.ts
+  frontmatterDialect: none
+events:
+  PreToolUse: "tool:before"
+ioContract: normalized-v1
+capabilities:
+  requires:
+    - bun
+  degradeIfMissing:
+    - ask  # opencode has no interactive confirm; ask→throw (fail-closed) for a security gate
+notes: >
+  ask→throw mapping (fail-closed): policy-block is a security gate; canonical ask maps
+  to throw on opencode. The no-leak contract applies equally: Error.message names the
+  secret CLASS, never the captured value. ShimRejectError → throw (fail-closed; unknown
+  payload that passes a covered tool may contain a secret).
