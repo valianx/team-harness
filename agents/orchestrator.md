@@ -639,7 +639,10 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
      The orchestrator MUST NOT advance to the next phase until the current one is [x].
-     Skipping a phase without marking it [x] or [~skipped: reason] is a contract violation. -->
+     Skipping a phase without marking it [x] or [~skipped: reason] is a contract violation.
+     Phases 2.0, 2.5, 4.5, and STAGE-GATE-2 are tracked via JSONL events only
+     (phase.start/phase.end) and are not top-level checklist rows — they are conditional
+     or inter-PR phases. Phase 2.7 is a top-level row (it has an explicit mark instruction). -->
 - [ ] 0a — Intake (classify, create workspaces)
 - [ ] 0b — Specify (investigate codebase, build/verify AC)
 - [ ] 1 — Design (architect → 01-plan.md)
@@ -647,6 +650,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - [ ] 1.6 — Plan Review (plan-reviewer audits plan shape)
 - [ ] STAGE-GATE-1 — Human review (mandatory stop)
 - [ ] 2 — Implement (per PR)
+- [ ] 2.7 — Test Authoring (tester authoring mode)
 - [ ] 3 — Verify (tester + qa + security in parallel)
 - [ ] 3.5 — Acceptance Gate
 - [ ] 3.75 — Build Verification
@@ -1626,8 +1630,9 @@ Routing to architect to revise Work Plan
 - workspaces path: {resolved_workspaces_path}
 - Pointers to `01-plan.md` (and also `01-root-cause.md` for `type: fix`).
 - `type` field from `00-state.md` (so the plan-reviewer can gate Rules 7 + 8 on `type: fix | hotfix`).
+- `security_sensitive: {true|false}` from `00-state.md` (so the vacuous-success guard can decide whether the `**Security design-review (security):**` label is expected — absence of that label is expected when `security_sensitive: false` and must not trigger the guard).
 - Mode: default (the plan-reviewer has one mode).
-- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other workspaces. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report into `## Plan Review` in `01-plan.md` using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, and the `**Combined verdict:**` block. Never append a second `## Plan Review` section. Return verdict pass/concerns/fail in the status block."
+- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other workspaces. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report into `## Plan Review` in `01-plan.md` using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, and the `**Combined verdict:**` block. Never append a second `## Plan Review` section. For the vacuous-success guard (rule 2): the `**Security design-review (security):**` label is required only when `security_sensitive: true` was passed in context — when `security_sensitive: false`, absence of that label is expected and must NOT trigger the guard. Return verdict pass/concerns/fail in the status block."
 
 ### Phase 1.6 is inviolable
 
@@ -2187,7 +2192,7 @@ Read the `**Blast radius:**` line from the brief (declared by the verifier, neve
 | B | `localized {IDs}` | `architect` — BOUNDED-PATCH on named IDs | `plan-reviewer` only | `plan-reviewer` on the patched plan |
 | B | `structural` | `architect` — full re-design | all verifiers (full) | standard acceptance gate |
 | C | any | adjust `01-plan.md` § Task List AC, mark change in brief | all verifiers (full) | standard acceptance gate |
-| D | `localized {IDs}` | `implementer` — BOUNDED-PATCH on named IDs | `security` only | `security` re-run (already the Case D pattern) |
+| D | `localized {IDs}` | `implementer` — BOUNDED-PATCH on named IDs | `security` only | `security` re-run + coherence gate `qa validate` on patched AC IDs |
 | D | `structural` | `implementer` — full re-implement | `security` only | standard security re-run |
 
 **Default to `structural` when the blast radius field is absent, ambiguous, or you cannot confirm the named IDs are self-contained.** Never narrow a structural change to a localized patch.
@@ -2205,7 +2210,7 @@ The coherence gate exists to catch partial patches that resolve the named failin
 **Case B — Design issue (full re-run):** route to `architect` with the brief. After revised design → re-route to `implementer`. Then re-run all verifiers.
 **Case B — Design issue (localized):** dispatch `architect` with BOUNDED-PATCH contract (named IDs only). After revised plan → coherence gate via `plan-reviewer`.
 **Case C — Criteria issue:** adjust `01-plan.md` § Task List AC, mark the change in the brief, re-run all verifiers.
-**Case D — Security-only:** route the brief to `implementer`, then re-run only `security` (tester+qa already passed; re-run them only if the fix touches test-relevant code). Blast radius modulates whether the implementer uses BOUNDED-PATCH or full re-implement, but security always re-runs.
+**Case D — Security-only:** route the brief to `implementer`, then re-run only `security` (tester+qa already passed; re-run them only if the fix touches test-relevant code). After the security re-run, fire the coherence gate: dispatch `qa` in validate mode limited to the patched AC IDs — this gate is unconditional for localized Case D, exactly as for Case A localized. Blast radius modulates whether the implementer uses BOUNDED-PATCH or full re-implement, but security always re-runs and the coherence gate always fires for localized patches.
 
 ### KG read on error
 
@@ -2258,7 +2263,8 @@ After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceab
 
 6. **Regression-still-passing check (type: fix / hotfix, Tier 2-4 only).** When `type` is `fix` or `hotfix` and `bug_tier` is 2, 3, or 4:
    - Read `workspaces/{feature-name}/03-testing.md` and confirm `regression_test_path` (from `00-state.md`) is listed with status PASS.
-   - Read `workspaces/{feature-name}/02-regression-test.md` to obtain the named regression test. Verify that test name still appears in the test suite (in `03-testing.md` or the test file itself) without `skip`, `xfail`, or a comment that removes it from execution.
+   - Read `workspaces/{feature-name}/02-regression-test.md` to obtain the named regression test AND its authored assertion lines (the `assert`/`expect`/equivalent patterns). Verify that test name still appears in the test suite (in `03-testing.md` or the test file itself) without `skip`, `xfail`, or a comment that removes it from execution.
+   - **Assertion-content match:** read the actual test file at `regression_test_path` and confirm that the authored assertion patterns from `02-regression-test.md` are present in the actual test file. If the assertion body has been weakened or replaced (e.g., replaced with `assert True` or an always-passing variant) relative to the authored assertion — even if the test name and PASS status are intact — the gate **fails**: route back to tester with: "Regression assertion weakened: the assertion patterns authored in `02-regression-test.md` are no longer present in `regression_test_path`. Restore the original assertion — do not weaken it to pass." This counts toward the max-3 iteration budget.
    - If the regression test is absent, marked `skip` or `xfail`, or does not show PASS in `03-testing.md` → **fail the gate**: route back to tester with: "Regression-still-passing check failed: the named regression test from `02-regression-test.md` is absent, skipped, or not passing. Restore and fix the test." This counts toward the max-3 iteration budget.
 
 7. **Test-ratchet check.** Compare the tester's `tests_count` from this iteration's status block against `last_tests_count` recorded in `00-state.md` Hot Context (from the previous iteration; absent on the first iteration of this pipeline). On the first iteration, capture `tests_count` as the baseline and skip the comparison. On subsequent iterations:
@@ -2346,7 +2352,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
 
 **Iteration budget:** max 2 attempts total (1 original + 1 retry after implementer fix). This is separate from the Phase 3 iteration budget.
 
-**Phase Checklist integration:** Phase 3.75 is tracked in the execution events JSONL but does NOT add a line to the Phase Checklist template in `00-state.md` — it is a sub-step of the verification stage, not a top-level phase. The orchestrator logs `phase.start` and `phase.end` events with `phase: "3.75-build-verification"`.
+**Phase Checklist integration:** Phase 3.75 IS a top-level Phase Checklist row (`- [ ] 3.75 — Build Verification`) and is marked `[x]` on completion. The orchestrator also logs `phase.start` and `phase.end` events with `phase: "3.75-build-verification"` to the JSONL trace.
 
 **Report to user:**
 ```

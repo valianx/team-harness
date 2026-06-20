@@ -550,7 +550,7 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 ### Step 9c — Acceptance Matrix
 
-Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `04-validation.md` and (if it exists) `04-security.md`. Save it to `workspaces/{feature-name}/acceptance-matrix.md`:
+Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `04-validation.md` and (if it exists) `04-security.md`. Save it to `docs/specs/{feature-name}/acceptance-matrix.md` (create the folder if it does not exist):
 
 ```markdown
 # Acceptance Matrix: {feature-name}
@@ -561,7 +561,7 @@ Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-t
 | AC-2 | {gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
 ```
 
-This file becomes part of the PR body in Step 11.2. Stage it together with the other delivery artifacts in Step 10.0 (`git add workspaces/{feature-name}/acceptance-matrix.md`).
+This file becomes part of the PR body in Step 11.2. Stage it together with the other delivery artifacts in Step 10.0 (`git add docs/specs/{feature-name}/acceptance-matrix.md`). The path `docs/specs/` is tracked by git (not git-ignored), so the matrix is committed with the PR.
 
 ### Step 9d — Reviewability size gate
 
@@ -591,14 +591,15 @@ This becomes the "Size justification" section embedded in the PR body in Step 11
 **Step 10.0 — Stage delivery files:**
 ```
 git add CLAUDE.md CHANGELOG.md
-git add {version-file}       # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)
-git add docs/                 # only if created/modified in Step 5b or 5c
+git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)
+git add docs/                 # only if created/modified in Step 5b or 5c (includes docs/specs/ acceptance matrix)
 git add README.md             # only if modified in Step 6
 git add openapi/openapi.yaml  # only if updated in Step 8
+git add changelog.d/{pr-slug}.md  # ONLY when a fragment was written in Step 9e and Step 9e assembly was SKIPPED (skip-version edge); if Step 9e ran and assembled CHANGELOG.md, stage CHANGELOG.md instead
 ```
 
-**If version was bumped:** verify the version file is staged: `git diff --cached {version-file}`. If not staged, stop and fix.
-**If version was skipped (Step 9.0):** do NOT stage the version file. The commit will only include docs/changelog.
+**If version was bumped:** verify BOTH `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` are staged: `git diff --cached .claude-plugin/`. If either is not staged, stop and fix.
+**If version was skipped (Step 9.0):** do NOT stage the version files. The commit will only include docs/changelog.
 
 **Commit message** (conventional commits):
 - If version bumped: `docs({feature_name}): add documentation, changelog, and version bump for <summary>`
@@ -743,7 +744,7 @@ Suggested reading order, optimised for the reviewer's mental model:
 - **After:** {observable behaviour after this PR}
 
 ## Acceptance Matrix (mandatory)
-{paste the table from workspaces/{feature-name}/acceptance-matrix.md}
+{paste the table from docs/specs/{feature-name}/acceptance-matrix.md}
 
 ## Definition of Done (mandatory)
 - [x] Lint: {command} → PASS

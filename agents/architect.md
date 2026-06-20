@@ -1401,9 +1401,9 @@ Ordered implementation steps. The implementer follows this sequence.
 
 ### Summary
 
-| PR | Service | Files | AC count | Depends on | Split reason |
-|----|---------|-------|----------|------------|--------------|
-| PR-1 | {service} | {N} | {N} | none | — |
+| PR | Service | Base | Files | AC count | Depends on | Split reason |
+|----|---------|------|-------|----------|------------|--------------|
+| PR-1 | {service} | main | {N} | {N} | none | — |
 
 ### PR-1: {imperative title}
 
@@ -1411,9 +1411,11 @@ Ordered implementation steps. The implementer follows this sequence.
 - **Title:** `{conventional-commit-style PR title}`
 - **Status:** pending
 - **Branch (suggested):** `feat/{kebab-case-name}`
+- **Base:** main
 - **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
 - **Files:**
   - `{path}` (new|modify)
+- **Split reason:** {one of the closed-list reasons, ONLY if this service has >1 PR; OMIT this field otherwise}
 - **Depends on:** {PR-N | none}
 - **Notes:** {anything the implementer should know}
 

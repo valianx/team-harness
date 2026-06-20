@@ -130,10 +130,10 @@ name: review-pr
 8. **Detect workspaces** (team-harness pipeline PRs carry AC):
    ```sh
    workspaces_PATH=""
-   if ls "$WORKTREE/workspaces/"*/01-architecture.md 2>/dev/null | head -1 | grep -q .; then
-     workspaces_PATH=$(ls "$WORKTREE/workspaces/"*/01-architecture.md 2>/dev/null | head -1 | xargs dirname)
-   elif ls "$WORKTREE/workspaces/"*/02-task-list.md 2>/dev/null | head -1 | grep -q .; then
-     workspaces_PATH=$(ls "$WORKTREE/workspaces/"*/02-task-list.md 2>/dev/null | head -1 | xargs dirname)
+   if ls "$WORKTREE/workspaces/"*/01-plan.md 2>/dev/null | head -1 | grep -q .; then
+     workspaces_PATH=$(ls "$WORKTREE/workspaces/"*/01-plan.md 2>/dev/null | head -1 | xargs dirname)
+   elif ls "$WORKTREE/workspaces/"*/02-implementation.md 2>/dev/null | head -1 | grep -q .; then
+     workspaces_PATH=$(ls "$WORKTREE/workspaces/"*/02-implementation.md 2>/dev/null | head -1 | xargs dirname)
    fi
    has_workspaces=false
    [ -n "$workspaces_PATH" ] && has_workspaces=true

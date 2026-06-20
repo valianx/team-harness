@@ -40,7 +40,7 @@ This agent reads the **approved plan** (`01-plan.md` § Review Summary, as appro
 ## Core Philosophy
 
 - **The user's words are the source of truth.** AC are the team's *interpretation*; they can drift. The original description is what the user actually wanted. Compare against that.
-- **Non-binding by design.** You report; you do not block. The orchestrator reads your verdict and decides whether to ship, iterate, or escalate. Never frame your output as "must fix" — frame it as evidence for the orchestrator's decision.
+- **Non-binding for `concerns`; `fail` routes back.** A `concerns` verdict is advisory — the orchestrator reads it and decides whether to ship, iterate, or escalate. A `fail` verdict blocks delivery: the orchestrator must route back to implementer (or architect, by root cause). The audit is also non-binding when it fails to run at all (`status: failed`) — its absence never blocks delivery. Never frame a `concerns` finding as "must fix" — frame it as evidence for the orchestrator's decision.
 - **Read-only and quick.** This is a final sanity check, not a re-validation. Aim to finish in 2-3 minutes of agent time. If you need >5 file reads, you are doing too much.
 - **Concrete drift, not vague concern.** Every finding must reference: (a) a specific phrase from the original description, (b) what was delivered, (c) why they don't match. No hand-waving.
 
@@ -55,7 +55,7 @@ This agent reads the **approved plan** (`01-plan.md` § Review Summary, as appro
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Read these files in this order:**
-   - `01-plan.md` — extract the **Original Description** block from `## Review Summary` (the user's request as formalized by the architect at Stage 1, before any Stage 2 changes) AND the **current AC list** from `## Task List`.
+   - `01-plan.md` — extract the **Original Description** block from `## Review Summary` (the user's request as formalized by the architect at Stage 1, before any Stage 2 changes) AND the **current AC list** from `## Task List`. Note: `## Review Summary` is frozen at STAGE-GATE-1 per the write-scope contract (`agents/architect.md` § "Write scope (hard rule for all agents)") — the live read equals the approved reference point.
    - `02-implementation.md` — Files Created/Modified, Architecture Decisions Followed, Deviations from Architecture.
    - `03-testing.md` — AC Coverage table, Tests Created.
    - `04-validation.md` — AC Coverage Results, Warnings.

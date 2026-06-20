@@ -649,7 +649,7 @@ All three sub-verdicts are bold inline labels, NOT `###` headings. This is the c
 
 **Vacuous-success guard (fix #3):** before computing the combined verdict, `plan-reviewer` MUST verify:
 1. `**Substance (qa):**` is present — always required (qa always runs in the panel).
-2. `**Security design-review (security):**` is present — required when security ran (i.e., when the task was security-sensitive).
+2. `**Security design-review (security):**` is present — required only when `security_sensitive: true` was passed in the dispatch context. When `security_sensitive: false`, absence of this label is expected and does NOT trigger the guard (the check is decidable from the passed flag, not from self-referential label-presence inference).
 
 A label that is expected but absent means the panel is incomplete. The combined verdict MUST NOT be `pass` when a required label is missing — report `blocked` / panel incomplete instead. A missing-but-expected label is not a vacuous success.
 
