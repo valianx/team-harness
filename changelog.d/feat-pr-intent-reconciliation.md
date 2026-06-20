@@ -1,0 +1,7 @@
+### Added
+- `agents/delivery.md` — PR bodies now include a mandatory `## Objective / Why` section (goal + governing principle as the review lens, first element after the issue reference) and a conditional `## Intentional removals (not regressions)` table (`Removed | Why | Where it lives now`) when the diff removes or relocates content. A conditional `## Behavior-neutral reformat` one-line note is included when a pure reformat is folded into the diff. The `## How to review` section gains a deletion-dominated calibration line directing reviewers to verify destinations rather than deletions.
+- `agents/reviewer.md` — new `### Reconciliation of removals against the stated objective` sub-step in Goal Assessment: when the PR body declares an intentional relocation in the `## Intentional removals (not regressions)` table and the reviewer independently confirms the destination exists, the removal is surfaced as "confirma que coincide con el objetivo declarado" (under `### Remociones intencionales`) rather than flagged as a regression or a loosening-impact CRITICAL (#380, #379).
+
+### Fixed
+- `th:review-pr` no longer flags a PR-stated, relocated removal as a regression when the delivery PR body's `## Intentional removals (not regressions)` table accounts for it and the destination is independently confirmed (#379).
+- Reviewer no longer duplicates findings across `### Sugerencias`, `### Detalles Menores`, and `### Resumen`, and no longer re-narrates the PR's own build/test/SemVer/version-bump verification as findings (#379).

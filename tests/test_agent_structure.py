@@ -239,6 +239,60 @@ check("reviewer.md Reviewability score has alta/media/baja",
 check("reviewer.md Reviewability mentions 40 lines / 4 params / 3 levels",
       "40" in reviewer and ("3 niveles" in reviewer or "3 levels" in reviewer))
 
+# AC-6: reconciliation instruction (English) + Spanish output heading
+check(
+    "reviewer.md AC-6: has reconciliation-of-removals instruction (English)",
+    "Reconciliation of removals against the stated objective" in reviewer,
+    "marker 'Reconciliation of removals against the stated objective' not found — "
+    "AC-6 (#379a) reconciliation sub-step missing from reviewer.md",
+)
+check(
+    "reviewer.md AC-6: has Spanish intentional-removals output heading",
+    "Remociones intencionales" in reviewer,
+    "marker 'Remociones intencionales' not found — "
+    "AC-6 (#379a) Spanish review_body heading missing from reviewer.md",
+)
+# AC-7: guard branches — BOTH must be asserted separately (qa-plan concern C4)
+check(
+    "reviewer.md AC-7 guard branch 1: 'not accounted for' present",
+    "not accounted for" in reviewer,
+    "marker 'not accounted for' not found — "
+    "AC-7 guard clause (un-accounted-for removal stays in scope) missing from reviewer.md",
+)
+check(
+    "reviewer.md AC-7 guard branch 2: 'genuinely deleted' present",
+    "genuinely deleted" in reviewer,
+    "marker 'genuinely deleted' not found — "
+    "AC-7 guard clause (genuinely-deleted-value removal stays in scope) missing from reviewer.md",
+)
+# AC-8: single-channel + no-re-narration rule
+check(
+    "reviewer.md AC-8: single-channel rule ('most specific channel')",
+    "most specific channel" in reviewer,
+    "marker 'most specific channel' not found — "
+    "AC-8 (#379b-i) single-channel rule missing from reviewer.md",
+)
+check(
+    "reviewer.md AC-8: no-re-narration rule ('re-narrate')",
+    "re-narrate" in reviewer,
+    "marker 're-narrate' not found — "
+    "AC-8 (#379b-ii) no-re-narration rule missing from reviewer.md",
+)
+# AC-9 (coherence seam, reviewer side): heading byte-identical across both files
+check(
+    "reviewer.md AC-9: coherence-seam heading '## Intentional removals (not regressions)'",
+    "## Intentional removals (not regressions)" in reviewer,
+    "marker '## Intentional removals (not regressions)' not found in reviewer.md — "
+    "AC-9 coherence seam broken: heading must be byte-identical in delivery.md and reviewer.md",
+)
+# AC-9 (coherence seam, reviewer side): column names as ONE contiguous string (preserves order)
+check(
+    "reviewer.md AC-9: coherence-seam columns 'Removed | Why | Where it lives now' (contiguous)",
+    "Removed | Why | Where it lives now" in reviewer,
+    "marker 'Removed | Why | Where it lives now' not found in reviewer.md — "
+    "AC-9 column order/spelling must match delivery.md exactly",
+)
+
 # ---------------------------------------------------------------------------
 # Suite 7 — implementer.md Reviewability Contract
 # ---------------------------------------------------------------------------
@@ -282,6 +336,28 @@ checks_delivery = [
     ("PR body section: Pre-PR Review (conditional)", "## Pre-PR Review"),
     ("PR body section: Size justification (conditional)",
      "## Size justification"),
+    # AC-1: mandatory Objective/Why lead section
+    ("AC-1: PR body section '## Objective / Why' present", "## Objective / Why"),
+    # AC-2: conditional intentional-removals section heading + column header
+    ("AC-2: PR body section '## Intentional removals (not regressions)'",
+     "## Intentional removals (not regressions)"),
+    ("AC-2: intentional-removals table column 'Where it lives now'",
+     "Where it lives now"),
+    # AC-3: deletion-dominated review calibration phrase
+    ("AC-3: How-to-review calibration phrase 'verify the destinations'",
+     "verify the destinations"),
+    # AC-4: conditional behavior-neutral reformat note
+    ("AC-4: conditional reformat note 'Behavior-neutral reformat'",
+     "Behavior-neutral reformat"),
+    # AC-5: version-sync invariant in Step 11.3
+    ("AC-5: Step 11.3 version-sync invariant 'never leave a stale version in the body'",
+     "never leave a stale version in the body"),
+    # AC-9 (coherence seam, delivery side): heading byte-identical across both files
+    ("AC-9: coherence-seam heading '## Intentional removals (not regressions)' in delivery.md",
+     "## Intentional removals (not regressions)"),
+    # AC-9 (coherence seam, delivery side): column names as ONE contiguous string (preserves order)
+    ("AC-9: coherence-seam columns 'Removed | Why | Where it lives now' (contiguous) in delivery.md",
+     "Removed | Why | Where it lives now"),
 ]
 for label, marker in checks_delivery:
     check(f"delivery.md has {label}",
