@@ -239,7 +239,7 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 | `writes[].reason` | always | One of the 4 reason codes below |
 | `writes[].detail` | optional | Mechanical context only — **same secret prohibition as `operation.*`**: no tokens, no bearer credentials, no private URLs, no user-path identifiers |
 
-**Consistency invariant:** `succeeded == count of writes[] entries where reason == "ok"` and `attempted == writes.length`. `/th:trace` validates and aggregates using this invariant.
+**Consistency invariant:** `succeeded == count of writes[] entries where reason == "ok" AND detail does NOT start with "content-gate:"` and `attempted == writes.length`. Content-gate skips (`reason: "ok"`, `detail: "content-gate: ..."`) are legitimate zero-increment entries and are excluded from the `succeeded` equality. `/th:trace` validates and aggregates using this invariant.
 
 **Reason vocabulary (4 codes):**
 
