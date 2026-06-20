@@ -77,6 +77,7 @@ Write your init summary to `workspaces/{feature-name}/00-init.md`:
 - `CHANGELOG.md` — {created | already existed}
 - `docs/knowledge.md` — {created | already existed}
 - `.gitignore` — {updated with /workspaces | already had it}
+- `.gitattributes` — {created with * text=auto eol=lf | already pinned EOL | skipped}
 
 ## Golden Commands Discovered
 {list of verified commands}
@@ -435,6 +436,26 @@ Check if `docs/knowledge.md` exists. If not, create it:
 **Rules:**
 - Do NOT add content — the delivery agent populates it later
 - Do NOT modify an existing `docs/knowledge.md`
+
+### 4.4 — Scaffold `.gitattributes` EOL pinning (If Missing)
+
+Check if `.gitattributes` exists at the repository root and whether it already pins line endings (contains `text=auto` or `eol=`). If it is absent OR does not pin EOL:
+
+1. Create or append to `.gitattributes`:
+
+```
+* text=auto eol=lf
+```
+
+This pins all text files to LF on checkout, which is the dominant convention for cross-platform repositories and the default recommended by Git for new repos. Detect the dominant EOL convention from existing source files (`.ts`, `.py`, `.go`, `.js`, etc.) before choosing `lf` or `crlf`; `lf` is the default when no dominant convention is found.
+
+2. **When a formatter config is present** (`.prettierrc`, `.prettierrc.json`, `.prettierrc.yaml`, or a `"prettier"` key in `package.json`): optionally set `endOfLine: "lf"` in the Prettier config to match the `.gitattributes` setting. Note to the operator that a one-time `git add --renormalize .` may be needed to re-normalize existing files in the index.
+
+3. Add a `.gitattributes` line to the Init Report "Files Created/Updated" block (see the Init Report template below).
+
+**Rules:**
+- Do NOT overwrite an existing `.gitattributes` that already pins EOL — skip with log "`.gitattributes` already pins EOL — skipping scaffold".
+- Do NOT modify an existing `.gitattributes` that pins a different EOL convention (e.g., `eol=crlf`) — log the discrepancy and note it to the operator.
 
 ---
 
