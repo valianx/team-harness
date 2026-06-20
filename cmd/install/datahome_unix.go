@@ -213,7 +213,7 @@ func createAndSecureDir(path string) error {
 		return fmt.Errorf("fstat on data-home directory %q: %w", path, err)
 	}
 
-	if !isDirectory(st.Mode) {
+	if !isDirectory(uint32(st.Mode)) {
 		return fmt.Errorf("data-home path %q opened but fstat reports it is not a directory", path)
 	}
 
@@ -297,7 +297,7 @@ func ensureAncestorsSecure(path string) error {
 		if fstatErr != nil {
 			return fmt.Errorf("fstat on ancestor directory %q: %w", dir, fstatErr)
 		}
-		if !isDirectory(st.Mode) {
+		if !isDirectory(uint32(st.Mode)) {
 			return fmt.Errorf("ancestor path %q is not a directory after creation", dir)
 		}
 	}
