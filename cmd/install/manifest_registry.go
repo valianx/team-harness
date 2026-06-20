@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"path"
 	"strings"
 )
 
@@ -25,16 +26,217 @@ func isInvocableAgent(name string, isDir bool) bool {
 	return name != "README.md" && !strings.HasPrefix(name, "ref-")
 }
 
+// opencodeExcludedSkills is the authoritative set of top-level skill folders
+// excluded from the opencode skill copy. These skills invoke the `claude`
+// binary or depend on a Claude-Code-only mechanic (plugin marketplace,
+// ~/.claude.json plugin config, CC session launch) and are non-functional
+// under opencode. Declared once so the walker and the test share one source
+// of truth.
+var opencodeExcludedSkills = map[string]bool{
+	"update":     true,
+	"setup":      true,
+	"background": true,
+	"cross-repo": true,
+	"tmux":       true,
+	"recover":    true,
+}
+
+// opencodeCopyableSkillExt is the fail-closed allowlist for skill asset
+// extensions (layer c — SEC-DR-2 hardening). Only these extensions are copied
+// into .opencode/skills/; any other extension (binaries, .exe, .pyd, .wasm,
+// extension-less files) is skipped with a logged note.
+//
+// The list is derived from the real skills/**/references/ trees:
+// .md, .txt, .toml, .html, .py (render_excalidraw.py), .json, .yaml/.yml,
+// .svg, .png.
+//
+// Note: .py is on the allowlist because render_excalidraw.py is a legitimate
+// first-party skill asset. .venv Python files share the .py extension but are
+// blocked by layers (a) and (b) on their dot-segment path before this check.
+var opencodeCopyableSkillExt = map[string]bool{
+	".md":   true,
+	".txt":  true,
+	".toml": true,
+	".html": true,
+	".py":   true,
+	".json": true,
+	".yaml": true,
+	".yml":  true,
+	".svg":  true,
+	".png":  true,
+}
+
+// isCopyableSkillPath is the fail-closed copy predicate for skill files.
+// It returns true only when ALL of the following hold:
+//  1. No path segment begins with '.' or '_' (defensive .venv / _shared guard — layer b).
+//  2. The file is not skills/README.md.
+//  3. The first path segment after skills/ is not in opencodeExcludedSkills.
+//  4. The first path segment after skills/ is not "opencode-commands" (that
+//     folder is emitted by buildCommandComponents, not the skill walker).
+//  5. The file extension is in opencodeCopyableSkillExt (layer c — fail-closed).
+//
+// The rel argument is the path relative to the "skills/" root
+// (e.g. "d2-diagram/references/dsl-reference.md").
+func isCopyableSkillPath(rel string) bool {
+	segments := strings.Split(rel, "/")
+
+	// Rule 1: skip any segment beginning with '.' or '_'.
+	for _, seg := range segments {
+		if strings.HasPrefix(seg, ".") || strings.HasPrefix(seg, "_") {
+			return false
+		}
+	}
+
+	// Rule 2: skip skills/README.md (the top-level readme, rel == "README.md").
+	if rel == "README.md" {
+		return false
+	}
+
+	// Rules 3 & 4: the first segment is the skill folder name.
+	if len(segments) == 0 {
+		return false
+	}
+	topLevel := segments[0]
+	if opencodeExcludedSkills[topLevel] {
+		return false
+	}
+	if topLevel == "opencode-commands" {
+		return false
+	}
+
+	// Rule 5: fail-closed extension allowlist.
+	ext := strings.ToLower(path.Ext(rel))
+	if ext == "" || !opencodeCopyableSkillExt[ext] {
+		return false
+	}
+
+	return true
+}
+
+// buildSkillComponents returns one ComponentManifest per copyable skill file,
+// mirroring the buildHookSubdirComponents pattern (one component per file).
+//
+// Source: skills/<rel>
+// Emit:   {config_root}/skills/<rel>  (preserves the subfolder path verbatim)
+//
+// Skills use the identity transform (kind != agent && kind != command in
+// transformToOpencode), so the content is copied byte-for-byte — the
+// cross-harness identical requirement is satisfied with no transform code.
+func buildSkillComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
+	var components []ComponentManifest
+
+	err := fs.WalkDir(embeddedFS, "skills", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		// p is the full embedded path: "skills/foo/bar.md"
+		// rel is the part after "skills/": "foo/bar.md"
+		rel := strings.TrimPrefix(p, "skills/")
+
+		if !isCopyableSkillPath(rel) {
+			return nil
+		}
+
+		// Derive a safe component ID from the relative path.
+		// Replace path separators and other non-kebab characters with hyphens.
+		compIDBase := strings.NewReplacer(
+			"/", "-",
+			".", "-",
+			"_", "-",
+		).Replace(rel)
+		// Trim any leading/trailing hyphens that may result from replacement.
+		compIDBase = strings.Trim(compIDBase, "-")
+		compID := "skill-" + compIDBase
+
+		components = append(components, ComponentManifest{
+			SchemaVersion:  1,
+			Component:      compID,
+			Module:         "opencode-harness",
+			Kind:           "skill",
+			Source:         "skills/" + rel,
+			Cost:           "low",
+			Stability:      "stable",
+			DefaultInstall: true,
+			Emits: OwnershipTags{
+				Files:      []string{"{config_root}/skills/" + rel},
+				ConfigKeys: []string{},
+			},
+		})
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk skills: %w", err)
+	}
+
+	return components, nil
+}
+
+// buildCommandComponents returns one ComponentManifest per .md file in
+// installer-assets/opencode-commands/. Each file is emitted as a `command` kind
+// component to {config_root}/commands/<name>.md.
+//
+// The source directory is installer-assets/ (not skills/) so that changes here
+// do not touch a distributed plugin-asset path and do not require a plugin.json
+// version bump.
+//
+// The command surface undergoes the standard transformToOpencode command
+// transform (kind == "command"), which projects the frontmatter into the
+// opencode command shape and applies the anti-injection gate.
+func buildCommandComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
+	const srcDir = "installer-assets/opencode-commands"
+
+	entries, err := fs.ReadDir(embeddedFS, srcDir)
+	if err != nil {
+		return nil, fmt.Errorf("read dir %q: %w", srcDir, err)
+	}
+
+	var components []ComponentManifest
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+
+		name := strings.TrimSuffix(e.Name(), ".md")
+
+		// Derive a safe kebab component ID.
+		compIDBase := strings.NewReplacer(".", "-", "_", "-").Replace(name)
+		compID := "command-" + compIDBase
+
+		components = append(components, ComponentManifest{
+			SchemaVersion:  1,
+			Component:      compID,
+			Module:         "opencode-harness",
+			Kind:           "command",
+			Source:         srcDir + "/" + e.Name(),
+			Cost:           "low",
+			Stability:      "stable",
+			DefaultInstall: true,
+			Emits: OwnershipTags{
+				Files:      []string{"{config_root}/commands/" + e.Name()},
+				ConfigKeys: []string{},
+			},
+		})
+	}
+
+	return components, nil
+}
+
 // buildOpencodeManifests builds the real module+component set for the opencode
 // runtime. The component set consists of:
 //   - Agent components: all invocable agents (excluding ref-*.md / README /
 //     _shared / testing-refs) transformed to .opencode/agents/<name>.md
+//   - Skill components: all copyable skill files (excluding the six
+//     opencode-incompatible skills and the opencode-commands source folder)
+//     copied verbatim to .opencode/skills/<name>/...
+//   - Command components: skills/opencode-commands/*.md emitted as opencode
+//     commands to .opencode/commands/<name>.md
 //   - Hook-plugin component: the full transitive closure of hooks/ts/opencode-plugin.ts
 //     + entry/*.opencode.ts + bodies/*.ts + shim/*.ts → {config_root}/plugins/
-//
-// No command components are emitted today (S-7 — the command set is empty;
-// the "command" kind is registered in validKind so future components validate).
-// No skill components are emitted (reuse ~/.claude/skills/ discovery).
 func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 	embeddedFS := EmbeddedAssets()
 
@@ -44,15 +246,33 @@ func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 		return nil, nil, fmt.Errorf("build agent components: %w", err)
 	}
 
+	// Collect skill components (closes the skills-copy drift).
+	skillComponents, err := buildSkillComponents(embeddedFS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build skill components: %w", err)
+	}
+
+	// Collect command components (the /th-update command and any future commands).
+	commandComponents, err := buildCommandComponents(embeddedFS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build command components: %w", err)
+	}
+
 	// Collect hook-plugin component (full transitive closure).
 	hookComponents, err := buildHookPluginComponents(embeddedFS)
 	if err != nil {
 		return nil, nil, fmt.Errorf("build hook components: %w", err)
 	}
 
-	allComponents := append(agentComponents, hookComponents...)
+	allComponents := make([]ComponentManifest, 0,
+		len(agentComponents)+len(skillComponents)+len(commandComponents)+len(hookComponents))
+	allComponents = append(allComponents, agentComponents...)
+	allComponents = append(allComponents, skillComponents...)
+	allComponents = append(allComponents, commandComponents...)
+	allComponents = append(allComponents, hookComponents...)
 
-	// Build the module manifest listing all component IDs.
+	// Build the module manifest listing all component IDs AFTER assembling the
+	// full component slice (keeps orphan-check safe).
 	componentIDs := make([]string, 0, len(allComponents))
 	for _, c := range allComponents {
 		componentIDs = append(componentIDs, c.Component)
@@ -61,7 +281,7 @@ func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 	module := ModuleManifest{
 		SchemaVersion:  1,
 		Module:         "opencode-harness",
-		Description:    "Team Harness agents and hook plugin for the opencode runtime",
+		Description:    "Team Harness agents, skills, commands and hook plugin for the opencode runtime",
 		DefaultInstall: "always",
 		Components:     componentIDs,
 	}
