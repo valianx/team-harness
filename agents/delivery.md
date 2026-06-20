@@ -393,6 +393,8 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 ### Step 9 — Version bump
 
+**Sole version-bump site.** Delivery is the ONLY agent that sets the project version. No implementer, inline, or orchestrator step may set or modify the plugin version (`plugin.json`, `marketplace.json`, or any equivalent version site). If a version change is detected in the diff that was not authored by this delivery run, flag it as an unauthorized bump and do NOT proceed with Step 9 until the unauthorized change is reverted or confirmed intentional by the operator. An over-bump above the mechanical SemVer floor (e.g., a MINOR applied to a PATCH-floor diff) requires a `bump-override: minor — <reason>` justification committed as a trailer in the PR body or as a git commit trailer, matching the prepublish-guard hard-deny token (see `hooks/prepublish-guard.sh` bump-floor sub-stage). Without that justification, the `prepublish-guard.sh` hook will deny the push at `git push` time.
+
 **If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP.** Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version file.
 
 ### Step 9.0 — Version sites (explicit enumeration)
@@ -525,6 +527,12 @@ Re-run the test gate ONLY when one of these three exceptions applies:
 - (b) The record is stale: delivery's HEAD is ahead of the commit Phase 3 verify ran against, or test-relevant files (source, tests, build config) changed since Phase 3 verify completed.
 - (c) Delivery itself modified test-relevant files in this run (source code, test files, or build config).
 
+**Security-verdict staleness gate.** In addition to the test-staleness check above, verify that the security (and adversary, when it ran) verdict is still current before proceeding. The security verdict is STALE and delivery is BLOCKED when ANY of the following applies:
+- (s1) delivery's HEAD is ahead of the commit the `security` (or `adversary`) agent reviewed — i.e., commits were added after the Phase 3 security verdict was recorded.
+- (s2) A security-relevant file changed since the verdict: any file under `auth/`, `api/`, `db/`, `crypto/`, `session/`, hook scripts, or any file whose change the plan classified as `security_sensitive`.
+
+When the security verdict is stale: block delivery and signal the orchestrator to re-run the `security` and `adversary` (when applicable) agents before the next delivery attempt. Do NOT proceed to commit with a stale security verdict. Record the staleness reason in `00-state.md § Delivery` under "Security verdict stale".
+
 Lint, typecheck, and build rows that were NOT covered by Phase 3 verify still run regardless.
 
 When a re-run is warranted, use the discovery procedure below.
@@ -585,6 +593,21 @@ size_justification=$(awk '/^## Reviewability Exceptions/,/^## /' workspaces/{fea
 ```
 
 This becomes the "Size justification" section embedded in the PR body in Step 11.2.
+
+### Step 9f — PR-body / runbook presence-reconcile
+
+Before staging, reconcile the PR description (or runbook) against the shipped code. Every flag, environment variable, and provisioning step named in the PR description or runbook MUST:
+
+1. **Exist** — the flag/env-var/step is present in the shipped code (not removed, not renamed without updating the docs).
+2. **Spell-match** — the name in the description/runbook matches the name in the code byte-for-byte (case-sensitive).
+
+**How to check:** read the PR body draft from `workspaces/{feature-name}/02-implementation.md` or `00-state.md § Delivery PR body`, then grep the shipped files for each env-var and flag name identified in the description. A discrepancy is a doc-vs-code rollout contradiction.
+
+**Verdict:**
+- If a doc-vs-code rollout contradiction is found → report it as a HIGH finding and block delivery. Fix the discrepancy (update the PR description or the code) before proceeding. Log the contradiction in `00-state.md § Delivery` under "Presence-reconcile failures".
+- If all named flags/env-vars/steps spell-match the shipped code → proceed.
+
+**Scope:** this check is additive and never replaces the DoD gate. It runs after Step 9d (size gate) and before Step 10 (commit and push). Apply it to all PRs that include runbook, deployment, or flag/feature-toggle documentation in the PR body.
 
 ### Step 10 — Commit and push
 

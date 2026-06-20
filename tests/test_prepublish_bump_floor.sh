@@ -528,6 +528,205 @@ assert_nodecision "control: docs/ + PATCH — stdout empty"
 assert_stderr_not_contains "control: no over-bump WARN for PATCH" "WARN"
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Suite 16 (new cases) — over-bump hard-deny + bump-override escape-hatch
+# Functional tests for AC-1..AC-3 (#383 over-bump governance).
+#
+# Token injection: the hook reads the override token from:
+#   1. GIT_COMMIT_MSG environment variable (commit trailer)
+#   2. GIT_PUSH_OPTION_COUNT / GIT_PUSH_OPTION_N (push options)
+# Both sources are tested below via env-var injection in the run_hook helper.
+# ---------------------------------------------------------------------------
+echo
+echo "--- Suite 16 (AC-1/#383): over-bump DENY — MINOR applied on M-only/PATCH-floor diff, no override ---"
+
+# Scenario: MODIFY agents/bar.md only (M-only) → PATCH floor.
+# Applied bump: MINOR (2.107.0 → 2.108.0) → exceeds floor → deny.
+_bare_a1=$(_new_tmp)
+_clone_a1=$(_new_tmp)
+_make_repo "$_bare_a1" "$_clone_a1" "2.107.0"
+
+(
+    cd "$_clone_a1"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# existing agent" > agents/existing.md
+    git add agents/existing.md
+    git commit -m "base: add agents/existing.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Modify only (M-only → PATCH floor) but apply MINOR bump (over-bump)
+    echo "# existing agent — updated" > agents/existing.md
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "modify agents/existing.md (minor bump — over-bump)" -q 2>/dev/null
+)
+
+_run_hook "$_clone_a1"
+assert_deny "Suite16/AC-1: MINOR applied on M-only (PATCH floor) without override → deny"
+
+echo
+echo "--- Suite 16 (AC-2/#383): over-bump ALLOWED — valid bump-override token via GIT_COMMIT_MSG ---"
+
+_bare_a2=$(_new_tmp)
+_clone_a2=$(_new_tmp)
+_make_repo "$_bare_a2" "$_clone_a2" "2.107.0"
+
+(
+    cd "$_clone_a2"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# agent two" > agents/two.md
+    git add agents/two.md
+    git commit -m "base: add agents/two.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # M-only → PATCH floor, apply MINOR (over-bump), but provide valid override token
+    echo "# agent two — updated" > agents/two.md
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "modify agents/two.md (minor bump)" -q 2>/dev/null
+)
+
+# Inject the valid override token via GIT_COMMIT_MSG
+_HOOK_STDOUT=""
+_HOOK_STDERR=""
+_tmpout_a2=$(mktemp)
+_tmperr_a2=$(mktemp)
+(cd "$_clone_a2" && _push_payload | GIT_COMMIT_MSG="bump-override: minor — fix + surface in same PR" bash "$HOOK" >"$_tmpout_a2" 2>"$_tmperr_a2") || true
+_HOOK_STDOUT=$(cat "$_tmpout_a2")
+_HOOK_STDERR=$(cat "$_tmperr_a2")
+rm -f "$_tmpout_a2" "$_tmperr_a2"
+assert_nodecision "Suite16/AC-2a: over-bump WITH valid bump-override (GIT_COMMIT_MSG) → nodecision"
+
+echo
+echo "--- Suite 16 (AC-2/#383): over-bump ALLOWED — valid bump-override token via GIT_PUSH_OPTION_* ---"
+
+_bare_a2p=$(_new_tmp)
+_clone_a2p=$(_new_tmp)
+_make_repo "$_bare_a2p" "$_clone_a2p" "2.107.0"
+
+(
+    cd "$_clone_a2p"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p hooks
+    echo "#!/bin/bash" > hooks/myhook.sh
+    git add hooks/myhook.sh
+    git commit -m "base: add hooks/myhook.sh" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # M-only → PATCH floor, apply MINOR (over-bump), provide override via push option
+    echo "#!/bin/bash # updated" > hooks/myhook.sh
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "modify hooks/myhook.sh (minor bump)" -q 2>/dev/null
+)
+
+# Inject the valid override token via GIT_PUSH_OPTION_*
+_HOOK_STDOUT=""
+_HOOK_STDERR=""
+_tmpout_a2p=$(mktemp)
+_tmperr_a2p=$(mktemp)
+(cd "$_clone_a2p" && _push_payload \
+    | GIT_PUSH_OPTION_COUNT=1 \
+      GIT_PUSH_OPTION_0="bump-override: minor — hotfix + new hook surface in same PR" \
+      bash "$HOOK" >"$_tmpout_a2p" 2>"$_tmperr_a2p") || true
+_HOOK_STDOUT=$(cat "$_tmpout_a2p")
+_HOOK_STDERR=$(cat "$_tmperr_a2p")
+rm -f "$_tmpout_a2p" "$_tmperr_a2p"
+assert_nodecision "Suite16/AC-2b: over-bump WITH valid bump-override (GIT_PUSH_OPTION_0) → nodecision"
+
+echo
+echo "--- Suite 16 (AC-2/#383 guard): override token containing control chars → rejected → deny ---"
+
+_bare_a2c=$(_new_tmp)
+_clone_a2c=$(_new_tmp)
+_make_repo "$_bare_a2c" "$_clone_a2c" "2.107.0"
+
+(
+    cd "$_clone_a2c"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# ctrl agent" > agents/ctrl.md
+    git add agents/ctrl.md
+    git commit -m "base: add agents/ctrl.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # M-only → PATCH floor, apply MINOR (over-bump)
+    echo "# ctrl agent — updated" > agents/ctrl.md
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "modify agents/ctrl.md (minor bump)" -q 2>/dev/null
+)
+
+# Inject an override token containing a control character (tab = \x09).
+# SEC-DR-A: control chars must be rejected → override is treated as absent → deny.
+_HOOK_STDOUT=""
+_HOOK_STDERR=""
+_tmpout_a2c=$(mktemp)
+_tmperr_a2c=$(mktemp)
+_ctrl_token=$(printf 'bump-override: minor \t— malicious payload')
+(cd "$_clone_a2c" && _push_payload \
+    | GIT_COMMIT_MSG="$_ctrl_token" bash "$HOOK" >"$_tmpout_a2c" 2>"$_tmperr_a2c") || true
+_HOOK_STDOUT=$(cat "$_tmpout_a2c")
+_HOOK_STDERR=$(cat "$_tmperr_a2c")
+rm -f "$_tmpout_a2c" "$_tmperr_a2c"
+assert_deny "Suite16/AC-2c: control-char override token rejected → falls through to deny"
+
+echo
+echo "--- Suite 16 (AC-3/#383 regression): under-bump WARN still emitted; no-bump hard-block still fires ---"
+
+# AC-3 regression (a): ADD agents/new.md + PATCH delta → MINOR WARN still present (existing AC-1 case).
+# This is already covered by the existing AC-1 fixture in Suite 15. Verify the
+# WARN text is present in stderr of _HOOK_STDERR from the Suite-15 AC-1 run, which
+# is still in scope here.
+# Re-use a fresh fixture to be self-contained and order-independent.
+_bare_a3w=$(_new_tmp)
+_clone_a3w=$(_new_tmp)
+_make_repo "$_bare_a3w" "$_clone_a3w" "2.107.0"
+
+(
+    cd "$_clone_a3w"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# regression guard" > agents/rg.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "add agents/rg.md (patch bump — under-bump)" -q 2>/dev/null
+)
+
+_run_hook "$_clone_a3w"
+assert_nodecision "Suite16/AC-3a: under-bump WARN (ADD + PATCH) → still nodecision (no block)"
+assert_stderr_contains "Suite16/AC-3a: under-bump WARN still emitted in stderr" "WARN"
+
+# AC-3 regression (b): MODIFY agent + NO version bump → hard-block still fires.
+_bare_a3d=$(_new_tmp)
+_clone_a3d=$(_new_tmp)
+_make_repo "$_bare_a3d" "$_clone_a3d" "2.107.0"
+
+(
+    cd "$_clone_a3d"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# block agent" > agents/blk.md
+    git add agents/blk.md
+    git commit -m "base: add agents/blk.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    echo "# block agent — modified" > agents/blk.md
+    git add agents/blk.md
+    git commit -m "modify agents/blk.md (no bump — regression guard)" -q 2>/dev/null
+)
+
+_run_hook "$_clone_a3d"
+assert_deny "Suite16/AC-3b: no-bump hard-block still fires (regression guard)"
+
 # AC-8 structural check: --name-status in hook; no new git show without MSYS guard
 # ---------------------------------------------------------------------------
 echo

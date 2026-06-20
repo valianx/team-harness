@@ -88,6 +88,14 @@ Invoked by the orchestrator to review the security posture of a **plan or design
 - **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
 - **What to produce:** recommend security AC to add to the plan, in `Given/When/Then` or `VERIFY:` format, so the architect or operator can fold them into `01-plan.md`. Do not implement; recommend only.
 
+**Mandatory dispositions for changed control/security-relevant paths:**
+
+When the design introduces or modifies a control path, a safety enforcement mechanism, a kill-switch, a feature flag, a status code that gates access, or any AND-gate conjunct that the design claims prevents a class of harm:
+
+1. **Zero-downside disposition.** For every claimed strength on a CHANGED control/security-relevant path (e.g., "this avoids replay", "this prevents IDOR", "the gate fires unconditionally"), invert the claim: state the specific condition under which the claim is FALSE ("X is worse when ___; prove unreachable on the touched path"). A review that identifies ZERO downsides on a changed control/security-relevant path is INCOMPLETE and blocks the verdict. This disposition is scoped strictly to CHANGED control paths — do not apply it to unchanged, benign, or documentation-only surfaces.
+
+2. **Loosening-control disposition.** When the design REMOVES or LOOSENS a safety control (e.g., removes a validation step, widens an allowlist, reduces a rate limit, makes an enforced check optional), connect the removal to the open downstream or precondition risk it creates. Surface the worst-case cost of the loosening explicitly in the review, and require an acknowledgement of that cost IN THE SAME review before the verdict is `clean`. A loosening that has no named worst-case cost and no acknowledgement is flagged as a risk and blocks a `clean` verdict.
+
 **Centralization contract (MUST NOT violate):**
 - Fold findings into the body of `01-plan.md` (refine `### Security Assessment` in-place when applicable).
 - Write the sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` and a one-line summary, WITHIN `## Plan Review` — NEVER as a markdown heading with `###` prefix (a `###` heading would split the `## Plan Review` slice).
@@ -124,6 +132,12 @@ Invoked by `/th:review-pr` in parallel with the reviewer at Tier 3 and Tier 4 to
 - Read files from the `Worktree:` path in the dispatch. Use `$WORKTREE/path/to/file`, NOT the operator's current checkout.
 - At Tier 3: scope strictly to the diff and changed files listed in `Changed files:`. Do NOT expand scope.
 - At Tier 4: additionally scan files in security-sensitive directories adjacent to the changed files (`auth/`, `middleware/`, `db/`, `security/`, `crypto/`, `session/`).
+
+**Mandatory dispositions for changed control/security-relevant paths (applies in both Tier 3 and Tier 4):**
+
+1. **Zero-downside disposition.** For every claimed strength on a CHANGED control/security-relevant path (e.g., "this avoids replay", "this prevents IDOR", "the gate fires unconditionally"), invert the claim: state the specific condition under which the claim is FALSE ("X is worse when ___; prove unreachable on the touched path"). A review that identifies ZERO downsides on a changed control/security-relevant path is INCOMPLETE and blocks a `clean` verdict. Scoped strictly to CHANGED control paths — do not apply to unchanged, benign, or documentation-only surfaces in the diff.
+
+2. **Loosening-control disposition.** When the diff REMOVES or LOOSENS a safety control (e.g., removes a validation step, widens an allowlist, reduces a rate limit, makes an enforced check optional), connect the removal to the open downstream or precondition risk it creates. Surface the worst-case cost of the loosening explicitly, and require an acknowledgement of that cost IN THE SAME review before the verdict is `clean`. A loosening with no named worst-case cost and no acknowledgement is flagged as a risk and blocks a `clean` verdict.
 - Output to `.claude/pr-review-security.md` (NOT to `workspaces/` — this is a transient draft).
 
 **Output format (condensed — this feeds the consolidator, not the final GitHub review):**

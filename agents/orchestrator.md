@@ -150,6 +150,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `tester` | Creates tests with factory mocks, runs them | Yes (tests) | `03-testing.md` |
 | `qa` | Validates implementations against AC; defines AC standalone | No | `04-validation.md` |
 | `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `04-security.md` |
+| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it | could-not-break`; report in Spanish | No | `04-adversary.md` |
 | `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `01-plan.md § Plan Review` |
 | `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `04-validation.md § Drift Analysis` |
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `00-state.md § Delivery` |
@@ -2105,13 +2106,13 @@ Note: a frontend repo with zero browser-real types is legitimately jsdom-only wh
 
 **Tier-gated dispatch table (`type: fix` / `type: hotfix`):**
 
-| `bug_tier` | tester | qa | security | Notes |
-|---|---|---|---|---|
-| `0` | suite no-regress only (no full audit; no workspaces to reference) | **skipped** | **skipped** | ~1 agent run. No workspaces created. PR review is the only gate. |
-| `1` | suite no-regress only (no specific assertion against a missing regression test when Phase 2.0 was skipped) | reduced — verify diff matches `01-plan.md` § Review Summary intent only (AC list is implicit "the cited issue is fixed") | **skipped** | ~3 agent runs. `regression_test_referenced: null` in qa status block when Phase 2.0 was skipped. |
-| `2` | default verify (post-fix regression test must pass) | validate mode (default bug-fix contract) | **skipped** | ~5 agent runs. |
-| `3` (default) | default verify | validate mode (default bug-fix contract) | pipeline mode | ~7 agent runs. Current PR #50 baseline. |
-| `4` | default verify | validate mode (default bug-fix contract) | pipeline mode + **extended analysis** (cross-references prior-art from `01-root-cause.md ## Prior Art`; analyses adjacent-code attack surface beyond the diff) | ~9 agent runs. |
+| `bug_tier` | tester | qa | security | adversary | Notes |
+|---|---|---|---|---|---|
+| `0` | suite no-regress only (no full audit; no workspaces to reference) | **skipped** | **skipped** | **skipped** | ~1 agent run. No workspaces created. PR review is the only gate. |
+| `1` | suite no-regress only (no specific assertion against a missing regression test when Phase 2.0 was skipped) | reduced — verify diff matches `01-plan.md` § Review Summary intent only (AC list is implicit "the cited issue is fixed") | **skipped** | **skipped** | ~3 agent runs. `regression_test_referenced: null` in qa status block when Phase 2.0 was skipped. |
+| `2` | default verify (post-fix regression test must pass) | validate mode (default bug-fix contract) | **skipped** | **skipped** | ~5 agent runs. |
+| `3` (default) | default verify | validate mode (default bug-fix contract) | pipeline mode | pipeline mode (when `security_sensitive: true`) | ~7–9 agent runs. Current PR #50 baseline. |
+| `4` | default verify | validate mode (default bug-fix contract) | pipeline mode + **extended analysis** (cross-references prior-art from `01-root-cause.md ## Prior Art`; analyses adjacent-code attack surface beyond the diff) | pipeline mode (when `security_sensitive: true`) | ~9–11 agent runs. |
 
 **Feature flow (`type: feature` / `refactor` / `enhancement`):** unchanged from existing behaviour — tester + qa always; security only when `security-sensitive: true` per Phase 0a Step 7 classification.
 
@@ -2121,6 +2122,7 @@ Launch agents simultaneously using Task tool calls in the same message:
 - **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
 - **qa** (validate mode): feature name, summary of what was implemented (from implementer's status block summary). For `type: fix` / `type: hotfix` (Tier 2-4): also instruct: "Validate AC-1 (reproduction-no-longer-bug) by reading reproduction steps from `01-plan.md` § Review Summary and verifying observed behaviour matches expected. Validate AC-2 (regression-test-exists) by cross-checking `02-regression-test.md` against the current suite. Set `regression_test_referenced: true|false` and `reproduction_steps_validated: true|false` in your status block." For `type: fix` Tier 1: instruct: "Reduced validation. Verify the diff matches the intent stated in `01-plan.md` § Review Summary. AC list is implicit — the cited issue is fixed. Set `regression_test_referenced: null` (Phase 2.0 was skipped) and `reproduction_steps_validated: true|false` in your status block."
 - **security** (pipeline mode, only when the dispatch table above says so): feature name, list of files created/modified, summary of what was implemented, reference to `00-knowledge-context.md` if it exists. Instruct: "This is pipeline mode — focus on the changed files and their security implications." For `bug_tier: 4`: additionally instruct: "Extended analysis. Read `01-root-cause.md ## Prior Art` and cross-reference any prior `process-insight` nodes describing similar failure modes. Analyse the adjacent code paths beyond the diff (one hop out in the call graph) for related vulnerability classes. Surface findings on adjacent code as `## Adjacent Surface Findings` in `04-security.md` separate from the diff findings."
+- **adversary** (pipeline mode, only when `security_sensitive: true` in `00-state.md` AND the dispatch table above says so for feature flow / bug_tier 3-4): feature name, list of files created/modified, summary of what was implemented, reference to `04-security.md` (the GO-seeking analysis it is independent from). Instruct: "You are in pipeline-adversary mode. Read `01-plan.md` (the reviewed design), the diff / changed files, and `04-security.md` (the GO-seeking analysis). Attack the design's worst-case downside per your mandate. Issue `broke-it | could-not-break`. A `could-not-break` on a changed control/security-relevant path sets `incomplete_on_changed_control: true` in your status block." Dispatch in the SAME parallel Task message as tester/qa/security — adversary runs concurrently with security, wall-clock bounded by the slower of the two.
 
 ### When frontend_scope: true — ux-reviewer validate (Phase 3.4)
 
@@ -2139,9 +2141,21 @@ Append a `phase.end` event after the ux-reviewer status block is received:
 {"ts":"…","event":"phase.end","phase":"3.4-ux-validate","feature":"{feature}","status":"{success|skipped|failed}","extra":{"findings_critical":N,"findings_high":N}}
 ```
 
-**Gate (status-block):** All agents return compact status blocks. Read all:
-- If all `status: success` → update `00-state.md`, proceed to Phase 4
-- If any `status: failed` → **ONLY THEN** read the failing agent's workspaces (`03-testing.md`, `04-validation.md`, and/or `04-security.md`) to understand what went wrong
+**Gate (status-block):** All agents return compact status blocks. Read all and compute the worst-of combined verdict:
+
+```
+phase3_combined = worst-of(qa_verdict, security_verdict_when_ran, adversary_verdict_when_ran)
+severity order: fail > concerns > pass
+security mapping:   clean → pass,                risks-found → fail
+adversary mapping:  could-not-break(benign) → pass,
+                    broke-it → fail,
+                    could-not-break(changed-control) → fail   (INCOMPLETE)
+```
+
+The orchestrator reads `incomplete_on_changed_control` from the adversary status block (not just `adversary_verdict`) when computing the roll-up. A `could-not-break` with `incomplete_on_changed_control: true` maps to `fail` (INCOMPLETE), NOT approval.
+
+- If `phase3_combined = pass` and all `status: success` → update `00-state.md`, proceed to Phase 4
+- If `phase3_combined = fail` or any `status: failed` → **ONLY THEN** read the failing agent's workspaces (`03-testing.md`, `04-validation.md`, `04-security.md`, and/or `04-adversary.md`) to understand what went wrong
 
 **Do NOT read workspaces on happy path.** Trust the status blocks.
 
@@ -2192,10 +2206,22 @@ Read the `**Blast radius:**` line from the brief (declared by the verifier, neve
 | B | `localized {IDs}` | `architect` — BOUNDED-PATCH on named IDs | `plan-reviewer` only | `plan-reviewer` on the patched plan |
 | B | `structural` | `architect` — full re-design | all verifiers (full) | standard acceptance gate |
 | C | any | adjust `01-plan.md` § Task List AC, mark change in brief | all verifiers (full) | standard acceptance gate |
-| D | `localized {IDs}` | `implementer` — BOUNDED-PATCH on named IDs | `security` only | `security` re-run + coherence gate `qa validate` on patched AC IDs |
-| D | `structural` | `implementer` — full re-implement | `security` only | standard security re-run |
+| D | `localized {IDs}` | `implementer` — BOUNDED-PATCH on named IDs | `security` and `adversary` (when applicable) only | `security`/`adversary` re-run + coherence gate `qa validate` on patched AC IDs |
+| D | `structural` | `implementer` — full re-implement | `security` and `adversary` (when applicable) only | standard security re-run |
 
 **Default to `structural` when the blast radius field is absent, ambiguous, or you cannot confirm the named IDs are self-contained.** Never narrow a structural change to a localized patch.
+
+**Security-verdict staleness re-gate (applies regardless of blast radius or case type).**
+
+A security or adversary verdict is BOUND to the security-relevant design surface it reviewed at the time it was issued. That surface includes: the enforcement model, status codes that gate access, rollout order of controls, AND-gate conjuncts, kill-switches, feature flags, and observe-window presence. When any of the following occurs AFTER a security/adversary verdict is recorded, the verdict is STALE and the security stage (both `security` AND `adversary`, when applicable) MUST re-run before delivery or push proceeds:
+
+- An operator "simplify/remove" edit modifies or removes any element of the security-relevant design surface (even if the edit seems benign — fail-SAFE on doubt).
+- New implementation files are committed that touch auth, API, DB, crypto, or session paths that were not part of the reviewed surface.
+- The orchestrator detects via diff hash or file-mtime that the security-relevant design surface changed since the last recorded verdict.
+
+**Fail-SAFE:** when in doubt whether a post-verdict change touches the security-relevant surface, re-run the security stage. The cost of a spurious re-run is latency; the cost of a missed re-run is a stale GO on a changed design. Never fail-open on this decision.
+
+**This trigger is ADDITIVE:** it adds a re-run condition; it never removes, short-circuits, or waives the existing non-waivable security floor. The security stage stays a hard floor regardless of the re-gate trigger.
 
 **Step 2c — Coherence gate (mandatory after every localized patch):**
 
@@ -2210,7 +2236,7 @@ The coherence gate exists to catch partial patches that resolve the named failin
 **Case B — Design issue (full re-run):** route to `architect` with the brief. After revised design → re-route to `implementer`. Then re-run all verifiers.
 **Case B — Design issue (localized):** dispatch `architect` with BOUNDED-PATCH contract (named IDs only). After revised plan → coherence gate via `plan-reviewer`.
 **Case C — Criteria issue:** adjust `01-plan.md` § Task List AC, mark the change in the brief, re-run all verifiers.
-**Case D — Security-only:** route the brief to `implementer`, then re-run only `security` (tester+qa already passed; re-run them only if the fix touches test-relevant code). After the security re-run, fire the coherence gate: dispatch `qa` in validate mode limited to the patched AC IDs — this gate is unconditional for localized Case D, exactly as for Case A localized. Blast radius modulates whether the implementer uses BOUNDED-PATCH or full re-implement, but security always re-runs and the coherence gate always fires for localized patches.
+**Case D — Security-or-adversary-only:** route the brief to `implementer`, then re-run `security` AND `adversary` (when `adversary` was run on the original verify pass). tester+qa already passed; re-run them only if the fix touches test-relevant code. After the security/adversary re-run, fire the coherence gate: dispatch `qa` in validate mode limited to the patched AC IDs — this gate is unconditional for localized Case D, exactly as for Case A localized. Blast radius modulates whether the implementer uses BOUNDED-PATCH or full re-implement, but security (and adversary when applicable) always re-runs and the coherence gate always fires for localized patches.
 
 ### KG read on error
 

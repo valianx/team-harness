@@ -335,7 +335,11 @@ Before writing any test:
    - `go.mod` → `go`
    - `pyproject.toml` / `pytest.ini` → `python`
    - `vite.config.*` + react dep → `vite-react`; `nuxt.config.*` → `nuxt`; `svelte.config.*` → `svelte`
-   Record the detected stack token. When a frontend stack is detected but browser-mode is n/a for it (currently non-react stacks: vue / nuxt / svelte / etc. — `browser-mode.md` targets react-nextjs), do NOT silently degrade: record in the decision log `"frontend stack {detected}: browser-mode n/a, scoping browser-real assertions to e2e (Playwright)"` so the gap is visible to the operator.
+   Record the detected stack token. When a frontend stack is detected and a real-browser-API AC is present, route to `browser-mode` WHERE a maintained render package exists:
+   - `react` / `next.config.*` → `vitest-browser-react` (see `## react-nextjs` in `browser-mode.md`)
+   - `vue` / `nuxt.config.*` → `vitest-browser-vue` (see `## vue` in `browser-mode.md`)
+   - `svelte.config.*` → `vitest-browser-svelte` (see `## svelte` in `browser-mode.md`)
+   For stacks WITHOUT a maintained browser-mode render package, do NOT silently degrade: record in the decision log `"frontend stack {detected}: no maintained browser-mode render package found, scoping browser-real assertions to e2e (Playwright)"` so the gap is visible to the operator.
 3. **Explore existing tests** — use Glob and Read to find test files and understand the project's patterns:
    - Directory structure (colocated vs centralized `/tests` directory)
    - Naming conventions (`.test.ts`, `.spec.ts`, `_test.go`, `_test.py`)

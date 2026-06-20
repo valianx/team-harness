@@ -16,7 +16,7 @@ import (
 // Note: agents/_shared/ contains cross-cutting snippets (not invocable agents)
 // and is intentionally excluded from the count.
 func TestEmbeddedAssets_AgentCount(t *testing.T) {
-	const wantAgents = 26
+	const wantAgents = 27 // +adversary (#373); embed-count integrity check, not a lowCostMatrix/model-allocation change
 	embedded := EmbeddedAssets()
 
 	var mdFiles []string
