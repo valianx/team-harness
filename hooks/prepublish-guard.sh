@@ -37,23 +37,38 @@
 #   an advisory WARN to stderr. Fail-open: unreadable file, missing file, or
 #   unparseable version → skip advisory, nodecision silently.
 #
-#   BUMP-FLOOR SUB-STAGE (advisory, runs only on the Check-1 PASS path):
+#   BUMP-FLOOR SUB-STAGE (runs only on the Check-1 PASS path):
 #   After the hard-block evaluation, derives a mechanical SemVer floor from the
-#   name-status diff over shipped paths and emits an advisory WARN to stderr
-#   when the actual bump level is below the floor. The floor table:
+#   name-status diff over shipped paths. The floor table:
 #
 #     D or R shipped path  → MAJOR-candidate floor
 #     A shipped path       → MINOR floor
 #     M-only shipped path  → PATCH floor
 #
+#   UNDER-BUMP: when actual < floor, emits advisory WARN to stderr (push not
+#   blocked). The MAJOR/MINOR advisory messages apply; floor==patch with
+#   actual==none cannot reach here (Check 1 already denied).
+#
+#   OVER-BUMP HARD-DENY: when actual > floor (e.g. MINOR applied on an
+#   M-only/PATCH-floor diff), the push is DENIED unless a valid
+#   bump-override: minor — <reason>  token is present in the push context
+#   (last commit-trailer or PR-body passed via GIT_COMMIT_MSG env var).
+#   The token parse:
+#     - regex: ^bump-override: (minor|major) — .+$  (single-line match)
+#     - rejects control chars (SEC-DR-A guard)
+#     - never eval, never interpolate into deny reason
+#   If a valid token is present → nodecision (allow).
+#   If absent → deny() with a hardcoded literal reason (SDR-PPG-01).
+#   Fail-open on any parse fault (match existing posture).
+#
 #   NOTE: floor=="none" cannot occur on the shipped-asset path because the
 #   over-bump advisory (above) handles the no-shipped-asset case before this
 #   sub-stage is ever reached.
 #
-#   The floor sub-stage ALWAYS ends at nodecision (empty stdout, exit 0). It
-#   NEVER emits permissionDecision: "ask" or "deny". WARNs go to stderr only.
-#   Fail-open: any version that does not match ^[0-9]+\.[0-9]+\.[0-9]+$ or any
-#   sub-command fault → skip the floor compare with a one-line stderr note.
+#   The floor sub-stage ends at nodecision (empty stdout, exit 0) on all
+#   non-deny paths. Fail-open: any version that does not match
+#   ^[0-9]+\.[0-9]+\.[0-9]+$ or any sub-command fault → skip the floor
+#   compare with a one-line stderr note.
 #
 #   Structural invariant: the hard-block deny path calls deny() (which exit 0s)
 #   and therefore NEVER reaches the floor sub-stage. A WARN and a block can
@@ -434,11 +449,12 @@ except Exception:
     fi
 
     # -----------------------------------------------------------------------
-    # Check 1 passed. Bump-floor sub-stage (advisory only).
+    # Check 1 passed. Bump-floor sub-stage.
     #
     # The deny path above calls deny() which exits before reaching here.
-    # This sub-stage ONLY runs on the pass path. It NEVER emits deny or ask.
-    # All WARNs go to stderr; the sub-stage always ends at nodecision below.
+    # This sub-stage ONLY runs on the pass path.
+    # UNDER-BUMP: advisory WARN to stderr; push not blocked.
+    # OVER-BUMP: hard-deny unless a valid bump-override token is present.
     # Fail-open: any parse fault or unknown version → skip, one-line note.
     # -----------------------------------------------------------------------
 
@@ -516,13 +532,64 @@ EOF
         # "shipped touched + no version change", so on the pass path a shipped-touch
         # always has actual >= patch. Guard is implicit — fall through to nodecision.
     fi
-    # NOTE: the floor=="none" over-bump branch was removed — it was dead code.
-    # The early-exit at the no-shipped-asset check above handles the over-bump
-    # advisory before the shipped-path block is entered; on the shipped path,
-    # _floor is always major/minor/patch (never "none"), so that branch could
-    # never trigger here.
-    # All other cases: actual >= floor → silent (correct).
+    if [ "$_rank_actual" -gt "$_rank_floor" ] 2>/dev/null; then
+        # OVER-BUMP: applied bump level EXCEEDS the mechanical floor.
+        # Deny unless a valid bump-override token is present in the push context.
+        #
+        # Token format (single-line): bump-override: minor — <reason>
+        # Source: last commit-trailer ($GIT_COMMIT_MSG env var) or GIT_PUSH_OPTION_* variables.
+        # SEC-DR-A control-char guard: reject any value containing control chars (never eval).
 
+        _override_found=false
+        _override_src=""
+
+        # Attempt 1: read from GIT_COMMIT_MSG environment variable (commit trailer).
+        if [ -n "${GIT_COMMIT_MSG:-}" ]; then
+            _override_src="$GIT_COMMIT_MSG"
+        fi
+
+        # Attempt 2: read from GIT_PUSH_OPTION_COUNT / GIT_PUSH_OPTION_N (push options).
+        if [ "${GIT_PUSH_OPTION_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+            _i=0
+            while [ "$_i" -lt "${GIT_PUSH_OPTION_COUNT:-0}" ] 2>/dev/null; do
+                _opt_var="GIT_PUSH_OPTION_${_i}"
+                _opt_val="${!_opt_var:-}" 2>/dev/null || _opt_val=""
+                if [ -n "$_opt_val" ]; then
+                    _override_src="${_override_src}
+${_opt_val}"
+                fi
+                _i=$(( _i + 1 ))
+            done
+        fi
+
+        if [ -n "$_override_src" ]; then
+            # SEC-DR-A: reject control chars in the override source before any processing.
+            if printf '%s' "$_override_src" | grep -qP '[[:cntrl:]]' 2>/dev/null \
+                || printf '%s' "$_override_src" | LC_ALL=C grep -q $'[\x00-\x1f\x7f]' 2>/dev/null; then
+                printf 'prepublish-guard: bump-override source contains control characters; treating as absent (SEC-DR-A). Over-bump check proceeds.\n' >&2
+            else
+                # Match the canonical token pattern on any line of the source.
+                if printf '%s' "$_override_src" | grep -qE '^bump-override: (minor|major) — .+$' 2>/dev/null; then
+                    _override_found=true
+                fi
+            fi
+        fi
+
+        if [ "$_override_found" = "true" ]; then
+            # Valid override token present — suppress the over-bump deny.
+            printf 'prepublish-guard: over-bump allowed by bump-override token (actual=%s floor=%s)\n' \
+                "$_actual" "$_floor" >&2
+            nodecision
+        fi
+
+        # No valid override: hard-deny the over-bump.
+        # Reason is hardcoded prose; the only interpolated values are the bounded SemVer-level
+        # enums ${_floor}/${_actual} (each ∈ {major,minor,patch,none}) — no untrusted or
+        # config-derived content reaches the reason string (SDR-PPG-01; CWE-209-safe).
+        deny "prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths (agents/|skills/|hooks/) only warrant a ${_floor} bump, but a ${_actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${_actual} — <reason>. See CLAUDE.md §6.3 and agents/delivery.md Step 9. Push blocked."
+    fi
+
+    # All other cases: actual >= floor and actual <= floor → silent (correct).
     nodecision
 fi
 
