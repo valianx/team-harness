@@ -215,6 +215,14 @@ func runApplyCommand() {
 
 	fmt.Printf("apply: done (created %d, updated %d, skipped %d, removed %d)\n",
 		len(diff.ToCreate), len(diff.ToUpdate), len(diff.ToSkipHashMatch), len(diff.ToRemove))
+
+	// For the opencode runtime, remind the operator how to update later.
+	// The Claude Code path uses /th:update via the plugin marketplace; opencode
+	// has no plugin marketplace — re-running the install link is the only update
+	// mechanism, and /th-update in opencode triggers the same instruction.
+	if runtimeFlag == "opencode" {
+		fmt.Println("To update later, re-run: curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash (or type /th-update in opencode).")
+	}
 }
 
 // registerOpencodeMCPIfConfigured registers MCP servers in opencode.json when
@@ -348,10 +356,20 @@ func runUninstallCommand() {
 
 // loadDefaultManifests returns the manifest set for the given runtime.
 // For claude-code, the existing engine behavior is preserved (empty manifests,
-// exercised via tests). For opencode, returns the real component set.
+// exercised via tests). For opencode, returns the real component set AND
+// validates it against the schema/SEC-05 gates before returning (F3 — the
+// production apply path always runs validateManifests so a malformed component
+// fails loudly at install time rather than silently mis-emitting later).
 func loadDefaultManifests(runtime string) ([]ModuleManifest, []ComponentManifest, error) {
 	if runtime == "opencode" {
-		return buildOpencodeManifests()
+		modules, components, err := buildOpencodeManifests()
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := validateManifests(modules, components, EmbeddedAssets()); err != nil {
+			return nil, nil, fmt.Errorf("opencode manifest validation: %w", err)
+		}
+		return modules, components, nil
 	}
 	// claude-code: empty manifests (existing behavior — engine exercised via tests).
 	return nil, nil, nil

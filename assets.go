@@ -18,8 +18,11 @@ import (
 //     agents/_shared/ subdirectory (shared cross-cutting snippets).
 //   - The embedded layout mirrors the repo layout: `agents/architect.md`
 //     in the repo becomes `agents/architect.md` inside embeddedAssets.
+//   - installer-assets/ holds opencode-only templates (e.g. commands) that are
+//     NOT distributed plugin assets (agents/skills/hooks). Changes here do not
+//     require a plugin.json version bump.
 
-//go:embed all:agents skills hooks
+//go:embed all:agents skills hooks installer-assets
 var embeddedAssets embed.FS
 
 // FS returns the read-only embedded filesystem containing agents/, skills/,

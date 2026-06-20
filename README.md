@@ -91,6 +91,18 @@ Run the update command, then reload:
 > ```
 > The catalog refresh (`marketplace update`) alone does **not** download files — `claude plugin update` is the step that fetches the new version. This is exactly what `/th:update` automates, so prefer the command above and use this sequence only for troubleshooting.
 
+### Updating (opencode)
+
+opencode has no plugin marketplace. The update mechanism is a re-run of the install link, which is idempotent — only files whose content changed are rewritten:
+
+```
+curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+```
+
+Then restart the opencode session so the refreshed agents, skills, and commands are loaded.
+
+Alternatively, type `/th-update` inside opencode. The command instructs the agent to run the re-install command above in a terminal.
+
 ---
 
 ## Quick start
