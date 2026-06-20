@@ -1,0 +1,2 @@
+### Fixed
+- `cmd/install/datahome_unix.go`: cast `st.Mode` to `uint32` at the `isDirectory` call sites — `syscall.Stat_t.Mode` is `uint16` on darwin and `uint32` on linux, so the darwin cross-compile of the installer failed (linux-only `go test` did not catch it). The CI `go-test` job now also cross-compiles all five release targets so platform-specific build breaks surface on the PR instead of at release time.

@@ -47,3 +47,17 @@ jobs:
           # paths because /tmp is not owned by the runner user (UID 1001).
           TMPDIR: ${{ runner.temp }}
         run: go test ./cmd/install/ -count=1
+
+      - name: Cross-compile all release targets (catch platform-specific build breaks)
+        # `go test` above runs only on linux/amd64, so a type that differs by GOOS
+        # (e.g. syscall.Stat_t.Mode is uint16 on darwin, uint32 on linux) compiles
+        # here but breaks the release cross-compile. Build every release.yml target
+        # so such breaks surface on the PR, not at tag time.
+        run: |
+          set -e
+          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64; do
+            GOOS=${target%-*}
+            GOARCH=${target#*-}
+            echo "building $GOOS/$GOARCH"
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/install
+          done
