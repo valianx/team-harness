@@ -515,6 +515,14 @@ Reads `skills/review-pr/SKILL.md` and `agents/architect.md` as plain text and as
 
 (Self-ref, 3 checks) test file contains `Suite 124` and `contract-contradiction-sweep`; `docs/testing.md` registers `Suite 124` and `contract-contradiction-sweep`; `CLAUDE.md` does NOT contain `Suite 124` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `contract-contradiction-sweep`.
 
+### Suite 125 — issues-batch-383-331-363-373
+
+52 checks. Structural phrase-presence assertions covering all 19 Acceptance Criteria (AC-1..AC-19) for the consolidated issues-batch PR (#383 over-bump governance, #331 Vue/Svelte browser-mode, #363 gitattributes init, #373 security-verdict-staleness re-gate + adversary agent). Folded into `tests/test_agent_structure.py` (already wired as Suite 2 in `tests/run-all.sh` — no standalone file; see MEMORY note "run-all hardcoded suite list"). Functional hook tests for AC-1..AC-3 are folded into `tests/test_prepublish_bump_floor.sh` (Suite 16 in run-all.sh).
+
+Structural checks span: `hooks/prepublish-guard.sh` (AC-1..AC-3), `agents/delivery.md` (AC-4, AC-12, AC-14), `agents/testing-refs/browser-mode.md` (AC-5, AC-6), `agents/tester.md` (AC-7), `agents/testing-refs/_index.md` (AC-8), `agents/init.md` (AC-9, AC-10), `agents/orchestrator.md` (AC-11, AC-17, AC-18), `agents/security.md` (AC-13, AC-14e), `agents/adversary.md` (AC-15, AC-16, AC-19), `agents/README.md` (AC-19d). `adversary` is added to `EXPECTED_AGENTS` and `READ_ONLY_AGENTS` in Suite 1 so per-agent file-exists + tools-present + Bash-excluded checks also assert adversary.md.
+
+(Self-ref, 3 checks) test file contains `Suite 125` and `issues-batch-383-331-363-373`; `docs/testing.md` registers `Suite 125` and `issues-batch-383-331-363-373`; `CLAUDE.md` does NOT contain `Suite 125` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `issues-batch-383-331-363-373`.
+
 ### Suite 12 — security-self-scan
 
 5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).

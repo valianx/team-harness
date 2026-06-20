@@ -82,10 +82,11 @@ EXPECTED_AGENTS = [
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator",
     "code-researcher",  # AC-1: new sonnet codebase-research map agent
+    "adversary",        # AC-15..AC-19: independent adversarial reviewer (issues-batch #373-5)
 ]
 
 # Read-only agents that MUST NOT have Bash in their allowlist
-READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "acceptance-checker", "plan-reviewer", "mentor"}
+READ_ONLY_AGENTS = {"architect", "security", "qa", "qa-plan", "acceptance-checker", "plan-reviewer", "mentor", "adversary"}
 
 for agent_name in EXPECTED_AGENTS:
     path = AGENTS_DIR / f"{agent_name}.md"
@@ -2365,7 +2366,8 @@ check(
 # are excluded from this check — modes.go is a frozen artifact; new agents go in
 # the README low-cost matrix (vestigial, for documentation only).
 MODES_GO_EXCLUDED = {"qa-plan", "ux-reviewer", "gcp-infra", "mentor", "researcher", "research-consolidator",
-                     "code-researcher"}  # AC-1: new sonnet agent added after Go installer freeze; not in lowCostMatrix
+                     "code-researcher",  # AC-1: new sonnet agent added after Go installer freeze; not in lowCostMatrix
+                     "adversary"}  # #373: new opus agent post-Go-freeze; plugin-only per CLAUDE.md §3 (no cmd/install edit), tracked in the README low-cost matrix instead
 for agent_name in EXPECTED_AGENTS:
     if agent_name in MODES_GO_EXCLUDED:
         continue
@@ -22634,21 +22636,29 @@ check(
     " self-detected frontend_scope would otherwise overwrite the harness TESTING.md)",
 )
 
-# ---- iter2 (d) tester.md Vue/Svelte n/a disposition token ----
-# When a non-react frontend stack (vue/nuxt/svelte) is detected, browser-mode is
-# n/a for that stack.  The iteration-2 fix adds an explicit 'do not silently
-# degrade' disposition to Gate A.  Token: 'non-react stacks: vue' in the Gate-A
-# step prose (the most specific stable phrase).
+# ---- iter2 (d) tester.md Vue/Svelte browser-mode routing + no-silent-degrade ----
+# SUPERSEDED by #331 (v2.116.0): the original iter2 assertion required the token
+# 'non-react stacks: vue', encoding the contract that vue/svelte have NO realizable
+# browser-mode lane and must be marked n/a. #331 changes that contract — maintained
+# `vitest-browser-vue` and `vitest-browser-svelte` packages exist, so Gate A now
+# ROUTES vue/nuxt/svelte to browser-mode where a package exists. The underlying
+# REV-C #8 concern (no SILENT degradation; operator visibility) is PRESERVED, not
+# dropped: Gate A still carries an explicit 'do NOT silently degrade' disposition,
+# now scoped to stacks WITHOUT a maintained render package (degrade to e2e, logged).
+# This check is updated to the new contract (test-update-with-rationale, not a
+# weakening): assert the vue/svelte browser-mode routing AND the preserved
+# no-silent-degradation disposition.
 check(
-    "suite107(iter2d): agents/tester.md Gate A contains Vue/Svelte n/a disposition"
-    " token ('non-react stacks: vue' present — do not silently degrade)",
-    "non-react stacks: vue" in _s107_tester,
-    "agents/tester.md Gate A must document that for non-react frontend stacks"
-    " (vue/nuxt/svelte) browser-mode is n/a and the tester must NOT silently"
-    " degrade — log the gap in the decision log instead (iter2: REV-C #8 finding;"
-    " skills mark frontend_scope for these stacks but no realizable browser-mode"
-    " lane exists; explicit disposition prevents silent fallback to jsdom without"
-    " operator visibility)",
+    "suite107(iter2d): agents/tester.md Gate A routes vue/svelte to browser-mode"
+    " (vitest-browser-vue/-svelte) and preserves the no-silent-degrade disposition (#331)",
+    "vitest-browser-vue" in _s107_tester
+    and "vitest-browser-svelte" in _s107_tester
+    and "do NOT silently degrade" in _s107_tester,
+    "agents/tester.md Gate A must (#331) route vue/nuxt → vitest-browser-vue and"
+    " svelte → vitest-browser-svelte, AND retain an explicit 'do NOT silently degrade'"
+    " disposition for stacks without a maintained browser-mode render package (degrade"
+    " to e2e, logged) — preserving the REV-C #8 operator-visibility intent under the"
+    " new contract",
 )
 
 # ---- iter3: ref-direct-modes.md ## Test Mode section references A1-F3 + A1-F4 ----
@@ -29725,6 +29735,530 @@ check(
 )
 
 # Marker: contract-contradiction-sweep
+
+# ---------------------------------------------------------------------------
+# Suite 125 — issues-batch-383-331-363-373 structural assertions
+# Folded into test_agent_structure.py (already wired as Suite 2 in run-all.sh).
+# Covers AC-1..AC-19 phrase-presence checks for issues #383, #331, #363, #373,
+# and the new adversary agent (AC-15..AC-19).
+#
+# adversary is added to EXPECTED_AGENTS and READ_ONLY_AGENTS above (at Suite 1)
+# so the existing per-agent checks assert file-exists, tools-present, and
+# Bash-excluded automatically.  This suite adds the deeper phrase-presence checks
+# for each AC.
+#
+# Anchor policy: use the ACTUAL substring present in the file when the
+# implementer's text differs from the AC-table's ideal form (documented inline).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 125: issues-batch-383-331-363-373 structural checks ===")
+
+_s125_hook   = read(HOOKS_DIR / "prepublish-guard.sh")
+_s125_del    = read(AGENTS_DIR / "delivery.md")
+_s125_bmode  = read(AGENTS_DIR / "testing-refs" / "browser-mode.md")
+_s125_tester = read(AGENTS_DIR / "tester.md")
+_s125_index  = read(AGENTS_DIR / "testing-refs" / "_index.md")
+_s125_init   = read(AGENTS_DIR / "init.md")
+_s125_orch   = read(AGENTS_DIR / "orchestrator.md")
+_s125_sec    = read(AGENTS_DIR / "security.md")
+_s125_adv    = read(AGENTS_DIR / "adversary.md")
+_s125_readme = read(AGENTS_DIR / "README.md")
+
+# -------------------------------------------------------------------
+# AC-1 (#383) — over-bump hard-deny branch in prepublish-guard.sh
+# -------------------------------------------------------------------
+check(
+    "s125/AC-1: prepublish-guard.sh over-bump deny branch present",
+    "deny \"prepublish-guard: version bump level exceeds the mechanical SemVer floor"
+    in _s125_hook,
+    "marker 'deny ...version bump level exceeds the mechanical SemVer floor' not found "
+    "in hooks/prepublish-guard.sh — AC-1 (#383) over-bump hard-deny branch missing",
+)
+
+# -------------------------------------------------------------------
+# AC-2 (#383) — bump-override token parse + SEC-DR-A control-char guard
+# -------------------------------------------------------------------
+check(
+    "s125/AC-2a: prepublish-guard.sh bump-override token regex present",
+    "bump-override: (minor|major) — .+$" in _s125_hook,
+    "marker 'bump-override: (minor|major) — .+$' not found in hooks/prepublish-guard.sh "
+    "— AC-2 (#383) override token regex missing",
+)
+check(
+    "s125/AC-2b: prepublish-guard.sh SEC-DR-A control-char guard referenced",
+    "SEC-DR-A control-char guard" in _s125_hook,
+    "marker 'SEC-DR-A control-char guard' not found in hooks/prepublish-guard.sh "
+    "— AC-2 (#383) SEC-DR-A guard comment missing",
+)
+check(
+    "s125/AC-2c: prepublish-guard.sh control-char guard code (grep -qP '[[:cntrl:]]')",
+    "grep -qP '[[:cntrl:]]'" in _s125_hook,
+    "marker \"grep -qP '[[:cntrl:]]'\" not found in hooks/prepublish-guard.sh "
+    "— AC-2 (#383) control-char guard implementation missing",
+)
+
+# -------------------------------------------------------------------
+# AC-3 (#383) — existing WARN and hard-block UNCHANGED (regression guard)
+# -------------------------------------------------------------------
+check(
+    "s125/AC-3a: prepublish-guard.sh under-bump WARN still present",
+    "UNDER-BUMP: actual level is below the mechanical floor." in _s125_hook,
+    "marker 'UNDER-BUMP: actual level is below the mechanical floor.' not found "
+    "in hooks/prepublish-guard.sh — AC-3 (#383) existing under-bump WARN removed",
+)
+check(
+    "s125/AC-3b: prepublish-guard.sh no-bump hard-block still present",
+    "deny \"prepublish-guard: distributed assets" in _s125_hook,
+    "marker 'deny ...prepublish-guard: distributed assets' not found "
+    "in hooks/prepublish-guard.sh — AC-3 (#383) no-bump hard-block removed",
+)
+
+# -------------------------------------------------------------------
+# AC-4 (#383) — delivery.md Step 9 sole-bumper + escape-hatch clause
+# -------------------------------------------------------------------
+check(
+    "s125/AC-4a: delivery.md states delivery is the ONLY version-bump site",
+    "Delivery is the ONLY agent that sets the project version" in _s125_del,
+    "marker 'Delivery is the ONLY agent that sets the project version' not found "
+    "in agents/delivery.md — AC-4 (#383) sole-bumper clause missing",
+)
+check(
+    "s125/AC-4b: delivery.md names the bump-override justification token",
+    "bump-override: minor — <reason>" in _s125_del,
+    "marker 'bump-override: minor — <reason>' not found in agents/delivery.md "
+    "— AC-4 (#383) escape-hatch reference missing from delivery Step 9",
+)
+
+# -------------------------------------------------------------------
+# AC-5 (#331) — browser-mode.md has ## vue and ## svelte sections
+# -------------------------------------------------------------------
+check(
+    "s125/AC-5a: browser-mode.md has ## vue section",
+    "## vue" in _s125_bmode,
+    "marker '## vue' not found in agents/testing-refs/browser-mode.md "
+    "— AC-5 (#331) Vue section missing",
+)
+check(
+    "s125/AC-5b: browser-mode.md has ## svelte section",
+    "## svelte" in _s125_bmode,
+    "marker '## svelte' not found in agents/testing-refs/browser-mode.md "
+    "— AC-5 (#331) Svelte section missing",
+)
+
+# -------------------------------------------------------------------
+# AC-6 (#331) — vitest-browser-vue / vitest-browser-svelte + maturity note
+# -------------------------------------------------------------------
+check(
+    "s125/AC-6a: browser-mode.md names vitest-browser-vue",
+    "vitest-browser-vue" in _s125_bmode,
+    "marker 'vitest-browser-vue' not found in agents/testing-refs/browser-mode.md "
+    "— AC-6 (#331) Vue toolchain reference missing",
+)
+check(
+    "s125/AC-6b: browser-mode.md names vitest-browser-svelte",
+    "vitest-browser-svelte" in _s125_bmode,
+    "marker 'vitest-browser-svelte' not found in agents/testing-refs/browser-mode.md "
+    "— AC-6 (#331) Svelte toolchain reference missing",
+)
+check(
+    "s125/AC-6c: browser-mode.md maturity note — React and Vue mature",
+    "React and Vue browser-mode tooling are mature" in _s125_bmode,
+    "marker 'React and Vue browser-mode tooling are mature' not found "
+    "in agents/testing-refs/browser-mode.md — AC-6 (#331) maturity gradient note missing",
+)
+check(
+    "s125/AC-6d: browser-mode.md maturity note — Svelte less battle-tested",
+    "vitest-browser-svelte` is stable and maintained but less battle-tested" in _s125_bmode,
+    "marker 'vitest-browser-svelte` is stable and maintained but less battle-tested' not found "
+    "in agents/testing-refs/browser-mode.md — AC-6 (#331) Svelte maturity caveat missing",
+)
+
+# -------------------------------------------------------------------
+# AC-7 (#331) — tester.md Gate-A routing updated
+# -------------------------------------------------------------------
+check(
+    "s125/AC-7a: tester.md Gate-A names vitest-browser-vue routing",
+    "vitest-browser-vue" in _s125_tester,
+    "marker 'vitest-browser-vue' not found in agents/tester.md "
+    "— AC-7 (#331) Gate-A route to vitest-browser-vue missing",
+)
+check(
+    "s125/AC-7b: tester.md Gate-A names vitest-browser-svelte routing",
+    "vitest-browser-svelte" in _s125_tester,
+    "marker 'vitest-browser-svelte' not found in agents/tester.md "
+    "— AC-7 (#331) Gate-A route to vitest-browser-svelte missing",
+)
+check(
+    "s125/AC-7c: tester.md Gate-A conditions e2e fallback on package absence",
+    "stacks WITHOUT a maintained browser-mode render package" in _s125_tester,
+    "marker 'stacks WITHOUT a maintained browser-mode render package' not found "
+    "in agents/tester.md — AC-7 (#331) conditioned e2e-fallback clause missing",
+)
+
+# -------------------------------------------------------------------
+# AC-8 (#331) — _index.md browser-mode row lists vue, svelte
+# -------------------------------------------------------------------
+check(
+    "s125/AC-8: _index.md browser-mode row covers react-nextjs, vue, svelte",
+    "react-nextjs, vue, svelte" in _s125_index,
+    "marker 'react-nextjs, vue, svelte' not found in agents/testing-refs/_index.md "
+    "— AC-8 (#331) manifest not updated for Vue/Svelte",
+)
+
+# -------------------------------------------------------------------
+# AC-9 (#363) — init.md Phase 4.4 scaffolds * text=auto eol=lf
+# -------------------------------------------------------------------
+check(
+    "s125/AC-9: init.md contains .gitattributes EOL scaffold line",
+    "* text=auto eol=lf" in _s125_init,
+    "marker '* text=auto eol=lf' not found in agents/init.md "
+    "— AC-9 (#363) gitattributes EOL scaffold step missing",
+)
+
+# -------------------------------------------------------------------
+# AC-10 (#363) — init.md formatter config note + Init Report entry
+# Note: implementation writes endOfLine: \"lf\" (with quotes) not endOfLine: lf
+# -------------------------------------------------------------------
+check(
+    "s125/AC-10a: init.md mentions endOfLine: \"lf\" for Prettier config",
+    'endOfLine: "lf"' in _s125_init,
+    "marker 'endOfLine: \"lf\"' not found in agents/init.md "
+    "— AC-10 (#363) Prettier endOfLine note missing "
+    "(implementation uses double-quoted form: endOfLine: \"lf\")",
+)
+check(
+    "s125/AC-10b: init.md mentions git add --renormalize .",
+    "git add --renormalize ." in _s125_init,
+    "marker 'git add --renormalize .' not found in agents/init.md "
+    "— AC-10 (#363) renormalize note missing",
+)
+check(
+    "s125/AC-10c: init.md Init Report lists .gitattributes",
+    ".gitattributes" in _s125_init,
+    "marker '.gitattributes' not found in agents/init.md "
+    "— AC-10 (#363) Init Report Files Created/Updated entry missing",
+)
+
+# -------------------------------------------------------------------
+# AC-11 (#373-1) — orchestrator.md verdict-staleness re-gate clause
+# -------------------------------------------------------------------
+check(
+    "s125/AC-11a: orchestrator.md names 'verdict is STALE' condition",
+    "verdict is STALE" in _s125_orch,
+    "marker 'verdict is STALE' not found in agents/orchestrator.md "
+    "— AC-11 (#373-1) staleness re-gate clause missing",
+)
+check(
+    "s125/AC-11b: orchestrator.md names the security-relevant design surface",
+    "security-relevant design surface" in _s125_orch,
+    "marker 'security-relevant design surface' not found in agents/orchestrator.md "
+    "— AC-11 (#373-1) design surface definition missing",
+)
+check(
+    "s125/AC-11c: orchestrator.md names enforcement model, status codes",
+    "enforcement model, status codes" in _s125_orch,
+    "marker 'enforcement model, status codes' not found in agents/orchestrator.md "
+    "— AC-11 (#373-1) surface enumeration incomplete",
+)
+check(
+    "s125/AC-11d: orchestrator.md re-gate is fail-SAFE",
+    "fail-SAFE" in _s125_orch,
+    "marker 'fail-SAFE' not found in agents/orchestrator.md "
+    "— AC-11 (#373-1) fail-SAFE posture not stated",
+)
+check(
+    "s125/AC-11e: orchestrator.md re-gate is additive (ADDITIVE)",
+    "This trigger is ADDITIVE" in _s125_orch,
+    "marker 'This trigger is ADDITIVE' not found in agents/orchestrator.md "
+    "— AC-11 (#373-1) additive-only language missing",
+)
+
+# -------------------------------------------------------------------
+# AC-12 (#373-1) — delivery.md Step 9b security-verdict staleness gate
+# Note: implementation says 'STALE and delivery is BLOCKED' (not 'stale → block delivery')
+# -------------------------------------------------------------------
+check(
+    "s125/AC-12a: delivery.md has Security-verdict staleness gate",
+    "Security-verdict staleness gate" in _s125_del,
+    "marker 'Security-verdict staleness gate' not found in agents/delivery.md "
+    "— AC-12 (#373-1) staleness gate section missing from Step 9b",
+)
+check(
+    "s125/AC-12b: delivery.md staleness gate references security and adversary agents",
+    "HEAD is ahead of the commit the `security` (or `adversary`) agent reviewed"
+    in _s125_del,
+    "marker 'HEAD is ahead of the commit the `security` (or `adversary`) agent reviewed' "
+    "not found in agents/delivery.md "
+    "— AC-12 (#373-1) HEAD-ahead trigger condition missing from staleness gate",
+)
+check(
+    "s125/AC-12c: delivery.md staleness gate signals re-run of security and adversary",
+    "signal the orchestrator to re-run the `security` and `adversary`" in _s125_del,
+    "marker 'signal the orchestrator to re-run the `security` and `adversary`' "
+    "not found in agents/delivery.md "
+    "— AC-12 (#373-1) re-run signal instruction missing",
+)
+check(
+    "s125/AC-12d: delivery.md staleness results in block (STALE and delivery is BLOCKED)",
+    "STALE and delivery is BLOCKED" in _s125_del,
+    "marker 'STALE and delivery is BLOCKED' not found in agents/delivery.md "
+    "— AC-12 (#373-1) block-on-stale instruction missing "
+    "(implementation uses 'STALE and delivery is BLOCKED', not 'stale → block delivery')",
+)
+
+# -------------------------------------------------------------------
+# AC-13 (#373-2) — security.md zero-downside + INCOMPLETE + loosening-control dispositions
+# -------------------------------------------------------------------
+check(
+    "s125/AC-13a: security.md has Zero-downside disposition",
+    "Zero-downside disposition" in _s125_sec,
+    "marker 'Zero-downside disposition' not found in agents/security.md "
+    "— AC-13 (#373-2) zero-downside disposition section missing",
+)
+check(
+    "s125/AC-13b: security.md zero-downside inversion phrase",
+    "X is worse when ___; prove unreachable on the touched path" in _s125_sec,
+    "marker 'X is worse when ___; prove unreachable on the touched path' "
+    "not found in agents/security.md "
+    "— AC-13 (#373-2) inverted-strength analysis instruction missing",
+)
+check(
+    "s125/AC-13c: security.md zero-downside disposition causes INCOMPLETE verdict",
+    "INCOMPLETE and blocks the verdict" in _s125_sec,
+    "marker 'INCOMPLETE and blocks the verdict' not found in agents/security.md "
+    "— AC-13 (#373-2) INCOMPLETE verdict consequence missing",
+)
+check(
+    "s125/AC-13d: security.md has Loosening-control disposition",
+    "Loosening-control disposition" in _s125_sec,
+    "marker 'Loosening-control disposition' not found in agents/security.md "
+    "— AC-13 (#373-4) loosening-control disposition section missing",
+)
+check(
+    "s125/AC-13e: security.md loosening-control names worst-case cost",
+    "worst-case cost" in _s125_sec,
+    "marker 'worst-case cost' not found in agents/security.md "
+    "— AC-13 (#373-4) worst-case cost requirement missing",
+)
+check(
+    "s125/AC-13f: security.md loosening-control requires acknowledgement",
+    "acknowledgement" in _s125_sec,
+    "marker 'acknowledgement' not found in agents/security.md "
+    "— AC-13 (#373-4) explicit acknowledgement requirement missing",
+)
+
+# -------------------------------------------------------------------
+# AC-14 (#373-3, #373-4) — delivery.md presence-reconcile + security.md loosening
+# (qa-plan concern C-1: dropped the moot 'phase-2 flag note' assertion)
+# -------------------------------------------------------------------
+check(
+    "s125/AC-14a: delivery.md has PR-body / runbook presence-reconcile step",
+    "PR-body / runbook presence-reconcile" in _s125_del,
+    "marker 'PR-body / runbook presence-reconcile' not found in agents/delivery.md "
+    "— AC-14 (#373-3) presence-reconcile step missing from delivery",
+)
+check(
+    "s125/AC-14b: delivery.md presence-reconcile requires spell-match",
+    "spell-match" in _s125_del,
+    "marker 'spell-match' not found in agents/delivery.md "
+    "— AC-14 (#373-3) spell-match requirement missing from presence-reconcile",
+)
+check(
+    "s125/AC-14c: delivery.md presence-reconcile names doc-vs-code rollout contradiction",
+    "doc-vs-code rollout contradiction" in _s125_del,
+    "marker 'doc-vs-code rollout contradiction' not found in agents/delivery.md "
+    "— AC-14 (#373-3) rollout contradiction finding clause missing "
+    "(note: the implementation splits 'contradiction' and 'HIGH finding' across two sentences)",
+)
+check(
+    "s125/AC-14d: delivery.md presence-reconcile contradiction blocks delivery (HIGH finding)",
+    "HIGH finding" in _s125_del or "report it as a HIGH finding" in _s125_del,
+    "marker 'HIGH finding' not found in agents/delivery.md "
+    "— AC-14 (#373-3) HIGH-severity consequence missing from presence-reconcile",
+)
+check(
+    "s125/AC-14e: security.md loosening-control names worst-case cost of the loosening",
+    "worst-case cost of the loosening" in _s125_sec,
+    "marker 'worst-case cost of the loosening' not found in agents/security.md "
+    "— AC-14 (#373-4) loosening-control disposition missing worst-case cost phrasing",
+)
+
+# -------------------------------------------------------------------
+# AC-15 (#373-5) — adversary.md frontmatter (adversary already in EXPECTED_AGENTS
+# and READ_ONLY_AGENTS — Suite 1 asserts file-exists, tools-present, Bash-excluded)
+# This block asserts specific frontmatter field values.
+# -------------------------------------------------------------------
+_s125_adv_fm = parse_frontmatter(_s125_adv)
+check(
+    "s125/AC-15a: adversary.md frontmatter name: adversary",
+    _s125_adv_fm.get("name", "") == "adversary",
+    f"frontmatter name is '{_s125_adv_fm.get('name', '')}', expected 'adversary'",
+)
+check(
+    "s125/AC-15b: adversary.md frontmatter model: opus",
+    _s125_adv_fm.get("model", "") == "opus",
+    f"frontmatter model is '{_s125_adv_fm.get('model', '')}', expected 'opus'",
+)
+check(
+    "s125/AC-15c: adversary.md frontmatter color: red",
+    _s125_adv_fm.get("color", "") == "red",
+    f"frontmatter color is '{_s125_adv_fm.get('color', '')}', expected 'red'",
+)
+_s125_adv_tools = [t.strip() for t in _s125_adv_fm.get("tools", "").split(",")]
+check(
+    "s125/AC-15d: adversary.md tools includes Read",
+    "Read" in _s125_adv_tools,
+    "Read not in adversary.md tools — AC-15 (#373-5)",
+)
+check(
+    "s125/AC-15e: adversary.md tools includes Glob",
+    "Glob" in _s125_adv_tools,
+    "Glob not in adversary.md tools — AC-15 (#373-5)",
+)
+check(
+    "s125/AC-15f: adversary.md tools includes Grep",
+    "Grep" in _s125_adv_tools,
+    "Grep not in adversary.md tools — AC-15 (#373-5)",
+)
+check(
+    "s125/AC-15g: adversary.md tools includes Write",
+    "Write" in _s125_adv_tools,
+    "Write not in adversary.md tools — AC-15 (#373-5)",
+)
+check(
+    "s125/AC-15h: adversary.md tools EXCLUDES Bash",
+    "Bash" not in _s125_adv_tools,
+    "Bash found in adversary.md tools — adversary must be read-only (AC-15)",
+)
+check(
+    "s125/AC-15i: adversary.md tools EXCLUDES Edit",
+    "Edit" not in _s125_adv_tools,
+    "Edit found in adversary.md tools — adversary must not modify source (AC-15)",
+)
+
+# -------------------------------------------------------------------
+# AC-16 (#373-5) — adversary.md Core Philosophy mandate phrases
+# -------------------------------------------------------------------
+check(
+    "s125/AC-16a: adversary.md contains verdict token 'broke-it'",
+    "broke-it" in _s125_adv,
+    "marker 'broke-it' not found in agents/adversary.md — AC-16 (#373-5)",
+)
+check(
+    "s125/AC-16b: adversary.md contains verdict token 'could-not-break'",
+    "could-not-break" in _s125_adv,
+    "marker 'could-not-break' not found in agents/adversary.md — AC-16 (#373-5)",
+)
+check(
+    "s125/AC-16c: adversary.md states NEVER issues a GO",
+    "NEVER issues a GO" in _s125_adv,
+    "marker 'NEVER issues a GO' not found in agents/adversary.md "
+    "— AC-16 (#373-5) NEVER-issues-GO mandate missing",
+)
+check(
+    "s125/AC-16d: adversary.md states INCOMPLETE disposition for could-not-break on changed control",
+    "INCOMPLETE" in _s125_adv,
+    "marker 'INCOMPLETE' not found in agents/adversary.md "
+    "— AC-16 (#373-5) INCOMPLETE-on-changed-control disposition missing",
+)
+
+# -------------------------------------------------------------------
+# AC-17 (#373-5) — orchestrator.md wires adversary into Your-Team and Phase-3 dispatch
+# -------------------------------------------------------------------
+check(
+    "s125/AC-17a: orchestrator.md Your-Team table has adversary row",
+    "| `adversary`" in _s125_orch or "`adversary` |" in _s125_orch,
+    "marker '`adversary`' row not found in agents/orchestrator.md Your-Team table "
+    "— AC-17 (#373-5) adversary missing from team roster",
+)
+check(
+    "s125/AC-17b: orchestrator.md Phase-3 dispatch mentions adversary",
+    "adversary" in _s125_orch
+    and "Dispatch in the SAME parallel Task message" in _s125_orch,
+    "adversary not found in Phase-3 parallel dispatch block of agents/orchestrator.md "
+    "— AC-17 (#373-5) adversary not wired into Phase-3 dispatch",
+)
+
+# -------------------------------------------------------------------
+# AC-18 (#373-5) — orchestrator.md worst-of roll-up names adversary + broke-it + incomplete
+# -------------------------------------------------------------------
+check(
+    "s125/AC-18a: orchestrator.md worst-of names adversary_verdict_when_ran",
+    "worst-of(qa_verdict, security_verdict_when_ran, adversary_verdict_when_ran)"
+    in _s125_orch,
+    "marker 'worst-of(qa_verdict, security_verdict_when_ran, adversary_verdict_when_ran)' "
+    "not found in agents/orchestrator.md "
+    "— AC-18 (#373-5) adversary not in worst-of roll-up formula",
+)
+check(
+    "s125/AC-18b: orchestrator.md worst-of maps broke-it to fail",
+    "broke-it → fail" in _s125_orch,
+    "marker 'broke-it → fail' not found in agents/orchestrator.md "
+    "— AC-18 (#373-5) broke-it mapping missing from worst-of",
+)
+check(
+    "s125/AC-18c: orchestrator.md reads incomplete_on_changed_control from adversary status block",
+    "incomplete_on_changed_control" in _s125_orch,
+    "marker 'incomplete_on_changed_control' not found in agents/orchestrator.md "
+    "— AC-18 (#373-5) INCOMPLETE field not read in worst-of gate",
+)
+
+# -------------------------------------------------------------------
+# AC-19 (#373-5) — adversary.md boundary + README.md roster entry
+# Note: 'reads `security`'s output as input' is present in the boundary table row
+# as 'reads `04-security.md` as input'; the Core Philosophy says 'You read `security`'s
+# output as input' (with 'You' prefix). Assert the table form as the canonical anchor.
+# -------------------------------------------------------------------
+check(
+    "s125/AC-19a: adversary.md reads security's output (boundary table: reads `04-security.md` as input)",
+    "reads `04-security.md` as input" in _s125_adv,
+    "marker 'reads `04-security.md` as input' not found in agents/adversary.md "
+    "— AC-19 (#373-5) boundary statement about reading security output missing",
+)
+check(
+    "s125/AC-19b: adversary.md MUST NOT run the OWASP/CWE scan",
+    "MUST NOT run the OWASP/CWE" in _s125_adv,
+    "marker 'MUST NOT run the OWASP/CWE' not found in agents/adversary.md "
+    "— AC-19 (#373-5) OWASP/CWE boundary statement missing",
+)
+check(
+    "s125/AC-19c: adversary.md states NEVER issues a GO (independence from security)",
+    "NEVER issues a GO" in _s125_adv,
+    "marker 'NEVER issues a GO' not found in agents/adversary.md "
+    "— AC-19 (#373-5) no-GO boundary missing (already asserted in AC-16c; "
+    "kept here for AC-19 coverage completeness)",
+)
+check(
+    "s125/AC-19d: agents/README.md roster lists adversary",
+    "adversary" in _s125_readme,
+    "marker 'adversary' not found in agents/README.md "
+    "— AC-19 (#373-5) adversary missing from agent roster",
+)
+
+# Self-referential guards (hygiene contract — mirrors Suite 124 pattern)
+_s125_own = read(Path(__file__))
+check(
+    "suite125(self-ref): test file contains 'Suite 125' and 'issues-batch-383-331-363-373'",
+    "Suite 125" in _s125_own and "issues-batch-383-331-363-373" in _s125_own,
+    "test file must self-reference Suite 125 and the marker 'issues-batch-383-331-363-373'",
+)
+
+_s125_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite125(registry): docs/testing.md registers 'Suite 125' and 'issues-batch-383-331-363-373'",
+    "Suite 125" in _s125_testing_md and "issues-batch-383-331-363-373" in _s125_testing_md,
+    "docs/testing.md must register Suite 125 and the 'issues-batch-383-331-363-373' marker — "
+    "see docs/testing.md for the canonical suite registry",
+)
+
+_s125_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite125(hygiene): CLAUDE.md does NOT contain 'Suite 125' (§11 hygiene contract)",
+    "Suite 125" not in _s125_claude_md,
+    "CLAUDE.md must not mention Suite 125 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: issues-batch-383-331-363-373
 
 # ---------------------------------------------------------------------------
 # Summary
