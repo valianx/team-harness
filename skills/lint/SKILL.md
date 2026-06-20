@@ -189,6 +189,7 @@ Canonical matrix (must match exactly):
 | `architect` | opus | high |
 | `agent-builder` | opus | max |
 | `security` | opus | max |
+| `adversary` | opus | max |
 | `reviewer` | opus | max |
 | `qa` | sonnet | high |
 | `qa-plan` | opus | high |
