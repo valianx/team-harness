@@ -138,16 +138,28 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Public evaluateSessionStart — main body function.
-// Returns SessionStartOutput (additionalContext + systemMessage).
+// composeSessionDirectives — pure shared composer.
+// Returns the ordered directive array for a given config (or null config).
+// Shared between the CC entry (evaluateSessionStart) and the opencode event
+// handler (session-enforcement.opencode.ts) so the text is NEVER duplicated.
+//
+// Loads (in order):
+//   1. orchestrator disposition — unconditional, always present.
+//   2. language directive — gated on validated config["language"].
+//   3. english-learning directive — gated on boolean config["english_learning"]
+//      AND language en-or-absent.
+//   4. workspace-mode directive — gated on config["logs-mode"] === "obsidian".
+//
+// Security (SEC-DR-A/B): delegates validation to the private load functions;
+// no new interpolation site is introduced here. Config bytes reach the output
+// ONLY via LANG_RE-validated `language` (loadLanguage) or CONTROL_CHAR_RE-
+// validated `logs-path` (loadWorkspaceMode) or exact-true booleans
+// (loadEnglishLearning). No raw config string is interpolated directly.
 // ---------------------------------------------------------------------------
 
-export function evaluateSessionStart(
-  _input: NormalizedInput,
-  reader: SessionStartReader
-): SessionStartOutput {
-  const config = reader.readConfig();
-
+export function composeSessionDirectives(
+  config: Record<string, unknown> | null
+): string[] {
   const directives: string[] = [];
 
   // Load 1 — orchestrator (unconditional).
@@ -170,6 +182,22 @@ export function evaluateSessionStart(
     const wsDirective = loadWorkspaceMode(config);
     if (wsDirective !== null) directives.push(wsDirective);
   }
+
+  return directives;
+}
+
+// ---------------------------------------------------------------------------
+// Public evaluateSessionStart — main body function.
+// Returns SessionStartOutput (additionalContext + systemMessage).
+// Calls composeSessionDirectives() to keep the CC path byte-identical.
+// ---------------------------------------------------------------------------
+
+export function evaluateSessionStart(
+  _input: NormalizedInput,
+  reader: SessionStartReader
+): SessionStartOutput {
+  const config = reader.readConfig();
+  const directives = composeSessionDirectives(config);
 
   if (directives.length === 0) {
     return { additionalContext: null, systemMessage: null };

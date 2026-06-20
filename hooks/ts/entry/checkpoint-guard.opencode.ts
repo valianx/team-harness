@@ -18,9 +18,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
 import { inboundOpencode, outboundOpencode, ShimRejectError } from "../shim/shim.js";
 import { evaluate, type StateReader } from "../bodies/checkpoint-guard.js";
+import { resolveOpencodeConfigRoot } from "../shim/opencode-config.js";
 
 type HookCallback = (input: unknown, output: unknown) => Promise<void>;
 
@@ -30,42 +30,8 @@ interface CheckpointGuardPlugin {
   };
 }
 
-// resolveOpencodeConfigRoot returns the opencode config root directory.
-// Resolution order (mirrors the Go installer's opencodeGlobalConfigDir):
-//   1. OPENCODE_CONFIG_DIR env override — validated (absolute, no traversal).
-//   2. Windows: %APPDATA%\opencode
-//   3. Linux/macOS: $XDG_CONFIG_HOME/opencode else ~/.config/opencode
-//
-// Returns null when the resolved path contains ".." or is not absolute
-// (SEC-OC-R3 — rejects traversal/injection overrides).
-function resolveOpencodeConfigRoot(): string | null {
-  // Check for an env override first (SEC-OC-R3: validate before use).
-  const override = process.env["OPENCODE_CONFIG_DIR"];
-  if (override) {
-    const normalized = path.normalize(override);
-    if (!path.isAbsolute(normalized) || normalized.includes("..")) {
-      // Reject traversal or relative injection attempts.
-      return null;
-    }
-    return normalized;
-  }
-
-  const isWindows = process.platform === "win32";
-  if (isWindows) {
-    const appdata = process.env["APPDATA"];
-    if (!appdata) {
-      return path.join(os.homedir(), "AppData", "Roaming", "opencode");
-    }
-    return path.join(appdata, "opencode");
-  }
-
-  // Linux / macOS: $XDG_CONFIG_HOME/opencode else ~/.config/opencode
-  const xdg = process.env["XDG_CONFIG_HOME"];
-  if (xdg && path.isAbsolute(xdg)) {
-    return path.join(xdg, "opencode");
-  }
-  return path.join(os.homedir(), ".config", "opencode");
-}
+// resolveOpencodeConfigRoot is imported from ../shim/opencode-config.js
+// (SEC-OC-R3 hardening shared with prepublish-guard and session-enforcement).
 
 function makeStateReader(): StateReader {
   return {
