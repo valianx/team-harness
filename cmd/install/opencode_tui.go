@@ -86,10 +86,14 @@ type opencodeSetupFormData struct {
 // collectOpencodeSetupInteractive presents the full-surface .team-harness.json
 // setup form and returns the collected values.
 //
-// When existing is non-nil (P3 detected pre-existing config), the form opens
-// with an import-confirm group that asks the operator whether to use the
-// existing values as defaults. The form NEVER silently consumes or overwrites
-// an existing config.
+// When cand is non-nil (P3 detected a pre-existing config from either the
+// opencode-owned path or the Claude Code fallback path), a STANDALONE PRE-FORM
+// confirm runs BEFORE the main form is built. The import decision gates the
+// pre-fill: on accept, applyImportCandidate pre-fills data from the candidate;
+// on decline, data stays at fresh defaults.
+//
+// The main form is then built with the (possibly pre-filled) data and has NO
+// Group-0 import confirm — that decision was already collected pre-form.
 //
 // On ErrUserAborted or a "Cancel" choice in the final confirm, the function
 // prints a notice and exits 0. Assets are already installed; this only
@@ -97,43 +101,61 @@ type opencodeSetupFormData struct {
 //
 // JSON-snippet detection (MemoryURL starts with '{') is forwarded to
 // handleJSONSnippetFallbackForOpencode after form.Run().
-func collectOpencodeSetupInteractive(existing map[string]string) opencodeSetupValues {
+func collectOpencodeSetupInteractive(cand *importCandidate, importSource string) opencodeSetupValues {
 	data := &opencodeSetupFormData{
-		importExisting:    false,
-		configureWorkLogs: false,
-		logsMode:          "local",
-		logsPath:          "",
-		logsSubfolder:     "work-logs",
-		language:          "",
-		englishLearning:   false,
-		configureMCP:      false,
-		memoryURL:         "",
-		memoryRequiresAuth: false,
-		configureContext7: false,
-		configureClickUp:  false,
-		clickUpWorkspaceID: "",
+		importExisting:         false,
+		configureWorkLogs:      false,
+		logsMode:               "local",
+		logsPath:               "",
+		logsSubfolder:          "work-logs",
+		language:               "",
+		englishLearning:        false,
+		configureMCP:           false,
+		memoryURL:              "",
+		memoryRequiresAuth:     false,
+		configureContext7:      false,
+		configureClickUp:       false,
+		clickUpWorkspaceID:     "",
 		configureObsidianTasks: false,
-		doSetup:           true,
+		doSetup:                true,
 	}
 
-	// Pre-populate defaults from existing config when operator agrees (P3).
-	// The actual import is applied after the form if data.importExisting is true.
-	if existing != nil {
-		if v, ok := existing["logs-mode"]; ok && v != "" {
-			data.logsMode = v
+	// Pre-form import decision: runs BEFORE the main form is built so that the
+	// main form's defaults are set correctly on first render. On decline, data
+	// stays at fresh defaults and applyImportCandidate is never called (AC-3).
+	if cand != nil {
+		confirm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewNote().
+					Title("Existing configuration detected").
+					Description(importSourceNote(importSource)),
+				huh.NewConfirm().
+					Value(&data.importExisting).
+					Title("Import existing settings as defaults?").
+					Affirmative("Import").
+					Negative("Start fresh"),
+			).Title("Existing Config"),
+		).
+			WithAccessible(isAccessibleMode()).
+			WithTheme(installerTheme())
+
+		if err := confirm.Run(); err != nil {
+			if errors.Is(err, huh.ErrUserAborted) {
+				fmt.Println("Setup cancelled. Assets remain installed.")
+				os.Exit(0)
+			}
+			fmt.Fprintf(os.Stderr, "Error: setup form failed: %v\n", err)
+			os.Exit(1)
 		}
-		if v, ok := existing["logs-path"]; ok && v != "" {
-			data.logsPath = v
-		}
-		if v, ok := existing["logs-subfolder"]; ok && v != "" {
-			data.logsSubfolder = v
-		}
-		if v, ok := existing["language"]; ok && v != "" {
-			data.language = v
+
+		// Apply the candidate ONLY when the operator chose Import (AC-3 oracle:
+		// decline path leaves data at fresh defaults above).
+		if data.importExisting {
+			applyImportCandidate(data, cand)
 		}
 	}
 
-	groups := buildOpencodeSetupGroups(data, existing)
+	groups := buildOpencodeSetupGroups(data)
 	form := huh.NewForm(groups...).
 		WithAccessible(isAccessibleMode()).
 		WithTheme(installerTheme())
@@ -166,30 +188,86 @@ func collectOpencodeSetupInteractive(existing map[string]string) opencodeSetupVa
 	return buildOpencodeSetupValues(data)
 }
 
-// buildOpencodeSetupGroups assembles all huh form groups for the opencode
-// setup flow. Groups are ordered: import confirm (conditional), work-logs,
-// language, english-learning, Memory MCP, context7, ClickUp, Obsidian tasks,
-// final confirm.
-func buildOpencodeSetupGroups(data *opencodeSetupFormData, existing map[string]string) []*huh.Group {
-	var groups []*huh.Group
+// importSourceNote returns the human-readable description used in the pre-form
+// confirm, naming the actual source (opencode-owned vs Claude Code config).
+func importSourceNote(importSource string) string {
+	if importSource == "claude-code" {
+		return "A team-harness config was found at ~/.claude/.team-harness.json\n" +
+			"(your existing Claude Code configuration).\n\n" +
+			"Settings detected: work-logs mode/path/subfolder, language,\n" +
+			"english-learning, ClickUp workspace ID, Obsidian tasks.\n\n" +
+			"Choose Import to pre-fill the form with those values\n" +
+			"(you can adjust each setting before confirming).\n" +
+			"Choose Start fresh to begin with default values."
+	}
+	// opencode-owned re-run
+	return "A .team-harness.json was found at the opencode config path.\n" +
+		"Settings detected: work-logs mode/path/subfolder, language,\n" +
+		"english-learning, ClickUp workspace ID, Obsidian tasks.\n\n" +
+		"Choose Import to pre-fill the form with those values\n" +
+		"(you can adjust each setting before confirming).\n" +
+		"Choose Start fresh to begin with default values."
+}
 
-	// ── Group 0: import existing config (P3, conditional) ─────────────────────
-	if existing != nil {
-		groups = append(groups,
-			huh.NewGroup(
-				huh.NewNote().
-					Title("Existing configuration detected").
-					Description("A .team-harness.json was found at the opencode config path.\nThe following prompts will pre-fill from those values if you choose to import."),
-				huh.NewConfirm().
-					Value(&data.importExisting).
-					Title("Import existing settings as defaults?").
-					Affirmative("Import").
-					Negative("Start fresh"),
-			).Title("Existing Config"),
-		)
+// applyImportCandidate pre-fills data from the candidate on import-accept.
+// Free-text values are validated at the pre-fill point (SEC-004):
+//   - logs-path and clickup.workspace_id: rejected if they contain any char in
+//     [\x00-\x1f\x7f] (parity with CONTROL_CHAR_RE from session-start.ts).
+//   - language: accepted only when it satisfies ^[a-z]{2}$ (isValidISOLang).
+//
+// The 3 non-form keys (english_learning/clickup/obsidian_tasks) are carried by
+// setting their configure* flags so buildOpencodeSetupValues carries them
+// through unchanged (AC-15: buildOpencodeSetupValues is NOT modified).
+func applyImportCandidate(data *opencodeSetupFormData, cand *importCandidate) {
+	// Work-logs (form-backed).
+	if cand.logsMode != "" {
+		data.logsMode = cand.logsMode
+		data.configureWorkLogs = true
+	}
+	// Guard logs-path for control characters before it becomes a form default.
+	if cand.logsPath != "" && !hasControlChar(cand.logsPath) {
+		data.logsPath = cand.logsPath
+	}
+	if cand.logsSubfolder != "" {
+		data.logsSubfolder = cand.logsSubfolder
 	}
 
-	// ── Group 1: work-logs output ─────────────────────────────────────────────
+	// Language (form-backed) — accept only a clean 2-letter ISO 639-1 code.
+	if isValidISOLang(cand.language) {
+		data.language = cand.language
+		data.configureLanguage = true
+	}
+
+	// English-learning (NON-form) — carry via configure flag + value.
+	if cand.englishLearning {
+		data.configureEnglishLearning = true
+		data.englishLearning = true
+	}
+
+	// ClickUp (NON-form) — guard the free-text workspace_id, then carry.
+	if cand.clickUpWorkspaceID != "" && !hasControlChar(cand.clickUpWorkspaceID) {
+		data.configureClickUp = true
+		data.clickUpWorkspaceID = cand.clickUpWorkspaceID
+	}
+
+	// Obsidian-tasks (NON-form) — carry via configure flag.
+	if cand.obsidianTasksEnabled {
+		data.configureObsidianTasks = true
+	}
+}
+
+// buildOpencodeSetupGroups assembles all huh form groups for the opencode
+// setup flow. Groups are ordered: work-logs, language, english-learning,
+// Memory MCP, context7, ClickUp, Obsidian tasks, final confirm.
+//
+// The import-confirm group (formerly Group 0) has been removed — that decision
+// is now collected by a standalone pre-form confirm in collectOpencodeSetupInteractive
+// BEFORE this function is called, so the main form always starts with data
+// already at the correct defaults (imported or fresh).
+func buildOpencodeSetupGroups(data *opencodeSetupFormData) []*huh.Group {
+	var groups []*huh.Group
+
+	// ── Group 0: work-logs output ─────────────────────────────────────────────
 	logsSelect := huh.NewSelect[string]().
 		Value(&data.logsMode).
 		Title("Work-Logs Output").

@@ -8,14 +8,17 @@ import (
 )
 
 // ansiSupported returns true when the terminal is likely to render ANSI colour
-// escape sequences correctly. It checks for Windows legacy cmd (no ANSI) by
-// examining the TERM and COLORTERM env vars and the isTerminal guard.
+// escape sequences correctly.
 //
 // Criteria (conservative — prefer plain over garbled):
 //   - stdin must be an interactive terminal (isTerminal())
 //   - TERM must not be "dumb"
-//   - On Windows, TERM or COLORTERM must be set (Windows Terminal / Git Bash /
-//     VS Code integrated terminal all set one of these; legacy cmd.exe does not)
+//   - On Windows: true when ANY of WT_SESSION, TERM_PROGRAM, TERM, COLORTERM is
+//     set, OR when enableVirtualTerminalProcessing() succeeds (Windows 10 1511+).
+//     Only a true legacy console (VT-enable fails AND no terminal signals) falls
+//     back to plain ASCII. This mirrors the isAccessibleMode() WT_SESSION gate
+//     in tui.go:407.
+//   - On non-Windows: true (Unix/macOS terminals natively support ANSI).
 func ansiSupported() bool {
 	if !isTerminal() {
 		return false
@@ -24,26 +27,40 @@ func ansiSupported() bool {
 	if term == "dumb" {
 		return false
 	}
-	// On Windows the native console (cmd.exe / old PowerShell) does not set TERM.
-	// Windows Terminal, VS Code, and Git Bash do. Accept COLORTERM as a fallback.
 	if isWindowsRuntime() {
-		if term == "" && os.Getenv("COLORTERM") == "" {
-			return false
+		// Accept any explicit terminal signal (mirrors isAccessibleMode precedent).
+		if os.Getenv("WT_SESSION") != "" ||
+			os.Getenv("TERM_PROGRAM") != "" ||
+			term != "" ||
+			os.Getenv("COLORTERM") != "" {
+			return true
 		}
+		// No explicit signal — attempt to enable VT processing via syscall.
+		// Returns false on legacy consoles where the syscall is unavailable.
+		return enableVirtualTerminalProcessing()
 	}
 	return true
 }
 
 // printWelcomeBanner prints a large block-letter banner to stdout. It is called
-// once at the very start of main(), before any prompt fires. It is never
-// called on --version or --help paths.
+// once at the very start of runApplyCommand(), before any prompt fires.
 //
 // Design goals:
 //   - Big block-letter wordmark (ANSI Shadow font) styled like Claude Code / Gemini CLI.
 //   - ANSI 256-color brand palette: orange wordmark, purple orbital dots, grey rings.
 //   - Plain-ASCII fallback for legacy terminals (legacy cmd.exe, CI piped output).
 //   - Height ≤ 25 lines, width ≤ 65 cols.
+//
+// On Windows, enableVirtualTerminalProcessing() is called first (no-op on
+// non-Windows). This ensures VT mode is active before the ANSI gate decision
+// so that ansiSupported() can observe the live console state rather than relying
+// solely on environment variables. The huh TUI also enables VT, but only when
+// form.Run() starts — after this banner prints.
 func printWelcomeBanner() {
+	// Attempt VT-enable before the gate decision so the banner can observe the
+	// result. On non-Windows this is a no-op returning true.
+	enableVirtualTerminalProcessing()
+
 	if ansiSupported() {
 		printBannerColor()
 	} else {

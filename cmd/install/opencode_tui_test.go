@@ -344,8 +344,227 @@ func TestNonInteractiveFlag_ForcesEnvFlagsPath(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Suite — applyImportCandidate (AC-2 / AC-3 / AC-6 / AC-15)
+// ---------------------------------------------------------------------------
+
+// TestApplyImportCandidate_AcceptCarriesAll7Keys verifies that on import-accept
+// all 7 allowlisted keys — including the 3 non-form keys via configure* flags —
+// are set in data, and that buildOpencodeSetupValues subsequently carries them
+// into the written cfg (AC-2 / AC-15).
+func TestApplyImportCandidate_AcceptCarriesAll7Keys(t *testing.T) {
+	cand := &importCandidate{
+		logsMode:             "obsidian",
+		logsPath:             "/vault",
+		logsSubfolder:        "notes",
+		language:             "es",
+		englishLearning:      true,
+		clickUpWorkspaceID:   "ws-99",
+		obsidianTasksEnabled: true,
+	}
+
+	data := freshFormData()
+	applyImportCandidate(data, cand)
+
+	// 4 form-backed keys.
+	if data.logsMode != "obsidian" {
+		t.Errorf("logsMode = %q, want obsidian", data.logsMode)
+	}
+	if !data.configureWorkLogs {
+		t.Error("configureWorkLogs = false, want true (logsMode was set)")
+	}
+	if data.logsPath != "/vault" {
+		t.Errorf("logsPath = %q, want /vault", data.logsPath)
+	}
+	if data.logsSubfolder != "notes" {
+		t.Errorf("logsSubfolder = %q, want notes", data.logsSubfolder)
+	}
+	if data.language != "es" {
+		t.Errorf("language = %q, want es", data.language)
+	}
+	if !data.configureLanguage {
+		t.Error("configureLanguage = false, want true")
+	}
+
+	// 3 non-form keys — carried via configure* flags.
+	if !data.configureEnglishLearning {
+		t.Error("configureEnglishLearning = false, want true")
+	}
+	if !data.englishLearning {
+		t.Error("englishLearning = false, want true")
+	}
+	if !data.configureClickUp {
+		t.Error("configureClickUp = false, want true")
+	}
+	if data.clickUpWorkspaceID != "ws-99" {
+		t.Errorf("clickUpWorkspaceID = %q, want ws-99", data.clickUpWorkspaceID)
+	}
+	if !data.configureObsidianTasks {
+		t.Error("configureObsidianTasks = false, want true")
+	}
+
+	// buildOpencodeSetupValues (UNCHANGED, AC-15) carries all 7 through.
+	cfg := buildOpencodeSetupValues(data)
+	if cfg.LogsMode != "obsidian" {
+		t.Errorf("cfg.LogsMode = %q, want obsidian", cfg.LogsMode)
+	}
+	if cfg.LogsPath != "/vault" {
+		t.Errorf("cfg.LogsPath = %q, want /vault", cfg.LogsPath)
+	}
+	if cfg.Language != "es" {
+		t.Errorf("cfg.Language = %q, want es", cfg.Language)
+	}
+	if !cfg.EnglishLearning {
+		t.Error("cfg.EnglishLearning = false, want true")
+	}
+	if cfg.ClickUpWorkspaceID != "ws-99" {
+		t.Errorf("cfg.ClickUpWorkspaceID = %q, want ws-99", cfg.ClickUpWorkspaceID)
+	}
+	if !cfg.ObsidianTasksEnabled {
+		t.Error("cfg.ObsidianTasksEnabled = false, want true")
+	}
+}
+
+// TestApplyImportCandidate_DeclineYieldsFreshDefaults verifies that when
+// applyImportCandidate is NOT called (decline path), data retains fresh
+// defaults and buildOpencodeSetupValues produces a fresh local-mode cfg.
+// This is the AC-3 oracle: catches the #385 no-op regression where "Start fresh"
+// still pre-filled because the confirm was never read.
+func TestApplyImportCandidate_DeclineYieldsFreshDefaults(t *testing.T) {
+	// Decline: applyImportCandidate is NOT called.
+	data := freshFormData()
+
+	cfg := buildOpencodeSetupValues(data)
+
+	// On decline, local mode is the default.
+	if cfg.LogsMode != "local" {
+		t.Errorf("cfg.LogsMode = %q on decline, want local (fresh default)", cfg.LogsMode)
+	}
+	if cfg.LogsPath != "" {
+		t.Errorf("cfg.LogsPath = %q on decline, want empty (fresh default)", cfg.LogsPath)
+	}
+	if cfg.Language != "" {
+		t.Errorf("cfg.Language = %q on decline, want empty (fresh default)", cfg.Language)
+	}
+	if cfg.EnglishLearning {
+		t.Error("cfg.EnglishLearning = true on decline, want false (fresh default)")
+	}
+	if cfg.ClickUpWorkspaceID != "" {
+		t.Errorf("cfg.ClickUpWorkspaceID = %q on decline, want empty (fresh default)", cfg.ClickUpWorkspaceID)
+	}
+	if cfg.ObsidianTasksEnabled {
+		t.Error("cfg.ObsidianTasksEnabled = true on decline, want false (fresh default)")
+	}
+}
+
+// TestApplyImportCandidate_ControlCharInLogsPathRejected verifies that a
+// logs-path with control characters is NOT pre-filled (SEC-004 / AC-6).
+func TestApplyImportCandidate_ControlCharInLogsPathRejected(t *testing.T) {
+	cand := &importCandidate{
+		logsMode: "obsidian",
+		logsPath: "/vault/with\x00nul",
+	}
+	data := freshFormData()
+	applyImportCandidate(data, cand)
+
+	// logsMode is set (clean), but logsPath must be rejected.
+	if data.logsPath != "" {
+		t.Errorf("logsPath = %q, want empty (control char must be rejected)", data.logsPath)
+	}
+}
+
+// TestApplyImportCandidate_ControlCharInWorkspaceIDRejected verifies that a
+// ClickUp workspace_id with control characters is NOT pre-filled (SEC-004 / AC-6).
+func TestApplyImportCandidate_ControlCharInWorkspaceIDRejected(t *testing.T) {
+	cand := &importCandidate{
+		clickUpWorkspaceID: "ws\x1fbad",
+	}
+	data := freshFormData()
+	applyImportCandidate(data, cand)
+
+	if data.configureClickUp {
+		t.Error("configureClickUp = true, want false (workspace_id with control char must be rejected)")
+	}
+	if data.clickUpWorkspaceID != "" {
+		t.Errorf("clickUpWorkspaceID = %q, want empty (control char must be rejected)", data.clickUpWorkspaceID)
+	}
+}
+
+// TestApplyImportCandidate_InvalidLanguageRejected verifies that an invalid
+// language code (not 2 lowercase ASCII letters) is NOT pre-filled (AC-6).
+func TestApplyImportCandidate_InvalidLanguageRejected(t *testing.T) {
+	for _, bad := range []string{"eng", "EN", "E", "", "es_MX"} {
+		cand := &importCandidate{language: bad}
+		data := freshFormData()
+		applyImportCandidate(data, cand)
+
+		if data.language != "" || data.configureLanguage {
+			t.Errorf("language %q: data.language = %q / configureLanguage = %v, want empty/false",
+				bad, data.language, data.configureLanguage)
+		}
+	}
+}
+
+// TestApplyImportCandidate_AbsentNonFormKeys_NoEmptyKeyInjection verifies
+// that when english_learning/clickup/obsidian_tasks are absent (false/empty)
+// in the source, the configure* flags are NOT set — no empty-key injection
+// into the written cfg (AC-15 unambiguous oracle for F3).
+func TestApplyImportCandidate_AbsentNonFormKeys_NoEmptyKeyInjection(t *testing.T) {
+	cand := &importCandidate{
+		logsMode: "local",
+		// englishLearning:      false (zero value),
+		// clickUpWorkspaceID:   "" (zero value),
+		// obsidianTasksEnabled: false (zero value),
+	}
+	data := freshFormData()
+	applyImportCandidate(data, cand)
+
+	if data.configureEnglishLearning {
+		t.Error("configureEnglishLearning = true, want false (absent source → no injection)")
+	}
+	if data.configureClickUp {
+		t.Error("configureClickUp = true, want false (absent source → no injection)")
+	}
+	if data.configureObsidianTasks {
+		t.Error("configureObsidianTasks = true, want false (absent source → no injection)")
+	}
+
+	cfg := buildOpencodeSetupValues(data)
+	if cfg.EnglishLearning {
+		t.Error("cfg.EnglishLearning = true from absent source (AC-15 violated)")
+	}
+	if cfg.ClickUpWorkspaceID != "" {
+		t.Errorf("cfg.ClickUpWorkspaceID = %q from absent source (AC-15 violated)", cfg.ClickUpWorkspaceID)
+	}
+	if cfg.ObsidianTasksEnabled {
+		t.Error("cfg.ObsidianTasksEnabled = true from absent source (AC-15 violated)")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
+
+// freshFormData returns an opencodeSetupFormData with the same initial values
+// that collectOpencodeSetupInteractive uses for a fresh start (decline path).
+func freshFormData() *opencodeSetupFormData {
+	return &opencodeSetupFormData{
+		importExisting:         false,
+		configureWorkLogs:      false,
+		logsMode:               "local",
+		logsPath:               "",
+		logsSubfolder:          "work-logs",
+		language:               "",
+		englishLearning:        false,
+		configureMCP:           false,
+		memoryURL:              "",
+		memoryRequiresAuth:     false,
+		configureContext7:      false,
+		configureClickUp:       false,
+		clickUpWorkspaceID:     "",
+		configureObsidianTasks: false,
+		doSetup:                true,
+	}
+}
 
 // containsString is a simple substring check used in secret-presence
 // assertions. Using strings.Contains would require importing strings in the
