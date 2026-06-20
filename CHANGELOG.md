@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.114.0] - 2026-06-20
+
+### Added
+- Interactive opencode setup flow (`apply --runtime opencode`): when a terminal is present and `--non-interactive` is not set, the installer presents the full `.team-harness.json` settings surface as a sequence of skippable, explanatory prompts — work-logs mode, language, english-learning, Memory MCP, context7, ClickUp, Obsidian tasks — mirroring the `/th:setup` UX.
+- `--non-interactive` / `--yes` flag for `apply --runtime opencode`: forces the env/flags resolution path even when a controlling terminal is present, closing the "tty present, no human" hang class (SEC-DR-7).
+- Allowlisted read-merge-write `.team-harness.json` writer for the opencode config root: preserves unknown operator keys byte-for-byte; always overwrites installer-managed keys from the installer (SEC-OC-R4 mass-assignment defense); routed through the hardened `opencodePlacer` write path (SEC-OC-R2).
+- `detectExistingConfig` for P3: when a `.team-harness.json` already exists at the opencode config path, the interactive flow asks before importing its values — never silently consumes or overwrites.
+- Explanatory post-apply summary for the opencode runtime: lists components placed with paths and counts, settings written to `.team-harness.json`, and MCP registration status (names only, no URL or secret values — SEC-OC-R5).
+- `agents/delivery.md` — PR bodies now include a mandatory `## Objective / Why` section (goal + governing principle as the review lens, first element after the issue reference) and a conditional `## Intentional removals (not regressions)` table (`Removed | Why | Where it lives now`) when the diff removes or relocates content. A conditional `## Behavior-neutral reformat` one-line note is included when a pure reformat is folded into the diff. The `## How to review` section gains a deletion-dominated calibration line directing reviewers to verify destinations rather than deletions.
+- `agents/reviewer.md` — new `### Reconciliation of removals against the stated objective` sub-step in Goal Assessment: when the PR body declares an intentional relocation in the `## Intentional removals (not regressions)` table and the reviewer independently confirms the destination exists, the removal is surfaced as "confirma que coincide con el objetivo declarado" (under `### Remociones intencionales`) rather than flagged as a regression or a loosening-impact CRITICAL (#380, #379).
+
+### Changed
+- `checkpoint-guard.opencode.ts` and `prepublish-guard.opencode.ts` now resolve `.team-harness.json` from the opencode-owned config root (`$XDG_CONFIG_HOME/opencode`, `%APPDATA%\opencode`, or `~/.config/opencode`) instead of `os.homedir()/.claude`, making the opencode install autonomous from Claude Code (P2). The config-root resolver validates any `OPENCODE_CONFIG_DIR` override against traversal and injection (SEC-OC-R3). The `.cc.ts` entries are unchanged and continue reading `~/.claude/.team-harness.json`.
+
+### Fixed
+- `th:review-pr` no longer flags a PR-stated, relocated removal as a regression when the delivery PR body's `## Intentional removals (not regressions)` table accounts for it and the destination is independently confirmed (#379).
+- Reviewer no longer duplicates findings across `### Sugerencias`, `### Detalles Menores`, and `### Resumen`, and no longer re-narrates the PR's own build/test/SemVer/version-bump verification as findings (#379).
+
 ## [2.110.0] - 2026-06-19
 
 ### Added

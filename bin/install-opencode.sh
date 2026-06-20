@@ -106,10 +106,20 @@ echo "Checksum verified."
 
 # ---------------------------------------------------------------------------
 # Run the verified binary.
-# MEMORY_MCP_URL and CONTEXT7_API_KEY are OPTIONAL. When set, pass
-# --memory-url on argv (so the URL is NOT recorded in shell history).
-# When absent, the binary installs all assets and skips MCP registration —
-# no prompt, no error, no hang. To register MCP servers later, re-run with:
+#
+# Interactive setup: when a terminal (/dev/tty) is present, the binary
+# presents the full .team-harness.json setup surface (work-logs mode,
+# language, english-learning, Memory MCP, context7, ClickUp, Obsidian tasks)
+# as a sequence of skippable, explanatory prompts. Each setting is optional.
+#
+# Non-interactive (headless/CI): when /dev/tty is absent, the binary
+# installs all assets and resolves configuration from env vars + defaults only
+# — no prompt, no hang. Use --non-interactive (alias: --yes) to force this
+# path even when a terminal is present (e.g. automated deployments).
+#
+# MEMORY_MCP_URL and CONTEXT7_API_KEY are OPTIONAL. When MEMORY_MCP_URL is
+# set, it is passed via --memory-url argv (not env, to avoid shell history).
+# To configure MCP servers later, re-run with the env vars set:
 #   MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
 #     CONTEXT7_API_KEY=your-key \
 #     curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
@@ -117,7 +127,8 @@ echo "Checksum verified."
 # Redirect stdin from /dev/tty when present — same rationale as install.sh:
 # when invoked via 'curl | bash', bash holds the pipe as stdin; the binary
 # must read from the operator's terminal, not the remaining pipe bytes.
-# Forward "$@" so the operator can override --scope or --opencode-dir.
+# Forward "$@" so the operator can pass --scope, --opencode-dir, or
+# --non-interactive / --yes to the binary.
 # ---------------------------------------------------------------------------
 chmod +x "$TMP/install"
 

@@ -240,6 +240,24 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 19: opencode config-path resolver (AC-10 / SEC-OC-R3)"
+echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    echo "opencode-config-resolver: SKIP (node not found — install Node.js to run this suite)"
+elif ! command -v npm >/dev/null 2>&1; then
+    echo "opencode-config-resolver: SKIP (npm not found)"
+else
+    if bash "$TESTS_DIR/test_opencode_config_resolver.sh"; then
+        echo "opencode-config-resolver: PASS"
+    else
+        echo "opencode-config-resolver: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

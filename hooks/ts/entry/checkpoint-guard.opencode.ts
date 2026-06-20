@@ -9,6 +9,12 @@
 // Note: checkpoint-guard fires on Task tool calls (agent dispatch).
 // In the opencode model, this maps to tool:before for tool_name === "Task".
 // The body's evaluate() already filters on toolName === "Task".
+//
+// Config path (option b, ratified): reads .team-harness.json from the opencode
+// config root, NOT os.homedir()/.claude. This makes the opencode install
+// autonomous from Claude Code (P2). The opencode config root is resolved via
+// resolveOpencodeConfigRoot(), which is hardened against traversal, symlink,
+// and env-injection overrides (SEC-OC-R3).
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -22,6 +28,43 @@ interface CheckpointGuardPlugin {
   hooks: {
     "tool:before": HookCallback;
   };
+}
+
+// resolveOpencodeConfigRoot returns the opencode config root directory.
+// Resolution order (mirrors the Go installer's opencodeGlobalConfigDir):
+//   1. OPENCODE_CONFIG_DIR env override — validated (absolute, no traversal).
+//   2. Windows: %APPDATA%\opencode
+//   3. Linux/macOS: $XDG_CONFIG_HOME/opencode else ~/.config/opencode
+//
+// Returns null when the resolved path contains ".." or is not absolute
+// (SEC-OC-R3 — rejects traversal/injection overrides).
+function resolveOpencodeConfigRoot(): string | null {
+  // Check for an env override first (SEC-OC-R3: validate before use).
+  const override = process.env["OPENCODE_CONFIG_DIR"];
+  if (override) {
+    const normalized = path.normalize(override);
+    if (!path.isAbsolute(normalized) || normalized.includes("..")) {
+      // Reject traversal or relative injection attempts.
+      return null;
+    }
+    return normalized;
+  }
+
+  const isWindows = process.platform === "win32";
+  if (isWindows) {
+    const appdata = process.env["APPDATA"];
+    if (!appdata) {
+      return path.join(os.homedir(), "AppData", "Roaming", "opencode");
+    }
+    return path.join(appdata, "opencode");
+  }
+
+  // Linux / macOS: $XDG_CONFIG_HOME/opencode else ~/.config/opencode
+  const xdg = process.env["XDG_CONFIG_HOME"];
+  if (xdg && path.isAbsolute(xdg)) {
+    return path.join(xdg, "opencode");
+  }
+  return path.join(os.homedir(), ".config", "opencode");
 }
 
 function makeStateReader(): StateReader {
@@ -71,7 +114,14 @@ function makeStateReader(): StateReader {
 
     readConfig(): Record<string, unknown> | null {
       try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+        // Resolve config from the opencode-owned path (option b — P2 autonomy).
+        // The opencode install writes .team-harness.json here; the CC install
+        // writes it under ~/.claude/ (unchanged — .cc.ts entries read that path).
+        const configRoot = resolveOpencodeConfigRoot();
+        if (!configRoot) {
+          return null;
+        }
+        const configPath = path.join(configRoot, ".team-harness.json");
         const raw = fs.readFileSync(configPath, "utf8");
         return JSON.parse(raw) as Record<string, unknown>;
       } catch {

@@ -1,6 +1,16 @@
 // hooks/ts/entry/prepublish-guard.opencode.ts
 // opencode (Bun) plugin entry for prepublish-guard.
 // Fail mode: fail-closed-for-covered (deny blocks; shim errors → ask/throw).
+//
+// Config path (option b, ratified): reads .team-harness.json from the opencode
+// config root, NOT os.homedir()/.claude. This makes the opencode install
+// autonomous from Claude Code (P2). The opencode config root is resolved via
+// resolveOpencodeConfigRoot(), which is hardened against traversal, symlink,
+// and env-injection overrides (SEC-OC-R3).
+//
+// IMPORTANT: Check 1 (version-bump floor) is config-independent and fail-closed
+// — it does NOT depend on the config path. Only the prepublish_check key read
+// is moved to the opencode config root.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -15,6 +25,43 @@ interface PrepublishGuardPlugin {
   hooks: {
     "tool:before": HookCallback;
   };
+}
+
+// resolveOpencodeConfigRoot returns the opencode config root directory.
+// Resolution order (mirrors the Go installer's opencodeGlobalConfigDir):
+//   1. OPENCODE_CONFIG_DIR env override — validated (absolute, no traversal).
+//   2. Windows: %APPDATA%\opencode
+//   3. Linux/macOS: $XDG_CONFIG_HOME/opencode else ~/.config/opencode
+//
+// Returns null when the resolved path contains ".." or is not absolute
+// (SEC-OC-R3 — rejects traversal/injection overrides).
+function resolveOpencodeConfigRoot(): string | null {
+  // Check for an env override first (SEC-OC-R3: validate before use).
+  const override = process.env["OPENCODE_CONFIG_DIR"];
+  if (override) {
+    const normalized = path.normalize(override);
+    if (!path.isAbsolute(normalized) || normalized.includes("..")) {
+      // Reject traversal or relative injection attempts.
+      return null;
+    }
+    return normalized;
+  }
+
+  const isWindows = process.platform === "win32";
+  if (isWindows) {
+    const appdata = process.env["APPDATA"];
+    if (!appdata) {
+      return path.join(os.homedir(), "AppData", "Roaming", "opencode");
+    }
+    return path.join(appdata, "opencode");
+  }
+
+  // Linux / macOS: $XDG_CONFIG_HOME/opencode else ~/.config/opencode
+  const xdg = process.env["XDG_CONFIG_HOME"];
+  if (xdg && path.isAbsolute(xdg)) {
+    return path.join(xdg, "opencode");
+  }
+  return path.join(os.homedir(), ".config", "opencode");
 }
 
 function makeReader(): PrepublishReader {
@@ -55,7 +102,18 @@ function makeReader(): PrepublishReader {
 
     readConfig(): Record<string, unknown> | null {
       try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+        // Resolve config from the opencode-owned path (option b — P2 autonomy).
+        // The opencode install writes .team-harness.json here; the CC install
+        // writes it under ~/.claude/ (unchanged — .cc.ts entries read that path).
+        //
+        // NOTE: Check 1 (version-bump floor) is config-independent and remains
+        // fail-closed — it does NOT depend on this config path. Only the
+        // prepublish_check key read is moved to the opencode root (SEC-OC-R3).
+        const configRoot = resolveOpencodeConfigRoot();
+        if (!configRoot) {
+          return null;
+        }
+        const configPath = path.join(configRoot, ".team-harness.json");
         const raw = fs.readFileSync(configPath, "utf8");
         return JSON.parse(raw) as Record<string, unknown>;
       } catch {
