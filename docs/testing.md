@@ -483,6 +483,26 @@ Implementation note: the over-bump check (`floor=none` + `rank[actual] >= MINOR`
 
 (Self-ref, 3 checks) test file contains `Suite 122`, `tester-no-version-assertion`, and the grep-confirm token; `docs/testing.md` registers `Suite 122` and `tester-no-version-assertion`; `CLAUDE.md` does NOT contain `Suite 122` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `tester-no-version-assertion`.
 
+### Suite 123 — install-opencode-sha256-invariants
+
+8 checks. Structural assertions for the five durable SHA256 integrity invariants in `bin/install-opencode.sh` (SEC-003, folded as LOW security finding on the opencode install-link public curl|bash surface). Folded into `tests/test_agent_structure.py` (already wired as Suite 2 in `tests/run-all.sh` — no standalone file, no new `# Suite N:` block; see MEMORY note "run-all hardcoded suite list").
+
+Reads `bin/install-opencode.sh` as plain text and asserts:
+
+(1, 1 check) TOCTOU / anti-reorder guard: text offset of `chmod +x` > text offset of the comparison expression `"$ACTUAL" != "$EXPECTED"`. Prevents a reorder where the binary is made executable before the hash check runs.
+
+(2, 1 check) Fail-closed no-hash-tool branch: the region near the "no sha256sum or shasum available" message contains `exit 1`. Prevents a silent skip when no verification tool is available.
+
+(3a, 1 check) Anchored field match: `'$2==a'` is present — the awk extraction uses an exact field match, not a substring glob. Prevents a partial filename collision granting a different asset's hash to the downloaded file.
+
+(3b, 1 check) `sha256sum -c` ABSENT: the verify-file-against-checksums shortcut is not used; extract-and-compare is used instead (the `-c` form fails when SHA256SUMS contains multiple asset entries).
+
+(4, 1 check) Asset-absent branch: `[ -z "$EXPECTED" ]` exists and its region contains `exit 1`. Prevents running an unverified binary when the platform has no SHA256SUMS entry.
+
+(5, 1 check) Anti-leak: no `echo` or `printf` line directly expands `$MEMORY_MCP_URL` or `$MEMORY_MCP_BEARER`. Parity with the `test_security_scan.py` Check-5 pattern.
+
+(Self-ref, 3 checks) test file contains `Suite 123`, `install-opencode-sha256-invariants`, and `_slice_section`; `docs/testing.md` registers `Suite 123` and `install-opencode-sha256-invariants`; `CLAUDE.md` does NOT contain `Suite 123` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `install-opencode-sha256-invariants`.
+
 ### Suite 12 — security-self-scan
 
 5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).

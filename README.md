@@ -26,6 +26,35 @@
 /th:setup
 ```
 
+### Install into opencode
+
+opencode support is in beta. Install Team Harness into opencode with:
+
+```
+curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+```
+
+You will be prompted for your Memory MCP URL, or set `MEMORY_MCP_URL` beforehand to run fully non-interactively:
+
+```
+MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
+  curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+```
+
+**Environment variables:**
+
+| Variable | When required | Purpose |
+|---|---|---|
+| `MEMORY_MCP_URL` | At install time | Your Memory MCP server URL. Written literally to `opencode.json`; not a secret. |
+| `MEMORY_MCP_BEARER` | In your shell when running opencode | opencode resolves `{env:MEMORY_MCP_BEARER}` at runtime. If unset, the Authorization header is sent empty. |
+| `CONTEXT7_API_KEY` | In your shell when running opencode | opencode resolves `{env:CONTEXT7_API_KEY}` at runtime for library docs retrieval. |
+
+The installer writes only the Memory URL literally to `opencode.json`. Both secrets (`MEMORY_MCP_BEARER` and `CONTEXT7_API_KEY`) remain as `{env:}` references resolved by opencode at runtime — they are never written to disk by team-harness.
+
+If `MEMORY_MCP_BEARER` is not exported in your shell when the install runs, the script prints a one-line non-blocking warning (the install still completes).
+
+**Security note:** The downloaded binary is verified against the published `SHA256SUMS` before it runs. The checksum file is served over HTTPS from the GitHub release origin but is not cryptographically signed — verification protects against corruption and tampering of the binary relative to the checksum, not against a compromise of the release origin (TOFU over HTTPS).
+
 `/th:setup` configures the two required MCP servers (Memory and context7) and the **logs mode** — where pipeline workspaces are stored:
 
 | Mode | Where | When to use |
