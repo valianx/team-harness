@@ -154,16 +154,28 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Backup (single rolling backup — overwritten each run, never accumulates)
    cp "$CLAUDE_MD" "$CLAUDE_MD.bak"
 
-   # Sync active managed blocks (DESTRUCTIVE replace between markers, or append)
+   # Sync active managed blocks (in-position replace between markers, or append)
    for BLOCK in orchestrator-dispatch-rule voice-rule; do
        CANONICAL=$(cat "$MB_DIR/$BLOCK.md")
        START_MARKER="<!-- ${BLOCK}:start -->"
        END_MARKER="<!-- ${BLOCK}:end -->"
        if grep -qF "$START_MARKER" "$CLAUDE_MD" && grep -qF "$END_MARKER" "$CLAUDE_MD"; then
-           # DESTRUCTIVE replace between markers (inclusive) using sed
-           sed -i.tmp "/${START_MARKER//\//\\/}/,/${END_MARKER//\//\\/}/d" "$CLAUDE_MD"
-           # Append canonical block at position of removed block
-           printf '\n%s\n' "$CANONICAL" >> "$CLAUDE_MD"
+           # In-position replace: rewrite the file in memory, preserving block position.
+           # Values are passed via the environment (not interpolated into the source) so
+           # paths/markers containing quotes or shell metacharacters stay safe.
+           TH_CLAUDE_MD="$CLAUDE_MD" TH_MB_FILE="$MB_DIR/$BLOCK.md" TH_SM="$START_MARKER" TH_EM="$END_MARKER" python3 -c '
+import os
+path = os.environ["TH_CLAUDE_MD"]
+content = open(path, "r", encoding="utf-8").read()
+canonical = open(os.environ["TH_MB_FILE"], "r", encoding="utf-8").read().rstrip()
+start_marker = os.environ["TH_SM"]
+end_marker = os.environ["TH_EM"]
+s = content.find(start_marker)
+e = content.find(end_marker)
+if s != -1 and e != -1 and e > s:
+    new_content = content[:s] + canonical + content[e + len(end_marker):]
+    open(path, "w", encoding="utf-8").write(new_content)
+'
        else
            printf '\n%s\n' "$CANONICAL" >> "$CLAUDE_MD"
        fi
@@ -172,7 +184,18 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    # Remove retired blocks (dev-mode, nested-dispatch-takeover, dev-mode-entry)
    for RETIRED in dev-mode nested-dispatch-takeover dev-mode-entry; do
        if grep -qF "<!-- ${RETIRED}:start -->" "$CLAUDE_MD" && grep -qF "<!-- ${RETIRED}:end -->" "$CLAUDE_MD"; then
-           sed -i.tmp "/<!-- ${RETIRED}:start -->/,/<!-- ${RETIRED}:end -->/d" "$CLAUDE_MD"
+           TH_CLAUDE_MD="$CLAUDE_MD" TH_SM="<!-- ${RETIRED}:start -->" TH_EM="<!-- ${RETIRED}:end -->" python3 -c '
+import os
+path = os.environ["TH_CLAUDE_MD"]
+content = open(path, "r", encoding="utf-8").read()
+start_marker = os.environ["TH_SM"]
+end_marker = os.environ["TH_EM"]
+s = content.find(start_marker)
+e = content.find(end_marker)
+if s != -1 and e != -1 and e > s:
+    new_content = content[:s] + content[e + len(end_marker):]
+    open(path, "w", encoding="utf-8").write(new_content)
+'
        fi
    done
 

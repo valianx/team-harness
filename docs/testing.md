@@ -503,6 +503,18 @@ Reads `bin/install-opencode.sh` as plain text and asserts:
 
 (Self-ref, 3 checks) test file contains `Suite 123`, `install-opencode-sha256-invariants`, and `_slice_section`; `docs/testing.md` registers `Suite 123` and `install-opencode-sha256-invariants`; `CLAUDE.md` does NOT contain `Suite 123` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `install-opencode-sha256-invariants`.
 
+### Suite 124 — contract-contradiction-sweep
+
+10 checks. Regression guards for the 11 contract-contradiction fixes shipped in issue #309. Folded into `tests/test_agent_structure.py` (already wired as Suite 2 in `tests/run-all.sh` — no standalone file; see MEMORY note "run-all hardcoded suite list").
+
+Reads `skills/review-pr/SKILL.md` and `agents/architect.md` as plain text and asserts:
+
+(Item 7, 4 checks) `skills/review-pr/SKILL.md` workspace-detection block contains the current pipeline filenames `01-plan.md` and `02-implementation.md`, and does NOT contain the legacy filenames `01-architecture.md` or `02-task-list.md`. The legacy filenames caused the qa subagent dispatch to be silently skipped whenever a workspaces folder was present.
+
+(Item 9, 3 checks) `agents/architect.md` BOTH `01-plan.md` templates (Schema and Full) contain the `| PR | Service | Base |` column header (count ≥ 2) and the `**Base:**` per-PR field (count ≥ 2). The Full template was the drifted copy that omitted the Base column introduced in v2.x.
+
+(Self-ref, 3 checks) test file contains `Suite 124` and `contract-contradiction-sweep`; `docs/testing.md` registers `Suite 124` and `contract-contradiction-sweep`; `CLAUDE.md` does NOT contain `Suite 124` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `contract-contradiction-sweep`.
+
 ### Suite 12 — security-self-scan
 
 5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).

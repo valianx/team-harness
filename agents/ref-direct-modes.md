@@ -46,10 +46,12 @@ The `plan-review` direct mode runs a panel of up to three reviewers that fold th
 5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
 6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.
 
-**Vacuous-success guard (applies to this direct mode and to the research/diagram direct modes where the CLAUDE.md §5 centralization applies):** before surfacing the combined verdict, verify that the expected sub-verdict labels are present in `## Plan Review`:
-- `**Substance (qa):**` — always required (qa always runs in the panel, regardless of mode: design, research, or diagram).
+**Vacuous-success guard (applies to this direct mode and to the design/research panels where the CLAUDE.md §5 centralization applies):** before surfacing the combined verdict, verify that the expected sub-verdict labels are present in `## Plan Review`:
+- `**Substance (qa):**` — always required (qa always runs in the panel, for the `plan-review` direct mode and for the design/research panels).
 - `**Security design-review (security):**` — required only when security ran (i.e., the task was determined security-sensitive). When security was skipped, absence of this label is expected and does not trigger the guard.
 If a required label is absent, the panel is incomplete — do NOT surface a pass combined verdict. Report `blocked` / panel incomplete to the operator and prompt for a re-run.
+
+**Scope note:** this guard applies to the `plan-review` direct mode and to the design/research panels. Diagram modes (`/d2-diagram`, `/likec4-diagram`, `/excalidraw`) do NOT dispatch a qa/plan-review panel — the guard does not apply there.
 
 **Behaviour:**
 - Zero side-files. All panel output folds in-place into `01-plan.md`. No agent creates a parallel review file.

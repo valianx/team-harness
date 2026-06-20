@@ -51,7 +51,7 @@ After a localized patch, the orchestrator re-runs only the verifier(s) whose dom
 | A (impl) | `tester` + `qa` (security skipped unless patch touches security-sensitive code) | `tester` + `qa` + `security` |
 | B (design) | `plan-reviewer` only | all verifiers |
 | C (criteria) | all verifiers (criteria changes always touch everything) | all verifiers |
-| D (security-only) | `security` only | `security` only |
+| D (security-only) | `security` only — plus mandatory coherence gate (`qa` validate on patched AC IDs, per § Coherence Gate) | `security` only |
 
 ## Coherence Gate (Mandatory — Never Skipped)
 

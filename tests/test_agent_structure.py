@@ -29555,6 +29555,102 @@ check(
 # Marker: install-opencode-sha256-invariants
 
 # ---------------------------------------------------------------------------
+# Suite 124 — contract-contradiction-sweep (issue #309 regression guards)
+# Folded into test_agent_structure.py (already wired as Suite 2 in run-all.sh;
+# no new # Suite N: block needed — see docs/testing.md § "run-all hardcoded
+# suite list" note).
+# Item 7: skills/review-pr/SKILL.md detection block uses current pipeline filenames.
+# Item 9: both 01-plan.md templates in agents/architect.md carry Base column +
+#         **Base:** per-PR field.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 124: contract-contradiction-sweep (issue #309) ===")
+
+_s124_review_pr = read(SKILLS_DIR / "review-pr" / "SKILL.md")
+_s124_architect = read(AGENTS_DIR / "architect.md")
+
+# Item 7 — review-pr/SKILL.md detection block uses current pipeline filenames
+check(
+    "suite124(item7): skills/review-pr/SKILL.md detection block contains '01-plan.md'"
+    " — contract-contradiction-sweep",
+    "01-plan.md" in _s124_review_pr,
+    "skills/review-pr/SKILL.md detection block must reference 01-plan.md"
+    " (current pipeline filename) — legacy 01-architecture.md caused qa to be silently skipped",
+)
+check(
+    "suite124(item7): skills/review-pr/SKILL.md detection block contains"
+    " '02-implementation.md' — contract-contradiction-sweep",
+    "02-implementation.md" in _s124_review_pr,
+    "skills/review-pr/SKILL.md detection block must reference 02-implementation.md"
+    " (current pipeline filename) — legacy 02-task-list.md caused qa to be silently skipped",
+)
+check(
+    "suite124(item7): skills/review-pr/SKILL.md does NOT contain '01-architecture.md'"
+    " — contract-contradiction-sweep",
+    "01-architecture.md" not in _s124_review_pr,
+    "skills/review-pr/SKILL.md must not reference legacy filename 01-architecture.md"
+    " in the detection block — was causing qa workspaces to be silently skipped",
+)
+check(
+    "suite124(item7): skills/review-pr/SKILL.md does NOT contain '02-task-list.md'"
+    " — contract-contradiction-sweep",
+    "02-task-list.md" not in _s124_review_pr,
+    "skills/review-pr/SKILL.md must not reference legacy filename 02-task-list.md"
+    " in the detection block — was causing qa workspaces to be silently skipped",
+)
+
+# Item 9 — both 01-plan.md templates in agents/architect.md carry Base column + **Base:** field
+check(
+    "suite124(item9): agents/architect.md first 01-plan.md template contains"
+    " '| PR | Service | Base |' — contract-contradiction-sweep",
+    "| PR | Service | Base |" in _s124_architect,
+    "agents/architect.md first (Schema) template must include Base column"
+    " — required so plan-reviewer can verify the base branch",
+)
+check(
+    "suite124(item9): agents/architect.md BOTH 01-plan.md templates contain"
+    " '| PR | Service | Base |' (count >= 2) — contract-contradiction-sweep",
+    _s124_architect.count("| PR | Service | Base |") >= 2,
+    "agents/architect.md must have the Base column in BOTH templates"
+    " (Schema + Full) — second (Full) template was the drifted copy",
+)
+check(
+    "suite124(item9): agents/architect.md contains '**Base:**' per-PR field"
+    " in both templates (count >= 2) — contract-contradiction-sweep",
+    _s124_architect.count("**Base:**") >= 2,
+    "agents/architect.md must have '**Base:**' per-PR field in BOTH templates"
+    " — second (Full) template was missing it",
+)
+
+# Self-referential guards
+_s124_own = read(Path(__file__))
+check(
+    "suite124(self-ref): test file contains 'Suite 124' and"
+    " 'contract-contradiction-sweep' — contract-contradiction-sweep",
+    "Suite 124" in _s124_own and "contract-contradiction-sweep" in _s124_own,
+    "test file must self-reference Suite 124 and contract-contradiction-sweep",
+)
+
+_s124_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite124(registry): docs/testing.md registers 'Suite 124' and"
+    " 'contract-contradiction-sweep'",
+    "Suite 124" in _s124_testing_md
+    and "contract-contradiction-sweep" in _s124_testing_md,
+    "docs/testing.md must register Suite 124 and the 'contract-contradiction-sweep' marker",
+)
+
+_s124_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite124(hygiene): CLAUDE.md does NOT contain 'Suite 124'"
+    " (§11 hygiene contract) — contract-contradiction-sweep",
+    "Suite 124" not in _s124_claude_md,
+    "CLAUDE.md must not mention Suite 124 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: contract-contradiction-sweep
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
