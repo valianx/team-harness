@@ -258,6 +258,24 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 20: opencode session.created enforcement (AC-1..AC-5 + S-1..S-4)"
+echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    echo "opencode-session-enforcement: SKIP (node not found — install Node.js to run this suite)"
+elif ! command -v npm >/dev/null 2>&1; then
+    echo "opencode-session-enforcement: SKIP (npm not found)"
+else
+    if bash "$TESTS_DIR/test_opencode_session_enforcement.sh"; then
+        echo "opencode-session-enforcement: PASS"
+    else
+        echo "opencode-session-enforcement: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
