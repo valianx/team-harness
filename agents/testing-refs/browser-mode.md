@@ -435,6 +435,302 @@ Loaded references: agents/testing-refs/browser-mode.md
 
 ---
 
+## vue
+
+Stack: Vue 3 + Vite + TypeScript + Vitest 4.x + `vitest-browser-vue`
+
+### Install
+
+```bash
+npm install -D vitest @vitest/browser-playwright vitest-browser-vue @vitejs/plugin-vue
+```
+
+`vitest-browser-vue` provides an async `render` function backed by the Vitest Browser Mode locators API. It replaces `@testing-library/vue` for browser-mode tests. `@vitejs/plugin-vue` is required so Vite can compile `.vue` single-file components.
+
+### Config (browser project alongside jsdom unit project)
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import { playwright } from '@vitest/browser-playwright'
+import vue from '@vitejs/plugin-vue'
+
+export default defineConfig({
+  plugins: [vue()],
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          include: ['src/**/*.test.{ts,tsx}'],
+          setupFiles: ['./vitest.setup.ts'],
+        },
+      },
+      {
+        extends: true,
+        plugins: [vue()],
+        test: {
+          name: 'browser',
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+            headless: true,
+          },
+          include: ['src/**/*.browser.test.{ts,tsx}'],
+        },
+      },
+    ],
+  },
+})
+```
+
+### Component test with locators API
+
+```typescript
+// src/components/StickyHeader/StickyHeader.browser.test.ts
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, cleanup } from 'vitest-browser-vue'
+import StickyHeader from './StickyHeader.vue'
+
+afterEach(() => cleanup())
+
+// Note: render() is async in vitest-browser-vue — always await it.
+describe('StickyHeader', () => {
+  it('collapses when scrolled past threshold', async () => {
+    const { getByRole } = await render(StickyHeader, {
+      props: { threshold: 80 },
+    })
+    const header = getByRole('banner')
+
+    await window.scrollTo(0, 100)
+    await expect.element(header).toHaveClass('collapsed')
+  })
+
+  it('reports correct height via getBoundingClientRect', async () => {
+    const { getByRole } = await render(StickyHeader, { props: { threshold: 80 } })
+    const header = getByRole('banner')
+    const rect = (await header.element()).getBoundingClientRect()
+    expect(rect.height).toBeGreaterThan(0)
+  })
+})
+```
+
+Vue extras available from `vitest-browser-vue`: `rerender(props)` to update props after initial render; `emitted()` to inspect emitted events. The `attachTo` option is NOT supported — use `container` for document attachment. Always `await render(...)`: sync usage is deprecated in `vitest-browser-vue`.
+
+### IntersectionObserver / ResizeObserver test
+
+```typescript
+// src/components/LazySection/LazySection.browser.test.ts
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, cleanup } from 'vitest-browser-vue'
+import LazySection from './LazySection.vue'
+
+afterEach(() => cleanup())
+
+it('renders content once visible in viewport', async () => {
+  const { getByText } = await render(LazySection)
+  // Real IntersectionObserver fires when the element enters the viewport.
+  await expect.element(getByText('Loaded content')).toBeVisible()
+})
+```
+
+### ARIA live-region assertion
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, cleanup } from 'vitest-browser-vue'
+import { userEvent } from 'vitest/browser'
+import CheckoutForm from './CheckoutForm.vue'
+
+afterEach(() => cleanup())
+
+it('announces submission error in the live region', async () => {
+  const { getByRole } = await render(CheckoutForm)
+
+  await userEvent.click(getByRole('button', { name: /submit/i }))
+
+  const liveRegion = getByRole('status')   // role="status" implies aria-live="polite"
+  await expect.element(liveRegion).toHaveText(/please fill in all required fields/i)
+})
+```
+
+> Use `getByRole('status')` for `aria-live="polite"` regions and `getByRole('alert')` for `aria-live="assertive"`. Pair with an axe scan to verify the region's role and politeness attribute are valid.
+
+### Viewport control
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest'
+import { page } from 'vitest/browser'
+import { render, cleanup } from 'vitest-browser-vue'
+import ResponsiveNav from './ResponsiveNav.vue'
+
+afterEach(() => cleanup())
+
+describe('ResponsiveNav', () => {
+  it('collapses to hamburger menu on mobile viewport', async () => {
+    await page.viewport(375, 667)
+    const { getByRole } = await render(ResponsiveNav)
+
+    await expect.element(getByRole('button', { name: /menu/i })).toBeVisible()
+
+    await page.viewport(1280, 800)
+    await expect.element(getByRole('navigation')).toBeVisible()
+  })
+})
+```
+
+---
+
+## svelte
+
+Stack: Svelte 5 + Vite + TypeScript + Vitest 4.x + `vitest-browser-svelte`
+
+> **Maturity note:** React and Vue browser-mode tooling are mature (high snippet coverage, broad community usage). `vitest-browser-svelte` is stable and maintained but less battle-tested — the snippet corpus is substantially smaller. For Svelte projects, verify the installed version against the package changelog before authoring tests, and record any API gaps in the decision log. The e2e-degradation fallback (Playwright) remains available for cases where `vitest-browser-svelte` does not support the required assertion.
+
+### Install
+
+```bash
+npm install -D vitest @vitest/browser-playwright vitest-browser-svelte @sveltejs/vite-plugin-svelte
+```
+
+`vitest-browser-svelte` provides an async `render` function backed by the Vitest Browser Mode locators API. `@sveltejs/vite-plugin-svelte` is required so Vite can compile `.svelte` components.
+
+### Config (browser project alongside jsdom unit project)
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import { playwright } from '@vitest/browser-playwright'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+
+export default defineConfig({
+  plugins: [svelte()],
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          include: ['src/**/*.test.{ts,js}'],
+          setupFiles: ['./vitest.setup.ts'],
+        },
+      },
+      {
+        extends: true,
+        plugins: [svelte()],
+        test: {
+          name: 'browser',
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+            headless: true,
+          },
+          include: ['src/**/*.browser.test.{ts,js}'],
+        },
+      },
+    ],
+  },
+})
+```
+
+### Component test with locators API
+
+```typescript
+// src/components/StickyHeader/StickyHeader.browser.test.ts
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, cleanup } from 'vitest-browser-svelte'
+import StickyHeader from './StickyHeader.svelte'
+
+afterEach(() => cleanup())
+
+// Note: render() is async in vitest-browser-svelte — always await it.
+describe('StickyHeader', () => {
+  it('collapses when scrolled past threshold', async () => {
+    const { getByRole } = await render(StickyHeader, {
+      props: { threshold: 80 },
+    })
+    const header = getByRole('banner')
+
+    await window.scrollTo(0, 100)
+    await expect.element(header).toHaveClass('collapsed')
+  })
+
+  it('reports correct height via getBoundingClientRect', async () => {
+    const { getByRole } = await render(StickyHeader, { props: { threshold: 80 } })
+    const header = getByRole('banner')
+    const rect = (await header.element()).getBoundingClientRect()
+    expect(rect.height).toBeGreaterThan(0)
+  })
+})
+```
+
+### IntersectionObserver / ResizeObserver test
+
+```typescript
+// src/components/LazySection/LazySection.browser.test.ts
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, cleanup } from 'vitest-browser-svelte'
+import LazySection from './LazySection.svelte'
+
+afterEach(() => cleanup())
+
+it('renders content once visible in viewport', async () => {
+  const { getByText } = await render(LazySection)
+  // Real IntersectionObserver fires when the element enters the viewport.
+  await expect.element(getByText('Loaded content')).toBeVisible()
+})
+```
+
+### ARIA live-region assertion
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, cleanup } from 'vitest-browser-svelte'
+import { userEvent } from 'vitest/browser'
+import CheckoutForm from './CheckoutForm.svelte'
+
+afterEach(() => cleanup())
+
+it('announces submission error in the live region', async () => {
+  const { getByRole } = await render(CheckoutForm)
+
+  await userEvent.click(getByRole('button', { name: /submit/i }))
+
+  const liveRegion = getByRole('status')
+  await expect.element(liveRegion).toHaveText(/please fill in all required fields/i)
+})
+```
+
+### Viewport control
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest'
+import { page } from 'vitest/browser'
+import { render, cleanup } from 'vitest-browser-svelte'
+import ResponsiveNav from './ResponsiveNav.svelte'
+
+afterEach(() => cleanup())
+
+describe('ResponsiveNav', () => {
+  it('collapses to hamburger menu on mobile viewport', async () => {
+    await page.viewport(375, 667)
+    const { getByRole } = await render(ResponsiveNav)
+
+    await expect.element(getByRole('button', { name: /menu/i })).toBeVisible()
+
+    await page.viewport(1280, 800)
+    await expect.element(getByRole('navigation')).toBeVisible()
+  })
+})
+```
+
+---
+
 ## nestjs
 
 > Not applicable — Browser Mode targets UI components rendered in a real browser. NestJS is a

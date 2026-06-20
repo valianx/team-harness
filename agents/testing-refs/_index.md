@@ -12,7 +12,7 @@
 | ui-component | ui-component.md | react-nextjs | — (type is FE-only) |
 | visual | visual.md | react-nextjs | — (type is FE-only) |
 | a11y | a11y.md | react-nextjs | — (type is FE-only) |
-| browser-mode | browser-mode.md | react-nextjs | — (type is FE-only; nestjs/go/python: n/a) |
+| browser-mode | browser-mode.md | react-nextjs, vue, svelte | — (type is FE-only; nestjs/go/python: n/a) |
 
 > **Engine-overlap note:** `ui-component` (Storybook + `@storybook/addon-vitest`), `visual` Option C (`toMatchScreenshot` in a browser project), `browser-mode` (`vitest-browser-react`), and `a11y` No-Storybook path (axe-core inside a vitest-browser-react test) all execute inside Vitest Browser Mode (`@vitest/browser-playwright`). When two types are warranted for a single AC, load both reference files and apply each file's boundary note: story = appearance + interaction; browser-mode = raw layout/observer assertions.
 
