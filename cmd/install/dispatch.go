@@ -18,6 +18,12 @@ var opencodeDirFlag = ""
 // memoryURLFlag holds the --memory-url flag value (default: "", falls back to MEMORY_MCP_URL env).
 var memoryURLFlag = ""
 
+// nonInteractiveFlag holds the --non-interactive / --yes flag value.
+// When true, the opencode apply path skips the interactive form even when a
+// TTY is present, resolving configuration from env/flags only. This closes
+// the "tty present, no human" hang class (SEC-DR-7).
+var nonInteractiveFlag = false
+
 // dispatchSubcommand checks os.Args for a plan|apply|uninstall subcommand and
 // runs it. Returns true if a subcommand was handled (caller should not run the
 // legacy interactive install). Returns false if no subcommand matched.
@@ -102,6 +108,10 @@ func parseDispatchFlags(args []string) []string {
 			i += 2
 		case strings.HasPrefix(arg, "--memory-url="):
 			memoryURLFlag = strings.TrimPrefix(arg, "--memory-url=")
+			i++
+		case arg == "--non-interactive", arg == "--yes":
+			// Both forms are accepted as aliases (SEC-DR-7).
+			nonInteractiveFlag = true
 			i++
 		default:
 			remaining = append(remaining, arg)
@@ -206,94 +216,162 @@ func runApplyCommand() {
 		os.Exit(1)
 	}
 
-	// For opencode runtime, optionally register MCP servers in opencode.json.
-	// Both Memory MCP URL and context7 key are optional — assets are installed
-	// regardless. Skip-if-absent; no os.Exit when neither is supplied.
+	// For the opencode runtime: run the full setup flow (interactive or
+	// env/flags), write .team-harness.json, and register MCP servers.
 	if runtimeFlag == "opencode" {
-		registerOpencodeMCPIfConfigured(placer.SettingsDocPath())
+		opencodePlacer, ok := placer.(*opencodePlacer)
+		if !ok {
+			fmt.Fprintln(os.Stderr, "apply: internal error: opencode runtime has unexpected placer type")
+			os.Exit(1)
+		}
+		runOpencodePostApply(&diff, opencodePlacer)
+		return
 	}
 
 	fmt.Printf("apply: done (created %d, updated %d, skipped %d, removed %d)\n",
 		len(diff.ToCreate), len(diff.ToUpdate), len(diff.ToSkipHashMatch), len(diff.ToRemove))
-
-	// For the opencode runtime, remind the operator how to update later.
-	// The Claude Code path uses /th:update via the plugin marketplace; opencode
-	// has no plugin marketplace — re-running the install link is the only update
-	// mechanism, and /th-update in opencode triggers the same instruction.
-	if runtimeFlag == "opencode" {
-		fmt.Println("To update later, re-run: curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash (or type /th-update in opencode).")
-	}
 }
 
-// registerOpencodeMCPIfConfigured registers MCP servers in opencode.json when
-// the corresponding credentials are present. Both entries are optional:
-//
-//   - Memory MCP: registered when --memory-url flag or MEMORY_MCP_URL env is set.
-//     If the value fails scheme validation (non-http/https), the install exits
-//     non-zero — a provided-but-invalid URL is always an error.
-//     If absent: skipped with a one-line note; no exit.
-//
-//   - context7: registered when CONTEXT7_API_KEY env is set.
-//     If absent: skipped with a one-line note; no exit.
-//
-// A summary line lists which servers were registered vs skipped (names only,
-// never values).
-func registerOpencodeMCPIfConfigured(settingsDocPath string) {
-	memURL := resolveOpencodeMemoryURL()
-	ctx7Present := strings.TrimSpace(os.Getenv("CONTEXT7_API_KEY")) != ""
+// runOpencodePostApply handles the opencode-specific post-apply flow:
+//  1. Determine whether to run the interactive form or the env/flags path.
+//  2. Collect opencode setup values.
+//  3. Write .team-harness.json (allowlisted merge-preserving).
+//  4. Register MCP servers in opencode.json.
+//  5. Print the explanatory apply summary.
+func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
+	cfgPath := opencodeSettingsConfigPath(placer.ConfigRoot())
 
+	// Gate: interactive ONLY when a real TTY is present AND --non-interactive
+	// is NOT set. The nonInteractiveFlag closes the "tty present, no human"
+	// hang class (#378 by another door — SEC-DR-7).
+	interactive := !nonInteractiveFlag && hasInteractiveInput()
+
+	var cfg opencodeSetupValues
+	if interactive {
+		// P3: detect pre-existing config and ask before reusing.
+		existing := detectExistingConfig(cfgPath)
+		var existingStrings map[string]string
+		if existing != nil {
+			existingStrings = map[string]string{
+				"logs-mode":      extractStringFromRaw(existing, "logs-mode"),
+				"logs-path":      extractStringFromRaw(existing, "logs-path"),
+				"logs-subfolder": extractStringFromRaw(existing, "logs-subfolder"),
+				"language":       extractStringFromRaw(existing, "language"),
+			}
+		}
+		cfg = collectOpencodeSetupInteractive(existingStrings)
+	} else {
+		cfg = resolveOpencodeSetupFromEnvFlags()
+	}
+
+	// Write the .team-harness.json through the hardened write path (SEC-OC-R2).
+	if err := writeOpencodeTeamHarnessConfig(cfgPath, cfg, placer); err != nil {
+		fmt.Fprintf(os.Stderr, "apply: write .team-harness.json: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Register MCP servers in opencode.json.
+	registerOpencodeMCPFromValues(cfg.MCP, placer.SettingsDocPath())
+
+	// Print the explanatory summary.
+	printOpencodeApplySummary(diff, cfg, cfgPath, placer.ConfigRoot())
+}
+
+// resolveOpencodeSetupFromEnvFlags builds opencodeSetupValues from environment
+// variables and flags only, with sensible defaults. This is the non-interactive
+// path: no prompts, no blocking, no /dev/tty access.
+func resolveOpencodeSetupFromEnvFlags() opencodeSetupValues {
+	cfg := opencodeSetupValues{}
+
+	// Work-logs mode from LOGS_MODE env (default: local).
+	logsMode := strings.TrimSpace(os.Getenv("LOGS_MODE"))
+	if logsMode == "" {
+		logsMode = "local"
+	}
+	cfg.LogsMode = logsMode
+	if logsMode == "obsidian" {
+		cfg.LogsPath = strings.TrimSpace(os.Getenv("LOGS_PATH"))
+		cfg.LogsSubfolder = strings.TrimSpace(os.Getenv("LOGS_SUBFOLDER"))
+		if cfg.LogsSubfolder == "" {
+			cfg.LogsSubfolder = "work-logs"
+		}
+	}
+
+	// Language from LANGUAGE env (optional).
+	cfg.Language = strings.TrimSpace(os.Getenv("LANGUAGE"))
+	// Strip locale variants (e.g. "es_MX" → "es").
+	if idx := strings.IndexByte(cfg.Language, '_'); idx >= 0 {
+		cfg.Language = cfg.Language[:idx]
+	}
+	if len(cfg.Language) != 2 {
+		cfg.Language = "" // only accept clean ISO 639-1
+	}
+
+	// Memory MCP from flag / env.
+	memURL := resolveOpencodeMemoryURL()
+	cfg.MCP.MemoryURL = memURL
+	if memURL != "" {
+		cfg.MCP.MemoryRequiresAuth = strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")) != ""
+	}
+
+	// context7 from env.
+	cfg.MCP.Context7Enabled = strings.TrimSpace(os.Getenv("CONTEXT7_API_KEY")) != ""
+
+	return cfg
+}
+
+// registerOpencodeMCPFromValues registers MCP servers in opencode.json using
+// the values from an opencodeSetupValues struct. This is the refactored sink
+// that accepts an explicit struct rather than reading from global env/flags.
+//
+// Contract (unchanged from the former registerOpencodeMCPIfConfigured):
+//   - Memory MCP: registered when mcp.MemoryURL is non-empty. A provided-but-
+//     invalid URL exits non-zero (provided-but-invalid is always an error).
+//     If absent: skipped with a one-line note; no os.Exit.
+//   - context7: registered when mcp.Context7Enabled is true.
+//     If absent: skipped with a one-line note; no os.Exit.
+//   - A non-blocking warning is printed when the bearer is unset (opencode
+//     resolves {env:MEMORY_MCP_BEARER} at runtime).
+//   - Summary: names only, never URL values or secret values (SEC-OC-R5).
+func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string) {
 	const context7URL = "https://mcp.context7.com/mcp"
 
 	memRegistered := false
 	ctx7Registered := false
 
-	if memURL != "" {
+	if mcp.MemoryURL != "" {
 		// URL was provided — validate scheme; exit on bad value.
-		if err := validateMCPURL(memURL); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: MEMORY_MCP_URL=%q is invalid: %s\n", memURL, err)
+		if err := validateMCPURL(mcp.MemoryURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Memory MCP URL is invalid: %s\n", err)
 			os.Exit(1)
 		}
 		memRegistered = true
 
-		// Non-blocking warning when the bearer is unset at install time.
+		// Non-blocking warning when the bearer env var is unset at install time.
 		// opencode resolves {env:MEMORY_MCP_BEARER} at runtime.
 		if strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")) == "" {
 			fmt.Fprintln(os.Stderr, "Warning: MEMORY_MCP_BEARER is not set. opencode will send an empty Authorization header to the Memory MCP until you export MEMORY_MCP_BEARER in your shell.")
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "Memory MCP not configured (MEMORY_MCP_URL not set). To register later: re-run with MEMORY_MCP_URL=<url> --memory-url <url>, or edit opencode.json directly.")
+		fmt.Fprintln(os.Stderr, "Memory MCP not configured. To register later: re-run the install with MEMORY_MCP_URL set, or edit opencode.json directly.")
 	}
 
-	if ctx7Present {
+	if mcp.Context7Enabled {
 		ctx7Registered = true
 	} else {
-		fmt.Fprintln(os.Stderr, "context7 not configured (CONTEXT7_API_KEY not set). To register later: re-run with CONTEXT7_API_KEY=<key> set, or edit opencode.json directly.")
+		fmt.Fprintln(os.Stderr, "context7 not configured. To register later: export CONTEXT7_API_KEY and re-run the install, or edit opencode.json directly.")
 	}
 
 	// Register whichever servers are configured in a single opencode.json write.
-	// registerOpencodeMCP skips an entry when its URL is empty (buildOpencodeMemoryEntry
-	// returns nil for empty URL; buildOpencodeContext7Entry is guarded below).
 	if memRegistered || ctx7Registered {
 		ctx7URL := ""
 		if ctx7Registered {
 			ctx7URL = context7URL
 		}
-		if err := registerOpencodeMCP(memURL, ctx7URL, settingsDocPath); err != nil {
+		if err := registerOpencodeMCP(mcp.MemoryURL, ctx7URL, settingsDocPath); err != nil {
 			fmt.Fprintf(os.Stderr, "apply: opencode.json MCP registration: %v\n", err)
 			os.Exit(1)
 		}
-	}
-
-	// Summary: names only, never values.
-	switch {
-	case memRegistered && ctx7Registered:
-		fmt.Println("apply: MCP registered: memory, context7")
-	case memRegistered:
-		fmt.Println("apply: MCP registered: memory (context7 skipped — CONTEXT7_API_KEY not set)")
-	case ctx7Registered:
-		fmt.Println("apply: MCP registered: context7 (memory skipped — MEMORY_MCP_URL not set)")
-	default:
-		fmt.Println("apply: MCP registration skipped (neither MEMORY_MCP_URL nor CONTEXT7_API_KEY set)")
 	}
 }
 
@@ -306,6 +384,91 @@ func resolveOpencodeMemoryURL() string {
 		return strings.TrimSpace(memoryURLFlag)
 	}
 	return strings.TrimSpace(os.Getenv("MEMORY_MCP_URL"))
+}
+
+// printOpencodeApplySummary prints the explanatory post-apply summary for the
+// opencode runtime. The summary describes what was placed, what was written to
+// config, and MCP status — using names only, never echoing URL values or
+// secrets (SEC-OC-R5).
+//
+// Keys with no live opencode reader today (language, english_learning, clickup,
+// obsidian_tasks) are described as "written to config" to avoid overstating
+// enforcement. The keys WITH a live reader (logs-mode/logs-path/logs-subfolder
+// via checkpoint-guard; prepublish_check via prepublish-guard) are described
+// as "read by the opencode hook plugin".
+func printOpencodeApplySummary(diff *PlanDiff, cfg opencodeSetupValues, cfgPath, configRoot string) {
+	created := len(diff.ToCreate)
+	updated := len(diff.ToUpdate)
+	skipped := len(diff.ToSkipHashMatch)
+	removed := len(diff.ToRemove)
+
+	fmt.Println("apply: done — opencode runtime")
+	fmt.Printf("  Components placed (created %d, updated %d, skipped %d, removed %d):\n",
+		created, updated, skipped, removed)
+	fmt.Printf("    agents  → %s/agents/\n", configRoot)
+	fmt.Printf("    plugin  → %s/plugins/\n", configRoot)
+	fmt.Println()
+	fmt.Printf("  Settings written → %s\n", cfgPath)
+
+	// Work-logs (has a live opencode reader via checkpoint-guard).
+	switch cfg.LogsMode {
+	case "obsidian":
+		fmt.Printf("    work-logs        → obsidian → %s\n", cfg.LogsPath)
+		fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
+	default:
+		fmt.Printf("    work-logs        → local\n")
+		fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
+	}
+
+	// Language (no live opencode reader yet — written forward-compatibly).
+	if cfg.Language != "" {
+		fmt.Printf("    language         → %s (written to config; runtime enforcement on opencode is a tracked follow-up)\n", cfg.Language)
+	} else {
+		fmt.Printf("    language         → (not set)\n")
+	}
+
+	// English learning (no live opencode reader yet).
+	if cfg.EnglishLearning {
+		fmt.Printf("    english-learning → enabled (written to config; runtime enforcement on opencode is a tracked follow-up)\n")
+	} else {
+		fmt.Printf("    english-learning → off\n")
+	}
+
+	// ClickUp (no live opencode reader yet).
+	if cfg.ClickUpWorkspaceID != "" {
+		fmt.Printf("    clickup          → configured (written to config)\n")
+	} else {
+		fmt.Printf("    clickup          → (not configured)\n")
+	}
+
+	// Obsidian tasks (no live opencode reader yet).
+	if cfg.ObsidianTasksEnabled {
+		fmt.Printf("    obsidian-tasks   → enabled (written to config)\n")
+	} else {
+		fmt.Printf("    obsidian-tasks   → (not enabled)\n")
+	}
+
+	// MCP status — names only, never values (SEC-OC-R5).
+	fmt.Println()
+	fmt.Println("  MCP servers (opencode.json):")
+	if cfg.MCP.MemoryURL != "" {
+		if cfg.MCP.MemoryRequiresAuth {
+			fmt.Println("    memory    → registered  (bearer resolved at runtime from {env:MEMORY_MCP_BEARER} — export it in your shell)")
+		} else {
+			fmt.Println("    memory    → registered")
+		}
+	} else {
+		fmt.Println("    memory    → skipped     (set MEMORY_MCP_URL and re-run to register)")
+	}
+
+	if cfg.MCP.Context7Enabled {
+		fmt.Println("    context7  → registered  (API key resolved at runtime from {env:CONTEXT7_API_KEY} — export it in your shell)")
+	} else {
+		fmt.Println("    context7  → skipped     (export CONTEXT7_API_KEY and re-run to register)")
+	}
+
+	fmt.Println()
+	fmt.Println("  Update later: re-run the install link, or type /th-update inside opencode.")
 }
 
 // runUninstallCommand runs the manifest uninstall subcommand.
