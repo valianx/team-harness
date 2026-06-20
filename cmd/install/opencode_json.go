@@ -44,13 +44,14 @@ func registerOpencodeMCP(memURL, context7URL, docPath string) error {
 		_ = json.Unmarshal(v, &mcpRaw)
 	}
 
-	// Build desired entries.
+	// Build desired entries. Either may be nil when the caller passes an empty
+	// URL — the entry is simply not written (skip-if-absent).
 	newMemory := buildOpencodeMemoryEntry(memURL)
 	newContext7 := buildOpencodeContext7Entry(context7URL)
 
 	// Detect whether anything would change.
 	memChanged := newMemory != nil && !opencodeEntryMatches(mcpRaw["memory"], newMemory)
-	ctx7Changed := !opencodeEntryMatches(mcpRaw["context7"], newContext7)
+	ctx7Changed := newContext7 != nil && !opencodeEntryMatches(mcpRaw["context7"], newContext7)
 
 	if !memChanged && !ctx7Changed {
 		return nil // nothing to do — already up-to-date
@@ -70,7 +71,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string) error {
 		encoded, _ := json.Marshal(merged)
 		mcpRaw["memory"] = json.RawMessage(encoded)
 	}
-	if ctx7Changed {
+	if ctx7Changed && newContext7 != nil {
 		merged := opencodeMergeEntry(mcpRaw["context7"], newContext7)
 		encoded, _ := json.Marshal(merged)
 		mcpRaw["context7"] = json.RawMessage(encoded)
@@ -108,8 +109,12 @@ func buildOpencodeMemoryEntry(url string) map[string]interface{} {
 }
 
 // buildOpencodeContext7Entry returns the desired mcp.context7 entry.
+// Returns nil when url is empty — the caller skips writing the entry.
 // The API key is written as {env:CONTEXT7_API_KEY} (no literal secret).
 func buildOpencodeContext7Entry(url string) map[string]interface{} {
+	if url == "" {
+		return nil
+	}
 	return map[string]interface{}{
 		"type": "remote",
 		"url":  url,

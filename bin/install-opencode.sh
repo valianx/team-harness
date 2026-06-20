@@ -105,35 +105,15 @@ fi
 echo "Checksum verified."
 
 # ---------------------------------------------------------------------------
-# Memory URL resolution (AC-2, AC-3, AC-5).
-# Read MEMORY_MCP_URL from env; fall back to /dev/tty prompt; error if neither.
-# Never echo or log the URL value (AC-5, SEC-DR-4).
-# ---------------------------------------------------------------------------
-if [ -z "${MEMORY_MCP_URL:-}" ]; then
-    if [ -e /dev/tty ]; then
-        printf 'Memory MCP URL (e.g. https://your-mcp.example.com/mcp): ' >/dev/tty
-        IFS= read -r MEMORY_MCP_URL </dev/tty
-        if [ -z "${MEMORY_MCP_URL:-}" ]; then
-            echo "Error: Memory MCP URL is required. Set MEMORY_MCP_URL or enter it at the prompt." >&2
-            exit 1
-        fi
-    else
-        echo "Error: Memory MCP URL is required." >&2
-        echo "  Detected: no controlling terminal available and MEMORY_MCP_URL is not set." >&2
-        echo "  Options:" >&2
-        echo "    1. Set the env var before running:" >&2
-        echo "         MEMORY_MCP_URL=https://your-mcp.example.com/mcp \\" >&2
-        echo "           curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash" >&2
-        echo "    2. Run interactively in a real terminal (TTY available)." >&2
-        echo "  There is no default URL." >&2
-        exit 1
-    fi
-fi
-
-# ---------------------------------------------------------------------------
 # Run the verified binary.
-# Pass --memory-url on the argv so the URL is NOT passed via the environment
-# that the shell would record in history.
+# MEMORY_MCP_URL and CONTEXT7_API_KEY are OPTIONAL. When set, pass
+# --memory-url on argv (so the URL is NOT recorded in shell history).
+# When absent, the binary installs all assets and skips MCP registration —
+# no prompt, no error, no hang. To register MCP servers later, re-run with:
+#   MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
+#     CONTEXT7_API_KEY=your-key \
+#     curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+#
 # Redirect stdin from /dev/tty when present — same rationale as install.sh:
 # when invoked via 'curl | bash', bash holds the pipe as stdin; the binary
 # must read from the operator's terminal, not the remaining pipe bytes.
@@ -142,16 +122,23 @@ fi
 chmod +x "$TMP/install"
 
 echo "Launching installer..."
-if [ -e /dev/tty ]; then
-    "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@" </dev/tty
+if [ -n "${MEMORY_MCP_URL:-}" ]; then
+    # URL provided — pass it via argv (not via env that shell records in history).
+    if [ -e /dev/tty ]; then
+        "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@" </dev/tty
+    else
+        "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@"
+    fi
 else
-    "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@"
+    # No URL — install assets only; MCP registration is skipped inside the binary.
+    if [ -e /dev/tty ]; then
+        "$TMP/install" apply --runtime opencode --scope global "$@" </dev/tty
+    else
+        "$TMP/install" apply --runtime opencode --scope global "$@"
+    fi
 fi
 INSTALL_EXIT=$?
 
-# AC-10: the binary (dispatch.go::registerOpencodeRequiredMCP) emits the
-# MEMORY_MCP_BEARER warning authoritatively because it knows whether the MCP
-# registration happened. The script must NOT duplicate that warning — the
-# operator would see it twice per install. Exit with the binary's exit code.
-
+# The binary (dispatch.go::registerOpencodeMCPIfConfigured) emits any
+# MCP-related notes authoritatively. The script does not duplicate them.
 exit $INSTALL_EXIT

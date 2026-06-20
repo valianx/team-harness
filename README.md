@@ -34,24 +34,34 @@ opencode support is in beta. Install Team Harness into opencode with:
 curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
 ```
 
-You will be prompted for your Memory MCP URL, or set `MEMORY_MCP_URL` beforehand to run fully non-interactively:
+This installs all agents, skills, commands, and hooks. The bare form requires no environment variables — MCP server registration is optional and skipped when credentials are absent.
+
+To auto-register MCP servers at install time, supply them via environment:
+
+```
+MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
+  CONTEXT7_API_KEY=your-key \
+  curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+```
+
+Or to register only Memory MCP (context7 skipped):
 
 ```
 MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
   curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
 ```
 
+To add or update MCP entries after install, re-run with the desired env vars set.
+
 **Environment variables:**
 
-| Variable | When required | Purpose |
+| Variable | Required | Purpose |
 |---|---|---|
-| `MEMORY_MCP_URL` | At install time | Your Memory MCP server URL. Written literally to `opencode.json`; not a secret. |
-| `MEMORY_MCP_BEARER` | In your shell when running opencode | opencode resolves `{env:MEMORY_MCP_BEARER}` at runtime. If unset, the Authorization header is sent empty. |
-| `CONTEXT7_API_KEY` | In your shell when running opencode | opencode resolves `{env:CONTEXT7_API_KEY}` at runtime for library docs retrieval. |
+| `MEMORY_MCP_URL` | Optional | Memory MCP server URL. When set, registered in `opencode.json` at install time. When absent, skipped — configure later. |
+| `CONTEXT7_API_KEY` | Optional | context7 API key for library docs retrieval. When set, registers the context7 MCP server. When absent, skipped — configure later. |
+| `MEMORY_MCP_BEARER` | Optional at install | opencode resolves `{env:MEMORY_MCP_BEARER}` at runtime. If unset when the install runs, a one-line non-blocking warning is printed; the install still completes. |
 
 The installer writes only the Memory URL literally to `opencode.json`. Both secrets (`MEMORY_MCP_BEARER` and `CONTEXT7_API_KEY`) remain as `{env:}` references resolved by opencode at runtime — they are never written to disk by team-harness.
-
-If `MEMORY_MCP_BEARER` is not exported in your shell when the install runs, the script prints a one-line non-blocking warning (the install still completes).
 
 **Security note:** The downloaded binary is verified against the published `SHA256SUMS` before it runs. The checksum file is served over HTTPS from the GitHub release origin but is not cryptographically signed — verification protects against corruption and tampering of the binary relative to the checksum, not against a compromise of the release origin (TOFU over HTTPS).
 

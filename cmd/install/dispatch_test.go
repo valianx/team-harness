@@ -1,17 +1,16 @@
 package main
 
 // Tests for the opencode apply path: --memory-url flag parsing, URL validation,
-// empty-URL hard-error, and the bearer-unset warning being non-blocking.
+// optional-skip-if-absent behavior, and the bearer-unset warning being non-blocking.
 //
-// os.Exit paths (AC-2, AC-2b) cannot be directly exercised in unit tests without
-// subprocess wiring. The tests below cover the deterministic helpers that
-// feed those paths:
-//   - parseDispatchFlags consumes --memory-url (AC-2c)
-//   - resolveOpencodeMemoryURL returns the flag value when set
+// The tests below cover the deterministic helpers that feed the optional-MCP path:
+//   - parseDispatchFlags consumes --memory-url
+//   - resolveOpencodeMemoryURL returns the flag value when set (flag wins over env)
 //   - resolveOpencodeMemoryURL returns the env var value when set and no flag
-//   - validateMCPURL rejects non-http(s) schemes (AC-2b)
-//   - The bearer warning path is non-blocking (AC-10): MEMORY_MCP_BEARER unset
-//     does not cause a non-zero exit; the warning only goes to stderr.
+//   - resolveOpencodeMemoryURL returns "" when neither flag nor env is set (skip-if-absent)
+//   - validateMCPURL rejects non-http(s) schemes (provided-but-invalid is always an error)
+//   - The bearer warning path is non-blocking: MEMORY_MCP_BEARER unset does not
+//     cause a non-zero exit; the warning only goes to stderr.
 
 import (
 	"strings"
@@ -125,6 +124,23 @@ func TestResolveOpencodeMemoryURL_FlagWhitespaceIsTrimmed(t *testing.T) {
 	got := resolveOpencodeMemoryURL()
 	if got != "https://flag.example.com/mcp" {
 		t.Errorf("resolveOpencodeMemoryURL() = %q, want trimmed value", got)
+	}
+}
+
+// TestResolveOpencodeMemoryURL_AbsentReturnsEmpty verifies that when neither
+// --memory-url flag nor MEMORY_MCP_URL env is set, resolveOpencodeMemoryURL
+// returns "" (skip-if-absent — no os.Exit). The caller decides whether the
+// empty value means "skip registration" or "error on invalid provided URL".
+func TestResolveOpencodeMemoryURL_AbsentReturnsEmpty(t *testing.T) {
+	orig := memoryURLFlag
+	defer func() { memoryURLFlag = orig }()
+	memoryURLFlag = ""
+
+	t.Setenv("MEMORY_MCP_URL", "")
+
+	got := resolveOpencodeMemoryURL()
+	if got != "" {
+		t.Errorf("resolveOpencodeMemoryURL() = %q, want empty string when absent", got)
 	}
 }
 
