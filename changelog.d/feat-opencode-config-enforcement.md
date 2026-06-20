@@ -1,5 +1,0 @@
-### Added
-- opencode now applies the configured `language`, `english_learning`, and orchestrator-disposition at session start via a `session.created` event hook that calls `client.session.prompt(noReply:true)` — the opencode-native equivalent of Claude Code's SessionStart `additionalContext`; closes #386.
-- Extracted `composeSessionDirectives(config)` from `hooks/ts/bodies/session-start.ts` as a shared pure function — both the CC and opencode paths use the same directive text (single source of truth; no divergence possible).
-- Promoted `resolveOpencodeConfigRoot()` + `readOpencodeConfig()` to a shared shim (`hooks/ts/shim/opencode-config.ts`); removed private copies from `checkpoint-guard.opencode.ts` and `prepublish-guard.opencode.ts`.
-- Added behavioral Suite 20 (`tests/test_opencode_session_enforcement.sh`) with 19 assertions covering S-1 wired injection, S-2 directive snapshot, S-3 negative trigger, AC-3 fail-silent, AC-4 injection-resistance (SEC-DR-A/B), and end-to-end plugin-main wiring.
