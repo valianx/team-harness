@@ -697,6 +697,19 @@ gh pr create --base main \
 
 (`Fixes #` for `type: fix` / `type: hotfix` — triggers GitHub auto-close on merge; `Closes #` for everything else. When no linked issue exists, OMIT the `Closes #N` / `Fixes #N` line completely.)
 
+## Objective / Why (mandatory)
+{One sentence: the PR's goal and its governing principle, framed as the lens to review through. Source the goal from `01-plan.md § Review Summary` and the governing principle from the same. Example: "Relocate per-provider environment variables from the shared config table to per-provider docs so each integration is self-contained; the governing principle is that the shared table must not carry provider-specific detail." This section is the first thing the reviewer reads — everything else should be judged against it.}
+
+## Intentional removals (not regressions) (conditional — include only when the diff removes or relocates content; omit entirely otherwise)
+The reviewer's reconciliation step keys off this table. For each row, independently confirm the value exists at the stated destination before treating the removal as intentional.
+
+| Removed | Why | Where it lives now |
+|---------|-----|--------------------|
+| {removed element, e.g. `ALPS_TIMEOUT` env-table row} | {reason, e.g. relocated per governing principle — provider-specific detail belongs in the provider doc} | {destination, e.g. `docs/providers/alps.md § Environment variables`} |
+
+## Behavior-neutral reformat (conditional — include only when a pure reformat such as Prettier, gofmt, or whitespace normalization is folded into the diff; omit entirely otherwise)
+{N} lines in {files} are a behavior-neutral reformat; zero functional change.
+
 ## Bug Report (conditional — mandatory for type: fix and type: hotfix; omit entirely otherwise)
 
 **Reported behaviour:** {1-2 sentences from 01-plan.md § Review Summary → Bug Report → Reported behaviour}
@@ -734,6 +747,8 @@ Suggested reading order, optimised for the reviewer's mental model:
 3. Then `{test file}` to confirm the contract is exercised.
 4. Skim the rest.
 
+When deletions dominate (deletions > 2× additions, or the change is relocation-heavy), verify the destinations listed in *Intentional removals*, not the deletions themselves.
+
 ## Risk and blast radius (mandatory)
 - **Risk level:** low | medium | high — {one-line justification}
 - **Blast radius:** {what could break if this is wrong, e.g. "auth on /api/* — every authenticated endpoint would 401"}
@@ -767,11 +782,13 @@ EOF
 )"
 ```
 
-**Section omission rules:** sections marked **conditional** are omitted entirely (heading and content) when not applicable. Do NOT leave empty section headings. The reviewer reads what is present and skips nothing.
+**Section omission rules:** sections marked **conditional** are omitted entirely (heading and content) when not applicable. Do NOT leave empty section headings. The reviewer reads what is present and skips nothing. The mandatory sections in this template are: `## Objective / Why`, `## Main change`, `## File map`, `## How to review`, `## Risk and blast radius`, `## Acceptance Matrix`, `## Definition of Done`, and `## Version`. The conditional sections are: `## Intentional removals (not regressions)` (removals/relocations present in diff), `## Behavior-neutral reformat` (pure reformat folded in), `## Bug Report` (type: fix / hotfix), `## Before / after` (visible behaviour change), `## Follow-ups`, `## Pre-PR Review`, and `## Size justification`.
 
 **Step 11.3 — Update existing PR (when Step 11.0 found an open PR):**
 
 Update the existing PR's body with the same complete template as Step 11.2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — edit an existing PR". When `has_gh=false` and a token + GitHub origin are available, use the curl PATCH fallback. When neither is available, emit the URL for the operator to update manually.
+
+**Version-sync invariant:** when re-rendering the body after a re-version or merge, the `## Version` line and any version literal in `## Objective / Why` MUST reflect the current bumped version — never leave a stale version in the body.
 
 ```
 gh pr edit {pr-number} \
