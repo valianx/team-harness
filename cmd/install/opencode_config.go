@@ -8,6 +8,68 @@ import (
 	"time"
 )
 
+// claudeCodeTeamHarnessConfigPath returns the path to the Claude Code
+// team-harness config file: ~/.claude/.team-harness.json
+// (%USERPROFILE%\.claude\.team-harness.json on Windows).
+// Uses os.UserHomeDir for cross-platform home-directory resolution.
+func claudeCodeTeamHarnessConfigPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".claude", manifestFilename), nil
+}
+
+// importCandidate carries all 7 allowlisted keys read from a detected
+// .team-harness.json during migration source detection (CC config or
+// opencode-owned re-run).
+type importCandidate struct {
+	logsMode             string
+	logsPath             string
+	logsSubfolder        string
+	language             string
+	englishLearning      bool
+	clickUpWorkspaceID   string
+	obsidianTasksEnabled bool
+}
+
+// buildImportCandidate reads the 7 allowlisted keys from a raw JSON map via
+// the existing typed extractors. MCP URL and secrets are NOT in
+// .team-harness.json and are never read here.
+func buildImportCandidate(m map[string]json.RawMessage) *importCandidate {
+	return &importCandidate{
+		logsMode:             extractStringFromRaw(m, "logs-mode"),
+		logsPath:             extractStringFromRaw(m, "logs-path"),
+		logsSubfolder:        extractStringFromRaw(m, "logs-subfolder"),
+		language:             extractStringFromRaw(m, "language"),
+		englishLearning:      extractBoolFromRaw(m, "english_learning"),
+		clickUpWorkspaceID:   extractClickUpWorkspaceID(m),
+		obsidianTasksEnabled: extractObsidianTasksEnabled(m),
+	}
+}
+
+// hasControlChar reports whether s contains any character in [\x00-\x1f\x7f].
+// This mirrors CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/ from session-start.ts
+// (SEC-DR-A). Single definition reused for logs-path and clickup.workspace_id
+// validation in applyImportCandidate (SEC-004).
+func hasControlChar(s string) bool {
+	for _, r := range s {
+		if r <= 0x1f || r == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidISOLang reports whether s is a valid ISO 639-1 two-letter language
+// code (exactly 2 lowercase ASCII letters). Mirrors LANG_RE = /^[a-z]{2}$/.
+func isValidISOLang(s string) bool {
+	if len(s) != 2 {
+		return false
+	}
+	return s[0] >= 'a' && s[0] <= 'z' && s[1] >= 'a' && s[1] <= 'z'
+}
+
 // opencodeSettingsConfigPath returns the path to the team-harness config file
 // under the opencode config root: <root>/.team-harness.json.
 func opencodeSettingsConfigPath(configRoot string) string {

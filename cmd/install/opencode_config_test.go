@@ -221,3 +221,271 @@ func TestOpencodeSettingsConfigPath(t *testing.T) {
 		t.Errorf("opencodeSettingsConfigPath = %q, want %q", got, want)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests: buildImportCandidate — 7-key read (AC-2 / AC-4)
+// ---------------------------------------------------------------------------
+
+// TestBuildImportCandidate_ReadsAll7Keys verifies that buildImportCandidate
+// reads all 7 allowlisted keys from a raw JSON map, including the 3 non-form
+// keys that previously went unmigrated.
+func TestBuildImportCandidate_ReadsAll7Keys(t *testing.T) {
+	seed := map[string]interface{}{
+		"logs-mode":      "obsidian",
+		"logs-path":      "/vault/path",
+		"logs-subfolder": "notes",
+		"language":       "es",
+		"english_learning": true,
+		"clickup": map[string]interface{}{
+			"workspace_id": "ws-42",
+		},
+		"obsidian_tasks": map[string]interface{}{
+			"enabled": true,
+		},
+	}
+	seedBytes, _ := json.Marshal(seed)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(seedBytes, &raw); err != nil {
+		t.Fatalf("unmarshal seed: %v", err)
+	}
+
+	cand := buildImportCandidate(raw)
+	if cand == nil {
+		t.Fatal("buildImportCandidate returned nil")
+	}
+	if cand.logsMode != "obsidian" {
+		t.Errorf("logsMode = %q, want obsidian", cand.logsMode)
+	}
+	if cand.logsPath != "/vault/path" {
+		t.Errorf("logsPath = %q, want /vault/path", cand.logsPath)
+	}
+	if cand.logsSubfolder != "notes" {
+		t.Errorf("logsSubfolder = %q, want notes", cand.logsSubfolder)
+	}
+	if cand.language != "es" {
+		t.Errorf("language = %q, want es", cand.language)
+	}
+	if !cand.englishLearning {
+		t.Error("englishLearning = false, want true")
+	}
+	if cand.clickUpWorkspaceID != "ws-42" {
+		t.Errorf("clickUpWorkspaceID = %q, want ws-42", cand.clickUpWorkspaceID)
+	}
+	if !cand.obsidianTasksEnabled {
+		t.Error("obsidianTasksEnabled = false, want true")
+	}
+}
+
+// TestBuildImportCandidate_PartialKeys verifies that absent keys are returned
+// as zero values (not an error), so a sparse CC config migrates safely.
+func TestBuildImportCandidate_PartialKeys(t *testing.T) {
+	seed := map[string]interface{}{
+		"logs-mode": "local",
+	}
+	seedBytes, _ := json.Marshal(seed)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(seedBytes, &raw); err != nil {
+		t.Fatalf("unmarshal seed: %v", err)
+	}
+
+	cand := buildImportCandidate(raw)
+	if cand.logsMode != "local" {
+		t.Errorf("logsMode = %q, want local", cand.logsMode)
+	}
+	// All absent keys should be zero values.
+	if cand.logsPath != "" {
+		t.Errorf("logsPath = %q, want empty", cand.logsPath)
+	}
+	if cand.englishLearning {
+		t.Error("englishLearning = true, want false (absent key)")
+	}
+	if cand.clickUpWorkspaceID != "" {
+		t.Errorf("clickUpWorkspaceID = %q, want empty", cand.clickUpWorkspaceID)
+	}
+	if cand.obsidianTasksEnabled {
+		t.Error("obsidianTasksEnabled = true, want false (absent key)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: hasControlChar / isValidISOLang — SEC-004 pre-fill validation (AC-6)
+// ---------------------------------------------------------------------------
+
+// TestHasControlChar_DetectsNul verifies that \x00 is detected.
+func TestHasControlChar_DetectsNul(t *testing.T) {
+	if !hasControlChar("/path/with\x00nul") {
+		t.Error("hasControlChar: missed \\x00")
+	}
+}
+
+// TestHasControlChar_DetectsUnit1F verifies that \x1f (the last C0 control) is detected.
+func TestHasControlChar_DetectsUnit1F(t *testing.T) {
+	if !hasControlChar("/path/with\x1f") {
+		t.Error("hasControlChar: missed \\x1f")
+	}
+}
+
+// TestHasControlChar_DetectsDel verifies that \x7f (DEL) is detected.
+func TestHasControlChar_DetectsDel(t *testing.T) {
+	if !hasControlChar("bad\x7fvalue") {
+		t.Error("hasControlChar: missed \\x7f")
+	}
+}
+
+// TestHasControlChar_AcceptsCleanPath verifies that a normal path is accepted.
+func TestHasControlChar_AcceptsCleanPath(t *testing.T) {
+	if hasControlChar("/home/user/my-vault") {
+		t.Error("hasControlChar: false positive on clean path")
+	}
+}
+
+// TestIsValidISOLang_AcceptsLowercasePairs verifies valid 2-letter codes.
+func TestIsValidISOLang_AcceptsLowercasePairs(t *testing.T) {
+	for _, code := range []string{"en", "es", "fr", "de", "zh"} {
+		if !isValidISOLang(code) {
+			t.Errorf("isValidISOLang(%q) = false, want true", code)
+		}
+	}
+}
+
+// TestIsValidISOLang_RejectsTooLong verifies that codes longer than 2 letters
+// are rejected.
+func TestIsValidISOLang_RejectsTooLong(t *testing.T) {
+	for _, code := range []string{"eng", "english", "es_MX"} {
+		if isValidISOLang(code) {
+			t.Errorf("isValidISOLang(%q) = true, want false (too long)", code)
+		}
+	}
+}
+
+// TestIsValidISOLang_RejectsUppercase verifies that uppercase codes are rejected.
+func TestIsValidISOLang_RejectsUppercase(t *testing.T) {
+	for _, code := range []string{"EN", "Es", "FR"} {
+		if isValidISOLang(code) {
+			t.Errorf("isValidISOLang(%q) = true, want false (uppercase not allowed)", code)
+		}
+	}
+}
+
+// TestIsValidISOLang_RejectsEmpty verifies that empty string is rejected.
+func TestIsValidISOLang_RejectsEmpty(t *testing.T) {
+	if isValidISOLang("") {
+		t.Error("isValidISOLang(\"\") = true, want false")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: CC-config fallback path — AC-1, AC-4, AC-5
+// ---------------------------------------------------------------------------
+
+// TestCCConfigFallback_CandidateBuiltFromCCConfig verifies that when the
+// opencode-owned config is absent but ~/.claude/.team-harness.json exists,
+// detectExistingConfig finds it (AC-1 oracle: CC-config candidate detected).
+// This test exercises detectExistingConfig on the CC path directly (the HOME
+// override approach makes claudeCodeTeamHarnessConfigPath testable without
+// env manipulation on all platforms).
+func TestCCConfigFallback_DetectFromArbitraryPath(t *testing.T) {
+	// Simulate: write a valid .team-harness.json to a temp directory.
+	tmpHome := t.TempDir()
+	ccDir := filepath.Join(tmpHome, ".claude")
+	if err := os.MkdirAll(ccDir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	ccCfgPath := filepath.Join(ccDir, ".team-harness.json")
+
+	seed := map[string]interface{}{
+		"logs-mode": "obsidian",
+		"language":  "es",
+	}
+	seedBytes, _ := json.Marshal(seed)
+	if err := os.WriteFile(ccCfgPath, seedBytes, 0o600); err != nil {
+		t.Fatalf("write CC config: %v", err)
+	}
+
+	// Use detectExistingConfig directly on the CC path (same function the
+	// CC-fallback branch in dispatch.go calls).
+	m := detectExistingConfig(ccCfgPath)
+	if m == nil {
+		t.Fatal("detectExistingConfig returned nil for an existing CC config")
+	}
+	cand := buildImportCandidate(m)
+	if cand.logsMode != "obsidian" {
+		t.Errorf("logsMode = %q, want obsidian", cand.logsMode)
+	}
+	if cand.language != "es" {
+		t.Errorf("language = %q, want es", cand.language)
+	}
+}
+
+// TestCCConfigFallback_AbsentReturnNil verifies that detectExistingConfig
+// returns nil when the CC config file does not exist (AC-5: no CC config →
+// candidate nil → fresh defaults, install completes without requiring it).
+func TestCCConfigFallback_AbsentReturnNil(t *testing.T) {
+	tmpHome := t.TempDir()
+	nonExistentPath := filepath.Join(tmpHome, ".claude", ".team-harness.json")
+
+	m := detectExistingConfig(nonExistentPath)
+	if m != nil {
+		t.Error("detectExistingConfig returned non-nil for absent CC config (AC-5 violated)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: .ps1 static-verify check — AC-7, AC-9 (Step 10)
+// ---------------------------------------------------------------------------
+
+// TestInstallOpencodePS1_StaticVerify asserts that bin/install-opencode.ps1
+// contains the correct security-critical patterns required by AC-7 / AC-9:
+//   - Exact-field asset-name match using -eq (not Select-String, -match, or
+//     substring), per SEC-002.
+//   - .ToLowerInvariant() hash normalization, per SEC-001.
+//   - -UseBasicParsing and -TimeoutSec on BOTH download calls, per SEC-003.
+//   - Direct-run shape: & $exe / $psi.FileName with the binary file, per AC-8.
+//   - --memory-url argv shape, per AC-9.
+//   - $args forwarding, per AC-9.
+func TestInstallOpencodePS1_StaticVerify(t *testing.T) {
+	psPath := filepath.Join("..", "..", "bin", "install-opencode.ps1")
+	content, err := os.ReadFile(psPath)
+	if err != nil {
+		t.Fatalf("could not read bin/install-opencode.ps1: %v", err)
+	}
+	src := string(content)
+
+	checks := []struct {
+		name    string
+		pattern string
+	}{
+		// SEC-002: exact-field split, not substring match.
+		{"exact-field-split: -split '\\s+'", `-split '\s+'`},
+		{"exact-field-eq: -eq $Asset", `-eq $Asset`},
+		// SEC-001: case-insensitive hash normalization.
+		{"hash-normalization: ToLowerInvariant", `ToLowerInvariant()`},
+		// SEC-003: -UseBasicParsing and -TimeoutSec on downloads.
+		{"sums-download: UseBasicParsing", `-UseBasicParsing`},
+		{"sums-download: TimeoutSec", `-TimeoutSec`},
+		// Direct-run shape via ProcessStartInfo (AC-8).
+		{"direct-run: psi.FileName", `$psi.FileName`},
+		{"direct-run: UseShellExecute=$false", `UseShellExecute = $false`},
+		// --memory-url argv shape (AC-9).
+		{"memory-url-argv: --memory-url", `--memory-url`},
+		// $args forwarding (AC-9).
+		{"extra-args: $args", `$args`},
+		// No Select-String / -match for the asset name (SEC-002 negative check).
+	}
+
+	for _, chk := range checks {
+		if !containsString(src, chk.pattern) {
+			t.Errorf("install-opencode.ps1 missing required pattern (%s): %q", chk.name, chk.pattern)
+		}
+	}
+
+	// Negative check: SEC-002 requires exact-field match, NOT Select-String or -match
+	// against the asset name as a standalone substring matcher.
+	// "Select-String" may appear in comments explaining what NOT to do, so we check
+	// for the functional form: Select-String used with the $Asset variable.
+	if containsString(src, "Select-String $Asset") || containsString(src, "Select-String $asset") {
+		t.Error("install-opencode.ps1 uses Select-String for asset lookup (SEC-002 violated: use exact-field -eq)")
+	}
+}

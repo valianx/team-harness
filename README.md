@@ -30,26 +30,34 @@
 
 opencode support is in beta. Install Team Harness into opencode with:
 
+**Linux / macOS (bash):**
 ```
 curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+```
+
+**Windows (PowerShell):**
+```
+iwr https://valianx.github.io/team-harness/install-opencode.ps1 | iex
 ```
 
 This installs all agents, skills, commands, and hooks. The bare form requires no environment variables — MCP server registration is optional and skipped when credentials are absent.
 
 To auto-register MCP servers at install time, supply them via environment:
 
+**Linux / macOS:**
 ```
 MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
   CONTEXT7_API_KEY=your-key \
   curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
 ```
 
-Or to register only Memory MCP (context7 skipped):
+**Windows:**
+```
+$env:MEMORY_MCP_URL = "https://your-mcp.example.com/mcp"
+iwr https://valianx.github.io/team-harness/install-opencode.ps1 | iex
+```
 
-```
-MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
-  curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
-```
+Or to register only Memory MCP (context7 skipped), set only `MEMORY_MCP_URL` in the same way.
 
 To add or update MCP entries after install, re-run with the desired env vars set.
 

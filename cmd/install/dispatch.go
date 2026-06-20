@@ -248,18 +248,28 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 
 	var cfg opencodeSetupValues
 	if interactive {
-		// P3: detect pre-existing config and ask before reusing.
-		existing := detectExistingConfig(cfgPath)
-		var existingStrings map[string]string
-		if existing != nil {
-			existingStrings = map[string]string{
-				"logs-mode":      extractStringFromRaw(existing, "logs-mode"),
-				"logs-path":      extractStringFromRaw(existing, "logs-path"),
-				"logs-subfolder": extractStringFromRaw(existing, "logs-subfolder"),
-				"language":       extractStringFromRaw(existing, "language"),
+		// P3: detect pre-existing config and offer import before asking again.
+		//   (a) Check the opencode-owned config path first (re-run case).
+		//   (b) When absent, fall back to the CC config at ~/.claude/.team-harness.json
+		//       (first install on a machine that already has Claude Code team-harness).
+		//   (c) When neither exists: candidate is nil → fresh defaults (AC-5 / P2 preserved).
+		existingRaw := detectExistingConfig(cfgPath)
+		importSource := "opencode"
+		if existingRaw == nil {
+			if ccPath, err := claudeCodeTeamHarnessConfigPath(); err == nil {
+				if cc := detectExistingConfig(ccPath); cc != nil {
+					existingRaw = cc
+					importSource = "claude-code"
+				}
 			}
+			// os.UserHomeDir error or absent CC config → existingRaw stays nil → fresh.
 		}
-		cfg = collectOpencodeSetupInteractive(existingStrings)
+
+		var cand *importCandidate
+		if existingRaw != nil {
+			cand = buildImportCandidate(existingRaw)
+		}
+		cfg = collectOpencodeSetupInteractive(cand, importSource)
 	} else {
 		cfg = resolveOpencodeSetupFromEnvFlags()
 	}

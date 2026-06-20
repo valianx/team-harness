@@ -276,6 +276,25 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 21: Go installer — opencode Windows completeness"
+echo "# (buildImportCandidate 7-key read, accept/decline, SEC-004,"
+echo "#  .ps1 static verify, banner gate logic)"
+echo "# Requires: go. Skipped when absent."
+echo "############################################################"
+if ! command -v go >/dev/null 2>&1; then
+    echo "go-installer-opencode-windows: SKIP (go not found — install Go to run this suite)"
+else
+    REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+    if go test "$REPO_ROOT/cmd/install/..." -count=1 -run "TestBuildImportCandidate|TestHasControlChar|TestIsValidISOLang|TestCCConfigFallback|TestApplyImportCandidate|TestAnsiSupported|TestInstallOpencodePS1" 2>&1; then
+        echo "go-installer-opencode-windows: PASS"
+    else
+        echo "go-installer-opencode-windows: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

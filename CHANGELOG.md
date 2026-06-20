@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.116.0] - 2026-06-20
+
+### Added
+- `bin/install-opencode.ps1`: native Windows bootstrap for the opencode install path — downloads `install-windows-amd64.exe` / `arm64.exe`, verifies SHA256 fail-closed (exact-field asset match, case-insensitive compare, `-UseBasicParsing -TimeoutSec` on both downloads), strips Mark-of-the-Web, and runs the binary directly so the TUI inherits the real console stdin. One-liner: `iwr https://valianx.github.io/team-harness/install-opencode.ps1 | iex`.
+- `cmd/install/banner_windows.go`: `enableVirtualTerminalProcessing()` via `golang.org/x/sys/windows` to enable ANSI VT processing on Windows before the banner prints (SEC-005: non-restore is deliberate; process is short-lived; syscall failure falls to ASCII fallback).
+- `cmd/install/banner_unix.go`: no-op stub for non-Windows builds (existing banner behavior preserved byte-for-byte on Linux/macOS).
+
+### Changed
+- **opencode P3 config migration (Fix 1):** The import confirm was a latent no-op in #385 — "Start fresh" still pre-filled because `data.importExisting` was never read. The confirm is now a STANDALONE PRE-FORM decision that runs before the main form is built, so "Start fresh" yields true fresh defaults (AC-3 oracle). The 4-string adapter is replaced by `importCandidate` carrying all 7 allowlisted keys; the 3 non-form keys (`english_learning`, `clickup.workspace_id`, `obsidian_tasks.enabled`) now migrate on accept via `configure*` flags, with `buildOpencodeSetupValues` unchanged (AC-15).
+- **opencode P3 CC-config fallback:** When the opencode-owned `.team-harness.json` is absent (first install), the installer detects `~/.claude/.team-harness.json` (the operator's existing Claude Code config) and offers to import it. Declining yields fresh defaults. CC config import validates `logs-path` and `clickup.workspace_id` for control characters, and `language` for valid ISO 639-1, at the pre-fill point (SEC-004 parity with `CONTROL_CHAR_RE` from `session-start.ts`).
+- **Windows banner (Fix 3):** `ansiSupported()` now recognizes `WT_SESSION`/`TERM_PROGRAM`/`TERM`/`COLORTERM` on Windows and falls back to a `SetConsoleMode` VT-enable attempt. Windows Terminal now renders the same high-quality orange block-glyph banner as Linux/macOS; the `#` ASCII fallback is retained for truly legacy consoles.
+- `pages.yml`: publishes `install-opencode.ps1` alongside the existing scripts and adds a release-time smoke probe for the published URL.
+- `go.mod`: `golang.org/x/sys` promoted from indirect to direct dependency (already vendored at v0.42.0; no version change).
+
 ## [2.115.0] - 2026-06-20
 
 ### Added
