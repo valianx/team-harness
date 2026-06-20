@@ -174,6 +174,11 @@ func runPlanCommand() {
 // runApplyCommand runs the manifest apply subcommand.
 // Exits non-zero on error.
 func runApplyCommand() {
+	// Show the welcome banner at the top of the apply output (Fix 2).
+	// The dispatch path returns before main():70, so the banner would otherwise
+	// be skipped entirely for opencode installs.
+	printWelcomeBanner()
+
 	placer, err := selectPlacer()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apply: %v\n", err)
@@ -201,65 +206,98 @@ func runApplyCommand() {
 		os.Exit(1)
 	}
 
-	// For opencode runtime, register MCP servers in opencode.json.
-	// The Memory URL is required — no silent skip (repo policy: no default URL).
+	// For opencode runtime, optionally register MCP servers in opencode.json.
+	// Both Memory MCP URL and context7 key are optional — assets are installed
+	// regardless. Skip-if-absent; no os.Exit when neither is supplied.
 	if runtimeFlag == "opencode" {
-		registerOpencodeRequiredMCP(placer.SettingsDocPath())
+		registerOpencodeMCPIfConfigured(placer.SettingsDocPath())
 	}
 
 	fmt.Printf("apply: done (created %d, updated %d, skipped %d, removed %d)\n",
 		len(diff.ToCreate), len(diff.ToUpdate), len(diff.ToSkipHashMatch), len(diff.ToRemove))
 }
 
-// registerOpencodeRequiredMCP registers MCP servers in opencode.json for the
-// opencode runtime. The Memory URL is mandatory (repo policy: no default URL,
-// no silent skip). Resolution order: --memory-url flag → MEMORY_MCP_URL env.
-// Exits non-zero when the URL is absent or has a non-http(s) scheme.
-// Emits a non-blocking stderr warning when MEMORY_MCP_BEARER is unset (AC-10).
-func registerOpencodeRequiredMCP(settingsDocPath string) {
+// registerOpencodeMCPIfConfigured registers MCP servers in opencode.json when
+// the corresponding credentials are present. Both entries are optional:
+//
+//   - Memory MCP: registered when --memory-url flag or MEMORY_MCP_URL env is set.
+//     If the value fails scheme validation (non-http/https), the install exits
+//     non-zero — a provided-but-invalid URL is always an error.
+//     If absent: skipped with a one-line note; no exit.
+//
+//   - context7: registered when CONTEXT7_API_KEY env is set.
+//     If absent: skipped with a one-line note; no exit.
+//
+// A summary line lists which servers were registered vs skipped (names only,
+// never values).
+func registerOpencodeMCPIfConfigured(settingsDocPath string) {
 	memURL := resolveOpencodeMemoryURL()
-
-	if err := validateMCPURL(memURL); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: MEMORY_MCP_URL=%q is invalid: %s\n", memURL, err)
-		os.Exit(1)
-	}
+	ctx7Present := strings.TrimSpace(os.Getenv("CONTEXT7_API_KEY")) != ""
 
 	const context7URL = "https://mcp.context7.com/mcp"
-	if err := registerOpencodeMCP(memURL, context7URL, settingsDocPath); err != nil {
-		fmt.Fprintf(os.Stderr, "apply: opencode.json MCP registration: %v\n", err)
-		os.Exit(1)
+
+	memRegistered := false
+	ctx7Registered := false
+
+	if memURL != "" {
+		// URL was provided — validate scheme; exit on bad value.
+		if err := validateMCPURL(memURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: MEMORY_MCP_URL=%q is invalid: %s\n", memURL, err)
+			os.Exit(1)
+		}
+		memRegistered = true
+
+		// Non-blocking warning when the bearer is unset at install time.
+		// opencode resolves {env:MEMORY_MCP_BEARER} at runtime.
+		if strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")) == "" {
+			fmt.Fprintln(os.Stderr, "Warning: MEMORY_MCP_BEARER is not set. opencode will send an empty Authorization header to the Memory MCP until you export MEMORY_MCP_BEARER in your shell.")
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, "Memory MCP not configured (MEMORY_MCP_URL not set). To register later: re-run with MEMORY_MCP_URL=<url> --memory-url <url>, or edit opencode.json directly.")
 	}
 
-	// AC-10: non-blocking warning when the bearer is unset at install time.
-	// opencode resolves {env:MEMORY_MCP_BEARER} at runtime; if unset, the
-	// Authorization header will be empty until the operator exports the variable.
-	if strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")) == "" {
-		fmt.Fprintln(os.Stderr, "Warning: MEMORY_MCP_BEARER is not set. opencode will send an empty Authorization header to the Memory MCP until you export MEMORY_MCP_BEARER in your shell.")
+	if ctx7Present {
+		ctx7Registered = true
+	} else {
+		fmt.Fprintln(os.Stderr, "context7 not configured (CONTEXT7_API_KEY not set). To register later: re-run with CONTEXT7_API_KEY=<key> set, or edit opencode.json directly.")
+	}
+
+	// Register whichever servers are configured in a single opencode.json write.
+	// registerOpencodeMCP skips an entry when its URL is empty (buildOpencodeMemoryEntry
+	// returns nil for empty URL; buildOpencodeContext7Entry is guarded below).
+	if memRegistered || ctx7Registered {
+		ctx7URL := ""
+		if ctx7Registered {
+			ctx7URL = context7URL
+		}
+		if err := registerOpencodeMCP(memURL, ctx7URL, settingsDocPath); err != nil {
+			fmt.Fprintf(os.Stderr, "apply: opencode.json MCP registration: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Summary: names only, never values.
+	switch {
+	case memRegistered && ctx7Registered:
+		fmt.Println("apply: MCP registered: memory, context7")
+	case memRegistered:
+		fmt.Println("apply: MCP registered: memory (context7 skipped — CONTEXT7_API_KEY not set)")
+	case ctx7Registered:
+		fmt.Println("apply: MCP registered: context7 (memory skipped — MEMORY_MCP_URL not set)")
+	default:
+		fmt.Println("apply: MCP registration skipped (neither MEMORY_MCP_URL nor CONTEXT7_API_KEY set)")
 	}
 }
 
 // resolveOpencodeMemoryURL returns the Memory MCP URL from --memory-url flag or
-// MEMORY_MCP_URL env (trimmed). Exits non-zero with an instructive message when
-// neither is set (AC-2: no silent skip — a --runtime opencode apply requires an
-// explicit URL).
+// MEMORY_MCP_URL env (trimmed). Returns an empty string when neither is set —
+// the caller decides whether absence is an error (skip-if-absent for optional
+// registration; error for explicit --memory-url with invalid value).
 func resolveOpencodeMemoryURL() string {
 	if memoryURLFlag != "" {
 		return strings.TrimSpace(memoryURLFlag)
 	}
-	if env := strings.TrimSpace(os.Getenv("MEMORY_MCP_URL")); env != "" {
-		return env
-	}
-	fmt.Fprintln(os.Stderr, `Memory MCP URL is required for opencode installs.
-  Detected: neither --memory-url flag nor MEMORY_MCP_URL env var is set.
-  Options:
-    1. Pass the URL as a flag:
-         install apply --runtime opencode --memory-url https://your-mcp.example.com/mcp
-    2. Set the env var before running:
-         MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
-           install apply --runtime opencode
-  There is no default URL.`)
-	os.Exit(1)
-	return "" // unreachable
+	return strings.TrimSpace(os.Getenv("MEMORY_MCP_URL"))
 }
 
 // runUninstallCommand runs the manifest uninstall subcommand.
