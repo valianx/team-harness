@@ -204,6 +204,14 @@ Write operations that require a valid token.
    and the body file path. Report `status: blocked-manual-push`. Do NOT block
    waiting — surface the command and return.
 
+**Security note — JSON serialization:** all Tier B curl-write blocks that accept
+GitHub-sourced or operator-supplied field values (title, body, comment) write
+those values to a JSON payload file via `python3 json.dumps` (values passed as
+argv, never interpolated into a shell string), then pass the file to curl with
+`--data @<payload-file>`. Never add untrusted values directly inside a
+double-quoted `--data "{...}"` shell literal — that pattern is a CWE-78 injection
+vector and is prohibited here.
+
 ### Tier B — create a PR
 
 ```bash
@@ -211,12 +219,17 @@ if [ "$has_gh" = "true" ]; then
   gh pr create --title "{title}" --body "{body}" --base main --head {branch}
 elif [ "$is_github" = "true" ] && [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   token="${GH_TOKEN:-$GITHUB_TOKEN}"
+  # Serialize untrusted title/body/branch via python3 json.dumps (argv — no shell interpolation).
+  _pr_payload="$(mktemp /tmp/gh-pr-create-XXXXXX.json)"
+  python3 -c "import json,sys; print(json.dumps({'title':sys.argv[1],'body':sys.argv[2],'head':sys.argv[3],'base':'main'}))" \
+    "{title}" "{body}" "{branch}" > "$_pr_payload"
   curl -sf -X POST \
     -H "Authorization: Bearer $token" \
     -H "Accept: application/vnd.github+json" \
     -H "Content-Type: application/json" \
     "https://api.github.com/repos/$repo_path/pulls" \
-    --data "{\"title\":\"{title}\",\"body\":\"{body}\",\"head\":\"{branch}\",\"base\":\"main\"}"
+    --data @"$_pr_payload"
+  rm -f "$_pr_payload"
 else
   # Write body to file and surface for operator paste
   mkdir -p workspaces/{feature}/inputs
@@ -245,12 +258,17 @@ if [ "$has_gh" = "true" ]; then
   gh pr edit {number} --body "{body}"
 elif [ "$is_github" = "true" ] && [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   token="${GH_TOKEN:-$GITHUB_TOKEN}"
+  # Serialize untrusted body via python3 json.dumps (argv — no shell interpolation).
+  _pr_edit_payload="$(mktemp /tmp/gh-pr-edit-XXXXXX.json)"
+  python3 -c "import json,sys; print(json.dumps({'body':sys.argv[1]}))" \
+    "{body}" > "$_pr_edit_payload"
   curl -sf -X PATCH \
     -H "Authorization: Bearer $token" \
     -H "Accept: application/vnd.github+json" \
     -H "Content-Type: application/json" \
     "https://api.github.com/repos/$repo_path/pulls/{number}" \
-    --data "{\"body\":\"{body}\"}"
+    --data @"$_pr_edit_payload"
+  rm -f "$_pr_edit_payload"
 else
   echo "Update PR body manually at: https://github.com/$repo_path/pull/{number}"
 fi
@@ -263,12 +281,17 @@ if [ "$has_gh" = "true" ]; then
   gh issue create --title "{title}" --label "{label}" --assignee "@me" --body "{body}"
 elif [ "$is_github" = "true" ] && [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   token="${GH_TOKEN:-$GITHUB_TOKEN}"
+  # Serialize untrusted title/body/label via python3 json.dumps (argv — no shell interpolation).
+  _issue_create_payload="$(mktemp /tmp/gh-issue-create-XXXXXX.json)"
+  python3 -c "import json,sys; print(json.dumps({'title':sys.argv[1],'body':sys.argv[2],'labels':[sys.argv[3]]}))" \
+    "{title}" "{body}" "{label}" > "$_issue_create_payload"
   curl -sf -X POST \
     -H "Authorization: Bearer $token" \
     -H "Accept: application/vnd.github+json" \
     -H "Content-Type: application/json" \
     "https://api.github.com/repos/$repo_path/issues" \
-    --data "{\"title\":\"{title}\",\"body\":\"{body}\",\"labels\":[\"{label}\"]}"
+    --data @"$_issue_create_payload"
+  rm -f "$_issue_create_payload"
 else
   mkdir -p workspaces/{feature}/inputs
   cat > workspaces/{feature}/inputs/issue-create.md << 'ISSUEBODY'
@@ -287,12 +310,17 @@ if [ "$has_gh" = "true" ]; then
   gh issue edit {number} --body "{body}"
 elif [ "$is_github" = "true" ] && [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   token="${GH_TOKEN:-$GITHUB_TOKEN}"
+  # Serialize untrusted body via python3 json.dumps (argv — no shell interpolation).
+  _issue_edit_payload="$(mktemp /tmp/gh-issue-edit-XXXXXX.json)"
+  python3 -c "import json,sys; print(json.dumps({'body':sys.argv[1]}))" \
+    "{body}" > "$_issue_edit_payload"
   curl -sf -X PATCH \
     -H "Authorization: Bearer $token" \
     -H "Accept: application/vnd.github+json" \
     -H "Content-Type: application/json" \
     "https://api.github.com/repos/$repo_path/issues/{number}" \
-    --data "{\"body\":\"{body}\"}"
+    --data @"$_issue_edit_payload"
+  rm -f "$_issue_edit_payload"
 else
   mkdir -p workspaces/{feature}/inputs
   cat > workspaces/{feature}/inputs/issue-edit.md << 'EDITBODY'
@@ -310,12 +338,17 @@ if [ "$has_gh" = "true" ]; then
   gh issue comment {number} --body "{comment}"
 elif [ "$is_github" = "true" ] && [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   token="${GH_TOKEN:-$GITHUB_TOKEN}"
+  # Serialize untrusted comment via python3 json.dumps (argv — no shell interpolation).
+  _issue_comment_payload="$(mktemp /tmp/gh-issue-comment-XXXXXX.json)"
+  python3 -c "import json,sys; print(json.dumps({'body':sys.argv[1]}))" \
+    "{comment}" > "$_issue_comment_payload"
   curl -sf -X POST \
     -H "Authorization: Bearer $token" \
     -H "Accept: application/vnd.github+json" \
     -H "Content-Type: application/json" \
     "https://api.github.com/repos/$repo_path/issues/{number}/comments" \
-    --data "{\"body\":\"{comment}\"}"
+    --data @"$_issue_comment_payload"
+  rm -f "$_issue_comment_payload"
 else
   mkdir -p workspaces/{feature}/inputs
   cat > workspaces/{feature}/inputs/issue-comment.md << 'COMMENTBODY'
