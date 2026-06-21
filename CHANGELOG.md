@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.118.1] - 2026-06-21
+
+### Fixed
+
+- **opencode installer now migrates Claude Code memory + context7 MCP config into `opencode.json` on non-interactive apply.** The migration was silently skipped because `resolveClaudePaths()` — the sole initialiser of the `claudeJSON` package var — was only called on the legacy interactive path, after `dispatchSubcommand()` returned. On the `apply` sub-command path `claudeJSON` stayed `""`, causing `readExistingMCPServers()` to call `os.ReadFile("")` and return an empty map. Fixed by calling `resolveClaudePaths()` at the top of `runApplyCommand()`.
+- **context7 API key from CC config is now wired into the non-interactive resolver.** Previously `resolveOpencodeSetupFromEnvFlagsWithCCURL` only checked the `CONTEXT7_API_KEY` env var; the CC-migrated context7 key was never passed in. Fixed by changing the resolver to accept the full `opencodeMCPMigration` struct and checking `migration.Context7Key` as the env-var fallback.
+- **Migrated tokens are copied literally into `opencode.json` on the non-interactive CC→opencode migration path** so the MCP servers work out of the box without requiring the operator to export env vars. Literal copy is used only when the operator's `~/.claude.json` actually carried tokens (`ccMigration.hasLiteralTokens()`); absent tokens fall back to `{env:VAR}` references. This is a scoped, operator-authorised relaxation of the SEC-OC-R1 env-ref invariant for this migration path only. The file is written `0o600` unconditionally.
+- **Apply summary now leads with a prominent `Installed successfully` headline** followed by a de-emphasised detail block (component counts, paths, MCP status). The previous flat summary had no success signal.
+- **"Memory MCP not configured" / "context7 not configured" stderr lines no longer fire when the corresponding server was successfully migrated** from the CC config. They still fire when the server is genuinely absent (no URL / no key).
+
 ## [2.118.0] - 2026-06-21
 
 ### Added
