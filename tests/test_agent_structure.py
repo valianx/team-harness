@@ -4931,37 +4931,23 @@ check(
 # must declare `clickup_workspace_id` so the consumer (ClickUp skill) has a field
 # to read.  Verifies the producer↔consumer contract is not broken.
 #
-# Strategy: locate the Current State template region in orchestrator.md by
-# anchoring on the line "## Current State" and slicing to the next "##"-level
-# heading (the Phase Checklist).  Within that slice, assert:
+# Strategy: anchor on "## Current State" via _slice_section (anti-false-green:
+# missing anchor returns "" → checks fail immediately, no false-green possible).
+# Within that anchor-scoped slice, assert:
 #   1. `clickup_workspace_id` is declared as a field.
-#   2. The surrounding context ties it to the override/resolved/workspace concept.
+#   2. The slice context ties it to the override/resolved/workspace concept.
+#      (The entire slice is already scoped to the Current State template, so a
+#      simple token-in-slice check is sufficient — no ±N window needed.)
 _CS_ANCHOR = "## Current State"
-_cs_idx = _s32_orch.find(_CS_ANCHOR)
-if _cs_idx == -1:
-    _cs_template = ""
-else:
-    _cs_rest = _s32_orch[_cs_idx:]
-    # Terminate at the next "## " heading (sibling-level in the template).
-    _cs_boundary = re.search(r"\n## ", _cs_rest[1:])
-    _cs_template = _cs_rest[: _cs_boundary.start() + 1] if _cs_boundary else _cs_rest
+_cs_template = _slice_section(_s32_orch, _CS_ANCHOR)
 
 _gp_field_present = "clickup_workspace_id" in _cs_template
 _gp_context_ok = (
     _gp_field_present
     and (
-        "override" in _cs_template[
-            max(0, _cs_template.find("clickup_workspace_id") - 200):
-            _cs_template.find("clickup_workspace_id") + 200
-        ]
-        or "resolved" in _cs_template[
-            max(0, _cs_template.find("clickup_workspace_id") - 200):
-            _cs_template.find("clickup_workspace_id") + 200
-        ]
-        or "workspace" in _cs_template[
-            max(0, _cs_template.find("clickup_workspace_id") - 200):
-            _cs_template.find("clickup_workspace_id") + 200
-        ]
+        "override" in _cs_template
+        or "resolved" in _cs_template
+        or "workspace" in _cs_template
     )
 )
 check(
@@ -30274,6 +30260,212 @@ check(
 )
 
 # Marker: issues-batch-383-331-363-373
+
+# ---------------------------------------------------------------------------
+# Suite 126 — anchor-scoped-assertion-meta-test
+# ---------------------------------------------------------------------------
+# Enforces the normative testing principle (iii): structural assertions in
+# tests/*.py must use anchor-scoped _slice_section slicing, not fixed-width
+# find()+N content slices or changelog.d/*.md existence assertions.
+#
+# Banned shapes (these trigger a failure):
+#   (a) "token" in some_var[some_var.find("x") + N : some_var.find("x") + M]
+#       — fixed-width content slice feeding a 'token in slice' assertion.
+#       The regex matches: .find(...) followed by +/- <int> in a slice context.
+#       NB: abs(find(A, i) - i) <= N proximity guards are NOT banned (they
+#       compute distance, not a content slice). Index-comparison find() is NOT
+#       banned. Only the fixed-width slice shape that feeds a 'token in slice'
+#       boolean is forbidden.
+#   (b) (REPO_ROOT / "changelog.d" / "something.md").exists() — or equivalent
+#       changelog.d file-existence assertions feeding a check().
+#
+# SYNTHETIC-POSITIVE check (mirrors Suite 35 RED-on-branch note):
+# A synthetic string is constructed below that CONTAINS the banned shape in
+# its text content, and the scanner's predicate is applied to it directly —
+# proving the predicate fires on the banned shape (RED) without needing to
+# write an actual fragile assertion in this file.  The scanner itself never
+# scans synthetic strings — only real test-file paths — so this file's own
+# legitimate find() calls are never flagged.
+#
+# Self-referential guard: Suite 126 literal + anchor-scoped-assertion-meta-test
+# marker must be present in this file AND in docs/testing.md.
+# Suite 126 must be ABSENT from CLAUDE.md §11 (hygiene contract).
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 126: anchor-scoped-assertion-meta-test ===")
+
+import ast
+import glob as _glob_mod
+
+# --- Predicate: does this line look like the banned find()+N content-slice shape? ---
+# Matches lines that contain .find(...) followed by + or - <int> in a slice
+# context, AND are NOT:
+#   - comment lines (stripped starts with #)
+#   - inside _slice_section / _slice_bullet_section definitions
+#   - proximity guards: abs( ... find( ... ) ... - ... ) or for-loop index usage
+#   - index-comparison find() (find(X) < find(Y), find(X) == -1, etc.)
+# The predicate is intentionally conservative: it only fires on the shape
+# ".find(X) [+-] <int>" where the result is used in a slice (the context is
+# a [ ... ] indexing expression).
+_FRAGILE_FIND_RE = re.compile(
+    r'\.find\([^)]+\)\s*[\+\-]\s*\d+'
+)
+_PROXIMITY_RE = re.compile(
+    r'abs\s*\('
+)
+
+
+def _is_fragile_find_slice(line: str) -> bool:
+    """Return True when line contains the banned find()+N content-slice shape."""
+    stripped = line.strip()
+    # Skip comment lines
+    if stripped.startswith("#"):
+        return False
+    # Skip _slice_section / _slice_bullet_section definitions — helper internals
+    if "_slice_section" in stripped or "_slice_bullet" in stripped:
+        return False
+    # Skip lines that are inside a proximity guard (abs(...) pattern)
+    if _PROXIMITY_RE.search(stripped):
+        return False
+    # Skip index-comparison find() uses: find(X) == -1, find(X) < find(Y), etc.
+    # These patterns don't appear in a slice [find(X)±N] context.
+    if not re.search(r'\[', stripped):
+        # If there's no bracket on the line, the find() result is not used as
+        # a slice index — only as a comparison.  Allow it.
+        return False
+    return bool(_FRAGILE_FIND_RE.search(stripped))
+
+
+def _is_fragile_changelog_exists(line: str) -> bool:
+    """Return True when line contains a changelog.d file-existence assertion.
+
+    The banned form is constructing a Path with a changelog.d segment and then
+    calling .exists() on it.  Example of the banned shape (space-separated so
+    this docstring does not self-trigger the predicate):
+      (REPO_ROOT / changelog_d_dir / "fragment.md").exists()
+    This is never a valid structural test assertion: fragments are assembled and
+    deleted at delivery, so the file is always absent after release.
+    We require the path-construction operator (/) AND .exists() to distinguish
+    the banned assertion from predicate definitions or string comparisons.
+    """
+    stripped = line.strip()
+    if stripped.startswith("#"):
+        return False
+    # Require: changelog.d path segment + .exists() + path-construction context.
+    # The '/ "changelog.d"' or '/"changelog.d"' pattern identifies actual path
+    # construction (not a string-comparison predicate like this function's body).
+    _has_path_segment = (
+        '/ "changelog.d"' in stripped
+        or "/ 'changelog.d'" in stripped
+    )
+    return _has_path_segment and ".exists()" in stripped
+
+
+# --- Scan all tests/*.py files ---
+_s126_tests_dir = REPO_ROOT / "tests"
+_s126_py_files = list(_s126_tests_dir.glob("*.py"))
+
+_s126_fragile_find_hits: list[tuple[str, int, str]] = []
+_s126_changelog_exists_hits: list[tuple[str, int, str]] = []
+
+for _s126_path in _s126_py_files:
+    try:
+        _s126_src = _s126_path.read_text(encoding="utf-8")
+    except Exception:
+        continue
+    for _s126_lineno, _s126_line in enumerate(_s126_src.splitlines(), 1):
+        if _is_fragile_find_slice(_s126_line):
+            _s126_fragile_find_hits.append(
+                (str(_s126_path.name), _s126_lineno, _s126_line.strip()[:120])
+            )
+        if _is_fragile_changelog_exists(_s126_line):
+            _s126_changelog_exists_hits.append(
+                (str(_s126_path.name), _s126_lineno, _s126_line.strip()[:120])
+            )
+
+# Check (1) — no banned find()+N content-slice shape in any tests/*.py
+check(
+    "s126(1): no banned find()+N content-slice assertion remains in tests/*.py"
+    " (anchor-scoped-assertion-meta-test — banned shape: .find(X)±N in a slice)",
+    len(_s126_fragile_find_hits) == 0,
+    "Banned find()+N content-slice shape found in tests/*.py — refactor to"
+    " _slice_section(text, anchor):\n  "
+    + "\n  ".join(f"{f}:{n}: {l}" for f, n, l in _s126_fragile_find_hits[:5])
+    if _s126_fragile_find_hits else "",
+)
+
+# Check (2) — no changelog.d/*.md existence assertion in any tests/*.py
+check(
+    "s126(2): no changelog.d file-existence assertion remains in tests/*.py"
+    " (anchor-scoped-assertion-meta-test — assert ## [X.Y.Z] in CHANGELOG.md instead)",
+    len(_s126_changelog_exists_hits) == 0,
+    "Banned changelog.d/*.md existence assertion found in tests/*.py — replace"
+    " with: '## [X.Y.Z]' in CHANGELOG_text:\n  "
+    + "\n  ".join(f"{f}:{n}: {l}" for f, n, l in _s126_changelog_exists_hits[:5])
+    if _s126_changelog_exists_hits else "",
+)
+
+# Check (3) — SYNTHETIC-POSITIVE: the predicate fires on a synthetic banned string.
+# This proves the scanner would catch a real regression — a RED-on-branch test.
+# The synthetic string is assembled at runtime from parts so no single source line
+# contains the full banned shape (preventing the scanner from flagging THIS file).
+_S126_SYNTH_PARTS = [
+    '"frag_tok" in _var[_var',
+    "." + "find" + '("anchor") + 0 : _var',
+    "." + "find" + '("anchor") + 100]',
+]
+_S126_SYNTHETIC_BANNED = "".join(_S126_SYNTH_PARTS)
+_s126_synth_fires = _is_fragile_find_slice(_S126_SYNTHETIC_BANNED)
+check(
+    "s126(3): synthetic banned shape triggers the predicate"
+    " (confirms scanner would catch a real regression — synthetic-positive check)",
+    _s126_synth_fires,
+    "Predicate did NOT fire on the synthetic banned shape — the meta-test has"
+    " a false-negative gap; review _is_fragile_find_slice logic."
+    f" Synthetic line was: {_S126_SYNTHETIC_BANNED!r}",
+)
+
+# Check (4) — _slice_section canonical helper present in this file
+_s126_self_text = read(Path(__file__).resolve())
+check(
+    "s126(4): _slice_section canonical helper present in tests/test_agent_structure.py",
+    "_slice_section" in _s126_self_text and "def _slice_section" in _s126_self_text,
+    "Canonical helper '_slice_section' not found in test_agent_structure.py —"
+    " the helper must be defined here so new suites can import the pattern",
+)
+
+# Check (5) — docs/testing.md principle (iii) section present
+_s126_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "s126(5): docs/testing.md contains the normative principle"
+    " '### (iii) Structural assertions are anchor-scoped, never whole-file first-occurrence'",
+    "### (iii) Structural assertions are anchor-scoped" in _s126_testing_md,
+    "Normative principle '### (iii)' not found in docs/testing.md — "
+    "add the '### (iii) Structural assertions are anchor-scoped...' section under"
+    " '## Testing principles'",
+)
+
+# Check (6) — self-referential guard
+check(
+    "s126(6/self-ref): test file contains 'Suite 126' and 'anchor-scoped-assertion-meta-test'",
+    "Suite 126" in _s126_self_text and "anchor-scoped-assertion-meta-test" in _s126_self_text,
+    "Test file must contain 'Suite 126' and the marker 'anchor-scoped-assertion-meta-test'",
+)
+check(
+    "s126(6/registry): docs/testing.md registers 'Suite 126' and 'anchor-scoped-assertion-meta-test'",
+    "Suite 126" in _s126_testing_md and "anchor-scoped-assertion-meta-test" in _s126_testing_md,
+    "docs/testing.md must register 'Suite 126' and 'anchor-scoped-assertion-meta-test'",
+)
+
+# Check (7) — hygiene: CLAUDE.md must NOT contain 'Suite 126'
+_s126_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "s126(7/hygiene): CLAUDE.md does NOT contain 'Suite 126' (§11 hygiene contract)",
+    "Suite 126" not in _s126_claude_md,
+    "CLAUDE.md must not mention Suite 126 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: anchor-scoped-assertion-meta-test
 
 # ---------------------------------------------------------------------------
 # Summary

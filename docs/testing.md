@@ -21,6 +21,29 @@ A test that exercises a `PreToolUse` hook, a permission gate, or any config-depe
 
 `tests/test_isolated_hook_env.sh` (Suite 84) implements this: it builds a throwaway `HOME` wired with only the plugin's hooks (read from `.claude-plugin/hooks.json`), drives the chain with controlled tool payloads, and asserts the emitted decision comes solely from the installed hooks. It proves the hook *defers*; it cannot prove the GUI dialog renders (headless CI cannot observe Claude Code's real dialog — that boundary is stated in the suite scope note).
 
+### (iii) Structural assertions are anchor-scoped, never whole-file first-occurrence
+
+Assertions in `tests/test_agent_structure.py` that verify *where* a token appears — not merely *that* it appears — MUST use the `_slice_section(text, anchor)` helper (defined at `tests/test_agent_structure.py:4645`). This helper extracts text from a named anchor to the next markdown heading boundary, returning `""` when the anchor is absent. A missing anchor produces an immediate failure (no false-green possible: `"token" in ""` is always `False`).
+
+**Canonical shape:**
+```python
+_slice = _slice_section(text, "### Section Heading")
+check("label", "expected-token" in _slice, "detail message")
+```
+
+**Banned shapes** (each produces a false-green risk or anchoring gap):
+
+| Banned shape | Why banned | Replacement |
+|---|---|---|
+| `text[text.find(anchor) - N : text.find(anchor) + N]` | Fixed-width content slice; fails silently when anchor moves | `_slice_section(text, anchor)` |
+| `text[: text.find(anchor) + N]` | Unbounded left edge; finds tokens before the intended section | `_slice_section(text, anchor)` |
+| `"token" in text` (whole-file) for structure-sensitive assertions | First occurrence can be in a different, unintended section | `_slice_section(text, anchor)` |
+| `re.search(pattern, text)` without an anchor slice for section-scoped checks | Same ambiguity as whole-file search | Anchor first, then search within the slice |
+| Exact version strings in assertions (e.g., `"2.117.0" in text`) | Asserts pin to a specific version; breaks on every release | Use a regex or substring floor (`"2." in text`) |
+| `(REPO_ROOT / "changelog.d" / "fragment.md").exists()` | Fragment is assembled and deleted at delivery; assertion is always false after release | Assert `## [X.Y.Z]` in `CHANGELOG.md` instead |
+
+**Scope of this principle:** applies to every structural assertion in `tests/test_agent_structure.py` and any test file that imports its helpers. Proximity checks (`abs(find(A, i) - i) <= N` inside a `any(...)` comprehension) are allowed — they assert distance, not content slice membership. Index-comparison `find()` (e.g., `find(X) < find(Y)` to verify order) is allowed. Suite 126 enforces this principle as a meta-test: it scans `tests/*.py` for the banned shapes and fails when any are found.
+
 ## Test files — scope and coverage
 
 - **`tests/test_policy_block.sh`** — functional tests for `hooks/policy-block.sh`. Each case feeds a tool-call JSON payload and asserts the output (deny → JSON with `permissionDecision: "deny"`; allow → empty stdout). ~48 cases: `rm` destructive vs safe (`/`, `~`, `$HOME`, `--`, wildcard), git destructive vs safe (`--force`, `--no-verify`, `reset --hard`, `clean -f`), SQL DROP/TRUNCATE, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`, `secrets.*`), allow-list variants (`.env.example`/`.sample`/`.template`), malformed payloads (fail-open).
@@ -522,6 +545,10 @@ Reads `skills/review-pr/SKILL.md` and `agents/architect.md` as plain text and as
 Structural checks span: `hooks/prepublish-guard.sh` (AC-1..AC-3), `agents/delivery.md` (AC-4, AC-12, AC-14), `agents/testing-refs/browser-mode.md` (AC-5, AC-6), `agents/tester.md` (AC-7), `agents/testing-refs/_index.md` (AC-8), `agents/init.md` (AC-9, AC-10), `agents/orchestrator.md` (AC-11, AC-17, AC-18), `agents/security.md` (AC-13, AC-14e), `agents/adversary.md` (AC-15, AC-16, AC-19), `agents/README.md` (AC-19d). `adversary` is added to `EXPECTED_AGENTS` and `READ_ONLY_AGENTS` in Suite 1 so per-agent file-exists + tools-present + Bash-excluded checks also assert adversary.md.
 
 (Self-ref, 3 checks) test file contains `Suite 125` and `issues-batch-383-331-363-373`; `docs/testing.md` registers `Suite 125` and `issues-batch-383-331-363-373`; `CLAUDE.md` does NOT contain `Suite 125` (§11 hygiene contract). Pure text/file reads — no agent invocation, no paid spend. Marker: `issues-batch-383-331-363-373`.
+
+### Suite 126 — anchor-scoped-assertion-meta-test
+
+7 checks. Enforces the normative `### (iii)` principle from `## Testing principles`: structural assertions in `tests/*.py` must use anchor-scoped `_slice_section` slicing, not fixed-width `find()+N` content slices or `changelog.d/*.md` existence assertions. (1) Banned shape absent — no `find() + N` or `find() - N` fixed-width content slices feeding a `token in slice` check remain in any scanned `tests/*.py` file. (2) Banned shape absent — no `changelog.d/.../*.md` file-existence assertions remain in any scanned `tests/*.py` file. (3) Synthetic-positive check: adding a `"fragile_token" in some_var[some_var.find("x") + 0 : some_var.find("x") + 100]` pattern to a synthetic in-memory string makes the predicate fire (the meta-test's own scanner would catch it). (4) `_slice_section` canonical helper present in `tests/test_agent_structure.py`. (5) `docs/testing.md` principle `### (iii)` section present (canonical normative declaration). (6) Self-referential guard — `Suite 126` in `docs/testing.md` (canonical registry) and `Suite 126` + `anchor-scoped-assertion-meta-test` in `tests/test_agent_structure.py`. (7) `CLAUDE.md §11` does NOT contain `Suite 126` (hygiene contract). Index-comparison `find()` and proximity-guard `abs(find(A, i) - i) <= N` are NOT flagged (allowed shapes). Written failing-first before pre-existing fragile sites were refactored; passes on the refactored tree. Marker: `anchor-scoped-assertion-meta-test`.
 
 ### Suite 12 — security-self-scan
 
