@@ -408,7 +408,46 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 **Sole version-bump site.** Delivery is the ONLY agent that sets the project version. No implementer, inline, or orchestrator step may set or modify the plugin version (`plugin.json`, `marketplace.json`, or any equivalent version site). If a version change is detected in the diff that was not authored by this delivery run, flag it as an unauthorized bump and do NOT proceed with Step 9 until the unauthorized change is reverted or confirmed intentional by the operator. An over-bump above the mechanical SemVer floor (e.g., a MINOR applied to a PATCH-floor diff) requires a `bump-override: minor — <reason>` justification committed as a trailer in the PR body or as a git commit trailer, matching the prepublish-guard hard-deny token (see `hooks/prepublish-guard.sh` bump-floor sub-stage). Without that justification, the `prepublish-guard.sh` hook will deny the push at `git push` time.
 
-**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP.** Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version file.
+**Feature-mode (default) vs release-mode:**
+
+| Mode | Signal | Behavior |
+|------|--------|----------|
+| Feature-mode | `skip-version: true` (orchestrator default for all feature/batch deliveries) | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). If this change is a consumer-facing bump that produces no `changelog.d/` fragment (internal refactor), write a `version.d/{slug}.bump` marker (one line: `patch`, `minor`, or `major`) so the release step can include it. |
+| Release-mode | `release-mode: true` (passed by `/th:release` via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. |
+
+**`version.d/` marker discipline (feature-mode only).** Write `version.d/{slug}.bump` ONLY when ALL of the following are true:
+1. The change reaches the consumer (it is not repo-internal docs/tests/CI only).
+2. No `changelog.d/` fragment is being written for this delivery (fragment-less internal bump).
+
+The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contains exactly one line: `patch`, `minor`, or `major`. The `version.d/` directory is tracked by git (not gitignored) so the release step on a fresh checkout sees the markers. Stage it in Step 10.0 alongside the changelog fragment.
+
+**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
+
+**If the orchestrator passed `release-mode: true` → continue below through Step 9-R and then Steps 9.0–9e.**
+
+### Step 9-R — Release-mode bump-level discovery (runs ONLY when `release-mode: true`)
+
+Before choosing the SemVer level in Step 9.2, aggregate pending fragments and markers:
+
+**Sub-step 9-R-1 — Collect pending `changelog.d/` fragments.**
+List all `*.md` files in `changelog.d/`. For each fragment, scan for subsection headers and map to SemVer:
+
+| Subsection header | SemVer level |
+|---|---|
+| `### Removed` | major |
+| `### Added` / `### Deprecated` | minor |
+| `### Fixed` / `### Changed` / `### Security` | patch |
+
+**Sub-step 9-R-2 — Collect pending `version.d/` markers.**
+List all `*.bump` files in `version.d/` (if the directory exists). Each file contains one line: `patch`, `minor`, or `major`. Read each and record the level.
+
+**Sub-step 9-R-3 — Derive the bump level.**
+Take the MAX across all fragment-derived levels and all marker levels. If no fragments and no markers exist, default to `patch`.
+
+**Sub-step 9-R-4 — Empty `version.d/`.**
+After deriving the level, delete all `*.bump` files from `version.d/` (the directory itself may remain). Stage the deletions in Step 10.0 alongside the version files.
+
+Proceed to Step 9.0 with the derived level as the input to Step 9.2 (skip the git-diff analysis in Step 9.2 — the level is already derived).
 
 ### Step 9.0 — Version sites (explicit enumeration)
 
@@ -661,7 +700,9 @@ git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # ONLY if ve
 git add docs/                 # only if created/modified in Step 5b or 5c (includes docs/specs/ acceptance matrix)
 git add README.md             # only if modified in Step 6
 git add openapi/openapi.yaml  # only if updated in Step 8
-git add changelog.d/{pr-slug}.md  # ONLY when a fragment was written in Step 9e and Step 9e assembly was SKIPPED (skip-version edge); if Step 9e ran and assembled CHANGELOG.md, stage CHANGELOG.md instead
+git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written (feature-mode or release-mode before assembly)
+git add version.d/{slug}.bump     # ONLY when a version.d/ marker was written in Step 9 feature-mode
+# In release-mode after Step 9-R-4: stage version.d/ deletions: git add version.d/
 ```
 
 **If version was bumped:** verify BOTH `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` are staged: `git diff --cached .claude-plugin/`. If either is not staged, stop and fix.
