@@ -605,29 +605,16 @@ func TestRegisterOpencodeMCP_Literal_NotInTeamHarnessConfig(t *testing.T) {
 }
 
 // TestPrintOpencodeApplySummary_NoLiteralSecretInOutput verifies that
-// printOpencodeApplySummary writes "names only" (SEC-OC-R5): the literal
-// token values are never echoed in the summary output (AC-8).
+// printOpencodeApplySummary never echoes secret values in its output (SEC-OC-R5 / AC-8).
+// The summary now ends at "Installed successfully." with no detail block at all,
+// so no token value can appear.
 func TestPrintOpencodeApplySummary_NoLiteralSecretInOutput(t *testing.T) {
-	dir := t.TempDir()
-	diff := PlanDiff{}
-	cfg := opencodeSetupValues{
-		LogsMode: "local",
-		MCP: opencodeMCPValues{
-			MemoryURL:          "https://mcp.example.com/mcp",
-			MemoryRequiresAuth: true,
-			Context7Enabled:    true,
-		},
-	}
-
 	// Capture stdout.
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	printOpencodeApplySummary(&diff, cfg, dir+"/.team-harness.json", dir, MCPRegisterOutcome{
-		Memory:   MCPStatusAdded,
-		Context7: MCPStatusAdded,
-	})
+	printOpencodeApplySummary()
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -874,28 +861,16 @@ func TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped(t *testing.T) {
 	}
 }
 
-// TestPrintOpencodeApplySummary_ReRun_ShowsAlreadyConfigured verifies that the
-// summary output shows "already configured" (not "registered") when the MCP
-// outcome says MCPStatusAlreadyConfigured — end-to-end fix assertion.
-func TestPrintOpencodeApplySummary_ReRun_ShowsAlreadyConfigured(t *testing.T) {
-	dir := t.TempDir()
-	diff := PlanDiff{}
-	cfg := opencodeSetupValues{
-		LogsMode: "local",
-		MCP: opencodeMCPValues{
-			MemoryURL:       "https://mcp.example.com/mcp",
-			Context7Enabled: true,
-		},
-	}
-
+// TestPrintOpencodeApplySummary_ReRun_NoPerRunStateInOutput verifies that the
+// summary does NOT contain per-run MCP state strings ("already configured",
+// "registered", "skipped") -- the summary ends at "Installed successfully."
+// and the MCP detail block is absent (operator-locked change).
+func TestPrintOpencodeApplySummary_ReRun_NoPerRunStateInOutput(t *testing.T) {
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
-		Memory:   MCPStatusAlreadyConfigured,
-		Context7: MCPStatusAlreadyConfigured,
-	})
+	printOpencodeApplySummary()
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -904,11 +879,14 @@ func TestPrintOpencodeApplySummary_ReRun_ShowsAlreadyConfigured(t *testing.T) {
 	n, _ := r.Read(buf)
 	output := string(buf[:n])
 
-	if !strings.Contains(output, "already configured") {
-		t.Errorf("summary missing 'already configured' on re-run (fix: real per-run MCP state):\n%s", output)
+	for _, absent := range []string{"already configured", "registered", "skipped"} {
+		if strings.Contains(output, absent) {
+			t.Errorf("summary contains per-run MCP state text %q (detail block must be absent):\n%s", absent, output)
+		}
 	}
-	if strings.Contains(output, "registered") {
-		t.Errorf("summary shows 'registered' on idempotent re-run — must show 'already configured' (fix):\n%s", output)
+	// The headline must still be present.
+	if !strings.Contains(output, "Installed successfully") {
+		t.Errorf("summary missing 'Installed successfully' headline:\n%s", output)
 	}
 }
 
