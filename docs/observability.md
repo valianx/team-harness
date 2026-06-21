@@ -354,8 +354,19 @@ trace, not an independent source.
 
 1. Read all `phase.end` events from `{docs_root}/{events_file}`.
 2. For each event, extract `agent`, `phase`, `tokens`, and `tokens_estimated`.
-3. Classify the agent's model tier: `architect` → `opus`; all others → `sonnet`
-   (conservative default; override if the agent's frontmatter states a different model).
+3. Classify the agent's model tier using the following priority order:
+   - **Primary path — read frontmatter `model:` field.** Locate `agents/{agent}.md` and
+     read its YAML frontmatter `model:` field. Classify as `opus` when `model` starts with
+     `claude-opus` or equals `opus`; classify as `sonnet` otherwise.
+   - **Static opus-agent fallback** (used only when frontmatter is unreadable — file absent,
+     not parseable, or `model:` key missing): treat these agents as `opus` regardless of any
+     other assumption:
+     `architect`, `security`, `adversary`, `qa-plan`, `ux-reviewer`, `reviewer`,
+     `reviewer-consolidator`, `agent-builder`, `mentor`, `gcp-infra`, `gcp-cost-analyzer`,
+     `orchestrator`.
+   - **No "all others → sonnet" default.** When frontmatter is unreadable AND the agent
+     is not in the static opus list above, classify as `sonnet` and mark the row with `(?)` to
+     signal that the classification is uncertain.
 4. Compute cost per phase using the price table (see above). Sum to get total.
 5. Build the per-agent and per-phase tables.
 6. Count phases where `tokens_estimated == true` for the header annotation.

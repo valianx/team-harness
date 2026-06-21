@@ -9,6 +9,8 @@ color: cyan
 
 This file is read on-demand by the orchestrator when executing a special flow. It is NOT part of the orchestrator's system prompt.
 
+**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active flow (e.g., Bug-fix Flow, Research Flow, Docs Flow) and read only that section. Load additional sections only when the flow cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
+
 ---
 
 ## Research Flow

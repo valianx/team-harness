@@ -9,6 +9,8 @@ color: cyan
 
 This file is read on-demand by the orchestrator when executing a direct mode. It is NOT part of the orchestrator's system prompt.
 
+**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active mode (e.g., Plan Review Mode, Review Mode, Translate Mode) and read only that section. Load additional sections only when the mode cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
+
 ---
 
 ## Plan Review Mode (standalone audit of Stage 1 artifacts)
@@ -431,7 +433,7 @@ Full Diff:
 
 ### Step 2b — Invoke reviewer (Update Body)
 
-Invoke `reviewer` in **update-body mode** via Task tool:
+Invoke `reviewer` in **update-body mode** via Task tool. Pass the changed-files list only — omit the full diff (the reviewer updates the existing body based on what files changed, not by re-reading the full diff):
 
 ```
 mode: update-body
@@ -443,15 +445,13 @@ Existing review ID: {review_id}
 Existing review body: {current body text}
 Changed Files:
 {file list}
-Full Diff:
-{diff}
 ```
 
 Take `review_body` from the reviewer's status block and write it to `.claude/pr-review-draft.md`. Jump to Step 3.
 
 ### Step 2c — Invoke reviewer (Reply)
 
-Invoke `reviewer` in **reply mode** via Task tool:
+Invoke `reviewer` in **reply mode** via Task tool. Pass the thread context and the changed-files list only — omit the full diff (the reply scope is the thread, not the whole diff):
 
 ```
 mode: reply
@@ -466,8 +466,6 @@ Thread context:
   original_body: {the inline comment text}
 Changed Files:
 {file list}
-Full Diff:
-{diff}
 ```
 
 Take `reply_body` from the reviewer's status block and write it to `.claude/pr-review-reply-draft.md`. Return to the skill:

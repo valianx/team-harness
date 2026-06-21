@@ -254,7 +254,18 @@ issues: {critical and high finding titles, or "none"}
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand task scope, architecture, and implementation.
+1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. Load workspace files using the **input manifest** below (named files first; glob-all only when a named file is absent).
+
+   **Security agent input manifest (read in this order):**
+   | File | Why |
+   |------|-----|
+   | `01-plan.md` | Task scope, architecture decisions, security assessment block, changed-file list (pipeline mode) |
+   | `02-implementation.md` | Files created/modified by the implementer — the primary scan target in pipeline mode |
+   | `00-knowledge-context.md` | KG prior-art already fetched by the orchestrator — avoid duplicate searches |
+   | `03-testing.md` | Test scope, known gaps — informs what the tester did NOT cover |
+   | Git diff / changed-files list | Passed in dispatch payload for pipeline mode; derive from `02-implementation.md § Files Created/Modified` when absent |
+
+   **Glob-all fallback:** when a file named in the manifest is absent from the workspace folder, fall back to reading all remaining workspace files (`workspaces/{feature-name}/*.md`). Do not skip context — the manifest is a reading ORDER, not a reading FILTER.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
@@ -547,6 +558,57 @@ Note known CVEs for the detected version ranges. Flag packages more than 2 major
 ---
 
 ## Phase 4 — Security Report
+
+### Mode → template mapping
+
+| Mode | Template | Rationale |
+|------|----------|-----------|
+| `pipeline` (Phase 3 in-pipeline dispatch, Tier 3) | **Compact findings-only** (see below) | The implementer scan is scoped to changed files; the orchestrator needs findings fast with no boilerplate |
+| `audit` (default) | **Audit-grade** (risk-score table + 10-row OWASP matrix) | Full project assessment; stakeholder-ready |
+| `focused` | **Audit-grade** | Same depth, narrower scope |
+| `design-review` | In-plan inline (no `04-security.md`) | No code exists; see Design Review Mode above |
+| `pr-review-security` | Condensed (see PR Review Security Mode above) | Feeds consolidator; not a standalone report |
+| `/th:audit-security` | **Audit-grade** | Operator-driven standalone audit; full output required |
+
+**Rule:** the SCAN scope (OWASP/CWE analysis, all checklist items in Phases 1–3) is the same for all modes — only the OUTPUT format changes.
+
+---
+
+### Pipeline mode — compact findings-only report
+
+When running in `pipeline` mode, write a compact report to `workspaces/{feature-name}/04-security.md`. Omit the global risk-score weight table and the empty-row OWASP matrix. Every finding still requires `file:line` + CWE.
+
+```markdown
+## Security Review — {feature-name}
+**Mode:** pipeline
+**Files scanned:** {N}
+**Estándares:** OWASP Top 10 2025, CWE Top 25 2025
+
+### Crítico
+- `{file}:{line}` — [CWE-{N}] {descripción breve del hallazgo}
+
+### Alto
+- `{file}:{line}` — [CWE-{N}] {descripción breve del hallazgo}
+
+### Medio / Bajo / Info
+- `{file}:{line}` — [CWE-{N}] {descripción breve del hallazgo}
+
+### Resumen
+{1-2 oraciones: N crítico/alto hallazgos, riesgo general para esta feature. Sin tablas de peso ni matriz OWASP vacía.}
+```
+
+When no findings are found in pipeline mode:
+```markdown
+## Security Review — {feature-name}
+**Mode:** pipeline
+**qa_status:** clean
+
+No security findings in the scanned changed files.
+```
+
+---
+
+### Audit / focused mode — audit-grade report
 
 Write the complete report in Spanish to `workspaces/{feature-name}/04-security.md`.
 

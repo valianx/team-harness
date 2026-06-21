@@ -258,6 +258,7 @@ Used by the orchestrator immediately after Phase 4 (Delivery) and before Phase 5
   - **Advisory.** The verdict does not block delivery — Phase 4.5 is non-binding by design (third line of defense already covered by Phase 3.5 + 3.6).
   - **Tight cap.** Top issues field is capped at 3 (not 8 like Fresh Review's suggestions). Goal: surface the most important things in the report to the user, not a full audit.
   - **Skip when diff is trivial.** If the orchestrator says the diff is `<50 lines` or `≤2 files`, the orchestrator skips this mode entirely — there's nothing meaningful to summarize.
+  - **Inline diff truncation bound (upper cap: 1500 lines).** The orchestrator passes the pre-fetched diff inline. If the diff exceeds 1500 lines, the orchestrator truncates it at 1500 lines and appends a marker: `[diff truncated at 1500 lines — full diff available in the PR]`. The reviewer parses the truncated diff as-is; the full diff is accessible via the Read tool on changed files. A truncated diff does NOT reduce the line cap for the skip-when-trivial check — `<50 lines` refers to the original diff size, not the truncated payload.
 
 The orchestrator writes the output to `workspaces/{feature-name}/04-internal-review.md` and embeds the `summary` and `criticals_count` in the report to the user.
 

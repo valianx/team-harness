@@ -139,10 +139,12 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 
 1. **Read project knowledge** — read `docs/knowledge.md` if it exists. This contains prior decisions, patterns, constraints, and stack info. Follow established patterns and respect previous decisions.
 
-2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. Read ALL files:
+2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. Read the following files (input manifest):
    - `01-plan.md` — **CRITICAL: this is your blueprint AND the spec.** Read `## Review Summary` for feature-wide scope (context, not your scope). Read `## Architecture` for the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies). Read `## Task List` for your assigned PR's `Files:` scope and `Acceptance Criteria:`.
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `04-validation.md` — understand acceptance criteria to satisfy
+   - `failure-brief.md` — failure brief from orchestrator (present only on bounded-patch re-dispatch)
+   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 

@@ -312,7 +312,13 @@ For each business rule provided in the context:
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside (task intake, architecture decisions, implementation details, prior test work).
+1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
+   - `01-plan.md` — AC block for this PR, Work Plan, and project type
+   - `02-implementation.md` — implementer output: files changed, deviations, known limitations
+   - `01-root-cause.md` — root-cause analysis and regression test approach (bug-fix flow only)
+   - `02-regression-test.md` — prior regression test authoring (Phase 3 verify-run mode only)
+   - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
+   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
