@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.119.0] - 2026-06-21
+
+### Added
+
+- **Flow telemetry emission (v2.118.0):** `agents/orchestrator.md` gains a new `## Flow Telemetry Emission` section defining the 8-event pipeline friction signal catalog (`guard.block`, `gate.fail`, `verify.reject`, `iteration.loop`, `blocked`, `scope.collapse`, `mcp.unavailable`, `abandon`). When `flow_telemetry.enabled: true` in `~/.claude/.team-harness.json` (default: false), the orchestrator emits best-effort, metadata-only payloads to `context-harness-mcp` via `mcp__memory__record_flow_event` at existing friction points. Any emission error logs `flow-telemetry: unavailable` and the pipeline continues unchanged (emission is non-blocking). The event enum is a multi-site invariant byte-identical to `context-harness-mcp/internal/validate/flowevent.go` (coordinated two-repo change required to add or rename values).
+- **`flow_telemetry.enabled` config key:** `skills/setup/SKILL.md` adds Step 4f and a `flow-telemetry` intent route so operators can opt in to flow telemetry via `/th:setup flow-telemetry` or the full interactive setup. The key defaults to `false`; absence means OFF. Stored namespaced as `{"flow_telemetry": {"enabled": true}}` in `~/.claude/.team-harness.json` via the existing merge-write-whole-document contract (no other keys destroyed).
+- **Two-plane observability documentation:** `docs/observability.md` gains a `## Two observability planes` section that explicitly documents the **local** plane (`00-execution-events.{jsonl|md}`, always active, unchanged) as separate from the **cross-user** flow-event plane (opt-in telemetry channel). The local plane schema and all existing sections are unchanged.
+- **AC-2.7 cross-repo schema-identity guard (Suite 127):** `tests/test_flow_event_schema_sync.py` is a new standalone test that fetches `context-harness-mcp/internal/validate/flowevent.go` (raw GitHub URL pinned to the merged PR-1 commit) and asserts byte-identity between the CH event enum and the catalog in `agents/orchestrator.md § Flow Telemetry Emission`. On network failure the test emits a clear warning and exits 0 (SKIP) so it never false-reds CI in offline environments. Together with CH's runtime `flow_event_rejected` relay (AC-1.9), schema drift is caught both statically in CI and at runtime in Axiom.
+
+### Fixed
+
+- `apply --runtime opencode` no longer causes opencode to reject placed agent `.md` files at startup. The Go installer transform now maps CC color names to opencode named enums (`green→success`, `red→error`, `yellow/orange→warning`, `cyan/blue/teal→info`, `purple/magenta/pink→accent`) instead of passing them through, and converts the `permission` field from an invalid array form (`{allow: [PascalCase tools]}`) to a valid `PermissionRuleConfig` flow-mapping object (`{lowercase-key: allow}`) with MCP tools silently dropped.
+- **context7 now migrates on the interactive (curl|bash) path.** The CC migration's context7 key was threaded only into the non-interactive resolver; on the interactive path the import short-circuit returned `Context7Enabled = false` even when `~/.claude.json` had a context7 entry. Fixed by threading an `initialContext7Enabled` signal into `collectOpencodeSetupInteractivePreFilled`, set from `ccMigration.Context7Key` before the import short-circuit fires.
+- **Cleaner apply summary.** The skip-path parentheticals `(set MEMORY_MCP_URL and re-run to register)` and `(export CONTEXT7_API_KEY and re-run to register)` are removed; the bare `skipped` word is kept. The trailing `Update later: re-run the install link…` line is removed. The `Installed successfully.` headline and all other output are unchanged.
+- **Clearer dependency check.** `checkOpencodeDependencies` now prints `Checking recommended tools:` and each line shows the full human name, the binary name in parentheses, and a clear `found` / `not found — <hint>` status (e.g. `Python 3 (python3) ......... found`).
+- `hooks/prepublish-guard.sh` now scopes its git version-bump checks to the pushed worktree instead of the session/project root, eliminating false-positive hard-denies that blocked legitimate pushes from isolated `git worktree` branches (#411). The guard reads the `cwd` field from the PreToolUse payload (the runtime-trusted directory the Bash tool executes in) and `cd`s into it once, before any git inspection. Invalid `cwd` values (control chars, missing directory) are rejected with a stderr warning and the guard falls back to the session root (fail-open — never a false block). Backward-compatible: payloads without a `cwd` field continue to evaluate the process CWD as before.
+
 ## [2.118.1] - 2026-06-21
 
 ### Fixed

@@ -1,5 +1,0 @@
-### Fixed
-
-- **context7 now migrates on the interactive (curl|bash) path.** The CC migration's context7 key was threaded only into the non-interactive resolver; on the interactive path the import short-circuit returned `Context7Enabled = false` even when `~/.claude.json` had a context7 entry. Fixed by threading an `initialContext7Enabled` signal into `collectOpencodeSetupInteractivePreFilled`, set from `ccMigration.Context7Key` before the import short-circuit fires.
-- **Cleaner apply summary.** The skip-path parentheticals `(set MEMORY_MCP_URL and re-run to register)` and `(export CONTEXT7_API_KEY and re-run to register)` are removed; the bare `skipped` word is kept. The trailing `Update later: re-run the install link…` line is removed. The `Installed successfully.` headline and all other output are unchanged.
-- **Clearer dependency check.** `checkOpencodeDependencies` now prints `Checking recommended tools:` and each line shows the full human name, the binary name in parentheses, and a clear `found` / `not found — <hint>` status (e.g. `Python 3 (python3) ......... found`).
