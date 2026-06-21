@@ -213,6 +213,18 @@ The plan opens with `## Review Summary` so the human can scan PRs, decisions, an
 - touches_async_messaging: true|false
 - destructive: true|false
 
+### Multi-site invariants
+*(Include this block whenever the plan introduces or modifies an invariant that lives in more than one file. Omit when all invariants are single-file.)*
+
+For each multi-site invariant, list **every** site where it must hold. Fence sites that MUST NOT change so delivery can verify the atomic-sync MATCH check.
+
+| Invariant | Site | File | Anchor / field |
+|-----------|------|------|----------------|
+| {name of invariant} | {site label} | `{path}` | `{section heading or field name}` |
+| {name of invariant} | {site label — fenced: MUST NOT change} | `{path}` | `{section heading or field name}` |
+
+**Why this block exists:** delivery Step 9.4a reads this table and verifies that every listed site contains a consistent value. A site absent from this table is invisible to the delivery cross-site MATCH check. See `agents/delivery.md` Step 9.0 for the worked example with version-literal sites.
+
 ## Architecture
 
 ### Current State
@@ -708,6 +720,18 @@ Adapt your analysis to the project type. For every decision, systematically eval
 ### Domain Heuristics (apply when the trigger matches)
 
 These heuristics encode lessons learned across past pipelines. Walk through them whenever the feature touches the trigger area; do not invent constraints when the trigger does not match.
+
+#### Multi-site invariants (applies to every feature, refactor, or enhancement)
+
+An invariant lives in more than one file when a single logical constraint (a version literal, a status-block field, a seam-contract token) must be present and consistent at N ≥ 2 locations. Examples: a version number that appears in `plugin.json`, `marketplace.json`, and `CLAUDE.md §3`; a status-block field declared in a leaf-agent prompt and documented in the orchestrator's aggregation note; a canonicalized convention declared in a doc and enforced in a test.
+
+**Whenever your design introduces or modifies such an invariant:**
+
+1. Enumerate the **full site-set** — every file and anchor where the invariant must hold. A site you omit is invisible to the delivery cross-site MATCH check (Step 9.4a) and to the implementer.
+2. **Fence sites that MUST NOT change.** Mark them in the `### Multi-site invariants` table in `## Review Summary`. This tells the implementer which sites are frozen and tells delivery which fenced sites to verify are unmodified.
+3. **Apply the discipline reflexively.** The `### Multi-site invariants` block in `01-plan.md § Review Summary` IS itself a multi-site invariant: if it names a site that the implementer must edit, the implementer edits ALL sites in the same concern-commit (not piecemeal). The table is the source-of-truth for that atomicity requirement.
+
+The worked example is `agents/delivery.md` Step 9.0: the version-site enumeration table lists every canonical version-literal site explicitly and fences off the top-level marketplace schema version so delivery never modifies it accidentally.
 
 #### PostgreSQL high-volume time-series table (transactions, events, audit logs)
 
@@ -1514,6 +1538,7 @@ regression_test_kind: unit | integration | e2e | null   # set in root-cause mode
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
+kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a design decision; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}
 ```
