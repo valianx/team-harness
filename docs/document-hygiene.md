@@ -4,7 +4,7 @@
 
 ## File size cap mechanics
 
-**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing. Structural sections (§1-§7) are exempt — they shrink by extracting detailed tables/protocols to docs/ files (as done with §7.4-7.6 → `docs/voice-guide.md` and §14 protocol → `docs/subagent-orchestration.md`).
+**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. The delivery agent checks file size after every update; if CLAUDE.md exceeds 35 KB, it must offload the largest non-structural section to `docs/` before committing. Structural sections (§1-§7) are exempt — they shrink by extracting detailed tables/protocols to docs/ files (as done with §7.4-7.6 → `docs/voice-guide.md` and §14 protocol → `docs/subagent-orchestration.md`). Because project and user CLAUDE.md load into Claude Code's cached project-context layer at session start, the size cap also bounds the per-session cached-token footprint — not only file readability (see `docs/cost-and-caching.md`).
 
 ## Section size rules
 

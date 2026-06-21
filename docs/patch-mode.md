@@ -44,7 +44,7 @@ When `Blast radius: structural`, the standard full re-dispatch contract applies 
 
 ## Selective Verifier Re-Run (Orchestrator Side)
 
-After a localized patch, the orchestrator re-runs only the verifier(s) whose domain the patch touched:
+After a localized patch, the orchestrator re-runs only the verifier(s) whose domain the patch touched. Re-dispatching the same agent within the 5-minute subagent cache TTL reuses that agent's warm cache, so keep selective re-runs prompt (see `docs/cost-and-caching.md`).
 
 | Case | Localized re-run | Full re-run (structural) |
 |------|-----------------|--------------------------|
