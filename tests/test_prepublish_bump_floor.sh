@@ -58,9 +58,16 @@ sys.exit(0 if t >= floor else 1)
 " 2>/dev/null
 }
 
-# Build a preToolUse Bash payload for git push
+# Build a preToolUse Bash payload for git push (no cwd field — backward compat)
 _push_payload() {
     printf '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD"}}'
+}
+
+# Build a preToolUse Bash payload for git push WITH an explicit cwd field.
+# Usage: _push_payload_with_cwd /path/to/worktree
+_push_payload_with_cwd() {
+    local cwd_dir="$1"
+    printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"git push origin HEAD"}}' "$cwd_dir"
 }
 
 # Run hook from inside a given directory.
@@ -73,6 +80,23 @@ _run_hook() {
     tmpout=$(mktemp)
     tmperr=$(mktemp)
     (cd "$dir" && _push_payload | bash "$HOOK" >"$tmpout" 2>"$tmperr") || true
+    _HOOK_STDOUT=$(cat "$tmpout")
+    _HOOK_STDERR=$(cat "$tmperr")
+    rm -f "$tmpout" "$tmperr"
+}
+
+# Run hook with PROCESS CWD = session_dir but payload cwd = cwd_dir.
+# This simulates: hook launched from session_dir (dirty/wrong tree), but payload
+# tells the hook that the actual push originates from cwd_dir (the clean worktree).
+# Outputs: sets _HOOK_STDOUT and _HOOK_STDERR in the caller.
+_run_hook_from() {
+    local session_dir="$1" cwd_dir="$2"
+    _HOOK_STDOUT=""
+    _HOOK_STDERR=""
+    local tmpout tmperr
+    tmpout=$(mktemp)
+    tmperr=$(mktemp)
+    (cd "$session_dir" && _push_payload_with_cwd "$cwd_dir" | bash "$HOOK" >"$tmpout" 2>"$tmperr") || true
     _HOOK_STDOUT=$(cat "$tmpout")
     _HOOK_STDERR=$(cat "$tmperr")
     rm -f "$tmpout" "$tmperr"
@@ -1166,6 +1190,247 @@ if [ -z "$_ask_in_floor" ]; then
 else
     fail "AC-6/AC-8: ask token" "floor sub-stage contains 'ask' decision: $_ask_in_floor"
 fi
+
+# ---------------------------------------------------------------------------
+# Suite 18: Worktree-scope fix — guard reads payload cwd, not process CWD
+#
+# Each test sets up two git repos: a "session root" (dirty/wrong tree, B) and
+# a "clean worktree" (A). The hook runs with its PROCESS CWD pointing at B,
+# but the payload carries cwd pointing at A. After the fix the guard must
+# evaluate A, not B.
+#
+# NEW-1: clean worktree A passes even when B strays a shipped-asset with no fragment
+# NEW-2: clean worktree A passes even when B strays a version-site bump
+# NEW-3: a real bump-floor violation IN A (release path) still denies — floor not weakened
+# NEW-4: empty/omitted cwd → backward-compat (falls back to process CWD)
+# NEW-5: control-char cwd → SEC-DR-A reject, fail-open, no deny
+# NEW-6: non-existent cwd dir → fail-open, no deny
+# ---------------------------------------------------------------------------
+echo
+echo "=== Suite 18: worktree-scope (guard reads payload cwd, not process CWD) ==="
+
+# ---------------------------------------------------------------------------
+# NEW-1: clean worktree A passes even when session-root B is dirty
+#         (shipped asset changed in B but no changelog.d/ fragment)
+#
+# Without the fix: hook inspects B → sees shipped-asset change with no fragment
+# → deny. With the fix: hook inspects A → no shipped-asset change → nodecision.
+# ---------------------------------------------------------------------------
+echo
+echo "--- NEW-1: clean worktree A passes even when B strays shipped-asset with no fragment ---"
+
+# Build A: clean worktree — no shipped-asset changes vs origin/main
+_bare_n1a=$(_new_tmp)
+_clone_n1a=$(_new_tmp)
+_make_repo "$_bare_n1a" "$_clone_n1a" "2.107.0"
+(
+    cd "$_clone_n1a"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    # Add only a docs file — no shipped-asset change, no version bump
+    mkdir -p docs
+    echo "# notes" > docs/notes.md
+    git add docs/notes.md
+    git commit -m "docs: add notes.md (no asset, no bump)" -q 2>/dev/null
+)
+
+# Build B: session root — DIRTY: strays a shipped-asset change with no fragment
+_bare_n1b=$(_new_tmp)
+_clone_n1b=$(_new_tmp)
+_make_repo "$_bare_n1b" "$_clone_n1b" "2.107.0"
+(
+    cd "$_clone_n1b"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# base agent" > agents/dirty.md
+    git add agents/dirty.md
+    git commit -m "base: add agents/dirty.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Stray shipped-asset change with no fragment/marker → would deny if evaluated
+    echo "# dirty agent — modified" > agents/dirty.md
+    git add agents/dirty.md
+    git commit -m "feat: dirty shipped-asset change, no fragment (should be bypassed by cwd)" -q 2>/dev/null
+)
+
+# Run: process CWD = B (dirty), payload cwd = A (clean)
+_run_hook_from "$_clone_n1b" "$_clone_n1a"
+assert_nodecision "NEW-1: process-CWD=B(dirty) payload-cwd=A(clean) → evaluates A → nodecision"
+
+# ---------------------------------------------------------------------------
+# NEW-2: clean worktree A passes even when session-root B strays a version bump
+#
+# Without the fix: hook inspects B → sees version-site bump on a feature branch
+# → stray-bump deny. With the fix: hook inspects A → no bump → nodecision.
+# ---------------------------------------------------------------------------
+echo
+echo "--- NEW-2: clean worktree A passes even when B strays a version-site bump ---"
+
+# Build A: clean feature branch — ships a changelog.d/ fragment, no bump
+_bare_n2a=$(_new_tmp)
+_clone_n2a=$(_new_tmp)
+_make_repo "$_bare_n2a" "$_clone_n2a" "2.107.0"
+(
+    cd "$_clone_n2a"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents changelog.d
+    echo "# n2 agent" > agents/n2.md
+    printf '### Changed\n- n2 update\n' > changelog.d/feat-n2.md
+    git add agents/n2.md changelog.d/feat-n2.md
+    git commit -m "feat: n2 agent with fragment, no bump (clean feature branch)" -q 2>/dev/null
+)
+
+# Build B: session root — DIRTY: stray version-site bump on a feature branch
+_bare_n2b=$(_new_tmp)
+_clone_n2b=$(_new_tmp)
+_make_repo "$_bare_n2b" "$_clone_n2b" "2.107.0"
+(
+    cd "$_clone_n2b"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# b2 agent" > agents/b2.md
+    git add agents/b2.md
+    git commit -m "base: add agents/b2.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Stray version bump + no shipped-asset change → stray-bump deny if evaluated
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .claude-plugin/
+    git commit -m "feat: stray version-site bump on session-root B (should be bypassed by cwd)" -q 2>/dev/null
+)
+
+# Run: process CWD = B (stray-bump), payload cwd = A (clean)
+_run_hook_from "$_clone_n2b" "$_clone_n2a"
+assert_nodecision "NEW-2: process-CWD=B(stray-bump) payload-cwd=A(clean) → evaluates A → nodecision"
+
+# ---------------------------------------------------------------------------
+# NEW-3: real bump-floor violation IN worktree A still denies — floor not weakened
+#
+# Payload cwd = A, and A itself has a release-path over-bump violation.
+# The guard must still deny → the floor is re-targeted, not bypassed.
+# ---------------------------------------------------------------------------
+echo
+echo "--- NEW-3: real bump-floor violation in worktree A still denies (floor not weakened) ---"
+
+# Build A: release branch with MINOR bump on a M-only (PATCH floor) diff → over-bump deny
+_bare_n3a=$(_new_tmp)
+_clone_n3a=$(_new_tmp)
+_make_repo "$_bare_n3a" "$_clone_n3a" "2.107.0"
+(
+    cd "$_clone_n3a"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# n3 agent" > agents/n3.md
+    git add agents/n3.md
+    git commit -m "base: add agents/n3.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    git checkout -b release/v2.108.0 -q 2>/dev/null
+    # Modify only (M-only → PATCH floor) but apply MINOR bump (over-bump)
+    echo "# n3 agent — updated" > agents/n3.md
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "release: v2.108.0 — modify agents/n3.md (minor bump on M-only — over-bump)" -q 2>/dev/null
+)
+
+# Build B: clean unrelated repo (process CWD should not matter here)
+_bare_n3b=$(_new_tmp)
+_clone_n3b=$(_new_tmp)
+_make_repo "$_bare_n3b" "$_clone_n3b" "2.107.0"
+
+# Run: process CWD = B (clean), payload cwd = A (has real violation)
+_run_hook_from "$_clone_n3b" "$_clone_n3a"
+assert_deny "NEW-3: payload-cwd=A(over-bump violation) → evaluates A → deny (floor not weakened)"
+
+# ---------------------------------------------------------------------------
+# NEW-4: empty/omitted cwd field → backward-compat (falls back to process CWD)
+#
+# Uses _push_payload (no cwd field) with process CWD on a clean branch.
+# Existing suite tests (15-17) already cover this via _run_hook; here we
+# verify explicitly that the worktree-scope block is a no-op when cwd is absent.
+# ---------------------------------------------------------------------------
+echo
+echo "--- NEW-4: empty/omitted cwd → backward-compat (evaluates process CWD) ---"
+
+_bare_n4=$(_new_tmp)
+_clone_n4=$(_new_tmp)
+_make_repo "$_bare_n4" "$_clone_n4" "2.107.0"
+(
+    cd "$_clone_n4"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    # Docs-only change: no shipped asset, no version bump → nodecision
+    mkdir -p docs
+    echo "# doc n4" > docs/n4.md
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    git add .
+    git commit -m "docs: n4.md (no asset, no bump)" -q 2>/dev/null
+)
+
+# Use _run_hook (no cwd in payload); process CWD = clean docs-only branch
+_run_hook "$_clone_n4"
+assert_nodecision "NEW-4: no cwd in payload → evaluates process CWD (backward-compat) → nodecision"
+
+# ---------------------------------------------------------------------------
+# NEW-5: control-char cwd → SEC-DR-A reject, fail-open, no deny
+#
+# The hook must reject a cwd containing a control character, skip the cd,
+# emit a SEC-DR-A/control-char warning to stderr, and NOT deny on that basis.
+# Process CWD is the clean repo from NEW-4, so the guard will pass (nodecision).
+# ---------------------------------------------------------------------------
+echo
+echo "--- NEW-5: control-char cwd → SEC-DR-A reject, fail-open, no deny ---"
+
+_HOOK_STDOUT=""
+_HOOK_STDERR=""
+_tmpout_n5=$(mktemp)
+_tmperr_n5=$(mktemp)
+
+# Inject a tab into the cwd value via JSON escape \t (single backslash + t in
+# the JSON string). The JSON parser decodes \t to a real tab character (0x09),
+# which is a control character. A literal tab byte in JSON is invalid and causes
+# a parse failure (returning empty cwd), so we must use the JSON escape form so
+# the parser extracts a real tab before the SEC-DR-A control-char guard fires.
+# Note: bash single-quoting preserves \t as the two characters backslash + t,
+# which is the correct JSON escape for a tab.
+(cd "$_clone_n4" && printf '%s' \
+    '{"tool_name":"Bash","cwd":"/tmp/clean\tdevil","tool_input":{"command":"git push origin HEAD"}}' \
+    | bash "$HOOK" >"$_tmpout_n5" 2>"$_tmperr_n5") || true
+_HOOK_STDOUT=$(cat "$_tmpout_n5")
+_HOOK_STDERR=$(cat "$_tmperr_n5")
+rm -f "$_tmpout_n5" "$_tmperr_n5"
+
+assert_nodecision "NEW-5: control-char cwd → rejected (SEC-DR-A), no deny (fail-open)"
+assert_stderr_contains "NEW-5: SEC-DR-A warning in stderr" "control"
+
+# ---------------------------------------------------------------------------
+# NEW-6: non-existent cwd dir → fail-open, no deny
+#
+# When cwd is a syntactically valid string but points at a non-existent directory,
+# the hook must skip the cd, emit a warning, and NOT deny. Process CWD is the
+# clean repo from NEW-4 so the guard passes (nodecision) after skipping the cd.
+# ---------------------------------------------------------------------------
+echo
+echo "--- NEW-6: non-existent cwd dir → fail-open, no deny ---"
+
+_HOOK_STDOUT=""
+_HOOK_STDERR=""
+_tmpout_n6=$(mktemp)
+_tmperr_n6=$(mktemp)
+
+_nonexistent_cwd="/tmp/nonexistent-worktree-guard-test-$$"
+(cd "$_clone_n4" && printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"git push origin HEAD"}}' \
+    "$_nonexistent_cwd" | bash "$HOOK" >"$_tmpout_n6" 2>"$_tmperr_n6") || true
+_HOOK_STDOUT=$(cat "$_tmpout_n6")
+_HOOK_STDERR=$(cat "$_tmperr_n6")
+rm -f "$_tmpout_n6" "$_tmperr_n6"
+
+assert_nodecision "NEW-6: non-existent cwd → skipped, no deny (fail-open)"
+assert_stderr_contains "NEW-6: non-existent-dir warning in stderr" "does not exist"
 
 # ---------------------------------------------------------------------------
 # Summary
