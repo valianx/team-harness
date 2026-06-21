@@ -64,15 +64,15 @@ Q-1 through Q-6 cover Part 1 (gh-fallback core). Q-7 through Q-10 cover §9.5 (R
 
 ## Q-5 — Behavioural smoke test checklist
 
-**Question:** Should a manual smoke-test checklist be added to `docs/contributing.md` for verifying the gh-fallback path locally (e.g., uninstall gh temporarily and run `/issue #N`)?
+**Question:** Should a manual smoke-test checklist be added to `CONTRIBUTING.md` for verifying the gh-fallback path locally (e.g., uninstall gh temporarily and run `/issue #N`)?
 
 **Options considered:**
-- (a) Yes — one-paragraph addition to `docs/contributing.md`. [DEFAULT]
+- (a) Yes — one-paragraph addition to `CONTRIBUTING.md`. [DEFAULT]
 - (b) No — trust structural tests; manual paths are implicit.
 
-**Decision:** (a) was selected — add a smoke-test note to `docs/contributing.md`.
+**Decision:** (a) was selected — add a smoke-test note to `CONTRIBUTING.md`.
 
-**Rationale:** The structural test suite can verify cross-references but cannot exercise the fallback chain end-to-end (no live LLM in CI). A one-paragraph checklist in `docs/contributing.md` gives future contributors a concrete verification path without requiring a live run.
+**Rationale:** The structural test suite can verify cross-references but cannot exercise the fallback chain end-to-end (no live LLM in CI). A one-paragraph checklist in `CONTRIBUTING.md` gives future contributors a concrete verification path without requiring a live run.
 
 ---
 

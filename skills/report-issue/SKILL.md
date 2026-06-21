@@ -5,7 +5,7 @@ description: File a structured GitHub issue against valianx/team-harness with co
 name: report-issue
 
 <!-- IMPORTANT: This skill executes DIRECTLY and does NOT route through the orchestrator. -->
-<!-- It is standalone, like /th:lint. Do NOT dispatch to the orchestrator agent. -->
+<!-- It is standalone, like /th:lint. Do NOT route this through the orchestrator. -->
 
 Analyze the input: $ARGUMENTS
 

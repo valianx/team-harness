@@ -86,6 +86,14 @@ surfaces:
 Background and the per-asset-type process:
 [`docs/opencode-migration-guide.md`](./docs/opencode-migration-guide.md).
 
+## Agent and pipeline changes
+
+Per [`CLAUDE.md` §14](./CLAUDE.md#14-subagent-orchestration):
+
+- Adding or modifying an agent → route through `architect` first, then `agent-builder` writes the prompt.
+- Installer / hooks / MCP server changes → `architect` then `security` review (elevated privileges on the user's machine).
+- Pipeline phase changes → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+
 ## Verifying your change
 
 ```
@@ -94,6 +102,33 @@ bash tests/run-all.sh
 
 This runs the policy-block, structure, and frontmatter suites. CI runs the same
 command on every PR. See [`docs/testing.md`](./docs/testing.md) for the suite registry.
+
+### Verifying gh-fallback paths locally
+
+To smoke-test the graceful degradation introduced in v2.10.0 without needing to actually uninstall `gh`:
+
+1. Set `has_gh=false` in your test by temporarily running with a dummy `GH_TOKEN` and no `gh` auth (e.g., `GH_TOKEN="" gh auth logout --hostname github.com` in a scratch env).
+2. In a Claude Code session, run `/issue #N` for a real issue number on a public GitHub repo — the skill should fetch the issue via the `curl` Tier A fallback and report "gh CLI unavailable. Fetched issue #N via the GitHub REST API instead."
+3. For Tier B write paths, run `/deliver` on a feature branch — if `GH_TOKEN` is set, it should attempt a curl PR creation; if not, it should emit the compare URL and a body file, then report `blocked-manual-push`.
+4. For Tier D (project board), verify the orchestrator logs "Project board update skipped — gh CLI unavailable" rather than erroring out.
+
+This is a manual smoke test — the automated test suite (`tests/test_agent_structure.py`) only verifies the static cross-references are present.
+
+## Release process
+
+The release flow is operator-side. `delivery` bumps the `version` constant in `cmd/install/main.go` and adds a `[X.Y.Z]` block to `CHANGELOG.md`, but does **not** run `git tag` — the human decides when to publish.
+
+After a PR merges:
+
+```bash
+git checkout main && git pull origin main
+git tag -a vX.Y.Z -m "Release vX.Y.Z — short description"
+git push origin vX.Y.Z
+```
+
+The tag push triggers `release.yml` (builds 5 cross-compiled binaries → GitHub Releases) and `pages.yml` (publishes the three bootstrap scripts to GitHub Pages on `release: published`).
+
+Pre-requisite (one-time, repo-level): repo Settings → Pages → Source = **GitHub Actions** + an environment named `github-pages` configured to allow deployments from the relevant tags / branches.
 
 ## Reporting issues
 
