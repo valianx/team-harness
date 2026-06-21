@@ -118,6 +118,17 @@ issues: {list of critical design risks, or "none"}
 
 Note: `kg_save_candidates` is not emitted in design-review mode — this mode reviews a plan (no code vulnerabilities), so there are no security findings to persist to the KG. Only Pipeline Mode and Audit Mode produce KG write candidates (Critical/High findings with node_type `error` or `pattern`).
 
+### Structural Security Invariants to Recommend (design-review)
+
+When the plan touches credentials, IPC boundaries, or read-only external integrations, surface the following patterns as architectural recommendations — the goal is to make the dangerous capability unreachable from the public/IPC surface by construction, not guarded at runtime:
+
+- **Unexported method / unexported type** — keep credential-handling or IPC-calling logic in unexported functions/types; only a narrow, auditable façade is exported.
+- **Narrowed wrapper interface** — expose an interface that omits the dangerous operations (e.g., read-only interface over a read-write store); callers that should not write can never obtain a write handle.
+- **Package-level seam** — place sensitive operations in a dedicated internal package; the compiler enforces that external packages cannot call them without an explicit import grant.
+- **Redaction-by-marshaling** — strip secrets and PII in the type's `MarshalJSON` / `String()` / `fmt.Formatter`; structural redaction at the boundary is safer than relying on every caller to omit the field.
+
+Flag the design when a dangerous capability (credential store write, IPC send, external-data mutate) is reachable from a public API handler or an IPC endpoint with no structural barrier — runtime checks alone are insufficient when the call graph is not constrained by the type system or package visibility.
+
 ---
 
 ### PR Review Security Mode (`pr-review-security`)
@@ -399,8 +410,8 @@ For each high-risk file identified in Phase 1, read the file and perform detaile
 
 **Path Traversal (CWE-22):**
 - [ ] File paths constructed from user input without normalization
-- [ ] `path.join()` or `resolve()` with user input, missing `startsWith(basePath)` check
-- [ ] Zip/archive extraction without path sanitization (Zip Slip)
+- [ ] `path.join()` or `resolve()` with user input, missing `startsWith(basePath)` check — write-path containment is an explicit pre-write realpath gate (not a side effect of slug/sanitization): sanitize before truncate; `realpath()` + segment-prefix check after resolution; per-component `lstat()` to reject symlinks before descent; `O_NOFOLLOW` on the leaf open (note: Windows has no `O_NOFOLLOW` equivalent — apply explicit symlink check there); batch writes use a fail-closed dry-run before committing. The `lstat()` + `O_NOFOLLOW` layers are not redundant with `realpath()`: they close the TOCTOU race (CWE-367) between resolving the path and opening it, where an attacker swaps a component for a symlink after the `realpath()` check passes. Any composition of operator-supplied input into a write path is treated as default HIGH severity (CWE-22).
+- [ ] Zip/archive extraction without path sanitization (Zip Slip) — SHA-256 of a network-fetched archive MUST be verified before decompression begins; Zip Slip path-escape guard applied before expand (reject entries whose resolved path escapes the target directory); extracted-file checksum verified after extraction as defense-in-depth; placeholder or missing checksums ABORT the operation (CWE-409 / Zip Slip).
 
 **SSRF (CWE-918 / A01:2025):**
 - [ ] HTTP client calls with user-controlled URLs (`fetch`, `axios`, `requests`, `HttpClient`)
@@ -496,6 +507,7 @@ For each high-risk file identified in Phase 1, read the file and perform detaile
 - [ ] Deserialization of untrusted data without type checking (Java `ObjectInputStream`, PHP `unserialize`, Python `pickle`)
 - [ ] Webhooks received without signature verification
 - [ ] File uploads processed without content verification
+- [ ] Archive supply-chain order violated — SHA-256 of a network-fetched archive not verified BEFORE decompression; Zip Slip path-escape not checked before expand; extracted-file checksum absent as defense-in-depth; placeholder checksums not treated as ABORT condition (CWE-409 / Zip Slip)
 
 **Logging:**
 - [ ] Passwords, tokens, or PII written to logs
@@ -540,6 +552,18 @@ For each high-risk file identified in Phase 1, read the file and perform detaile
 - [ ] Files served from user-controlled paths within the web root (Path Traversal)
 - [ ] Executable file extensions not blocked in upload endpoints (`.php`, `.jsp`, `.sh`)
 - [ ] Temporary files left in predictable locations
+
+### 2.10 — Config-Driven Session/Secret Injection (A04:2025 / CWE-94)
+
+Config templates that assemble session parameters or secrets (connection strings, signing keys, webhook secrets) from operator-supplied values are injection vectors when the composition is not structurally constrained.
+
+- [ ] Config value composed from free-text operator input rather than fixed ASCII template + narrowly-validated substitution values — use a fixed-template approach where only validated slot values are substituted, never raw operator strings
+- [ ] Validation regex not fully anchored (`^...$`) — a line-oriented grep that matches a substring can pass a multiline value that embeds a second directive (e.g., `value\ninjected-key=evil`); require full-variable-anchored regex
+- [ ] Boolean config slot accepts non-exact-literal value — validate only `true` / `false` (exact string); never coerce truthy/falsy strings from operator input
+- [ ] Secret value written to a config file without 0o600 permissions at-rest; secrets default to `{env:VAR}` reference style for headless deployments to avoid writing plaintext to disk
+- [ ] Secrets or sensitive config values disclosed to stdout or logs rather than to `/dev/tty` (or the OS-equivalent secure terminal) when the operator must confirm them
+
+**Note:** `hooks/` owns the validation-regex shape for gate hooks. If a security finding involves the regex pattern applied by a gate hook, flag it for a separate hooks-tier remediation task — do not propose an inline fix to `hooks/` files in this audit.
 
 ---
 
