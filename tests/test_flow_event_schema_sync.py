@@ -21,14 +21,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).parent.parent
 
 # ---------------------------------------------------------------------------
-# Canonical CH source — raw GitHub URL pinned to the merge commit of PR-1.
-# The commit SHA below is the merge commit for feat/record-flow-event into
-# context-harness-mcp main.  Update when CH cuts a new release that changes
-# the schema (coordinated two-repo change per multi-site invariant).
+# Canonical CH source — raw GitHub URL on context-harness-mcp main (the merged
+# schema). The guard compares the live CH main enum against the snapshot below,
+# so any divergence on either side fails the test (drift detection across the
+# two-repo multi-site invariant). PR-1 (record_flow_event) is merged to main.
 # ---------------------------------------------------------------------------
 CH_RAW_URL = (
     "https://raw.githubusercontent.com/valianx/context-harness-mcp/"
-    "feat/record-flow-event/internal/validate/flowevent.go"
+    "main/internal/validate/flowevent.go"
 )
 
 # ---------------------------------------------------------------------------
@@ -83,20 +83,46 @@ def _fetch_ch_source() -> str | None:
 
 
 def _parse_ch_enum(source: str) -> frozenset[str]:
-    """Extract the flowEventTypes map keys from flowevent.go source."""
-    # Match lines like: "guard.block": true,
+    """Extract the flowEventTypes map keys from flowevent.go source.
+
+    Scopes extraction to the specific `flowEventTypes = map[string]bool{ ... }`
+    block so that other map[string]bool declarations (taskTypes, hookValues,
+    reasonValues, gateValues, etc.) do not pollute the result.
+    """
+    # Locate the exact declaration line, then slice to the matching closing brace.
+    decl_match = re.search(r'\bflowEventTypes\s*=\s*map\[string\]bool\s*\{', source)
+    if not decl_match:
+        return frozenset()
+
+    block_start = decl_match.end()
+    close_idx = source.find("}", block_start)
+    if close_idx == -1:
+        return frozenset()
+
+    block = source[block_start:close_idx]
+    # Within the scoped block, extract all quoted keys that map to `true`.
     pattern = re.compile(r'"([a-z.]+)":\s+true')
-    return frozenset(pattern.findall(source))
+    return frozenset(pattern.findall(block))
 
 
 def _parse_ch_per_event_fields(source: str) -> dict[str, frozenset[str]]:
     """
-    Extract per-event field names from the validateFlowEventPerEvent switch statement.
-    Looks for lines like: if !hookValues[p.Hook] { ... }
-    and maps them to their event.
+    Extract per-event field names from the validateFlowEventPerEvent switch.
 
-    This is a best-effort parse — it confirms the field *names* are present in the
-    CH source for each event case, not the full type contract.
+    CH delegates each case to a named helper:
+        case "guard.block":
+            return validateGuardBlock(p)
+
+    The field accessors (p.Hook, p.Reason, etc.) live in those helpers, not in
+    the case body itself.  This parser therefore:
+      1. Parses the validateFlowEventPerEvent switch to build an
+         event → helper-function-name map.
+      2. For each helper, locates its function body and searches for the
+         field accessors defined in field_map.
+
+    Degrades to best-effort (skip-with-note) for any event whose helper cannot
+    be located — the event-enum check (B1) is the hard assertion; field checks
+    are confirmatory.
     """
     # Mapping from Go struct field accessor to JSON field name.
     field_map = {
@@ -113,23 +139,73 @@ def _parse_ch_per_event_fields(source: str) -> dict[str, frozenset[str]]:
         "p.LastStage": "last_stage",
     }
 
-    # Split by case blocks.
-    case_pattern = re.compile(r'case\s+"([a-z.]+)":')
-    cases = case_pattern.split(source)
+    # ── Step 1: locate validateFlowEventPerEvent and parse its switch ──────────
+    # Find the function body start (opening brace after the signature).
+    per_event_match = re.search(
+        r'\bfunc\s+validateFlowEventPerEvent\s*\([^)]*\)[^{]*\{', source
+    )
+    if not per_event_match:
+        return {}
 
+    # Extract the function body by counting braces from the opening {.
+    fn_start = per_event_match.end() - 1  # index of the opening '{'
+    depth = 0
+    fn_end = fn_start
+    for idx in range(fn_start, len(source)):
+        if source[idx] == '{':
+            depth += 1
+        elif source[idx] == '}':
+            depth -= 1
+            if depth == 0:
+                fn_end = idx + 1
+                break
+    per_event_body = source[fn_start:fn_end]
+
+    # Parse: case "event.name": ... return helperFuncName(p)
+    case_helper_re = re.compile(
+        r'case\s+"([a-z.]+)":\s*\n\s*return\s+(\w+)\(p\)'
+    )
+    event_to_helper: dict[str, str] = {}
+    for m in case_helper_re.finditer(per_event_body):
+        event_to_helper[m.group(1)] = m.group(2)
+
+    # ── Step 2: for each helper, parse its body for field accessors ────────────
     result: dict[str, frozenset[str]] = {}
-    # cases[0] = preamble; then alternating event-name / case-body.
-    i = 1
-    while i < len(cases) - 1:
-        event_name = cases[i]
-        case_body = cases[i + 1]
+    for event_name, helper_name in event_to_helper.items():
+        # Locate the helper function definition.
+        helper_match = re.search(
+            rf'\bfunc\s+{re.escape(helper_name)}\s*\([^)]*\)[^{{]*\{{', source
+        )
+        if not helper_match:
+            # Best-effort: skip this event's field check with a note; do not
+            # produce a false negative.
+            print(
+                f"  NOTE: helper '{helper_name}' for event '{event_name}' not found "
+                f"in CH source — skipping field check for this event.",
+                file=sys.stderr,
+            )
+            continue
+
+        # Extract the helper body by brace counting.
+        h_start = helper_match.end() - 1
+        depth = 0
+        h_end = h_start
+        for idx in range(h_start, len(source)):
+            if source[idx] == '{':
+                depth += 1
+            elif source[idx] == '}':
+                depth -= 1
+                if depth == 0:
+                    h_end = idx + 1
+                    break
+        helper_body = source[h_start:h_end]
+
         fields: set[str] = set()
         for accessor, json_name in field_map.items():
-            if accessor in case_body:
+            if accessor in helper_body:
                 fields.add(json_name)
         if fields:
             result[event_name] = frozenset(fields)
-        i += 2
 
     return result
 
