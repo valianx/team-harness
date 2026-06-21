@@ -57,7 +57,7 @@ Then retry `/plugin install th`.
 
 **Cause:** Skills require YAML frontmatter with a `description` field to be discovered by the plugin system. If the SKILL.md files don't have frontmatter, the plugin loader skips them.
 
-**Status:** Under investigation. Skills are invoked via the orchestrator agent which routes internally — the 0-skill count does not block normal usage via `@th:orchestrator`.
+**Status:** Under investigation. Skills are invoked via the orchestrator flow which routes internally — the 0-skill count does not block normal usage via `@th:orchestrator`.
 
 ---
 

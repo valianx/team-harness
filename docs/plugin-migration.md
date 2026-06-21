@@ -40,7 +40,7 @@ Skills now use the directory format. Each skill lives at `skills/<name>/SKILL.md
 
 - **Agents** — all 19 agents in `agents/` are unchanged. Names, models, and contracts are identical.
 - **Pipeline behavior** — all pipelines (feature, fix, hotfix, research, docs, review) run identically.
-- **orchestrator as entry point** — `@th:orchestrator` in chat still routes to the same orchestrator agent.
+- **orchestrator as entry point** — `@th:orchestrator` in chat still routes to the same orchestrator.
 - **Workspaces** — pipeline workspaces (local `./workspaces/` or Obsidian vault) work identically.
 - **Low-cost mode** — only available via the legacy Go installer; the plugin cannot transform frontmatter on install. See [`docs/install.md` § Legacy installer](./install.md#legacy-installer-contributors--offline--ci).
 - **`.team-harness.json` manifest** — config file location and format unchanged.

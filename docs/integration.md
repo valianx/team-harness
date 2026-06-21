@@ -17,7 +17,7 @@ Claude Code
     │
     └── team-harness plugin
             │
-            ├── orchestrator agent (Phase 6 knowledge-save + security-finding writes)
+            ├── orchestrator (Phase 6 knowledge-save + security-finding writes)
             ├── delivery agent (Step 11.5 passive capture)
             └── any agent reading the KG (search_nodes, open_nodes, read_graph)
                         │
