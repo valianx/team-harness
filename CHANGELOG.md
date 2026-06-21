@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.118.0] - 2026-06-21
+
+### Added
+- `docs/cost-and-caching.md` — operator reference for Claude Code prompt-caching behavior and cost controls: automatic caching and the three cache layers, subagent 5-minute vs main-session 1-hour TTL, operator env-vars (`DISABLE_PROMPT_CACHING*`, `ENABLE_PROMPT_CACHING_1H`, `FORCE_PROMPT_CACHING_5M`), verified pricing multipliers and model-specific minimum cacheable prefixes, statusline cache-performance observation, and the TTL-regression caveat (claude-code issue 46829). All facts verified against Claude Code and Anthropic API documentation.
+- `th:init` scaffolds a `.gitattributes` (`* text=auto eol=lf`) when a repo has no EOL pin, with an optional prettier `endOfLine: lf` and a renormalize note — preventing whole-file CRLF/LF churn on Windows checkouts (#363).
+- Tester browser-mode references for Vue and Svelte (`vitest-browser-vue`, `vitest-browser-svelte`); Gate-A now routes vue/nuxt/svelte to Browser Mode where a maintained render package exists, keeping an explicit (non-silent) e2e fallback for stacks without one (#331).
+- New read-only `adversary` agent (opus): an independent adversarial reviewer with a break-the-design mandate. Runs in Stage-2 verify in parallel with `security` on security-sensitive changes, issues `broke-it | could-not-break` (never a GO), and feeds the delivery-blocking worst-of verdict; a `could-not-break` on a changed control path is surfaced as INCOMPLETE, not approval (#373).
+- Security/GO verdict-staleness re-gate: a security verdict is bound to the reviewed design surface; a post-verdict change (especially an operator "simplify/remove" edit) marks it stale and re-runs both `security` and `adversary` before delivery (#373).
+- Security review dispositions: a zero-downside review on a changed control path is INCOMPLETE and blocks the verdict; loosening a safety control requires surfacing the worst-case cost for acknowledgement. Delivery presence-reconcile: flags/env-vars/provisioning-steps named in the PR body must exist and spell-match the code (#373).
+- **A1 — Multi-site invariant enumeration (architect + delivery):** `agents/architect.md` now requires a `### Multi-site invariants` table in `01-plan.md § Review Summary` whenever an invariant lives in more than one file, enumerating every site and fencing sites that must not change. A new `agents/delivery.md` Step 9.4a (pre-STAGE-GATE-3) reads that table and verifies all declared sites match each other, returning `status: failed` with a "partial sync" report on any divergence. The existing Step 9.0 enumerated version-site table and its FENCED-OFF block are preserved unchanged as the worked example.
+- **A2 — Anchor-scoped assertion canonical principle + meta-test (Suite 126):** `docs/testing.md` gains a new `### (iii) Structural assertions are anchor-scoped, never whole-file first-occurrence` principle that canonicalizes `_slice_section` as the required assertion shape and bans six fragile patterns. Suite 126 (`anchor-scoped-assertion-meta-test`) enforces this principle with a self-referential guard; all pre-existing fragile `find()+N` content-slice assertions in `tests/test_agent_structure.py` have been refactored to `_slice_section`.
+- **B1 — Defect-aware second KG query + `kg_hit_used` recall field (closes #403):** `agents/orchestrator.md` defines a best-effort, non-blocking second `mcp__memory__search_nodes` query at Phase 1 end / Phase 1.5 entry, seeded from the located files and failure mode, appended as a new block to `00-knowledge-context.md`; every leaf-agent Return Protocol status block now declares a `kg_hit_used:` field aggregated into the pipeline trace.
+- Repo-local bidirectional `/harness-migrate` contributor command (`to-opencode` / `to-claude-code`) — a deterministic Node transform that projects this repo's agent and command files between Claude Code and opencode frontmatter formats, with write-path containment, injection-form rejection, and batch fail-closed semantics.
+- `bin/install-opencode.sh` — curl-pipeable bootstrap script for opencode installs (Unix/macOS). Downloads the latest released Go binary, verifies it against the published `SHA256SUMS` (fail-closed, TOCTOU-safe), and runs `apply --runtime opencode --scope global`. Served at `https://valianx.github.io/team-harness/install-opencode.sh` via GitHub Pages.
+- `--memory-url` flag on `apply --runtime opencode` — explicit Memory MCP URL override; resolution order: `--memory-url` flag → `MEMORY_MCP_URL` env → hard non-zero exit with remediation message.
+- Non-blocking `MEMORY_MCP_BEARER`-unset warning on successful opencode installs — emitted to stderr; the install still exits 0.
+- `--runtime opencode` flag for the Go installer: places the 25 invocable agents under `{opencode_config}/agents/`, the full TS hook-plugin closure under `{opencode_config}/plugins/`, and registers `mcp.memory`/`mcp.context7` in `opencode.json` using `{env:VAR}` indirection — no literal secret is written to disk (SEC-DR-1).
+- Go port of the `harness-migrate/migrate.mjs` CC→opencode frontmatter transform (`cmd/install/transform.go`): model provider-prefix, `tools→permission.allow`, effort dropped, `mode: subagent` blanket; injection-form and prototype-pollution rejection (SEC-DR-4); shared cross-language conformance fixture (`testdata/transform-conformance.json`).
+- Transform threaded into `ComputePlan` BEFORE `hashBytes` (S-1 idempotency fix): `PlannedFile.SrcHash` is now the hash of transformed bytes, guaranteeing that a second `apply` produces zero writes.
+- SEC-05 leaf-exact allowlist for the `mcp` namespace; leaf-exact dotted-key delete in `deleteConfigKeys`; hardened `Place` write path (`cmd/install/hardened_write.go`, SEC-DR-3); runtime-scoped ledger filenames.
+- `kind: command` added to the `validKind` enum in `manifest_schema.go` (S-7).
+- `go test ./cmd/install` CI job in `.github/workflows/test.yml`.
+- Skills are now copied into `.opencode/skills/` during the opencode install; six opencode-incompatible skills excluded; `/th-update` opencode command added; README "Updating (opencode)" section added.
+- `/th:release` skill: on-demand release step that aggregates all pending `changelog.d/` fragments and `version.d/` markers, derives the SemVer bump level, bumps all three synchronized version sites once, assembles the CHANGELOG, and pushes a `release/vX.Y.Z` branch (#405).
+- Delivery `release-mode`: `release-mode: true` task signal re-enables Step 9 version bump; adds Step 9-R bump-level aggregation from fragments and markers (#405).
+- `version.d/` marker convention: feature delivery may write a `version.d/{slug}.bump` marker for fragment-less internal bumps so the release step can include them in the bump-level max (#405).
+- `/th:research-code`: hybrid multi-agent codebase-research flow — new read-only `code-researcher` sonnet agent fans out per-file/module lanes (optional web lanes), consolidator surfaces docs-vs-code conflicts, bounded gap-closure with a `code_closeable` gate.
+- `/th:setup <intent>` natural-language argument routing: routes directly to one configuration concern using bilingual ES/EN cues; no-argument invocation is unchanged; no-match arguments print the list of routable concerns.
+- `/th:test-cross-browser`: new on-demand skill that routes to the orchestrator with `Mode: test` + `cross_browser: true`, triggering the tester's cross-engine matrix (Chromium / Firefox / WebKit + branded channels + optional cloud grid).
+- `agents/testing-refs/cross-browser.md`: new axis reference loaded only when `cross_browser: true`; documents the honest browser model, per-engine skip annotations, browser × resolution matrix strategy, 13-family known-failure-modes catalog, and CI guidance.
+- `agents/security.md` — folded four standing security-checklist items mined from the 2026-06-21 KG analysis (Tier B): structural compile-time security-invariant catalog, write-path realpath containment gate, archive verify-before-extract + Zip Slip ordering (CWE-409), and fixed-template config/secret injection.
+- `agents/architect.md` — folded two reusable design heuristics: tenancy-conditioned observability content-capture dial, and bounding a designed map/reduce fan-out by ROUNDS rather than a cumulative lane budget.
+- **External-report scope verification contract (v2.116.2).** GitHub issues, issue comments, PR review comments, and ClickUp tasks are time-stamped reports. The pipeline now verifies the real residual scope against the current tree before planning or implementing, and recommends closing-with-evidence when the residual is empty. Encoded in `docs/discover-phase.md §13`, `agents/orchestrator.md` Phase 0b Step 1.5, `agents/architect.md` Spec Feedback Protocol Channel 3, and `CLAUDE.md §6.6`.
+
+### Changed
+- `CLAUDE.md §6.3`: noted that editing an `agents/*.md` cold-invalidates that agent's cached prefix for every operator until re-warmed, reinforcing the batch-edits-per-release rule.
+- `docs/document-hygiene.md`: noted that the CLAUDE.md size cap also bounds the per-session cached-token footprint.
+- `docs/patch-mode.md`: noted that re-dispatching the same agent within the 5-minute subagent cache TTL reuses its warm cache.
+- `docs/pipelines.md`: added Discover front-end, Phases 1.7/2.7/3.75/4.5, corrected STAGE-GATE-2 firing, updated artifact names to current (`01-plan.md`, `00-research.md`), rewrote Test pipeline section, split Plan/Design flows, added Milestone-Build Flow and initiative fan-out sections.
+- `docs/how-it-works.md`: added Tier 0 to bug-fix tier table, expanded agent roster to 28, expanded hooks list, added dev-mode note, replaced stale artifact references.
+- Finish #342 residual rewording: 5 remaining "orchestrator agent" phrasings in skills/docs now name the orchestrator role/flow. Moved `INTEGRATION.md` to `docs/integration.md`; moved `UPSTREAM_ISSUE_DRAFT.md` to `docs/upstream-issue-draft.md`; merged `docs/contributing.md` into `CONTRIBUTING.md`.
+- The prepublish-guard bump-floor is now a hard `deny` on over-bumps (fix-only diff applying MINOR/MAJOR), with a per-PR `bump-override: minor — <reason>` escape hatch read from the commit trailer (#383).
+- `apply --runtime opencode` now requires an explicit, scheme-validated Memory URL; `mcp.context7` is now always written to `opencode.json` on opencode apply; `cmd/install/main.go` version constant bumped to `2.112.0`.
+- `loadDefaultManifests("opencode")` now calls `validateManifests` on the built component set before returning.
+- Orchestrator now passes `skip-version: true` as the DEFAULT for all feature (non-release) deliveries; `release-mode` is the only path that re-enables the version bump (#405).
+- `hooks/prepublish-guard.sh` Check 1 reconciled: feature pushes require a `changelog.d/` fragment or `version.d/` marker; release pushes must have all three version sites bumped and matching the branch version; over-bump hard-deny relocated to the release path (#405).
+- `CLAUDE.md §6.3` per-PR bump mandate reframed as release-time deferral, consistent with the `changelog.d/` precedent (#405).
+- `th:tester` no longer emits unit tests that assert a spec/manifest version string equals the release version (#364); version-parity assertions belong in a delivery/release gate.
+- Orchestrator now always renders the architect's confidence score at STAGE-GATE-1 (reframed from additive to required).
+- Trimmed opencode interactive setup to two prompts (Memory MCP + context7); removed Agent Output Location, Language, English-Learning, ClickUp, and Obsidian Tasks groups and the final confirm — worst-case stops drop from ~16 to ≤3. Import decision now short-circuits straight to write-config + MCP-registration.
+- `docs/patch-mode.md` + `agents/orchestrator.md`: Case D (security-only localized patch) now explicitly requires a coherence gate (`qa validate` on patched AC IDs) after the security re-run.
+- `agents/orchestrator.md` Phase Checklist: phases `2.0`, `2.5`, `4.5`, and `STAGE-GATE-2` are now JSONL-only; row `2.7 — Test Authoring` added; Phase 3.75 corrected to IS a top-level checklist row.
+- `agents/orchestrator.md` Phase 3.5 + `agents/ref-special-flows.md`: regression-still-passing gate now also checks assertion-content match — authored assertion patterns must still be present in the actual test file.
+- `agents/plan-reviewer.md` + `agents/orchestrator.md` Phase 1.6: vacuous-success guard for the security-design-review label is now conditioned on `security_sensitive: true` from the dispatch payload.
+- `agents/ref-direct-modes.md`: vacuous-success guard scope clarified — applies to `plan-review` direct mode only; diagram modes are excluded.
+- Pipeline now verifies prior-stage recorded outcomes instead of re-executing them, eliminating paid-twice work across five seams (#307): Phase 3 skips test re-run when Phase 2.7 already recorded a green suite; reviewer bounds inlined PR diff with a line cap; `update-body` and `reply` review submodes receive only changed-files list; security pipeline-mode report uses a compact findings-only format; blanket "read ALL workspace files" replaced by per-agent input manifests; lazy-load directive for `ref-special-flows.md` and `ref-direct-modes.md`; delivery Golden-Command DoD now classifies commands (paid/interactive excluded from routine gate).
+
+### Fixed
+- `TestEmbeddedAssets_AgentCount` updated to 25 and its `WalkDir` now skips ALL `agents/` subdirectories; `TestEmbeddedAssets_AllExpectedAgents` roster updated to include 7 missing agents.
+- `loadDefaultManifests("opencode")` now calls `validateManifests` before returning — a malformed component now fails the install loudly at install time.
+- `cmd/install/datahome_unix.go`: cast `st.Mode` to `uint32` at the `isDirectory` call sites — `syscall.Stat_t.Mode` is `uint16` on darwin, causing the darwin cross-compile to fail. The CI `go-test` job now also cross-compiles all five release targets.
+- `acceptance-checker`: clarified that `fail` verdict routes back to implementer/architect while `concerns` is advisory.
+- `docs/observability.md`: `kg_write` invariant now excludes content-gate skips from the `succeeded` count.
+- `skills/review-pr/SKILL.md`: workspace-detection block now uses current pipeline filenames (`01-plan.md`, `02-implementation.md`).
+- `agents/architect.md`: Full `01-plan.md` template now carries the `Base` column and `**Base:**` per-PR field.
+- `agents/delivery.md`: acceptance-matrix save path moved from git-ignored `workspaces/{feature-name}/` to committed `docs/specs/{feature-name}/`.
+- `skills/update/SKILL.md`: bash managed-block sync now uses in-position Python 3 replacement — previous `sed -i.tmp` approach left `.tmp` litter.
+- Normalized `hooks/*.sh` committed file modes to remove spurious mode-only `modified` diffs under `core.fileMode=true` (#397); 15 hooks pinned to `100644`; `hooks/notify-stage.sh` kept `100755` (Suite 22 asserts executable bit).
+- opencode installer (`apply --runtime opencode`) no longer requires `MEMORY_MCP_URL` or `CONTEXT7_API_KEY` — both are optional; assets install regardless, MCP servers registered only when credentials are supplied.
+- Welcome banner now shown at the start of `apply --runtime opencode`.
+- `install-opencode.sh` no longer prompts for or requires `MEMORY_MCP_URL`; bare `curl -fsSL … | bash` works with no environment variables set and no TTY required.
+- Memory MCP URL paste under `curl | bash`: the huh form now wires `/dev/tty` explicitly as the bubbletea input source (`tea.WithInput`) so bracketed-paste is attached to the real controlling terminal, not a pipe-backed stdin.
+
+### Security
+- **gh-fallback Tier B write blocks: CWE-78 JSON injection hardening (#306).** The five `curl`-write fallback paths in `agents/_shared/gh-fallback.md` (create PR, edit PR, create issue, edit issue, comment on issue) previously interpolated untrusted GitHub-sourced values directly into a shell-quoted `--data` literal, allowing command injection and malformed JSON when the value contains `"`, `\`, newline, or `$(...)`. All five blocks now serialize untrusted field values to a temp file via `python3 json.dumps` (values passed as argv — never inside a shell string) and pass the file to curl with `--data @file`.
+
 ## [2.117.0] - 2026-06-20
 
 ### Added
