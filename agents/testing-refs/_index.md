@@ -13,6 +13,12 @@
 | visual | visual.md | react-nextjs | — (type is FE-only) |
 | a11y | a11y.md | react-nextjs | — (type is FE-only) |
 | browser-mode | browser-mode.md | react-nextjs, vue, svelte | — (type is FE-only; nestjs/go/python: n/a) |
+| cross-browser | cross-browser.md | react-nextjs | nestjs, go, python: n/a (browser-only axis) |
+
+> **`cross-browser` axis note:** `cross-browser.md` is loaded **alongside** the warranted `e2e` or
+> `browser-mode` reference — never as the sole warranted type. It is loaded **only when the dispatch
+> payload carries `cross_browser: true`** (set exclusively by `/th:test-cross-browser`). Absent the
+> flag, the tester's behavior is identical to today.
 
 > **Engine-overlap note:** `ui-component` (Storybook + `@storybook/addon-vitest`), `visual` Option C (`toMatchScreenshot` in a browser project), `browser-mode` (`vitest-browser-react`), and `a11y` No-Storybook path (axe-core inside a vitest-browser-react test) all execute inside Vitest Browser Mode (`@vitest/browser-playwright`). When two types are warranted for a single AC, load both reference files and apply each file's boundary note: story = appearance + interaction; browser-mode = raw layout/observer assertions.
 
