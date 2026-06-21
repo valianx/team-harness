@@ -1,8 +1,46 @@
-# Observability — operation.* Event Schema
+# Observability — Event Schemas and Planes
 
-> Supplementary schema for sub-pipeline operations. This document defines the
-> `operation.*` event family and its placement within the mandatory
-> `00-execution-events.{jsonl|md}` contract.
+> This document defines the TH observability surfaces: the **local** per-workspace pipeline
+> trace (`00-execution-events.{jsonl|md}`) and the **cross-user** flow-event plane (opt-in
+> telemetry via `context-harness-mcp`). The two planes are independent and serve different
+> purposes. The local plane is always active; the cross-user plane is opt-in and never
+> affects pipeline outcomes.
+
+## Two observability planes — local vs. cross-user
+
+Team Harness maintains two distinct observability planes. Operators and tools (e.g.,
+`/th:trace`) read only from the **local plane**. The **cross-user plane** is a separate,
+opt-in channel for aggregate fleet-level friction signals. The two planes MUST NOT be
+conflated — they answer different questions with different audiences.
+
+| Dimension | Local plane (`00-execution-events`) | Cross-user plane (flow events) |
+|-----------|-------------------------------------|-------------------------------|
+| Purpose | Per-workspace pipeline trace for the individual operator | Cross-fleet friction signal for TH maintainers |
+| File | `00-execution-events.jsonl` (local mode) / `00-execution-events.md` (obsidian mode) | No file — relayed to Axiom via `context-harness-mcp` |
+| Audience | Operator + `/th:trace` skill | TH maintainers via Axiom dashboard |
+| Default | ALWAYS active — every pipeline writes this | OFF by default (`flow_telemetry.enabled: false`). Opt-in via `/th:setup flow-telemetry` |
+| Blocking? | Mandatory — missing events are a contract violation | Non-blocking — emission failure is logged and the pipeline continues |
+| Schema scope | Rich pipeline detail (phase timing, tokens, gate verdicts, iteration counts, tool usage) | Metadata-only bounded fields (8-value event enum, ints, version, timestamp, bare project tag — NO diff, NO code, NO paths) |
+| Contains PII / content? | Operator-local only; never sent cross-user | Filtered by CH `internal/validate.Run` + metadata-only by construction |
+
+### Cross-user flow-event plane (opt-in)
+
+When `flow_telemetry.enabled: true` in `~/.claude/.team-harness.json` (default: `false`),
+the orchestrator emits pipeline friction events to `context-harness-mcp` via the
+`mcp__memory__record_flow_event` MCP tool. Emission is best-effort:
+
+- Any error (CH unreachable, tool absent, timeout, validation rejection) → log
+  `flow-telemetry: unavailable` as an `operation.failed` event in `{events_file}` and
+  continue. The pipeline outcome is NEVER changed by a telemetry failure.
+- Payloads are metadata-only: bounded enums, integers, booleans, a semver string, and a
+  timestamp. No diff, no code, no file paths with user identifiers, no AC text.
+- The CH Content Filter (`internal/validate.Run`) is the ingest-side enforcement floor;
+  TH emission is the construction-side floor. Neither side trusts the other alone.
+
+Full emission contract, the 8-event catalog, and the trigger map: see
+`agents/orchestrator.md § "Flow Telemetry Emission"`.
+
+---
 
 ## What operation.* is
 
