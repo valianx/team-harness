@@ -308,7 +308,7 @@ func TestRegisterOpencodeMCP_EnvRef_WritesEnvRefs(t *testing.T) {
 	dir := t.TempDir()
 	docPath := filepath.Join(dir, "opencode.json")
 
-	err := registerOpencodeMCP(
+	_, err := registerOpencodeMCP(
 		"https://mcp.example.com/mcp",
 		"https://mcp.context7.com/mcp",
 		docPath,
@@ -376,7 +376,7 @@ func TestRegisterOpencodeMCP_Literal_WritesLiteralValues(t *testing.T) {
 	docPath := filepath.Join(dir, "opencode.json")
 
 	secrets := opencodeMCPSecrets{MemoryBearer: "tok", Context7Key: "key"}
-	err := registerOpencodeMCP(
+	_, err := registerOpencodeMCP(
 		"https://mcp.example.com/mcp",
 		"https://mcp.context7.com/mcp",
 		docPath,
@@ -531,7 +531,7 @@ func TestNonInteractiveMigration_LiteralPath(t *testing.T) {
 	if cfg.MCP.Context7Enabled {
 		ctx7URL = context7URL
 	}
-	if err := registerOpencodeMCP(cfg.MCP.MemoryURL, ctx7URL, docPath, mode, secrets); err != nil {
+	if _, err := registerOpencodeMCP(cfg.MCP.MemoryURL, ctx7URL, docPath, mode, secrets); err != nil {
 		t.Fatalf("registerOpencodeMCP: %v", err)
 	}
 
@@ -624,7 +624,10 @@ func TestPrintOpencodeApplySummary_NoLiteralSecretInOutput(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	printOpencodeApplySummary(&diff, cfg, dir+"/.team-harness.json", dir)
+	printOpencodeApplySummary(&diff, cfg, dir+"/.team-harness.json", dir, MCPRegisterOutcome{
+		Memory:   MCPStatusAdded,
+		Context7: MCPStatusAdded,
+	})
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -722,7 +725,7 @@ func TestRegisterOpencodeMCP_FileMode_EnvRef(t *testing.T) {
 	dir := t.TempDir()
 	docPath := filepath.Join(dir, "opencode.json")
 
-	err := registerOpencodeMCP(
+	_, err := registerOpencodeMCP(
 		"https://mcp.example.com/mcp",
 		"https://mcp.context7.com/mcp",
 		docPath,
@@ -755,7 +758,7 @@ func TestRegisterOpencodeMCP_FileMode_Literal(t *testing.T) {
 	docPath := filepath.Join(dir, "opencode.json")
 
 	secrets := opencodeMCPSecrets{MemoryBearer: "tok", Context7Key: "key"}
-	err := registerOpencodeMCP(
+	_, err := registerOpencodeMCP(
 		"https://mcp.example.com/mcp",
 		"https://mcp.context7.com/mcp",
 		docPath,
@@ -773,6 +776,139 @@ func TestRegisterOpencodeMCP_FileMode_Literal(t *testing.T) {
 	// AC-12 binding contract: 0o600 UNCONDITIONALLY (both literal and env-ref paths).
 	if info.Mode().Perm() != 0o600 {
 		t.Errorf("opencode.json mode = %o, want 0o600 (AC-12 literal path)", info.Mode().Perm())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fix: real per-run MCP outcome — registered / already configured / skipped
+// ---------------------------------------------------------------------------
+
+// TestRegisterOpencodeMCP_FreshRun_ReturnsAdded verifies that a fresh call to
+// registerOpencodeMCP (opencode.json absent) returns MCPStatusAdded for both
+// servers — "registered" in the summary is truthful.
+func TestRegisterOpencodeMCP_FreshRun_ReturnsAdded(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+
+	outcome, err := registerOpencodeMCP(
+		"https://mcp.example.com/mcp",
+		"https://mcp.context7.com/mcp",
+		docPath,
+		tokenModeEnvRef,
+		opencodeMCPSecrets{},
+	)
+	if err != nil {
+		t.Fatalf("registerOpencodeMCP: %v", err)
+	}
+
+	if outcome.Memory != MCPStatusAdded {
+		t.Errorf("Memory outcome = %q, want %q (fresh run — fix: real per-run MCP state)", outcome.Memory, MCPStatusAdded)
+	}
+	if outcome.Context7 != MCPStatusAdded {
+		t.Errorf("Context7 outcome = %q, want %q (fresh run — fix: real per-run MCP state)", outcome.Context7, MCPStatusAdded)
+	}
+}
+
+// TestRegisterOpencodeMCP_IdempotentReRun_ReturnsAlreadyConfigured verifies
+// that an identical re-run (opencode.json already contains the correct entries)
+// returns MCPStatusAlreadyConfigured for both servers. This is the fix for the
+// operator-observed issue: "registered" was shown even when nothing was written.
+func TestRegisterOpencodeMCP_IdempotentReRun_ReturnsAlreadyConfigured(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+
+	// First run — writes the file.
+	if _, err := registerOpencodeMCP(
+		"https://mcp.example.com/mcp",
+		"https://mcp.context7.com/mcp",
+		docPath,
+		tokenModeEnvRef,
+		opencodeMCPSecrets{},
+	); err != nil {
+		t.Fatalf("first registerOpencodeMCP: %v", err)
+	}
+
+	// Second run — identical parameters, nothing should change.
+	outcome, err := registerOpencodeMCP(
+		"https://mcp.example.com/mcp",
+		"https://mcp.context7.com/mcp",
+		docPath,
+		tokenModeEnvRef,
+		opencodeMCPSecrets{},
+	)
+	if err != nil {
+		t.Fatalf("second registerOpencodeMCP: %v", err)
+	}
+
+	if outcome.Memory != MCPStatusAlreadyConfigured {
+		t.Errorf("Memory outcome = %q, want %q on idempotent re-run (fix: real per-run MCP state)", outcome.Memory, MCPStatusAlreadyConfigured)
+	}
+	if outcome.Context7 != MCPStatusAlreadyConfigured {
+		t.Errorf("Context7 outcome = %q, want %q on idempotent re-run (fix: real per-run MCP state)", outcome.Context7, MCPStatusAlreadyConfigured)
+	}
+}
+
+// TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped verifies that when
+// both URLs are empty, registerOpencodeMCP returns MCPStatusSkipped for both
+// servers (genuine absence path — nothing is written).
+func TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+
+	// Empty URLs → both servers skipped.
+	outcome, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{})
+	if err != nil {
+		t.Fatalf("registerOpencodeMCP: %v", err)
+	}
+
+	if outcome.Memory != MCPStatusSkipped {
+		t.Errorf("Memory outcome = %q, want %q (absent URL — fix: real per-run MCP state)", outcome.Memory, MCPStatusSkipped)
+	}
+	if outcome.Context7 != MCPStatusSkipped {
+		t.Errorf("Context7 outcome = %q, want %q (absent URL — fix: real per-run MCP state)", outcome.Context7, MCPStatusSkipped)
+	}
+
+	// File must not have been created.
+	if _, err := os.Stat(docPath); !os.IsNotExist(err) {
+		t.Error("opencode.json was created despite both URLs being empty (fix: genuine absence must not write)")
+	}
+}
+
+// TestPrintOpencodeApplySummary_ReRun_ShowsAlreadyConfigured verifies that the
+// summary output shows "already configured" (not "registered") when the MCP
+// outcome says MCPStatusAlreadyConfigured — end-to-end fix assertion.
+func TestPrintOpencodeApplySummary_ReRun_ShowsAlreadyConfigured(t *testing.T) {
+	dir := t.TempDir()
+	diff := PlanDiff{}
+	cfg := opencodeSetupValues{
+		LogsMode: "local",
+		MCP: opencodeMCPValues{
+			MemoryURL:       "https://mcp.example.com/mcp",
+			Context7Enabled: true,
+		},
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
+		Memory:   MCPStatusAlreadyConfigured,
+		Context7: MCPStatusAlreadyConfigured,
+	})
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 65536)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if !strings.Contains(output, "already configured") {
+		t.Errorf("summary missing 'already configured' on re-run (fix: real per-run MCP state):\n%s", output)
+	}
+	if strings.Contains(output, "registered") {
+		t.Errorf("summary shows 'registered' on idempotent re-run — must show 'already configured' (fix):\n%s", output)
 	}
 }
 
