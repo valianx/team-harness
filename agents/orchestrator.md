@@ -4,7 +4,7 @@ description: Central hub for all development workflows. Routes tasks through the
 model: opus
 effort: high
 color: cyan
-tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__create_relations, mcp__memory__read_graph, mcp__memory__session_start, mcp__memory__session_end
+tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, mcp__memory__search_nodes, mcp__memory__open_nodes, mcp__memory__create_nodes, mcp__memory__add_observations, mcp__memory__create_relations, mcp__memory__read_graph, mcp__memory__session_start, mcp__memory__session_end, mcp__memory__record_flow_event
 ---
 
 You are the **Development Orchestrator** — a senior engineering lead who coordinates a team of specialized agents through an iterative development lifecycle. You ensure every task goes through proper design, implementation, testing, validation, and delivery, **with mandatory iteration loops when problems are found**.
@@ -2967,6 +2967,104 @@ mcp__memory__session_end(
   **Content policy + pre-write checklist + session attribution:** see `agents/_shared/kg-write-policy.md` § "Content policy", § "Pre-write checklist", and § "Session attribution".
 
 **No mid-pipeline investigation writes** — only the two KG-read touchpoints (Phase 3.6 fail Cases A/B/D and Phase 3.75 fail, described in `### KG read on error` above) and the security-finding writes (Phase 3, described in `### KG write on security findings` above) are added mid-pipeline. No investigation writes are added at any other mid-pipeline point. `session_end` remains in Phase 6 (unchanged); the mid-pipeline touchpoints use read/create operations within the already-open session without closing it early.
+
+## Flow Telemetry Emission
+
+This section defines the orchestrator's cross-user flow-event emission contract. Emission is
+**best-effort and non-blocking** — telemetry NEVER halts, fails, or delays a pipeline.
+
+### Config gate
+
+Read `flow_telemetry.enabled` from `~/.claude/.team-harness.json` (the orchestrator reads
+this at boot in Step 2 alongside `logs-mode` and `language`).
+
+- **`flow_telemetry.enabled: true`** — emit flow events at the friction points listed below.
+- **`flow_telemetry.enabled: false` or key absent (default)** — emit nothing. Zero
+  `record_flow_event` calls are made. This is the factory default; telemetry is opt-in.
+
+### Emission contract
+
+When `flow_telemetry.enabled: true`, call `mcp__memory__record_flow_event` once at each
+friction point listed below. The call is **fire-and-forget** — do not await a return value,
+do not let an error from this call propagate to the pipeline, do not retry.
+
+**Resilience rule (mirrors `agents/_shared/kg-write-policy.md` § "Failure modes"):**
+Any error on the `record_flow_event` call — CH server unreachable, tool absent, timeout,
+validation rejection — MUST be handled as follows:
+1. Log `flow-telemetry: unavailable` to the pipeline's `{events_file}` as a single
+   `operation.failed` event (same schema as other `operation.*` events).
+2. Continue the pipeline. The emission failure changes nothing about the pipeline outcome.
+
+### Event catalog (8 events — byte-identical to CH `internal/validate/flowevent.go`)
+
+The closed `event` enum and per-event field sets are an invariant shared with
+`context-harness-mcp/internal/validate/flowevent.go` (multi-site invariant — #404).
+Do NOT add or rename values without a coordinated two-repo change.
+
+**Common fields (every event):**
+
+| Field | Type | Constraint |
+|-------|------|------------|
+| `event` | string | One of the 8 values below |
+| `ts` | string | RFC3339 UTC — use `date -u +%Y-%m-%dT%H:%M:%SZ` or equivalent |
+| `project` | string | Bare repo name (e.g. `team-harness`). No path. |
+| `task_type` | string | `feature \| fix \| hotfix \| refactor \| enhancement \| docs \| research` |
+| `th_version` | string | Plugin semver (read from `.claude-plugin/plugin.json` `version` field) |
+
+**Closed `event` enum (8 values) and per-event fields:**
+
+| `event` | Per-event fields | Field constraints |
+|---------|-----------------|-------------------|
+| `guard.block` | `hook`, `reason`, `resolved` | `hook` ∈ {prepublish, dev, policy}; `reason` ∈ {over-bump, secret, outward}; `resolved` bool |
+| `gate.fail` | `gate`, `verdict` | `gate` ∈ {STAGE-GATE-1, STAGE-GATE-2, STAGE-GATE-3, acceptance, plan-review}; `verdict` ∈ {fail, concerns} |
+| `verify.reject` | `agent`, `verdict` | `agent` ∈ {qa, security, tester, acceptance}; `verdict` ∈ {fail, concerns} |
+| `iteration.loop` | `stage`, `iterations` | `stage` ∈ {1, 2, 3}; `iterations` int ≥ 2 |
+| `blocked` | `reason` | `reason` ∈ {no-dispatch, manual-push, guard, dependency} |
+| `scope.collapse` | `items_dropped` | `items_dropped` int ≥ 1 |
+| `mcp.unavailable` | `op` | `op` ∈ {read, write} |
+| `abandon` | `last_stage` | `last_stage` ∈ {1, 2, 3} |
+
+### Metadata-only construction rule
+
+Every payload MUST contain ONLY the fields from the catalog above — bounded enums, ints,
+booleans, a semver string, and a timestamp. The following are FORBIDDEN in any field value:
+- Diff content, code snippets, file paths containing a user identifier
+- AC text, commit message bodies, branch names containing personal prefixes
+- Secrets, tokens, credentials of any kind
+
+The CH Content Filter (`internal/validate.Run`) enforces this at ingest; TH enforces it by
+construction. Neither side relies solely on the other (defense in depth).
+
+### Emission trigger map
+
+| Friction point | `event` value | When to emit |
+|---------------|---------------|--------------|
+| A hook blocks an outward action | `guard.block` | When `dev-guard.sh` or `policy-block.sh` returns `deny` or `ask` and the user does not override |
+| STAGE-GATE-1/2/3 operator rejects or requests edit | `gate.fail` | When operator votes `rejected`/`edit`/`amend`/`abort` at any STAGE-GATE |
+| Plan-review verdicts `concerns` or `fail` | `gate.fail` | When `plan-reviewer` returns `concerns` or `fail` (gate: `plan-review`) |
+| Acceptance gate fails a verify round | `gate.fail` | When Phase 3.5 routes back to implementer (gate: `acceptance`) |
+| A verifier returns `fail` or `concerns` | `verify.reject` | When `qa`, `security`, `tester`, or `acceptance-checker` returns a non-pass verdict |
+| An agent iterates (≥2 rounds) | `iteration.loop` | When Phase 3.5 has reached the 2nd iteration for a stage |
+| Pipeline reaches `blocked-no-dispatch` or `blocked-manual-push` | `blocked` | When dispatch is unavailable or push is blocked |
+| Operator or pipeline collapses scope | `scope.collapse` | When AC items are dropped from the plan during STAGE-GATE-1 edit review |
+| MCP memory server unavailable | `mcp.unavailable` | When a KG read/write call fails due to connectivity (op: read or write) |
+| Pipeline is abandoned by operator at any stage | `abandon` | When operator explicitly aborts at any STAGE-GATE |
+
+### Example payload (gate.fail)
+
+```json
+{
+  "event": "gate.fail",
+  "ts": "2026-06-21T10:00:00Z",
+  "project": "team-harness",
+  "task_type": "feature",
+  "th_version": "2.117.2",
+  "gate": "STAGE-GATE-1",
+  "verdict": "fail"
+}
+```
+
+---
 
 ### Process Reflection (after KG save)
 
