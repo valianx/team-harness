@@ -15,8 +15,8 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 | **Security-sensitive** | Auto-triggered by path patterns (`auth/`, `middleware/`, `db/`, etc.) or keywords | Forces `security` agent in parallel during verify. Cannot be downgraded. |
 | **Frontend-scope** | Auto-triggered by path patterns (`components/`, `pages/`, `*.tsx`, `*.vue`, CSS) or UI/UX keywords | Adds `ux-reviewer` in Stage 1 (enrich: UI/UX AC) and Stage 3 (validate: accessibility, responsiveness, component reuse). Only critical findings block. |
 | **Database changes** | Auto-triggered when diff touches migration files | Architect declares migration strategy; plan-reviewer validates reversibility. |
-| **Test pipeline** | `/test-pipeline` · `@th:orchestrator run the test pipeline` | Service-wide coverage analysis. No code changes; produces a prioritized test list. |
-| **Research** | `/research <topic>` · `@th:orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `01-research.md`, no code committed. |
+| **Test pipeline** | `/test-pipeline` · `@th:orchestrator run the test pipeline` | Service-wide test authoring with 80 % branch-coverage gate (max 3 loops). Writes coverage config + test code in worktrees; output: `05-consolidation.md`. |
+| **Research** | `/research <topic>` · `@th:orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `00-research.md`, no code committed. |
 | **Spike** | `/spike <prototype>` · `@th:orchestrator spike <X>` | Throwaway prototype to validate a technical approach. No delivery. |
 | **Plan** | `/plan <task>` · `/design <feature>` · `@th:orchestrator give me the work plan` | Stage 1 only (intake → architect → plan-review → STAGE-GATE-1). Stops without implementing. |
 | **PR review** | `/review-pr #N` · `@th:orchestrator review PR #N` | 5-phase enriched review with worktree, tier-aware multi-agent dispatch (reviewer + qa + security at Tier 3+), explicit decision menu. |
@@ -38,36 +38,55 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 
 **When to use.** New features, enhancements, API additions, non-trivial refactors, or any work that requires a design decision before implementation. Default when no special intent is detected. Invoke via `@th:orchestrator <describe new feature>`.
 
+### Discover front-end (before Phase 1)
+
+Every feature pipeline is preceded by the **Discover phase** — the orchestrator's default intake posture before dispatching the architect. It is interactive and runs at the top-level chat session (not inside a subagent):
+
+1. **Framing gate (B1).** The orchestrator restates what it understood and asks any clarifying questions. An explicit advance signal from the operator (`dale`, `go`, `plan it`, `procedé`, …) closes Discover. Without an advance signal or a fast-path skip marker (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`), the orchestrator never dispatches the architect.
+2. **Intake survey (§5 of `docs/discover-phase.md`).** Four meta-decisions captured immediately after the advance signal: pipeline shape (full / fast), effort, iteration autonomy, and a scope hint.
+3. **Spec co-authoring — `00-spec-seed.md`.** If the task is a large or vague scope, the operator and orchestrator collaboratively author a one-page spec seed (`00-spec-seed.md`) to anchor the architect's design. This is optional but strongly recommended for ambiguous tasks; the orchestrator proposes it when `functional_clarity_confirmed: false` after the framing gate.
+4. **Approach checkpoint.** Before dispatching the architect, the orchestrator surfaces the tentative pipeline shape (pipeline type, affected services, security flags) and confirms with the operator. If the auto-classification disagrees with the operator's intent, this is the correction point.
+5. **Plan sketches + sketch-guard at STAGE-GATE-1.** Once the architect completes Phase 1, it writes sketch files (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) alongside `01-plan.md`. `hooks/sketch-guard.sh` fires at STAGE-GATE-1 and blocks the gate if a required sketch is missing.
+
+Full contract: [`docs/discover-phase.md`](./discover-phase.md).
+
 ### Phases
 
 | Phase | Agent | Output |
 |---|---|---|
-| Phase 0a — Classify & Read | orchestrator | `00-state.md` initialized, KG session started |
-| Phase 0b — Intake | orchestrator | `00-task-intake.md` |
-| Phase 1 — Design | architect | `01-architecture.md`, `02-task-list.md` |
-| Phase 1.5 — Plan Ratification | qa | AC validation against Work Plan |
-| Phase 1.6 — Plan Review | plan-reviewer | `01-plan-review.md` — pass/concerns/fail verdict |
-| **STAGE-GATE-1** | operator | Approve or approve-autonomous |
+| Phase 0a — Classify & Intake | orchestrator | `00-state.md` initialized, Discover gate, intake survey, KG session started |
+| Phase 0b — Specify | orchestrator | AC list and scope confirmed in `00-state.md` |
+| Phase 1 — Design | architect | `01-plan.md` (merged architecture + task list) + `sketches/` |
+| Phase 1.7 — UX Enrich | ux-reviewer (when `frontend_scope: true`) | `01-ux-review.md`, UI/UX AC appended to `01-plan.md` |
+| Phase 1.5 — Plan Ratification | qa | AC validation against Work Plan (appended to `01-plan.md`) |
+| Phase 1.6 — Plan Review | plan-reviewer | verdict appended to `01-plan.md § Plan Review` |
+| **STAGE-GATE-1** | operator | Approve or approve-autonomous; sketch-guard validates `sketches/` |
 | Phase 2.0 — (bug-fix only) | — | — (see Bug-fix pipeline) |
 | Phase 2 — Implementation | implementer | code, `02-implementation.md` |
 | Phase 2.5 — Constraint Reconciliation | qa | keep/amend/drop decision when a hidden constraint surfaces |
-| Phase 3 — Verify | tester, qa, security (parallel) | `03-testing.md`, `04-validation.md`, `04-security.md` |
-| Phase 3.5 — Acceptance Gate | orchestrator | re-routes to implementer if any AC is missing a passing test |
-| Phase 3.6 — Acceptance Check | acceptance-checker | `06-acceptance-check.md` — independent spec-vs-delivery comparison |
-| **STAGE-GATE-2** | operator | Per-PR approval (skipped with autonomy) |
+| Phase 2.7 — Test Authoring | tester (authoring mode) | `03-testing.md` (authoring section); must complete before Phase 3 |
+| Phase 3 — Verify | tester (run-only), qa, security* (parallel) | `03-testing.md` (verify section), `04-validation.md`, `04-security.md` |
+| Phase 3.5 — Acceptance Gate | orchestrator | re-routes to implementer if any AC is missing a passing test (max 3 loops) |
+| Phase 3.75 — Build Verification | orchestrator | build/lint commands; retry implementer once if fail |
+| Phase 3.6 — Acceptance Check | acceptance-checker | verdict appended to `04-validation.md` |
+| **STAGE-GATE-2** | operator | Per-round approval (skipped when operator granted `approve-autonomous` at GATE-1) |
 | Phase 4 — Delivery | delivery | CHANGELOG entry, version bump, branch, commit |
-| Phase 4.5 — Internal Review | reviewer | `05-internal-review.md` — advisory top-3 issues |
+| Phase 4.5 — Internal Review | reviewer | advisory top-3 issues |
 | **STAGE-GATE-3** | operator | Final ship/amend/abort |
-| Phase 5 — GitHub | delivery | PR opened on GitHub (`Fixes #N`, labels) |
+| Phase 5 — GitHub Update | orchestrator + delivery | PR opened on GitHub post-STAGE-GATE-3 (`Fixes #N`, labels) |
 | Phase 6 — KG Capture | orchestrator | `process-insight` node written to Memory MCP |
 
-**STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires between PR batches and is skipped when the operator granted `approve autonomous` at GATE-1.
+*`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true`.
+
+**STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires **per-round** (once per round of PRs, between rounds) and is skipped when the operator granted `approve-autonomous` at GATE-1. A "round" is all PRs that share the same dependency depth; independent PRs run in parallel within a round, and STAGE-GATE-2 fires once when the whole round completes — not once per PR.
+
+**Phase ordering note.** Phase 1.7 executes before Phase 1.5 in time (assigned a higher number for observability-identity continuity, following the same precedent as Phase 3.75 which executes before Phase 3.6). Phase 2.7 (test authoring) must complete before Phase 3 (verify).
 
 ### Notable artifacts
 
-- `workspaces/{feature}/01-architecture.md` — design proposal
-- `workspaces/{feature}/02-task-list.md` — PR table with Given/When/Then AC per PR and `Status:` field
-- `workspaces/{feature}/01-plan-review.md` — plan-reviewer verdict
+- `workspaces/{feature}/01-plan.md` — merged design proposal + task list (§ Architecture + § Task List); plan-reviewer verdict appended as `§ Plan Review`
+- `workspaces/{feature}/sketches/` — api-contract, data-model, ui-wireframe, etc. (presence gated by sketch-guard at STAGE-GATE-1)
+- `workspaces/{feature}/00-spec-seed.md` — optional pre-architect spec anchor (Discover phase)
 - `workspaces/{feature}/00-state.md` — live pipeline state (TL;DR + phase + agent results)
 - `workspaces/{feature}/00-execution-events.jsonl` — append-only JSONL trace (local mode)
 - `workspaces/{feature}/00-execution-events.md` — same trace wrapped in YAML frontmatter + code fence (obsidian mode)
@@ -85,7 +104,7 @@ Full specification: [`agents/ref-special-flows.md`](../agents/ref-special-flows.
 
 | Stage | Bug-fix difference |
 |---|---|
-| Stage 1 | architect runs in **root-cause mode** → `01-root-cause.md` (1 page max) instead of `01-architecture.md` |
+| Stage 1 | architect runs in **root-cause mode** → `01-root-cause.md` (1 page max) instead of `01-plan.md` |
 | Phase 2.0 | tester authors a **failing regression test** in `02-regression-test.md` BEFORE the implementer touches source — mandatory, no fallback |
 | Stage 2 — Implementation | implementer runs under **scope discipline**: zero tangential refactors; spotted issues go to `## Follow-ups Spotted` |
 | Stage 2 — Verify | `security` agent runs **always** in parallel with `tester` and `qa`, regardless of any other criterion |
@@ -149,15 +168,22 @@ Security-sensitive flows force `security-sensitive: true` at Phase 0a Step 7, re
 
 **When to use.** Any feature or fix that adds, removes, or alters database schema, indexes, or migrations.
 
-Migration strategy is mandatory for all database-touching PRs: migrations must be reversible (up + down), follow the project's migration tooling, and be deployed atomically with the code that depends on them. The architect declares the migration strategy in `01-architecture.md` and the plan-reviewer validates it.
+Migration strategy is mandatory for all database-touching PRs: migrations must be reversible (up + down), follow the project's migration tooling, and be deployed atomically with the code that depends on them. The architect declares the migration strategy in `01-plan.md` and the plan-reviewer validates it.
 
 ---
 
 ## Test pipeline (/test-pipeline)
 
-**When to use.** Service-wide test coverage analysis or a structured test pass across multiple components without a feature change. Triggered by `/test-pipeline` or `@th:orchestrator run the test pipeline`.
+**When to use.** Service-wide test authoring and coverage enforcement across multiple components without a feature change. Triggered by `/test-pipeline` or `@th:orchestrator run the test pipeline`.
 
-The `tester` agent runs in coverage mode, reports coverage gaps, and produces a prioritized list of tests to add. No implementation or delivery phases run.
+The test pipeline **writes coverage configuration and test code** — it is not a read-only analysis. It runs inside a worktree, iterates until the coverage gate is met or the loop limit is reached, and commits the result:
+
+1. **Phase 1 — Coverage config.** Sets up or updates the coverage tool for the service.
+2. **Phase 2 — Module decomposition.** The orchestrator decomposes the service into testable modules and dispatches `tester` agents in parallel, one per module.
+3. **Phase 3 — Test generation (iterative).** Each `tester` agent writes or updates test files for its module. If the 80 % branch-coverage gate is not met, the loop retries (max 3 loops service-wide).
+4. **Phase 4 — Consolidation.** Output: `workspaces/test-pipeline/05-consolidation.md` — a quality report with final coverage numbers, gaps, and recommended follow-ups.
+
+**Coverage gate: 80 % branch coverage service-wide is mandatory.** The pipeline iterates until met or max 3 loops. No implementation (feature) or delivery phases run. Source: `skills/test-pipeline/SKILL.md`.
 
 ---
 
@@ -165,15 +191,101 @@ The `tester` agent runs in coverage mode, reports coverage gaps, and produces a 
 
 **When to use.** Time-boxed investigation of an unknown (technology evaluation, feasibility analysis, performance profiling, cost modeling). No code changes are committed. Triggered by `/research <topic>`, `/spike <prototype>`, `@th:orchestrator investigate <X>`, or `@th:orchestrator spike <X>`.
 
-The orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `01-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
+The orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `00-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
 
 ---
 
-## Plan flow (type: plan)
+## Plan flow (`/plan`) and design flow (`/design`)
 
-**When to use.** Design-only run: the operator wants `01-architecture.md` + `02-task-list.md` but will not immediately implement. Triggered by `/plan`, `/design`, or `@th:orchestrator give me the work plan`.
+These are two distinct flows that produce different artifacts and serve different purposes.
 
-Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. No implementation dispatched. The operator can resume implementation later via `@th:orchestrator implement it`.
+### `/plan` — task breakdown to GitHub issues (planning mode)
+
+**When to use.** Breaking a broad scope into parallel tasks with dispatch labels, creating GitHub issues (or `tasks/` files when `gh` is absent) as the output. Triggered by `/plan <scope>` or `/th:plan`.
+
+The orchestrator runs in **planning mode**: SPECIFY → DESIGN (architect produces `01-planning.md`, a multi-task breakdown with dependency labels) → create one GitHub issue per task. The flow stops after issue creation.
+
+| File | Consumer | Purpose |
+|------|---------|---------|
+| `01-planning.md` | orchestrator (multi-task dispatch) | Break a broad scope into N parallel tasks with BLOCKER/PARALLEL/CONVERGENCE/SEQUENTIAL labels |
+
+**`plan-and-execute` variant.** Appending "and execute" / "ejecutar" to the `/plan` call transitions to `plan-and-execute` mode: after issue creation, the orchestrator fans out to execute each task through the full pipeline in parallel. See **Parallel dispatch flow** below.
+
+Full contract: `skills/plan/SKILL.md` and [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Plan Flow.
+
+### `/design` — Stage 1 design run (design mode)
+
+**When to use.** Design-only run: the operator wants the architecture proposal and task list for a single feature but will not immediately implement. Triggered by `/design <feature>` or `@th:orchestrator give me the work plan`.
+
+Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `01-plan.md` — the merged architecture + task list with per-PR Given/When/Then AC. No implementation dispatched. The operator can resume implementation later via `@th:orchestrator implement it`.
+
+| File | Consumer | Purpose |
+|------|---------|---------|
+| `01-plan.md` | implementer + qa + plan-reviewer | Merged architecture + task list (§ Architecture + § Task List); plan-review verdict appended as § Plan Review |
+
+---
+
+## Milestone-Build Flow (single-repo `type: plan`)
+
+**When to use.** One project decomposed into milestones (M0…MN), executed as a step-by-step build. The entire build ships as ONE PR opened after all milestones are complete. Triggered by a broad single-repo build request that the architect decomposes into milestones.
+
+**Key invariants:**
+
+- **One workspace — one PR.** The entire build lives in a single workspace; one PR is opened at the end after STAGE-GATE-3. Per-milestone PRs are prohibited.
+- **Milestones are commits, not PRs.** Each milestone produces one commit on the feature branch. The `## Milestone Index` table in `00-state.md` tracks `Milestone | Slug | Status | Commit` — no `PR` column per milestone.
+- **Flat stage files.** `02-implementation.md`, `03-testing.md`, `04-validation.md`, and `04-security.md` are whole-task documents. No per-milestone suffixes (e.g., `02-implementation-m1.md`) and no second-cycle suffixes (e.g., `02b-implementation.md`) are ever created.
+- **Independent milestones run in parallel.** The architect annotates each milestone in `01-plan.md` as `independent` or `depends-on-Mx`. Independent milestones are dispatched concurrently in isolated worktrees and converge as serial commits in dependency order.
+- **Identity-keyed, not date-keyed.** The orchestrator finds the plan workspace by identity slug (date-agnostic glob + frontmatter confirm). A day rollover never creates a new workspace.
+
+**Gate model:**
+
+| Gate | Fires | Scope |
+|------|-------|-------|
+| STAGE-GATE-1 | Once | Approve the whole milestone plan (`01-plan.md`) including the dependency graph |
+| (per milestone) | per milestone | Implement → one commit on the feature branch → update Milestone Index |
+| (verify) | once, whole-task | Flat `03-testing.md` / `04-validation.md` cover the whole build |
+| STAGE-GATE-3 | Once | After ALL milestones complete — ONE PR opened |
+
+Full contract: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Milestone-Build Flow.
+
+---
+
+## Parallel dispatch flow (plan-and-execute)
+
+**When to use.** The operator has 2+ tasks (from `/plan plan-and-execute`, `/th:issue #1 #2 #3`, or a broad scope the orchestrator decomposes). The orchestrator fans out to execute each task through the full pipeline in parallel worktrees.
+
+**Entry points:**
+
+- `/th:plan plan-and-execute` → architect produces `01-planning.md` → parallel dispatch
+- `/th:issue #1 #2 #3` → multiple issues → parallel dispatch
+- Natural-language batch request → orchestrator runs Specify + Design (planning mode) → parallel dispatch
+
+**Execution model:**
+
+1. The orchestrator reads `01-planning.md` for dependency labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and groups tasks into rounds.
+2. Round 1 tasks (no blockers) run in parallel, each in its own worktree, each running the full pipeline.
+3. Subsequent rounds are gated: a round starts only after all its blockers in the previous round are complete.
+4. Same-repo tasks consolidate into ONE PR by default (the delivery agent merges all task branches into a `batch/<name>-verify` integration branch and opens one consolidated PR). Operator can opt out with "keep them as separate PRs".
+5. **No double-gating.** STAGE-GATE-1/2/3 fire inside each child pipeline; the batch orchestrator does not additionally fire them at the batch level.
+
+**Branching strategy.** Round 1 tasks branch from `main`. Round 2 tasks branch from Round 1's feature branch — when Round 1's PR merges, Round 2's PRs auto-rebase cleanly.
+
+Full contract: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Plan Flow § Parallel Dispatch Flow.
+
+---
+
+## Initiative fan-out (multi-project)
+
+**When to use.** A cross-repo initiative involves 2+ projects (e.g., backend + frontend + infra). The orchestrator groups per-project pipelines under an `overview.md` parent index and fans out Stage 2 lanes in parallel when ≥2 projects clear STAGE-GATE-1.
+
+**Key mechanics:**
+
+- An `overview.md` initiative index is created (detect + confirm gate before creation).
+- Each project runs its own full pipeline in a dedicated worktree.
+- `--serial` overrides the fan-out and forces sequential project execution.
+- Per-project STAGE-GATE-1/2/3 fire inside each project lane; the initiative level does not add additional gates.
+
+Full contract: [`agents/orchestrator.md`](../agents/orchestrator.md) § Parallel Multi-Project Dispatch.
 
 ---
 
@@ -181,7 +293,7 @@ Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. No implementation dispatc
 
 **When to use.** Fires automatically between Phase 3 (Verify) and STAGE-GATE-2 for every PR in every pipeline.
 
-Phase 3.5 is the orchestrator re-reading the three verify artifacts (`03-testing.md`, `04-validation.md`, `04-security.md`) and the original AC list. If any AC from `02-task-list.md` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
+Phase 3.5 is the orchestrator re-reading the three verify artifacts (`03-testing.md`, `04-validation.md`, `04-security.md`) and the original AC list. If any AC from `01-plan.md § Task List` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
 
 ---
 

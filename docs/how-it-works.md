@@ -29,9 +29,11 @@ You tell the orchestrator: `@th:orchestrator give me the work plan for this task
 
 ### Stage 1 — Analysis
 
-The `orchestrator` creates `workspaces/daily-reports/` and routes to the `architect`. The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-architecture.md` (the design proposal) and `02-task-list.md` (one section per PR, with Given/When/Then acceptance criteria). `qa` runs Phase 1.5 to confirm every AC maps to a Work Plan step. `plan-reviewer` runs Phase 1.6 to audit the plan-shape (one PR per service, AC format, consolidated documents, cross-references).
+The `orchestrator` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal before dispatching the architect. Only after that signal does it create `workspaces/daily-reports/` and route to the `architect`.
 
-You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the PR table. Reply `approve` (per-PR stops in Stage 2) or `approve autonomous` (skip the per-PR stops).
+The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per PR, with Given/When/Then acceptance criteria). It also writes plan sketches (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) when the change touches those surfaces. `qa` runs Phase 1.5 to confirm every AC maps to a Work Plan step. `plan-reviewer` runs Phase 1.6 to audit the plan-shape; its verdict is appended directly to `01-plan.md § Plan Review`.
+
+You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the PR table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` (per-PR stops in Stage 2) or `approve autonomous` (skip the per-PR stops).
 
 ### Stage 2 — Implementation (one PR at a time)
 
@@ -42,13 +44,13 @@ PRs run in parallel rounds computed from their `Depends on:` field (round 1 is e
 - The Acceptance Gate (Phase 3.5) re-reads the three artifacts; if any AC is missing a passing test it routes back to the implementer.
 - Phase 3.6 (`acceptance-checker`) independently compares the original spec against the delivered work.
 
-**STAGE-GATE-2** fires between PRs — unless you granted autonomy at GATE-1.
+**STAGE-GATE-2** fires **per-round** (once per round of PRs, between rounds) — unless you granted autonomy at GATE-1.
 
 ### Stage 3 — Delivery
 
-`delivery` updates the CHANGELOG, bumps the version, creates the feature branch, commits with conventional messages. Phase 4.5 **Internal Review** runs the `reviewer` advisory-mode on the freshly-pushed diff and surfaces the top 3 issues.
+`delivery` updates the CHANGELOG, bumps the version, creates the feature branch, commits with conventional messages (Phase 4). Phase 4.5 **Internal Review** runs the `reviewer` advisory-mode on the freshly-pushed diff and surfaces the top 3 issues.
 
-**STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the PR opens on GitHub.
+**STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the orchestrator proceeds to Phase 5 (GitHub Update): the PR is opened on GitHub with `Fixes #N` and labels. The PR is NOT opened during the Phase 4 commit step — STAGE-GATE-3 must complete first.
 
 ---
 
@@ -64,7 +66,7 @@ When the orchestrator classifies a request as `type: fix` or `type: hotfix` (via
 
 | Stage | Bug-fix difference |
 |---|---|
-| Stage 1 — Analysis | The architect runs in **root-cause mode** and produces `01-root-cause.md` (1 page max, focused on file:line + mechanism + scope) instead of `01-architecture.md`. plan-reviewer gains Rules 7 + 8 (Regression Test Approach declared in `01-root-cause.md`; regression test cross-referenced in every PR's AC). |
+| Stage 1 — Analysis | The architect runs in **root-cause mode** and produces `01-root-cause.md` (1 page max, focused on file:line + mechanism + scope) instead of `01-plan.md`. plan-reviewer gains Rules 7 + 8 (Regression Test Approach declared in `01-root-cause.md`; regression test cross-referenced in every PR's AC). |
 | Phase 2.0 — Regression Test (NEW, between STAGE-GATE-1 and Phase 2) | The tester authors a **failing test** in `02-regression-test.md` BEFORE the implementer touches source code. The test becomes the implementer's contract. Mandatory always; there is no fallback. |
 | Stage 2 — Implementation | The implementer runs under a **scope-discipline contract**: zero tangential refactors, no "while I'm here" cleanups. Spotted issues go to `## Follow-ups Spotted`, not into the diff. |
 | Stage 2 — Verify | `security` agent runs **always** in parallel with `tester` and `qa`, regardless of any other criterion. Defense-in-depth: many bugs have non-obvious security implications. |
@@ -72,18 +74,21 @@ When the orchestrator classifies a request as `type: fix` or `type: hotfix` (via
 
 For `type: hotfix`: Phase 1 (architect root-cause) is skipped entirely; the orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 (regression test) is still mandatory.
 
-### Tier System (1-4)
+### Tier System (0–4)
 
-The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bugs skip ceremony and critical bugs get extended analysis. The orchestrator combines three signals — keywords in the bug report (low-tier hints like `typo`, high-tier triggers like `auth`/`injection`/`token`/`bypass`), file-path patterns (Tier 1: `*.md` / `docs/**`; Tier 2: `.github/**` / `scripts/**` / `*.test.*`; Tier 3: `src/**` / `lib/**` / `app/**` / `cmd/**`; Tier 4: sensitive paths combined with high-tier keywords), and operator overrides (`[TIER: N]`, `[regression-test: required]`, `[security: required]`) — to derive `bug_tier: 1 | 2 | 3 | 4`. Sensitive paths (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) force a minimum of Tier 3 regardless of the operator's hint, so a Tier 1 / Tier 2 run cannot accidentally bypass security on production-critical code.
+The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bugs skip ceremony and critical bugs get extended analysis. The orchestrator combines three signals — keywords in the bug report (low-tier hints like `typo`, high-tier triggers like `auth`/`injection`/`token`/`bypass`), file-path patterns (Tier 1: `*.md` / `docs/**`; Tier 2: `.github/**` / `scripts/**` / `*.test.*`; Tier 3: `src/**` / `lib/**` / `app/**` / `cmd/**`; Tier 4: sensitive paths combined with high-tier keywords), and operator overrides (`[TIER: N]`, `[regression-test: required]`, `[security: required]`) — to derive `bug_tier: 0 | 1 | 2 | 3 | 4`. Sensitive paths (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) force a minimum of Tier 3 regardless of the operator's hint, so a Tier 1 / Tier 2 run cannot accidentally bypass security on production-critical code.
 
-| Tier | Name | Phase 1 (root-cause) | Phase 2.0 (regression test) | Phase 3 agents | Agent runs |
+| Tier | Name | Phase 1 (root-cause) | Phase 2.0 (regression test) | Phase 3 agents | workspaces |
 |---|---|---|---|---|---|
-| **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (suite no-regress) only | ~3 |
-| **2** | Light fix | Architect with `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | ~5 |
-| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max (current PR #50 default) | Mandatory | tester + qa + security | ~7 |
-| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa + security (extended analysis) | ~9 |
+| **0** | Trivial/Cosmetic | Skipped | Skipped | tester only (suite no-regress; no full audit) | **None** — no `workspaces/` folder created |
+| **1** | Docs/Trivial | Skipped — one-sentence prose plan | Conditional skip when no behavior change | tester (suite no-regress) only | Yes — minimal |
+| **2** | Light fix | Architect with `mode: light-root-cause`, ≤30 lines | Mandatory | tester + qa | Yes — full |
+| **3** | Standard fix | Architect with `mode: full-root-cause`, 1 pg max | Mandatory | tester + qa + security | Yes — full |
+| **4** | Critical/Security | Architect with `mode: full-root-cause` + mandatory `## Prior Art` (`mcp__memory__search_nodes`) | Mandatory | tester + qa + security (extended analysis) | Yes — full + prior-art |
 
-The architect can re-tier in Phase 1 via `tier_promote: <new_tier>` if codebase analysis reveals the scope is wider than the initial classification — operator-in-loop, same protocol as `type_reclassify`. Default is Tier 3 when signals are ambiguous (conservative).
+**Tier 0 — no workspaces.** Genuinely cosmetic changes (typo in a comment, whitespace in README, CHANGELOG typo): the implementer makes the fix, runs tests, and opens the PR. No `00-state.md`, no `01-plan.md`, no workspaces folder. The PR review is the only gate. Auto-classifies when all of: single file, ≤5 lines changed, docs/comment/whitespace-only path, no test paths, no system-level files (`agents/*.md`, `skills/*.md`, `cmd/install/*.go`). Declare explicitly with `[TIER: 0]`.
+
+The architect can re-tier in Phase 1 via `tier_promote: <new_tier>` if codebase analysis reveals the scope is wider than the initial classification — operator-in-loop. Default is Tier 3 when signals are ambiguous (conservative).
 
 Full flow definition: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Bug-fix Flow § Tier System.
 
@@ -93,7 +98,7 @@ Full flow definition: [`agents/ref-special-flows.md`](../agents/ref-special-flow
 
 All state lives in files. `/recover {feature-name}` reads `00-state.md` and continues from `next_action`. Works across compactions, across sessions, across machines (as long as `workspaces/` travels with the repo).
 
-Open `02-task-list.md` at any point and you see PR-level `Status:` (`pending | in-progress | verified | merged | blocked`) and AC checkboxes flipped to `- [x]` on PASS. No cross-referencing required.
+Open `01-plan.md § Task List` at any point and you see PR-level `Status:` (`pending | in-progress | verified | merged | blocked`) and AC checkboxes flipped to `- [x]` on PASS. No cross-referencing required.
 
 ---
 
@@ -105,9 +110,9 @@ Chat-driven Claude Code, run unguided, has documented failure modes that compoun
 |---|---|
 | Acceptance criteria drift silently mid-task | `[CONSTRAINT-DISCOVERED]` annotations + Phase 2.5 reconciliation force keep/amend/drop to be a deliberate decision |
 | Plans accumulate iteration cruft (`v1 → v6`, "previously decided", parallel review files) | `architect` forbids version markers; `qa` cannot write sibling review files — analysis docs read as one polished pass |
-| Reviews get punted to the human ("the harness blocked it") | Phase 1.6 plan-review is inviolable — subagent or inline fallback, never escalated to the user without an audit |
+| Reviews get punted to the human ("the harness blocked it") | Phase 1.6 plan-review is inviolable — dispatched as a subagent, never escalated to the user without a verdict; there is no degraded inline mode |
 | Multi-PR splits leave the WHY in nobody's head | Base PRs carry `Cleanup PR:` with operational rationale; secondary PRs carry `Base PR:` back-reference |
-| "Did the AC pass?" requires reading three files | `02-task-list.md` self-describes: `Status:` per PR + AC checkboxes flipped on PASS |
+| "Did the AC pass?" requires reading three files | `01-plan.md § Task List` self-describes: `Status:` per PR + AC checkboxes flipped on PASS |
 | Agents silently disappear when their frontmatter has invalid YAML | A structural test parses every agent and fails on broken YAML |
 | Destructive commands slip through inattention | `PreToolUse` policy blocks `rm -rf`, force push, secret-file writes |
 
@@ -117,10 +122,20 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 ## What ships
 
-- **Agents.** `orchestrator`, `architect`, `implementer`, `tester`, `qa`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `reviewer-consolidator`, `security`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `translator`, `gcp-cost-analyzer`, `init`, `agent-builder`. Full roster + model + effort matrix in [`agents/README.md`](../agents/README.md).
-- **Skills** (slash commands). Most route into the orchestrator; standalone utilities include `/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through the orchestrator.
-- **Hooks.** `hooks/policy-block.sh` is the `PreToolUse` policy gate — it intercepts every `Bash`, `Write`, `Edit`, and `NotebookEdit` tool call and denies destructive operations before they execute (48 tested cases: `rm -rf`, force-push, secret-file writes, SQL DROP/TRUNCATE, sensitive-path writes). Notification scripts per OS are optional opt-in. See [`hooks/README.md`](../hooks/README.md).
+- **Agents.** 27 agents as of v2.116: `orchestrator`, `architect`, `implementer`, `tester`, `qa`, `qa-plan`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `reviewer-consolidator`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
+- **Skills** (slash commands). Most route into the orchestrator; standalone utilities include `/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/plan`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through the orchestrator.
+- **Hooks.** Multiple `PreToolUse` / `PreCompact` hooks gate destructive operations and enforce invariants: `policy-block.sh` (48 tested cases: `rm -rf`, force-push, secret-file writes, SQL DROP/TRUNCATE, sensitive-path writes), `dev-guard.sh` (outward-action gate for `git push`, `gh pr`, GitHub API writes — requires explicit operator approval), `checkpoint-guard.sh` (B1/B2/B3 reasoning-checkpoint enforcement), `sketch-guard.sh` (STAGE-GATE-1 sketch-presence validation), `worktree-guard.sh` (worktree discipline), `prepublish-guard.sh` (pre-publish safety checks). Notification scripts per OS are optional opt-in. Full hook catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
+
+---
+
+## Dev mode (top-level-is-orchestrator, SEC-DR-2)
+
+Since v2.56 / SEC-DR-2, **the top-level Claude Code agent IS the orchestrator**. No filesystem marker, no mode flag, and no special invocation is required — when Claude Code runs at the top level, it operates with the full orchestrator role and dispatches specialist subagents via the `Task` tool.
+
+**Outward-action gate.** All outward actions (`git push`, `gh pr create`, `gh pr merge`, GitHub API writes, ClickUp MCP writes) require explicit operator approval via `hooks/dev-guard.sh`. The hook fires unconditionally — the agent cannot auto-approve these actions regardless of autonomy grants.
+
+**No "inline fallback" for subagent dispatch.** All specialist subagents (architect, implementer, tester, qa, etc.) are dispatched via `Task`. There is no degraded inline-substitution mode — if `Task` is unavailable (e.g., in an opencode nested context), the orchestrator emits a `dispatch_handoff` directive and the top-level Claude takes over dispatch. See `docs/subagent-orchestration.md` for the full handoff protocol.
 
 ---
 
