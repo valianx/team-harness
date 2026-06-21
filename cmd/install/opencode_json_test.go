@@ -28,20 +28,18 @@ import (
 // ---------------------------------------------------------------------------
 
 // TestBuildOpencodeSetupGroups_GroupCount verifies that buildOpencodeSetupGroups
-// still returns the same number of groups as before (structural regression check).
-// The jargon-free contract is verified by the source-scan test below (AC-1).
+// returns exactly 5 groups after the trim: Memory MCP (confirm + URL + auth +
+// bearer note) and context7 (AC-2). The previous count was 15 groups.
 func TestBuildOpencodeSetupGroups_GroupCount(t *testing.T) {
 	data := freshFormData()
 	groups := buildOpencodeSetupGroups(data)
-	// 8 groups: agent output (2) + language (2) + english-learning (2) +
-	// memory MCP (4) + context7 (1) + ClickUp (2) + Obsidian tasks (1) + confirm (1) = 15.
-	// The exact count validates no group was accidentally added or removed.
-	if len(groups) == 0 {
-		t.Error("buildOpencodeSetupGroups returned no groups")
-	}
-	// Sanity check: at least 10 groups.
-	if len(groups) < 10 {
-		t.Errorf("buildOpencodeSetupGroups returned %d groups, want at least 10", len(groups))
+	// Trimmed form: Memory MCP confirm(1) + URL(1) + auth(1) + bearer note(1) +
+	// context7(1) = 5 groups. The removed groups are: agent output (2), language (2),
+	// english-learning (2), ClickUp (2), Obsidian tasks (1), final confirm (1) = 10
+	// groups removed. Final count: 15 - 10 = 5.
+	const want = 5
+	if len(groups) != want {
+		t.Errorf("buildOpencodeSetupGroups returned %d groups, want %d (AC-2: trimmed form)", len(groups), want)
 	}
 }
 
@@ -112,22 +110,17 @@ func extractFuncBody(funcStart string) string {
 }
 
 // ---------------------------------------------------------------------------
-// AC-2: Internal keys / default values preserved
+// AC-1: LogsMode is always "local" (work-logs group removed)
 // ---------------------------------------------------------------------------
 
-// TestLogsSubfolderDefault_Preserved verifies that the `work-logs` default
-// subfolder VALUE is preserved in buildOpencodeSetupValues when the operator
-// skips the subfolder input (AC-2).
-func TestLogsSubfolderDefault_Preserved(t *testing.T) {
-	data := freshFormData()
-	data.configureWorkLogs = true
-	data.logsMode = "obsidian"
-	data.logsPath = "/vault"
-	data.logsSubfolder = "" // operator left blank → default kicks in
-
-	cfg := buildOpencodeSetupValues(data)
-	if cfg.LogsSubfolder != "work-logs" {
-		t.Errorf("LogsSubfolder = %q, want work-logs (default value must be preserved, AC-2)", cfg.LogsSubfolder)
+// TestLogsModeAlwaysLocal verifies that buildOpencodeSetupValues always
+// returns LogsMode == "local" after the work-logs group was removed (AC-1).
+// The previous TestLogsSubfolderDefault_Preserved is superseded by this test
+// because the work-logs / obsidian path is no longer reachable interactively.
+func TestLogsModeAlwaysLocal(t *testing.T) {
+	cfg := buildOpencodeSetupValues(freshFormData())
+	if cfg.LogsMode != "local" {
+		t.Errorf("LogsMode = %q, want local (work-logs group removed, AC-1)", cfg.LogsMode)
 	}
 }
 

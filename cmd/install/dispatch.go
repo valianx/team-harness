@@ -261,6 +261,10 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 	mode := tokenModeEnvRef
 	secrets := opencodeMCPSecrets{}
 
+	// Detect optional runtime dependencies and print guidance (no prompt, no exec).
+	// Runs on both branches — output is informational only and never blocks.
+	checkOpencodeDependencies()
+
 	var cfg opencodeSetupValues
 	if interactive {
 		// P3: detect pre-existing config and offer import before asking again.
@@ -341,35 +345,19 @@ func resolveOpencodeSetupFromEnvFlags() opencodeSetupValues {
 // environment variables and flags, using ccURL as the lowest-precedence
 // fallback for the Memory URL when flag and env are both empty (AC-9).
 //
+// After the trim, logs-mode is always "local" on the non-interactive path
+// (the work-logs group is removed from the interactive form). Language,
+// english_learning, clickup, and obsidian_tasks are not written (AC-7).
+//
 // Security invariant: this function NEVER populates opencodeMCPSecrets or
 // tokenModeLiteral — the literal path is unreachable from any non-interactive
 // resolver (AC-7 / AC-11).
 func resolveOpencodeSetupFromEnvFlagsWithCCURL(ccURL string) opencodeSetupValues {
 	cfg := opencodeSetupValues{}
 
-	// Work-logs mode from LOGS_MODE env (default: local).
-	logsMode := strings.TrimSpace(os.Getenv("LOGS_MODE"))
-	if logsMode == "" {
-		logsMode = "local"
-	}
-	cfg.LogsMode = logsMode
-	if logsMode == "obsidian" {
-		cfg.LogsPath = strings.TrimSpace(os.Getenv("LOGS_PATH"))
-		cfg.LogsSubfolder = strings.TrimSpace(os.Getenv("LOGS_SUBFOLDER"))
-		if cfg.LogsSubfolder == "" {
-			cfg.LogsSubfolder = "work-logs"
-		}
-	}
-
-	// Language from LANGUAGE env (optional).
-	cfg.Language = strings.TrimSpace(os.Getenv("LANGUAGE"))
-	// Strip locale variants (e.g. "es_MX" → "es").
-	if idx := strings.IndexByte(cfg.Language, '_'); idx >= 0 {
-		cfg.Language = cfg.Language[:idx]
-	}
-	if len(cfg.Language) != 2 {
-		cfg.Language = "" // only accept clean ISO 639-1
-	}
+	// Work-logs mode — always "local" (the work-logs group was removed in the
+	// interactive flow; the non-interactive path follows suit for consistency).
+	cfg.LogsMode = "local"
 
 	// Memory MCP: flag > env > CC-migrated URL (AC-9 precedence).
 	memURL := resolveMemoryURLWithCCFallback(ccURL)
@@ -622,42 +610,9 @@ func printOpencodeApplySummary(diff *PlanDiff, cfg opencodeSetupValues, cfgPath,
 	fmt.Printf("  Settings written → %s\n", cfgPath)
 
 	// Work-logs (has a live opencode reader via checkpoint-guard).
-	switch cfg.LogsMode {
-	case "obsidian":
-		fmt.Printf("    work-logs        → obsidian → %s\n", cfg.LogsPath)
-		fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
-	default:
-		fmt.Printf("    work-logs        → local\n")
-		fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
-	}
-
-	// Language (no live opencode reader yet — written forward-compatibly).
-	if cfg.Language != "" {
-		fmt.Printf("    language         → %s (written to config; runtime enforcement on opencode is a tracked follow-up)\n", cfg.Language)
-	} else {
-		fmt.Printf("    language         → (not set)\n")
-	}
-
-	// English learning (no live opencode reader yet).
-	if cfg.EnglishLearning {
-		fmt.Printf("    english-learning → enabled (written to config; runtime enforcement on opencode is a tracked follow-up)\n")
-	} else {
-		fmt.Printf("    english-learning → off\n")
-	}
-
-	// ClickUp (no live opencode reader yet).
-	if cfg.ClickUpWorkspaceID != "" {
-		fmt.Printf("    clickup          → configured (written to config)\n")
-	} else {
-		fmt.Printf("    clickup          → (not configured)\n")
-	}
-
-	// Obsidian tasks (no live opencode reader yet).
-	if cfg.ObsidianTasksEnabled {
-		fmt.Printf("    obsidian-tasks   → enabled (written to config)\n")
-	} else {
-		fmt.Printf("    obsidian-tasks   → (not enabled)\n")
-	}
+	// Always "local" after the trim — the work-logs group was removed (AC-1).
+	fmt.Printf("    work-logs        → local\n")
+	fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
 
 	// MCP status — names only, never values (SEC-OC-R5).
 	fmt.Println()

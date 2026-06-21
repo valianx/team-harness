@@ -29,14 +29,14 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesUnknownKeys(t *testing.T) {
 	// Seed an existing config with an unknown operator key and a known key.
 	seed := map[string]interface{}{
 		"operator_custom_key": "keep-me-intact",
-		"logs-mode":           "local",
+		"logs-mode":           "obsidian",
 	}
 	seedBytes, _ := json.Marshal(seed)
 	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
 		t.Fatalf("seed write: %v", err)
 	}
 
-	cfg := opencodeSetupValues{LogsMode: "obsidian", LogsPath: "/tmp/vault", LogsSubfolder: "work-logs"}
+	cfg := opencodeSetupValues{LogsMode: "local"}
 	if err := writeOpencodeTeamHarnessConfig(cfgPath, cfg, placer); err != nil {
 		t.Fatalf("writeOpencodeTeamHarnessConfig: %v", err)
 	}
@@ -55,9 +55,9 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesUnknownKeys(t *testing.T) {
 		t.Errorf("operator_custom_key was not preserved: got %v", result["operator_custom_key"])
 	}
 
-	// Installer sets logs-mode from cfg (obsidian overrides the seed's local).
-	if result["logs-mode"] != "obsidian" {
-		t.Errorf("logs-mode = %v, want obsidian", result["logs-mode"])
+	// Installer always writes "local" after the trim (AC-1).
+	if result["logs-mode"] != "local" {
+		t.Errorf("logs-mode = %v, want local", result["logs-mode"])
 	}
 }
 
@@ -223,25 +223,21 @@ func TestOpencodeSettingsConfigPath(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: buildImportCandidate — 7-key read (AC-2 / AC-4)
+// Tests: buildImportCandidate — trimmed to logs-mode only (AC-7)
 // ---------------------------------------------------------------------------
 
-// TestBuildImportCandidate_ReadsAll7Keys verifies that buildImportCandidate
-// reads all 7 allowlisted keys from a raw JSON map, including the 3 non-form
-// keys that previously went unmigrated.
-func TestBuildImportCandidate_ReadsAll7Keys(t *testing.T) {
+// TestBuildImportCandidate_ReadsLogsMode verifies that buildImportCandidate
+// reads the surviving allowlisted key (logs-mode) from a raw JSON map.
+// The removed keys (language, english_learning, clickup, obsidian_tasks) are
+// intentionally not extracted — they must not appear in the written config (AC-7).
+func TestBuildImportCandidate_ReadsLogsMode(t *testing.T) {
 	seed := map[string]interface{}{
-		"logs-mode":      "obsidian",
-		"logs-path":      "/vault/path",
-		"logs-subfolder": "notes",
-		"language":       "es",
+		"logs-mode": "obsidian",
+		// Removed fields present in the file — must NOT be read into the candidate.
+		"language":         "es",
 		"english_learning": true,
-		"clickup": map[string]interface{}{
-			"workspace_id": "ws-42",
-		},
-		"obsidian_tasks": map[string]interface{}{
-			"enabled": true,
-		},
+		"clickup":          map[string]interface{}{"workspace_id": "ws-42"},
+		"obsidian_tasks":   map[string]interface{}{"enabled": true},
 	}
 	seedBytes, _ := json.Marshal(seed)
 
@@ -257,31 +253,13 @@ func TestBuildImportCandidate_ReadsAll7Keys(t *testing.T) {
 	if cand.logsMode != "obsidian" {
 		t.Errorf("logsMode = %q, want obsidian", cand.logsMode)
 	}
-	if cand.logsPath != "/vault/path" {
-		t.Errorf("logsPath = %q, want /vault/path", cand.logsPath)
-	}
-	if cand.logsSubfolder != "notes" {
-		t.Errorf("logsSubfolder = %q, want notes", cand.logsSubfolder)
-	}
-	if cand.language != "es" {
-		t.Errorf("language = %q, want es", cand.language)
-	}
-	if !cand.englishLearning {
-		t.Error("englishLearning = false, want true")
-	}
-	if cand.clickUpWorkspaceID != "ws-42" {
-		t.Errorf("clickUpWorkspaceID = %q, want ws-42", cand.clickUpWorkspaceID)
-	}
-	if !cand.obsidianTasksEnabled {
-		t.Error("obsidianTasksEnabled = false, want true")
-	}
 }
 
-// TestBuildImportCandidate_PartialKeys verifies that absent keys are returned
-// as zero values (not an error), so a sparse CC config migrates safely.
-func TestBuildImportCandidate_PartialKeys(t *testing.T) {
+// TestBuildImportCandidate_AbsentLogsModeReturnsEmpty verifies that absent
+// logs-mode is returned as "" (not an error), so a sparse CC config is handled.
+func TestBuildImportCandidate_AbsentLogsModeReturnsEmpty(t *testing.T) {
 	seed := map[string]interface{}{
-		"logs-mode": "local",
+		"language": "es", // non-allowlisted key — ignored
 	}
 	seedBytes, _ := json.Marshal(seed)
 
@@ -291,21 +269,8 @@ func TestBuildImportCandidate_PartialKeys(t *testing.T) {
 	}
 
 	cand := buildImportCandidate(raw)
-	if cand.logsMode != "local" {
-		t.Errorf("logsMode = %q, want local", cand.logsMode)
-	}
-	// All absent keys should be zero values.
-	if cand.logsPath != "" {
-		t.Errorf("logsPath = %q, want empty", cand.logsPath)
-	}
-	if cand.englishLearning {
-		t.Error("englishLearning = true, want false (absent key)")
-	}
-	if cand.clickUpWorkspaceID != "" {
-		t.Errorf("clickUpWorkspaceID = %q, want empty", cand.clickUpWorkspaceID)
-	}
-	if cand.obsidianTasksEnabled {
-		t.Error("obsidianTasksEnabled = true, want false (absent key)")
+	if cand.logsMode != "" {
+		t.Errorf("logsMode = %q, want empty (absent key)", cand.logsMode)
 	}
 }
 
@@ -397,7 +362,9 @@ func TestCCConfigFallback_DetectFromArbitraryPath(t *testing.T) {
 
 	seed := map[string]interface{}{
 		"logs-mode": "obsidian",
-		"language":  "es",
+		// Removed keys may exist in old CC configs — must be ignored (AC-7).
+		"language":         "es",
+		"english_learning": true,
 	}
 	seedBytes, _ := json.Marshal(seed)
 	if err := os.WriteFile(ccCfgPath, seedBytes, 0o600); err != nil {
@@ -411,11 +378,9 @@ func TestCCConfigFallback_DetectFromArbitraryPath(t *testing.T) {
 		t.Fatal("detectExistingConfig returned nil for an existing CC config")
 	}
 	cand := buildImportCandidate(m)
+	// Only logs-mode is extracted; removed fields are not read (AC-7).
 	if cand.logsMode != "obsidian" {
 		t.Errorf("logsMode = %q, want obsidian", cand.logsMode)
-	}
-	if cand.language != "es" {
-		t.Errorf("language = %q, want es", cand.language)
 	}
 }
 
