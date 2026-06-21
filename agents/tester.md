@@ -417,6 +417,20 @@ After Phase 0, the router loads only the reference sections that the warranted t
 
 **AC-scoped invariant:** the router fires only on the warranted types from Phase 0 step 3b. A backend PR whose ACs are about a pure utility loads `unit.md#react-nextjs` (or the detected stack), not `ui-component.md`. The router NEVER expands scope beyond what an AC or a changed file warrants.
 
+**Cross-browser axis (conditional load — gated on `cross_browser: true`):** when the dispatch
+payload contains `cross_browser: true`, load `agents/testing-refs/cross-browser.md` IN ADDITION to
+the warranted `e2e` or `browser-mode` reference derived above, then record the selection in the
+decision log:
+```
+Selected additional axis: cross-browser
+Reason: dispatch payload carries cross_browser: true (set by /th:test-cross-browser skill).
+Loaded references: agents/testing-refs/cross-browser.md (alongside warranted e2e/browser-mode ref)
+```
+This clause adds a conditional load. It does NOT reorder the existing first-match branches above.
+**Absent `cross_browser: true`, this clause has no effect — tester behavior is identical to today.**
+The `cross-browser.md` reference is never warranted by an AC category alone; only the explicit flag
+triggers it.
+
 **Conventions vs. reference precedence:** when the AC names a tool explicitly, or the repo's discovered test framework differs from the reference's tool choice (e.g., a Cypress repo detected via `cypress.config`), the **discovered repo framework wins**; the loaded reference applies as principles (selector strategy, assertion discipline), not as a tool mandate. Record the divergence in the decision log.
 
 **(type × stack) → file/section mapping:**
