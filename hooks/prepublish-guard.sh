@@ -23,12 +23,39 @@
 #     guard fault NEVER blocks the operator.
 #
 # CHECK 1 — VERSION BUMP (git push)
-#   Computes git diff --name-status origin/main...HEAD LOCALLY. If any path in
-#   the diff matches agents/|skills/|hooks/, then BOTH .claude-plugin/plugin.json
-#   AND .claude-plugin/marketplace.json version values must differ from
-#   origin/main. Compares the version VALUE (not file presence) to guard against
-#   a touch that leaves the version byte-identical (SEC-PPG-6).
+#   Distinguishes FEATURE pushes from RELEASE pushes by branch name.
 #   Generic safety: .claude-plugin/plugin.json absent → no-op (other repos).
+#
+#   RELEASE-PR DISCRIMINATOR:
+#   Branch name matched against ^release/v[0-9]+\.[0-9]+\.[0-9]+$ (SEC-DR-A
+#   control-char guard applied before the match). A branch named release/vX.Y.Z
+#   is a release push; all other branches are feature pushes.
+#
+#   FEATURE PATH (branch does NOT match release/vX.Y.Z):
+#   For shipped-asset pushes (agents/|skills/|hooks/ touched in the diff):
+#     - REQUIRE: a changelog.d/ fragment (*.md) OR a version.d/ marker (*.bump)
+#       is present in the diff. If neither is found → DENY.
+#     - STRAY-BUMP DENY: if any of the three version sites (.claude-plugin/
+#       plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3) differs
+#       from origin/main → DENY (single-bump invariant: only release-mode bumps).
+#   For non-shipped-asset pushes (docs/tests/CI only): pass through to
+#   the over-bump advisory (unchanged) and nodecision.
+#
+#   RELEASE PATH (branch matches release/vX.Y.Z):
+#   The branch version X.Y.Z is extracted from the branch name.
+#     - REQUIRE: all three version sites bumped and matching X.Y.Z → else DENY.
+#     - OVER-BUMP HARD-DENY: when actual > floor, deny unless a valid
+#       bump-override: minor|major — <reason> token is present (same token
+#       that previously guarded the feature path).
+#     - UNDER-BUMP ADVISORY: warn to stderr when actual < floor (push not blocked).
+#
+#   BUMP-FLOOR SUB-STAGE (runs only on the release path PASS):
+#   Derives a mechanical SemVer floor from the name-status diff over shipped
+#   paths. The floor table:
+#
+#     D or R shipped path  → MAJOR-candidate floor
+#     A shipped path       → MINOR floor
+#     M-only shipped path  → PATCH floor
 #
 #   OVER-BUMP ADVISORY (runs on the no-shipped-asset early-exit path):
 #   Before exiting nodecision when no agents/|skills/|hooks/ path is in the
@@ -37,42 +64,17 @@
 #   an advisory WARN to stderr. Fail-open: unreadable file, missing file, or
 #   unparseable version → skip advisory, nodecision silently.
 #
-#   BUMP-FLOOR SUB-STAGE (runs only on the Check-1 PASS path):
-#   After the hard-block evaluation, derives a mechanical SemVer floor from the
-#   name-status diff over shipped paths. The floor table:
-#
-#     D or R shipped path  → MAJOR-candidate floor
-#     A shipped path       → MINOR floor
-#     M-only shipped path  → PATCH floor
-#
-#   UNDER-BUMP: when actual < floor, emits advisory WARN to stderr (push not
-#   blocked). The MAJOR/MINOR advisory messages apply; floor==patch with
-#   actual==none cannot reach here (Check 1 already denied).
-#
-#   OVER-BUMP HARD-DENY: when actual > floor (e.g. MINOR applied on an
-#   M-only/PATCH-floor diff), the push is DENIED unless a valid
-#   bump-override: minor — <reason>  token is present in the push context
-#   (last commit-trailer or PR-body passed via GIT_COMMIT_MSG env var).
-#   The token parse:
-#     - regex: ^bump-override: (minor|major) — .+$  (single-line match)
-#     - rejects control chars (SEC-DR-A guard)
-#     - never eval, never interpolate into deny reason
-#   If a valid token is present → nodecision (allow).
-#   If absent → deny() with a hardcoded literal reason (SDR-PPG-01).
-#   Fail-open on any parse fault (match existing posture).
-#
-#   NOTE: floor=="none" cannot occur on the shipped-asset path because the
-#   over-bump advisory (above) handles the no-shipped-asset case before this
-#   sub-stage is ever reached.
+#   SEC-DR-A control-char guard: applied to the branch name before regex match
+#   and to the bump-override token before processing. Never eval, never
+#   interpolate config-derived content into deny reasons (SDR-PPG-01).
 #
 #   The floor sub-stage ends at nodecision (empty stdout, exit 0) on all
 #   non-deny paths. Fail-open: any version that does not match
 #   ^[0-9]+\.[0-9]+\.[0-9]+$ or any sub-command fault → skip the floor
 #   compare with a one-line stderr note.
 #
-#   Structural invariant: the hard-block deny path calls deny() (which exit 0s)
-#   and therefore NEVER reaches the floor sub-stage. A WARN and a block can
-#   never co-occur in the same invocation.
+#   Structural invariant: every deny() call exits before reaching the floor
+#   sub-stage. A WARN and a block can never co-occur in the same invocation.
 #
 # CHECK 2 — TESTS (gh pr create)
 #   Reads prepublish_check (string) from ~/.claude/.team-harness.json.
@@ -350,16 +352,48 @@ except Exception:
         nodecision
     fi
 
-    # Distributed assets changed → verify BOTH plugin.json and marketplace.json
-    # have a version value that differs from origin/main.
-    # Compare version VALUE, not mere file presence (SEC-PPG-6 / AC-3).
+    # -----------------------------------------------------------------------
+    # Release-PR discriminator.
+    # Read the current branch name; match against ^release/v[0-9]+\.[0-9]+\.[0-9]+$
+    # SEC-DR-A: reject branch name containing control chars before the regex match.
+    # -----------------------------------------------------------------------
+
+    _branch=""
+    _branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || {
+        printf 'prepublish-guard: git rev-parse --abbrev-ref HEAD failed; skipping release discriminator\n' >&2
+        nodecision
+    }
+
+    # SEC-DR-A: reject control chars in branch name.
+    if printf '%s' "$_branch" | grep -qP '[[:cntrl:]]' 2>/dev/null \
+        || printf '%s' "$_branch" | LC_ALL=C grep -q $'[\x00-\x1f\x7f]' 2>/dev/null; then
+        printf 'prepublish-guard: branch name contains control characters; treating as feature branch (SEC-DR-A)\n' >&2
+        _branch="__invalid__"
+    fi
+
+    _is_release_branch=false
+    _branch_version=""
+    if printf '%s' "$_branch" | grep -qE '^release/v[0-9]+\.[0-9]+\.[0-9]+$' 2>/dev/null; then
+        _is_release_branch=true
+        # Extract X.Y.Z from release/vX.Y.Z
+        _branch_version=$(printf '%s' "$_branch" | sed 's|^release/v||' 2>/dev/null || true)
+    fi
+
+    # -----------------------------------------------------------------------
+    # Read the three version sites (HEAD and origin/main) needed by both paths.
+    # MSYS_NO_PATHCONV=1 prevents MSYS path conversion on Windows Git Bash.
+    # Third site: CLAUDE.md §3 "Current version:" literal (~line 112).
+    # Fail-open for all three sites: parse fault → empty string → bumped=false.
+    # -----------------------------------------------------------------------
 
     _plugin_head=""
     _plugin_origin=""
     _market_head=""
     _market_origin=""
+    _claude_head=""
+    _claude_origin=""
 
-    # Read HEAD version from plugin.json (already verified the file exists).
+    # Read HEAD versions.
     if command -v python3 >/dev/null 2>&1; then
         _plugin_head=$(python3 -c "
 import json, sys
@@ -385,10 +419,17 @@ except Exception:
             | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
     fi
 
-    # Read origin/main version from git show.
-    # MSYS_NO_PATHCONV=1 prevents MSYS path conversion on Windows Git Bash from
-    # mangling the colon-separated treeish 'origin/main:.claude-plugin/...' into
-    # an unresolvable path (e.g. 'C:/main/.claude-plugin/...' on some MSYS builds).
+    # Read CLAUDE.md §3 HEAD version: anchored extraction, fail-open on parse fault.
+    # Pattern: **Current version:** `X.Y.Z` (the backtick-quoted literal on that line).
+    if [ -f "CLAUDE.md" ]; then
+        _claude_head=$(grep -oE '\*\*Current version:\*\* `[0-9]+\.[0-9]+\.[0-9]+`' CLAUDE.md 2>/dev/null \
+            | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+        if [ -z "$_claude_head" ]; then
+            printf 'prepublish-guard: CLAUDE.md §3 version literal not parseable; skipping third-site check (fail-open)\n' >&2
+        fi
+    fi
+
+    # Read origin/main versions.
     if MSYS_NO_PATHCONV=1 git show origin/main:.claude-plugin/plugin.json >/dev/null 2>&1; then
         if command -v python3 >/dev/null 2>&1; then
             _plugin_origin=$(MSYS_NO_PATHCONV=1 git show origin/main:.claude-plugin/plugin.json 2>/dev/null \
@@ -426,9 +467,17 @@ except Exception:
         fi
     fi
 
-    # Evaluate: both versions must be non-empty AND changed vs origin/main.
+    # Read CLAUDE.md §3 origin/main version: same anchored pattern, fail-open.
+    if MSYS_NO_PATHCONV=1 git show origin/main:CLAUDE.md >/dev/null 2>&1; then
+        _claude_origin=$(MSYS_NO_PATHCONV=1 git show origin/main:CLAUDE.md 2>/dev/null \
+            | grep -oE '\*\*Current version:\*\* `[0-9]+\.[0-9]+\.[0-9]+`' \
+            | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+    fi
+
+    # Evaluate bump state.
     _plugin_bumped=false
     _market_bumped=false
+    _claude_bumped=false
 
     if [ -n "$_plugin_head" ] && [ -n "$_plugin_origin" ] && [ "$_plugin_head" != "$_plugin_origin" ]; then
         _plugin_bumped=true
@@ -443,19 +492,102 @@ except Exception:
         _market_bumped=true
     fi
 
-    if [ "$_plugin_bumped" = "false" ] || [ "$_market_bumped" = "false" ]; then
-        # Hard-coded literal reason — safe to use deny() directly (no config-derived content).
-        deny "prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but the plugin version was not bumped. Bump \\\"version\\\" in BOTH .claude-plugin/plugin.json AND .claude-plugin/marketplace.json (matched semver) in this push, or the marketplace serves nothing (CLAUDE.md §6.3). Push blocked."
+    # Third site: only evaluate when both head and origin are parseable (fail-open on empty).
+    if [ -n "$_claude_head" ] && [ -n "$_claude_origin" ] && [ "$_claude_head" != "$_claude_origin" ]; then
+        _claude_bumped=true
+    elif [ -n "$_claude_head" ] && [ -z "$_claude_origin" ]; then
+        # CLAUDE.md is new in this branch (no origin/main counterpart) — treat as bumped.
+        _claude_bumped=true
+    fi
+    # If _claude_head is empty (parse fault): _claude_bumped stays false → fail-open.
+
+    # -----------------------------------------------------------------------
+    # FEATURE PATH — not a release branch.
+    # Requires: a changelog.d/ fragment OR a version.d/ marker in the diff.
+    # Denies: any stray version bump on any of the three sites.
+    # -----------------------------------------------------------------------
+
+    if [ "$_is_release_branch" = "false" ]; then
+
+        # STRAY-BUMP DENY (single-bump invariant): feature branches must not bump
+        # any version site. Version bumps happen ONLY on release/vX.Y.Z branches.
+        # Third site (_claude_bumped): only fires when the CLAUDE.md §3 literal was
+        # parseable at both HEAD and origin/main; parse fault leaves _claude_bumped=false (fail-open).
+        if [ "$_plugin_bumped" = "true" ] || [ "$_market_bumped" = "true" ] || [ "$_claude_bumped" = "true" ]; then
+            deny "prepublish-guard: feature branch (non-release/vX.Y.Z) strays a version bump on a version site. Version bumps are reserved for release/vX.Y.Z branches cut by \/th:release. Remove the version change or use the release flow. Push blocked."
+        fi
+
+        # FRAGMENT-OR-MARKER CHECK: require a changelog.d/ *.md fragment OR a
+        # version.d/ *.bump marker somewhere in the diff for shipped-asset pushes.
+        # This ensures deferred releases have a traceable signal for each feature.
+        # Presence check: look for the path pattern in the diff (added or modified).
+        _has_fragment=false
+        _has_marker=false
+
+        if printf '%s' "$_changed" | awk -F'\t' '{print $NF}' \
+            | grep -qE '^changelog\.d/[a-z0-9-]+\.md$' 2>/dev/null; then
+            _has_fragment=true
+        fi
+        if printf '%s' "$_changed" | awk -F'\t' '{print $NF}' \
+            | grep -qE '^version\.d/[a-z0-9-]+\.bump$' 2>/dev/null; then
+            _has_marker=true
+        fi
+
+        if [ "$_has_fragment" = "false" ] && [ "$_has_marker" = "false" ]; then
+            deny "prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but neither a changelog.d/ fragment nor a version.d/ marker was found in the diff. Write a changelog.d/{pr-slug}.md fragment (for user-visible changes) or a version.d/{pr-slug}.bump marker (for internal consumer-received changes with no changelog entry) and re-push. See CLAUDE.md §6.3 and agents/delivery.md Step 9. Push blocked."
+        fi
+
+        # Feature push with fragment or marker and no stray bump → allow.
+        nodecision
     fi
 
     # -----------------------------------------------------------------------
-    # Check 1 passed. Bump-floor sub-stage.
-    #
-    # The deny path above calls deny() which exits before reaching here.
-    # This sub-stage ONLY runs on the pass path.
-    # UNDER-BUMP: advisory WARN to stderr; push not blocked.
-    # OVER-BUMP: hard-deny unless a valid bump-override token is present.
-    # Fail-open: any parse fault or unknown version → skip, one-line note.
+    # RELEASE PATH — branch matches release/vX.Y.Z.
+    # Requires: all three version sites bumped and matching the branch version.
+    # Over-bump hard-deny (unless bump-override token present).
+    # Preserves fail-open posture.
+    # -----------------------------------------------------------------------
+
+    # Verify all three sites are bumped.
+    # Third site: if _claude_head is empty (parse fault), _claude_bumped=false — fail-open
+    # means we skip the CLAUDE.md §3 partial-bump deny for that site only. The two JSON
+    # sites are always checked (their parse fault leaves _plugin/_market_head empty, which
+    # keeps _plugin/_market_bumped=false, which still fires the deny — correct behavior
+    # because the JSON sites are the distribution-critical source of truth).
+    if [ "$_plugin_bumped" = "false" ] || [ "$_market_bumped" = "false" ]; then
+        # Hard-coded literal reason — safe to use deny() directly (no config-derived content).
+        deny "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3), but at least one was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+    fi
+    # Third site partial-bump check: fires only when CLAUDE.md §3 was parseable and not bumped.
+    if [ -n "$_claude_head" ] && [ "$_claude_bumped" = "false" ]; then
+        deny "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3), but CLAUDE.md §3 was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+    fi
+
+    # Verify plugin.json HEAD version matches the branch version X.Y.Z.
+    if [ -n "$_branch_version" ] && [ -n "$_plugin_head" ]; then
+        if [ "$_plugin_head" != "$_branch_version" ]; then
+            deny "prepublish-guard: release branch is release/v${_branch_version} but .claude-plugin/plugin.json version is '${_plugin_head}'. They must match. Update the version files to ${_branch_version} or rename the branch. Push blocked."
+        fi
+    fi
+
+    # Verify marketplace.json HEAD version matches the branch version X.Y.Z.
+    if [ -n "$_branch_version" ] && [ -n "$_market_head" ]; then
+        if [ "$_market_head" != "$_branch_version" ]; then
+            deny "prepublish-guard: release branch is release/v${_branch_version} but .claude-plugin/marketplace.json plugins[0].version is '${_market_head}'. They must match. Push blocked."
+        fi
+    fi
+
+    # Verify CLAUDE.md §3 HEAD version matches the branch version X.Y.Z.
+    # Fail-open: if _claude_head is empty (parse fault), skip this check.
+    if [ -n "$_branch_version" ] && [ -n "$_claude_head" ]; then
+        if [ "$_claude_head" != "$_branch_version" ]; then
+            deny "prepublish-guard: release branch is release/v${_branch_version} but CLAUDE.md §3 Current version is '${_claude_head}'. All three version sites must match the branch version. Push blocked."
+        fi
+    fi
+
+    # -----------------------------------------------------------------------
+    # Release path: all three sites bumped and matching. Now run bump-floor
+    # sub-stage (the over/under-bump advisory + hard-deny lives here for release).
     # -----------------------------------------------------------------------
 
     # Derive the mechanical floor from name-status over shipped paths.
@@ -528,9 +660,7 @@ EOF
             printf 'prepublish-guard: WARN — a NEW shipped file was added (new invocable surface) but the version bump is %s. SemVer suggests MINOR. If the new file is not a new invocable surface (e.g. a _shared include), ignore. (advisory; push not blocked)\n' \
                 "$_actual" >&2
         fi
-        # floor==patch with actual==none cannot occur here: Check 1 already denied
-        # "shipped touched + no version change", so on the pass path a shipped-touch
-        # always has actual >= patch. Guard is implicit — fall through to nodecision.
+        # floor==patch with actual<patch on release path: advisory already covered above.
     fi
     if [ "$_rank_actual" -gt "$_rank_floor" ] 2>/dev/null; then
         # OVER-BUMP: applied bump level EXCEEDS the mechanical floor.
@@ -589,7 +719,7 @@ ${_opt_val}"
         deny "prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths (agents/|skills/|hooks/) only warrant a ${_floor} bump, but a ${_actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${_actual} — <reason>. See CLAUDE.md §6.3 and agents/delivery.md Step 9. Push blocked."
     fi
 
-    # All other cases: actual >= floor and actual <= floor → silent (correct).
+    # All other cases on release path: actual >= floor and actual <= floor → silent (correct).
     nodecision
 fi
 

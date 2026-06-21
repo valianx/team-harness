@@ -2669,7 +2669,7 @@ Then return your status block and exit.
 - Feature name for workspaces
 - workspaces path: {resolved_workspaces_path}
 - Summary of what was built, tested, and validated (from status block summaries, NOT re-reading workspaces)
-- **`skip-version: true`** if the orchestrator explicitly requests it.
+- **`skip-version: true`** — DEFAULT for all feature (non-release) deliveries. The plugin version is bumped at release-time via `/th:release`, not per-PR. Only delivery `release-mode` (invoked by `/th:release`) re-enables the bump. Pass `skip-version: false` ONLY when explicitly running in `release-mode`.
 
 **Gate (status-block):** The delivery agent returns a compact status block. Handle each outcome:
 
@@ -4019,11 +4019,11 @@ If any task in the batch had `security-sensitive: true`, invoke `security` (pipe
 git diff main...batch/{batch-name}-verify
 ```
 
-**5d. Run delivery (with version bump — this is the final task):**
+**5d. Run delivery (feature-mode — version bump deferred to release):**
 Invoke `delivery` with:
 - Feature name: the batch name
 - Summary: aggregated from all tasks
-- `skip-version: false` (this is the final delivery — bump is allowed)
+- `skip-version: true` (DEFAULT — the plugin version is bumped at release-time via `/th:release`, not per batch delivery. The delivery agent will write a `changelog.d/` fragment covering all batch tasks. Only delivery `release-mode` re-enables the bump.)
 - All branches are already merged into the verify branch
 
 The delivery agent will:
