@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.119.1] - 2026-06-21
+
+### Changed
+
+- Apply summary for the opencode runtime now ends at "Installed successfully." — the Components placed, Settings written, MCP servers, and Update later blocks are removed.
+- Token import from Claude Code into opencode is now automatic (literal copy, no interactive confirm prompt); literal copy is the unconditional default when the operator's Claude Code config carries tokens.
+- Rewrote README H1 and tagline to lead with Claude Code / multi-agent orchestration keywords for search-snippet discoverability.
+
 ## [2.119.0] - 2026-06-21
 
 ### Added
