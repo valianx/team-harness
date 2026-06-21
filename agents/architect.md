@@ -82,7 +82,14 @@ If the file you are about to overwrite is already very large (>30 KB or >800 lin
 
 1. **Read project knowledge** — read `docs/knowledge.md` if it exists. This contains prior decisions, patterns, constraints, and stack info. Use it to avoid contradicting previous decisions and to follow established patterns.
 
-2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand previous work (task intake, prior architecture decisions, implementation progress, test strategy, validation status).
+2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
+   - `00-state.md` — current pipeline phase, type, and security-sensitivity flags
+   - `00-knowledge-context.md` — KG prior art for this feature (if present)
+   - `00-research.md` — prior research report (if present; primary evidence base in research/research-code modes)
+   - `01-plan.md` — prior architecture decisions and AC (for amendment and bounded-patch modes)
+   - `02-implementation.md` — implementer output (for root-cause / audit modes)
+   - `failure-brief.md` — failure brief from orchestrator (for bounded-patch dispatches)
+   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 

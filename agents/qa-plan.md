@@ -195,7 +195,12 @@ In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **subs
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand previous work (task intake, architecture decisions, implementation progress, test results).
+1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
+   - `01-plan.md` — the plan being ratified: AC list, Work Plan steps, and `## Plan Review` section
+   - `00-acceptance-criteria.md` — standalone AC definition (define-ac mode only)
+   - `04-validation.md` — prior reconciliation decisions (reconcile mode only)
+   - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
+   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
