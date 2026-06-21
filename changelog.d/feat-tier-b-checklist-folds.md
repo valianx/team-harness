@@ -1,5 +1,0 @@
-### Added
-
-- `agents/security.md` — folded four standing security-checklist items mined from the 2026-06-21 KG analysis (Tier B): a structural compile-time security-invariant catalog (make the dangerous capability unreachable from the public/IPC surface), a write-path realpath containment gate (with a TOCTOU/CWE-367 note on the `lstat`/`O_NOFOLLOW` layers and the Windows gap), archive verify-before-extract + Zip Slip ordering (CWE-409), and fixed-template config/secret injection.
-- `agents/architect.md` — folded two reusable design heuristics: a tenancy-conditioned observability content-capture dial (single-tenant full payload vs multi-tenant metadata-only, as a post-deploy revisit rather than a hard plan-time prohibition) and bounding a designed map/reduce fan-out by ROUNDS rather than a cumulative lane budget.
-- Version bump: `2.117.1 → 2.117.2` (patch — additive guidance folds inside existing agent prompts, M-only) across `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (`plugins[0].version`), and `CLAUDE.md` ("Current version" line).
