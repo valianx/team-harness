@@ -1367,6 +1367,39 @@ Use Glob, Grep, and Read to discover:
 - APIs or interfaces that will be affected
 - Dependencies and constraints
 
+### Step 1.5 — Verify real scope of external reports
+
+**Gated on external-report origin.** This step fires only when the task originated from a GitHub issue, a GitHub issue comment, a GitHub PR review comment, or a ClickUp task routed into the pipeline. For direct operator requests (chat, `/th:design`, `/th:implement`), skip this step entirely.
+
+**Why this step exists.** External reports describe the codebase as it was when filed. By the time the pipeline runs, some or all of the reported items may already be fixed, partially resolved, or superseded by a refactor. Building AC from stale stated scope wastes reviewer time and risks re-fixing a resolved bug or opening a zero-delta PR.
+
+**Procedure** (per `docs/discover-phase.md §13`):
+
+1. For each claimed item in the report, grep the exact symbol, pattern, or phrase. Record whether it exists and where.
+2. Read the named files at the relevant sections. Confirm the reported behaviour or pattern still applies.
+3. Run `git log --grep="{relevant keyword}" --oneline` and scan `changelog.d/` for prior-fix entries. A `fix(area):` commit or `### Fixed` entry is strong evidence the item is already resolved.
+4. If `gh` is available, check whether a PR fixing the item exists (merged or open).
+
+**Output — real residual scope.** Produce:
+
+```
+Real residual scope:
+- {file}:{line} — {description of the actual current state}
+Stated-vs-real divergence: {summary of what the report claimed vs. what actually exists}
+```
+
+Flag each divergent item: `[ALREADY-FIXED]`, `[PARTIALLY-FIXED]`, or `[SCOPE-SHIFTED]`.
+
+**Feed real scope forward:**
+
+- **Into Step 2** — build AC from the **real residual scope**, not the stated scope. If an item is already fixed, do NOT include it as an AC.
+- **Into Step 5** — add a `Real residual scope:` line to the architect dispatch payload listing the verified residual items with `file:line`.
+
+**Empty-residual case.** When all claimed items are already fixed or no longer apply:
+
+1. Do NOT advance to plan/implement. Record the close-with-evidence recommendation in the Stage 1 STOP block (STAGE-GATE-1): produce a per-item `file:line` comment block the operator can post as a closing comment on the issue.
+2. NEVER auto-close the issue or task — closing is an outward action gated by `dev-guard.sh`. The operator decides.
+
 ### Step 2 — Build the functional spec
 
 Construct:
@@ -1426,6 +1459,7 @@ Collect the following as an in-memory payload to pass verbatim in the architect'
 - **Bug report (type: fix / hotfix only):** Reported behaviour / Expected behaviour / Reproduction steps / Environment
 - **Spec seed:** `"00-spec-seed.md present — read it as your primary prior before codebase exploration"` (when `spec_seed_present: true`); `"no spec seed — standard mode"` (when `spec_seed_present: false`)
 - **Scope hint:** the `survey_scope_hint` value from `00-state.md` (or `null`; replaces broad file-scope exploration when non-null)
+- **Real residual scope:** `{file:line list from Step 1.5}` (when task origin is an external report and residual is non-empty); `"n/a — direct operator request"` (for non-report tasks)
 
 The architect uses this payload to write `01-plan.md` § Review Summary (the formalized spec) AND § Architecture AND § Task List — making `01-plan.md` the single source of truth from Stage 1 onward.
 

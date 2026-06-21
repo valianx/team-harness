@@ -175,6 +175,7 @@ checks_orch = [
     ("JSONL trace", "00-execution-events.jsonl"),
     ("compaction trigger", "Mid-pipeline compaction trigger"),
     ("policy-block reference", "policy-block"),
+    ("verify-report-scope step", "Step 1.5 — Verify real scope of external reports"),
 ]
 for label, marker in checks_orch:
     check(
@@ -193,6 +194,20 @@ check(
     "orchestrator.md declares STAGE-GATE-3 is mandatory / non-skippable",
     "STAGE-GATE-3" in orch and ("irreversible" in orch.lower() or "cannot be skipped" in orch.lower()),
     "STAGE-GATE-3 mandatory-ness not documented",
+)
+
+# verify-report-scope contract — companion checks for architect.md and docs
+arch = read(AGENTS_DIR / "architect.md")
+check(
+    "architect.md has Channel 3 — Stale external-report scope",
+    "### Channel 3 — Stale external-report scope" in arch,
+    "marker '### Channel 3 — Stale external-report scope' not found in architect.md",
+)
+discover = read(REPO_ROOT / "docs" / "discover-phase.md")
+check(
+    "docs/discover-phase.md has §13 External-report scope verification",
+    "## 13. External-report scope verification" in discover,
+    "marker '## 13. External-report scope verification' not found in docs/discover-phase.md",
 )
 
 # ---------------------------------------------------------------------------
