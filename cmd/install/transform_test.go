@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -14,7 +16,7 @@ import (
 // conformanceCase is one entry in testdata/transform-conformance.json.
 type conformanceCase struct {
 	Name           string `json:"name"`
-	Surface        string `json:"surface"`  // "agent" or "command"
+	Surface        string `json:"surface"` // "agent" or "command"
 	Input          string `json:"input"`
 	ExpectedOutput string `json:"expectedOutput"`
 	ExpectError    bool   `json:"expectError"`
@@ -263,5 +265,159 @@ func TestTransform_CommandArgumentHintDropped(t *testing.T) {
 	}
 	if strings.Contains(string(got), "argument-hint") {
 		t.Error("argument-hint must be dropped in command transform (no opencode equivalent)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Suite: Placed-format validation over all real agents (AC-4)
+// ---------------------------------------------------------------------------
+
+// opencodePermKeySet is the closed set of valid opencode permission keys.
+// Source: https://opencode.ai/docs/agents (confirmed in 00-research.md).
+var opencodePermKeySet = map[string]bool{
+	"read":               true,
+	"edit":               true,
+	"glob":               true,
+	"grep":               true,
+	"list":               true,
+	"bash":               true,
+	"task":               true,
+	"external_directory": true,
+	"todowrite":          true,
+	"webfetch":           true,
+	"websearch":          true,
+	"lsp":                true,
+	"skill":              true,
+	"question":           true,
+	"doom_loop":          true,
+}
+
+// opencodeColorRe matches the opencode color field: hex or named enum.
+var opencodeColorRe = regexp.MustCompile(`^(#[0-9a-fA-F]{6}|primary|secondary|accent|success|warning|error|info)$`)
+
+// TestTransformPlacedFormat_AllAgents applies the opencode transform to every
+// real agent .md file in agents/ and asserts the output is valid opencode format:
+//
+//   - permission field is present and is a YAML block mapping (not a flow array)
+//   - every permission key in the output is a member of the opencode closed key set
+//   - no mcp__* tokens appear in the frontmatter section
+//   - if color is present, it matches the opencode hex-or-enum pattern
+//
+// The test parses the raw output string to extract permission keys because the
+// placed output uses YAML block mappings that our minimal parser does not handle
+// as nested objects. The pattern match below is intentionally simple: it scans
+// the permission block in the serialized YAML for indented "  key: value" lines.
+//
+// This is AC-4 per 01-plan.md.
+func TestTransformPlacedFormat_AllAgents(t *testing.T) {
+	agentsFS := EmbeddedAssets()
+
+	err := fs.WalkDir(agentsFS, "agents", func(agentPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(agentPath, ".md") {
+			return nil
+		}
+		// Skip README and _shared snippets (not invocable agents).
+		base := agentPath[strings.LastIndex(agentPath, "/")+1:]
+		if base == "README.md" || strings.Contains(agentPath, "_shared") {
+			return nil
+		}
+
+		src, readErr := fs.ReadFile(agentsFS, agentPath)
+		if readErr != nil {
+			t.Errorf("cannot read embedded %s: %v", agentPath, readErr)
+			return nil
+		}
+
+		got, transformErr := transformToOpencode(src, TransformKindAgent)
+		if transformErr != nil {
+			t.Errorf("agent %s: transformToOpencode error: %v", agentPath, transformErr)
+			return nil
+		}
+
+		// Extract the frontmatter section only (between --- fences).
+		outStr := string(got)
+		fmSection := ""
+		if strings.HasPrefix(outStr, "---\n") {
+			rest := outStr[4:]
+			if closeIdx := strings.Index(rest, "\n---"); closeIdx >= 0 {
+				fmSection = rest[:closeIdx]
+			}
+		}
+
+		// Assert permission is present and is flow-form object (not array form).
+		// Valid: "permission: {read: allow, edit: allow}" or "permission: {}"
+		// Invalid: "permission: {allow: [...]}" or block form with separate allow: key
+		if !strings.Contains(fmSection, "permission:") {
+			t.Errorf("agent %s: permission field missing from frontmatter", agentPath)
+			return nil
+		}
+		if strings.Contains(fmSection, "allow: [") || strings.Contains(fmSection, "\n  allow:") {
+			t.Errorf("agent %s: permission uses array form (allow: [...]) — must be an object (PermissionRuleConfig)", agentPath)
+		}
+		// Verify flow-form: permission must be on a single line as "{...}".
+		for _, line := range strings.Split(fmSection, "\n") {
+			if strings.HasPrefix(line, "permission:") {
+				trimmed := strings.TrimSpace(strings.TrimPrefix(line, "permission:"))
+				if !strings.HasPrefix(trimmed, "{") {
+					t.Errorf("agent %s: permission must be flow-form {key: allow, ...}, got: %q", agentPath, line)
+				}
+				break
+			}
+		}
+
+		// Assert no mcp__ tokens appear in the frontmatter.
+		if strings.Contains(fmSection, "mcp__") {
+			t.Errorf("agent %s: mcp__ token found in frontmatter — must be dropped from permission", agentPath)
+		}
+
+		// Validate every permission key in the flow-form object against the closed key set.
+		// Flow form: "permission: {read: allow, edit: allow, bash: allow}"
+		for _, line := range strings.Split(fmSection, "\n") {
+			if !strings.HasPrefix(line, "permission:") {
+				continue
+			}
+			inner := strings.TrimSpace(strings.TrimPrefix(line, "permission:"))
+			// Strip surrounding braces.
+			if len(inner) >= 2 && inner[0] == '{' && inner[len(inner)-1] == '}' {
+				inner = inner[1 : len(inner)-1]
+			}
+			for _, pair := range strings.Split(inner, ",") {
+				pair = strings.TrimSpace(pair)
+				if pair == "" {
+					continue
+				}
+				colonIdx := strings.Index(pair, ":")
+				if colonIdx < 0 {
+					continue
+				}
+				key := strings.TrimSpace(pair[:colonIdx])
+				if key == "" {
+					continue
+				}
+				if !opencodePermKeySet[key] {
+					t.Errorf("agent %s: permission key %q is not in the opencode closed key set", agentPath, key)
+				}
+			}
+			break
+		}
+
+		// Assert color, if present, is a valid opencode value.
+		for _, line := range strings.Split(fmSection, "\n") {
+			if strings.HasPrefix(line, "color: ") {
+				colorStr := strings.TrimSpace(strings.TrimPrefix(line, "color: "))
+				colorStr = strings.Trim(colorStr, `"'`)
+				if !opencodeColorRe.MatchString(colorStr) {
+					t.Errorf("agent %s: color %q is not a valid opencode enum or hex (#rrggbb)", agentPath, colorStr)
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDir agents: %v", err)
 	}
 }

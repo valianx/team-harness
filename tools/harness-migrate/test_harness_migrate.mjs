@@ -125,16 +125,17 @@ This is the agent body. It uses $ARGUMENTS in instructions.
 
 // Expected opencode projection of the agent (oracle)
 // - model: anthropic/claude-opus-4-5
-// - permission: { allow: [Read, Glob, Grep], ask: [], deny: [] }
+// - permission: {read: "allow", glob: "allow", grep: "allow"} (object form, opencode PermissionRuleConfig)
 // - mode: subagent (forward-injected)
+// - color: warning (orange maps to the opencode "warning" named enum)
 // - th-origin: opencode (records the current format; consistent with structural evidence)
 const EXPECTED_OPENCODE_AGENT_FM = {
   name: "test-agent",
   description: "A test agent for migration tests.",
   model: "anthropic/claude-opus-4-5",
-  permission: { allow: ["Read", "Glob", "Grep"], ask: [], deny: [] },
+  permission: { read: "allow", glob: "allow", grep: "allow" },
   mode: "subagent",
-  color: "orange",
+  color: "warning",
   "th-origin": "opencode",
 };
 
@@ -340,9 +341,12 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   const { frontmatter: fm, body } = parseFrontmatter(result.content);
 
   assert("AC-1: output path is .opencode/agents/", result.outputPath.includes(path.join(".opencode", "agents")));
-  assert("AC-1: agent tools: → permission.allow array",
-    Array.isArray(fm["permission"]?.["allow"]) &&
-    JSON.stringify(fm["permission"]["allow"]) === JSON.stringify(["Read", "Glob", "Grep"])
+  assert("AC-1: agent permission is object form (read, glob, grep)",
+    typeof fm["permission"] === "object" &&
+    !Array.isArray(fm["permission"]) &&
+    fm["permission"]["read"] === "allow" &&
+    fm["permission"]["glob"] === "allow" &&
+    fm["permission"]["grep"] === "allow"
   );
   assert("AC-1: model is provider-prefixed", fm["model"] === "anthropic/claude-opus-4-5");
   assert("AC-1: mode is forward-injected", fm["mode"] === "subagent");
@@ -371,8 +375,9 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   // NOT against the transform's own output — so a symmetric bug that corrupts both
   // directions equally would still be caught here.
   //
-  // Expected serialised content produced by transformToOpencode for CC_AGENT_CONTENT
-  // (fields ordered: name, description, model, permission{allow,ask,deny}, mode, color, th-origin).
+  // Expected serialised content produced by transformToOpencode for CC_AGENT_CONTENT.
+  // Fields ordered: name, description, model, permission (block object form), mode, color, th-origin.
+  // color: orange maps to opencode "warning" enum.
   // Body starts with a blank line then the CC_AGENT_CONTENT body verbatim.
   const EXPECTED_OPENCODE_AGENT_SERIALISED = [
     "---",
@@ -380,14 +385,11 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
     "description: A test agent for migration tests.",
     "model: anthropic/claude-opus-4-5",
     "permission:",
-    "  allow:",
-    "    - Read",
-    "    - Glob",
-    "    - Grep",
-    "  ask:",
-    "  deny:",
+    "  read: allow",
+    "  glob: allow",
+    "  grep: allow",
     "mode: subagent",
-    "color: orange",
+    "color: warning",
     "th-origin: opencode",
     "---",
     "",
