@@ -6760,6 +6760,9 @@ CANONICAL_KG_TOOLS = frozenset({
     "session_start",
     "session_end",
     "session_summary",
+    # Flow telemetry — added in CH v1.2.0 (feat/record-flow-event, PR-1).
+    # Records metadata-only pipeline friction events; no KG node created.
+    "record_flow_event",
 })
 
 # Bare tokens that the server no longer (or never did) register.

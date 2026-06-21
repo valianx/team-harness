@@ -295,6 +295,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 127: flow-event-schema-sync (AC-2.7 cross-repo guard)"
+echo "############################################################"
+if python3 "$TESTS_DIR/test_flow_event_schema_sync.py"; then
+    echo "flow-event-schema-sync: PASS"
+else
+    echo "flow-event-schema-sync: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

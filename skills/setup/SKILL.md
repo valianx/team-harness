@@ -29,6 +29,7 @@ Match on the normalized argument containing any listed cue (substring or close s
 | **english-learning** | Step 3.6 — english-learning correction mode | `english learning`, `english-learning`, `english corrections`, `learn english`, `correction mode` | `aprender inglés`, `correcciones de inglés`, `modo de corrección`, `inglés` |
 | **clickup** | § Targeted: ClickUp | `clickup`, `click up`, `clickup workspace`, `clickup id` | `clickup`, `id de clickup`, `espacio de clickup` |
 | **obsidian-tasks** | § Targeted: Obsidian Tasks | `obsidian tasks`, `obsidian-tasks`, `tasks plugin` | `tareas de obsidian`, `obsidian tasks` |
+| **flow-telemetry** | Step 4f — flow telemetry opt-in | `flow telemetry`, `flow-telemetry`, `telemetry`, `friction events` | `telemetría`, `telemetría de flujo`, `eventos de fricción` |
 | **python / deps** | Step 6b — python3 probe | `python`, `python3`, `dependencies`, `deps`, `secret scan`, `entropy` | `python`, `dependencias`, `escaneo de secretos` |
 
 ### No-match fallback
@@ -39,14 +40,15 @@ When the normalized argument does not confidently match any concern in the inten
 No configuration concern matched for: '<original argument>'
 
 Routable concerns for /th:setup <intent>:
-  memory          — Memory MCP URL and bearer token
-  context7        — context7 API key
-  workspace       — workspace output mode (local / obsidian vault path)
-  language        — default response language (ISO 639-1)
-  english-learning — english-learning correction mode
-  clickup         — ClickUp workspace ID
-  obsidian-tasks  — Obsidian Tasks integration
-  python          — python3 presence and dependency probe
+  memory           — Memory MCP URL and bearer token
+  context7         — context7 API key
+  workspace        — workspace output mode (local / obsidian vault path)
+  language         — default response language (ISO 639-1)
+  english-learning  — english-learning correction mode
+  clickup          — ClickUp workspace ID
+  obsidian-tasks   — Obsidian Tasks integration
+  flow-telemetry   — cross-user flow telemetry opt-in (default: off)
+  python           — python3 presence and dependency probe
 
 Retype the command with one of the above concerns, or run /th:setup with no argument to walk the full configuration flow.
 ```
@@ -232,6 +234,21 @@ Use neutral, standard language that reads the same to a reader from any country.
 - Keep the tone declarative and professional; the reader's country should not be inferable from word choice.
 <!-- voice-rule:end -->
 
+### 4f. Configure flow telemetry opt-in
+
+Ask the operator whether to enable cross-user flow telemetry emission. When ON, the
+orchestrator emits metadata-only pipeline friction events (gate failures, guard blocks,
+iteration loops, etc.) to `context-harness-mcp` via the `record_flow_event` MCP tool for
+cross-fleet observability. Emission is always best-effort and non-blocking — it never affects
+the pipeline outcome. The default is OFF (opt-in, never on by surprise).
+
+- **Prompt:** `Enable flow telemetry? Sends metadata-only friction events to context-harness-mcp when the CH server is reachable. [y/N]` (default: N — off)
+- Show the current configured value from `~/.claude/.team-harness.json` `flow_telemetry.enabled` field (if present) as the default hint.
+- Accept `y` (enable) or `n`/Enter (disable / keep off).
+- On `y`: persist `flow_telemetry.enabled: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `flow_telemetry.enabled` key (boolean `true`), write the whole document back. Never emit a partial payload.
+- On `n`/Enter: if no prior `flow_telemetry.enabled` key existed, omit the key entirely (absence = OFF). If a prior value of `true` existed and the operator declines, write `flow_telemetry.enabled: false`.
+- The key is namespaced under `flow_telemetry` as a nested object: `{"flow_telemetry": {"enabled": true}}`.
+
 ### 5. Write manifest
 
 Write `~/.claude/.team-harness.json` with:
@@ -244,15 +261,18 @@ Write `~/.claude/.team-harness.json` with:
   "logs-path": "<vault path or empty>",
   "logs-subfolder": "<subfolder or empty>",
   "language": "<ISO 639-1 code, e.g. 'en' or 'es'; omit key if not configured>",
-  "english_learning": "<true|false; omit key if not configured>"
+  "english_learning": "<true|false; omit key if not configured>",
+  "flow_telemetry": {"enabled": false}
 }
 ```
 
-Preserve ALL existing fields (like `files`, `clickup`, `pricing`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, and any other operator-configured key.
+Preserve ALL existing fields (like `files`, `clickup`, `pricing`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, and any other operator-configured key.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
 The `english_learning` key is written only when the operator answered in Step 3.6; if they declined and no prior value existed, omit the key entirely (absence of the key means mode OFF, which is the default).
+
+The `flow_telemetry.enabled` key defaults to `false` (opt-in). When absent from an existing manifest, treat it as `false` — do not emit telemetry until the operator explicitly opts in via Step 4f or `/th:setup flow-telemetry`.
 
 ### 6. Verify connectivity
 
