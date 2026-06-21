@@ -108,9 +108,12 @@ echo "Checksum verified."
 # Run the verified binary.
 #
 # Interactive setup: when a terminal (/dev/tty) is present, the binary
-# presents the full .team-harness.json setup surface (work-logs mode,
-# language, english-learning, Memory MCP, context7, ClickUp, Obsidian tasks)
-# as a sequence of skippable, explanatory prompts. Each setting is optional.
+# presents the trimmed .team-harness.json setup surface as a sequence of
+# skippable, explanatory prompts. Only two settings are configurable:
+#   - Memory MCP URL (paste or JSON snippet; bearer token stays in your shell)
+#   - context7 (enable/skip; API key stays in your shell)
+# All other settings use silent defaults (work-logs → local; no language,
+# no english-learning, no ClickUp, no Obsidian tasks).
 #
 # Non-interactive (headless/CI): when /dev/tty is absent, the binary
 # installs all assets and resolves configuration from env vars + defaults only
@@ -126,7 +129,10 @@ echo "Checksum verified."
 #
 # Redirect stdin from /dev/tty when present — same rationale as install.sh:
 # when invoked via 'curl | bash', bash holds the pipe as stdin; the binary
-# must read from the operator's terminal, not the remaining pipe bytes.
+# must read from the operator's terminal, not the remaining pipe bytes. The
+# binary also wires /dev/tty explicitly into the huh form as the bubbletea
+# input source so that pasting a bare Memory MCP URL is reliably delivered
+# as a single paste event (not dropped or split under curl | bash).
 # Forward "$@" so the operator can pass --scope, --opencode-dir, or
 # --non-interactive / --yes to the binary.
 # ---------------------------------------------------------------------------

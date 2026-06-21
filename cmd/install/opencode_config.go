@@ -20,31 +20,22 @@ func claudeCodeTeamHarnessConfigPath() (string, error) {
 	return filepath.Join(home, ".claude", manifestFilename), nil
 }
 
-// importCandidate carries all 7 allowlisted keys read from a detected
+// importCandidate carries the allowlisted keys read from a detected
 // .team-harness.json during migration source detection (CC config or
-// opencode-owned re-run).
+// opencode-owned re-run). After the trim, only logs-mode is read —
+// the removed settings (language, english_learning, clickup, obsidian_tasks)
+// are never imported into a new config (AC-7).
 type importCandidate struct {
-	logsMode             string
-	logsPath             string
-	logsSubfolder        string
-	language             string
-	englishLearning      bool
-	clickUpWorkspaceID   string
-	obsidianTasksEnabled bool
+	logsMode string
 }
 
-// buildImportCandidate reads the 7 allowlisted keys from a raw JSON map via
-// the existing typed extractors. MCP URL and secrets are NOT in
-// .team-harness.json and are never read here.
+// buildImportCandidate reads the surviving allowlisted key from a raw JSON map.
+// MCP URL and secrets are NOT in .team-harness.json and are never read here.
+// The removed fields (language, english_learning, clickup, obsidian_tasks) are
+// intentionally not extracted — they must not appear in the written config (AC-7).
 func buildImportCandidate(m map[string]json.RawMessage) *importCandidate {
 	return &importCandidate{
-		logsMode:             extractStringFromRaw(m, "logs-mode"),
-		logsPath:             extractStringFromRaw(m, "logs-path"),
-		logsSubfolder:        extractStringFromRaw(m, "logs-subfolder"),
-		language:             extractStringFromRaw(m, "language"),
-		englishLearning:      extractBoolFromRaw(m, "english_learning"),
-		clickUpWorkspaceID:   extractClickUpWorkspaceID(m),
-		obsidianTasksEnabled: extractObsidianTasksEnabled(m),
+		logsMode: extractStringFromRaw(m, "logs-mode"),
 	}
 }
 
@@ -82,14 +73,11 @@ func opencodeSettingsConfigPath(configRoot string) string {
 // single-config-file merge rule). Installer-managed keys are tracked
 // separately and are always set by the installer — they are never trusted
 // from the existing file (SEC-OC-R4 mass-assignment defense).
+//
+// The trimmed installer no longer writes language, english_learning, clickup, or
+// obsidian_tasks — those keys are excluded from the allowlist (AC-7).
 var allowlistedOpencodeKeys = map[string]bool{
-	"logs-mode":          true,
-	"logs-path":          true,
-	"logs-subfolder":     true,
-	"language":           true,
-	"english_learning":   true,
-	"clickup":            true,
-	"obsidian_tasks":     true,
+	"logs-mode": true,
 }
 
 // installerManagedKeys are always overwritten by the installer regardless of
@@ -133,47 +121,11 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 		delete(raw, k)
 	}
 
-	// Apply logs-mode always (default is "local").
-	logsMode := cfg.LogsMode
-	if logsMode == "" {
-		logsMode = "local"
-	}
-	raw["logs-mode"] = mustMarshalJSON(logsMode)
-
-	// Apply logs-path and logs-subfolder only when obsidian mode is selected.
-	if logsMode == "obsidian" {
-		raw["logs-path"] = mustMarshalJSON(cfg.LogsPath)
-		raw["logs-subfolder"] = mustMarshalJSON(cfg.LogsSubfolder)
-	} else {
-		// Clear obsidian-specific keys when switching to local.
-		delete(raw, "logs-path")
-		delete(raw, "logs-subfolder")
-	}
-
-	// Apply language when non-empty (operator skipped → omit key entirely).
-	if cfg.Language != "" {
-		raw["language"] = mustMarshalJSON(cfg.Language)
-	}
-
-	// Apply english_learning when explicitly set to true.
-	if cfg.EnglishLearning {
-		raw["english_learning"] = mustMarshalJSON(true)
-	}
-
-	// Apply clickup when a workspace ID was provided.
-	if cfg.ClickUpWorkspaceID != "" {
-		clickup := map[string]interface{}{
-			"workspace_id": cfg.ClickUpWorkspaceID,
-		}
-		raw["clickup"] = mustMarshalJSON(clickup)
-	}
-
-	// Apply obsidian_tasks when enabled.
-	if cfg.ObsidianTasksEnabled {
-		raw["obsidian_tasks"] = mustMarshalJSON(map[string]interface{}{
-			"enabled": true,
-		})
-	}
+	// Apply logs-mode — always "local" after the trim (work-logs group removed).
+	// Clear any pre-existing obsidian-specific keys when present in the file.
+	raw["logs-mode"] = mustMarshalJSON("local")
+	delete(raw, "logs-path")
+	delete(raw, "logs-subfolder")
 
 	// Set installer-managed keys — always from the installer, never from the
 	// existing file (SEC-OC-R4).
@@ -258,33 +210,3 @@ func extractBoolFromRaw(m map[string]json.RawMessage, key string) bool {
 	return b
 }
 
-// extractClickUpWorkspaceID extracts the clickup.workspace_id from a raw
-// JSON map. Returns "" when the key is absent or the nested structure
-// does not match.
-func extractClickUpWorkspaceID(m map[string]json.RawMessage) string {
-	v, ok := m["clickup"]
-	if !ok {
-		return ""
-	}
-	var clickup map[string]interface{}
-	if err := json.Unmarshal(v, &clickup); err != nil {
-		return ""
-	}
-	id, _ := clickup["workspace_id"].(string)
-	return id
-}
-
-// extractObsidianTasksEnabled extracts the obsidian_tasks.enabled from a
-// raw JSON map. Returns false when the key is absent.
-func extractObsidianTasksEnabled(m map[string]json.RawMessage) bool {
-	v, ok := m["obsidian_tasks"]
-	if !ok {
-		return false
-	}
-	var tasks map[string]interface{}
-	if err := json.Unmarshal(v, &tasks); err != nil {
-		return false
-	}
-	enabled, _ := tasks["enabled"].(bool)
-	return enabled
-}
