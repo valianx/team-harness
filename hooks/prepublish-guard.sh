@@ -22,6 +22,18 @@
 #     present, internal-timeout (exit 124), command-not-found (exit 127). A
 #     guard fault NEVER blocks the operator.
 #
+# WORKTREE SCOPE (Check 1 and Check 2, fix for #411):
+#   When the payload carries a top-level `cwd` field, the hook cd's into it
+#   once, immediately after stdin drain, so that every implicit-CWD git call
+#   and every relative-path read in Check 1 and Check 2 is scoped to the pushed
+#   worktree — not the session/project root that is the hook's process CWD.
+#   Validation: control-char → SEC-DR-A reject (fail-open); non-existent dir →
+#   skip cd (fail-open); cd failure → skip (fail-open). Empty/absent cwd →
+#   guard evaluates the process CWD (backward-compatible, mirrors pre-fix
+#   behaviour). Accepted residual: `git -C <dir> push` / `cd <dir> && push`
+#   forms where `cwd` is the session root — handled by fail-open (never a
+#   false BLOCK; documented parallel to the dev-guard.sh obfuscation residual).
+#
 # CHECK 1 — VERSION BUMP (git push)
 #   Distinguishes FEATURE pushes from RELEASE pushes by branch name.
 #   Generic safety: .claude-plugin/plugin.json absent → no-op (other repos).
@@ -177,6 +189,60 @@ semver_delta() {
 # exit codes explicitly; a non-zero test exit is a BLOCK decision, not a crash.
 # ---------------------------------------------------------------------------
 input="$(cat)"
+
+# ---------------------------------------------------------------------------
+# Step 1b — Resolve the payload cwd (worktree-scope fix, #411)
+#
+# Claude Code sets the PreToolUse top-level `cwd` field to the directory the
+# Bash tool call executes in. When a pipeline agent pushes from a git worktree,
+# `cwd` is that worktree — NOT the session/project root that is the hook's
+# process CWD. Scoping the guard to `cwd` ensures Check 1 and Check 2 inspect
+# the pushed worktree rather than the unrelated session root.
+#
+# Resolution: python3 d.get('cwd','') preferred, grep/sed fallback.
+# Mirrors hooks/subagent-trace.sh:79-98 exactly.
+# Validation (fail-open on every fault — never deny on cwd-basis alone):
+#   empty cwd     → skip cd; guard evaluates process CWD (backward-compat).
+#   control chars → SEC-DR-A reject; stderr warn; skip cd (fail-open).
+#   non-existent  → stderr warn; skip cd (fail-open).
+#   cd fails      → stderr warn; continue without cd (fail-open).
+# After a successful cd, every relative-path read and every implicit-CWD git
+# invocation in Check 1 and Check 2 is scoped to the pushed worktree.
+#
+# Accepted residual (git -C <dir>/cd <dir> && git push): when an agent issues
+# `git -C /elsewhere push` from a Bash whose CWD is the session root, `cwd`
+# is the session root (not /elsewhere). The guard then evaluates the session
+# root — identical to pre-fix behaviour, and still fail-open for that edge case.
+# ---------------------------------------------------------------------------
+_cwd_from_payload=""
+if command -v python3 >/dev/null 2>&1; then
+    _cwd_from_payload=$(python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    print(d.get('cwd', ''))
+except Exception:
+    print('')
+" <<< "$input" 2>/dev/null || true)
+else
+    _cwd_from_payload=$(printf '%s' "$input" \
+        | grep -o '"cwd"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
+        | sed 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
+fi
+
+if [ -n "$_cwd_from_payload" ]; then
+    # SEC-DR-A: reject control chars in cwd before any use.
+    if printf '%s' "$_cwd_from_payload" | grep -qP '[[:cntrl:]]' 2>/dev/null \
+        || printf '%s' "$_cwd_from_payload" | LC_ALL=C grep -q $'[\x00-\x1f\x7f]' 2>/dev/null; then
+        printf 'prepublish-guard: payload cwd contains control characters; skipping cd (SEC-DR-A, fail-open)\n' >&2
+    elif [ ! -d "$_cwd_from_payload" ]; then
+        printf 'prepublish-guard: payload cwd does not exist as a directory; skipping cd (fail-open)\n' >&2
+    else
+        cd "$_cwd_from_payload" || {
+            printf 'prepublish-guard: cd into payload cwd failed; continuing with process CWD (fail-open)\n' >&2
+        }
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Step 2 — Extract tool_name; only gate on Bash tool calls
