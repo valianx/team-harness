@@ -386,6 +386,7 @@ summary: {1-2 sentences: N files created/modified, key patterns used, any deviat
 context7_consult: hit:N miss:N skipped:M
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 kg_prior_art: hit:N applied:bool | n/a
+kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced implementation decisions; [] when none
 sketches_read: [sketches/api-contract.md, ...]  # list every sketches/*.md read; [] when none present
 regression_test_passes: true | false   # type: fix | hotfix only; omit the line otherwise
 follow_ups_spotted: {N}                 # type: fix | hotfix only; omit the line otherwise

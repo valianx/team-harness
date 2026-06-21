@@ -496,6 +496,7 @@ sketches_read: [sketches/api-contract.md, ...]  # list every sketches/*.md read;
 context7_consult: hit:N miss:N skipped:N
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
+kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced validation decisions; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 regression_test_referenced: true | false | null  # validate mode for type: fix | hotfix only; null when bug_tier: 1 (Phase 2.0 skipped); omit otherwise
 reproduction_steps_validated: true | false      # validate mode for type: fix | hotfix only; omit otherwise
