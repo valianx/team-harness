@@ -1,6 +1,8 @@
-# Team Harness
+# Team Harness — Claude Code Agent Orchestration System
 
-> An agent harness for **Claude Code**. Turns the chat into a Spec-Driven Development pipeline with mandatory human gates and full state captured as files so any session can resume from where the last one left off.
+> Team Harness is a multi-agent orchestration system for **Claude Code**: an orchestrator dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
+>
+> Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
 
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
