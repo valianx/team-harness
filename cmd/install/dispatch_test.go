@@ -14,6 +14,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -386,4 +387,37 @@ func TestPrintOpencodeApplySummary_StructCarriesNoSecretValues(t *testing.T) {
 	}
 	// If the struct had a SecretBearer field, this test would not compile
 	// after adding an assignment to it below — which is the gate.
+}
+
+// TestPrintOpencodeApplySummary_ContainsInstalledSuccessfully verifies that the
+// redesigned summary (AC-3 / fix) leads with a prominent "Installed successfully"
+// headline on stdout. This is the AC-3 structural assertion for the summary redesign.
+func TestPrintOpencodeApplySummary_ContainsInstalledSuccessfully(t *testing.T) {
+	dir := t.TempDir()
+	diff := PlanDiff{}
+	cfg := opencodeSetupValues{
+		LogsMode: "local",
+		MCP: opencodeMCPValues{
+			MemoryURL:       "https://mcp.example.com/mcp",
+			Context7Enabled: true,
+		},
+	}
+
+	// Capture stdout.
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 65536)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if !strings.Contains(output, "Installed successfully") {
+		t.Errorf("summary missing 'Installed successfully' headline (AC-3):\n%s", output)
+	}
 }

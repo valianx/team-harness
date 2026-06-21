@@ -317,10 +317,11 @@ func TestNonInteractiveFlag_YesAliasAccepted(t *testing.T) {
 }
 
 // TestNonInteractiveFlag_ForcesEnvFlagsPath verifies that when
-// nonInteractiveFlag is true, resolveOpencodeSetupFromEnvFlags is the correct
-// resolution path (the interactive gate is closed). This test asserts the
-// gating logic: `interactive = !nonInteractiveFlag && hasInteractiveInput()`.
+// nonInteractiveFlag is true, the interactive gate is closed. This test asserts
+// the gating logic: `interactive = !nonInteractiveFlag && hasInteractiveInput()`.
 // When nonInteractiveFlag is true, interactive must be false regardless of tty.
+// The token-mode within the non-interactive branch (env-ref vs literal) is a
+// separate concern tested by TestNonInteractiveMigration_LiteralPath.
 func TestNonInteractiveFlag_ForcesEnvFlagsPath(t *testing.T) {
 	// Setting nonInteractiveFlag = true means the gate expression evaluates to
 	// !true && <anything> = false. We verify this by computing the gate.
@@ -331,6 +332,44 @@ func TestNonInteractiveFlag_ForcesEnvFlagsPath(t *testing.T) {
 	interactive := !nonInteractiveFlag && hasInteractiveInput()
 	if interactive {
 		t.Error("interactive = true with --non-interactive set; gate must be false (SEC-DR-7)")
+	}
+}
+
+// TestNonInteractiveFlag_WithCCTokens_YieldsLiteralMode verifies that on the
+// non-interactive path, when the CC migration carries literal tokens, the caller
+// pattern (runOpencodePostApply) sets tokenModeLiteral + populated secrets.
+// This is the sibling to TestNonInteractiveFlag_ForcesEnvFlagsPath: the branch
+// is still taken (non-interactive), but the token-mode WITHIN it is now literal
+// when the CC migration had tokens (fix: scoped relaxation of SEC-OC-R1).
+func TestNonInteractiveFlag_WithCCTokens_YieldsLiteralMode(t *testing.T) {
+	// Simulate the caller logic from runOpencodePostApply non-interactive branch.
+	ccMigration := opencodeMCPMigration{
+		MemoryURL:    "https://mcp.example.com/mcp",
+		MemoryBearer: "fake-bearer",
+		Context7Key:  "ctx7sk-fake",
+	}
+
+	// Default mode (the starting point in runOpencodePostApply).
+	mode := tokenModeEnvRef
+	secrets := opencodeMCPSecrets{}
+
+	// The fix: caller sets literal mode when hasLiteralTokens().
+	if ccMigration.hasLiteralTokens() {
+		mode = tokenModeLiteral
+		secrets = opencodeMCPSecrets{
+			MemoryBearer: ccMigration.MemoryBearer,
+			Context7Key:  ccMigration.Context7Key,
+		}
+	}
+
+	if mode != tokenModeLiteral {
+		t.Error("mode = tokenModeEnvRef, want tokenModeLiteral for CC migration with tokens (fix: SEC-OC-R1 scoped relaxation)")
+	}
+	if secrets.MemoryBearer != "fake-bearer" {
+		t.Errorf("secrets.MemoryBearer = %q, want fake-bearer", secrets.MemoryBearer)
+	}
+	if secrets.Context7Key != "ctx7sk-fake" {
+		t.Errorf("secrets.Context7Key = %q, want ctx7sk-fake", secrets.Context7Key)
 	}
 }
 

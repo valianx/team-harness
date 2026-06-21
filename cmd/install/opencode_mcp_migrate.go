@@ -62,20 +62,26 @@ const (
 	tokenModeEnvRef tokenMode = iota
 
 	// tokenModeLiteral writes the literal secret values into opencode.json.
-	// This conditionally relaxes SEC-OC-R1 — reachable ONLY via the explicit
-	// interactive token-import confirm (AC-7). NEVER reachable from the
-	// non-interactive resolver path.
+	// This conditionally relaxes SEC-OC-R1:
+	//   - Interactive path: reachable via the explicit token-import confirm
+	//     (runTokenImportConfirm, AC-7 original behaviour).
+	//   - Non-interactive CC→opencode migration path: reachable when the
+	//     operator's ~/.claude.json carried literal tokens AND the apply path
+	//     is non-interactive (fix(install): scoped relaxation, operator-locked
+	//     at STAGE-GATE-1). Gated on ccMigration.hasLiteralTokens() so that
+	//     an empty/absent CC token never writes an empty literal.
 	tokenModeLiteral
 )
 
 // opencodeMCPSecrets carries the literal token values for the tokenModeLiteral
-// path. It is constructed ONLY inside the interactive Yes branch of the
-// token-import confirm — there is no code path from the non-interactive
-// resolver to a non-empty opencodeMCPSecrets (AC-7).
+// path. It is constructed in two places:
+//   - Interactive Yes branch of runTokenImportConfirm (original AC-7 contract).
+//   - Non-interactive CC→opencode migration branch in runOpencodePostApply when
+//     ccMigration.hasLiteralTokens() is true (fix(install): scoped relaxation).
 //
 // The struct is transient: it is passed down the call chain and is never
 // stored in any persistent config file other than the deliberate
-// literal-into-opencode.json write on the Yes path.
+// literal-into-opencode.json write on the Yes/migration path.
 type opencodeMCPSecrets struct {
 	MemoryBearer string
 	Context7Key  string
