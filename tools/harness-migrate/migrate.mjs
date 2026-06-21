@@ -324,15 +324,21 @@ function serializeFrontmatter(fm, body) {
         lines.push(`  - ${item}`);
       }
     } else if (value !== null && typeof value === "object") {
-      lines.push(`${key}:`);
-      for (const [k, v] of Object.entries(value)) {
-        if (Array.isArray(v)) {
-          lines.push(`  ${k}:`);
-          for (const item of v) {
-            lines.push(`    - ${item}`);
+      const entries = Object.entries(value);
+      if (entries.length === 0) {
+        // Empty object → flow-form {} to avoid a bare "key:" that parsers read back as "".
+        lines.push(`${key}: {}`);
+      } else {
+        lines.push(`${key}:`);
+        for (const [k, v] of entries) {
+          if (Array.isArray(v)) {
+            lines.push(`  ${k}:`);
+            for (const item of v) {
+              lines.push(`    - ${item}`);
+            }
+          } else {
+            lines.push(`  ${k}: ${v}`);
           }
-        } else {
-          lines.push(`  ${k}: ${v}`);
         }
       }
     } else {
@@ -541,6 +547,70 @@ function agentToolsToPermissionAllow(toolsStr) {
   return toolsStr.split(",").map((t) => t.trim()).filter(Boolean);
 }
 
+/**
+ * Map a CC tool name to its opencode permission key.
+ * Returns [key, true] when valid; ["", false] for MCP/unknown tools (to drop).
+ * Write and NotebookEdit both map to "edit" — callers must dedup.
+ */
+function ccToolToOpencodePermKey(cc) {
+  switch (cc) {
+    case "Read": return ["read", true];
+    case "Edit": return ["edit", true];
+    case "Write": return ["edit", true];
+    case "NotebookEdit": return ["edit", true];
+    case "Bash": return ["bash", true];
+    case "Glob": return ["glob", true];
+    case "Grep": return ["grep", true];
+    case "Task": return ["task", true];
+    case "WebFetch": return ["webfetch", true];
+    case "WebSearch": return ["websearch", true];
+    default: return ["", false]; // MCP tools and unknowns are dropped.
+  }
+}
+
+/**
+ * CC agent `tools:` comma-string → opencode permission object {key: "allow"}.
+ * Write+Edit collapse to a single "edit" key (dedup preserving first occurrence).
+ * MCP tools and unrecognized tokens are silently dropped.
+ */
+function agentToolsToOpencodePermission(toolsStr) {
+  if (!toolsStr || typeof toolsStr !== "string") return {};
+  const perm = Object.create(null);
+  for (const raw of toolsStr.split(",")) {
+    const token = raw.trim();
+    if (!token) continue;
+    const [key, ok] = ccToolToOpencodePermKey(token);
+    if (!ok) continue;
+    if (!(key in perm)) {
+      perm[key] = "allow";
+    }
+  }
+  return perm;
+}
+
+/**
+ * Map a CC color name to an opencode named enum.
+ * Already-valid opencode enum values and hex colors pass through unchanged.
+ * Unknown values return ["", false] to indicate the field should be dropped.
+ */
+function ccColorToOpencode(cc) {
+  if (!cc || typeof cc !== "string") return ["", false];
+  // Pass through already-valid opencode enum values.
+  const validEnums = new Set(["primary", "secondary", "accent", "success", "warning", "error", "info"]);
+  if (validEnums.has(cc)) return [cc, true];
+  // Pass through valid hex colors (#rrggbb).
+  if (/^#[0-9a-fA-F]{6}$/.test(cc)) return [cc, true];
+  // Map CC color names → opencode named enums.
+  switch (cc) {
+    case "green": return ["success", true];
+    case "red": return ["error", true];
+    case "yellow": case "orange": return ["warning", true];
+    case "cyan": case "blue": case "teal": return ["info", true];
+    case "purple": case "magenta": case "pink": return ["accent", true];
+    default: return ["", false]; // Unknown — drop to avoid emitting an invalid value.
+  }
+}
+
 /** CC command `allowed-tools:` (string or array) -> opencode `permission.allow` array. */
 function commandAllowedToolsToPermissionAllow(allowedTools) {
   if (!allowedTools) return [];
@@ -558,6 +628,71 @@ function commandAllowedToolsToPermissionAllow(allowedTools) {
 function permissionAllowToAgentTools(allow) {
   if (!allow || !Array.isArray(allow)) return "";
   return allow.join(", ");
+}
+
+/**
+ * Map an opencode permission key back to its canonical CC tool name.
+ * "edit" → "Edit" (canonical; Write is omitted, it was always an alias).
+ */
+function opencodePermKeyToCCTool(key) {
+  switch (key) {
+    case "read": return "Read";
+    case "edit": return "Edit";
+    case "bash": return "Bash";
+    case "glob": return "Glob";
+    case "grep": return "Grep";
+    case "task": return "Task";
+    case "webfetch": return "WebFetch";
+    case "websearch": return "WebSearch";
+    default: return null; // Unknown opencode key — drop.
+  }
+}
+
+/**
+ * Convert an opencode agent permission object {key: "allow"|...} back to a
+ * CC tools comma-string. Only "allow"-valued keys are included.
+ * Handles both the new object form and the legacy array form (for compatibility).
+ */
+function opencodePermissionToAgentTools(permission) {
+  if (!permission) return "";
+  // Legacy command form: has "allow" key with an array value.
+  if (Array.isArray(permission["allow"])) {
+    return permissionAllowToAgentTools(permission["allow"]);
+  }
+  // New agent form: {key: "allow"}.
+  if (typeof permission === "object") {
+    const tools = [];
+    for (const [key, action] of Object.entries(permission)) {
+      if (action === "allow") {
+        const ccTool = opencodePermKeyToCCTool(key);
+        if (ccTool) tools.push(ccTool);
+      }
+    }
+    return tools.join(", ");
+  }
+  return "";
+}
+
+/**
+ * Map an opencode named color enum back to a canonical CC color name.
+ * This is a lossy reverse map — multiple CC colors mapped to the same enum,
+ * so we pick one canonical CC color per enum. Hex colors pass through unchanged.
+ */
+function opencodeColorToCC(color) {
+  if (!color || typeof color !== "string") return color;
+  // Hex colors pass through unchanged.
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+  // Map opencode named enums → canonical CC colors.
+  switch (color) {
+    case "success": return "green";
+    case "error": return "red";
+    case "warning": return "yellow";
+    case "info": return "cyan";
+    case "accent": return "purple";
+    case "primary": return "blue";
+    case "secondary": return "teal";
+    default: return color; // Unknown enum — pass through.
+  }
 }
 
 /** opencode `permission.allow` array -> CC command `allowed-tools:` space-string. */
@@ -799,14 +934,17 @@ function transformToOpencode(filePath, content, repoRoot) {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
     if (fm["model"] !== undefined) projected["model"] = toProviderPrefixedModel(String(fm["model"]));
+    // tools: → permission object {key: "allow"} with mapped lowercase opencode keys.
+    // MCP tools and unrecognized tokens are dropped. Write+Edit deduplicate to "edit".
     const toolsVal = fm["tools"];
-    projected["permission"] = {
-      allow: agentToolsToPermissionAllow(typeof toolsVal === "string" ? toolsVal : ""),
-      ask: [],
-      deny: [],
-    };
+    projected["permission"] = agentToolsToOpencodePermission(typeof toolsVal === "string" ? toolsVal : "");
     projected["mode"] = "subagent";
-    if (fm["color"] !== undefined) projected["color"] = fm["color"];
+    // color: map CC color names → opencode named enums; pass through valid values.
+    // Unknown colors are dropped (omitted) to avoid emitting an invalid field.
+    if (fm["color"] !== undefined) {
+      const [mappedColor, ok] = ccColorToOpencode(String(fm["color"]));
+      if (ok) projected["color"] = mappedColor;
+    }
   } else {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
@@ -849,10 +987,10 @@ function transformToCC(filePath, content, repoRoot) {
     : path.join(repoRoot, ".claude", "commands", basename);
 
   const permission = fm["permission"];
+
+  // Determine ask/deny for lossiness reporting (command-surface legacy form only).
   const ask = (permission && Array.isArray(permission["ask"])) ? permission["ask"] : [];
   const deny = (permission && Array.isArray(permission["deny"])) ? permission["deny"] : [];
-  const allow = (permission && Array.isArray(permission["allow"])) ? permission["allow"] : [];
-
   const lossy = (ask.length > 0 || deny.length > 0)
     ? `ask/deny dropped (ask: [${ask.join(", ")}], deny: [${deny.join(", ")}])`
     : null;
@@ -863,8 +1001,13 @@ function transformToCC(filePath, content, repoRoot) {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
     if (fm["model"] !== undefined) projected["model"] = toBareModel(String(fm["model"]));
-    projected["tools"] = permissionAllowToAgentTools(allow);
-    if (fm["color"] !== undefined) projected["color"] = fm["color"];
+    // Agent permission is now an object {key: "allow"} — convert back to CC tools string.
+    // Each key maps back to the CC tool name; "edit" maps to "Edit" (canonical; Write is
+    // omitted since Edit is the more specific tool in CC format).
+    projected["tools"] = opencodePermissionToAgentTools(permission);
+    // color: map opencode enum back to a canonical CC color (lossy — e.g. info could have
+    // been blue, cyan, or teal; we pick a canonical one per enum).
+    if (fm["color"] !== undefined) projected["color"] = opencodeColorToCC(String(fm["color"]));
     // mode: drop ONLY when it was injected by the forward pass (one of the known injected values).
     // A mode carrying any other value is preserved.
     const modeVal = fm["mode"];
@@ -875,8 +1018,10 @@ function transformToCC(filePath, content, repoRoot) {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
     if (fm["model"] !== undefined) projected["model"] = toBareModel(String(fm["model"]));
-    if (allow.length > 0 || permission !== undefined) {
-      projected["allowed-tools"] = permissionAllowToCommandAllowedTools(allow);
+    // Command permission is still array-form: {allow: [...], ask: [], deny: []}.
+    const commandAllow = (permission && Array.isArray(permission["allow"])) ? permission["allow"] : [];
+    if (commandAllow.length > 0 || permission !== undefined) {
+      projected["allowed-tools"] = permissionAllowToCommandAllowedTools(commandAllow);
     }
     if (fm["agent"] !== undefined) projected["agent"] = fm["agent"];
     // argument-hint cannot be recovered (not carried by forward pass).

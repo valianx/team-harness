@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -80,23 +81,24 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 		if v, ok := fm["model"]; ok {
 			projected["model"] = toProviderPrefixedModel(fmt.Sprintf("%v", v))
 		}
-		// tools: → permission (comma-separated string)
+		// tools: → permission object {key: "allow"} with mapped lowercase opencode keys.
+		// MCP tools and unrecognized tokens are dropped. Write+Edit deduplicate to "edit".
 		toolsStr := ""
 		if v, ok := fm["tools"]; ok {
 			toolsStr = fmt.Sprintf("%v", v)
 		}
-		projected["permission"] = map[string]interface{}{
-			"allow": agentToolsToPermissionAllow(toolsStr),
-			"ask":   []string{},
-			"deny":  []string{},
-		}
+		projected["permission"] = agentToolsToOpencodePermission(toolsStr)
 		// mode: blanket "subagent" for the GENERIC transform (fixture-bound).
 		// The mode-by-role installer layer (orchestrator → primary) is applied
 		// as a post-projection step in manifest_registry.go, NOT here, to keep
 		// the parity fixture in lockstep with migrate.mjs.
 		projected["mode"] = "subagent"
+		// color: map CC color names → opencode named enums; pass through valid values.
+		// Unknown colors are dropped (omitted) to avoid emitting an invalid field.
 		if v, ok := fm["color"]; ok {
-			projected["color"] = v
+			if mapped, ok := ccColorToOpencode(fmt.Sprintf("%v", v)); ok {
+				projected["color"] = mapped
+			}
 		}
 		// effort: NOT carried forward (S-4) — opencode has no effort field.
 		// th-origin marker
@@ -177,6 +179,108 @@ func agentToolsToPermissionAllow(toolsStr string) []string {
 		}
 	}
 	return out
+}
+
+// ccToolToOpencodePermKey maps a CC tool name to its opencode permission key.
+// Returns the mapped key and ok=true when the tool has a valid mapping.
+// MCP tools (mcp__*) and unrecognized tokens return ("", false) and are dropped.
+// Write and NotebookEdit both map to "edit" — callers must dedup the result set.
+func ccToolToOpencodePermKey(cc string) (string, bool) {
+	switch cc {
+	case "Read":
+		return "read", true
+	case "Edit":
+		return "edit", true
+	case "Write":
+		return "edit", true
+	case "NotebookEdit":
+		return "edit", true
+	case "Bash":
+		return "bash", true
+	case "Glob":
+		return "glob", true
+	case "Grep":
+		return "grep", true
+	case "Task":
+		return "task", true
+	case "WebFetch":
+		return "webfetch", true
+	case "WebSearch":
+		return "websearch", true
+	default:
+		// MCP tools (mcp__*) and any future unknown tool name are dropped.
+		return "", false
+	}
+}
+
+// ccColorToOpencode maps a CC color name to an opencode named enum.
+// Already-valid opencode enum values and hex colors pass through unchanged.
+// Unknown values are dropped (return "", false) — safer than emitting an invalid color.
+func ccColorToOpencode(cc string) (string, bool) {
+	// Pass through already-valid opencode enum values.
+	switch cc {
+	case "primary", "secondary", "accent", "success", "warning", "error", "info":
+		return cc, true
+	}
+	// Pass through valid hex colors (#rrggbb, case-insensitive).
+	if len(cc) == 7 && cc[0] == '#' {
+		allHex := true
+		for _, c := range cc[1:] {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				allHex = false
+				break
+			}
+		}
+		if allHex {
+			return cc, true
+		}
+	}
+	// Map CC color names → opencode named enums.
+	switch cc {
+	case "green":
+		return "success", true
+	case "red":
+		return "error", true
+	case "yellow", "orange":
+		return "warning", true
+	case "cyan", "blue", "teal":
+		return "info", true
+	case "purple", "magenta", "pink":
+		return "accent", true
+	default:
+		// Unknown color — drop to avoid emitting an invalid value.
+		return "", false
+	}
+}
+
+// orderedPermission holds a PermissionRuleConfig (key→"allow") with
+// deterministic key order preserved from the source tools: field.
+type orderedPermission struct {
+	keys   []string
+	values map[string]string
+}
+
+// agentToolsToOpencodePermission converts a CC tools comma-string to an
+// ordered opencode permission object of the form {key: "allow"}.
+// Write+Edit collapse to a single "edit" key (dedup preserving first occurrence).
+// MCP tools and unrecognized tokens are silently dropped.
+func agentToolsToOpencodePermission(toolsStr string) orderedPermission {
+	perm := orderedPermission{values: map[string]string{}}
+	for _, raw := range strings.Split(toolsStr, ",") {
+		token := strings.TrimSpace(raw)
+		if token == "" {
+			continue
+		}
+		key, ok := ccToolToOpencodePermKey(token)
+		if !ok {
+			continue
+		}
+		if _, exists := perm.values[key]; !exists {
+			perm.values[key] = "allow"
+			perm.keys = append(perm.keys, key)
+		}
+	}
+	return perm
 }
 
 func commandAllowedToolsToPermissionAllow(allowedTools interface{}) []string {
@@ -536,10 +640,16 @@ func serializeFrontmatterYAML(fm map[string]interface{}, body string) []byte {
 		written[k] = true
 	}
 	// Write any remaining keys not in the order list (e.g. custom fields).
-	for k, v := range fm {
+	// Sort for deterministic output — Go map iteration is random.
+	var remaining []string
+	for k := range fm {
 		if !written[k] {
-			writeYAMLKeyValue(&buf, k, v)
+			remaining = append(remaining, k)
 		}
+	}
+	sort.Strings(remaining)
+	for _, k := range remaining {
+		writeYAMLKeyValue(&buf, k, fm[k])
 	}
 
 	buf.WriteString("---\n")
@@ -552,11 +662,30 @@ func writeYAMLKeyValue(buf *bytes.Buffer, key string, value interface{}) {
 	switch v := value.(type) {
 	case string:
 		buf.WriteString(key + ": " + v + "\n")
+	case orderedPermission:
+		// Agent permission object: emit as a YAML flow mapping {key: value, ...}.
+		// Flow form is valid YAML, round-trips through our parser, and is byte-stable
+		// across the applyModeByRole re-serialization pass (block form would require
+		// parser support for nested block mappings, which parseFrontmatterYAML lacks).
+		buf.WriteString(key + ": {")
+		for i, k := range v.keys {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(k + ": " + v.values[k])
+		}
+		buf.WriteString("}\n")
 	case map[string]interface{}:
-		// Inline flow mapping for "permission" objects.
-		buf.WriteString(key + ": ")
-		writeFlowMapping(buf, v)
-		buf.WriteString("\n")
+		// Detect opencode-format permission objects (keys like read/edit/bash) vs
+		// command-format permission objects (has "allow" key with an array value).
+		// Opencode permission → block form; command permission → flow form.
+		if key == "permission" && !isCommandPermissionMap(v) {
+			writeFlowPermissionMap(buf, key, v)
+		} else {
+			buf.WriteString(key + ": ")
+			writeFlowMapping(buf, v)
+			buf.WriteString("\n")
+		}
 	case []interface{}:
 		// Inline flow sequence.
 		buf.WriteString(key + ": ")
@@ -571,8 +700,37 @@ func writeYAMLKeyValue(buf *bytes.Buffer, key string, value interface{}) {
 	}
 }
 
+// isCommandPermissionMap returns true when m is a command-surface permission object
+// (has an "allow" key), as opposed to an opencode agent permission object (keys
+// like read, edit, bash whose values are the string "allow").
+func isCommandPermissionMap(m map[string]interface{}) bool {
+	_, hasAllow := m["allow"]
+	return hasAllow
+}
+
+// writeFlowPermissionMap emits an opencode agent permission object as a YAML
+// flow mapping {key: value, ...}. Keys are emitted in sorted order for
+// deterministic output across applyModeByRole round-trips.
+// An empty map emits {}.
+func writeFlowPermissionMap(buf *bytes.Buffer, key string, m map[string]interface{}) {
+	buf.WriteString(key + ": {")
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for i, k := range keys {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(k + ": " + fmt.Sprintf("%v", m[k]))
+	}
+	buf.WriteString("}\n")
+}
+
 // writeFlowMapping serializes a map as a YAML flow mapping {k: v, ...}.
 // For the "permission" object, the canonical key order is allow, ask, deny.
+// Remaining keys are emitted in sorted order for deterministic output.
 func writeFlowMapping(buf *bytes.Buffer, m map[string]interface{}) {
 	buf.WriteString("{")
 	keyOrder := []string{"allow", "ask", "deny"}
@@ -591,16 +749,21 @@ func writeFlowMapping(buf *bytes.Buffer, m map[string]interface{}) {
 		writeFlowValue(buf, v)
 		written[k] = true
 	}
-	for k, v := range m {
-		if written[k] {
-			continue
+	// Remaining keys in sorted order for deterministic output.
+	var remaining []string
+	for k := range m {
+		if !written[k] {
+			remaining = append(remaining, k)
 		}
+	}
+	sort.Strings(remaining)
+	for _, k := range remaining {
 		if !first {
 			buf.WriteString(", ")
 		}
 		first = false
 		buf.WriteString(k + ": ")
-		writeFlowValue(buf, v)
+		writeFlowValue(buf, m[k])
 	}
 	buf.WriteString("}")
 }
