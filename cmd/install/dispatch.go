@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"charm.land/huh/v2"
 )
 
 // runtimeFlag holds the --runtime flag value (default: claude-code).
@@ -244,19 +242,19 @@ func runApplyCommand() {
 //  1. Read the CC MCP migration candidate (URL + optional literal tokens).
 //  2. Determine whether to run the interactive form or the env/flags path.
 //  3. Collect opencode setup values (with CC URL pre-fill on the interactive path).
-//  4. (Interactive only, when literal tokens detected) Present the token-import confirm.
-//     (Non-interactive, when CC carried literal tokens) Set tokenModeLiteral silently
-//     — scoped relaxation of SEC-OC-R1 for the CC→opencode migration path (AC-7 fix).
+//  4. When literal tokens were detected in CC, copy them directly (literal is the
+//     unconditional default on both the interactive and non-interactive paths —
+//     scoped relaxation of SEC-OC-R1 for the CC→opencode migration, operator-locked).
 //  5. Write .team-harness.json (allowlisted merge-preserving).
 //  6. Register MCP servers in opencode.json (with the resolved tokenMode + secrets).
-//  7. (Interactive, No path) Disclose found token values to /dev/tty (AC-13).
-//  8. Print the explanatory apply summary.
+//  7. Print the explanatory apply summary.
 func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 	cfgPath := opencodeSettingsConfigPath(placer.ConfigRoot())
 
 	// Step 1: read the CC MCP migration candidate. This is always done (cheap
 	// read of ~/.claude.json); the result is used to pre-fill the Memory URL
-	// and, on the interactive path, to offer the token-import confirm.
+	// and to populate the literal tokens (copied unconditionally when present
+	// on the migration path — both interactive and non-interactive).
 	ccMigration := readClaudeCodeMCPMigration()
 
 	// Gate: interactive ONLY when a real TTY is present AND --non-interactive
@@ -265,8 +263,8 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 	interactive := !nonInteractiveFlag && hasInteractiveInput()
 
 	// Default token mode and secrets — env-ref is the safe starting point.
-	// These are overridden below: on the interactive path via runTokenImportConfirm;
-	// on the non-interactive path when ccMigration.hasLiteralTokens() (fix: AC-2/AC-7).
+	// Overridden on both paths when ccMigration.hasLiteralTokens() is true:
+	// literal copy is the unconditional default for the CC→opencode migration.
 	mode := tokenModeEnvRef
 	secrets := opencodeMCPSecrets{}
 
@@ -311,29 +309,29 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 
 		cfg = collectOpencodeSetupInteractiveWithURL(cand, importSource, resolvedMemURL, ccHasContext7)
 
-		// Step 4: after the main form, when literal tokens were detected in CC,
-		// present the standalone token-import confirm. This runs AFTER the form
-		// so it does not interfere with the form group hiding logic.
+		// Step 4: when literal tokens were detected in CC, copy them directly
+		// (literal is the unconditional default — no confirm prompt needed).
+		// This matches the non-interactive path and the operator-authorized
+		// SEC-OC-R1 relaxation for the CC→opencode migration path.
 		if ccMigration.hasLiteralTokens() {
-			mode, secrets = runTokenImportConfirm(ccMigration)
+			mode = tokenModeLiteral
+			secrets = opencodeMCPSecrets{
+				MemoryBearer: ccMigration.MemoryBearer,
+				Context7Key:  ccMigration.Context7Key,
+			}
 		}
 	} else {
 		// Non-interactive path: resolve setup values from env/flags with the
 		// full CC migration as lowest-precedence fallback for URL and context7.
 		cfg = resolveOpencodeSetupFromEnvFlagsWithCCURL(ccMigration)
 
-		// fix(install): scoped relaxation of SEC-OC-R1 for the CC→opencode
-		// migration path. When the migration carried literal tokens, copy them
-		// into opencode.json so the servers work out of the box — no env-var
-		// export step required. This mirrors runTokenImportConfirm's return
-		// shape (tokenModeLiteral + populated opencodeMCPSecrets) but runs
-		// silently (no interactive confirm) on the non-interactive path.
-		//
-		// Scope constraint: literal is used ONLY when the operator's own
+		// Scoped relaxation of SEC-OC-R1 for the CC→opencode migration path.
+		// When the migration carried literal tokens, copy them directly into
+		// opencode.json so the servers work out of the box — no env-var export
+		// step required. Literal is used ONLY when the operator's own
 		// ~/.claude.json actually carried the tokens (ccMigration.hasLiteralTokens()).
-		// When CC lacked a token (empty field), the corresponding secret in
-		// opencodeMCPSecrets stays empty and buildOpencode*Entry falls back to the
-		// env-ref placeholder — no empty literal is ever written.
+		// When CC lacked a token, the corresponding secret in opencodeMCPSecrets
+		// stays empty and buildOpencode*Entry falls back to the env-ref placeholder.
 		if ccMigration.hasLiteralTokens() {
 			mode = tokenModeLiteral
 			secrets = opencodeMCPSecrets{
@@ -350,19 +348,10 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 	}
 
 	// Register MCP servers in opencode.json (with the resolved mode + secrets).
-	// Capture the real per-server outcome for the summary (fix: truthful status).
-	mcpOutcome := registerOpencodeMCPFromValues(cfg.MCP, placer.SettingsDocPath(), mode, secrets)
-
-	// Step 7: on the interactive env-ref "No" path, disclose found token values
-	// to the controlling terminal (/dev/tty) so the operator can export them.
-	// NEVER written to stdout (AC-13) — a redirected install > log.txt cannot
-	// capture it. Only called when env-ref was chosen (No) AND tokens were found.
-	if interactive && mode == tokenModeEnvRef && ccMigration.hasLiteralTokens() {
-		discloseCCTokensToTTY(ccMigration)
-	}
+	registerOpencodeMCPFromValues(cfg.MCP, placer.SettingsDocPath(), mode, secrets)
 
 	// Print the explanatory summary.
-	printOpencodeApplySummary(diff, cfg, cfgPath, placer.ConfigRoot(), mcpOutcome)
+	printOpencodeApplySummary()
 }
 
 // resolveOpencodeSetupFromEnvFlags builds opencodeSetupValues from environment
@@ -442,8 +431,8 @@ func resolveMemoryURLWithCCFallback(ccURL string) string {
 //
 // mode and secrets control whether secrets are written as {env:VAR} references
 // (default: tokenModeEnvRef) or as literal values (tokenModeLiteral). The literal
-// mode is reached either via the interactive token-import confirm OR via the
-// non-interactive CC→opencode migration when ccMigration.hasLiteralTokens()
+// mode is the unconditional default on both the interactive and non-interactive
+// CC→opencode migration paths, gated on ccMigration.hasLiteralTokens()
 // (scoped relaxation of SEC-OC-R1, operator-locked at STAGE-GATE-1).
 //
 // Contract (unchanged from the former registerOpencodeMCPIfConfigured):
@@ -534,76 +523,8 @@ func collectOpencodeSetupInteractiveWithURL(cand *importCandidate, importSource,
 	return collectOpencodeSetupInteractivePreFilled(cand, importSource, resolvedURL, initialContext7Enabled)
 }
 
-// runTokenImportConfirm presents the standalone token-import confirm to the
-// operator (interactive only; called ONLY when literal tokens were detected in
-// the CC config). Returns the resolved tokenMode and, on Yes, the populated
-// opencodeMCPSecrets.
-//
-// The confirm is a single combined choice covering both the Memory bearer and
-// the context7 key (single confirm per plan decision). The operator can choose:
-//   - Yes → tokenModeLiteral (secrets written literally into opencode.json)
-//   - No  → tokenModeEnvRef  (current {env:VAR} behavior; disclosure follows)
-//
-// On No or on any error, returns (tokenModeEnvRef, empty secrets) — the safe
-// default. The literal path is reachable ONLY from this function (AC-7).
-func runTokenImportConfirm(migration opencodeMCPMigration) (tokenMode, opencodeMCPSecrets) {
-	// Build the description listing which tokens were found.
-	var found []string
-	if migration.MemoryBearer != "" {
-		found = append(found, "a Memory MCP bearer token")
-	}
-	if migration.Context7Key != "" {
-		found = append(found, "a context7 API key")
-	}
-
-	var foundDesc string
-	switch len(found) {
-	case 1:
-		foundDesc = "Found " + found[0] + " in your Claude Code config."
-	case 2:
-		foundDesc = "Found " + found[0] + " and " + found[1] + " in your Claude Code config."
-	default:
-		return tokenModeEnvRef, opencodeMCPSecrets{}
-	}
-
-	desc := foundDesc + "\n\n" +
-		"Yes — store them literally in opencode.json (works immediately, no env export needed).\n" +
-		"No  — keep {env:VAR} references (export the values in your shell before launching opencode)."
-
-	var importTokens bool
-	confirm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Value(&importTokens).
-				Title("Import tokens from Claude Code into opencode?").
-				Description(desc).
-				Affirmative("Yes — store them in opencode.json").
-				Negative("No — keep environment-variable references"),
-		).Title("Token Import"),
-	).
-		WithAccessible(isAccessibleMode()).
-		WithTheme(installerTheme())
-
-	if err := confirm.Run(); err != nil {
-		// User aborted or error — fall back to env-ref silently.
-		return tokenModeEnvRef, opencodeMCPSecrets{}
-	}
-
-	if !importTokens {
-		return tokenModeEnvRef, opencodeMCPSecrets{}
-	}
-
-	// Yes: populate the literal secrets struct (the ONLY place it is ever
-	// constructed — AC-7 security invariant).
-	return tokenModeLiteral, opencodeMCPSecrets{
-		MemoryBearer: migration.MemoryBearer,
-		Context7Key:  migration.Context7Key,
-	}
-}
-
 // discloseCCTokensToTTY writes the found CC token values to the controlling
-// terminal (/dev/tty) so the operator can export them. This is the "No" path
-// disclosure (AC-13).
+// terminal (/dev/tty) so the operator can export them manually (AC-13).
 //
 // The values are NEVER written to stdout (so `install > log.txt` cannot capture
 // them). On Windows / when /dev/tty is unavailable, the values are NOT written
@@ -637,49 +558,12 @@ func discloseCCTokensToTTY(migration opencodeMCPMigration) {
 }
 
 // printOpencodeApplySummary prints the post-apply summary for the opencode
-// runtime to stdout. The summary leads with a prominent "Installed successfully"
-// headline followed by a de-emphasised detail block. Names only — never URL
-// values or secret values (SEC-OC-R5).
-//
-// The mcpOutcome parameter carries the REAL per-server outcome of this run so
-// the summary reflects what actually happened (fix: truthful per-run status).
-// A re-run where nothing changed shows "already configured", not "registered".
-//
-// Keys with no live opencode reader today (language, english_learning, clickup,
-// obsidian_tasks) are described as "written to config" to avoid overstating
-// enforcement. The keys WITH a live reader (logs-mode/logs-path/logs-subfolder
-// via checkpoint-guard; prepublish_check via prepublish-guard) are described
-// as "read by the opencode hook plugin".
-func printOpencodeApplySummary(diff *PlanDiff, cfg opencodeSetupValues, cfgPath, configRoot string, mcpOutcome MCPRegisterOutcome) {
-	created := len(diff.ToCreate)
-	updated := len(diff.ToUpdate)
-	skipped := len(diff.ToSkipHashMatch)
-	removed := len(diff.ToRemove)
-
-	// Prominent headline — the operator's first read after install (AC-3).
+// runtime to stdout. The summary ends at the "Installed successfully." headline —
+// the detail block (components, settings, MCP status) is intentionally omitted
+// to keep the operator-facing output minimal (operator-locked change).
+func printOpencodeApplySummary() {
 	fmt.Println()
 	fmt.Println("Installed successfully.")
-	fmt.Println()
-
-	// De-emphasised detail block.
-	fmt.Printf("  Components placed (created %d, updated %d, skipped %d, removed %d):\n",
-		created, updated, skipped, removed)
-	fmt.Printf("    agents  → %s/agents/\n", configRoot)
-	fmt.Printf("    plugin  → %s/plugins/\n", configRoot)
-	fmt.Println()
-	fmt.Printf("  Settings written → %s\n", cfgPath)
-
-	// Work-logs (has a live opencode reader via checkpoint-guard).
-	// Always "local" after the trim — the work-logs group was removed (AC-1).
-	fmt.Printf("    work-logs        → local\n")
-	fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
-
-	// MCP status — real per-run outcome, names only, never values (SEC-OC-R5).
-	// fix: display what ACTUALLY happened this run, not a static capability flag.
-	fmt.Println()
-	fmt.Println("  MCP servers (opencode.json):")
-	fmt.Printf("    memory    → %s\n", mcpOutcome.Memory)
-	fmt.Printf("    context7  → %s\n", mcpOutcome.Context7)
 }
 
 // runUninstallCommand runs the manifest uninstall subcommand.

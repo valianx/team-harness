@@ -34,11 +34,10 @@ type MCPRegisterOutcome struct {
 // registerOpencodeMCP merges mcp.memory and mcp.context7 into the opencode.json
 // at docPath. The default secret model writes {env:VAR} references (tokenModeEnvRef).
 // When called with tokenModeLiteral + a non-empty opencodeMCPSecrets, the literal
-// token values are written instead. tokenModeLiteral is reachable from two sites:
-//   - the interactive token-import confirm (runTokenImportConfirm), AND
-//   - the non-interactive CC→opencode migration path, gated on
-//     ccMigration.hasLiteralTokens() (scoped relaxation of SEC-OC-R1,
-//     operator-locked at STAGE-GATE-1; see dispatch.go:319-337).
+// token values are written instead. tokenModeLiteral is used on both the interactive
+// and non-interactive CC→opencode migration paths when ccMigration.hasLiteralTokens()
+// is true (unconditional literal copy — scoped relaxation of SEC-OC-R1,
+// operator-locked; see dispatch.go runOpencodePostApply).
 //
 // Secret model (default — tokenModeEnvRef):
 //   - mcp.memory.headers.Authorization = "{env:MEMORY_MCP_BEARER}"
