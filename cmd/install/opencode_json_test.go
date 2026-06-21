@@ -405,16 +405,15 @@ func TestRegisterOpencodeMCP_Literal_WritesLiteralValues(t *testing.T) {
 // AC-7: non-interactive resolver never produces tokenModeLiteral
 // ---------------------------------------------------------------------------
 
-// TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoLiteralPath verifies that
-// the non-interactive resolver never constructs a tokenModeLiteral or a
-// non-empty opencodeMCPSecrets. The only output is the cfg struct — secrets
-// are not in the return value, and the caller (runOpencodePostApply) only
-// calls runTokenImportConfirm on the interactive path (AC-7).
+// TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef verifies the
+// no-migration case: when no CC migration is passed, the resolver reads from env
+// only and produces cfg values suitable for the env-ref token path (AC-7 preserved).
 //
-// This test asserts the structural contract: the env-flags resolver has no
-// parameter for secrets and no way to produce them (the literal struct is
-// constructed ONLY in runTokenImportConfirm which is never called on this path).
-func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoLiteralPath(t *testing.T) {
+// This replaces TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoLiteralPath which
+// asserted the OLD contract (literal-unreachable from resolver). The resolver still
+// returns no secrets; token-mode selection now happens in the caller based on
+// ccMigration.hasLiteralTokens(). This test covers the no-migration branch.
+func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef(t *testing.T) {
 	origFlag := memoryURLFlag
 	defer func() { memoryURLFlag = origFlag }()
 	memoryURLFlag = ""
@@ -424,20 +423,138 @@ func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoLiteralPath(t *testing.T) {
 	t.Setenv("MEMORY_MCP_BEARER", "fake-bearer")
 	t.Setenv("LOGS_MODE", "")
 
-	// The non-interactive resolver call — equivalent to what runOpencodePostApply
-	// calls on the non-interactive path.
-	cfg := resolveOpencodeSetupFromEnvFlagsWithCCURL("")
+	// Empty migration: no CC tokens → resolver uses env only.
+	cfg := resolveOpencodeSetupFromEnvFlagsWithCCURL(opencodeMCPMigration{})
 
 	// The result is an opencodeSetupValues — no secrets, no tokenMode.
-	// The test confirms that cfg.MCP carries only the URL (no bearer field).
+	// The caller (runOpencodePostApply) checks hasLiteralTokens() separately;
+	// this path returns env-ref-suitable values.
 	if cfg.MCP.MemoryURL != "https://mcp.example.com/mcp" {
 		t.Errorf("MemoryURL = %q, want https://mcp.example.com/mcp", cfg.MCP.MemoryURL)
 	}
-	// The struct has no secret fields (compile-time assertion via the existing
-	// TestOpencodeSetupValues_NoSecretFields test). Here we just verify the
-	// resolver returns a value that is wired through env-ref registration.
 	if !cfg.MCP.Context7Enabled {
-		t.Error("Context7Enabled = false, want true when CONTEXT7_API_KEY is set")
+		t.Error("Context7Enabled = false, want true when CONTEXT7_API_KEY is set (no-migration case)")
+	}
+}
+
+// TestResolveOpencodeSetupFromEnvFlagsWithCCURL_WithMigration_Context7Wired verifies
+// that when the CC migration carries a context7 key but the env var is absent, the
+// resolver sets Context7Enabled = true (fix: context7 key was previously ignored on
+// the non-interactive path).
+func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_WithMigration_Context7Wired(t *testing.T) {
+	origFlag := memoryURLFlag
+	defer func() { memoryURLFlag = origFlag }()
+	memoryURLFlag = ""
+
+	t.Setenv("MEMORY_MCP_URL", "")
+	t.Setenv("CONTEXT7_API_KEY", "") // env absent — must fall back to migration
+	t.Setenv("LOGS_MODE", "")
+
+	migration := opencodeMCPMigration{
+		MemoryURL:    "https://mcp.example.com/mcp",
+		MemoryBearer: "fake-bearer",
+		Context7Key:  "ctx7sk-migrated",
+	}
+
+	cfg := resolveOpencodeSetupFromEnvFlagsWithCCURL(migration)
+
+	if cfg.MCP.MemoryURL != "https://mcp.example.com/mcp" {
+		t.Errorf("MemoryURL = %q, want CC migrated URL", cfg.MCP.MemoryURL)
+	}
+	if !cfg.MCP.Context7Enabled {
+		t.Error("Context7Enabled = false, want true when CC migration has context7 key (fix: AC-2)")
+	}
+}
+
+// TestNonInteractiveMigration_LiteralPath verifies the fixed non-interactive
+// CC→opencode migration path end-to-end:
+//   - resolver yields Context7Enabled = true from the CC migration key
+//   - caller (runOpencodePostApply pattern) flips to tokenModeLiteral when
+//     ccMigration.hasLiteralTokens() is true
+//   - registerOpencodeMCP writes the literal values into opencode.json
+//
+// This test encodes the NEW contract for the non-interactive migration path:
+// CC-migration-with-tokens → tokenModeLiteral + literal values in opencode.json.
+// The no-migration → env-ref contract is covered by
+// TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef above.
+func TestNonInteractiveMigration_LiteralPath(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+
+	// Simulate the CC migration with literal tokens.
+	ccMigration := opencodeMCPMigration{
+		MemoryURL:    "https://team-harness.up.railway.app/mcp",
+		MemoryBearer: "fake-bearer-migration",
+		Context7Key:  "ctx7sk-migration-key",
+	}
+
+	// Step A: resolver returns a cfg with the migrated values.
+	origFlag := memoryURLFlag
+	defer func() { memoryURLFlag = origFlag }()
+	memoryURLFlag = ""
+	t.Setenv("MEMORY_MCP_URL", "")
+	t.Setenv("CONTEXT7_API_KEY", "")
+
+	cfg := resolveOpencodeSetupFromEnvFlagsWithCCURL(ccMigration)
+
+	if cfg.MCP.MemoryURL != "https://team-harness.up.railway.app/mcp" {
+		t.Errorf("MemoryURL = %q, want migrated URL", cfg.MCP.MemoryURL)
+	}
+	if !cfg.MCP.Context7Enabled {
+		t.Error("Context7Enabled = false, want true (migrated context7 key, fix AC-2)")
+	}
+
+	// Step B: caller detects hasLiteralTokens() and sets mode + secrets.
+	var mode tokenMode
+	var secrets opencodeMCPSecrets
+	if ccMigration.hasLiteralTokens() {
+		mode = tokenModeLiteral
+		secrets = opencodeMCPSecrets{
+			MemoryBearer: ccMigration.MemoryBearer,
+			Context7Key:  ccMigration.Context7Key,
+		}
+	}
+
+	if mode != tokenModeLiteral {
+		t.Error("mode = tokenModeEnvRef, want tokenModeLiteral when CC migration has tokens (fix AC-7)")
+	}
+	if secrets.MemoryBearer != "fake-bearer-migration" {
+		t.Errorf("secrets.MemoryBearer = %q, want fake-bearer-migration", secrets.MemoryBearer)
+	}
+	if secrets.Context7Key != "ctx7sk-migration-key" {
+		t.Errorf("secrets.Context7Key = %q, want ctx7sk-migration-key", secrets.Context7Key)
+	}
+
+	// Step C: write opencode.json with literal values (mirrors registerOpencodeMCPFromValues).
+	const context7URL = "https://mcp.context7.com/mcp"
+	ctx7URL := ""
+	if cfg.MCP.Context7Enabled {
+		ctx7URL = context7URL
+	}
+	if err := registerOpencodeMCP(cfg.MCP.MemoryURL, ctx7URL, docPath, mode, secrets); err != nil {
+		t.Fatalf("registerOpencodeMCP: %v", err)
+	}
+
+	data, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("opencode.json not written: %v", err)
+	}
+	content := string(data)
+
+	// AC-2: literal bearer must appear.
+	if !strings.Contains(content, "Bearer fake-bearer-migration") {
+		t.Error("literal bearer not found in opencode.json (AC-2 / fix: non-interactive migration)")
+	}
+	// AC-2: literal context7 key must appear.
+	if !strings.Contains(content, "ctx7sk-migration-key") {
+		t.Error("literal context7 key not found in opencode.json (AC-2 / fix: non-interactive migration)")
+	}
+	// Env-ref placeholders must NOT appear (they mean the migration failed).
+	if strings.Contains(content, "{env:MEMORY_MCP_BEARER}") {
+		t.Error("{env:MEMORY_MCP_BEARER} found — migration produced env-ref instead of literal (regression)")
+	}
+	if strings.Contains(content, "{env:CONTEXT7_API_KEY}") {
+		t.Error("{env:CONTEXT7_API_KEY} found — migration produced env-ref instead of literal (regression)")
 	}
 }
 
