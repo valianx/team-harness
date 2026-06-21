@@ -11,3 +11,11 @@ import "os"
 func openTTYDevice() (*os.File, error) {
 	return os.OpenFile("/dev/tty", os.O_RDONLY, 0)
 }
+
+// openTTYForWrite opens /dev/tty for writing. Used by the AC-13 token
+// disclosure path: secret values are written to the controlling terminal only,
+// never to stdout or any redirectable stream.
+// Returns an error when no controlling terminal is available.
+func openTTYForWrite() (*os.File, error) {
+	return os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+}

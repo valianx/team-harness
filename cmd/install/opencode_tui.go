@@ -14,7 +14,7 @@ import (
 // No secret values are stored here — the Memory bearer and context7 key are
 // NEVER captured for persistence (SEC-OC-R1).
 type opencodeSetupValues struct {
-	// Work-logs output.
+	// Agent output location (where agents write plans, implementations, test reports).
 	LogsMode      string // "local" or "obsidian"
 	LogsPath      string // absolute vault path (obsidian only)
 	LogsSubfolder string // subfolder within vault (obsidian only; default "work-logs")
@@ -50,7 +50,7 @@ type opencodeSetupFormData struct {
 	// P3 import confirm (shown only when an existing config is detected).
 	importExisting bool
 
-	// Work-logs.
+	// Agent output location.
 	configureWorkLogs bool
 	logsMode          string
 	logsPath          string
@@ -188,6 +188,104 @@ func collectOpencodeSetupInteractive(cand *importCandidate, importSource string)
 	return buildOpencodeSetupValues(data)
 }
 
+// collectOpencodeSetupInteractivePreFilled is identical to
+// collectOpencodeSetupInteractive but pre-fills data.memoryURL with initialURL
+// (and flips data.configureMCP = true) before building the form groups. This
+// implements the AC-9 CC-URL migration pre-fill: the operator sees the
+// CC-migrated URL in the Memory MCP URL field and can accept or edit it.
+//
+// When initialURL is empty, the behaviour is identical to the non-prefilled form.
+func collectOpencodeSetupInteractivePreFilled(cand *importCandidate, importSource, initialURL string) opencodeSetupValues {
+	data := &opencodeSetupFormData{
+		importExisting:         false,
+		configureWorkLogs:      false,
+		logsMode:               "local",
+		logsPath:               "",
+		logsSubfolder:          "work-logs",
+		language:               "",
+		englishLearning:        false,
+		configureMCP:           false,
+		memoryURL:              "",
+		memoryRequiresAuth:     false,
+		configureContext7:      false,
+		configureClickUp:       false,
+		clickUpWorkspaceID:     "",
+		configureObsidianTasks: false,
+		doSetup:                true,
+	}
+
+	// AC-9: inject the resolved URL before building the form so the operator
+	// sees it pre-populated. Flip configureMCP so the MCP group is visible.
+	if initialURL != "" {
+		data.memoryURL = initialURL
+		data.configureMCP = true
+	}
+
+	// Pre-form import decision (same as collectOpencodeSetupInteractive).
+	if cand != nil {
+		confirm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewNote().
+					Title("Existing configuration detected").
+					Description(importSourceNote(importSource)),
+				huh.NewConfirm().
+					Value(&data.importExisting).
+					Title("Import existing settings as defaults?").
+					Affirmative("Import").
+					Negative("Start fresh"),
+			).Title("Existing Config"),
+		).
+			WithAccessible(isAccessibleMode()).
+			WithTheme(installerTheme())
+
+		if err := confirm.Run(); err != nil {
+			if errors.Is(err, huh.ErrUserAborted) {
+				fmt.Println("Setup cancelled. Assets remain installed.")
+				os.Exit(0)
+			}
+			fmt.Fprintf(os.Stderr, "Error: setup form failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		if data.importExisting {
+			applyImportCandidate(data, cand)
+			// Re-apply the pre-filled URL after import if the import did not set
+			// a URL (import candidates never carry MCP URLs — only non-secret keys).
+			if data.memoryURL == "" && initialURL != "" {
+				data.memoryURL = initialURL
+				data.configureMCP = true
+			}
+		}
+	}
+
+	groups := buildOpencodeSetupGroups(data)
+	form := huh.NewForm(groups...).
+		WithAccessible(isAccessibleMode()).
+		WithTheme(installerTheme())
+
+	if err := form.Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			fmt.Println("Setup cancelled. Assets remain installed.")
+			os.Exit(0)
+		}
+		fmt.Fprintf(os.Stderr, "Error: setup form failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !data.doSetup {
+		fmt.Println("Setup cancelled. Assets remain installed.")
+		os.Exit(0)
+	}
+
+	if data.configureMCP && strings.HasPrefix(strings.TrimSpace(data.memoryURL), "{") {
+		tuiData := &tuiFormData{memURL: data.memoryURL, memBearer: ""}
+		handleJSONSnippetFallback(tuiData)
+		data.memoryURL = tuiData.memURL
+	}
+
+	return buildOpencodeSetupValues(data)
+}
+
 // importSourceNote returns the human-readable description used in the pre-form
 // confirm, naming the actual source (opencode-owned vs Claude Code config).
 func importSourceNote(importSource string) string {
@@ -257,7 +355,7 @@ func applyImportCandidate(data *opencodeSetupFormData, cand *importCandidate) {
 }
 
 // buildOpencodeSetupGroups assembles all huh form groups for the opencode
-// setup flow. Groups are ordered: work-logs, language, english-learning,
+// setup flow. Groups are ordered: agent output location, language, english-learning,
 // Memory MCP, context7, ClickUp, Obsidian tasks, final confirm.
 //
 // The import-confirm group (formerly Group 0) has been removed — that decision
@@ -267,10 +365,10 @@ func applyImportCandidate(data *opencodeSetupFormData, cand *importCandidate) {
 func buildOpencodeSetupGroups(data *opencodeSetupFormData) []*huh.Group {
 	var groups []*huh.Group
 
-	// ── Group 0: work-logs output ─────────────────────────────────────────────
+	// ── Group 0: agent output location ───────────────────────────────────────
 	logsSelect := huh.NewSelect[string]().
 		Value(&data.logsMode).
-		Title("Work-Logs Output").
+		Title("Save location").
 		Description("Where pipeline workspace files are written by the agents.").
 		Options(
 			huh.NewOption("Local — ./workspaces/ relative to each project", "local"),
@@ -294,27 +392,27 @@ func buildOpencodeSetupGroups(data *opencodeSetupFormData) []*huh.Group {
 
 	subfolderInput := huh.NewInput().
 		Value(&data.logsSubfolder).
-		Title("Vault Subfolder (optional)").
+		Title("Folder inside the vault (optional)").
 		Description("Subfolder inside the vault for work-logs (default: work-logs).").
 		Placeholder("work-logs")
 
 	groups = append(groups,
 		huh.NewGroup(
 			huh.NewNote().
-				Title("Work-Logs Output").
+				Title("Where agents save their work").
 				Description("Agents write pipeline workspaces (plans, implementations, test reports)\nto a location you control. Local mode uses ./workspaces/ beside each\nproject. Obsidian mode writes structured notes to a vault you specify.\nThe opencode hook plugin reads this setting to locate the pipeline state."),
 			huh.NewConfirm().
 				Value(&data.configureWorkLogs).
-				Title("Configure work-logs output now?").
+				Title("Choose where agents save their plans, implementations, and reports now?").
 				Affirmative("Yes").
 				Negative("Skip (keep default: local)"),
-		).Title("Work-Logs Setup"),
+		).Title("Agent Output Location"),
 
 		huh.NewGroup(
 			logsSelect,
 			vaultPathInput,
 			subfolderInput,
-		).Title("Work-Logs Details").
+		).Title("Output Location Details").
 			WithHideFunc(func() bool { return !data.configureWorkLogs }),
 	)
 

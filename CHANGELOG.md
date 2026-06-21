@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.117.0] - 2026-06-20
+
+### Added
+- opencode installer migrates the Memory MCP URL from `~/.claude.json` automatically (non-secret; pre-fills the setup prompt); precedence: `--memory-url` flag > `MEMORY_MCP_URL` env > CC-migrated URL.
+- Interactive token-import confirm: when literal Memory bearer and/or context7 API key are detected in the Claude Code config, a single combined confirm offers to store them literally in `opencode.json` (works immediately, file hardened to `0o600`) or keep `{env:VAR}` references (found values printed to `/dev/tty` only — never stdout — so `install > log.txt` cannot capture them). Non-interactive/headless installs always use `{env:VAR}` refs; no secret is auto-stored without an explicit per-run operator choice.
+- `cmd/install/opencode_mcp_migrate.go`: `readClaudeCodeMCPMigration()` reads only `mcpServers.memory` and `mcpServers.context7` (no server-map enumeration); reuses the existing `readExistingMCPServers`/`urlFromEntry`/`bearerFromEntry`/`mapGetString` helpers.
+
+### Changed
+- opencode setup-form titles rewritten to plain language (voice §7.2): "Where agents save their work", "Choose where agents save their plans, implementations, and reports now?", "Agent Output Location", "Save location", "Output Location Details", "Folder inside the vault (optional)". Internal config keys (`logs-mode`/`logs-path`/`logs-subfolder`) and the `work-logs` default value are unchanged.
+
+### Security
+- `opencode.json` is now written `0o600` unconditionally on both the literal and `{env:VAR}` paths (previously `0o644`); aligns the live file with the pre-existing backup write mode. Literal token path is reachable only via the interactive operator confirm — unreachable from non-interactive/headless/`--non-interactive` flows. Token values never reach `.team-harness.json`, apply summary, or any redirectable stream (AC-12, AC-13).
+
 ## [2.116.0] - 2026-06-20
 
 ### Added

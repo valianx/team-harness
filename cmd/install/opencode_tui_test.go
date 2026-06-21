@@ -226,7 +226,7 @@ func TestRegisterOpencodeMCPFromValues_NoSecretInOpencodeJSON(t *testing.T) {
 		MemoryRequiresAuth: true,
 		Context7Enabled:    true,
 	}
-	registerOpencodeMCPFromValues(mcp, settingsPath)
+	registerOpencodeMCPFromValues(mcp, settingsPath, tokenModeEnvRef, opencodeMCPSecrets{})
 
 	raw, err := os.ReadFile(settingsPath)
 	if err != nil {
@@ -267,7 +267,7 @@ func TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent(t *testing.T) {
 	}
 	// If either URL is invalid, the function calls os.Exit(1) — which would
 	// abort the test. The absence path should NOT exit.
-	registerOpencodeMCPFromValues(mcp, settingsPath)
+	registerOpencodeMCPFromValues(mcp, settingsPath, tokenModeEnvRef, opencodeMCPSecrets{})
 
 	// File may or may not exist — what matters is no panic/exit and that any
 	// written content is valid JSON.
