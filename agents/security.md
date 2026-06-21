@@ -869,6 +869,7 @@ summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, 
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
+kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced security findings; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}

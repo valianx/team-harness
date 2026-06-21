@@ -495,6 +495,24 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
 
 **Step 9.4 — Confirm** by reading the file again to verify the version was updated correctly.
 
+**Step 9.4a — Multi-site invariant MATCH check (pre-STAGE-GATE-3, non-blocking for single-site bumps).** Read `01-plan.md § Review Summary → ### Multi-site invariants` (if present). If the section exists and lists ≥2 sites for any invariant:
+
+1. For each invariant row in the table, read the actual value at every listed site.
+2. Compare all values for the same invariant. A MATCH means every non-fenced site holds the same value and every fenced site is unchanged from `main` (no edit introduced).
+3. If any site diverges — two non-fenced sites hold different values, OR a fenced site was modified — return `status: failed` with a **"partial sync" report** naming the invariant, the expected value, and the actual value at each site. Example report:
+
+   ```
+   Partial sync detected — invariant: plugin version
+     .claude-plugin/plugin.json: 2.118.0  ✓
+     .claude-plugin/marketplace.json plugins[0].version: 2.117.0  ✗ (stale)
+     CLAUDE.md §3: 2.118.0  ✓
+   Action required: update .claude-plugin/marketplace.json before proceeding.
+   ```
+
+4. If all sites MATCH (or the section is absent / has only single-site invariants), continue to Step 9e normally.
+
+**Reference:** `agents/delivery.md` Step 9.0 is the worked example of multi-site enumeration for version-literal sites. The `### Multi-site invariants` table in `01-plan.md` is authored by the architect per `agents/architect.md § Phase 2 → Domain Heuristics → Multi-site invariants`. This step generalizes the Step 9.0 version-site MATCH obligation to arbitrary multi-site invariants declared in the plan.
+
 ### Step 9e — CHANGELOG release cut (with `changelog.d/` assembly)
 
 **Gated on Step 9 having produced a version bump.** If Step 9 was skipped (`skip-version: true`) or produced no version change, skip this step entirely.
@@ -1390,6 +1408,7 @@ mergeable_state: clean | conflicting | undetermined | blocked | behind | unstabl
 ci_state: passing | failing | pending | none | not-verified
 worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
 context7_consult: hit:N miss:N skipped:N
+kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a delivery decision; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of blockers, or "none"}
 ```

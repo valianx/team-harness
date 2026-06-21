@@ -1564,6 +1564,26 @@ Next: ratify the plan (qa checks every AC has a Work Plan step)
 
 **Rewrite TL;DR** (row 3 of §5.2): `Now`: "Phase 1.5 plan-ratification running (qa checking AC coverage)." `Last`: "Phase 1 architect proposed {N} PRs across {M} services with {K} AC." `Next`: "Phase 1.6 plan-reviewer, then STAGE-GATE-1." `Open issues`: any `[CONSTRAINT-DISCOVERED]` annotations.
 
+### Defect-aware KG enrichment (Phase 1 end / Phase 1.5 entry)
+
+**When to run:** after the architect gate passes and the architect's status block declares the located surface (files, failure mode, or design constraints). Run before Phase 1.5 (plan-ratification). Skip for `type: hotfix` and `bug_tier: 1` (no architect dispatch, no located surface to seed from). Skip when `00-knowledge-context.md` was written fewer than 10 minutes ago (Phase 0a is still fresh — no second read needed).
+
+**Purpose:** the Phase 0a KG read is seeded from the operator's task description (general domain terms). After the architect locates the actual change surface (specific files, failure mode, component names), a second targeted read can surface prior-art nodes that Phase 0a missed. This enrichment is appended as a new block to `00-knowledge-context.md` so all downstream agents (implementer, tester, security) read one file.
+
+**Procedure (best-effort, non-blocking):**
+
+1. Extract 1-3 semantic queries from the architect's located surface:
+   - From the `Files:` fields in `01-plan.md § Task List` → form queries like `"architect delivery multi-site"`, `"kg_hit_used status block"`.
+   - From the architect's `summary` in the status block → extract the failure mode or design domain (e.g., `"KG recall measurability"`, `"assertion shape convention"`).
+   - Keep queries short (3-5 words) and domain-specific — same style as Phase 0a queries.
+2. Call `mcp__memory__search_nodes` with each query (vector search, top-3 per call). Collect the union of results, deduplicate by node name.
+3. If results are non-empty, **append** a new `## Phase 1 Defect-Aware Enrichment` block to `00-knowledge-context.md` listing the additional nodes (same format as the Phase 0a block). Do NOT overwrite the Phase 0a block.
+4. Emit one `operation.success` event to `{docs_root}/{events_file}` with `detail: "kg-phase1-enrichment"` and `nodes_found: N`.
+
+**On MCP error:** log `KG: unavailable` to the events file (`operation.failed`, `detail: "kg-phase1-enrichment"`) and continue without blocking Phase 1.5. The enrichment is always best-effort — its absence never stops the pipeline. Silent on success at the operator surface (events file only).
+
+**Mirror contract:** this procedure mirrors the Phase 3.6 / Phase 3.75 KG read (see `§ KG read on error` below) in budget (1-3 queries, top-3 each) and best-effort contract. The difference is the seed: Phase 3.6 seeds from failure brief (defect domain); this step seeds from the architect's located surface (design domain).
+
 ### When frontend_scope: true — ux-reviewer enrich (Phase 1.7)
 
 **Sub-phase identity:** `1.7-ux-enrich` — this number marks phase identity for observability and is NOT the execution order. Phase 1.7 executes BEFORE Phase 1.5 in time (after the architect gate, before plan-ratification); the number is higher than 1.5/1.6 because it was assigned for identity/observability continuity, following the same precedent as Phase 3.75 which executes before Phase 3.6.
@@ -3511,6 +3531,9 @@ When an agent returns, you parse its status block and propagate any of the follo
 | `memory_consult: search_nodes:N open_nodes:N` | `"memory": {"search_nodes": N, "open_nodes": N}` |
 | `kg_save_candidates: [a, b]` (architect/qa/tester/security) | `"kg_save_candidates": ["a", "b"]` |
 | `kg_passive_capture: written` / `kg_passive_capture: skipped: <reason>` (delivery) | `"kg_passive_capture": "written"` / `"skipped"` / `"failed"` |
+| `kg_hit_used: [node-a, node-b]` (all leaf agents) | `"kg_hit_used": ["node-a", "node-b"]` |
+
+**`kg_hit_used` aggregation.** Every leaf agent (`architect`, `implementer`, `tester`, `qa`, `security`, `delivery`) declares a `kg_hit_used: [node-name, ...]` field in its Return Protocol status block. An empty list `[]` is valid and means no KG node influenced the agent's output this run. The orchestrator propagates the list into the `phase.end` event's `tools.kg_hit_used` array. Aggregating these arrays across all `phase.end` events in `00-execution-events` gives a pipeline-level KG recall signal: `jq -s '[.[] | select(.event=="phase.end") | .tools.kg_hit_used // [] | .[]] | unique' {events_file}`. This is the measurability surface for issue #403.
 
 **Source of each field:** The `tools:` line in each JSONL event is sourced from the agent's status block `tools:` line. Parse it as space-separated key:value pairs (e.g., `read:12 write:2 bash:5`) and store the non-zero counts in `tool_counts`. Zero counts can be omitted by the agent; treat absent keys as 0 when aggregating. The `tokens` and `duration_ms` fields come from the Agent() tool response metadata (`total_tokens`, `duration_ms`). Both sources are combined into the JSONL event — neither replaces the other.
 
