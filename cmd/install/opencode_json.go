@@ -9,13 +9,18 @@ import (
 )
 
 // registerOpencodeMCP merges mcp.memory and mcp.context7 into the opencode.json
-// at docPath using the {env:VAR} secret model (SEC-DR-1).
+// at docPath. The default secret model writes {env:VAR} references (tokenModeEnvRef).
+// When called with tokenModeLiteral + a non-empty opencodeMCPSecrets, the literal
+// token values are written instead (operator-opt-in only — reachable ONLY via the
+// interactive token-import confirm, never from the non-interactive path; AC-7).
 //
-// Secret model (default):
+// Secret model (default — tokenModeEnvRef):
 //   - mcp.memory.headers.Authorization = "{env:MEMORY_MCP_BEARER}"
 //   - mcp.context7.headers.CONTEXT7_API_KEY = "{env:CONTEXT7_API_KEY}"
 //
-// No literal secret is written. opencode resolves the env var at runtime.
+// Secret model (literal — tokenModeLiteral):
+//   - mcp.memory.headers.Authorization = "Bearer <secrets.MemoryBearer>"
+//   - mcp.context7.headers.CONTEXT7_API_KEY = secrets.Context7Key
 //
 // Preservation contract (mirrors claude_json.go):
 //   - Operator-set top-level keys are preserved byte-for-byte.
@@ -25,7 +30,10 @@ import (
 //     (a re-apply does NOT silently re-enable a deliberately-disabled server,
 //     SEC-DR-6).
 //   - Write is skipped entirely when desired ⊆ existing (idempotent, no backup).
-func registerOpencodeMCP(memURL, context7URL, docPath string) error {
+//
+// Security: the file is ALWAYS written with mode 0o600 — unconditionally on both
+// the env-ref and literal paths (AC-12 binding contract from the security assessment).
+func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, secrets opencodeMCPSecrets) error {
 	// Read the whole file as a map of raw JSON values.
 	raw := map[string]json.RawMessage{}
 	existing, err := os.ReadFile(docPath)
@@ -44,10 +52,10 @@ func registerOpencodeMCP(memURL, context7URL, docPath string) error {
 		_ = json.Unmarshal(v, &mcpRaw)
 	}
 
-	// Build desired entries. Either may be nil when the caller passes an empty
-	// URL — the entry is simply not written (skip-if-absent).
-	newMemory := buildOpencodeMemoryEntry(memURL)
-	newContext7 := buildOpencodeContext7Entry(context7URL)
+	// Build desired entries using the caller-supplied token mode. Either entry
+	// may be nil when the caller passes an empty URL — the entry is not written.
+	newMemory := buildOpencodeMemoryEntry(memURL, mode, secrets)
+	newContext7 := buildOpencodeContext7Entry(context7URL, mode, secrets)
 
 	// Detect whether anything would change.
 	memChanged := newMemory != nil && !opencodeEntryMatches(mcpRaw["memory"], newMemory)
@@ -84,25 +92,38 @@ func registerOpencodeMCP(memURL, context7URL, docPath string) error {
 	out = append(out, '\n')
 
 	ensureDir(filepath.Dir(docPath))
-	if err := os.WriteFile(docPath, out, 0o644); err != nil {
+	// fix(sec): AC-12 — opencode.json is always written 0o600, unconditionally
+	// on both the env-ref and literal paths. A literal secret in a 0o644 file
+	// would be world-readable; 0o600 matches the backup write above.
+	if err := os.WriteFile(docPath, out, 0o600); err != nil {
 		return fmt.Errorf("write opencode.json %q: %w", docPath, err)
 	}
 	return nil
 }
 
 // buildOpencodeMemoryEntry returns the desired mcp.memory entry.
-// URL is written literally (not a secret). Bearer is written as the {env:VAR}
-// reference that opencode resolves at runtime — no literal secret at rest.
-func buildOpencodeMemoryEntry(url string) map[string]interface{} {
+// URL is written literally (not a secret).
+//
+// On tokenModeEnvRef (default): Authorization = "{env:MEMORY_MCP_BEARER}".
+// On tokenModeLiteral: Authorization = "Bearer <secrets.MemoryBearer>" —
+// mirrors buildMemoryEntry in claude_json.go (AC-6 / plan patterns).
+// Returns nil when url is empty.
+func buildOpencodeMemoryEntry(url string, mode tokenMode, secrets opencodeMCPSecrets) map[string]interface{} {
 	if url == "" {
 		return nil
+	}
+	var authValue string
+	if mode == tokenModeLiteral && secrets.MemoryBearer != "" {
+		authValue = "Bearer " + secrets.MemoryBearer
+	} else {
+		// Default env-ref (SEC-DR-1 preserved for env-ref path).
+		authValue = "{env:MEMORY_MCP_BEARER}"
 	}
 	return map[string]interface{}{
 		"type": "remote",
 		"url":  url,
 		"headers": map[string]interface{}{
-			// {env:MEMORY_MCP_BEARER} — opencode resolves at runtime (SEC-DR-1).
-			"Authorization": "{env:MEMORY_MCP_BEARER}",
+			"Authorization": authValue,
 		},
 		"enabled": true,
 	}
@@ -110,17 +131,26 @@ func buildOpencodeMemoryEntry(url string) map[string]interface{} {
 
 // buildOpencodeContext7Entry returns the desired mcp.context7 entry.
 // Returns nil when url is empty — the caller skips writing the entry.
-// The API key is written as {env:CONTEXT7_API_KEY} (no literal secret).
-func buildOpencodeContext7Entry(url string) map[string]interface{} {
+//
+// On tokenModeEnvRef (default): CONTEXT7_API_KEY = "{env:CONTEXT7_API_KEY}".
+// On tokenModeLiteral: CONTEXT7_API_KEY = secrets.Context7Key —
+// mirrors buildContext7Entry in claude_json.go (AC-6 / plan patterns).
+func buildOpencodeContext7Entry(url string, mode tokenMode, secrets opencodeMCPSecrets) map[string]interface{} {
 	if url == "" {
 		return nil
+	}
+	var keyValue string
+	if mode == tokenModeLiteral && secrets.Context7Key != "" {
+		keyValue = secrets.Context7Key
+	} else {
+		// Default env-ref (SEC-DR-1 preserved for env-ref path).
+		keyValue = "{env:CONTEXT7_API_KEY}"
 	}
 	return map[string]interface{}{
 		"type": "remote",
 		"url":  url,
 		"headers": map[string]interface{}{
-			// {env:CONTEXT7_API_KEY} — opencode resolves at runtime (SEC-DR-1).
-			"CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}",
+			"CONTEXT7_API_KEY": keyValue,
 		},
 		"enabled": true,
 	}

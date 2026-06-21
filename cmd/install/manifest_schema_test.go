@@ -296,7 +296,7 @@ func TestValidateConfigKeyNamespace_McpServersNamespaceStillRejected(t *testing.
 // not as a different interpolation format.
 func TestOpencodeJSON_EnvVarReferenceSyntax(t *testing.T) {
 	memURL := "https://mcp.example.com/mcp"
-	entry := buildOpencodeMemoryEntry(memURL)
+	entry := buildOpencodeMemoryEntry(memURL, tokenModeEnvRef, opencodeMCPSecrets{})
 	if entry == nil {
 		t.Fatal("buildOpencodeMemoryEntry returned nil for non-empty URL")
 	}
@@ -318,7 +318,7 @@ func TestOpencodeJSON_EnvVarReferenceSyntax(t *testing.T) {
 	}
 
 	// Verify the context7 entry similarly.
-	ctx7Entry := buildOpencodeContext7Entry("https://mcp.context7.com/mcp")
+	ctx7Entry := buildOpencodeContext7Entry("https://mcp.context7.com/mcp", tokenModeEnvRef, opencodeMCPSecrets{})
 	ctx7Headers, ok := ctx7Entry["headers"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("context7 headers field missing or not a map; got %T", ctx7Entry["headers"])

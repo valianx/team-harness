@@ -267,7 +267,7 @@ func TestRegisterOpencodeMCPFromValues_RegistersMemory(t *testing.T) {
 		MemoryURL:       "https://mcp.example.com/mcp",
 		Context7Enabled: false,
 	}
-	registerOpencodeMCPFromValues(mcp, settingsPath)
+	registerOpencodeMCPFromValues(mcp, settingsPath, tokenModeEnvRef, opencodeMCPSecrets{})
 
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
@@ -298,7 +298,7 @@ func TestRegisterOpencodeMCPFromValues_RegistersContext7(t *testing.T) {
 		MemoryURL:       "",
 		Context7Enabled: true,
 	}
-	registerOpencodeMCPFromValues(mcp, settingsPath)
+	registerOpencodeMCPFromValues(mcp, settingsPath, tokenModeEnvRef, opencodeMCPSecrets{})
 
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
@@ -339,7 +339,7 @@ func TestRegisterOpencodeMCPFromValues_EnvVarRefInJSON(t *testing.T) {
 		MemoryRequiresAuth: true,
 		Context7Enabled:    false,
 	}
-	registerOpencodeMCPFromValues(mcp, settingsPath)
+	registerOpencodeMCPFromValues(mcp, settingsPath, tokenModeEnvRef, opencodeMCPSecrets{})
 
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
