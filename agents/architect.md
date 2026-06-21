@@ -751,6 +751,20 @@ When the feature aggregates monetary values that may span multiple countries or 
 - A `total.currency = null` (or omitted) must explicitly mean "heterogeneous, do not aggregate"; UIs should render the breakdown instead of a sum.
 - Document the contract in `01-plan.md`: "API rejects single-object totals when the result spans multiple currencies." This anti-pattern is one of the most common bug sources in multi-country admin dashboards.
 
+#### Backend observability (OTel) and content-capture privacy
+
+When the feature adds or modifies request/response tracing, structured logging, or metrics emission in a backend service:
+- **Content-capture scope is a tenancy-conditioned DIAL, not a binary switch.** Single-tenant deployments may capture full request/response payloads behind a scrubber; multi-tenant deployments default to metadata-only (method, status, latency, tenant-ID) because payload capture in a shared environment leaks cross-tenant data.
+- Frame the dial as a **likely post-deploy revisit**, not a hard STAGE-GATE-1 prohibition — initial designs ship with metadata-only to be safe, and payload capture is enabled per-environment once a scrubber and data-residency contract are in place.
+- Reference the **stack-agnostic OTel template** when designing the instrumentation layer: master-switch env var that disables all capture (`OTEL_ENABLED=false` → noop provider); boot-guard that aborts startup when the switch is on but the exporter endpoint is unreachable; app-side scrubber strips PII/secrets before the span is exported; byte-identical image in all environments (no compile-time flag differences); design-to-iterate-cheap (cheap to add a new metric or attribute without a binary rebuild).
+
+#### Map/reduce or self-looping fan-out cost bound
+
+When the feature design includes a map/reduce pipeline, a self-looping research or analysis fan-out, or any parallel multi-lane dispatch that may expand dynamically:
+- **Bound cost by ROUNDS, not a cumulative lane budget.** A per-round cap is easy to reason about and to enforce in code; a cumulative budget across variable-depth rounds requires tracking state that is easy to miscount and silently overflow.
+- **Map lanes are demand-driven with a small per-round anti-runaway cap** — open only the lanes the current round's input requires, never pre-allocate the maximum; add a hard per-round ceiling (e.g., ≤ 10 lanes per round) to prevent a single malformed input from spawning an unbounded parallel explosion.
+- **Carry the round counter and gate verdict as structural state/trace, never prose** — the counter must be a typed field in the state object (or a trace attribute) that the gate reads programmatically; encoding it only in a human-readable message means the gate cannot enforce the bound reliably.
+
 ---
 
 ## Phase 2 — Plan Sketches (Design Mode)
