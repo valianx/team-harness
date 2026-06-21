@@ -41,7 +41,20 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside (task intake, architecture decisions, implementation details, test results, validation). Use this context to write accurate documentation.
+1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following named files (delivery input manifest):
+
+   | File | Purpose |
+   |------|---------|
+   | `00-state.md` | Current pipeline state; PR numbers, branch, survey fields |
+   | `01-plan.md` | AC list, architecture decisions, approved scope |
+   | `02-implementation.md` | Patterns applied, deviations, reviewability exceptions, follow-ups spotted |
+   | `03-testing.md` | Test results, AC coverage table, regression-test path |
+   | `04-validation.md` | QA PASS/FAIL verdict per AC |
+   | `04-security.md` | Security findings (read only when present) |
+
+   **Glob-all fallback.** When a named file above is absent, fall back to reading all `*.md` files in the workspace folder to locate the equivalent content. Log the fallback as `workspace_read: glob-fallback: {filename}` in the delivery summary.
+
+   Use the loaded context to write accurate documentation.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
@@ -539,7 +552,19 @@ When a re-run is warranted, use the discovery procedure below.
 
 Before staging, run the project's quality gates. Discover DoD commands from two sources, in this order of priority:
 
-**Source 1 — CLAUDE.md §4 Golden Commands table (primary for this repo):** Read `CLAUDE.md` and locate the `## 4. Golden Commands` section (or equivalent `§4`). Parse the table and treat every command listed there as a DoD gate for this repo. Commands in the Golden Commands table are authoritative because they represent the maintainer's own definition of what must pass before merging.
+**Source 1 — CLAUDE.md §4 Golden Commands table (primary for this repo):** Read `CLAUDE.md` and locate the `## 4. Golden Commands` section (or equivalent `§4`). Parse the table and classify each command before deciding whether it is a DoD gate.
+
+**Golden Command classification (apply to every entry in the table):**
+
+| Class | Criteria | DoD gate? |
+|-------|----------|-----------|
+| **Free-verification** | Command runs non-interactively, produces pass/fail output, and incurs no per-run API or compute cost beyond the local machine (e.g. `bash tests/run-all.sh`, `python3 tests/test_agent_structure.py`, `uv run --with PyYAML python tests/test_agent_frontmatter.py`, `bash tests/test_policy_block.sh`). | **Yes — include in DoD gate** |
+| **Paid** | Command is annotated with a cost hint (e.g. `~$1/run`, `~$N/run`, "behavioral suite"), or invokes an external API billed per call (e.g. `bash tests/run-behavioral.sh`). | **No — exclude from routine DoD gate (opt-in only)** |
+| **Interactive / TUI** | Command launches an interactive terminal UI or requires user input to complete (e.g. `go run ./cmd/install`, the Go installer TUI). | **No — exclude from routine DoD gate (opt-in only)** |
+
+**Classification rule for future commands:** if a new command is added to CLAUDE.md §4, classify it at the point of reading. Any command whose description mentions a cost, a price per run, an external API call, or the word "interactive", "TUI", or "prompt" is paid or interactive and is excluded. When classification is ambiguous, default to **free-verification** (safer to gate than to skip).
+
+**Opt-in path for paid / interactive commands.** When the orchestrator passes `run-paid-suite: true` or `run-interactive-check: true` in the task context, the corresponding excluded class is promoted to a DoD gate for this run only. Without an explicit opt-in, excluded commands are never run by delivery.
 
 **Source 2 — Project manifest (secondary, for other project types):** Read the project's manifest files (`package.json` scripts, `Makefile`, `pyproject.toml`, `Cargo.toml`) for additional gates not already covered by Source 1.
 
