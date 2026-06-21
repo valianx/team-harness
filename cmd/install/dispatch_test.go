@@ -408,7 +408,10 @@ func TestPrintOpencodeApplySummary_ContainsInstalledSuccessfully(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir)
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
+		Memory:   MCPStatusAdded,
+		Context7: MCPStatusAdded,
+	})
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -419,5 +422,158 @@ func TestPrintOpencodeApplySummary_ContainsInstalledSuccessfully(t *testing.T) {
 
 	if !strings.Contains(output, "Installed successfully") {
 		t.Errorf("summary missing 'Installed successfully' headline (AC-3):\n%s", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Suite — summary noise absence (AC-2/AC-3 reword: no skip parentheticals, no Update later)
+// ---------------------------------------------------------------------------
+
+// TestPrintOpencodeApplySummary_NoSkipParenthetical_Memory verifies that the
+// memory skip line no longer carries the "(set MEMORY_MCP_URL and re-run to register)"
+// parenthetical — AC-2/AC-3 reword.
+func TestPrintOpencodeApplySummary_NoSkipParenthetical_Memory(t *testing.T) {
+	dir := t.TempDir()
+	diff := PlanDiff{}
+	cfg := opencodeSetupValues{
+		LogsMode: "local",
+		MCP: opencodeMCPValues{
+			MemoryURL:       "", // absent → skip line
+			Context7Enabled: false,
+		},
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
+		Memory:   MCPStatusSkipped,
+		Context7: MCPStatusSkipped,
+	})
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 65536)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if strings.Contains(output, "set MEMORY_MCP_URL and re-run") {
+		t.Errorf("summary contains removed parenthetical 'set MEMORY_MCP_URL and re-run' (AC-2/AC-3):\n%s", output)
+	}
+	if strings.Contains(output, "re-run to register") {
+		t.Errorf("summary contains removed 're-run to register' suffix (AC-2/AC-3):\n%s", output)
+	}
+}
+
+// TestPrintOpencodeApplySummary_NoSkipParenthetical_Context7 verifies that the
+// context7 skip line no longer carries the "(export CONTEXT7_API_KEY and re-run to register)"
+// parenthetical — AC-2/AC-3 reword.
+func TestPrintOpencodeApplySummary_NoSkipParenthetical_Context7(t *testing.T) {
+	dir := t.TempDir()
+	diff := PlanDiff{}
+	cfg := opencodeSetupValues{
+		LogsMode: "local",
+		MCP: opencodeMCPValues{
+			MemoryURL:       "",
+			Context7Enabled: false, // absent → skip line
+		},
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
+		Memory:   MCPStatusSkipped,
+		Context7: MCPStatusSkipped,
+	})
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 65536)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if strings.Contains(output, "export CONTEXT7_API_KEY and re-run") {
+		t.Errorf("summary contains removed parenthetical 'export CONTEXT7_API_KEY and re-run' (AC-2/AC-3):\n%s", output)
+	}
+}
+
+// TestPrintOpencodeApplySummary_NoUpdateLaterLine verifies that the trailing
+// "Update later: re-run the install link…" line has been removed (AC-2/AC-3).
+func TestPrintOpencodeApplySummary_NoUpdateLaterLine(t *testing.T) {
+	dir := t.TempDir()
+	diff := PlanDiff{}
+	cfg := opencodeSetupValues{
+		LogsMode: "local",
+		MCP: opencodeMCPValues{
+			MemoryURL:       "https://mcp.example.com/mcp",
+			Context7Enabled: true,
+		},
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
+		Memory:   MCPStatusAdded,
+		Context7: MCPStatusAdded,
+	})
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 65536)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if strings.Contains(output, "Update later") {
+		t.Errorf("summary contains removed 'Update later' line (AC-2/AC-3):\n%s", output)
+	}
+}
+
+// TestPrintOpencodeApplySummary_BareSkippedNoParenthetical verifies that when
+// memory and context7 are both absent, the summary shows a bare "skipped" with
+// no trailing parenthetical text on either line (AC-3).
+func TestPrintOpencodeApplySummary_BareSkippedNoParenthetical(t *testing.T) {
+	dir := t.TempDir()
+	diff := PlanDiff{}
+	cfg := opencodeSetupValues{
+		LogsMode: "local",
+		MCP: opencodeMCPValues{
+			MemoryURL:       "",
+			Context7Enabled: false,
+		},
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	printOpencodeApplySummary(&diff, cfg, filepath.Join(dir, ".team-harness.json"), dir, MCPRegisterOutcome{
+		Memory:   MCPStatusSkipped,
+		Context7: MCPStatusSkipped,
+	})
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 65536)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	// The summary must contain bare "skipped" lines.
+	if !strings.Contains(output, "skipped") {
+		t.Errorf("summary missing 'skipped' status for absent servers (AC-3):\n%s", output)
+	}
+	// No parenthetical how-to on the skip lines.
+	for _, forbidden := range []string{"re-run", "export ", "set MEMORY"} {
+		if strings.Contains(output, forbidden) {
+			t.Errorf("summary contains forbidden 'skip parenthetical' text %q (AC-3):\n%s", forbidden, output)
+		}
 	}
 }

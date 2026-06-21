@@ -303,7 +303,13 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 		// precedence: flag > env > CC-migrated URL (AC-9).
 		resolvedMemURL := resolveMemoryURLWithCCFallback(ccMigration.MemoryURL)
 
-		cfg = collectOpencodeSetupInteractiveWithURL(cand, importSource, resolvedMemURL)
+		// fix(install): thread the CC migration's context7 key into the interactive
+		// collectors so that Import short-circuit (and the full form default) set
+		// Context7Enabled=true when a context7 key was present — matching the
+		// operator's directive: "si se importa, no preguntes — solo copia las credenciales".
+		ccHasContext7 := strings.TrimSpace(ccMigration.Context7Key) != ""
+
+		cfg = collectOpencodeSetupInteractiveWithURL(cand, importSource, resolvedMemURL, ccHasContext7)
 
 		// Step 4: after the main form, when literal tokens were detected in CC,
 		// present the standalone token-import confirm. This runs AFTER the form
@@ -344,7 +350,8 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 	}
 
 	// Register MCP servers in opencode.json (with the resolved mode + secrets).
-	registerOpencodeMCPFromValues(cfg.MCP, placer.SettingsDocPath(), mode, secrets)
+	// Capture the real per-server outcome for the summary (fix: truthful status).
+	mcpOutcome := registerOpencodeMCPFromValues(cfg.MCP, placer.SettingsDocPath(), mode, secrets)
 
 	// Step 7: on the interactive env-ref "No" path, disclose found token values
 	// to the controlling terminal (/dev/tty) so the operator can export them.
@@ -355,7 +362,7 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 	}
 
 	// Print the explanatory summary.
-	printOpencodeApplySummary(diff, cfg, cfgPath, placer.ConfigRoot())
+	printOpencodeApplySummary(diff, cfg, cfgPath, placer.ConfigRoot(), mcpOutcome)
 }
 
 // resolveOpencodeSetupFromEnvFlags builds opencodeSetupValues from environment
@@ -448,11 +455,11 @@ func resolveMemoryURLWithCCFallback(ccURL string) string {
 //   - A non-blocking warning is printed when the bearer is unset (env-ref path only;
 //     on the literal path the bearer is known).
 //   - Summary: names only, never URL values or secret values (SEC-OC-R5).
-func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string, mode tokenMode, secrets opencodeMCPSecrets) {
+func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string, mode tokenMode, secrets opencodeMCPSecrets) MCPRegisterOutcome {
 	const context7URL = "https://mcp.context7.com/mcp"
 
-	memRegistered := false
-	ctx7Registered := false
+	memWanted := false
+	ctx7Wanted := false
 
 	if mcp.MemoryURL != "" {
 		// URL was provided — validate scheme; exit on bad value.
@@ -460,7 +467,7 @@ func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string
 			fmt.Fprintf(os.Stderr, "Error: Memory MCP URL is invalid: %s\n", err)
 			os.Exit(1)
 		}
-		memRegistered = true
+		memWanted = true
 
 		// Non-blocking warning when the bearer env var is unset at install time
 		// AND we are using env-ref mode. On the literal path the bearer is already
@@ -473,21 +480,30 @@ func registerOpencodeMCPFromValues(mcp opencodeMCPValues, settingsDocPath string
 	}
 
 	if mcp.Context7Enabled {
-		ctx7Registered = true
+		ctx7Wanted = true
 	} else {
 		fmt.Fprintln(os.Stderr, "context7 not configured. To register later: export CONTEXT7_API_KEY and re-run the install, or edit opencode.json directly.")
 	}
 
 	// Register whichever servers are configured in a single opencode.json write.
-	if memRegistered || ctx7Registered {
+	// Return the real per-server outcome so the caller can display truthful status.
+	if memWanted || ctx7Wanted {
 		ctx7URL := ""
-		if ctx7Registered {
+		if ctx7Wanted {
 			ctx7URL = context7URL
 		}
-		if err := registerOpencodeMCP(mcp.MemoryURL, ctx7URL, settingsDocPath, mode, secrets); err != nil {
+		outcome, err := registerOpencodeMCP(mcp.MemoryURL, ctx7URL, settingsDocPath, mode, secrets)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "apply: opencode.json MCP registration: %v\n", err)
 			os.Exit(1)
 		}
+		return outcome
+	}
+
+	// Neither server was wanted — both are skipped.
+	return MCPRegisterOutcome{
+		Memory:   MCPStatusSkipped,
+		Context7: MCPStatusSkipped,
 	}
 }
 
@@ -502,20 +518,20 @@ func resolveOpencodeMemoryURL() string {
 	return strings.TrimSpace(os.Getenv("MEMORY_MCP_URL"))
 }
 
-// collectOpencodeSetupInteractiveWithURL calls collectOpencodeSetupInteractive
-// with the resolved Memory URL injected as the initial value so the operator
-// sees it pre-populated in the form. This implements the AC-9 CC-URL migration:
-// when the operator has not supplied --memory-url / MEMORY_MCP_URL, the
-// CC-migrated URL is shown pre-populated so the operator can accept or edit it.
+// collectOpencodeSetupInteractiveWithURL calls collectOpencodeSetupInteractivePreFilled
+// with the resolved Memory URL and a context7-present signal injected as initial values.
+// This implements the AC-9 CC-URL migration: when the operator has not supplied
+// --memory-url / MEMORY_MCP_URL, the CC-migrated URL is shown pre-populated so the
+// operator can accept or edit it.
 //
-// When resolvedURL is empty, this is identical to collectOpencodeSetupInteractive.
-func collectOpencodeSetupInteractiveWithURL(cand *importCandidate, importSource, resolvedURL string) opencodeSetupValues {
-	// The pre-fill is injected into the form via the initialMemoryURL signal:
-	// collectOpencodeSetupInteractivePreFilled accepts an initialURL that is
-	// written into data.memoryURL before the form is built, and flips
-	// data.configureMCP = true so the MCP group is visible (since we know
-	// there is a URL to show). The operator can still clear it or change it.
-	return collectOpencodeSetupInteractivePreFilled(cand, importSource, resolvedURL)
+// When resolvedURL is empty and initialContext7Enabled is false, this is identical
+// to collectOpencodeSetupInteractive with default values.
+//
+// fix(install): the initialContext7Enabled parameter threads the CC migration's
+// context7-present signal so the Import short-circuit and the default form value
+// both reflect the operator's existing CC context7 configuration.
+func collectOpencodeSetupInteractiveWithURL(cand *importCandidate, importSource, resolvedURL string, initialContext7Enabled bool) opencodeSetupValues {
+	return collectOpencodeSetupInteractivePreFilled(cand, importSource, resolvedURL, initialContext7Enabled)
 }
 
 // runTokenImportConfirm presents the standalone token-import confirm to the
@@ -625,12 +641,16 @@ func discloseCCTokensToTTY(migration opencodeMCPMigration) {
 // headline followed by a de-emphasised detail block. Names only — never URL
 // values or secret values (SEC-OC-R5).
 //
+// The mcpOutcome parameter carries the REAL per-server outcome of this run so
+// the summary reflects what actually happened (fix: truthful per-run status).
+// A re-run where nothing changed shows "already configured", not "registered".
+//
 // Keys with no live opencode reader today (language, english_learning, clickup,
 // obsidian_tasks) are described as "written to config" to avoid overstating
 // enforcement. The keys WITH a live reader (logs-mode/logs-path/logs-subfolder
 // via checkpoint-guard; prepublish_check via prepublish-guard) are described
 // as "read by the opencode hook plugin".
-func printOpencodeApplySummary(diff *PlanDiff, cfg opencodeSetupValues, cfgPath, configRoot string) {
+func printOpencodeApplySummary(diff *PlanDiff, cfg opencodeSetupValues, cfgPath, configRoot string, mcpOutcome MCPRegisterOutcome) {
 	created := len(diff.ToCreate)
 	updated := len(diff.ToUpdate)
 	skipped := len(diff.ToSkipHashMatch)
@@ -654,23 +674,12 @@ func printOpencodeApplySummary(diff *PlanDiff, cfg opencodeSetupValues, cfgPath,
 	fmt.Printf("    work-logs        → local\n")
 	fmt.Printf("                       (read by the opencode hook plugin; agents write pipeline workspaces here)\n")
 
-	// MCP status — names only, never values (SEC-OC-R5).
+	// MCP status — real per-run outcome, names only, never values (SEC-OC-R5).
+	// fix: display what ACTUALLY happened this run, not a static capability flag.
 	fmt.Println()
 	fmt.Println("  MCP servers (opencode.json):")
-	if cfg.MCP.MemoryURL != "" {
-		fmt.Println("    memory    → registered")
-	} else {
-		fmt.Println("    memory    → skipped     (set MEMORY_MCP_URL and re-run to register)")
-	}
-
-	if cfg.MCP.Context7Enabled {
-		fmt.Println("    context7  → registered")
-	} else {
-		fmt.Println("    context7  → skipped     (export CONTEXT7_API_KEY and re-run to register)")
-	}
-
-	fmt.Println()
-	fmt.Println("  Update later: re-run the install link, or type /th-update inside opencode.")
+	fmt.Printf("    memory    → %s\n", mcpOutcome.Memory)
+	fmt.Printf("    context7  → %s\n", mcpOutcome.Context7)
 }
 
 // runUninstallCommand runs the manifest uninstall subcommand.

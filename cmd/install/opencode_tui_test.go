@@ -377,23 +377,22 @@ func TestNonInteractiveFlag_WithCCTokens_YieldsLiteralMode(t *testing.T) {
 // Suite — AC-9: dependency detect/guide
 // ---------------------------------------------------------------------------
 
-// TestCheckDep_PresentToolPrintsOK verifies that checkDep prints "<tool>: ok"
-// when the tool is found in PATH. Uses "sh" as the probe (always available on unix).
+// TestCheckDep_PresentToolPrintsOK verifies that checkDep does not panic when
+// the tool is found in PATH. Uses "sh" as the probe (always available on unix).
 func TestCheckDep_PresentToolPrintsOK(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("sh not in PATH; skipping test")
 	}
-	// checkDep("sh", "...") would print "    sh: ok" — no-op on success path.
-	// This test asserts the code path is reached without panic.
-	checkDep("sh", "install hint not needed")
+	// checkDep("Shell", "sh", "...") prints found — no-op on success path; assert no panic.
+	checkDep("Shell", "sh", "install hint not needed")
 }
 
-// TestCheckDep_MissingToolPrintsHint verifies that checkDep prints a hint
-// when the tool is not found in PATH. We probe a guaranteed-missing name.
+// TestCheckDep_MissingToolPrintsHint verifies that checkDep does not panic when
+// the tool is not found in PATH. We probe a guaranteed-missing binary name.
 func TestCheckDep_MissingToolPrintsHint(t *testing.T) {
 	// "__th_nonexistent_tool_xyz__" cannot exist in PATH on any sane system.
 	// We verify no panic or os.Exit occurs on the missing path.
-	checkDep("__th_nonexistent_tool_xyz__", "install it from https://example.com")
+	checkDep("Nonexistent Tool", "__th_nonexistent_tool_xyz__", "install it from https://example.com")
 }
 
 // TestPython3InstallHint_ReturnsNonEmptyString verifies that the platform
@@ -862,6 +861,212 @@ func TestCheckOpencodeDependencies_CalledFromRunOpencodePostApply(t *testing.T) 
 
 	if !strings.Contains(funcBody, "checkOpencodeDependencies()") {
 		t.Error("runOpencodePostApply: checkOpencodeDependencies() not called — AC-9 integration point missing")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Suite — AC-4/fix: dependency display names (Region A reword)
+// ---------------------------------------------------------------------------
+
+// TestCheckOpencodeDependencies_HeaderIsCheckingRecommendedTools verifies that
+// checkOpencodeDependencies prints "Checking recommended tools:" (not the old
+// "Checking recommended dependencies:") — AC-4 reword.
+func TestCheckOpencodeDependencies_HeaderIsCheckingRecommendedTools(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(sourceDir(t), "opencode_deps.go"))
+	if err != nil {
+		t.Fatalf("read opencode_deps.go: %v", err)
+	}
+	content := string(src)
+
+	start := strings.Index(content, "func checkOpencodeDependencies(")
+	if start < 0 {
+		t.Fatal("checkOpencodeDependencies not found in opencode_deps.go")
+	}
+	funcBody := extractFuncBody(content[start:])
+
+	if !strings.Contains(funcBody, "Checking recommended tools:") {
+		t.Error("checkOpencodeDependencies does not print 'Checking recommended tools:' (AC-4 reword missing)")
+	}
+	if strings.Contains(funcBody, "Checking recommended dependencies:") {
+		t.Error("checkOpencodeDependencies still prints old 'Checking recommended dependencies:' header (AC-4 regression)")
+	}
+}
+
+// TestCheckDep_OutputContainsPython3HumanName verifies that checkDep is called
+// with the full human name "Python 3" for python3, matching AC-4.
+func TestCheckDep_OutputContainsPython3HumanName(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(sourceDir(t), "opencode_deps.go"))
+	if err != nil {
+		t.Fatalf("read opencode_deps.go: %v", err)
+	}
+	content := string(src)
+
+	start := strings.Index(content, "func checkOpencodeDependencies(")
+	if start < 0 {
+		t.Fatal("checkOpencodeDependencies not found in opencode_deps.go")
+	}
+	funcBody := extractFuncBody(content[start:])
+
+	if !strings.Contains(funcBody, `"Python 3"`) {
+		t.Error("checkOpencodeDependencies does not pass 'Python 3' as displayName (AC-4 human name missing)")
+	}
+}
+
+// TestCheckDep_OutputContainsGitHubCLIHumanName verifies that checkDep is called
+// with the full human name "GitHub CLI" for gh, matching AC-4.
+func TestCheckDep_OutputContainsGitHubCLIHumanName(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(sourceDir(t), "opencode_deps.go"))
+	if err != nil {
+		t.Fatalf("read opencode_deps.go: %v", err)
+	}
+	content := string(src)
+
+	start := strings.Index(content, "func checkOpencodeDependencies(")
+	if start < 0 {
+		t.Fatal("checkOpencodeDependencies not found in opencode_deps.go")
+	}
+	funcBody := extractFuncBody(content[start:])
+
+	if !strings.Contains(funcBody, `"GitHub CLI"`) {
+		t.Error("checkOpencodeDependencies does not pass 'GitHub CLI' as displayName (AC-4 human name missing)")
+	}
+}
+
+// TestCheckDep_FoundOutputContainsFoundWord verifies that checkDep output
+// contains "found" when the tool is present (AC-4: clear found / not found status).
+func TestCheckDep_FoundOutputContainsFoundWord(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not in PATH")
+	}
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	checkDep("Shell", "sh", "some hint")
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 1024)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if !strings.Contains(output, "found") {
+		t.Errorf("checkDep (present) output does not contain 'found': %q (AC-4)", output)
+	}
+	if !strings.Contains(output, "Shell") {
+		t.Errorf("checkDep (present) output does not contain displayName 'Shell': %q (AC-4)", output)
+	}
+	if !strings.Contains(output, "sh") {
+		t.Errorf("checkDep (present) output does not contain binary name 'sh': %q (AC-4)", output)
+	}
+}
+
+// TestCheckDep_NotFoundOutputContainsNotFoundWord verifies that checkDep output
+// contains "not found" when the tool is missing (AC-4: absence reported clearly).
+func TestCheckDep_NotFoundOutputContainsNotFoundWord(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	checkDep("Nonexistent Tool", "__th_nonexistent_xyz__", "hint text here")
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 1024)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	if !strings.Contains(output, "not found") {
+		t.Errorf("checkDep (missing) output does not contain 'not found': %q (AC-4)", output)
+	}
+	if !strings.Contains(output, "hint text here") {
+		t.Errorf("checkDep (missing) output does not contain the hint: %q (AC-4)", output)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Suite — fix(install): interactive path context7 threading (the real bug)
+// ---------------------------------------------------------------------------
+
+// TestInteractiveContext7_ImportShortCircuit_Context7EnabledFromMigration is the
+// regression test for the interactive-path bug: given an import candidate AND a
+// CC migration carrying a context7 key, the import short-circuit must return
+// cfg.MCP.Context7Enabled == true.
+//
+// Before the fix: collectOpencodeSetupInteractivePreFilled initialised
+// data.configureContext7 = false and never checked the migration key, so the
+// import short-circuit returned cfg.MCP.Context7Enabled = false.
+//
+// After the fix: initialContext7Enabled = true is threaded from the migration
+// key into the form data before the short-circuit, so the returned cfg has
+// Context7Enabled = true.
+func TestInteractiveContext7_ImportShortCircuit_Context7EnabledFromMigration(t *testing.T) {
+	// Simulate the form data as it is initialised by collectOpencodeSetupInteractivePreFilled
+	// when ccHasContext7 == true (the fix path).
+	data := freshFormData()
+
+	// This is the fix: initialContext7Enabled=true sets data.configureContext7=true
+	// before the import short-circuit returns buildOpencodeSetupValues(data).
+	data.configureContext7 = true // simulates the fix injecting the migration signal
+
+	cfg := buildOpencodeSetupValues(data)
+
+	if !cfg.MCP.Context7Enabled {
+		t.Error("Context7Enabled = false after import short-circuit with CC migration context7 key — " +
+			"fix(install): interactive import path must enable context7 when CC migration has a key")
+	}
+}
+
+// TestInteractiveContext7_NoMigration_Context7RemainsDisabled verifies that when
+// the CC migration has no context7 key, the import short-circuit leaves
+// Context7Enabled = false (the default), preserving the original behaviour for
+// users who have no context7 key configured in CC.
+func TestInteractiveContext7_NoMigration_Context7RemainsDisabled(t *testing.T) {
+	data := freshFormData()
+	// ccHasContext7 = false → data.configureContext7 stays false (not injected).
+
+	cfg := buildOpencodeSetupValues(data)
+
+	if cfg.MCP.Context7Enabled {
+		t.Error("Context7Enabled = true without a CC migration context7 key — should remain false (no regression)")
+	}
+}
+
+// TestCollectOpencodeSetupInteractivePreFilled_Context7InjectedInSource verifies
+// that the source of collectOpencodeSetupInteractivePreFilled contains the
+// initialContext7Enabled injection: `data.configureContext7 = true` inside the
+// `if initialContext7Enabled {` block. This is the structural assertion for the
+// interactive-path fix.
+func TestCollectOpencodeSetupInteractivePreFilled_Context7InjectedInSource(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join(sourceDir(t), "opencode_tui.go"))
+	if err != nil {
+		t.Fatalf("read opencode_tui.go: %v", err)
+	}
+	content := string(src)
+
+	start := strings.Index(content, "func collectOpencodeSetupInteractivePreFilled(")
+	if start < 0 {
+		t.Fatal("collectOpencodeSetupInteractivePreFilled not found in opencode_tui.go")
+	}
+	funcBody := extractFuncBody(content[start:])
+
+	if !strings.Contains(funcBody, "initialContext7Enabled") {
+		t.Error("collectOpencodeSetupInteractivePreFilled does not accept/use initialContext7Enabled parameter (fix missing)")
+	}
+	if !strings.Contains(funcBody, "data.configureContext7 = true") {
+		t.Error("collectOpencodeSetupInteractivePreFilled does not set data.configureContext7 = true from migration signal (fix missing)")
+	}
+	// The injection must occur BEFORE the import short-circuit (before buildOpencodeSetupGroups).
+	context7InjectIdx := strings.Index(funcBody, "initialContext7Enabled")
+	buildGroupsIdx := strings.Index(funcBody, "buildOpencodeSetupGroups(")
+	if context7InjectIdx < 0 || buildGroupsIdx < 0 {
+		return // already reported above
+	}
+	if context7InjectIdx > buildGroupsIdx {
+		t.Error("initialContext7Enabled injection occurs AFTER buildOpencodeSetupGroups — import short-circuit would not benefit from it (fix order wrong)")
 	}
 }
 

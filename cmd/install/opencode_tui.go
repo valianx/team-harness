@@ -136,12 +136,19 @@ func collectOpencodeSetupInteractive(cand *importCandidate, importSource string)
 
 // collectOpencodeSetupInteractivePreFilled is identical to
 // collectOpencodeSetupInteractive but pre-fills data.memoryURL with initialURL
-// (and flips data.configureMCP = true) before building the form groups. This
-// implements the CC-URL migration pre-fill: the operator sees the CC-migrated
-// URL in the Memory MCP URL field and can accept or edit it.
+// (and flips data.configureMCP = true) and, when initialContext7Enabled is true,
+// flips data.configureContext7 = true before building the form groups.
 //
-// When initialURL is empty, the behaviour is identical to the non-prefilled form.
-func collectOpencodeSetupInteractivePreFilled(cand *importCandidate, importSource, initialURL string) opencodeSetupValues {
+// This implements two CC-migration pre-fills:
+//   - Memory URL: the operator sees the CC-migrated URL pre-populated.
+//   - context7: when the CC config had a context7 key, context7 is enabled by
+//     default on the import short-circuit AND on the full form. The operator
+//     decision "si se importa, no preguntes — solo copia las credenciales" means
+//     CC-migrated context7 key presence → context7 enabled, no extra prompt.
+//
+// When initialURL is empty and initialContext7Enabled is false, behaviour is
+// identical to collectOpencodeSetupInteractive with default values.
+func collectOpencodeSetupInteractivePreFilled(cand *importCandidate, importSource, initialURL string, initialContext7Enabled bool) opencodeSetupValues {
 	data := &opencodeSetupFormData{
 		importExisting:     false,
 		configureMCP:       false,
@@ -155,6 +162,13 @@ func collectOpencodeSetupInteractivePreFilled(cand *importCandidate, importSourc
 	if initialURL != "" {
 		data.memoryURL = initialURL
 		data.configureMCP = true
+	}
+
+	// fix(install): inject CC context7 key presence before the import confirm
+	// so the import short-circuit (and "Start fresh" main form) both default
+	// context7 to enabled when the CC migration had a key.
+	if initialContext7Enabled {
+		data.configureContext7 = true
 	}
 
 	// Pre-form import decision (same as collectOpencodeSetupInteractive).
@@ -191,6 +205,9 @@ func collectOpencodeSetupInteractivePreFilled(cand *importCandidate, importSourc
 				data.memoryURL = initialURL
 				data.configureMCP = true
 			}
+			// fix(install): re-apply context7 default on import path — the form
+			// was not run, so data.configureContext7 retains the initialContext7Enabled
+			// value set above. buildOpencodeSetupValues reads it directly.
 			return buildOpencodeSetupValues(data)
 		}
 	}

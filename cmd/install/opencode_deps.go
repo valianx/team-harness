@@ -7,27 +7,29 @@ import (
 )
 
 // checkOpencodeDependencies detects optional runtime dependencies (python3, gh)
-// and prints a one-line OK note when present or OS-appropriate install guidance
-// when missing. No prompt is shown and no command is executed — this is
-// detect-and-guide only (AC-9 MVP; offer-to-run is a deferred follow-up).
+// and prints a one-line status for each: "found" when present, or
+// "not found — <OS-appropriate hint>" when missing. No prompt is shown and no
+// command is executed — this is detect-and-guide only (AC-9 MVP).
 //
-// Runs on the interactive branch; on the non-interactive branch the caller
-// decides whether to invoke it (prints to stdout; never blocks).
+// Runs on both interactive and non-interactive branches (prints to stdout;
+// never blocks).
 func checkOpencodeDependencies() {
-	fmt.Println("  Checking recommended dependencies:")
-	checkDep("python3", python3InstallHint())
-	checkDep("gh", ghInstallHint())
+	fmt.Println("  Checking recommended tools:")
+	checkDep("Python 3", "python3", python3InstallHint())
+	checkDep("GitHub CLI", "gh", ghInstallHint())
 }
 
-// checkDep prints "<tool>: ok" when the tool is in PATH, or OS-appropriate
-// install guidance when it is missing. Mirrors warnCLI's present/missing shape
-// but uses a detect-and-guide message rather than warnCLI's generic note.
-func checkDep(tool, hint string) {
-	if _, err := exec.LookPath(tool); err == nil {
-		fmt.Printf("    %s: ok\n", tool)
+// checkDep prints "    <displayName> (<binary>) ... found" when the binary is
+// in PATH, or "    <displayName> (<binary>) ... not found — <hint>" when missing.
+// displayName is the full human-readable name (e.g. "Python 3"), binary is the
+// executable looked up in PATH (e.g. "python3").
+func checkDep(displayName, binary, hint string) {
+	label := fmt.Sprintf("%s (%s)", displayName, binary)
+	if _, err := exec.LookPath(binary); err == nil {
+		fmt.Printf("    %-30s found\n", label)
 		return
 	}
-	fmt.Printf("    %s: not found — %s\n", tool, hint)
+	fmt.Printf("    %-30s not found — %s\n", label, hint)
 }
 
 // python3InstallHint returns the OS-appropriate install guidance for python3.

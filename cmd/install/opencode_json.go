@@ -8,6 +8,29 @@ import (
 	"time"
 )
 
+// MCPServerStatus describes what actually happened to one MCP server entry
+// during a single registerOpencodeMCP call. The value is determined by
+// comparing the desired entry against what was already in opencode.json.
+type MCPServerStatus string
+
+const (
+	// MCPStatusAdded means the entry was absent and has been written this run.
+	MCPStatusAdded MCPServerStatus = "registered"
+	// MCPStatusUpdated means the entry was present but differed and has been rewritten.
+	MCPStatusUpdated MCPServerStatus = "updated"
+	// MCPStatusAlreadyConfigured means the entry was already present and unchanged — nothing was written.
+	MCPStatusAlreadyConfigured MCPServerStatus = "already configured"
+	// MCPStatusSkipped means no URL/source was provided so the entry was not touched.
+	MCPStatusSkipped MCPServerStatus = "skipped"
+)
+
+// MCPRegisterOutcome carries the per-server real outcome of a registerOpencodeMCP
+// call so that callers can display truthful per-run status in the summary.
+type MCPRegisterOutcome struct {
+	Memory   MCPServerStatus
+	Context7 MCPServerStatus
+}
+
 // registerOpencodeMCP merges mcp.memory and mcp.context7 into the opencode.json
 // at docPath. The default secret model writes {env:VAR} references (tokenModeEnvRef).
 // When called with tokenModeLiteral + a non-empty opencodeMCPSecrets, the literal
@@ -36,16 +59,21 @@ import (
 //
 // Security: the file is ALWAYS written with mode 0o600 — unconditionally on both
 // the env-ref and literal paths (AC-12 binding contract from the security assessment).
-func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, secrets opencodeMCPSecrets) error {
+func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, secrets opencodeMCPSecrets) (MCPRegisterOutcome, error) {
+	outcome := MCPRegisterOutcome{
+		Memory:   MCPStatusSkipped,
+		Context7: MCPStatusSkipped,
+	}
+
 	// Read the whole file as a map of raw JSON values.
 	raw := map[string]json.RawMessage{}
 	existing, err := os.ReadFile(docPath)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read opencode.json %q: %w", docPath, err)
+		return outcome, fmt.Errorf("read opencode.json %q: %w", docPath, err)
 	}
 	if len(existing) > 0 {
 		if err := json.Unmarshal(existing, &raw); err != nil {
-			return fmt.Errorf("parse opencode.json %q: %w", docPath, err)
+			return outcome, fmt.Errorf("parse opencode.json %q: %w", docPath, err)
 		}
 	}
 
@@ -60,12 +88,36 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 	newMemory := buildOpencodeMemoryEntry(memURL, mode, secrets)
 	newContext7 := buildOpencodeContext7Entry(context7URL, mode, secrets)
 
-	// Detect whether anything would change.
-	memChanged := newMemory != nil && !opencodeEntryMatches(mcpRaw["memory"], newMemory)
-	ctx7Changed := newContext7 != nil && !opencodeEntryMatches(mcpRaw["context7"], newContext7)
+	// Determine per-server outcome: distinguish absent (skip) vs unchanged (already
+	// configured) vs new/changed (added or updated).
+	var memChanged, ctx7Changed bool
+	if newMemory != nil {
+		alreadyPresent := mcpRaw["memory"] != nil
+		matches := opencodeEntryMatches(mcpRaw["memory"], newMemory)
+		memChanged = !matches
+		if matches {
+			outcome.Memory = MCPStatusAlreadyConfigured
+		} else if alreadyPresent {
+			outcome.Memory = MCPStatusUpdated
+		} else {
+			outcome.Memory = MCPStatusAdded
+		}
+	}
+	if newContext7 != nil {
+		alreadyPresent := mcpRaw["context7"] != nil
+		matches := opencodeEntryMatches(mcpRaw["context7"], newContext7)
+		ctx7Changed = !matches
+		if matches {
+			outcome.Context7 = MCPStatusAlreadyConfigured
+		} else if alreadyPresent {
+			outcome.Context7 = MCPStatusUpdated
+		} else {
+			outcome.Context7 = MCPStatusAdded
+		}
+	}
 
 	if !memChanged && !ctx7Changed {
-		return nil // nothing to do — already up-to-date
+		return outcome, nil // nothing to do — already up-to-date
 	}
 
 	// Backup before write (0o600 — contains config adjacent to secrets).
@@ -73,7 +125,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := docPath + ".bak-" + ts
 		if err := os.WriteFile(bakPath, existing, 0o600); err != nil {
-			return fmt.Errorf("create backup %q: %w", bakPath, err)
+			return outcome, fmt.Errorf("create backup %q: %w", bakPath, err)
 		}
 	}
 
@@ -99,9 +151,9 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 	// on both the env-ref and literal paths. A literal secret in a 0o644 file
 	// would be world-readable; 0o600 matches the backup write above.
 	if err := os.WriteFile(docPath, out, 0o600); err != nil {
-		return fmt.Errorf("write opencode.json %q: %w", docPath, err)
+		return outcome, fmt.Errorf("write opencode.json %q: %w", docPath, err)
 	}
-	return nil
+	return outcome, nil
 }
 
 // buildOpencodeMemoryEntry returns the desired mcp.memory entry.
