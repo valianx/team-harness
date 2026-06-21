@@ -669,6 +669,8 @@ Use Glob, Grep, and Read to understand:
 
 When requirements are ambiguous, make the best architectural decision based on the codebase patterns and document your assumptions in `01-plan.md`. Do not stop to ask — keep moving.
 
+**External-report tasks:** when the task originated from a GitHub issue, issue comment, PR review comment, or ClickUp-routed task, apply **Spec Feedback Protocol Channel 3 — Stale external-report scope** during this phase — re-verify each claimed item against the tree and write `### Real-vs-Stated Scope` into `## Review Summary`. See `docs/discover-phase.md §13` for the full procedure.
+
 ---
 
 ## Phase 2 — Architecture Design
@@ -1231,6 +1233,34 @@ When you discover a technical constraint during design that invalidates or modif
 
 **Rationale for placement in `## Review Summary`:** STAGE-GATE-1 copies `## Review Summary` verbatim into the STOP block. The dissent must be where the operator reviews — inline markers in the plan body would be missed at the gate.
 
+### Channel 3 — Stale external-report scope (architect → plan)
+
+**Trigger.** The task originated from a GitHub issue, a GitHub issue comment, a GitHub PR review comment, or a ClickUp task routed into the pipeline. Skip this channel for direct operator requests.
+
+**Why this channel exists.** Even after the orchestrator runs Step 1.5, the architect re-verifies at design time because: (a) the orchestrator's pre-read grep may have been surface-level; (b) Phase 1 codebase analysis may surface files the report named that the Step 1.5 grep missed; (c) the architect owns the `## Review Summary` block that the operator reads at STAGE-GATE-1, so stated-vs-real divergence must appear there.
+
+**Procedure** (per `docs/discover-phase.md §13`):
+
+1. For each item in the dispatch payload's `Real residual scope:` line, re-verify with `Grep`, `Read`, `git log --grep`, and `changelog.d/` scan.
+2. For any item NOT listed in the orchestrator's residual (i.e., the report named it but Step 1.5 did not flag it), re-verify the same way.
+3. If Phase 1 codebase exploration reveals that a "residual" item is in fact already addressed, flag it `[ALREADY-FIXED]`.
+
+**Output — write `### Real-vs-Stated Scope` into `## Review Summary`:**
+
+```markdown
+### Real-vs-Stated Scope
+
+| Stated item | Real state | Evidence |
+|-------------|-----------|---------|
+| {file or pattern from report} | residual / already-fixed / scope-shifted | {commit, grep result, or changelog.d/ entry} |
+```
+
+Flag each row with `[ALREADY-FIXED: {ref}]`, `[PARTIALLY-FIXED: {what remains}]`, or `[SCOPE-SHIFTED: {new location}]` when divergence exists. If all items confirm as residual, write `Stated-vs-real divergence: none — scope confirmed current`.
+
+**Empty-residual case.** If all items are already fixed: recommend close-with-evidence in `## Review Summary` (produce per-item `file:line` evidence block). The operator decides — never auto-close.
+
+**When NOT to apply.** For direct operator requests this channel is silent. If the `Real residual scope:` line in the dispatch payload reads `"n/a — direct operator request"`, skip this channel entirely.
+
 ---
 
 ## Session Documentation
@@ -1253,6 +1283,7 @@ The Review Summary contains:
 5. `### Patterns to Mirror` — real in-repo `file:line` references (see contract below).
 6. `### Risks` — a table of risks, severities, and mitigations.
 7. `### Trade-offs` — the key trade-offs made.
+8. `### Real-vs-Stated Scope` *(external-report tasks only)* — the stated-vs-real scope table produced by Channel 3 (see Spec Feedback Protocol). Omit this block for direct operator requests.
 
 ### Confidence Score & Patterns to Mirror
 
