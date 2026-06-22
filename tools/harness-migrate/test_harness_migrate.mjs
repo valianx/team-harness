@@ -124,7 +124,8 @@ This is the agent body. It uses $ARGUMENTS in instructions.
 `;
 
 // Expected opencode projection of the agent (oracle)
-// - model: anthropic/claude-opus-4-5
+// - model: ABSENT — opencode agents are model-less so the harness follows the
+//   operator's runtime /model pick on any provider (no baked id, no provider lock-in).
 // - permission: {read: "allow", glob: "allow", grep: "allow"} (object form, opencode PermissionRuleConfig)
 // - mode: subagent (forward-injected)
 // - color: warning (orange maps to the opencode "warning" named enum)
@@ -132,7 +133,7 @@ This is the agent body. It uses $ARGUMENTS in instructions.
 const EXPECTED_OPENCODE_AGENT_FM = {
   name: "test-agent",
   description: "A test agent for migration tests.",
-  model: "anthropic/claude-opus-4-5",
+  model: undefined,
   permission: { read: "allow", glob: "allow", grep: "allow" },
   mode: "subagent",
   color: "warning",
@@ -350,7 +351,7 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
     fm["permission"]["glob"] === "allow" &&
     fm["permission"]["grep"] === "allow"
   );
-  assert("AC-1: model is provider-prefixed", fm["model"] === "anthropic/claude-opus-4-5");
+  assert("AC-1: agent is model-less (no model emitted)", fm["model"] === undefined);
   assert("AC-1: mode is forward-injected", fm["mode"] === "subagent");
   const { body: origBody } = parseFrontmatter(CC_AGENT_CONTENT);
   assert("AC-1: body is verbatim (identity)", body === origBody);
@@ -378,14 +379,14 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   // directions equally would still be caught here.
   //
   // Expected serialised content produced by transformToOpencode for CC_AGENT_CONTENT.
-  // Fields ordered: name, description, model, permission (block object form), mode, color, th-origin.
+  // Fields ordered: name, description, permission (block object form), mode, color, th-origin.
+  // model: ABSENT — opencode agents are model-less (harness follows the operator's /model pick).
   // color: orange maps to opencode "warning" enum.
   // Body starts with a blank line then the CC_AGENT_CONTENT body verbatim.
   const EXPECTED_OPENCODE_AGENT_SERIALISED = [
     "---",
     "name: test-agent",
     "description: A test agent for migration tests.",
-    "model: anthropic/claude-opus-4-5",
     "permission:",
     "  read: allow",
     "  glob: allow",
@@ -428,7 +429,9 @@ console.log("\n=== Section 5: Inverse transform opencode → CC (AC-4, AC-5) ===
   const { frontmatter: origFm } = parseFrontmatter(CC_AGENT_CONTENT);
   const { frontmatter: rtFm, body: rtBody } = parseFrontmatter(inverse.content);
 
-  assert("AC-4: round-trip model", rtFm["model"] === origFm["model"]);
+  // model is intentionally NOT preserved through opencode: the forward transform
+  // drops it (model-less), so the reverse reconstruction has no model to restore.
+  assert("AC-4: round-trip drops model (opencode is model-less)", rtFm["model"] === undefined);
   assert("AC-4: round-trip tools", rtFm["tools"] === origFm["tools"]);
   assert("AC-4: round-trip name", rtFm["name"] === origFm["name"]);
   assert("AC-4: round-trip description", rtFm["description"] === origFm["description"]);

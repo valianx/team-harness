@@ -88,9 +88,12 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 		if v, ok := fm["description"]; ok {
 			projected["description"] = v
 		}
-		if v, ok := fm["model"]; ok {
-			projected["model"] = toProviderPrefixedModel(fmt.Sprintf("%v", v))
-		}
+		// model: intentionally NOT emitted. opencode agents are model-less so the
+		// whole harness follows the operator's runtime /model pick on ANY provider
+		// (primary inherits the global model; subagents inherit the invoking primary).
+		// This avoids provider lock-in and ProviderModelNotFoundError from baked ids.
+		// Per-provider cost tiering is a future additive step (see
+		// docs/opencode-model-config.md); toProviderPrefixedModel is retained for it.
 		// tools: → permission object {key: "allow"} with mapped lowercase opencode keys.
 		// MCP tools and unrecognized tokens are dropped. Write+Edit deduplicate to "edit".
 		toolsStr := ""
@@ -121,9 +124,7 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 		if v, ok := fm["description"]; ok {
 			projected["description"] = v
 		}
-		if v, ok := fm["model"]; ok {
-			projected["model"] = toProviderPrefixedModel(fmt.Sprintf("%v", v))
-		}
+		// model: intentionally NOT emitted (model-less; see the agent-surface note above).
 		// allowed-tools → permission.allow
 		allowedTools := fm["allowed-tools"]
 		allowArr := commandAllowedToolsToPermissionAllow(allowedTools)

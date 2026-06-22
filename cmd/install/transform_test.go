@@ -103,17 +103,24 @@ func TestTransform_EffortDropped(t *testing.T) {
 	}
 }
 
-// TestTransform_ModelPrefixIdempotent asserts that already-prefixed models
-// are not double-prefixed.
-func TestTransform_ModelPrefixIdempotent(t *testing.T) {
-	input := "---\nmodel: anthropic/claude-opus-4-8\ntools: Read\n---\n"
-	got, err := transformToOpencode([]byte(input), TransformKindAgent)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	count := strings.Count(string(got), "anthropic/")
-	if count != 1 {
-		t.Errorf("expected exactly 1 'anthropic/' prefix, got %d in:\n%s", count, got)
+// TestTransform_ModelDropped asserts that opencode agents are model-less: any
+// model in the source — bare alias OR already-provider-prefixed — is dropped so
+// the harness follows the operator's runtime /model pick on any provider.
+func TestTransform_ModelDropped(t *testing.T) {
+	for _, input := range []string{
+		"---\nmodel: anthropic/claude-opus-4-8\ntools: Read\n---\n",
+		"---\nmodel: opus\ntools: Read\n---\n",
+	} {
+		got, err := transformToOpencode([]byte(input), TransformKindAgent)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(string(got), "\nmodel:") {
+			t.Errorf("model line must be dropped (model-less); got:\n%s", got)
+		}
+		if strings.Contains(string(got), "anthropic/") {
+			t.Errorf("no provider-prefixed model id should be emitted; got:\n%s", got)
+		}
 	}
 }
 

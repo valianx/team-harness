@@ -952,7 +952,12 @@ function transformToOpencode(filePath, content, repoRoot) {
   if (surface === "agent") {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
-    if (fm["model"] !== undefined) projected["model"] = toProviderPrefixedModel(String(fm["model"]));
+    // model: intentionally NOT emitted. opencode agents are model-less so the whole
+    // harness follows the operator's runtime /model pick on ANY provider (primary
+    // inherits the global model; subagents inherit the invoking primary). Avoids
+    // provider lock-in and ProviderModelNotFoundError. Per-provider tiering is a
+    // future additive step (docs/opencode-model-config.md); toProviderPrefixedModel
+    // is retained for it and for the reverse (opencode→CC) direction.
     // tools: → permission object {key: "allow"} with mapped lowercase opencode keys.
     // MCP tools and unrecognized tokens are dropped. Write+Edit deduplicate to "edit".
     const toolsVal = fm["tools"];
@@ -967,7 +972,7 @@ function transformToOpencode(filePath, content, repoRoot) {
   } else {
     if (fm["name"] !== undefined) projected["name"] = fm["name"];
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
-    if (fm["model"] !== undefined) projected["model"] = toProviderPrefixedModel(String(fm["model"]));
+    // model: intentionally NOT emitted (model-less; see the agent-surface note above).
     const allowedTools = fm["allowed-tools"];
     const allowArr = commandAllowedToolsToPermissionAllow(allowedTools);
     if (allowArr.length > 0 || allowedTools !== undefined) {

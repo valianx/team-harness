@@ -1,150 +1,152 @@
 [
   {
-    "name": "agent_bare_model_prefix",
+    "name": "agent_bare_model_dropped",
     "surface": "agent",
     "input": "---\nname: architect\ndescription: Software architect\nmodel: opus\ntools: Read, Edit, Bash\n---\nBody text here.\n",
-    "expectedOutput": "---\nname: architect\ndescription: Software architect\nmodel: anthropic/claude-opus-4-6\npermission: {read: allow, edit: allow, bash: allow}\nmode: subagent\nth-origin: opencode\n---\nBody text here.\n"
+    "expectedOutput": "---\nname: architect\ndescription: Software architect\npermission: {read: allow, edit: allow, bash: allow}\nmode: subagent\nth-origin: opencode\n---\nBody text here.\n",
+    "note": "model-less: opencode agents emit NO model: line so the harness follows the operator's /model pick on any provider. A bare CC alias in the input is dropped, not resolved."
   },
   {
-    "name": "agent_already_prefixed_model_idempotent",
+    "name": "agent_prefixed_model_dropped",
     "surface": "agent",
     "input": "---\nname: architect\nmodel: anthropic/claude-opus-4-8\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: architect\nmodel: anthropic/claude-opus-4-8\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: architect\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "model-less: even an already-provider-prefixed input model is dropped — opencode agents carry no model line."
   },
   {
     "name": "agent_multi_tools",
     "surface": "agent",
     "input": "---\ndescription: Implementer\nmodel: sonnet\ntools: Read, Edit, Write, Bash, Glob\n---\n",
-    "expectedOutput": "---\ndescription: Implementer\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow, edit: allow, bash: allow, glob: allow}\nmode: subagent\nth-origin: opencode\n---\n",
+    "expectedOutput": "---\ndescription: Implementer\npermission: {read: allow, edit: allow, bash: allow, glob: allow}\nmode: subagent\nth-origin: opencode\n---\n",
     "note": "Write collapses into edit; dedup means only one edit key."
   },
   {
     "name": "agent_empty_tools",
     "surface": "agent",
     "input": "---\nname: init\nmodel: haiku\ntools: \n---\nBody.\n",
-    "expectedOutput": "---\nname: init\nmodel: anthropic/claude-haiku-4-5\npermission: {}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: init\npermission: {}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "Empty tools list → empty permission object."
   },
   {
     "name": "agent_effort_dropped",
     "surface": "agent",
     "input": "---\nname: orchestrator\nmodel: sonnet\neffort: high\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: orchestrator\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: orchestrator\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "S-4: effort is dropped — opencode has no effort field. This case asserts the drop so a future reader does not restore it."
   },
   {
     "name": "agent_color_green_to_success",
     "surface": "agent",
     "input": "---\nname: architect\nmodel: opus\ncolor: green\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: architect\nmodel: anthropic/claude-opus-4-6\npermission: {read: allow}\nmode: subagent\ncolor: success\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: architect\npermission: {read: allow}\nmode: subagent\ncolor: success\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_purple_to_accent",
     "surface": "agent",
     "input": "---\nname: architect\nmodel: opus\ncolor: purple\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: architect\nmodel: anthropic/claude-opus-4-6\npermission: {read: allow}\nmode: subagent\ncolor: accent\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: architect\npermission: {read: allow}\nmode: subagent\ncolor: accent\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_red_to_error",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: red\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: error\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: error\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_yellow_to_warning",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: yellow\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: warning\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: warning\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_orange_to_warning",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: orange\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: warning\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: warning\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_cyan_to_info",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: cyan\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: info\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: info\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_blue_to_info",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: blue\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: info\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: info\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_teal_to_info",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: teal\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: info\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: info\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_magenta_to_accent",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: magenta\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: accent\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: accent\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_pink_to_accent",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: pink\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: accent\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: accent\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "agent_color_valid_enum_passthrough",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: primary\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: primary\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: primary\nth-origin: opencode\n---\nBody.\n",
     "note": "An already-valid opencode enum passes through unchanged."
   },
   {
     "name": "agent_color_valid_hex_passthrough",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ncolor: \"#ff6b6b\"\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\ncolor: #ff6b6b\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: test\npermission: {read: allow}\nmode: subagent\ncolor: #ff6b6b\nth-origin: opencode\n---\nBody.\n",
     "note": "A valid hex color passes through unchanged."
   },
   {
     "name": "agent_mcp_tools_dropped",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ntools: Read, Edit, mcp__memory__search_nodes, mcp__context7__query-docs\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: test\npermission: {read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "MCP tools are dropped from permission — opencode governs MCP separately."
   },
   {
     "name": "agent_write_collapses_to_edit",
     "surface": "agent",
     "input": "---\nname: test\nmodel: sonnet\ntools: Read, Edit, Write, Glob, Grep\n---\nBody.\n",
-    "expectedOutput": "---\nname: test\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow, edit: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: test\npermission: {read: allow, edit: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "Write maps to edit; dedup → single edit key."
   },
   {
     "name": "agent_blanket_mode_subagent",
     "surface": "agent",
     "input": "---\nname: orchestrator\nmodel: sonnet\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: orchestrator\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: orchestrator\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "Generic transform injects mode: subagent for ALL agents — including orchestrator. The mode-by-role override (orchestrator → primary) is an installer layer applied AFTER this generic transform and is NOT reflected here (AC-12)."
   },
   {
     "name": "agent_all_mapped_tools",
     "surface": "agent",
     "input": "---\nname: implementer\nmodel: sonnet\ntools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit\n---\nBody.\n",
-    "expectedOutput": "---\nname: implementer\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow, edit: allow, bash: allow, glob: allow, grep: allow, task: allow, webfetch: allow, websearch: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "expectedOutput": "---\nname: implementer\npermission: {read: allow, edit: allow, bash: allow, glob: allow, grep: allow, task: allow, webfetch: allow, websearch: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "All 10 CC tool names mapped; Write+NotebookEdit collapse into edit (dedup)."
   },
   {
     "name": "command_string_allowed_tools",
     "surface": "command",
     "input": "---\nname: my-command\ndescription: A command\nmodel: sonnet\nallowed-tools: Read Edit Bash\n---\nBody.\n",
-    "expectedOutput": "---\nname: my-command\ndescription: A command\nmodel: anthropic/claude-sonnet-4-6\npermission: {allow: [Read, Edit, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: my-command\ndescription: A command\npermission: {allow: [Read, Edit, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "command_array_allowed_tools",
     "surface": "command",
     "input": "---\nname: deploy\ndescription: Deploy command\nmodel: sonnet\nallowed-tools: [Read, Bash]\n---\nBody.\n",
-    "expectedOutput": "---\nname: deploy\ndescription: Deploy command\nmodel: anthropic/claude-sonnet-4-6\npermission: {allow: [Read, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n"
+    "expectedOutput": "---\nname: deploy\ndescription: Deploy command\npermission: {allow: [Read, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n"
   },
   {
     "name": "reject_inline_injection_in_body",
