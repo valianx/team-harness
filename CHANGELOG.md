@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.119.2] - 2026-06-21
+
+### Fixed
+
+- The CC→opencode frontmatter transform (`cmd/install/transform.go` and `tools/harness-migrate/migrate.mjs`) now resolves bare model aliases (`opus`/`sonnet`/`haiku`) to concrete models.dev model ids (`anthropic/claude-opus-4-6`, `anthropic/claude-sonnet-4-6`, `anthropic/claude-haiku-4-5`) instead of emitting the registry-invalid `anthropic/opus`. opencode rejects the bare-alias form, so a fresh install/migrate previously produced unusable opencode agent configs. Resolution uses a static release-time map (byte-identical across the Go and JS seams, locked by the shared `transform-conformance.json` fixture); already-concrete ids pass through unchanged. Installed configs stay current via the on-demand `/th:update-models` runtime path.
+
 ## [2.119.1] - 2026-06-21
 
 ### Changed
