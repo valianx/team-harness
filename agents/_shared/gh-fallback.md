@@ -91,6 +91,18 @@ elif [ "$is_github" = "true" ]; then
 fi
 ```
 
+**STOP-on-access-failure (PR read is not best-effort).** Unlike comment/review reads, resolving the PR head is load-bearing — a review must read from the real head, never a guess. If the `gh` call fails (`Could not resolve to a Repository`, `Repository not found`, auth/account error) AND the curl fallback fails or no token is set AND the head branch cannot be fetched locally (`git fetch origin {headRefName}` fails), STOP. Surface the operator-facing line below and wait. Do NOT substitute the currently checked-out branch for the PR. Do NOT assume the local branch is the PR. Do NOT review the primary working tree as a fallback. A PR review reads from a worktree at the resolved PR head or it does not run.
+
+Operator-facing STOP message:
+```
+cannot reach PR — authenticate or paste the diff
+
+The PR head could not be resolved from GitHub (gh: "{error}"; no token / wrong account).
+Review of the checked-out branch or the working tree is NOT a valid substitute.
+Options: (1) authenticate the correct gh account and re-run; or
+         (2) paste the PR diff, and I will review the pasted diff only.
+```
+
 ### Tier A — list open PRs for a branch
 
 ```bash
