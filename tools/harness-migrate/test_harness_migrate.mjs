@@ -192,8 +192,10 @@ assert(
   toProviderPrefixedModel("claude-opus-4-5") === "anthropic/claude-opus-4-5"
 );
 assert(
-  "model: alias → provider-prefixed",
-  toProviderPrefixedModel("opus") === "anthropic/opus"
+  "model: alias → resolved concrete provider-prefixed id",
+  toProviderPrefixedModel("opus") === "anthropic/claude-opus-4-6" &&
+    toProviderPrefixedModel("sonnet") === "anthropic/claude-sonnet-4-6" &&
+    toProviderPrefixedModel("haiku") === "anthropic/claude-haiku-4-5"
 );
 assert(
   "model: already-prefixed → identity",

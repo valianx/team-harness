@@ -35,6 +35,18 @@ const DIRECTION_TO_CC = "to-claude-code";
 /** Provider prefix used on the opencode side. */
 const ANTHROPIC_PREFIX = "anthropic/";
 
+/**
+ * Maps the three CC bare alias names to their current concrete opencode model ids.
+ * Pinned at release time from models.dev; installed configs stay fresh via
+ * the on-demand /th:update-models runtime path.
+ * Content must stay byte-identical to aliasToConcreteModel in cmd/install/transform.go.
+ */
+const ALIAS_TO_CONCRETE_MODEL = {
+  opus: "claude-opus-4-6",
+  sonnet: "claude-sonnet-4-6",
+  haiku: "claude-haiku-4-5",
+};
+
 /** Mode values injected by the forward pass, dropped on inverse for CC-origin files. */
 const INJECTED_MODE_VALUES = new Set(["primary", "subagent", "all"]);
 
@@ -527,8 +539,15 @@ function classifyFileSurface(filePath) {
 
 function toProviderPrefixedModel(bare) {
   if (!bare || typeof bare !== "string") return bare;
-  if (bare.startsWith(ANTHROPIC_PREFIX)) return bare;
-  return ANTHROPIC_PREFIX + bare;
+  // Strip any existing prefix to get the canonical bare form.
+  const canonical = bare.startsWith(ANTHROPIC_PREFIX)
+    ? bare.slice(ANTHROPIC_PREFIX.length)
+    : bare;
+  // Resolve bare alias to concrete model id; pass concrete ids through unchanged.
+  if (Object.prototype.hasOwnProperty.call(ALIAS_TO_CONCRETE_MODEL, canonical)) {
+    return ANTHROPIC_PREFIX + ALIAS_TO_CONCRETE_MODEL[canonical];
+  }
+  return ANTHROPIC_PREFIX + canonical;
 }
 
 function toBareModel(prefixed) {

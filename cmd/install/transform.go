@@ -19,6 +19,16 @@ var pollutionKeys = map[string]bool{
 // anthropicPrefix is the provider prefix prepended to bare model names.
 const anthropicPrefix = "anthropic/"
 
+// aliasToConcreteModel maps the three CC bare alias names to their current
+// concrete opencode model ids. Pinned at release time from models.dev;
+// installed configs stay fresh via the on-demand /th:update-models runtime path.
+// Map content must stay byte-identical to ALIAS_TO_CONCRETE_MODEL in migrate.mjs.
+var aliasToConcreteModel = map[string]string{
+	"opus":   "claude-opus-4-6",
+	"sonnet": "claude-sonnet-4-6",
+	"haiku":  "claude-haiku-4-5",
+}
+
 // TransformKind identifies the surface a transform applies to.
 const (
 	TransformKindAgent   = "agent"
@@ -160,10 +170,16 @@ func toProviderPrefixedModel(bare string) string {
 	if bare == "" {
 		return bare
 	}
+	// Strip any existing prefix to get the canonical bare form.
+	canonical := bare
 	if strings.HasPrefix(bare, anthropicPrefix) {
-		return bare
+		canonical = bare[len(anthropicPrefix):]
 	}
-	return anthropicPrefix + bare
+	// Resolve bare alias to concrete model id; pass concrete ids through unchanged.
+	if concrete, ok := aliasToConcreteModel[canonical]; ok {
+		return anthropicPrefix + concrete
+	}
+	return anthropicPrefix + canonical
 }
 
 func agentToolsToPermissionAllow(toolsStr string) []string {
