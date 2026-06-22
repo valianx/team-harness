@@ -1,0 +1,2 @@
+### Fixed
+- opencode install is now provider-agnostic: the CC→opencode transform emits no `model:` field on any agent (primary or subagent), so the whole harness follows the operator's runtime `/model` pick on any provider. This removes the baked `anthropic/<id>` that caused `ProviderModelNotFoundError` on providers that do not serve that id. Per-provider cost tiering is a deferred, additive step (see `docs/opencode-model-config.md`).
