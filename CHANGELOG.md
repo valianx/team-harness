@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.119.3] - 2026-06-22
+
+### Fixed
+
+- opencode install is now provider-agnostic: the CC→opencode transform emits no `model:` field on any agent (primary or subagent), so the whole harness follows the operator's runtime `/model` pick on any provider. This removes the baked `anthropic/<id>` that caused `ProviderModelNotFoundError` on providers that do not serve that id. Per-provider cost tiering is a deferred, additive step (see `docs/opencode-model-config.md`).
+
 ## [2.119.2] - 2026-06-21
 
 ### Fixed
