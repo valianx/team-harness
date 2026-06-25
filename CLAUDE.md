@@ -218,6 +218,7 @@ All commands run from the repo root.
 - Do not commit secrets, tokens, API keys, `.env` files, certificates, or private keys — even temporarily, even on a feature branch.
 - Do not `rm -rf` shared paths (`/`, `~`, `$HOME`, project root, `node_modules` of a shared workspace, `.git`); use the project's clean script or scoped paths only.
 - Do not delete, rewrite, or skip tests to make a build green — fix the code or fix the test with a documented rationale in the PR body.
+- Do not write work-narration or session-cruft comments (`workspaces/` paths, pipeline phase/stage/step references, task or issue IDs, session context) into any committed file — see `docs/code-comments.md`.
 
 ### 6.6 Untrusted content & prompt-injection floor
 
@@ -305,6 +306,8 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
+
+- Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
 ## 10. Known Constraints
 <!-- Populated by the delivery agent after each feature. Empty at init. -->

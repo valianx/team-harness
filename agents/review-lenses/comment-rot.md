@@ -13,6 +13,9 @@ Load this file when the diff contains any of:
 - Inline comments that describe behavior different from what the code actually does
 - Commented-out code blocks (`// old implementation`, `/* deprecated path */`)
 - Return type annotations in doc-comments that differ from the actual return type
+- Work-narration or session-cruft patterns: `// fix for issue`, `// fix for #`, `// per Step`,
+  `// workspace note`, `// per phase`, `// per stage`, `// added in this`, `// per orchestrator`,
+  phase or stage references inside code comments, pipeline-step references inside code comments
 
 ## What to look for
 
@@ -79,6 +82,42 @@ When both the code and the comment are wrong, classify as CRITICAL.
 Commented-out code should be removed, not left as dead reference. Version control preserves
 history — the comment serves no informational purpose for future readers.
 
+### Work-narration and session cruft
+
+Work-narration comments are comments that describe the authoring session rather than the code.
+They leak internal pipeline mechanics into shipped code and mislead future readers.
+
+```ts
+// Smell — references an issue ID; issue linkage belongs in the commit and PR
+// fix for issue #430
+
+// Smell — references a pipeline step; reader has no context for what "Step 6" means
+// per Step 6
+
+// Smell — references pipeline mechanics
+// added in this workspace session
+
+// Smell — references an orchestrator phase
+// per orchestrator Phase 2
+```
+
+**What to look for:**
+
+- Comments containing `fix for issue`, `fix for #`, `per Step`, `per Phase`, `per Stage`,
+  `workspace note`, `added in this`, `per orchestrator`, or any reference to pipeline
+  phase/stage/step numbers.
+- A comment that explains what was done during authoring rather than why the code exists.
+- Mid-body issue references (`// resolves #N`) — issue linkage belongs in the commit message
+  and PR body, not in source comments.
+
+**Documented exception.** A single top-of-file commit-shaped provenance header (one per file,
+at the very top) is tolerated. Example: `dev-guard.sh:3` carries `fix(dev-guard): … (F-016,
+#304)` — this is a file-provenance marker, not inline work-narration. Raise a finding only
+when the reference appears mid-body, not at the very top of the file.
+
+**Scope note.** Pre-existing work-narration comments in untouched code are out of scope for
+this lens. Raise findings only for comments the diff introduced or modified.
+
 ## Severity guidance
 
 | Pattern | Severity |
@@ -86,6 +125,7 @@ history — the comment serves no informational purpose for future readers.
 | Comment contradicts code in a way that would mislead a caller about safety, error handling, or return values | SUGGESTION |
 | Doc-comment `@param` list diverges from signature (callers receive wrong information) | SUGGESTION |
 | Bare `TODO`/`FIXME` in new code with no issue reference or resolution condition | SUGGESTION |
+| Work-narration / session-cruft comment (issue ID, phase/stage/step reference, workspace note) introduced or modified in this diff | SUGGESTION |
 | Commented-out code block (dead reference, version control has history) | NITPICK |
 | `HACK` marker with no explanation of why the hack is necessary | NITPICK |
 | Stale `// Returns X` comment where the return type changed but the behavior is correct | NITPICK |
