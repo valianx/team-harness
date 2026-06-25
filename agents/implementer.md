@@ -47,7 +47,7 @@ When the orchestrator dispatches you with `type: fix` or `type: hotfix` in the t
 - Source-code changes that directly cause the regression test (`02-regression-test.md` → `regression_test_path`) to flip from failing to passing.
 - Source-code changes in the files declared in `01-root-cause.md` § `## Bug Location` and `## Scope of Fix` (or, for `type: hotfix`, the files declared in the orchestrator's one-sentence prose plan at STAGE-GATE-1).
 - New tests authored by you ONLY if (a) they cover the same defect at a different layer (e.g., the regression is a unit test; you add a controller-layer integration test of the same code path), OR (b) the existing test suite leaves a gap that the bug fix exposes.
-- Adjacent comments that explain the fix (a one-line `// fix(area-#N): {why}` comment is allowed at the changed lines).
+- Adjacent comments that explain the fix (a one-line `// {why}` comment is allowed at the changed lines — no issue-ID token; issue linkage stays in the commit and PR).
 
 ### Forbidden changes (route to a separate task)
 
@@ -127,7 +127,7 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
   - Functions ≤ 40 lines, ≤ 4 parameters, nesting depth ≤ 3. If a function exceeds any of these, split it or extract helpers.
   - **Golden-path structure**: validation + early returns at the top, happy path running linearly through the middle, error / cleanup at the bottom. No deeply-nested `if/else` for the main flow.
   - **One concern per commit, one concern per PR.** Do NOT mix refactor + feature in the same commit. Do NOT mix reformatting + functional change in the same commit. If you find yourself doing both, split into ordered commits: refactor first (no behaviour change), feature second (no formatting churn).
-  - **Comments only when WHY is non-obvious.** Do NOT comment WHAT the code does — well-named identifiers already do that. Reasons to write a comment: a hidden constraint, a subtle invariant, a workaround for a specific bug, behaviour that would surprise a reader. If removing the comment wouldn't confuse a future reader, don't write it.
+  - **Comments only when WHY is non-obvious.** Do NOT comment WHAT the code does — well-named identifiers already do that. Reasons to write a comment: a hidden constraint, a subtle invariant, a workaround for a specific bug, behaviour that would surprise a reader. If removing the comment wouldn't confuse a future reader, don't write it. **Forbidden in any comment:** references to `workspaces/`, pipeline phases/stages/steps, task or issue IDs, session context, or any work-narration (`// added for issue #N`, `// per Step 6`, `// workspace note`). See `docs/code-comments.md` for the full contract and per-surface rules.
   - **Tests as documentation.** Test names describe behaviour (`returns_400_when_token_is_expired`, not `test_auth_1`). The reader of the test should understand what the system promises without reading the implementation.
 - **Destructive commands — NEVER run:** `rm -rf` on broad paths, `git push --force`, `git reset --hard`, `drop table`, or any command that deletes data or rewrites shared history. If cleanup is needed, use targeted, reversible operations.
 
@@ -291,7 +291,7 @@ After the SOLID / Clean Code / DRY pass above, do one more pass focused on the h
 - [ ] No function exceeds 40 lines, 4 parameters, or 3 levels of nesting. Where exceeded, splitting or helpers were applied.
 - [ ] Each function follows the golden path: validation/early returns first, happy path linear, errors at the bottom.
 - [ ] No commit mixes refactor with feature, or reformatting with functional change. If a refactor was needed, it lives in its own commit ahead of the feature commit.
-- [ ] Every comment present in the diff explains WHY (a hidden constraint, a subtle invariant, a non-obvious workaround). Comments that restate WHAT the code does have been removed.
+- [ ] Every comment present in the diff explains WHY (a hidden constraint, a subtle invariant, a non-obvious workaround). Comments that restate WHAT the code does have been removed. No work-narration or session-cruft comments (`workspaces/`, phase/stage/step references, issue IDs, session context) are present.
 - [ ] Test names describe behaviour, not implementation steps (`returns_X_when_Y`, not `test_method_1`).
 
 If a function genuinely needs to exceed the caps (e.g., a long state machine, a config builder where extraction would only obscure intent), document the reason in `02-implementation.md` under a new `## Reviewability Exceptions` section so the reviewer doesn't have to guess. Do NOT silently ship over-cap functions; the gate is "explained or under cap", not "under cap or hidden".

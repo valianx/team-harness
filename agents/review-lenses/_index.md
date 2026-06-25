@@ -7,7 +7,7 @@
 |------|------|--------------------------------|
 | silent-failure | silent-failure.md | empty `catch {}`, `.catch(() =>`, `except: pass`, `_ = err`, ignored return codes, swallowed promises, discarded `Result`/`Either` |
 | type-design | type-design.md | `\| null \| undefined` sprawl, primitive-typed ids/enums/money, boolean params, stringly-typed state, missing discriminated unions |
-| comment-rot | comment-rot.md | `TODO`, `FIXME`, `HACK`, doc-comment param lists diverging from signature, comments contradicting code |
+| comment-rot | comment-rot.md | `TODO`, `FIXME`, `HACK`, doc-comment param lists diverging from signature, comments contradicting code, work-narration patterns (`fix for issue`, `fix for #`, `per Step`, `per Phase`, `per Stage`, `workspace note`, pipeline-step/phase/stage references in comments) |
 | loosening-impact | loosening-impact.md | removed `if (`/`guard`/`assert`/`validate`/`whitelist`/`allowlist`/`require`/`check`; removed `try`/`catch`/error-handling; removed test cases; removed gate conditions; deleted or short-circuited flag reads; removed early-return guards |
 
 ## Path convention
