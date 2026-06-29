@@ -308,7 +308,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 - **Three-state update model**: update-available / already-current / installed-ahead. Installed-ahead → report only, no downgrade. Zero writes when already-current. → `cmd/install/update.go`
-- **Restart-to-activate honesty**: updaters NEVER claim live; always print "restart to activate." Mirrors `/th:update`. → `cmd/install/update.go:applyUpdateDiff`
+- **Restart-to-activate honesty**: updaters NEVER claim live; print "restart to activate" after any apply — NOT on the already-current/installed-ahead zero-write paths. Mirrors `/th:update`. → `cmd/install/update.go:applyUpdateDiff`
 - **TTY confirm prompt → stderr**: write prompt to `os.Stderr` (always writable); read from `/dev/tty` or `os.Stdin` fallback. Never write to an O_RDONLY handle. → `cmd/install/update.go:confirmApply`
 
 ## 10. Known Constraints

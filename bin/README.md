@@ -26,7 +26,7 @@ These scripts:
 After the update: **restart opencode** to activate. The update is NOT live in any running session until restart.
 
 Direct subcommand (headless / CI — skips TTY prompt and applies directly):
-```
+```text
 install update --runtime opencode --scope global --non-interactive
 ```
 

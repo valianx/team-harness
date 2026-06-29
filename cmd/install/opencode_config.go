@@ -170,8 +170,11 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 	raw := map[string]json.RawMessage{}
 	if readErr == nil && len(existing) > 0 {
 		if err := json.Unmarshal(existing, &raw); err != nil {
-			// Corrupt file — start fresh (only managed keys will be written).
-			raw = map[string]json.RawMessage{}
+			// fix(config): fail closed — a corrupt file must not be silently
+			// overwritten and replaced with only managed keys (AC-5). The operator
+			// must repair or remove the file before the update can proceed; this
+			// preserves all operator keys until the file is parseable again.
+			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
 		}
 	}
 
@@ -188,10 +191,15 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 	raw["updated_at"] = mustMarshalJSON(time.Now().UTC().Format(time.RFC3339))
 
 	// Backup before write — routes through the hardened write path.
+	// fix(config): backup must succeed before the rewrite; if the backup write
+	// fails there is no recovery copy, so abort rather than overwriting the
+	// config without a safety net.
 	if len(existing) > 0 && readErr == nil {
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := path + ".bak-" + ts
-		_ = hardenedWriteFile(existing, bakPath, placer.ConfigRoot(), false)
+		if err := hardenedWriteFile(existing, bakPath, placer.ConfigRoot(), false); err != nil {
+			return fmt.Errorf("backup .team-harness.json before update: %w", err)
+		}
 	}
 
 	// Serialize and write through the hardened placer path (SEC-OC-R2).

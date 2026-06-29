@@ -186,6 +186,13 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 // where stdin is the pipe), or from os.Stdin when stdin is an interactive
 // TTY but /dev/tty is unavailable (Windows interactive sessions).
 //
+// Why a raw bufio.Scanner prompt instead of the installer's huh/v2 TUI:
+// the update subcommand is a thin, non-interactive-aware path that runs
+// in contexts (curl | bash, headless CI) where a full bubbletea TUI
+// would be inappropriate or fail. The raw stderr-prompt + /dev/tty-read
+// pattern is deliberately lighter and correctly handles the piped-stdin
+// case that the TUI stack cannot.
+//
 // AC-12: operator answer "n" → ZERO writes performed by the caller.
 func confirmApply() bool {
 	// Resolve the best available reader for the operator's answer.

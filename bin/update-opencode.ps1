@@ -41,7 +41,13 @@ $BinUrl  = "$BaseUrl/$Asset"
 # Best-effort read of installed_version from .team-harness.json.
 # On any uncertainty, fall through to download + the authoritative Go-side
 # comparison (which parses JSON robustly and is idempotent).
+#
+# Skipped when passthrough args are present ($args.Count -gt 0). Flags like
+# --opencode-dir point the Go binary at a non-default config root; the
+# shell-side check only reads the default global path and would incorrectly
+# short-circuit before the binary resolves the correct root from those args.
 # ---------------------------------------------------------------------------
+if ($args.Count -eq 0) {
 $InstalledVersion = ''
 $LatestVersion = ''
 
@@ -108,6 +114,7 @@ if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
         exit 0
     }
 }
+} # end: $args.Count -eq 0 pre-check guard
 
 # ---------------------------------------------------------------------------
 # Download and verify (mirrors install-opencode.ps1 byte-for-byte — AC-10).

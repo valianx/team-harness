@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -269,49 +270,176 @@ func TestRefreshManagedConfigKeys_BackupWritten(t *testing.T) {
 	}
 }
 
+// TestRefreshManagedConfigKeys_CorruptJSON_FailClosed verifies that when the
+// existing .team-harness.json cannot be parsed (corrupt / partially-written),
+// refreshManagedConfigKeys returns an error and does NOT overwrite the file
+// (fail-closed — AC-5 byte-for-byte preservation guarantee).
+//
+// Before this fix the function silently discarded the parse error and started
+// with an empty map, then wrote ONLY the three managed keys — dropping every
+// operator key.
+func TestRefreshManagedConfigKeys_CorruptJSON_FailClosed(t *testing.T) {
+	dir := t.TempDir()
+	placer := newOpencodePlacerAt(dir)
+	cfgPath := opencodeSettingsConfigPath(dir)
+
+	// Truncated JSON — simulates a partially-written or disk-error-corrupted file.
+	corrupt := []byte(`{"logs-mode": "obsidian", "installed_version": "FORGED-1.0.0"`)
+	if err := os.WriteFile(cfgPath, corrupt, 0o644); err != nil {
+		t.Fatalf("seed write: %v", err)
+	}
+
+	err := refreshManagedConfigKeys(cfgPath, placer)
+	if err == nil {
+		t.Error("expected an error for corrupt JSON input, got nil — fail-closed not enforced")
+	}
+
+	// The config file must be byte-identical to the corrupt seed; it must NOT
+	// have been overwritten with only managed keys.
+	afterBytes, readErr := os.ReadFile(cfgPath)
+	if readErr != nil {
+		t.Fatalf("read after: %v", readErr)
+	}
+	if !bytes.Equal(corrupt, afterBytes) {
+		t.Error("config file was modified despite corrupt JSON — fail-closed (AC-5) was not applied")
+	}
+}
+
+// TestRefreshManagedConfigKeys_BackupFailure_ReturnsError verifies that when
+// the backup write fails (e.g. directory is read-only), refreshManagedConfigKeys
+// returns an error and does NOT overwrite the config. The backup must succeed
+// before the rewrite; without it there is no recovery copy if the main write
+// were to leave the file partially written.
+//
+// Simulation: make the directory read-only so creating a new backup file
+// (O_CREAT on a new entry) fails, while reading the existing config file
+// still succeeds. On a read-only dir, the existing file can be stat'd and
+// read but no new directory entries can be created.
+func TestRefreshManagedConfigKeys_BackupFailure_ReturnsError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod-based backup-failure simulation does not apply on Windows — permissions model differs")
+	}
+
+	dir := t.TempDir()
+	placer := newOpencodePlacerAt(dir)
+	cfgPath := opencodeSettingsConfigPath(dir)
+
+	seed := map[string]interface{}{
+		"logs-mode":         "obsidian",
+		"installed_version": "1.0.0",
+		"format_version":    "1",
+	}
+	seedBytes, _ := json.Marshal(seed)
+	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
+		t.Fatalf("seed write: %v", err)
+	}
+	originalBytes, _ := os.ReadFile(cfgPath)
+
+	// Make the directory read + execute only — backup creation (new file in the
+	// directory) will fail with EACCES; the existing config file can still be read.
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatalf("chmod dir read-only: %v", err)
+	}
+	// Restore directory permissions unconditionally so t.TempDir can clean up.
+	defer func() { _ = os.Chmod(dir, 0o755) }()
+
+	err := refreshManagedConfigKeys(cfgPath, placer)
+
+	// Restore now so we can read the file for verification.
+	_ = os.Chmod(dir, 0o755)
+
+	if err == nil {
+		t.Error("expected error when backup write fails, got nil — abort-on-backup-failure not enforced")
+	}
+
+	// The config must be unchanged: the main write must not have been attempted.
+	afterBytes, readErr := os.ReadFile(cfgPath)
+	if readErr != nil {
+		t.Fatalf("read after: %v", readErr)
+	}
+	if !bytes.Equal(originalBytes, afterBytes) {
+		t.Error("config file was modified despite backup failure — the config must remain unchanged when the backup cannot be written")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests: already-current short-circuit produces zero writes
 // ---------------------------------------------------------------------------
 
-// TestAlreadyCurrent_ZeroWrites verifies that when the installed version equals
-// the embedded binary version AND there is no on-disk asset divergence, the
-// update produces ZERO writes to asset files, the ledger, and .team-harness.json
-// (AC-2).
+// TestAlreadyCurrent_ZeroWrites_Decision verifies the zero-write guarantee for
+// the already-current case at two levels (AC-2):
 //
-// This test exercises the already-current decision through the compareSemver
-// contract (the runUpdateCommand already-current branch) and the PlanDiff
-// property of ComputePlan when all files match — it does not call
-// runUpdateCommand directly (which requires a full global opencode config root
-// and a network-free placer, neither of which the test harness provides).
-// The assertion is: "if compareSemver(installed, embedded) == 0 AND the plan
-// diff has zero create/update/remove, then no write functions are called."
+//   - Part A (decision gate): compareSemver returns 0 when installed == embedded,
+//     satisfying the condition that gates the early return in runUpdateCommand.
+//
+//   - Part B (write boundary): applyUpdateDiff called with a zero-change diff
+//     writes ONLY the config file (managed keys) and its backup — NO asset files.
+//
+// Boundary note: in runUpdateCommand the already-current path returns BEFORE
+// calling applyUpdateDiff when delta==0 and the plan diff has no action entries.
+// That early-return short-circuit is validated by Part A together with
+// TestCompareSemver_ThreeStateDispatch. Part B drives applyUpdateDiff directly
+// so the test fails if the write path regresses — not merely reconstructing the
+// production decision logic as a local variable.
 func TestAlreadyCurrent_ZeroWrites_Decision(t *testing.T) {
-	// Simulate the already-current branch: installed == embedded.
-	installed := version
-	if compareSemver(version, installed) != 0 {
-		t.Fatalf("test precondition: compareSemver(version, version) != 0; got %d", compareSemver(version, installed))
+	// Part A — decision gate.
+	if compareSemver(version, version) != 0 {
+		t.Fatalf("compareSemver(version, version) must be 0 (already-current gate); got %d", compareSemver(version, version))
 	}
 
-	// Simulate a plan diff where all files are hash-matched (zero writes).
+	// Part B — write boundary: drive applyUpdateDiff with a zero-change diff
+	// against a real temp config root.
+	dir := t.TempDir()
+	placer := newOpencodePlacerAt(dir)
+	cfgPath := opencodeSettingsConfigPath(dir)
+
+	seed := map[string]interface{}{
+		"installed_version": version,
+		"format_version":    "1",
+		"logs-mode":         "local",
+	}
+	seedBytes, _ := json.Marshal(seed)
+	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
+		t.Fatalf("seed write: %v", err)
+	}
+
+	// Zero-change diff: no ToCreate, ToUpdate, or ToRemove entries.
 	diff := PlanDiff{
 		ToCreate:        nil,
 		ToUpdate:        nil,
-		ToSkipHashMatch: []PlannedFile{{Component: "test", ConcreteDst: "/test/path"}},
+		ToSkipHashMatch: []PlannedFile{{Component: "test", ConcreteDst: filepath.Join(dir, "agents", "test.md")}},
 		ToRemove:        nil,
 		LedgerErrors:    nil,
 	}
-	hasChanges := len(diff.ToCreate)+len(diff.ToUpdate)+len(diff.ToRemove) > 0
-	if hasChanges {
-		t.Error("already-current check: hasChanges should be false when all files are in ToSkipHashMatch")
+
+	applyUpdateDiff(diff, cfgPath, placer)
+
+	// Only .team-harness.json and its timestamped backup must exist in the root;
+	// no asset files must be created (zero-change diff = zero asset writes).
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("readdir: %v", err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if name == ".team-harness.json" || strings.HasPrefix(name, ".team-harness.json.bak-") {
+			continue
+		}
+		t.Errorf("unexpected file in config root after zero-change applyUpdateDiff: %q (only config + backup expected)", name)
 	}
 
-	// The caller (runUpdateCommand) returns early when delta==0 && !hasChanges.
-	// This assertion proves the short-circuit decision is correct.
-	if compareSemver(version, installed) == 0 && !hasChanges {
-		// Correct: the function would have returned without writing anything.
-		return
+	// Managed keys must be bumped by applyUpdateDiff.
+	raw, readErr := os.ReadFile(cfgPath)
+	if readErr != nil {
+		t.Fatalf("read after: %v", readErr)
 	}
-	t.Error("already-current short-circuit logic is incorrect")
+	var result map[string]interface{}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result["installed_version"] != version {
+		t.Errorf("installed_version = %v, want %v (managed key not bumped by applyUpdateDiff)", result["installed_version"], version)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -362,15 +490,25 @@ func TestUpdateOpencodePS1_StaticVerify(t *testing.T) {
 		}
 	}
 
-	// Negative check (UAC heuristic avoidance — AC-10): the temp binary filename
-	// must not contain any of the Windows installer-detection trigger words.
-	// Find the line that sets the updater temp path.
-	for _, trigger := range []string{`"update"`, `"install"`, `"setup"`, `"patch"`} {
-		// Look for the trigger inside a filename assignment to the temp file path.
-		// The pattern: Join-Path $TmpDir "...update..." (any of the 4 triggers).
-		if strings.Contains(src, "Join-Path $TmpDir "+trigger) ||
-			strings.Contains(src, "Join-Path $TmpDir '"+trigger[1:len(trigger)-1]+"'") {
-			t.Errorf("update-opencode.ps1 temp binary filename contains UAC trigger word %s (Windows UAC heuristic avoidance violated — AC-10)", trigger)
+	// Negative check (UAC heuristic avoidance — AC-10): the actual temp binary
+	// filename must not contain any of the four Windows installer-detection trigger
+	// words as a case-insensitive SUBSTRING (e.g. "foo-update.exe" would also
+	// violate the heuristic).
+	// Extract the filename from the $UpdaterPath assignment line.
+	const updaterLinePrefix = `$UpdaterPath = Join-Path $TmpDir "`
+	if uidx := strings.Index(src, updaterLinePrefix); uidx == -1 {
+		t.Error("update-opencode.ps1 missing '$UpdaterPath = Join-Path $TmpDir' assignment (AC-10)")
+	} else {
+		rest := src[uidx+len(updaterLinePrefix):]
+		if qidx := strings.Index(rest, `"`); qidx == -1 {
+			t.Error("update-opencode.ps1: could not extract temp filename from $UpdaterPath assignment (AC-10)")
+		} else {
+			tempFilename := strings.ToLower(rest[:qidx])
+			for _, trigger := range []string{"update", "install", "setup", "patch"} {
+				if strings.Contains(tempFilename, trigger) {
+					t.Errorf("update-opencode.ps1 temp binary filename %q contains UAC trigger word %q — Windows installer-detection heuristic violated (AC-10)", rest[:qidx], trigger)
+				}
+			}
 		}
 	}
 
@@ -423,13 +561,13 @@ func TestUpdateOpencodePS1_NeutralTempFilename(t *testing.T) {
 // branch of runUpdateCommand (AC-3):
 //   - readInstalledVersion correctly reads a version that is ahead of the binary.
 //   - compareSemver(version, aheadVersion) < 0 — the correct gate for the branch.
-//   - The config file is NOT written when the installed-ahead condition is met;
-//     specifically, installed_version is not downgraded and operator keys survive.
 //
-// The test is hermetic: it uses a temp dir and calls only read-only helpers
-// (readInstalledVersion, compareSemver). No write function is called — this
-// mirrors what the installed-ahead branch in runUpdateCommand does (it returns
-// immediately after printing the version delta, before any write call).
+// No-write structural guarantee: the installed-ahead branch in runUpdateCommand
+// executes only fmt.Println calls and then returns immediately — there are no
+// calls to applyUpdateDiff or refreshManagedConfigKeys on that path. The
+// guarantee is enforced by the code structure, not by a runtime assertion, so
+// this test validates the two real functions (readInstalledVersion, compareSemver)
+// that determine whether the branch is entered.
 func TestInstalledAhead_VersionReadAndNoDowngradeGuarantee(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := opencodeSettingsConfigPath(dir)
@@ -439,54 +577,25 @@ func TestInstalledAhead_VersionReadAndNoDowngradeGuarantee(t *testing.T) {
 	seed := map[string]interface{}{
 		"installed_version": aheadVersion,
 		"format_version":    "1",
-		"logs-mode":         "obsidian",  // operator key — must survive untouched
-		"logs-path":         "/my/vault", // operator key — must survive untouched
+		"logs-mode":         "obsidian",
+		"logs-path":         "/my/vault",
 	}
 	seedBytes, _ := json.Marshal(seed)
 	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
 		t.Fatalf("seed write: %v", err)
 	}
 
-	// readInstalledVersion must correctly read the ahead version.
+	// readInstalledVersion must correctly read the ahead version from the config.
 	got := readInstalledVersion(cfgPath)
 	if got != aheadVersion {
 		t.Errorf("readInstalledVersion = %q, want %q", got, aheadVersion)
 	}
 
 	// The installed-ahead branch gate: compareSemver(embedded, installed) < 0.
+	// If this fails, the no-downgrade branch would never be entered.
 	delta := compareSemver(version, got)
 	if delta >= 0 {
 		t.Fatalf("installed-ahead branch condition not met: compareSemver(%q, %q) = %d, want < 0", version, got, delta)
-	}
-
-	// Record the config bytes before the (zero) write path.
-	originalBytes, _ := os.ReadFile(cfgPath)
-
-	// In the installed-ahead branch of runUpdateCommand, the only actions are
-	// fmt.Println calls followed by an immediate return — no write functions are
-	// invoked. Confirm the config file is byte-identical (no downgrade, no
-	// operator-key clobber).
-	afterBytes, err := os.ReadFile(cfgPath)
-	if err != nil {
-		t.Fatalf("read after: %v", err)
-	}
-	if !bytes.Equal(originalBytes, afterBytes) {
-		t.Error("config file was modified — installed-ahead branch must produce zero writes")
-	}
-
-	// Decode and assert specific fields for clarity in failure messages.
-	var result map[string]interface{}
-	if err := json.Unmarshal(afterBytes, &result); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if result["installed_version"] != aheadVersion {
-		t.Errorf("installed_version = %v, want %q (no-downgrade guarantee violated)", result["installed_version"], aheadVersion)
-	}
-	if result["logs-mode"] != "obsidian" {
-		t.Errorf("logs-mode = %v, want obsidian (operator key clobbered on installed-ahead path)", result["logs-mode"])
-	}
-	if result["logs-path"] != "/my/vault" {
-		t.Errorf("logs-path = %v, want /my/vault (operator key clobbered on installed-ahead path)", result["logs-path"])
 	}
 }
 

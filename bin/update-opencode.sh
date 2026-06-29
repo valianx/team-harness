@@ -56,7 +56,13 @@ BIN_URL="${BASE_URL}/${ASSET}"
 # Best-effort read of installed_version from .team-harness.json.
 # On any read uncertainty, fall through to download + the authoritative Go-side
 # comparison (which parses JSON robustly and is idempotent).
+#
+# Skipped when passthrough args are present ($# -gt 0). Flags like
+# --opencode-dir point the Go binary at a non-default config root; the
+# shell-side check only reads the default global path and would incorrectly
+# short-circuit before the binary resolves the correct root from those args.
 # ---------------------------------------------------------------------------
+if [ $# -eq 0 ]; then
 if [ -n "${XDG_CONFIG_HOME:-}" ]; then
     OC_CONFIG_DIR="${XDG_CONFIG_HOME}/opencode"
 else
@@ -119,6 +125,7 @@ EOF
         exit 0
     fi
 fi
+fi # end: $# -eq 0 pre-check guard
 
 # ---------------------------------------------------------------------------
 # Download and verify (mirrors install-opencode.sh byte-for-byte — AC-10).

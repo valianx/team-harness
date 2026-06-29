@@ -106,17 +106,17 @@ Run the update command, then reload:
 Run the dedicated updater bootstrap — it performs a cheap version pre-check (no binary download when already current), downloads and SHA256-verifies the binary, shows the four-bucket diff preview, and applies only changed files:
 
 **Linux / macOS:**
-```
+```bash
 curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh | bash
 ```
 
 **Windows (PowerShell):**
-```
+```powershell
 iwr https://valianx.github.io/team-harness/update-opencode.ps1 | iex
 ```
 
 Or run the subcommand directly (headless / CI):
-```
+```text
 install update --runtime opencode --scope global --non-interactive
 ```
 
