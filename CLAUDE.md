@@ -302,12 +302,19 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 
 ## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
+- **2026-06-29** — `refreshManagedConfigKeys` vs `writeOpencodeTeamHarnessConfig`: update path uses a separate function that overwrites ONLY `format_version`/`installed_version`/`updated_at` and never forces `logs-mode`/`logs-path`; install path may set defaults. → `cmd/install/opencode_config.go`
+- **2026-06-29** — VERSION release asset over GitHub API for version pre-check: `releases/latest/download/VERSION` (bare semver) avoids rate-limit exposure and is consistent with the no-API bootstrap philosophy. Best-effort (bootstrap falls through to binary download if absent). → `release.yml`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
+- **Three-state update model**: update-available / already-current / installed-ahead. Installed-ahead exits without downgrading. Zero writes when already-current. → `cmd/install/update.go:runUpdateCommand`
+- **Restart-to-activate honesty**: updaters NEVER claim an update is live; always print "restart to activate — NOT live until restart." Mirrors `/th:update` CC convention. → `cmd/install/update.go:applyUpdateDiff`
+- **Prompt output to stderr**: TTY confirm prompts write to `os.Stderr` (always writable), never to an O_RDONLY TTY handle. Read from `/dev/tty` (preferred) or `os.Stdin` fallback. → `cmd/install/update.go:confirmApply`
 
 ## 10. Known Constraints
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
+- **VERSION pre-check is best-effort only**: the `VERSION` asset is not SHA-signed; a MITM could suppress an update by spoofing "already current." The binary download + SHA256 verify is the security floor; VERSION is a performance optimization. (SEC-OC-U-01, Low)
+- **opencode requires full restart to activate asset changes**: hot-reload is experimental-flag-only. Updaters must not claim changes are live without a restart. Confirmed via opencode GitHub issues #10899/#8751/#6815/#22213.
 
 ## 11. Testing Conventions
 

@@ -103,15 +103,31 @@ Run the update command, then reload:
 
 ### Updating (opencode)
 
-opencode has no plugin marketplace. The update mechanism is a re-run of the install link, which is idempotent — only files whose content changed are rewritten:
+Run the dedicated updater bootstrap — it performs a cheap version pre-check (no binary download when already current), downloads and SHA256-verifies the binary, shows the four-bucket diff preview, and applies only changed files:
 
+**Linux / macOS:**
 ```
-curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh | bash
 ```
 
-Then restart the opencode session so the refreshed agents, skills, and commands are loaded.
+**Windows (PowerShell):**
+```
+iwr https://valianx.github.io/team-harness/update-opencode.ps1 | iex
+```
 
-Alternatively, type `/th-update` inside opencode. The command instructs the agent to run the re-install command above in a terminal.
+Or run the subcommand directly (headless / CI):
+```
+install update --runtime opencode --scope global --non-interactive
+```
+
+After the update completes, **restart opencode** to activate the refreshed agents, skills, and commands — the update is NOT live in any running opencode session until restart.
+
+The updater reports one of three states:
+- **update available** — new files downloaded, diff applied, restart to activate.
+- **already current** — no binary downloaded, no files written.
+- **installed ahead** — recorded version is newer than this binary; no downgrade performed.
+
+Alternatively, type `/th-update` inside opencode. The command instructs the agent to run the updater above in a terminal.
 
 ---
 
