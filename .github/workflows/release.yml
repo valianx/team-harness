@@ -35,21 +35,34 @@ jobs:
       - name: Cross-compile install binaries
         run: |
           mkdir -p dist
+          # Derive the tag from the dispatch input (workflow_dispatch) or the
+          # push ref (push: tags). GITHUB_REF_NAME is the branch name on
+          # workflow_dispatch, so use the tag input when present.
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
           for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64 windows-amd64; do
               GOOS=$(echo $target | cut -d- -f1)
               GOARCH=$(echo $target | cut -d- -f2)
               EXT=""
               [ "$GOOS" = "windows" ] && EXT=".exe"
               echo "Building install-${target}${EXT}..."
-              # Strip the leading "v" from the tag (e.g. v2.0.1 → 2.0.1) so
-              # main.go's "v%s" printf doesn't produce "vv2.0.1". Issue #11.
-              VERSION="${GITHUB_REF_NAME#v}"
               CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build \
                   -ldflags="-s -w -X main.version=${VERSION}" \
                   -o dist/install-${target}${EXT} \
                   ./cmd/install
           done
           ls -lah dist/
+
+      - name: Write VERSION asset
+        run: |
+          # Bare semver (no leading "v") — consumed by update-opencode.{sh,ps1}
+          # cheap pre-check via releases/latest/download/VERSION.
+          # Use the tag input on workflow_dispatch; GITHUB_REF_NAME is the branch
+          # name on manual runs, not the tag.
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "$VERSION" > dist/VERSION
+          echo "VERSION asset: $(cat dist/VERSION)"
 
       - name: Compute SHA256 sums
         run: |

@@ -1,0 +1,5 @@
+### Added
+- `install update --runtime opencode --scope global` subcommand: version-delta check (update-available / already-current / installed-ahead), `ComputePlan` four-bucket diff preview, interactive `[Y/n]` confirm, `ApplyPlan` apply (all SEC-01..08 guards reused), managed-key-only config bump (`refreshManagedConfigKeys` overwrites only `installed_version`/`updated_at`/`format_version`, preserves all operator keys byte-for-byte), and a restart-to-activate honesty block.
+- `bin/update-opencode.sh` and `bin/update-opencode.ps1` bootstrap scripts: cheap `VERSION` pre-check (skips 8 MB binary download when already current), SHA256-verified binary download (anchored exact-asset-name match, case-insensitive hash compare, fail-closed — mirrors `install-opencode.{sh,ps1}`), and `binary update --runtime opencode` dispatch. Windows temp filename avoids UAC heuristic trigger words.
+- `dist/VERSION` release asset (bare semver, one line) emitted by `release.yml` so `releases/latest/download/VERSION` resolves without a GitHub API call.
+- `update-opencode.{sh,ps1}` staged to GitHub Pages by `pages.yml` with a smoke-probe for each (parity with install-script probes).
