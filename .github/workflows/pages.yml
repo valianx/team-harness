@@ -33,6 +33,8 @@ jobs:
           cp bin/install.cmd             public/install.cmd
           cp bin/install-opencode.sh     public/install-opencode.sh
           cp bin/install-opencode.ps1    public/install-opencode.ps1
+          cp bin/update-opencode.sh      public/update-opencode.sh
+          cp bin/update-opencode.ps1     public/update-opencode.ps1
           cp -r site/. public/
           ls -lah public/
 
@@ -111,6 +113,38 @@ jobs:
       - name: Smoke-probe published install-opencode.ps1
         run: |
           URL="https://valianx.github.io/team-harness/install-opencode.ps1"
+          echo "Probing ${URL}..."
+          # Pages cache may need a few seconds to invalidate; retry up to 60s.
+          for i in 1 2 3 4 5 6; do
+              if curl -fsSL --max-time 10 -o /dev/null "$URL"; then
+                  echo "OK: ${URL} reachable."
+                  exit 0
+              fi
+              echo "Attempt $i failed, sleeping 10s..."
+              sleep 10
+          done
+          echo "Error: ${URL} did not become reachable within 60s." >&2
+          exit 1
+
+      - name: Smoke-probe published update-opencode.sh
+        run: |
+          URL="https://valianx.github.io/team-harness/update-opencode.sh"
+          echo "Probing ${URL}..."
+          # Pages cache may need a few seconds to invalidate; retry up to 60s.
+          for i in 1 2 3 4 5 6; do
+              if curl -fsSL --max-time 10 -o /dev/null "$URL"; then
+                  echo "OK: ${URL} reachable."
+                  exit 0
+              fi
+              echo "Attempt $i failed, sleeping 10s..."
+              sleep 10
+          done
+          echo "Error: ${URL} did not become reachable within 60s." >&2
+          exit 1
+
+      - name: Smoke-probe published update-opencode.ps1
+        run: |
+          URL="https://valianx.github.io/team-harness/update-opencode.ps1"
           echo "Probing ${URL}..."
           # Pages cache may need a few seconds to invalidate; retry up to 60s.
           for i in 1 2 3 4 5 6; do
