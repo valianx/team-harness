@@ -5,9 +5,11 @@ description: Update the th plugin — refresh catalog, download the new version,
 
 Refresh the `team-harness` plugin marketplace catalog, report whether a new `th` release is available, and keep the managed `~/.claude/CLAUDE.md` blocks aligned with the running plugin version. This is a standalone utility — it does NOT route through the orchestrator. It is the repeatable update command; `/th:setup` is the one-time bootstrap and is never part of this flow.
 
-Usage: `/th:update`
+Usage: `/th:update [--force-blocks]`
 
 Analyze the input: $ARGUMENTS
+
+If `--force-blocks` is present in `$ARGUMENTS`, export `TH_FORCE_BLOCKS=1` before running the step-6 command block; otherwise export `TH_FORCE_BLOCKS=0`. This flag bypasses operator-edit preservation (row 5 of the decision matrix) and adopts the canonical block content.
 
 ## Voice
 
@@ -83,11 +85,23 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
      - `<!-- dev-mode-entry:start -->` … `<!-- dev-mode-entry:end -->` (retired earlier — trigger-phrase mechanism replaced by output style)
      For each: if both start and end markers are present in `~/.claude/CLAUDE.md`, remove the entire block (inclusive of markers). If absent, no action.
    - **Developer-mode output style sync.** After syncing managed blocks, re-copy `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (create the directory if absent). This keeps the output style aligned with the installed plugin version.
-   - **Back up** `~/.claude/CLAUDE.md` to a single rolling backup `~/.claude/CLAUDE.md.bak` (overwritten each run) before the first write. If the file does not exist, create it (blocks-only) and skip the backup. No backup history accumulates and nothing is ever deleted — exactly one rolling backup is kept.
-   - **Write each block — DESTRUCTIVE replace, no content validation beyond marker-presence.** For each of the two canonical files: read its full content (that is the block, start marker to end marker inclusive). If both its start and end markers are present in `~/.claude/CLAUDE.md`, replace everything from the start marker to the end marker inclusive with the canonical file content. If the markers are absent, append the canonical file content at the end of the file. This is a DESTRUCTIVE replace: no comparison of existing content; only marker presence is checked. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
-   - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block.
+   - **Provenance tracking — co-located hash comment.** A `<!-- th-managed: <block> sha256=<64-hex> -->` comment placed immediately above each block's start marker records the SHA-256 hash of what the harness last wrote. Hash canonicalization: take the live block text from `<!-- <block>:start -->` through `<!-- <block>:end -->` inclusive → normalize CRLF to LF → `rstrip` → SHA-256 → lowercase hex. The comment sits OUTSIDE the hashed region (above the start marker) and is never part of its own hash.
+   - **Five-row decision matrix (applied per block, in order):** Let `current_hash` = hash of live block, `canonical_hash` = hash of block to write, `stored_hash` = value from the provenance comment (or absent).
+
+     | # | Condition | Action | Report token |
+     |---|-----------|--------|--------------|
+     | 1 | both markers absent | append canonical + stamp | `inserted` |
+     | 2 | `current_hash == canonical_hash` | ensure exactly one correct stamp; no body change | `already current` |
+     | 3 | `stored_hash` absent, body ≠ canonical | overwrite with canonical + stamp (first-run adopt) | `updated` |
+     | 4 | `stored_hash` present and `== current_hash`, body ≠ canonical | overwrite with canonical + re-stamp (harness update) | `updated` |
+     | 5 | `stored_hash` present and `≠ current_hash` | **SKIP overwrite — preserve operator bytes** | `preserved (operator-edited)` |
+
+     Defensive case: exactly one marker present (start without end, or vice versa) → skip that block with a `WARN:malformed` token; never append a duplicate. Row 5 with `--force-blocks` (`TH_FORCE_BLOCKS=1`): overwrite canonical + stamp; report `force-adopted`.
+   - **Atomic write — whole file, single operation.** All block changes, legacy-marker migrations, and retired-block removals are accumulated in memory, verified (each written block has both markers exactly once and a provenance stamp), then committed atomically: write a uniquely-named temp file in `~/.claude/` (same filesystem), `fsync`, then rename over `CLAUDE.md` (`os.replace` / `[System.IO.File]::Replace` with `Move-Item` create-fallback). A crash before the rename leaves the original `CLAUDE.md` intact. If no changes are needed, no file is written (true idempotent no-op).
+   - **Back up** `~/.claude/CLAUDE.md` to a single rolling backup `~/.claude/CLAUDE.md.bak` before each write (only when the file exists and changes will be made). No backup history accumulates — exactly one rolling backup is kept.
+   - Also migrate legacy orchestrator markers (`<!-- th-orchestrator-inline-rule:start -->`, `<!-- th-orchestrator-dispatch-rule:start -->`) by replacing them with the current `orchestrator-dispatch-rule` block, within the same atomic write.
    - **Never touch anything outside the marker-delimited blocks.** All other content in `~/.claude/CLAUDE.md` is the operator's and is preserved byte-for-byte.
-   - **Record** each block's outcome (`updated` / `inserted` / `already current` / `removed`) for the `managed blocks` row of the final report (step 7). Do not print it inline — the report is the only operator-facing message.
+   - **Record** each block's outcome (`updated` / `inserted` / `already current` / `preserved (operator-edited)` / `force-adopted`) in `$syncResult` for the `managed blocks` row of the final report (step 7). Do not print it inline — the report is the only operator-facing message. The agent runs the matching-OS command block below verbatim — do NOT improvise shell commands.
 
    **Windows (PowerShell) — run this block verbatim on Windows:**
    ```powershell
@@ -96,43 +110,162 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    $latestDir = Get-ChildItem -Path $pluginBase -Directory |
        Sort-Object { [Version]($_.Name -replace '[^0-9.]','') } |
        Select-Object -Last 1
-   $mbDir = "$($latestDir.FullName)\skills\setup\managed-blocks"
-   $claudeMd = "$env:USERPROFILE\.claude\CLAUDE.md"
+   $mbDir      = "$($latestDir.FullName)\skills\setup\managed-blocks"
+   $claudeMd   = "$env:USERPROFILE\.claude\CLAUDE.md"
+   $forceBlocks = $env:TH_FORCE_BLOCKS -eq "1"
 
-   # Backup (single rolling backup — overwritten each run, never accumulates)
-   Copy-Item $claudeMd "$claudeMd.bak"
+   function Get-CanonHash([string]$text) {
+       $norm  = $text -replace "`r`n", "`n"
+       $norm  = $norm.TrimEnd()
+       $bytes = [System.Text.Encoding]::UTF8.GetBytes($norm)
+       $sha   = [System.Security.Cryptography.SHA256]::Create()
+       ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join ""
+   }
 
-   # Sync active managed blocks (DESTRUCTIVE replace between markers, or append)
+   function Get-StoredHash([string]$before, [string]$blockName) {
+       $lines = $before -split "`n"
+       for ($i = $lines.Length - 1; $i -ge 0; $i--) {
+           $line = $lines[$i].Trim()
+           if ($line) {
+               $prefix = "<!-- th-managed: $blockName sha256="
+               $suffix = " -->"
+               if ($line.StartsWith($prefix) -and $line.EndsWith($suffix)) {
+                   $h = $line.Substring($prefix.Length, $line.Length - $prefix.Length - $suffix.Length)
+                   if ($h -match "^[0-9a-f]{64}$") { return $h }
+               }
+               break
+           }
+       }
+       return $null
+   }
+
+   function Remove-Stamps([string]$text, [string]$blockName) {
+       $pat = "<!-- th-managed: " + [regex]::Escape($blockName) + " sha256=[0-9a-f]{64} -->\n?"
+       return [regex]::Replace($text, $pat, "")
+   }
+
+   function Make-Stamp([string]$name, [string]$h) {
+       return "<!-- th-managed: $name sha256=$h -->`n"
+   }
+
+   if (Test-Path $claudeMd) { $original = Get-Content $claudeMd -Raw } else { $original = "" }
+   $content  = $original
+   $outcomes = @{}
+
    foreach ($block in @("orchestrator-dispatch-rule", "voice-rule")) {
-       $canonicalPath = "$mbDir\$block.md"
-       $canonical = Get-Content $canonicalPath -Raw
-       $startMarker = "<!-- $block`:start -->"
-       $endMarker   = "<!-- $block`:end -->"
-       $content = Get-Content $claudeMd -Raw
-       if ($content -match [regex]::Escape($startMarker) -and $content -match [regex]::Escape($endMarker)) {
-           # DESTRUCTIVE replace between markers (inclusive)
-           $pattern = [regex]::Escape($startMarker) + "[\s\S]*?" + [regex]::Escape($endMarker)
-           $content = [regex]::Replace($content, $pattern, $canonical.TrimEnd())
-           Set-Content $claudeMd $content -NoNewline
+       $canonical = (Get-Content "$mbDir\$block.md" -Raw).TrimEnd()
+       $sm   = "<!-- $block`:start -->"
+       $em   = "<!-- $block`:end -->"
+       $ch   = Get-CanonHash $canonical
+       $hasS = $content.Contains($sm)
+       $hasE = $content.Contains($em)
+
+       if (-not $hasS -and -not $hasE) {
+           $content = $content.TrimEnd("`n") + "`n" + (Make-Stamp $block $ch) + $canonical + "`n"
+           $outcomes[$block] = "inserted"; continue
+       }
+       if ($hasS -ne $hasE) { $outcomes[$block] = "WARN:malformed"; continue }
+
+       $si   = $content.IndexOf($sm)
+       $ei   = $content.IndexOf($em, $si)
+       if ($ei -lt $si) { $outcomes[$block] = "WARN:malformed"; continue }
+       $ep   = $ei + $em.Length
+       $live = $content.Substring($si, $ep - $si)
+       $lh   = Get-CanonHash $live
+       $sh   = Get-StoredHash $content.Substring(0, $si) $block
+
+       if ($lh -eq $ch) {
+           $content = Remove-Stamps $content $block
+           $si2     = $content.IndexOf($sm)
+           $content = $content.Substring(0, $si2) + (Make-Stamp $block $ch) + $content.Substring($si2)
+           $outcomes[$block] = "already current"
+       } elseif ($null -eq $sh) {
+           $content = Remove-Stamps $content $block
+           $si2     = $content.IndexOf($sm)
+           $ep2     = $content.IndexOf($em, $si2) + $em.Length
+           $content = $content.Substring(0, $si2) + (Make-Stamp $block $ch) + $canonical + $content.Substring($ep2)
+           $outcomes[$block] = "updated"
+       } elseif ($sh -eq $lh) {
+           $content = Remove-Stamps $content $block
+           $si2     = $content.IndexOf($sm)
+           $ep2     = $content.IndexOf($em, $si2) + $em.Length
+           $content = $content.Substring(0, $si2) + (Make-Stamp $block $ch) + $canonical + $content.Substring($ep2)
+           $outcomes[$block] = "updated"
+       } elseif ($forceBlocks) {
+           $content = Remove-Stamps $content $block
+           $si2     = $content.IndexOf($sm)
+           $ep2     = $content.IndexOf($em, $si2) + $em.Length
+           $content = $content.Substring(0, $si2) + (Make-Stamp $block $ch) + $canonical + $content.Substring($ep2)
+           $outcomes[$block] = "force-adopted"
        } else {
-           # Append
-           Add-Content $claudeMd "`n$canonical"
+           $outcomes[$block] = "preserved (operator-edited)"
+       }
+   }
+
+   # Migrate legacy orchestrator markers
+   foreach ($legacy in @("th-orchestrator-inline-rule", "th-orchestrator-dispatch-rule")) {
+       $lsm = "<!-- $legacy`:start -->"
+       $lem = "<!-- $legacy`:end -->"
+       if ($content.Contains($lsm) -and $content.Contains($lem)) {
+           $ls  = $content.IndexOf($lsm)
+           $le  = $content.IndexOf($lem, $ls) + $lem.Length
+           $odr = (Get-Content "$mbDir\orchestrator-dispatch-rule.md" -Raw).TrimEnd()
+           $content = $content.Substring(0, $ls) + (Make-Stamp "orchestrator-dispatch-rule" (Get-CanonHash $odr)) + $odr + $content.Substring($le)
        }
    }
 
    # Remove retired blocks (dev-mode, nested-dispatch-takeover, dev-mode-entry)
-   $content = Get-Content $claudeMd -Raw
-   foreach ($retiredBlock in @("dev-mode", "nested-dispatch-takeover", "dev-mode-entry")) {
-       $retiredStart = "<!-- $retiredBlock`:start -->"
-       $retiredEnd   = "<!-- $retiredBlock`:end -->"
-       if ($content -match [regex]::Escape($retiredStart) -and $content -match [regex]::Escape($retiredEnd)) {
-           $pattern = [regex]::Escape($retiredStart) + "[\s\S]*?" + [regex]::Escape($retiredEnd)
-           $content = [regex]::Replace($content, $pattern, "")
+   foreach ($retired in @("dev-mode", "nested-dispatch-takeover", "dev-mode-entry")) {
+       $rsm = "<!-- $retired`:start -->"
+       $rem = "<!-- $retired`:end -->"
+       if ($content.Contains($rsm) -and $content.Contains($rem)) {
+           $rs     = $content.IndexOf($rsm)
+           $re_end = $content.IndexOf($rem, $rs) + $rem.Length
+           $content = $content.Substring(0, $rs) + $content.Substring($re_end)
        }
    }
-   Set-Content $claudeMd $content -NoNewline
 
-   # Sync developer-mode output style (skip-if-identical write — no -Force copy)
+   # Verify: each written block has markers (×1 each) and a provenance stamp
+   $errs = @()
+   foreach ($block in @("orchestrator-dispatch-rule", "voice-rule")) {
+       $outcome = $outcomes[$block]
+       if ($outcome -like "WARN*" -or $outcome -eq "preserved (operator-edited)") { continue }
+       $sm     = "<!-- $block`:start -->"
+       $em     = "<!-- $block`:end -->"
+       $smCnt  = ([regex]::Matches($content, [regex]::Escape($sm))).Count
+       $emCnt  = ([regex]::Matches($content, [regex]::Escape($em))).Count
+       if ($smCnt -ne 1 -or $emCnt -ne 1) { $errs += "marker-count:$block"; continue }
+       $si     = $content.IndexOf($sm)
+       if (-not $content.Substring(0, $si).Contains("<!-- th-managed: $block sha256=")) { $errs += "stamp-missing:$block" }
+   }
+   if ($errs.Count -gt 0) { Write-Error ("VERIFY_FAIL:" + ($errs -join ";")); exit 1 }
+
+   # Atomic write if changed (backup before write, only when file exists and changes needed)
+   if ($content -ne $original) {
+       if ($original) { Copy-Item $claudeMd "$claudeMd.bak" -Force }
+       $claudeDir = Split-Path $claudeMd
+       $tmpFile   = [System.IO.Path]::Combine($claudeDir, [System.IO.Path]::GetRandomFileName() + ".tmp")
+       $fs = $null; $sw = $null
+       try {
+           # FileMode.CreateNew: exclusive create (O_EXCL parity) — fails closed on name collision
+           $fs = [System.IO.FileStream]::new($tmpFile, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+           $sw = [System.IO.StreamWriter]::new($fs, [System.Text.Encoding]::UTF8)
+           $sw.Write($content)
+           $sw.Flush()
+           $fs.Flush($true)   # fsync parity: flush OS write buffers to disk before rename
+           $sw.Dispose(); $sw = $null; $fs = $null   # Dispose also closes the underlying FileStream
+           if (Test-Path $claudeMd) { [System.IO.File]::Replace($tmpFile, $claudeMd, $null) } else { Move-Item $tmpFile $claudeMd }
+       } catch {
+           if ($sw) { try { $sw.Dispose() } catch {} }
+           elseif ($fs) { try { $fs.Dispose() } catch {} }
+           if (Test-Path $tmpFile) { try { [System.IO.File]::Delete($tmpFile) } catch {} }
+           Write-Error "WRITE_FAIL:$_"; exit 1
+       }
+   }
+
+   $syncResult = $outcomes | ConvertTo-Json -Compress
+
+   # Sync developer-mode output style (skip-if-identical write — no unconditional copy)
    $outputStyleSrc = "$($latestDir.FullName)\output-styles\developer-mode.md"
    $outputStyleDst = "$env:USERPROFILE\.claude\output-styles\developer-mode.md"
    $outputStyleDir = Split-Path $outputStyleDst
@@ -151,53 +284,165 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    MB_DIR="$PLUGIN_BASE/$LATEST_DIR/skills/setup/managed-blocks"
    CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 
-   # Backup (single rolling backup — overwritten each run, never accumulates)
-   cp "$CLAUDE_MD" "$CLAUDE_MD.bak"
+   # Sync managed blocks — consolidated atomic rewrite (five-row decision matrix).
+   # Values are passed via the environment (not interpolated into the source) so
+   # paths containing quotes or shell metacharacters stay safe.
+   SYNC_RESULT=$(TH_CLAUDE_MD="$CLAUDE_MD" TH_MB_DIR="$MB_DIR" TH_FORCE_BLOCKS="${TH_FORCE_BLOCKS:-0}" python3 -c '
+import os, sys, hashlib, re, tempfile, json, shutil
 
-   # Sync active managed blocks (in-position replace between markers, or append)
-   for BLOCK in orchestrator-dispatch-rule voice-rule; do
-       CANONICAL=$(cat "$MB_DIR/$BLOCK.md")
-       START_MARKER="<!-- ${BLOCK}:start -->"
-       END_MARKER="<!-- ${BLOCK}:end -->"
-       if grep -qF "$START_MARKER" "$CLAUDE_MD" && grep -qF "$END_MARKER" "$CLAUDE_MD"; then
-           # In-position replace: rewrite the file in memory, preserving block position.
-           # Values are passed via the environment (not interpolated into the source) so
-           # paths/markers containing quotes or shell metacharacters stay safe.
-           TH_CLAUDE_MD="$CLAUDE_MD" TH_MB_FILE="$MB_DIR/$BLOCK.md" TH_SM="$START_MARKER" TH_EM="$END_MARKER" python3 -c '
-import os
-path = os.environ["TH_CLAUDE_MD"]
-content = open(path, "r", encoding="utf-8").read()
-canonical = open(os.environ["TH_MB_FILE"], "r", encoding="utf-8").read().rstrip()
-start_marker = os.environ["TH_SM"]
-end_marker = os.environ["TH_EM"]
-s = content.find(start_marker)
-e = content.find(end_marker)
-if s != -1 and e != -1 and e > s:
-    new_content = content[:s] + canonical + content[e + len(end_marker):]
-    open(path, "w", encoding="utf-8").write(new_content)
-'
-       else
-           printf '\n%s\n' "$CANONICAL" >> "$CLAUDE_MD"
-       fi
-   done
+path         = os.environ["TH_CLAUDE_MD"]
+mb_dir       = os.environ["TH_MB_DIR"]
+force_blocks = os.environ.get("TH_FORCE_BLOCKS", "0") == "1"
 
-   # Remove retired blocks (dev-mode, nested-dispatch-takeover, dev-mode-entry)
-   for RETIRED in dev-mode nested-dispatch-takeover dev-mode-entry; do
-       if grep -qF "<!-- ${RETIRED}:start -->" "$CLAUDE_MD" && grep -qF "<!-- ${RETIRED}:end -->" "$CLAUDE_MD"; then
-           TH_CLAUDE_MD="$CLAUDE_MD" TH_SM="<!-- ${RETIRED}:start -->" TH_EM="<!-- ${RETIRED}:end -->" python3 -c '
-import os
-path = os.environ["TH_CLAUDE_MD"]
-content = open(path, "r", encoding="utf-8").read()
-start_marker = os.environ["TH_SM"]
-end_marker = os.environ["TH_EM"]
-s = content.find(start_marker)
-e = content.find(end_marker)
-if s != -1 and e != -1 and e > s:
-    new_content = content[:s] + content[e + len(end_marker):]
-    open(path, "w", encoding="utf-8").write(new_content)
-'
-       fi
-   done
+BLOCKS  = ["orchestrator-dispatch-rule", "voice-rule"]
+RETIRED = ["dev-mode", "nested-dispatch-takeover", "dev-mode-entry"]
+LEGACY  = ["th-orchestrator-inline-rule", "th-orchestrator-dispatch-rule"]
+
+def canon_hash(text):
+    norm = text.replace("\r\n", "\n").rstrip()
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
+
+def make_stamp(name, h):
+    return "<!-- th-managed: " + name + " sha256=" + h + " -->\n"
+
+def remove_stamps(text, name):
+    return re.sub(
+        "<!-- th-managed: " + re.escape(name) + " sha256=[0-9a-f]{64} -->\n?",
+        "", text
+    )
+
+def get_stored_hash(before, name):
+    for line in reversed(before.splitlines()):
+        s = line.strip()
+        if s:
+            pfx = "<!-- th-managed: " + name + " sha256="
+            sfx = " -->"
+            if s.startswith(pfx) and s.endswith(sfx):
+                h = s[len(pfx):-len(sfx)]
+                if re.fullmatch("[0-9a-f]{64}", h):
+                    return h
+            break
+    return None
+
+try:
+    original = open(path, "r", encoding="utf-8").read()
+except FileNotFoundError:
+    original = ""
+
+content  = original
+outcomes = {}
+
+for block in BLOCKS:
+    canonical = open(os.path.join(mb_dir, block + ".md"), "r", encoding="utf-8").read().rstrip()
+    sm  = "<!-- " + block + ":start -->"
+    em  = "<!-- " + block + ":end -->"
+    ch  = canon_hash(canonical)
+    has_s = sm in content
+    has_e = em in content
+
+    if not has_s and not has_e:
+        content = content.rstrip("\n") + "\n" + make_stamp(block, ch) + canonical + "\n"
+        outcomes[block] = "inserted"
+        continue
+
+    if has_s != has_e:
+        outcomes[block] = "WARN:malformed"
+        continue
+
+    si = content.find(sm)
+    ei = content.find(em, si)
+    if ei < si:
+        outcomes[block] = "WARN:malformed"
+        continue
+
+    ep   = ei + len(em)
+    live = content[si:ep]
+    lh   = canon_hash(live)
+    sh   = get_stored_hash(content[:si], block)
+
+    if lh == ch:
+        content = remove_stamps(content, block)
+        si2     = content.find(sm)
+        content = content[:si2] + make_stamp(block, ch) + content[si2:]
+        outcomes[block] = "already current"
+    elif sh is None:
+        content = remove_stamps(content, block)
+        si2     = content.find(sm)
+        ep2     = content.find(em, si2) + len(em)
+        content = content[:si2] + make_stamp(block, ch) + canonical + content[ep2:]
+        outcomes[block] = "updated"
+    elif sh == lh:
+        content = remove_stamps(content, block)
+        si2     = content.find(sm)
+        ep2     = content.find(em, si2) + len(em)
+        content = content[:si2] + make_stamp(block, ch) + canonical + content[ep2:]
+        outcomes[block] = "updated"
+    elif force_blocks:
+        content = remove_stamps(content, block)
+        si2     = content.find(sm)
+        ep2     = content.find(em, si2) + len(em)
+        content = content[:si2] + make_stamp(block, ch) + canonical + content[ep2:]
+        outcomes[block] = "force-adopted"
+    else:
+        outcomes[block] = "preserved (operator-edited)"
+
+for legacy in LEGACY:
+    lsm = "<!-- " + legacy + ":start -->"
+    lem = "<!-- " + legacy + ":end -->"
+    if lsm in content and lem in content:
+        ls  = content.find(lsm)
+        le  = content.find(lem, ls) + len(lem)
+        odr = open(os.path.join(mb_dir, "orchestrator-dispatch-rule.md"), "r", encoding="utf-8").read().rstrip()
+        content = content[:ls] + make_stamp("orchestrator-dispatch-rule", canon_hash(odr)) + odr + content[le:]
+
+for retired in RETIRED:
+    rsm    = "<!-- " + retired + ":start -->"
+    rem    = "<!-- " + retired + ":end -->"
+    if rsm in content and rem in content:
+        rs     = content.find(rsm)
+        re_end = content.find(rem, rs) + len(rem)
+        content = content[:rs] + content[re_end:]
+
+errs = []
+for block in BLOCKS:
+    outcome = outcomes.get(block, "")
+    if "WARN" in outcome or outcome == "preserved (operator-edited)":
+        continue
+    sm  = "<!-- " + block + ":start -->"
+    em  = "<!-- " + block + ":end -->"
+    if content.count(sm) != 1 or content.count(em) != 1:
+        errs.append("marker-count:" + block)
+        continue
+    si  = content.find(sm)
+    pfx = "<!-- th-managed: " + block + " sha256="
+    if pfx not in content[:si]:
+        errs.append("stamp-missing:" + block)
+
+if errs:
+    sys.stderr.write("VERIFY_FAIL:" + ";".join(errs) + "\n")
+    sys.exit(1)
+
+if content != original:
+    if original:
+        shutil.copy2(path, path + ".bak")
+    d   = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except Exception as exc:
+        try:
+            os.unlink(tmp)
+        except Exception:
+            pass
+        sys.stderr.write("WRITE_FAIL:" + str(exc) + "\n")
+        sys.exit(1)
+
+print(json.dumps(outcomes))
+')
 
    # Sync developer-mode output style (write-if-different — no unconditional cp)
    OUTPUT_STYLE_SRC="$PLUGIN_BASE/$LATEST_DIR/output-styles/developer-mode.md"
@@ -253,7 +498,7 @@ Install python3 now for full coverage? [Y/n]
      catalog refresh     done
      installed version   <X>
      downloaded version  <Y>
-     managed blocks      <per-block outcome, e.g. "synced (orchestrator-dispatch-rule updated, dev-mode removed)" or "in sync (2/2)">
+     managed blocks      <per-block outcome — examples: "in sync (2/2)", "orchestrator-dispatch-rule: updated; voice-rule: already current", "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current", "orchestrator-dispatch-rule: force-adopted; voice-rule: already current", "orchestrator-dispatch-rule: inserted; voice-rule: inserted">
      python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `Next: /reload-plugins (or restart Claude Code) to activate <Y>.`
@@ -265,14 +510,17 @@ Install python3 now for full coverage? [Y/n]
      catalog refresh     done
      installed version   <X>
      latest version      <X>
-     managed blocks      <e.g. "in sync (2/2)" or "synced (orchestrator-dispatch-rule updated)">
+     managed blocks      <e.g. "in sync (2/2)" or "orchestrator-dispatch-rule: updated; voice-rule: already current" or "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current">
      python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `No action required.`
 
    **(c) Installed ahead** (installed > latest): use template (b) with the title `th update — installed ahead of catalog`, show both versions, and a closing line noting the catalog may not have propagated the latest release yet.
 
-   In every case the `managed blocks` row reflects step 6's outcome. If the block sync wrote changes, the closing line for template (a)/(b) also notes that a backup of `~/.claude/CLAUDE.md` was written.
+   In every case the `managed blocks` row reflects step 6's outcome. If the block sync wrote changes, the closing line for template (a)/(b) also notes that a backup of `~/.claude/CLAUDE.md` was written at `~/.claude/CLAUDE.md.bak`.
+
+   When the `managed blocks` row contains `preserved (operator-edited)`, append this hint line outside the fence:
+   `Note: one or more managed blocks contain operator edits and were not overwritten. Run /th:update --force-blocks to adopt the canonical version, or delete the block from ~/.claude/CLAUDE.md and re-run to re-insert it.`
 
 ## Error handling
 
