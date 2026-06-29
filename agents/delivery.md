@@ -1415,7 +1415,7 @@ Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}
 - Message: {message}
 - PR: {url} (targeting main) — {created | updated | already merged} — merge: {CLEAN | CONFLICTING | UNDETERMINED | not-verified}, CI: {passing | failing | pending | none | not-verified}
 - Merge state: {CLEAN | CONFLICTING — base has diverged; PR cannot merge as-is | UNDETERMINED — GitHub did not resolve mergeability within the retry window; verify before merge | not-verified: gh-unavailable}
-- CI: {passing | FAILING — {N} check(s) not green | in progress | no checks configured | not-verified}
+- CI: {passing | FAILING — {N} check(s) not green | pending | none | not-verified}
 
 ## Files Committed
 - {file list}
