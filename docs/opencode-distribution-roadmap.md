@@ -2,7 +2,7 @@
 
 > **Status: built (opencode installer in production).** The Go installer (`cmd/install/`) ships a full plan/apply/uninstall engine with an append-only ownership ledger and all SEC-01..08 guards, wired for the opencode runtime. The updater (`install update`) and bootstrap scripts (`bin/update-opencode.{sh,ps1}`) are production-ready. This document records what is built, what is genuinely residual, and the design contracts that govern the residual work.
 
-## Build status
+## Build status — buildable-now-vs-defer
 
 | Item | Mechanism | Status | Notes |
 |------|-----------|--------|-------|
@@ -100,9 +100,9 @@ ioContract: normalized-v1           # which shim contract version this body spea
 - A missing capability is handled by the descriptor's `degradeIfMissing`, not by branching inside the body — keeping the body single-source.
 - The shim is **versioned** (`ioContract: normalized-v1`); a body declares which contract version it speaks, so the projector can refuse a mismatched body/shim pair at emit time.
 
-**Deferred build note.** Projection requires ≥2 runtimes; both Claude Code and opencode are now present. The first build step is a `claude-code` identity adapter (proving the canonical body round-trips unchanged) followed by the first non-identity adapter for opencode. The current hard-coded `opencodeRuntimeTransform` is the manual equivalent — migration to a descriptor-driven projector is additive.
+**Deferred build note.** Projection requires ≥2 runtimes; both Claude Code and opencode are now present. The first build step is a `claude-code` identity adapter (proving the canonical body round-trips unchanged) followed by the first non-identity adapter for opencode. The current hard-coded `opencodeRuntimeTransform` is the manual equivalent — migration to a descriptor-driven projector is additive. The descriptor-consuming projector itself is **design only** until the third runtime target triggers the build; `cmd/install/transform.go` is the production placeholder.
 
-### Security contract the projector build MUST satisfy
+### Security contract the build MUST satisfy (projector milestone)
 
 - **SEC-07 — Schema-validate inbound payloads before any body trusts them.** The shim MUST validate the inbound object against the `normalized-v1` schema before forwarding to any body. A type mismatch, unparseable input, or structurally invalid payload is a hard reject (fail-closed) — never a partially-parsed passthrough to a security-decision body.
 - **SEC-07 — Enforce size and nesting-depth bounds before parsing.** The build MUST impose a maximum payload size and maximum nesting depth prior to any parse step.
@@ -133,7 +133,7 @@ The schema and the ownership-tracking model are implemented in `cmd/install/`. T
 - `uninstall` removes exactly the union of `owns.files` and `owns.configKeys` for the targeted components, and nothing else.
 - `update` bumps only `installed_version`/`updated_at`/`format_version` in `.team-harness.json`; all other operator keys survive byte-for-byte (SEC-OC-R4 via `refreshManagedConfigKeys`).
 
-### Security contract (enforced)
+### Security contract the build MUST satisfy (enforced in production)
 
 - **SEC-04** — Secret-scan before every `appendLedger` call.
 - **SEC-05** — Ledger records key NAMES only; `{config_root}`-templated placeholders for paths; no secret values.
@@ -144,6 +144,13 @@ The schema and the ownership-tracking model are implemented in `cmd/install/`. T
 ## Item 3 — Single data-home resolver
 
 **Status: BUILT.** `ResolveDataHome()` in `cmd/install/datahome.go` implements the five-branch resolution order with full SEC-01/02/03/08 enforcement. The resolver is memoized, cross-platform (Windows/macOS/Linux), and unit-tested (`cmd/install/datahome_test.go`, `datahome_unix_test.go`, `datahome_windows_test.go`).
+
+**Resolution order (first match wins):** `TEAM_HARNESS_DATA_HOME` env var → `TH_DATA_HOME` env var → runtime-native config root (opencode: `XDG_CONFIG_HOME/opencode` or `~/.config/opencode`) → OS default → `~/.team-harness` fallback.
+
+### Security contract the build MUST satisfy (enforced in production)
+
+- **SEC-01 / SEC-02 / SEC-03 / SEC-08** — `secureAndVerify()` in `datahome.go`: per-segment `lstat` walk rejects symlinks and reparse points before resolving each directory segment; final path containment check (`isDescendantOf`); single-expansion `os.ExpandEnv` (no double-expansion, SEC-08); result pinned before any I/O uses it.
+- **SEC-DR-3** — Hardened write path for all files placed under the data-home root: `O_NOFOLLOW` on the leaf open (`hardenedWriteFile` in `hardened_write_unix.go`), per-segment `mkdir` (not recursive `MkdirAll`).
 
 ---
 
