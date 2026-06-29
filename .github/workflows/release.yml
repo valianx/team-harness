@@ -51,6 +51,14 @@ jobs:
           done
           ls -lah dist/
 
+      - name: Write VERSION asset
+        run: |
+          # Bare semver (no leading "v") — consumed by update-opencode.{sh,ps1}
+          # cheap pre-check via releases/latest/download/VERSION.
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "$VERSION" > dist/VERSION
+          echo "VERSION asset: $(cat dist/VERSION)"
+
       - name: Compute SHA256 sums
         run: |
           cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
