@@ -9809,13 +9809,22 @@ check(
 # SEC-002 hardening: the unconditional bash-level cp was replaced with a
 # conditional shutil.copy2 inside the Python script's `if content != original`
 # block, so a true no-op run leaves the existing .bak untouched.
+# Positional check: the backup call must appear AFTER the write guard, so
+# moving shutil.copy2 outside the guard causes this assertion to fail.
+_s45_guard_tok  = "if content != original:"
+_s45_backup_tok = 'shutil.copy2(path, path + ".bak")'
+_s45_guard_pos  = _s45_bash_slice.find(_s45_guard_tok)  if _s45_bash_slice else -1
+_s45_backup_pos = _s45_bash_slice.find(_s45_backup_tok) if _s45_bash_slice else -1
+_s45_backup_in_guard = (
+    _s45_guard_pos != -1 and _s45_backup_pos != -1 and _s45_backup_pos > _s45_guard_pos
+)
 check(
-    "sandbox-guard(2d/ac-2): bash block contains conditional Python backup"
-    " 'shutil.copy2(path, path + \".bak\")' (backup on write, not on no-op)",
-    bool(_s45_bash_slice) and 'shutil.copy2(path, path + ".bak")' in _s45_bash_slice,
-    "bash block does not contain 'shutil.copy2(path, path + \".bak\")' — "
-    "the conditional Python backup is missing from the bash block's python3 script; "
-    "the backup must live inside the `if content != original:` guard (SEC-002 contract)",
+    "sandbox-guard(2d/ac-2): bash block 'shutil.copy2(path, path + \".bak\")'"
+    " appears inside the 'if content != original:' guard (backup on write, not on no-op)",
+    bool(_s45_bash_slice) and _s45_backup_in_guard,
+    "bash block: 'shutil.copy2(path, path + \".bak\")' is absent or appears before"
+    " the 'if content != original:' guard — "
+    "the backup must live inside the write guard (SEC-002 contract)",
 )
 
 # ---- (3) Neither block — AC-3: -Force-free on /dev-mode + output-style ----

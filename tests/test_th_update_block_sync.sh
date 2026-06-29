@@ -121,178 +121,38 @@ Canonical voice rule content for testing.
 CANONICAL_VR
 
 # ---------------------------------------------------------------------------
-# The sync algorithm — extracted from skills/update/SKILL.md (bash block).
-# Changes here must be mirrored there; this is the single source of truth for
-# the five-row decision matrix and atomicity contract.
+# Python sync algorithm — extracted from skills/update/SKILL.md at test runtime.
+# Running the real algorithm guarantees the test stays coupled to the
+# implementation; a hand-maintained copy can drift silently while the test stays
+# green.  Approach: regex-extract the python3 -c '...' body from the bash block.
 # ---------------------------------------------------------------------------
+SKILL_MD="$SCRIPT_DIR/../skills/update/SKILL.md"
+if [ ! -f "$SKILL_MD" ]; then
+    echo "FAIL: skills/update/SKILL.md not found at: $SKILL_MD"
+    exit 1
+fi
+
 ALGO_PY="$WORK/sync_algo.py"
-cat > "$ALGO_PY" <<'PYEOF'
-import os, sys, hashlib, re, tempfile, json, shutil
+python3 - "$SKILL_MD" >"$ALGO_PY" <<'EXTRACTOR'
+import sys, re
 
-path     = os.environ["TH_CLAUDE_MD"]
-mb_dir   = os.environ["TH_MB_DIR"]
-force_blocks = os.environ.get("TH_FORCE_BLOCKS", "0") == "1"
+path = sys.argv[1]
+text = open(path, 'r', encoding='utf-8').read()
 
-BLOCKS  = ["orchestrator-dispatch-rule", "voice-rule"]
-RETIRED = ["dev-mode", "nested-dispatch-takeover", "dev-mode-entry"]
-LEGACY  = ["th-orchestrator-inline-rule", "th-orchestrator-dispatch-rule"]
-
-def canon_hash(text):
-    norm = text.replace("\r\n", "\n").rstrip()
-    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
-
-def make_stamp(name, h):
-    return "<!-- th-managed: " + name + " sha256=" + h + " -->\n"
-
-def remove_stamps(text, name):
-    return re.sub(
-        "<!-- th-managed: " + re.escape(name) + " sha256=[0-9a-f]{64} -->\n?",
-        "", text
-    )
-
-def get_stored_hash(before, name):
-    for line in reversed(before.splitlines()):
-        s = line.strip()
-        if s:
-            pfx = "<!-- th-managed: " + name + " sha256="
-            sfx = " -->"
-            if s.startswith(pfx) and s.endswith(sfx):
-                h = s[len(pfx):-len(sfx)]
-                if re.fullmatch("[0-9a-f]{64}", h):
-                    return h
-            break
-    return None
-
-try:
-    original = open(path, "r", encoding="utf-8").read()
-except FileNotFoundError:
-    original = ""
-
-content  = original
-outcomes = {}
-
-for block in BLOCKS:
-    canonical = open(os.path.join(mb_dir, block + ".md"), "r", encoding="utf-8").read().rstrip()
-    sm  = "<!-- " + block + ":start -->"
-    em  = "<!-- " + block + ":end -->"
-    ch  = canon_hash(canonical)
-    has_s = sm in content
-    has_e = em in content
-
-    if not has_s and not has_e:
-        # Row 1: markers absent — append canonical + stamp
-        content = content.rstrip("\n") + "\n" + make_stamp(block, ch) + canonical + "\n"
-        outcomes[block] = "inserted"
-        continue
-
-    if has_s != has_e:
-        # Malformed: only one marker present — skip with warning
-        outcomes[block] = "WARN:malformed"
-        continue
-
-    si = content.find(sm)
-    ei = content.find(em, si)
-    if ei < si:
-        outcomes[block] = "WARN:malformed"
-        continue
-
-    ep   = ei + len(em)
-    live = content[si:ep]
-    lh   = canon_hash(live)
-    sh   = get_stored_hash(content[:si], block)
-
-    if lh == ch:
-        # Row 2: already canonical — ensure exactly one correct stamp, no body change
-        content = remove_stamps(content, block)
-        si2     = content.find(sm)
-        content = content[:si2] + make_stamp(block, ch) + content[si2:]
-        outcomes[block] = "already current"
-    elif sh is None:
-        # Row 3: no stamp (pre-fix / first-run) — adopt: overwrite + stamp
-        content = remove_stamps(content, block)
-        si2     = content.find(sm)
-        ep2     = content.find(em, si2) + len(em)
-        content = content[:si2] + make_stamp(block, ch) + canonical + content[ep2:]
-        outcomes[block] = "updated"
-    elif sh == lh:
-        # Row 4: stamp matches live (harness wrote it), canonical changed — overwrite + re-stamp
-        content = remove_stamps(content, block)
-        si2     = content.find(sm)
-        ep2     = content.find(em, si2) + len(em)
-        content = content[:si2] + make_stamp(block, ch) + canonical + content[ep2:]
-        outcomes[block] = "updated"
-    elif force_blocks:
-        # Row 5 with --force-blocks: operator-edited but force-adopt canonical
-        content = remove_stamps(content, block)
-        si2     = content.find(sm)
-        ep2     = content.find(em, si2) + len(em)
-        content = content[:si2] + make_stamp(block, ch) + canonical + content[ep2:]
-        outcomes[block] = "force-adopted"
-    else:
-        # Row 5: stored_hash present and != live_hash — operator-edited, preserve
-        outcomes[block] = "preserved (operator-edited)"
-
-# Migrate legacy orchestrator markers
-for legacy in LEGACY:
-    lsm = "<!-- " + legacy + ":start -->"
-    lem = "<!-- " + legacy + ":end -->"
-    if lsm in content and lem in content:
-        ls  = content.find(lsm)
-        le  = content.find(lem, ls) + len(lem)
-        odr = open(os.path.join(mb_dir, "orchestrator-dispatch-rule.md"), "r", encoding="utf-8").read().rstrip()
-        content = content[:ls] + make_stamp("orchestrator-dispatch-rule", canon_hash(odr)) + odr + content[le:]
-
-# Remove retired blocks
-for retired in RETIRED:
-    rsm   = "<!-- " + retired + ":start -->"
-    rem   = "<!-- " + retired + ":end -->"
-    if rsm in content and rem in content:
-        rs    = content.find(rsm)
-        re_end = content.find(rem, rs) + len(rem)
-        content = content[:rs] + content[re_end:]
-
-# Verify: each written block has markers (×1 each) and a provenance stamp
-errs = []
-for block in BLOCKS:
-    outcome = outcomes.get(block, "")
-    if "WARN" in outcome or outcome == "preserved (operator-edited)":
-        continue
-    sm   = "<!-- " + block + ":start -->"
-    em   = "<!-- " + block + ":end -->"
-    if content.count(sm) != 1 or content.count(em) != 1:
-        errs.append("marker-count:" + block)
-        continue
-    si   = content.find(sm)
-    pfx  = "<!-- th-managed: " + block + " sha256="
-    if pfx not in content[:si]:
-        errs.append("stamp-missing:" + block)
-
-if errs:
-    sys.stderr.write("VERIFY_FAIL:" + ";".join(errs) + "\n")
+# Extract the python3 -c '...' body from the bash fenced block.
+# The opening delimiter is `python3 -c '` followed by a newline; the closing
+# delimiter is `')` on its own line.
+m = re.search(r"python3 -c '\n(.*?)\n'\)", text, re.DOTALL)
+if not m:
+    sys.stderr.write("ERROR: Could not extract Python sync algorithm from SKILL.md\n")
     sys.exit(1)
+sys.stdout.write(m.group(1) + '\n')
+EXTRACTOR
 
-# Atomic write (temp → fsync → os.replace); backup only when file existed and changed
-if content != original:
-    if original:
-        shutil.copy2(path, path + ".bak")
-    d   = os.path.dirname(os.path.abspath(path))
-    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(content)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp, path)
-    except Exception as exc:
-        try:
-            os.unlink(tmp)
-        except Exception:
-            pass
-        sys.stderr.write("WRITE_FAIL:" + str(exc) + "\n")
-        sys.exit(1)
-
-print(json.dumps(outcomes))
-PYEOF
+if [ $? -ne 0 ] || [ ! -s "$ALGO_PY" ]; then
+    echo "FAIL: Python sync algorithm extraction from SKILL.md failed"
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Helper: run sync algorithm against a CLAUDE.md, return JSON outcomes

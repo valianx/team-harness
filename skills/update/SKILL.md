@@ -161,7 +161,8 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        $hasE = $content.Contains($em)
 
        if (-not $hasS -and -not $hasE) {
-           $content = $content.TrimEnd("`n") + "`n" + (Make-Stamp $block $ch) + $canonical + "`n"
+           if (-not $content.EndsWith("`n")) { $content += "`n" }
+           $content += (Make-Stamp $block $ch) + $canonical + "`n"
            $outcomes[$block] = "inserted"; continue
        }
        if ($hasS -ne $hasE) { $outcomes[$block] = "WARN:malformed"; continue }
@@ -242,7 +243,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 
    # Atomic write if changed (backup before write, only when file exists and changes needed)
    if ($content -ne $original) {
-       if ($original) { Copy-Item $claudeMd "$claudeMd.bak" -Force }
+       if (Test-Path $claudeMd) { Copy-Item $claudeMd "$claudeMd.bak" -Force }
        $claudeDir = Split-Path $claudeMd
        $tmpFile   = [System.IO.Path]::Combine($claudeDir, [System.IO.Path]::GetRandomFileName() + ".tmp")
        $fs = $null; $sw = $null
@@ -341,7 +342,9 @@ for block in BLOCKS:
     has_e = em in content
 
     if not has_s and not has_e:
-        content = content.rstrip("\n") + "\n" + make_stamp(block, ch) + canonical + "\n"
+        if not content.endswith("\n"):
+            content += "\n"
+        content += make_stamp(block, ch) + canonical + "\n"
         outcomes[block] = "inserted"
         continue
 
@@ -423,7 +426,7 @@ if errs:
     sys.exit(1)
 
 if content != original:
-    if original:
+    if os.path.exists(path):
         shutil.copy2(path, path + ".bak")
     d   = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
