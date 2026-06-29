@@ -303,21 +303,21 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 
 ## 8. Architecture Decisions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
-- **2026-06-29** — `refreshManagedConfigKeys` vs `writeOpencodeTeamHarnessConfig`: update overwrites only `format_version`/`installed_version`/`updated_at`, never forces `logs-mode`/`logs-path`. → `cmd/install/opencode_config.go`
-- **2026-06-29** — `VERSION` asset for version pre-check: bare semver at `releases/latest/download/VERSION` avoids GitHub API. Best-effort; bootstrap falls through to binary download if absent. → `release.yml`
+- **2026-06-29** — `refreshManagedConfigKeys`: update writes only managed keys (`format_version`/`installed_version`/`updated_at`); operator keys preserved. → `cmd/install/opencode_config.go`
+- **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
-- **Three-state update model**: update-available / already-current / installed-ahead. Installed-ahead → report only, no downgrade. Zero writes when already-current. → `cmd/install/update.go`
-- **Restart-to-activate honesty**: updaters NEVER claim live; print "restart to activate" after any apply — NOT on the already-current/installed-ahead zero-write paths. Mirrors `/th:update`. → `cmd/install/update.go:applyUpdateDiff`
-- **TTY confirm prompt → stderr**: write prompt to `os.Stderr` (always writable); read from `/dev/tty` or `os.Stdin` fallback. Never write to an O_RDONLY handle. → `cmd/install/update.go:confirmApply`
+- **Three-state update**: update-available / already-current / installed-ahead; installed-ahead reports only; already-current zero-writes. → `cmd/install/update.go`
+- **Restart-to-activate honesty**: never claim live; print after any apply, not on zero-write paths. → `cmd/install/update.go`
+- **TTY prompt → stderr**: prompt to `os.Stderr`, read from `/dev/tty`/stdin; never write an O_RDONLY handle. → `cmd/install/update.go`
 
 - Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
 ## 10. Known Constraints
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
-- **VERSION pre-check is best-effort**: not SHA-signed; MITM can suppress an update. Binary SHA256 verify is the floor. (SEC-OC-U-01, Low)
-- **opencode requires restart for asset changes**: hot-reload is experimental-flag-only. Confirmed via issues #10899/#8751.
+- **`VERSION` pre-check best-effort**: unsigned; MITM can suppress an update (binary SHA256 is the floor). (SEC-OC-U-01, Low)
+- **opencode needs restart for asset changes**: hot-reload is experimental-only (issues #10899/#8751).
 
 ## 11. Testing Conventions
 
