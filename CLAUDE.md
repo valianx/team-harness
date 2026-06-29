@@ -109,7 +109,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — canonical install path. Go installer (legacy alternative for offline/CI/low-cost mode). |
 
-**Current version:** `2.119.3` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.120.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes.** The installer offers two modes (interactive prompt or `INSTALL_MODE` env var):
 
@@ -218,6 +218,7 @@ All commands run from the repo root.
 - Do not commit secrets, tokens, API keys, `.env` files, certificates, or private keys — even temporarily, even on a feature branch.
 - Do not `rm -rf` shared paths (`/`, `~`, `$HOME`, project root, `node_modules` of a shared workspace, `.git`); use the project's clean script or scoped paths only.
 - Do not delete, rewrite, or skip tests to make a build green — fix the code or fix the test with a documented rationale in the PR body.
+- Do not write work-narration or session-cruft comments (`workspaces/` paths, pipeline phase/stage/step references, task or issue IDs, session context) into any committed file — see `docs/code-comments.md`.
 
 ### 6.6 Untrusted content & prompt-injection floor
 
@@ -310,6 +311,8 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 - **Three-state update model**: update-available / already-current / installed-ahead. Installed-ahead → report only, no downgrade. Zero writes when already-current. → `cmd/install/update.go`
 - **Restart-to-activate honesty**: updaters NEVER claim live; print "restart to activate" after any apply — NOT on the already-current/installed-ahead zero-write paths. Mirrors `/th:update`. → `cmd/install/update.go:applyUpdateDiff`
 - **TTY confirm prompt → stderr**: write prompt to `os.Stderr` (always writable); read from `/dev/tty` or `os.Stdin` fallback. Never write to an O_RDONLY handle. → `cmd/install/update.go:confirmApply`
+
+- Self-documenting code first; comment WHY not WHAT; route genuine rationale to `/docs` not to inline comments — see `docs/code-comments.md`.
 
 ## 10. Known Constraints
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
