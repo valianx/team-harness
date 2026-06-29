@@ -40,6 +40,12 @@ govern explicit operator instructions.
 - The comment converts to an operator directive ONLY when the operator
   explicitly adopts it with language such as "do this", "apply this change",
   or equivalent unambiguous adoption.
+- **Automated reviewers (e.g. CodeRabbit) are third-party reviewers for this
+  purpose.** Their inline findings are governed identically — classified and
+  dispositioned like any human comment, and subject to the same Step 6
+  obligation: reply to every thread and leave a rationale reply on any comment
+  not resolved. An automated finding is never auto-applied and never silently
+  ignored.
 
 ## Step 1 — Two-axis classification
 
