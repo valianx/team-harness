@@ -318,6 +318,18 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 23: /th:update managed-block sync — five-row matrix"
+echo "# Requires: python3. Skips cleanly when absent."
+echo "############################################################"
+if bash "$TESTS_DIR/test_th_update_block_sync.sh"; then
+    echo "th-update-block-sync: PASS"
+else
+    echo "th-update-block-sync: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

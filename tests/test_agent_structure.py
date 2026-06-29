@@ -9638,12 +9638,17 @@ check(
     "for Unix/macOS operators; currently the skill improvises shell without per-OS blocks",
 )
 
-# Destructive-replace declaration — must explicitly state DESTRUCTIVE replace.
+# Edit-safe sync declaration — must document the operator-edit preservation behavior
+# (replaces the former DESTRUCTIVE-replace assertion; fix(update) PR changed the behavior
+# from destructive to edit-safe with the five-row decision matrix).
 check(
-    "canonical-blocks(7f): update/SKILL.md declares DESTRUCTIVE replace (AC-5)",
-    "DESTRUCTIVE" in _s44_update_text or "destructive" in _s44_update_text,
-    "update/SKILL.md must explicitly declare that the block-sync is a DESTRUCTIVE replace "
-    "(no comparison beyond marker-presence); currently this is implicit and undocumented",
+    "canonical-blocks(7f): update/SKILL.md documents edit-safe sync — "
+    "'preserved (operator-edited)' present (AC-5 / fix(update) clobber fix)",
+    "preserved (operator-edited)" in _s44_update_text,
+    "update/SKILL.md must document the operator-edit preservation behavior; "
+    "the string 'preserved (operator-edited)' must appear in the step-6 description "
+    "(five-row decision matrix row 5) — the former DESTRUCTIVE-replace contract was "
+    "superseded by the edit-safe, atomic sync introduced in fix(update)",
 )
 
 # ---------------------------------------------------------------------------
@@ -9775,14 +9780,16 @@ check(
 )
 
 # ---- (2) bash block — AC-2: remove-free backup ----------------------------
-# After the fix: single rolling cp "$CLAUDE_MD" "$CLAUDE_MD.bak" — no prune.
+# After the fix: backup is conditional — handled inside the Python script via
+# shutil.copy2(path, path + ".bak") within the `if content != original` guard.
+# The bash-level unconditional cp was removed by the SEC-002 hardening pass so
+# that no-op runs leave the existing .bak untouched (recovery-window preservation).
 check(
     "sandbox-guard(2a/ac-2): bash block does NOT contain 'xargs -r rm'"
     " (backup prune removed — sandbox trip cause 1)",
     bool(_s45_bash_slice) and "xargs -r rm" not in _s45_bash_slice,
     "bash block contains 'xargs -r rm' — the backup-retention prune is still present; "
-    "implementer must replace the timestamped-backup+prune lines with a single "
-    "cp \"$CLAUDE_MD\" \"$CLAUDE_MD.bak\" (no xargs rm anywhere in the block)",
+    "implementer must ensure no xargs rm anywhere in the block",
 )
 check(
     "sandbox-guard(2b/ac-2): bash block does NOT contain 'tail -n +4'"
@@ -9799,13 +9806,25 @@ check(
     "the fix requires a single fixed rolling backup '$CLAUDE_MD.bak' with no timestamp suffix; "
     "implementer must drop the TS variable and the .bak-$TS pattern",
 )
+# SEC-002 hardening: the unconditional bash-level cp was replaced with a
+# conditional shutil.copy2 inside the Python script's `if content != original`
+# block, so a true no-op run leaves the existing .bak untouched.
+# Positional check: the backup call must appear AFTER the write guard, so
+# moving shutil.copy2 outside the guard causes this assertion to fail.
+_s45_guard_tok  = "if content != original:"
+_s45_backup_tok = 'shutil.copy2(path, path + ".bak")'
+_s45_guard_pos  = _s45_bash_slice.find(_s45_guard_tok)  if _s45_bash_slice else -1
+_s45_backup_pos = _s45_bash_slice.find(_s45_backup_tok) if _s45_bash_slice else -1
+_s45_backup_in_guard = (
+    _s45_guard_pos != -1 and _s45_backup_pos != -1 and _s45_backup_pos > _s45_guard_pos
+)
 check(
-    "sandbox-guard(2d/ac-2): bash block contains single rolling backup"
-    " 'cp \"$CLAUDE_MD\" \"$CLAUDE_MD.bak\"' (fixed filename, no timestamp)",
-    bool(_s45_bash_slice) and 'cp "$CLAUDE_MD" "$CLAUDE_MD.bak"' in _s45_bash_slice,
-    "bash block does not contain the single rolling backup line "
-    "cp \"$CLAUDE_MD\" \"$CLAUDE_MD.bak\"; "
-    "implementer must add this as the sole backup operation (no .bak-$TS, no prune)",
+    "sandbox-guard(2d/ac-2): bash block 'shutil.copy2(path, path + \".bak\")'"
+    " appears inside the 'if content != original:' guard (backup on write, not on no-op)",
+    bool(_s45_bash_slice) and _s45_backup_in_guard,
+    "bash block: 'shutil.copy2(path, path + \".bak\")' is absent or appears before"
+    " the 'if content != original:' guard — "
+    "the backup must live inside the write guard (SEC-002 contract)",
 )
 
 # ---- (3) Neither block — AC-3: -Force-free on /dev-mode + output-style ----
