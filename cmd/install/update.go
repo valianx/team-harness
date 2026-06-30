@@ -129,8 +129,12 @@ func computeUpdatePlan(placer Placer) (PlanDiff, error) {
 	if err != nil {
 		return PlanDiff{}, fmt.Errorf("load manifests: %w", err)
 	}
+	transform, err := selectTransform(placer)
+	if err != nil {
+		return PlanDiff{}, err
+	}
 	selected := allComponentIDs(components)
-	return ComputePlan(modules, components, selected, placer, EmbeddedAssets(), selectTransform())
+	return ComputePlan(modules, components, selected, placer, EmbeddedAssets(), transform)
 }
 
 // applyUpdateDiff surfaces ledger errors, prints the plan, confirms with the

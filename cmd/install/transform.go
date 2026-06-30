@@ -29,6 +29,130 @@ var aliasToConcreteModel = map[string]string{
 	"haiku":  "claude-haiku-4-5",
 }
 
+// ---------------------------------------------------------------------------
+// Per-provider cost tiering (opt-in, additive — issue #424)
+// ---------------------------------------------------------------------------
+//
+// The model-less baseline above is the default for every opencode install.
+// When the operator opts into tiering for a provider (--opencode-tier /
+// opencode.cost_tier_provider), the transform instead BAKES a concrete
+// provider/model-id derived from each agent's CC source tier. This section is
+// the Go half of a three-site invariant: providerTierFamily and
+// providerTierConcrete must stay byte-identical to PROVIDER_TIER_FAMILY /
+// PROVIDER_TIER_CONCRETE in tools/harness-migrate/migrate.mjs and to the
+// embedded copy in skills/update-models/SKILL.md (locked by a structural
+// parity test — see tier_test.go).
+
+// ccModelAliasToTier maps a CC agent's source model: alias to its cost tier
+// label. The tier label set (default/medium/low) is provider-agnostic; a
+// provider's curated family map below resolves a tier label to a concrete
+// model family.
+var ccModelAliasToTier = map[string]string{
+	"opus":   "default",
+	"sonnet": "medium",
+	"haiku":  "low",
+}
+
+// tierOrder is the cost ordering from most to least expensive. Used by the
+// ragged-tier fallback (AC-3): a provider generation that does not expose a
+// given tier resolves to the nearest CHEAPER neighbor, never a previous
+// generation's more expensive tier.
+var tierOrder = []string{"default", "medium", "low"}
+
+// providerTierFamily is the curated, ragged provider→tier→model-family map.
+// A provider entry may omit a tier when its current generation does not
+// expose one; resolveFamilyForTier applies the nearest-cheaper-neighbor
+// fallback. Anthropic is the only launch provider (#424 scope).
+var providerTierFamily = map[string]map[string]string{
+	"anthropic": {
+		"default": "claude-opus",
+		"medium":  "claude-sonnet",
+		"low":     "claude-haiku",
+	},
+}
+
+// providerTierConcrete is the release-time pin: provider→tier→concrete model
+// id. Used by the installer to bake a model: line without a network call;
+// /th:update-models resolves the live equivalent post-install.
+var providerTierConcrete = map[string]map[string]string{
+	"anthropic": {
+		"default": "claude-opus-4-6",
+		"medium":  "claude-sonnet-4-6",
+		"low":     "claude-haiku-4-5",
+	},
+}
+
+// resolveFamilyForTier resolves the model family for (provider, tier),
+// applying the nearest-cheaper-neighbor fallback when the provider's curated
+// map omits that tier (AC-3). Returns ok=false when the provider is unknown
+// or has no entry at or below the requested tier.
+func resolveFamilyForTier(provider, tier string) (string, bool) {
+	return resolveTierMap(providerTierFamily, provider, tier)
+}
+
+// resolveConcreteForTier resolves the pinned concrete model id for
+// (provider, tier), applying the same nearest-cheaper-neighbor fallback as
+// resolveFamilyForTier so the family and concrete-id results stay aligned.
+func resolveConcreteForTier(provider, tier string) (string, bool) {
+	return resolveTierMap(providerTierConcrete, provider, tier)
+}
+
+// resolveTierMap walks tierOrder from tier downward (cheaper) until it finds
+// a populated entry in tiers[provider]. When no cheaper tier is populated
+// either, it falls back to the nearest MORE expensive tier as a last resort
+// — this is the "worst case one model serves all tiers" guarantee (AC-3): a
+// provider with only its most expensive tier curated still serves every tier
+// request rather than leaving medium/low unresolved. Shared by
+// resolveFamilyForTier and resolveConcreteForTier so both stay aligned on the
+// same fallback rule.
+func resolveTierMap(tiers map[string]map[string]string, provider, tier string) (string, bool) {
+	byTier, ok := tiers[provider]
+	if !ok {
+		return "", false
+	}
+	startIdx := -1
+	for i, t := range tierOrder {
+		if t == tier {
+			startIdx = i
+			break
+		}
+	}
+	if startIdx < 0 {
+		return "", false
+	}
+	// Prefer the nearest cheaper neighbor (toward the end of tierOrder).
+	for i := startIdx; i < len(tierOrder); i++ {
+		if v, ok := byTier[tierOrder[i]]; ok {
+			return v, true
+		}
+	}
+	// No cheaper option exists — fall back to the nearest more expensive tier.
+	for i := startIdx - 1; i >= 0; i-- {
+		if v, ok := byTier[tierOrder[i]]; ok {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// resolveTieredModel resolves the provider-prefixed concrete model id to bake
+// for an agent whose CC source model: value is sourceModelAlias (e.g. "opus").
+// Returns ok=false when the source alias is unrecognized (e.g. the agent
+// omits model: or already carries a concrete id) — callers fall back to the
+// model-less baseline output in that case.
+func resolveTieredModel(provider, sourceModelAlias string) (string, bool) {
+	canonical := strings.TrimPrefix(sourceModelAlias, anthropicPrefix)
+	tier, ok := ccModelAliasToTier[canonical]
+	if !ok {
+		return "", false
+	}
+	concrete, ok := resolveConcreteForTier(provider, tier)
+	if !ok {
+		return "", false
+	}
+	return provider + "/" + concrete, true
+}
+
 // TransformKind identifies the surface a transform applies to.
 const (
 	TransformKindAgent   = "agent"
@@ -143,6 +267,64 @@ func transformToOpencode(src []byte, kind string) ([]byte, error) {
 	}
 
 	return serializeFrontmatterYAML(projected, body), nil
+}
+
+// transformToOpencodeTiered applies the generic, fixture-bound
+// transformToOpencode AND bakes a concrete model: line for provider, derived
+// from the agent's CC source model: tier. Used only when the operator has
+// opted into per-provider cost tiering (provider non-empty) — the model-less
+// default path (transformToOpencode) is untouched by this function (AC-5).
+//
+// kind values other than TransformKindAgent (commands, skills, hooks) are not
+// tiered — opencode commands/skills/hooks carry no model: field — so this
+// function returns the generic transform output unchanged for those kinds.
+func transformToOpencodeTiered(src []byte, kind, provider string) ([]byte, error) {
+	transformed, err := transformToOpencode(src, kind)
+	if err != nil {
+		return nil, err
+	}
+	if kind != TransformKindAgent {
+		return transformed, nil
+	}
+
+	fm, _, err := parseFrontmatterYAML(src)
+	if err != nil {
+		return nil, &TransformError{Reason: fmt.Sprintf("parse frontmatter: %v", err)}
+	}
+	sourceModel, _ := fm["model"].(string)
+	concrete, ok := resolveTieredModel(provider, sourceModel)
+	if !ok {
+		// No tier mapping for this agent's source model (omitted, or already a
+		// concrete id) — fall back to the model-less baseline output.
+		return transformed, nil
+	}
+
+	return insertModelLine(transformed, concrete), nil
+}
+
+// insertModelLine inserts a "model: <id>" line immediately before the
+// "permission:" line of an already-projected agent frontmatter block.
+//
+// A textual insertion is used (instead of a parse/modify/reserialize
+// round-trip) because re-parsing transformed already lost the orderedPermission
+// type that preserves the source tools: order — a generic
+// map[string]interface{} round-trip would re-emit permission keys sorted
+// alphabetically instead of in source order. The agent projection always
+// emits a permission: line (even {} for an empty tools list), so this anchor
+// is reliable for every TransformKindAgent output.
+func insertModelLine(transformed []byte, concrete string) []byte {
+	marker := []byte("\npermission:")
+	idx := bytes.Index(transformed, marker)
+	if idx < 0 {
+		// No permission: line found (should not happen for agent kind) — leave
+		// output unchanged rather than risk corrupting it.
+		return transformed
+	}
+	out := make([]byte, 0, len(transformed)+len(concrete)+8)
+	out = append(out, transformed[:idx]...)
+	out = append(out, []byte("\nmodel: "+concrete)...)
+	out = append(out, transformed[idx:]...)
+	return out
 }
 
 // applyModeByRole applies the installer-specific mode-by-role override:

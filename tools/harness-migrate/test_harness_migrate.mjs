@@ -42,6 +42,11 @@ import {
   DIRECTION_TO_OPENCODE,
   DIRECTION_TO_CC,
   WRITABLE_PREFIXES,
+  TIER_ORDER,
+  resolveTierMap,
+  resolveFamilyForTier,
+  resolveConcreteForTier,
+  resolveTieredModel,
 } from "./migrate.mjs";
 
 // ---------------------------------------------------------------------------
@@ -929,6 +934,57 @@ console.log("\n=== Section 14: Plural directory names (AC-2) ===");
   const cmdResult = transformToOpencode(".claude/commands/test.md", CC_COMMAND_CONTENT, fakeRoot);
   assert("AC-2: command → .opencode/commands/ (plural)", cmdResult.outputPath.includes(path.join(".opencode", "commands")));
   assert("AC-2: no singular .opencode/command/ path", !cmdResult.outputPath.replace(/\\/g, "/").includes(".opencode/command/"));
+}
+
+// ---------------------------------------------------------------------------
+// Section 15: Per-provider cost tiering — ragged-tier resolution (AC-3, #424)
+// ---------------------------------------------------------------------------
+
+console.log("\n=== Section 15: Ragged-tier resolution (AC-3, #424) ===");
+
+{
+  // Fully ragged (single-tier) synthetic provider: only its most expensive
+  // tier is curated. Mirrors cmd/install/tier_test.go::
+  // TestResolveTierMap_WorstCaseOneModelServesAllTiers_AC3 — the same
+  // algorithm, exercised on the JS side via the exported resolveTierMap.
+  const singleTierMap = { "ragged-provider": { default: "big-model" } };
+
+  assert(
+    "AC-3: single-tier provider — requesting its own tier resolves directly",
+    resolveTierMap(singleTierMap, "ragged-provider", "default") === "big-model",
+  );
+  assert(
+    "AC-3: single-tier provider — medium falls back to the more-expensive default (last resort)",
+    resolveTierMap(singleTierMap, "ragged-provider", "medium") === "big-model",
+  );
+  assert(
+    "AC-3: single-tier provider — low falls back to the more-expensive default (worst case one model serves all tiers)",
+    resolveTierMap(singleTierMap, "ragged-provider", "low") === "big-model",
+  );
+
+  // Cheaper neighbor is preferred over a more-expensive one when both exist.
+  // Mirrors cmd/install/tier_test.go::TestResolveTierMap_PrefersCheaperOverMoreExpensive_AC3.
+  const twoTierMap = { "ragged-provider": { default: "big-model", low: "small-model" } };
+  assert(
+    "AC-3: requesting medium prefers the cheaper 'low' neighbor over the more-expensive 'default'",
+    resolveTierMap(twoTierMap, "ragged-provider", "medium") === "small-model",
+  );
+
+  // Unknown provider / unrecognized tier both resolve to null (no guessing).
+  assert("AC-3: unknown provider resolves to null", resolveTierMap(singleTierMap, "no-such-provider", "low") === null);
+  assert("AC-3: unrecognized tier label resolves to null", resolveTierMap(singleTierMap, "ragged-provider", "ultra") === null);
+
+  assert("TIER_ORDER is most-to-least expensive", TIER_ORDER.join(",") === "default,medium,low");
+
+  // The curated Anthropic map has all three tiers populated today, so the
+  // exported convenience wrappers resolve every tier directly (no fallback
+  // exercised here — the fallback path itself is proven above against the
+  // synthetic ragged map, matching how the curated map will behave once a
+  // ragged provider is added).
+  assert("resolveFamilyForTier: anthropic/default", resolveFamilyForTier("anthropic", "default") === "claude-opus");
+  assert("resolveConcreteForTier: anthropic/low", resolveConcreteForTier("anthropic", "low") === "claude-haiku-4-5");
+  assert("resolveTieredModel: opus alias bakes anthropic/claude-opus-4-6", resolveTieredModel("anthropic", "opus") === "anthropic/claude-opus-4-6");
+  assert("resolveTieredModel: unrecognized alias returns null", resolveTieredModel("anthropic", "claude-opus-4-6") === null);
 }
 
 // ---------------------------------------------------------------------------
