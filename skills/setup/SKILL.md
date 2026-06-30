@@ -119,6 +119,12 @@ The system requires two MCP servers: **Memory** (Knowledge Graph) and **context7
    ```
    Omit `headers` if no token was provided.
 4. Back up `~/.claude.json` before writing (copy to `~/.claude.json.bak-YYYYMMDD-HHMMSS`).
+5. **Atomic write + secret-safe permissions (mandatory):**
+   - Write the merged JSON to a temporary file in the same directory (e.g. `~/.claude.json.tmp-$$`).
+   - Set the temporary file's permissions to `0o600` (owner read+write only) BEFORE moving it into place.
+   - Rename (move) the temporary file to `~/.claude.json`. This is the atomic step — a crash before the rename leaves the original untouched; a crash after the rename leaves the new file in place.
+   - After the rename, verify permissions are still `0o600` (`chmod 600 ~/.claude.json`).
+   - Do NOT apply any secret-pattern scanner (e.g. `scanForSecrets`) to the config bytes — the file intentionally contains bearer tokens and API keys. The `0o600` permission is the mitigation; scanning would always trip on valid input.
 
 **context7 MCP:**
 1. Ask the user for their Context7 API key. Get one at https://context7.com/
@@ -133,6 +139,7 @@ The system requires two MCP servers: **Memory** (Knowledge Graph) and **context7
      }
    }
    ```
+3. Follow the same atomic write + `0o600` permissions sequence as Memory MCP (step 5 above) for every write to `~/.claude.json`.
 
 If both entries already exist in `~/.claude.json`, show current values and ask whether to keep or change each one.
 

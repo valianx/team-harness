@@ -1,0 +1,2 @@
+### Security
+- `skills/setup/SKILL.md`: added mandatory atomic write (write-to-temp-then-rename) and explicit `0o600` permission instructions for every `~/.claude.json` merge-write. Previously the skill had no permission or atomicity requirement, leaving bearer tokens and API keys potentially world-readable (`0o644` default) and vulnerable to truncation on crash. `scanForSecrets` is explicitly not applied to the config bytes (the file intentionally contains secrets; `0o600` is the mitigation).
