@@ -225,6 +225,12 @@ func deleteFiles(paths []string, r *RemovedComponent) error {
 // Before the rewrite, a timestamped .bak-<ts> copy is created with mode 0o600
 // (INFO-r2-1: stronger than the 0o644 that copyFileRaw produces — fold the
 // security finding here, not in copyFileRaw which is used elsewhere).
+//
+// The live rewrite itself is also 0o600 and atomic (CWE-276 fold), via
+// writeAtomicSecret (claude_json.go) — the same temp-file+rename writer used
+// for ~/.claude.json. A bare os.WriteFile never chmods a pre-existing file,
+// so only the atomic rename guarantees 0o600 on the live inode regardless of
+// the file's prior mode.
 func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent) error {
 	// Read the existing doc as a raw map to preserve unknown keys byte-for-byte.
 	raw := map[string]json.RawMessage{}
@@ -268,7 +274,7 @@ func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent
 	// Ensure parent directory exists.
 	ensureDir(filepath.Dir(settingsDocPath))
 
-	if err := os.WriteFile(settingsDocPath, out, 0o644); err != nil {
+	if err := writeAtomicSecret(settingsDocPath, out); err != nil {
 		return fmt.Errorf("write settings doc %q: %w", settingsDocPath, err)
 	}
 	return nil
