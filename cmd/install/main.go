@@ -320,7 +320,7 @@ func backupClaudeJSON() string {
 	}
 	timestamp := time.Now().Format("20060102-150405")
 	backup := claudeJSON + ".bak-" + timestamp
-	if err := copyFileRaw(claudeJSON, backup); err != nil {
+	if err := copyFileRaw(claudeJSON, backup, 0o600); err != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] could not create backup of ~/.claude.json: %v\n", err)
 		return ""
 	}

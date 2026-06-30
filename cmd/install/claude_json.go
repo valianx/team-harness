@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // readExistingMCPServers returns the current mcpServers block from ~/.claude.json,
@@ -83,11 +84,38 @@ func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 
 	out, _ := json.MarshalIndent(raw, "", "  ")
 	out = append(out, '\n')
-	if err := os.WriteFile(claudeJSON, out, 0o644); err != nil {
+	if err := writeAtomicSecret(claudeJSON, out); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not write ~/.claude.json: %v\n", err)
 		os.Exit(1)
 	}
 	return backup
+}
+
+// writeAtomicSecret writes payload to path via a temp-file-then-rename for
+// atomicity. The temp file is created at 0o600 (os.CreateTemp default) because
+// the payload contains bearer tokens and API keys; the mode is preserved
+// through the rename, so the live file is also 0o600 on POSIX.
+func writeAtomicSecret(path string, payload []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".claude.json.tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(payload); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("close temp: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("rename to dest: %w", err)
+	}
+	return nil
 }
 
 // rawEntryMatches reports whether the existing mcpServers entry already
