@@ -17,6 +17,7 @@ package main
 //               symlink at leaf caught by O_NOFOLLOW.
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -24,6 +25,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -274,7 +276,11 @@ func TestRegisterMCPServers_MalformedJSON_AbortsWithExitOne(t *testing.T) {
 		t.Fatalf("setup malformed file: %v", err)
 	}
 
-	cmd := exec.Command(os.Args[0],
+	// Bound the subprocess so a regression that never reaches os.Exit cannot
+	// hang CI indefinitely — the context timeout makes the test fail fast.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0],
 		"-test.run=^TestRegisterMCPServers_MalformedJSON_AbortsWithExitOne$",
 	)
 	cmd.Env = append(os.Environ(),
@@ -282,6 +288,9 @@ func TestRegisterMCPServers_MalformedJSON_AbortsWithExitOne(t *testing.T) {
 		"TH_CLAUDE_JSON="+malformedPath,
 	)
 	runErr := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Fatal("subprocess timed out after 60s — registerMCPServers may be hanging instead of calling os.Exit(1) (B2 regression)")
+	}
 
 	// Subprocess must exit non-zero (registerMCPServers calls os.Exit(1)).
 	if runErr == nil {
