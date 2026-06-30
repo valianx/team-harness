@@ -44,6 +44,36 @@ The events file is `00-execution-events.md` (obsidian mode) or `00-execution-eve
 4. Read `workspaces/{feature}/00-execution-events.{md,jsonl}` if it exists (for timing context — resolve filename from `logs_mode` in `00-state.md § Current State`)
 5. Validate the state:
    - If `status: complete` → tell user: "Pipeline '{feature}' already completed. Nothing to recover."
+   - If `status: blocked-no-dispatch` → report:
+     ```
+     Pipeline '{feature}' hit a dispatch failure — the orchestrator could not reach a subagent via Task.
+     Recovery path: top-level Claude takes over dispatch automatically. Parse the dispatch_handoff block
+     in the state or execution-events file, invoke the named agent via Task, and continue the pipeline.
+     Full takeover protocol: docs/subagent-orchestration.md § FALLBACK.
+     If the session has expired, re-run: /th:recover {feature} (this skill re-reads state and re-dispatches).
+     ```
+   - If `status: blocked-incomplete` → report:
+     ```
+     Pipeline '{feature}' is blocked on a missing artifact.
+     Missing artifacts (from 00-state.md § hot_context): {list missing artifacts}
+     Recovery: provide the missing artifact or re-run the phase that produces it.
+     Once the artifact is present, run /th:recover {feature} to resume.
+     ```
+   - If `status: blocked-manual-push` → report:
+     ```
+     Pipeline '{feature}' is waiting for a manual push — 'gh' is absent or unauthenticated.
+     The branch has been committed locally. To complete delivery:
+       1. git push origin {branch-name}
+       2. Open a pull request manually (or run 'gh pr create' once gh is authenticated)
+     Full fallback contract: agents/_shared/gh-fallback.md
+     ```
+   - If `status: blocked-pr-pending` → report:
+     ```
+     Pipeline '{feature}' created a pull request that is pending merge.
+     PR URL (from 00-state.md): {pr_url}
+     The pipeline is complete — no automated resume is needed. Merge the PR when it is ready.
+     If CI is failing, investigate and push a fix commit, then re-run merge.
+     ```
    - If phase and next_action are present → proceed
    - If state file is corrupted or missing key fields → tell user: "State file is incomplete. Showing what's there:" and display the raw content
 6. Pass recovery context to the `orchestrator` agent:
