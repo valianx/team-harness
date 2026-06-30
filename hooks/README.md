@@ -47,7 +47,7 @@ The default preset is **`ultra-quiet`** — fires **only** when the user needs t
 | Event | Matcher | When it fires | Why it's in the default set |
 |---|---|---|---|
 | `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block.sh` silently. |
-| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard.sh`). |
+| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard.sh`, which gates both `git push` and `gh pr create` as outward actions requiring operator approval). |
 | `Notification` | `idle_prompt` only | Claude finished a turn and is waiting for the user. | High signal: you need to act for Claude to continue. One notification per user-blocking pause. |
 | `SubagentStop` | `th:.*` | When a Team Harness pipeline subagent finishes. | Observability backstop: deterministic proof that a `th:*` subagent boundary occurred. See below. |
 | `PreCompact` | `manual\|auto` | Before context compaction runs. | State snapshot: enables `/th:recover` to restore in-flight state after an auto-compact. See below. |
@@ -259,7 +259,7 @@ The `PreToolUse` hook `prepublish-guard.sh` catches two recurring papercuts at t
 - **BLOCK** (`permissionDecision: deny`): fires only when the checked condition is confirmed — missing version bump on push, or non-zero test exit at PR-creation.
 - **FAIL-OPEN** (`nodecision` + one-line stderr warning): fires on every guard-evaluation fault: `git` absent, not inside a work-tree, `origin/main` does not resolve, `git diff` error, config file unparseable, `prepublish_check` value rejected by the control-char guard, `timeout`/`gtimeout` binary absent, internal-timeout (exit 124), command-not-found (exit 127). A guard fault NEVER blocks the operator.
 
-This hook is a strictly **additive sibling** to `dev-guard.sh`. Both hooks co-match `git push` and `gh pr create` as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard.sh`'s `ask` into an allow.
+This hook is a strictly **additive sibling** to `dev-guard.sh`. `dev-guard.sh` gates `git push` and `gh pr create` (and `gh issue create|edit|comment`) as outward-action approvals (`ask`). This hook adds a second enforcement layer — version-bump and test guard — for those same commands. Both hooks fire as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard.sh`'s `ask` into an allow.
 
 ### Check 1 — Version-bump guard (fires on `git push`)
 

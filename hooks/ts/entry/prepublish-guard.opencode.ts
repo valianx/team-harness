@@ -128,6 +128,8 @@ export default function prepublishGuardPlugin(): PrepublishGuardPlugin {
         } catch (err) {
           if (err instanceof ShimRejectError) {
             // Fail-closed for a potential covered action (git push / gh pr create).
+            // Note: dev-guard.sh also gates gh pr create as an outward action
+            // requiring explicit operator approval (unconditional, SEC-DR-2).
             throw new Error(
               "prepublish-guard: payload failed shim validation — cannot evaluate safety. Manual review required (prepublish-guard.opencode.ts SEC-07)."
             );
