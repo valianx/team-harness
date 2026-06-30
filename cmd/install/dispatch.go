@@ -50,6 +50,9 @@ func dispatchSubcommand() bool {
 	case "apply":
 		runApplyCommand()
 		return true
+	case "update":
+		runUpdateCommand()
+		return true
 	case "uninstall":
 		runUninstallCommand()
 		return true

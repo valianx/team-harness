@@ -5,12 +5,30 @@
 | Script | Platform | Usage |
 |--------|----------|-------|
 | `install-opencode.sh` | macOS / Linux | `curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh \| bash` |
+| `install-opencode.ps1` | Windows | `iwr https://valianx.github.io/team-harness/install-opencode.ps1 \| iex` |
 
-`install-opencode.sh` downloads the latest released Go binary, verifies its SHA256 checksum against the published `SHA256SUMS`, and runs `apply --runtime opencode --scope global`. It is **NOT deprecated** — this is the live opencode install path.
+These scripts download the latest released Go binary, verify its SHA256 checksum against the published `SHA256SUMS`, and run `apply --runtime opencode --scope global`. They are **NOT deprecated** — these are the live opencode install paths.
 
 See the README `### Install into opencode` section for the full env-var contract (`MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, `CONTEXT7_API_KEY`).
 
-> **Note:** A Windows PowerShell variant (`install-opencode.ps1`) is planned as an immediate follow-up. On Windows, install manually by downloading the binary from GitHub Releases and running `install apply --runtime opencode --scope global --memory-url <url>`.
+## opencode update (live path)
+
+| Script | Platform | Usage |
+|--------|----------|-------|
+| `update-opencode.sh` | macOS / Linux | `curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh \| bash` |
+| `update-opencode.ps1` | Windows | `iwr https://valianx.github.io/team-harness/update-opencode.ps1 \| iex` |
+
+These scripts:
+1. Perform a cheap `releases/latest/download/VERSION` pre-check — no binary download when already current.
+2. Download the platform binary and verify its SHA256 checksum (fail-closed, anchored exact-asset-name match, case-insensitive compare — mirrors the install scripts).
+3. Run `binary update --runtime opencode --scope global "$@"`, which shows the four-bucket diff preview, prompts `[Y/n]` on a TTY (operator "n" → zero writes), applies asset changes through the proven `ComputePlan`/`ApplyPlan` engine, and bumps only the installer-managed config keys.
+
+After the update: **restart opencode** to activate. The update is NOT live in any running session until restart.
+
+Direct subcommand (headless / CI — skips TTY prompt and applies directly):
+```text
+install update --runtime opencode --scope global --non-interactive
+```
 
 ---
 

@@ -154,6 +154,67 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 	return nil
 }
 
+// refreshManagedConfigKeys performs a managed-key-only update of the
+// .team-harness.json at path. Unlike writeOpencodeTeamHarnessConfig it does
+// NOT touch operator-controlled keys (logs-mode, logs-path, logs-subfolder, or
+// any unknown key). It overwrites ONLY the three installer-managed keys:
+// format_version, installed_version, updated_at — preserving everything else
+// byte-for-byte (SEC-OC-R4 / AC-5 contract).
+//
+// A timestamped backup of the existing file is written before each change
+// through the hardened placer path (SEC-OC-R2 / SEC-01..08 reused).
+func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
+	// Read existing JSON — silently start fresh if absent (first-time update
+	// after a pre-managed-key install).
+	existing, readErr := os.ReadFile(path)
+	raw := map[string]json.RawMessage{}
+	if readErr == nil && len(existing) > 0 {
+		if err := json.Unmarshal(existing, &raw); err != nil {
+			// fix(config): fail closed — a corrupt file must not be silently
+			// overwritten and replaced with only managed keys (AC-5). The operator
+			// must repair or remove the file before the update can proceed; this
+			// preserves all operator keys until the file is parseable again.
+			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+		}
+	}
+
+	// Remove installer-managed keys from the map so we always overwrite them
+	// (SEC-OC-R4 mass-assignment defense — same pattern as
+	// writeOpencodeTeamHarnessConfig). All other keys are preserved unchanged.
+	for k := range installerManagedKeys {
+		delete(raw, k)
+	}
+
+	// Set installer-managed keys from the binary — never from the existing file.
+	raw["format_version"] = mustMarshalJSON("1")
+	raw["installed_version"] = mustMarshalJSON(version)
+	raw["updated_at"] = mustMarshalJSON(time.Now().UTC().Format(time.RFC3339))
+
+	// Backup before write — routes through the hardened write path.
+	// fix(config): backup must succeed before the rewrite; if the backup write
+	// fails there is no recovery copy, so abort rather than overwriting the
+	// config without a safety net.
+	if len(existing) > 0 && readErr == nil {
+		ts := time.Now().UTC().Format("20060102-150405")
+		bakPath := path + ".bak-" + ts
+		if err := hardenedWriteFile(existing, bakPath, placer.ConfigRoot(), false); err != nil {
+			return fmt.Errorf("backup .team-harness.json before update: %w", err)
+		}
+	}
+
+	// Serialize and write through the hardened placer path (SEC-OC-R2).
+	out, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal .team-harness.json: %w", err)
+	}
+	out = append(out, '\n')
+
+	if err := hardenedWriteFile(out, path, placer.ConfigRoot(), false); err != nil {
+		return fmt.Errorf("write .team-harness.json: %w", err)
+	}
+	return nil
+}
+
 // detectExistingConfig reads and parses the .team-harness.json at path.
 // Returns the raw map when the file exists and is valid JSON. Returns nil
 // when the file is absent or unreadable (the normal opencode-only case).
