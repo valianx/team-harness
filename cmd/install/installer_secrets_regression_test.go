@@ -396,3 +396,187 @@ func TestClaudeCodePlacer_Place_RejectsSymlinkAtLeaf(t *testing.T) {
 		t.Errorf("escape target was written through leaf symlink (B3 regression): %q", content)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// B4 — legacy production leaf writers (copyAgentFile / copyEmbeddedFile)
+// route through hardenedWriteFile (finding 5 / B-L2).
+//
+// B3 hardened claudeCodePlacer.Place, but the production no-subcommand
+// claude-code install never calls the placer — it uses copyAgentFile and
+// copyEmbeddedFile (installAgents/Skills/Hooks), which wrote via plain
+// os.WriteFile / writeBytesToDest and therefore followed symlinks. These
+// tests exercise the production leaf writers directly, mirroring the B3
+// placer-level assertions.
+// ---------------------------------------------------------------------------
+
+// TestCopyAgentFile_RejectsSymlinkInParentPath verifies that copyAgentFile
+// rejects a symlink planted at a path component between claudeDir and the
+// destination file.
+func TestCopyAgentFile_RejectsSymlinkInParentPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Symlink requires elevated privileges on Windows")
+	}
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	outside := t.TempDir() // escape target outside claudeDir
+
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatalf("mkdir claudeDir: %v", err)
+	}
+	symlinkDir := filepath.Join(claudeDir, "agents")
+	if err := os.Symlink(outside, symlinkDir); err != nil {
+		t.Fatalf("create symlink in parent path: %v", err)
+	}
+
+	stats.Installed, stats.Updated, stats.Unchanged = nil, nil, nil
+	destPath := filepath.Join(claudeDir, "agents", "architect.md")
+	copyAgentFile("agents/architect.md", destPath, ModeStandard)
+
+	if len(stats.Installed) != 0 {
+		t.Error("copyAgentFile reported the file installed despite a symlinked parent component (finding 5 regression)")
+	}
+
+	escapedPath := filepath.Join(outside, "architect.md")
+	if _, statErr := os.Stat(escapedPath); !os.IsNotExist(statErr) {
+		t.Error("file was written through symlink into outside/ — directory-symlink escape succeeded (finding 5 regression)")
+	}
+}
+
+// TestCopyAgentFile_RejectsSymlinkAtLeaf verifies that copyAgentFile rejects
+// a symlink planted at the destination leaf itself.
+func TestCopyAgentFile_RejectsSymlinkAtLeaf(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("O_NOFOLLOW is a no-op on Windows; leaf protection is via Lstat walk")
+	}
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	outside := t.TempDir()
+	agentsDir := filepath.Join(claudeDir, "agents")
+	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
+		t.Fatalf("mkdir agents: %v", err)
+	}
+
+	leafSymlink := filepath.Join(agentsDir, "architect.md")
+	escapeTarget := filepath.Join(outside, "architect.md")
+	if err := os.Symlink(escapeTarget, leafSymlink); err != nil {
+		t.Fatalf("create leaf symlink: %v", err)
+	}
+
+	stats.Installed, stats.Updated, stats.Unchanged = nil, nil, nil
+	copyAgentFile("agents/architect.md", leafSymlink, ModeStandard)
+
+	if _, statErr := os.Stat(escapeTarget); !os.IsNotExist(statErr) {
+		content, _ := os.ReadFile(escapeTarget)
+		t.Errorf("escape target was written through leaf symlink (finding 5 regression): %q", content)
+	}
+}
+
+// TestCopyEmbeddedFile_RejectsSymlinkInParentPath verifies that
+// copyEmbeddedFile (the skills/hooks leaf writer) rejects a symlink planted
+// at a path component between claudeDir and the destination file.
+func TestCopyEmbeddedFile_RejectsSymlinkInParentPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Symlink requires elevated privileges on Windows")
+	}
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	outside := t.TempDir()
+
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatalf("mkdir claudeDir: %v", err)
+	}
+	symlinkDir := filepath.Join(claudeDir, "hooks")
+	if err := os.Symlink(outside, symlinkDir); err != nil {
+		t.Fatalf("create symlink in parent path: %v", err)
+	}
+
+	stats.Installed, stats.Updated, stats.Unchanged = nil, nil, nil
+	destPath := filepath.Join(claudeDir, "hooks", "checkpoint-guard.sh")
+	copyEmbeddedFile("hooks/checkpoint-guard.sh", destPath, true)
+
+	if len(stats.Installed) != 0 {
+		t.Error("copyEmbeddedFile reported the file installed despite a symlinked parent component (finding 5 regression)")
+	}
+
+	escapedPath := filepath.Join(outside, "checkpoint-guard.sh")
+	if _, statErr := os.Stat(escapedPath); !os.IsNotExist(statErr) {
+		t.Error("file was written through symlink into outside/ — directory-symlink escape succeeded (finding 5 regression)")
+	}
+}
+
+// TestCopyEmbeddedFile_RejectsSymlinkAtLeaf verifies that copyEmbeddedFile
+// rejects a symlink planted at the destination leaf itself.
+func TestCopyEmbeddedFile_RejectsSymlinkAtLeaf(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("O_NOFOLLOW is a no-op on Windows; leaf protection is via Lstat walk")
+	}
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	outside := t.TempDir()
+	hooksDir := filepath.Join(claudeDir, "hooks")
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
+		t.Fatalf("mkdir hooks: %v", err)
+	}
+
+	leafSymlink := filepath.Join(hooksDir, "checkpoint-guard.sh")
+	escapeTarget := filepath.Join(outside, "checkpoint-guard.sh")
+	if err := os.Symlink(escapeTarget, leafSymlink); err != nil {
+		t.Fatalf("create leaf symlink: %v", err)
+	}
+
+	stats.Installed, stats.Updated, stats.Unchanged = nil, nil, nil
+	copyEmbeddedFile("hooks/checkpoint-guard.sh", leafSymlink, true)
+
+	if _, statErr := os.Stat(escapeTarget); !os.IsNotExist(statErr) {
+		content, _ := os.ReadFile(escapeTarget)
+		t.Errorf("escape target was written through leaf symlink (finding 5 regression): %q", content)
+	}
+}
+
+// TestCopyEmbeddedFile_ExecutableModeMatchesLegacyBehavior verifies that a
+// hook asset installed through copyEmbeddedFile (executable=true) lands at
+// mode 0o755 — matching the pre-fix writeBytesToDest behavior (0o644 +
+// chmod +0o111) (AC-4).
+func TestCopyEmbeddedFile_ExecutableModeMatchesLegacyBehavior(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits not enforced on Windows")
+	}
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	destPath := filepath.Join(claudeDir, "hooks", "checkpoint-guard.sh")
+	copyEmbeddedFile("hooks/checkpoint-guard.sh", destPath, true)
+
+	info, err := os.Stat(destPath)
+	if err != nil {
+		t.Fatalf("stat %q: %v", destPath, err)
+	}
+	if got := info.Mode().Perm(); got != 0o755 {
+		t.Errorf("hook mode = %04o, want 0o755 (AC-4)", got)
+	}
+}
+
+// TestCopyAgentFile_ModeMatchesLegacyBehavior verifies that a non-executable
+// agent asset installed through copyAgentFile lands at mode 0o644 (AC-4).
+func TestCopyAgentFile_ModeMatchesLegacyBehavior(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits not enforced on Windows")
+	}
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	destPath := filepath.Join(claudeDir, "agents", "architect.md")
+	copyAgentFile("agents/architect.md", destPath, ModeStandard)
+
+	info, err := os.Stat(destPath)
+	if err != nil {
+		t.Fatalf("stat %q: %v", destPath, err)
+	}
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Errorf("agent mode = %04o, want 0o644 (AC-4)", got)
+	}
+}
