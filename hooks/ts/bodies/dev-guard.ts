@@ -35,7 +35,7 @@ function none(): NormalizedDecision {
 // + __clickup_(write verbs)
 // ---------------------------------------------------------------------------
 const CLICKUP_WRITE_RE =
-  /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file)$/;
+  /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
 
 // ---------------------------------------------------------------------------
 // Outward-action detection patterns (verbatim from dev-guard.sh sections 2a-2f)

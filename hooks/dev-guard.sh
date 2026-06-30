@@ -123,7 +123,7 @@ fi
 # ClickUp write pattern: mcp__ + any server segment (including underscores, for multi-word
 # MCP server names that Claude Code normalizes spaces-to-underscores) + __clickup_(write verbs).
 # fix(dev-guard): SEC-001 — mirror wiring semantics (.+) so multi-word servers match (#304)
-_clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
+_clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)'
 if printf '%s' "$_tool_name" | grep -qE "^${_clickup_write_pattern}" 2>/dev/null; then
     # ClickUp MCP outward write detected — unconditional ask (SEC-DR-2).
     ask "outward action — ClickUp MCP outward write ($_tool_name) requires explicit operator approval; preview the change before confirming (dev-guard.sh; see docs/dev-mode.md)"

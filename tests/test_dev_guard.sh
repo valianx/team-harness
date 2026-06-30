@@ -403,6 +403,26 @@ assert_nodecision "gh issue view (read-only)" "$TMP" "$(make_payload 'gh issue v
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
+# ClickUp MCP write gate — AC-A1-4 hardening: delete_task added
+# ---------------------------------------------------------------------------
+
+# Case CU-1 — ASK: clickup delete_task (destructive write; added by AC-A1-4 hardening)
+echo
+echo "=== ASK: mcp clickup delete_task (destructive write — AC-A1-4) ==="
+TMP=$(make_tmp)
+assert_ask "clickup delete_task (destructive write)" "$TMP" \
+    '{"tool_name":"mcp__my_clickup_server__clickup_delete_task","tool_input":{"task_id":"abc123"}}'
+rm -rf "$TMP"
+
+# Case CU-2 — NODECISION: clickup get_task_details (read-only — must NOT gate)
+echo
+echo "=== NODECISION: mcp clickup get_task_details (read-only — must NOT gate) ==="
+TMP=$(make_tmp)
+assert_nodecision "clickup get_task_details (read-only)" "$TMP" \
+    '{"tool_name":"mcp__my_clickup_server__clickup_get_task_details","tool_input":{"task_id":"abc123"}}'
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo
