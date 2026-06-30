@@ -34,9 +34,14 @@ func readExistingMCPServers() map[string]interface{} {
 // Returns the backup path if a write occurred, or "" if the file was untouched.
 func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 	// Read the whole file as a map of raw JSON values so unknown keys are preserved.
+	// Abort on malformed JSON: proceeding with an empty map would silently drop
+	// every operator key the file already contains.
 	raw := map[string]json.RawMessage{}
 	if fileData, err := os.ReadFile(claudeJSON); err == nil {
-		_ = json.Unmarshal(fileData, &raw)
+		if jsonErr := json.Unmarshal(fileData, &raw); jsonErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: existing ~/.claude.json is not valid JSON; refusing to rewrite — fix or remove it\n")
+			os.Exit(1)
+		}
 	}
 
 	// Extract (or initialise) the mcpServers sub-object.
