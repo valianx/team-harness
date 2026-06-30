@@ -137,9 +137,13 @@ per-phase context. The orchestrator's `phase.end` events in `00-execution-events
 remain the authoritative rich observability record. The SubagentStop payload
 simply does not carry that data.
 
-**Gated by `TH_HOOK_PROFILE`.** Setting `TH_HOOK_PROFILE=minimal` suppresses
-this hook (and all other observability/notification hooks). The default when
-the variable is unset is `standard`, which enables it.
+**Non-suppressible breadcrumb.** The existence breadcrumb (the `subagent.stop`
+write) runs unconditionally — `TH_HOOK_PROFILE=minimal` does NOT suppress it.
+Only the scope guard (non-`th:` agent → silent exit) and the base-path check
+(no resolvable workspace directory → silent exit) cause a run without a write.
+This makes the breadcrumb a deterministic observability floor: any `TH_HOOK_PROFILE`
+value can suppress notifications and richer observability, but it cannot erase
+proof that a `th:*` boundary occurred.
 
 ### 00-precompact.jsonl — PreCompact breadcrumb
 

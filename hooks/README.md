@@ -10,7 +10,7 @@ OS-native notification scripts plus the `config.json` template that wires them i
 | `notify-mac.sh` | macOS notification via `osascript`. Gated by `TH_HOOK_PROFILE`. |
 | `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). Gated by `TH_HOOK_PROFILE`. |
 | `notify-stage.sh` | Wrapper invoked by the orchestrator at stage boundaries (4 toasts/pipeline). Detects OS and routes to the matching `notify-{os}.sh`. Gated by `TH_HOOK_PROFILE`. |
-| `subagent-trace.sh` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
+| `subagent-trace.sh` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. **Breadcrumb is non-suppressible** — runs unconditionally regardless of `TH_HOOK_PROFILE`. |
 | `precompact-snapshot.sh` | PreCompact fail-open state snapshot. Copies `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling before context compaction so `/th:recover` can restore in-flight state. Appends a breadcrumb to `00-precompact.jsonl`. Never blocks compaction; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
 | `_hook-profile.sh` | Shared sourced helper — TH_HOOK_PROFILE resolver. Provides `th_hook_profile()` (normalizes the env var) and `th_observability_enabled <class>` (exits 0/1). Sourced only by observability/notification hooks; never by enforcement floors. |
 | `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). Always-on (never gated by `TH_HOOK_PROFILE`). |
@@ -64,6 +64,11 @@ orchestrator's rich `phase.end` events:
   subagent boundary occurred — useful when the orchestrator drops a `phase.end`.
 - It writes its breadcrumb to `00-subagent-trace.jsonl` (NOT `00-execution-events`),
   preserving the orchestrator's exclusive-writer contract.
+- **Non-suppressible breadcrumb:** the breadcrumb write runs unconditionally —
+  `TH_HOOK_PROFILE=minimal` does NOT suppress it. Only the scope guard (non-`th:`
+  agent) and the base-path check (no resolvable workspace) produce a silent exit
+  without a write. Any future richer/optional behavior must be placed after a
+  profile gate sourced after the breadcrumb.
 - Fail-OPEN: the hook exits 0 on every path, never blocks the subagent, and emits
   nothing on stdout. Non-`th:` subagents are silently skipped.
 
@@ -97,20 +102,23 @@ notification hooks. The enforcement floors (`policy-block.sh`, `dev-guard.sh`,
 this setting — no profile value can disable, skip, or downgrade any enforcement
 hook.
 
-| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) |
-|---------|--------------------------------------|--------------------------------------|
-| `minimal` | suppressed | suppressed |
-| `standard` (default when unset) | **enabled** | **enabled** |
-| `strict` | **enabled** | **enabled** |
+| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) | `subagent-trace.sh` breadcrumb |
+|---------|--------------------------------------|--------------------------------------|-------------------------------|
+| `minimal` | suppressed | suppressed | **always written** |
+| `standard` (default when unset) | **enabled** | **enabled** | **always written** |
+| `strict` | **enabled** | **enabled** | **always written** |
 
 `standard` preserves exactly today's behavior for all existing installs.
 `minimal` is the quietest operator experience — all notifications and observability
-hooks are silent. `strict` is the most-verbose level (today identical to
-`standard` in effect; reserved as a forward extension point).
+hooks are silent, but the `subagent-trace.sh` existence breadcrumb is never
+suppressed (it is the only non-suppressible observability write). `strict` is the
+most-verbose level (today identical to `standard` in effect; reserved as a forward
+extension point).
 
 The profile is read via `_hook-profile.sh`, a shared sourced helper. Only
 observability/notification hooks source it. Enforcement floors never source it
-and are structurally unable to be gated by it.
+and are structurally unable to be gated by it. The `subagent-trace.sh` breadcrumb
+does not source `_hook-profile.sh` — its write path is unconditional.
 
 **What was removed from the previous default (and why).** Earlier versions of this repo also wired:
 
