@@ -118,7 +118,7 @@ The system requires two MCP servers: **Memory** (Knowledge Graph) and **context7
    }
    ```
    Omit `headers` if no token was provided.
-4. Back up `~/.claude.json` before writing (copy to `~/.claude.json.bak-YYYYMMDD-HHMMSS`).
+4. Back up `~/.claude.json` before writing (copy to `~/.claude.json.bak-YYYYMMDD-HHMMSS`, then immediately `chmod 600` the backup — it contains the same secrets as the live file and must not be world-readable on multi-user hosts).
 5. **Atomic write + secret-safe permissions (mandatory):**
    - Write the merged JSON to a temporary file in the same directory (e.g. `~/.claude.json.tmp-$$`).
    - Set the temporary file's permissions to `0o600` (owner read+write only) BEFORE moving it into place.
