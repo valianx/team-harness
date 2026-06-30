@@ -824,6 +824,9 @@ if [ "$tool_name" = "Bash" ]; then
         if printf '%s' "$cmd" | grep -qE '\bBearer[[:space:]]+[A-Za-z0-9_/+.=-]{20,}\b' 2>/dev/null; then
             _bash_ask "possible Bearer token (Bearer ... keyword pattern)"
         fi
+        if printf '%s' "$cmd" | grep -qE '\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^[:space:]]{30,}' 2>/dev/null; then
+            _bash_ask "possible Azure SAS token (sv=... signature pattern)"
+        fi
     fi
 
     # No match — no decision (exit 0, empty stdout). Non-matching Bash calls pass through.

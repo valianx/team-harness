@@ -118,10 +118,10 @@ The system requires two MCP servers: **Memory** (Knowledge Graph) and **context7
    }
    ```
    Omit `headers` if no token was provided.
-4. Back up `~/.claude.json` before writing (copy to `~/.claude.json.bak-YYYYMMDD-HHMMSS`, then immediately `chmod 600` the backup — it contains the same secrets as the live file and must not be world-readable on multi-user hosts).
+4. Back up `~/.claude.json` before writing. Create the backup at `~/.claude.json.bak-YYYYMMDD-HHMMSS` with `0o600` permissions **from the moment of creation** — never copy with the ambient umask and tighten afterward, which leaves a brief world-readable window (the backup holds the same secrets as the live file). Use a create-then-fill sequence that sets the mode at creation: `( umask 077; cp ~/.claude.json ~/.claude.json.bak-YYYYMMDD-HHMMSS )`, or write the bytes through a tool that creates the file at `0o600`.
 5. **Atomic write + secret-safe permissions (mandatory):**
-   - Write the merged JSON to a temporary file in the same directory (e.g. `~/.claude.json.tmp-$$`).
-   - Set the temporary file's permissions to `0o600` (owner read+write only) BEFORE moving it into place.
+   - Create a temporary file in the same directory (e.g. `~/.claude.json.tmp-$$`) with `0o600` permissions **at creation**, BEFORE any bytes are written — a crash after the write but before a later `chmod` must never leave the secrets readable. Use `( umask 077; … )` around the write, or create the file `0o600` and then fill it.
+   - Write the merged JSON to that temporary file.
    - Rename (move) the temporary file to `~/.claude.json`. This is the atomic step — a crash before the rename leaves the original untouched; a crash after the rename leaves the new file in place.
    - After the rename, verify permissions are still `0o600` (`chmod 600 ~/.claude.json`).
    - Do NOT apply any secret-pattern scanner (e.g. `scanForSecrets`) to the config bytes — the file intentionally contains bearer tokens and API keys. The `0o600` permission is the mitigation; scanning would always trip on valid input.

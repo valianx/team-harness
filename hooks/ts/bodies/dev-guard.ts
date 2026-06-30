@@ -5,9 +5,9 @@
 //
 // Coverage catalogue (mirrors dev-guard.sh header, closed and enumerated):
 //   1. Push to a remote: git push (bare, -C, GIT_DIR=)
-//   2. PR merge/review/comment by ANY binary (gh pr merge/review/comment,
-//      gh api REST PUT/POST/PATCH/DELETE .../pulls, gh api graphql PR-write
-//      mutations, curl/wget mutating method to api.github.com)
+//   2. PR/issue writes by ANY binary (gh pr create/merge/review/comment,
+//      gh issue create/edit/comment, gh api REST PUT/POST/PATCH/DELETE .../pulls,
+//      gh api graphql PR-write mutations, curl/wget mutating method to api.github.com)
 //   3. ClickUp MCP outward writes (tool.name matches write pattern, no command)
 //
 // Default: none (no-decision) — ask/deny EXCLUSIVELY for covered actions.
@@ -46,7 +46,10 @@ const CLICKUP_WRITE_RE =
 const GIT_PUSH_RE =
   /(^|[\s|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)/;
 
-// 2b. gh pr merge
+// 2b. gh pr create (mutating verb only — read-only gh pr view/list/status stay ungated)
+const GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
+
+// 2c. gh pr merge
 const GH_PR_MERGE_RE = /(^|[\s|;`])gh\s+pr\s+merge(\s|$)/;
 
 // 2c. gh pr review (including --dismiss)
@@ -65,6 +68,10 @@ const GH_GRAPHQL_RE = /(^|[\s|;`])gh\s+api\s+graphql/i;
 const GRAPHQL_PR_MUTATIONS_RE =
   /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
 
+// 2e-ter. gh issue mutating writes (create, edit, comment).
+// Read-only gh issue list / gh issue view stay ungated (no outward side-effect).
+const GH_ISSUE_WRITE_RE = /(^|[\s|;`])gh\s+issue\s+(create|edit|comment)(\s|$)/;
+
 // 2f. curl/wget mutating method to api.github.com (both forms from dev-guard.sh)
 const CURL_WGET_MUTATING_RE =
   /(^|[\s|;`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com/i;
@@ -73,7 +80,7 @@ const MUTATING_METHOD_RE = /(-X|--request)\s*(PUT|POST|PATCH|DELETE)/i;
 
 // Defence-in-depth (F-016): raw payload scan when cmd is empty (mirrors dev-guard.sh lines 185-189)
 const RAW_OUTWARD_SCAN_RE =
-  /(git\s+push|gh\s+pr\s+merge|gh\s+pr\s+review|gh\s+pr\s+comment|gh\s+api.*pulls|api\.github\.com)/;
+  /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/;
 
 // ---------------------------------------------------------------------------
 // Public evaluate() — the single entry point every runtime calls.
@@ -122,7 +129,14 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
     );
   }
 
-  // 2b. gh pr merge
+  // 2b. gh pr create
+  if (GH_PR_CREATE_RE.test(cmdStr)) {
+    return ask(
+      "outward action 'gh pr create' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+    );
+  }
+
+  // 2c. gh pr merge
   if (GH_PR_MERGE_RE.test(cmdStr)) {
     return ask(
       "outward action 'gh pr merge' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
@@ -154,6 +168,13 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
   if (GH_GRAPHQL_RE.test(cmdStr) && GRAPHQL_PR_MUTATIONS_RE.test(cmdStr)) {
     return ask(
       "outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
+    );
+  }
+
+  // 2e-ter. gh issue mutating writes (create, edit, comment)
+  if (GH_ISSUE_WRITE_RE.test(cmdStr)) {
+    return ask(
+      "outward action 'gh issue write' requires explicit operator approval (dev-guard.ts); see docs/dev-mode.md § Outward-Action Gate"
     );
   }
 

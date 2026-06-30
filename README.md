@@ -144,7 +144,7 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 
 ## Orchestrator disposition
 
-The top-level agent IS the orchestrator — no marker file or activation command required. Development tasks route through the full pipeline automatically (architect → implementer → tester/qa/security → delivery). A deterministic gate (`hooks/dev-guard.sh`) requires explicit operator approval for every outward, irreversible action (`git push`, `gh pr create`, `gh pr merge`/`review`/`comment`, GitHub API writes) at the point of execution — the agent cannot publish or push without human confirmation.
+The top-level agent IS the orchestrator — no marker file or activation command required. Development tasks route through the full pipeline automatically (architect → implementer → tester/qa/security → delivery). A deterministic gate (`hooks/dev-guard.sh`) requires explicit operator approval for every outward, irreversible action (for example: `git push`, `gh pr create`, `gh pr merge`/`review`/`comment`, `gh issue create`/`edit`/`comment`, ClickUp outward writes, and GitHub API writes) at the point of execution — the agent cannot publish or push without human confirmation.
 
 Full contract: docs/dev-mode.md.
 

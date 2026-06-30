@@ -42,8 +42,8 @@ The events file is `00-execution-events.md` (obsidian mode) or `00-execution-eve
 2. If not found, check whether the workspace folder itself exists:
    - If the folder exists but has no `00-state.md` → tell the user: "'{feature}' is a diagram or spike workspace (no pipeline state file). These modes are untracked by design and require no recovery. See `docs/observability.md § Lightweight direct-mode exemptions`."
    - If the folder does not exist at all → tell the user: "No pipeline state found for '{feature}'. Use `/th:pipelines` to see active pipelines."
-3. Read `workspaces/{feature}/00-state.md` in full
-4. Read `workspaces/{feature}/00-execution-events.{md,jsonl}` if it exists (for timing context — resolve filename from `logs_mode` in `00-state.md § Current State`)
+3. Read `{resolved-path}/{feature}/00-state.md` in full
+4. Read `{resolved-path}/{feature}/00-execution-events.{md,jsonl}` if it exists (for timing context — resolve filename from `logs_mode` in `00-state.md § Current State`)
 5. Validate the state:
    - If `status: complete` → tell user: "Pipeline '{feature}' already completed. Nothing to recover."
    - If `status: blocked-no-dispatch` → report:
