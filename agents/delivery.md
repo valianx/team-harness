@@ -961,6 +961,8 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 **Offer-to-resolve on `CONFLICTING`.** When `mergeable == CONFLICTING`, append a one-line **offer** (not an action) to the operator-facing report: "To resolve: rebase the branch on the current base (`git fetch origin && git rebase origin/main`) and resolve conflicts, then re-push." Delivery does NOT perform the rebase automatically — it is an outward/irreversible action gated by `dev-guard.sh` and owned by the operator.
 
+**Automated review (CodeRabbit) is part of the review surface.** PRs to this repo receive an automated CodeRabbit analysis alongside the CI checks; it appears as a `CodeRabbit` check and posts inline review comments. Two consequences for this step: (1) a green test rollup does NOT mean the PR is reviewed — while CodeRabbit's review is in progress its check is `pending` and `mergeStateStatus` reads `UNSTABLE`; report `ci_state: pending` and do not treat the PR as done until the CodeRabbit review completes. (2) Every CodeRabbit inline finding is a reviewer comment and MUST be routed through `agents/_shared/apply-review-disposition.md`, including Step 6 — reply to every thread, resolve only `APPLIED`, and leave a rationale reply on anything not resolved. Applying a fix without posting the thread disposition is an incomplete review cycle.
+
 **Reporting sites.** Step 11.4 writes:
 
 - Status block: `mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable` and `ci_state: passing | failing | pending | none | not-verified`.
@@ -1413,7 +1415,7 @@ Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}
 - Message: {message}
 - PR: {url} (targeting main) — {created | updated | already merged} — merge: {CLEAN | CONFLICTING | UNDETERMINED | not-verified}, CI: {passing | failing | pending | none | not-verified}
 - Merge state: {CLEAN | CONFLICTING — base has diverged; PR cannot merge as-is | UNDETERMINED — GitHub did not resolve mergeability within the retry window; verify before merge | not-verified: gh-unavailable}
-- CI: {passing | FAILING — {N} check(s) not green | in progress | no checks configured | not-verified}
+- CI: {passing | FAILING — {N} check(s) not green | pending | none | not-verified}
 
 ## Files Committed
 - {file list}
