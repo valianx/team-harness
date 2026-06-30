@@ -63,15 +63,16 @@ func ensureDir(p string) {
 	}
 }
 
-// copyFileRaw performs a raw byte copy from src to dest (both filesystem paths).
-func copyFileRaw(src, dest string) error {
+// copyFileRaw performs a raw byte copy from src to dest (both filesystem paths)
+// using the given mode for the destination file.
+func copyFileRaw(src, dest string, mode os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
 
-	out, err := os.Create(dest)
+	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}

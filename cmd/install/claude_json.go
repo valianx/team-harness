@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // readExistingMCPServers returns the current mcpServers block from ~/.claude.json,
@@ -33,9 +34,14 @@ func readExistingMCPServers() map[string]interface{} {
 // Returns the backup path if a write occurred, or "" if the file was untouched.
 func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 	// Read the whole file as a map of raw JSON values so unknown keys are preserved.
+	// Abort on malformed JSON: proceeding with an empty map would silently drop
+	// every operator key the file already contains.
 	raw := map[string]json.RawMessage{}
 	if fileData, err := os.ReadFile(claudeJSON); err == nil {
-		_ = json.Unmarshal(fileData, &raw)
+		if jsonErr := json.Unmarshal(fileData, &raw); jsonErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: existing ~/.claude.json is not valid JSON; refusing to rewrite — fix or remove it\n")
+			os.Exit(1)
+		}
 	}
 
 	// Extract (or initialise) the mcpServers sub-object.
@@ -83,11 +89,38 @@ func registerMCPServers(context7Key string, choice MemoryMCPChoice) string {
 
 	out, _ := json.MarshalIndent(raw, "", "  ")
 	out = append(out, '\n')
-	if err := os.WriteFile(claudeJSON, out, 0o644); err != nil {
+	if err := writeAtomicSecret(claudeJSON, out); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not write ~/.claude.json: %v\n", err)
 		os.Exit(1)
 	}
 	return backup
+}
+
+// writeAtomicSecret writes payload to path via a temp-file-then-rename for
+// atomicity. The temp file is created at 0o600 (os.CreateTemp default) because
+// the payload contains bearer tokens and API keys; the mode is preserved
+// through the rename, so the live file is also 0o600 on POSIX.
+func writeAtomicSecret(path string, payload []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".claude.json.tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(payload); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("write temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("close temp: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("rename to dest: %w", err)
+	}
+	return nil
 }
 
 // rawEntryMatches reports whether the existing mcpServers entry already

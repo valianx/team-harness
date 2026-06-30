@@ -80,9 +80,8 @@ func (p *claudeCodePlacer) Place(src []byte, templatedDest string, kind string) 
 	concreteDest := p.configRoot + templatedDest[len("{config_root}"):]
 	concreteDest = filepath.FromSlash(concreteDest)
 
-	ensureDir(filepath.Dir(concreteDest))
 	executable := kind == "hook"
-	if err := writeBytesToDest(src, concreteDest, executable); err != nil {
+	if err := hardenedWriteFile(src, concreteDest, p.configRoot, executable); err != nil {
 		return "", fmt.Errorf("placer: write to %q: %w", concreteDest, err)
 	}
 	return concreteDest, nil

@@ -21,3 +21,23 @@ func writeLeafNoFollow(data []byte, dest string, executable bool) error {
 	}
 	return nil
 }
+
+// copyBackupHardened reads src and writes its contents to dest using O_EXCL so
+// a pre-created file at the backup path is rejected. O_NOFOLLOW is not available
+// on Windows (documented residual — see hardened_write_windows.go); symlink
+// protection on Windows rests on the caller's use of Lstat-based checks.
+func copyBackupHardened(src, dest string, mode os.FileMode) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("read source %q: %w", src, err)
+	}
+	out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return fmt.Errorf("open O_EXCL %q: %w", dest, err)
+	}
+	defer out.Close()
+	if _, wErr := out.Write(data); wErr != nil {
+		return fmt.Errorf("write %q: %w", dest, wErr)
+	}
+	return nil
+}
