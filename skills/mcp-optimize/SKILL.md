@@ -48,7 +48,7 @@ The operator can chat in any language; you reply in the operator's chat language
 
 If `$ARGUMENTS` contains `--help`, print the following and exit without running the audit:
 
-```
+```text
 /th:mcp-optimize — MCP tool-loading context audit and optimization
 
 Stages:
@@ -149,7 +149,7 @@ If `--apply` is NOT present, skip this section entirely — the run is REPORT-on
 
 Present the consolidated report using this shape:
 
-```
+```text
 ====================================
   /th:mcp-optimize — MCP Tool-Loading Audit
 ====================================

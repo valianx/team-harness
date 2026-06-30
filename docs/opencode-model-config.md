@@ -99,7 +99,7 @@ adding a provider later is a checked-in map edit, not a code change.
    concrete id**, and emits `model: <provider>/<concrete-id>`. No network call at
    install. Absent selection ⇒ unchanged model-less baseline.
 3. **`/th:update-models` live refresh.** Resolves `(provider, family) → newest concrete
-   by `release_date`` from the live models.dev API (`data[provider]["models"][bare_id]`,
+   by release_date` from the live models.dev API (`data[provider]["models"][bare_id]`,
    grouped by the model's `family` field — the real nested shape, not a flat
    provider-prefixed map) and rewrites the baked `model:` lines to the freshest version.
    **Never mix providers** — when the selected provider differs from what is currently
@@ -113,7 +113,7 @@ direction.
 
 CLI surface:
 
-```
+```shell
 install --runtime opencode --opencode-tier anthropic
 # bakes: orchestrator → anthropic/claude-opus-4-6; implementer → anthropic/claude-sonnet-4-6;
 #        init/acceptance-checker/translator/researcher → anthropic/claude-haiku-4-5
