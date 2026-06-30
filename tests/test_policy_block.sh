@@ -457,6 +457,34 @@ assert_allow "git commit -m body mentions --no-verify (false positive guard)" \
   '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fixes the --no-verify bypass\""}}'
 
 echo
+echo "=== [Degraded-path] Write content with SendGrid key (DENY on bash fallback) ==="
+# SEC-A-02: verify the bash degraded path's Write/Edit content scan detects the new
+# HIGH patterns. Force the degraded path by injecting a fake python3 that exits 127
+# (the documented "absent python3 simulation" — policy-block.sh treats it as absent
+# and falls back to the native bash gate).
+_DEGRADED_FAKE_DIR="$(mktemp -d)"
+cat > "$_DEGRADED_FAKE_DIR/python3" <<'SH'
+#!/bin/bash
+exit 127
+SH
+chmod +x "$_DEGRADED_FAKE_DIR/python3"
+_SG_KEY_DEG="SG.""AAAAAAAAAAAAAAAAAAAAAA.""BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+_degraded_out=$(
+    PATH="$_DEGRADED_FAKE_DIR:$PATH"
+    echo '{"tool_name":"Write","tool_input":{"file_path":"/app/mail.py","content":"KEY=\"'"$_SG_KEY_DEG"'\""}}' \
+        | bash "$HOOK" 2>&1
+)
+if echo "$_degraded_out" | grep -qE '"permissionDecision": *"deny"'; then
+    PASS=$((PASS + 1))
+    echo "  [PASS] DENY: Write SendGrid key — degraded-path Write/Edit detection (SEC-A-02)"
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("DENY expected for degraded-path Write/SendGrid (SEC-A-02): ${_degraded_out:-<empty>}")
+    echo "  [FAIL] DENY: Write SendGrid key — degraded-path Write/Edit detection (SEC-A-02) (got: ${_degraded_out:-<empty>})"
+fi
+rm -rf "$_DEGRADED_FAKE_DIR"
+
+echo
 echo "=== M3: FAIL-CLOSED — unmatched edge payload (ALLOW / no-decision) ==="
 # AC-12: unmatched payloads must produce no-decision (empty stdout), never allow JSON.
 assert_allow "unmatched Read on non-secret path" \

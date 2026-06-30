@@ -1024,6 +1024,9 @@ if [ "$tool_name" = "Write" ] || [ "$tool_name" = "Edit" ] || [ "$tool_name" = "
         if printf '%s' "$_content" | grep -qE -- '-----BEGIN (RSA |EC |OPENSSL |DSA )?PRIVATE KEY-----' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: PEM private key header"
         fi
+        if printf '%s' "$_content" | grep -qE '\bsk-ant-[A-Za-z0-9_-]{20,}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Anthropic API key (sk-ant-... pattern)"
+        fi
         if printf '%s' "$_content" | grep -qE '\bsk-(proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: OpenAI-style secret key (sk-... pattern)"
         fi
@@ -1041,6 +1044,28 @@ if [ "$tool_name" = "Write" ] || [ "$tool_name" = "Edit" ] || [ "$tool_name" = "
         fi
         if printf '%s' "$_content" | grep -qE '\bxoxb-[A-Za-z0-9-]{10,}\b' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: Slack bot token (xoxb-... pattern)"
+        fi
+        # SEC-A-02 hardening: propagate new HIGH patterns to the Write/Edit content scan
+        # to match the python3 path. sk-ant- is listed above before the generic sk- check.
+        if printf '%s' "$_content" | grep -qE '\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: SendGrid API key (SG.... pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bAC[0-9a-f]{32}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Twilio account SID (AC... pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bSK[0-9a-f]{32}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Twilio API key SID (SK... pattern)"
+        fi
+        # Medium-confidence patterns for Write/Edit content — route to ask (not deny).
+        # These mirror MEDIUM_CONFIDENCE_SECRETS_FIXED in the python3 path.
+        if printf '%s' "$_content" | grep -qE '\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b' 2>/dev/null; then
+            _bash_ask "possible JWT token (eyJ... three-segment base64url pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bBearer[[:space:]]+[A-Za-z0-9_/+.=-]{20,}\b' 2>/dev/null; then
+            _bash_ask "possible Bearer token (Bearer ... keyword pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^[:space:]]{30,}' 2>/dev/null; then
+            _bash_ask "possible Azure SAS token (sv=... signature pattern)"
         fi
     fi
 
