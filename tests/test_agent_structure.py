@@ -30490,6 +30490,63 @@ check(
 # Marker: anchor-scoped-assertion-meta-test
 
 # ---------------------------------------------------------------------------
+# Suite 129 — event-enum-reconcile (expanded JSONL event types)
+# ---------------------------------------------------------------------------
+# Verifies that the expanded event enum in agents/orchestrator.md includes the
+# event types added in the event-enum-reconcile fix (finding 10 enum half):
+# gate (human-checkpoint), research.lane.skipped, fanout.*, artifact.missing,
+# operation.*.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 129: event-enum-reconcile structural checks ===")
+
+_s129_orch = read(AGENTS_DIR / "orchestrator.md")
+
+_S129_NEW_EVENTS = [
+    "research.lane.skipped",
+    "fanout.start",
+    "fanout.lane.start",
+    "fanout.lane.end",
+    "fanout.converge",
+    "artifact.missing",
+    "operation.started",
+    "operation.success",
+    "operation.failed",
+]
+
+for _s129_event in _S129_NEW_EVENTS:
+    check(
+        f"s129/event-enum: orchestrator.md enum contains '{_s129_event}'",
+        _s129_event in _s129_orch,
+        f"event type '{_s129_event}' missing from agents/orchestrator.md event enum — "
+        "add it to the 'One of:' list in the schema table",
+    )
+
+# Self-referential guards (hygiene contract)
+_s129_own = read(Path(__file__))
+check(
+    "suite129(self-ref): test file contains 'Suite 129' and 'event-enum-reconcile'",
+    "Suite 129" in _s129_own and "event-enum-reconcile" in _s129_own,
+    "test file must self-reference Suite 129 and the marker 'event-enum-reconcile'",
+)
+
+_s129_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite129(registry): docs/testing.md registers 'Suite 129' and 'event-enum-reconcile'",
+    "Suite 129" in _s129_testing_md and "event-enum-reconcile" in _s129_testing_md,
+    "docs/testing.md must register Suite 129 and the 'event-enum-reconcile' marker",
+)
+
+_s129_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite129(hygiene): CLAUDE.md does NOT contain 'Suite 129' (§11 hygiene contract)",
+    "Suite 129" not in _s129_claude_md,
+    "CLAUDE.md must not mention Suite 129 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: event-enum-reconcile
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
