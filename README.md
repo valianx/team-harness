@@ -142,16 +142,9 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 
 ---
 
-## Developer mode
+## Orchestrator disposition
 
-Team Harness runs the orchestrated pipeline in **developer mode** — the **default disposition** as of v2.56.0. `/th:setup` and `/th:update` activate it automatically. Without it, the top-level agent handles your request **directly** (normal Claude Code behavior, no pipeline). To exit: `/dev-mode off` — the choice persists across future updates.
-
-- **Enter:** `/dev-mode` — starts immediately in the current session, no `/clear` needed.
-- **Exit:** `/dev-mode off`.
-
-`/dev-mode` writes the marker `~/.claude/.dev-mode-active`, shows the `DEVELOPER MODE ACTIVE` banner, and the top-level agent adopts the orchestrator role — routing development tasks through the pipeline and dispatching leaf agents directly. While the marker is present, every new session auto-resumes developer mode: a `SessionStart` hook surfaces the banner **instantly** (rendered by Claude Code, not the model) and loads the disposition silently. A deterministic gate (`hooks/dev-guard.sh`) requires explicit operator approval for outward, irreversible actions (`git push`, `gh pr merge`/`review`/`comment`, GitHub API writes) at the point of execution — the agent cannot publish or push on its own.
-
-A persistent alternative is the `developer-mode` output style (`/config` → Output style → `developer-mode`), which replaces the system prompt on reload.
+The top-level agent IS the orchestrator — no marker file or activation command required. Development tasks route through the full pipeline automatically (architect → implementer → tester/qa/security → delivery). A deterministic gate (`hooks/dev-guard.sh`) requires explicit operator approval for every outward, irreversible action (`git push`, `gh pr create`, `gh pr merge`/`review`/`comment`, GitHub API writes) at the point of execution — the agent cannot publish or push without human confirmation.
 
 Full contract: docs/dev-mode.md.
 
