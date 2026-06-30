@@ -119,6 +119,16 @@ If none of the derivations match (legacy pipeline, missing fields), fall back to
 
 **`Stage` column values:** `1` (analysis), `2` (implementation), `3` (delivery), or `—` for legacy pipelines (`pipeline_version: 1` or absent). Read from the `stage` field in `00-state.md`.
 
+### Workspace folders without 00-state.md (diagram / spike)
+
+When scanning `{resolved-path}/*/`, a workspace folder may exist that contains NO `00-state.md`. Do NOT raise an error or treat it as a corrupted pipeline. These are **diagram** or **spike** workspaces — named observability exemptions that produce output files (e.g. `diagram.excalidraw`, `02-implementation.md`) but no pipeline state. Report them separately in the table with status `untracked (diagram/spike)`:
+
+```
+| {feature} | — | — | untracked (diagram/spike) | — | — | {folder-mtime} | — |
+```
+
+Full exemption contract: `docs/observability.md § Lightweight direct-mode exemptions`.
+
 ### If no pipelines found
 
 ```

@@ -83,6 +83,8 @@ Full report: workspaces/{feature-name}/01-plan.md § Plan Review
 
 When invoked with `Direct Mode Task: diagram`:
 
+**Observability:** diagram mode is a named observability exemption — it writes no `00-state.md` and no `00-execution-events` file. Its workspace is intentionally invisible to `/th:pipelines` and `/th:recover`. See `docs/observability.md § Lightweight direct-mode exemptions`.
+
 ### Step 0 — Resolve output path
 
 If the task payload includes `Vault:` (non-null):
@@ -553,6 +555,7 @@ Step 6   Report to user
 
 1. Create `workspaces/{feature-name}/` if it doesn't exist
 2. Write initial `00-state.md` with `phase: translate`, `status: in_progress`
+3. Initialize the events file (local mode: `00-execution-events.jsonl`; obsidian mode: `00-execution-events.md`) with the opening `pipeline.start` event so `/th:pipelines` and `/th:recover` see a trace alongside the state file
 
 ### Step 2 — Discovery + Glossary + i18n Setup (sequential)
 

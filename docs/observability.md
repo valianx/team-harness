@@ -465,6 +465,17 @@ The `/trace <feature>` skill is the canonical 30-second answer to "did this pipe
 
 **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. This is the only exception; all other pipeline types including Tier 1-4 bug fixes, features, refactors, and documentation flows are subject to the mandatory observability contract.
 
+### Lightweight direct-mode exemptions (diagram, spike)
+
+**diagram** and **spike** direct modes are named observability exemptions, by design:
+
+- **diagram** — writes `workspaces/{feature}/00-research.md` and the diagram output file, but no `00-state.md` and no `00-execution-events` file. The mode is not a pipeline; it is a one-shot generation task with no phase structure to track.
+- **spike** — writes `workspaces/{feature}/02-implementation.md` (and optionally `00-knowledge-context.md`), but no `00-state.md` and no `00-execution-events` file. The mode is an exploratory single-phase task by design.
+
+`/th:pipelines` and `/th:recover` scan for `00-state.md` as the pipeline-presence signal. Diagram and spike workspaces lack this file and are **intentionally invisible** to both tools — they are not "interrupted pipelines" and do not need recovery. When a user asks `/th:pipelines` and a workspace folder exists without `00-state.md`, report it as "untracked by design (diagram or spike mode)".
+
+**translate** direct mode is NOT exempt. It already writes `00-state.md`; the events file is initialized at Step 1 (see `agents/ref-direct-modes.md` § Translate Flow). Its workspace is visible to `/th:pipelines` and `/th:recover`.
+
 ---
 
 ## Decision Ledger
