@@ -76,8 +76,13 @@ func opencodeSettingsConfigPath(configRoot string) string {
 //
 // The trimmed installer no longer writes language, english_learning, clickup, or
 // obsidian_tasks — those keys are excluded from the allowlist (AC-7).
+//
+// "opencode.cost_tier_provider" (#424) is the namespaced, opt-in per-provider
+// cost-tiering selection: absent ⇒ model-less baseline; present ⇒ the
+// provider whose curated tier map the transform bakes into agent files.
 var allowlistedOpencodeKeys = map[string]bool{
-	"logs-mode": true,
+	"logs-mode":                   true,
+	"opencode.cost_tier_provider": true,
 }
 
 // installerManagedKeys are always overwritten by the installer regardless of
@@ -126,6 +131,17 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 	raw["logs-mode"] = mustMarshalJSON("local")
 	delete(raw, "logs-path")
 	delete(raw, "logs-subfolder")
+
+	// Apply the per-provider cost-tiering selection (#424). cfg.CostTierProvider
+	// already reflects the resolved precedence (flag > persisted > absent) —
+	// write it verbatim; an empty selection clears any prior persisted value
+	// so an explicit opt-out (re-run without --opencode-tier and without a
+	// prior persisted key) stays absent, matching the baseline contract (AC-7).
+	if cfg.CostTierProvider != "" {
+		raw["opencode.cost_tier_provider"] = mustMarshalJSON(cfg.CostTierProvider)
+	} else {
+		delete(raw, "opencode.cost_tier_provider")
+	}
 
 	// Set installer-managed keys — always from the installer, never from the
 	// existing file (SEC-OC-R4).

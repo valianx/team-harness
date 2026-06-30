@@ -47,6 +47,100 @@ const ALIAS_TO_CONCRETE_MODEL = {
   haiku: "claude-haiku-4-5",
 };
 
+// ---------------------------------------------------------------------------
+// Per-provider cost tiering (opt-in, additive — issue #424)
+// ---------------------------------------------------------------------------
+//
+// The model-less baseline above is the default for every opencode install.
+// When the operator opts into tiering for a provider, the transform instead
+// BAKES a concrete provider/model-id derived from each agent's CC source
+// tier. This is the JS half of a three-site invariant: PROVIDER_TIER_FAMILY
+// and PROVIDER_TIER_CONCRETE must stay byte-identical to providerTierFamily /
+// providerTierConcrete in cmd/install/transform.go and to the embedded copy
+// in skills/update-models/SKILL.md (locked by a Go-side structural parity
+// test — see cmd/install/tier_test.go).
+
+/** CC agent source model: alias -> cost tier label (provider-agnostic). */
+const CC_MODEL_ALIAS_TO_TIER = {
+  opus: "default",
+  sonnet: "medium",
+  haiku: "low",
+};
+
+/** Cost ordering, most to least expensive — drives the ragged-tier fallback (AC-3). */
+const TIER_ORDER = ["default", "medium", "low"];
+
+/**
+ * Curated, ragged provider -> tier -> model-family map. A provider entry may
+ * omit a tier when its current generation does not expose one;
+ * resolveFamilyForTier applies the nearest-cheaper-neighbor fallback.
+ * Anthropic is the only launch provider (#424 scope).
+ */
+const PROVIDER_TIER_FAMILY = {
+  anthropic: {
+    default: "claude-opus",
+    medium: "claude-sonnet",
+    low: "claude-haiku",
+  },
+};
+
+/**
+ * Release-time pin: provider -> tier -> concrete model id. Used by the
+ * installer to bake a model: line without a network call; /th:update-models
+ * resolves the live equivalent post-install.
+ */
+const PROVIDER_TIER_CONCRETE = {
+  anthropic: {
+    default: "claude-opus-4-6",
+    medium: "claude-sonnet-4-6",
+    low: "claude-haiku-4-5",
+  },
+};
+
+/**
+ * Walks TIER_ORDER from tier downward (cheaper) until it finds a populated
+ * entry in tiers[provider]. Shared by resolveFamilyForTier and
+ * resolveConcreteForTier so both stay aligned on the same fallback rule.
+ * Returns null when the provider is unknown or has no entry at or below tier.
+ */
+function resolveTierMap(tiers, provider, tier) {
+  const byTier = tiers[provider];
+  if (!byTier) return null;
+  const startIdx = TIER_ORDER.indexOf(tier);
+  if (startIdx < 0) return null;
+  for (let i = startIdx; i < TIER_ORDER.length; i++) {
+    const v = byTier[TIER_ORDER[i]];
+    if (v !== undefined) return v;
+  }
+  return null;
+}
+
+function resolveFamilyForTier(provider, tier) {
+  return resolveTierMap(PROVIDER_TIER_FAMILY, provider, tier);
+}
+
+function resolveConcreteForTier(provider, tier) {
+  return resolveTierMap(PROVIDER_TIER_CONCRETE, provider, tier);
+}
+
+/**
+ * Resolves the provider-prefixed concrete model id to bake for an agent whose
+ * CC source model: value is sourceModelAlias (e.g. "opus"). Returns null when
+ * the source alias is unrecognized (e.g. the agent omits model: or already
+ * carries a concrete id) — callers fall back to the model-less baseline output.
+ */
+function resolveTieredModel(provider, sourceModelAlias) {
+  if (!sourceModelAlias || typeof sourceModelAlias !== "string") return null;
+  const canonical = sourceModelAlias.startsWith(ANTHROPIC_PREFIX)
+    ? sourceModelAlias.slice(ANTHROPIC_PREFIX.length)
+    : sourceModelAlias;
+  const tier = CC_MODEL_ALIAS_TO_TIER[canonical];
+  if (!tier) return null;
+  const concrete = resolveConcreteForTier(provider, tier);
+  if (!concrete) return null;
+  return `${provider}/${concrete}`;
+}
+
 /** Mode values injected by the forward pass, dropped on inverse for CC-origin files. */
 const INJECTED_MODE_VALUES = new Set(["primary", "subagent", "all"]);
 
@@ -990,6 +1084,51 @@ function transformToOpencode(filePath, content, repoRoot) {
   return { outputPath, content: serializeFrontmatter(projected, body), surface };
 }
 
+/**
+ * transformToOpencodeTiered applies the generic, fixture-bound
+ * transformToOpencode AND bakes a concrete model: line for provider, derived
+ * from the agent's CC source model: tier. Used only when the operator has
+ * opted into per-provider cost tiering (provider non-empty) — the model-less
+ * default path (transformToOpencode) is untouched by this function (AC-5).
+ *
+ * Returns the same { outputPath, content, surface } shape as
+ * transformToOpencode. Non-agent surfaces (commands, skills, hooks) are
+ * returned unchanged — opencode commands carry no model: field.
+ */
+function transformToOpencodeTiered(filePath, content, repoRoot, provider) {
+  const result = transformToOpencode(filePath, content, repoRoot);
+  if (result.surface !== "agent") return result;
+
+  const { frontmatter: fm } = parseFrontmatter(content);
+  const concrete = resolveTieredModel(provider, fm["model"]);
+  if (!concrete) {
+    // No tier mapping for this agent's source model (omitted, or already a
+    // concrete id) — fall back to the model-less baseline output.
+    return result;
+  }
+
+  return { ...result, content: insertModelLine(result.content, concrete) };
+}
+
+/**
+ * Inserts a "model: <id>" line immediately before the "permission:" line of
+ * an already-projected agent frontmatter block. Textual insertion (rather
+ * than re-adding a "model" key earlier in the projected object) keeps
+ * transformToOpencode untouched and the fixture-bound output deterministic.
+ * The agent projection always emits a permission: line (even {} for an empty
+ * tools list), so this anchor is reliable for every agent-surface output.
+ */
+function insertModelLine(content, concrete) {
+  const marker = "\npermission:";
+  const idx = content.indexOf(marker);
+  if (idx < 0) {
+    // No permission: line found (should not happen for agent kind) — leave
+    // output unchanged rather than risk corrupting it.
+    return content;
+  }
+  return content.slice(0, idx) + `\nmodel: ${concrete}` + content.slice(idx);
+}
+
 // ---------------------------------------------------------------------------
 // Inverse transform: opencode -> CC
 // ---------------------------------------------------------------------------
@@ -1265,6 +1404,7 @@ export {
   assertNoInjection,
   rejectPollutionKeys,
   transformToOpencode,
+  transformToOpencodeTiered,
   transformToCC,
   validateOutputPath,
   mkdirPerSegment,
@@ -1284,6 +1424,12 @@ export {
   toBareModel,
   isAlreadyIdentical,
   WRITABLE_PREFIXES,
+  PROVIDER_TIER_FAMILY,
+  PROVIDER_TIER_CONCRETE,
+  CC_MODEL_ALIAS_TO_TIER,
+  resolveFamilyForTier,
+  resolveConcreteForTier,
+  resolveTieredModel,
 };
 
 // ---------------------------------------------------------------------------

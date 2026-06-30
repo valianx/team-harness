@@ -217,5 +217,45 @@
     "input": "---\nname: bad\nmodel: sonnet\ntools: Read\nextras:\n  prototype: evil\n---\nBody.\n",
     "expectError": true,
     "note": "SEC-DR-4: prototype nested inside a block-style frontmatter object is rejected (recursive guard). Both Go and JS parsers handle block-style nesting and must reject identically."
+  },
+  {
+    "name": "tiered_opus_bakes_anthropic_opus",
+    "surface": "agent",
+    "tierProvider": "anthropic",
+    "input": "---\nname: architect\ndescription: Software architect\nmodel: opus\ntools: Read, Edit, Bash\n---\nBody text here.\n",
+    "expectedOutput": "---\nname: architect\ndescription: Software architect\nmodel: anthropic/claude-opus-4-6\npermission: {read: allow, edit: allow, bash: allow}\nmode: subagent\nth-origin: opencode\n---\nBody text here.\n",
+    "note": "#424 AC-9/AC-4: opt-in tiering bakes the pinned concrete id for the agent's CC source tier (opus -> default -> anthropic/claude-opus-4-6) instead of dropping model:."
+  },
+  {
+    "name": "tiered_sonnet_bakes_anthropic_sonnet",
+    "surface": "agent",
+    "tierProvider": "anthropic",
+    "input": "---\ndescription: Implementer\nmodel: sonnet\ntools: Read, Edit, Write, Bash, Glob\n---\n",
+    "expectedOutput": "---\ndescription: Implementer\nmodel: anthropic/claude-sonnet-4-6\npermission: {read: allow, edit: allow, bash: allow, glob: allow}\nmode: subagent\nth-origin: opencode\n---\n",
+    "note": "#424 AC-9: sonnet -> medium -> anthropic/claude-sonnet-4-6."
+  },
+  {
+    "name": "tiered_haiku_bakes_anthropic_haiku",
+    "surface": "agent",
+    "tierProvider": "anthropic",
+    "input": "---\nname: init\nmodel: haiku\ntools: \n---\nBody.\n",
+    "expectedOutput": "---\nname: init\nmodel: anthropic/claude-haiku-4-5\npermission: {}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "#424 AC-9: haiku -> low -> anthropic/claude-haiku-4-5."
+  },
+  {
+    "name": "tiered_already_concrete_model_falls_back_to_model_less",
+    "surface": "agent",
+    "tierProvider": "anthropic",
+    "input": "---\nname: architect\nmodel: anthropic/claude-opus-4-8\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: architect\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "#424: an already-concrete (non-alias) source model: has no entry in ccModelAliasToTier, so the tiered transform falls back to the model-less baseline rather than guessing a tier."
+  },
+  {
+    "name": "tiered_command_surface_untouched",
+    "surface": "command",
+    "tierProvider": "anthropic",
+    "input": "---\nname: my-command\ndescription: A command\nmodel: sonnet\nallowed-tools: Read Edit Bash\n---\nBody.\n",
+    "expectedOutput": "---\nname: my-command\ndescription: A command\npermission: {allow: [Read, Edit, Bash], ask: [], deny: []}\nth-origin: opencode\n---\nBody.\n",
+    "note": "#424: tiering only applies to the agent surface — opencode commands carry no model: field, so a tierProvider selection is a no-op for commands."
   }
 ]

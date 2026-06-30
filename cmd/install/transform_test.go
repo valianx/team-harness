@@ -14,6 +14,12 @@ import (
 // ---------------------------------------------------------------------------
 
 // conformanceCase is one entry in testdata/transform-conformance.json.
+//
+// TierProvider is optional (#424): when set, the case exercises the opt-in
+// tiered transform (transformToOpencodeTiered) instead of the model-less
+// baseline transform — this is how the SAME fixture file locks both the
+// model-less default (AC-5) and the tiered bake (AC-9) against drift between
+// the Go and JS implementations.
 type conformanceCase struct {
 	Name           string `json:"name"`
 	Surface        string `json:"surface"` // "agent" or "command"
@@ -21,6 +27,7 @@ type conformanceCase struct {
 	ExpectedOutput string `json:"expectedOutput"`
 	ExpectError    bool   `json:"expectError"`
 	Note           string `json:"note"`
+	TierProvider   string `json:"tierProvider"` // optional — empty means model-less (AC-9)
 }
 
 // TestTransformConformance_FixtureGo asserts every case in the shared
@@ -48,7 +55,13 @@ func TestTransformConformance_FixtureGo(t *testing.T) {
 				kind = TransformKindCommand
 			}
 
-			got, err := transformToOpencode([]byte(tc.Input), kind)
+			var got []byte
+			var err error
+			if tc.TierProvider != "" {
+				got, err = transformToOpencodeTiered([]byte(tc.Input), kind, tc.TierProvider)
+			} else {
+				got, err = transformToOpencode([]byte(tc.Input), kind)
+			}
 			if tc.ExpectError {
 				if err == nil {
 					t.Errorf("expected error but got none; output:\n%s", got)

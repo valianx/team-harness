@@ -22,6 +22,14 @@ type opencodeSetupValues struct {
 
 	// MCP configuration (URL-only — no secret values captured; SEC-OC-R1).
 	MCP opencodeMCPValues
+
+	// CostTierProvider is the opt-in per-provider cost-tiering selection
+	// (#424): "" means the model-less baseline (unchanged default); a curated
+	// provider name (e.g. "anthropic") means the transform bakes a concrete
+	// model: id per agent. Resolved by resolveActiveTierProvider — NOT a huh
+	// form field (the interactive setup form is intentionally capped at the
+	// Memory MCP + context7 groups; see TestBuildOpencodeSetupGroups_GroupCountIsInRange).
+	CostTierProvider string
 }
 
 // opencodeMCPValues holds the MCP-related fields from the setup flow.

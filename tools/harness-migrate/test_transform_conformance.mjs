@@ -28,6 +28,7 @@ import * as url from "node:url";
 import {
   parseFrontmatter,
   transformToOpencode,
+  transformToOpencodeTiered,
 } from "./migrate.mjs";
 
 // ---------------------------------------------------------------------------
@@ -118,14 +119,16 @@ function diffFrontmatter(want, got) {
 // Transform wrapper: runs the forward transform with correct path classification.
 // ---------------------------------------------------------------------------
 
-function runForwardTransform(content, surface) {
+function runForwardTransform(content, surface, tierProvider) {
   const fakeRepoRoot = "/conformance-fixture-repo";
   const fakePath = surface === "agent"
     ? path.join(fakeRepoRoot, "agents", "test.md")
     : path.join(fakeRepoRoot, ".claude", "commands", "test.md");
 
   try {
-    const result = transformToOpencode(fakePath, content, fakeRepoRoot);
+    const result = tierProvider
+      ? transformToOpencodeTiered(fakePath, content, fakeRepoRoot, tierProvider)
+      : transformToOpencode(fakePath, content, fakeRepoRoot);
     return { output: result.content };
   } catch (err) {
     return { error: err };
@@ -154,14 +157,14 @@ console.log(`Loaded ${cases.length} conformance case(s).`);
 console.log("");
 
 for (const tc of cases) {
-  const { name, surface, input, expectedOutput, expectError } = tc;
+  const { name, surface, input, expectedOutput, expectError, tierProvider } = tc;
 
   if (!name || !surface || input === undefined) {
     fail(name || "<unnamed>", "fixture case missing required fields (name, surface, input)");
     continue;
   }
 
-  const { output, error } = runForwardTransform(input, surface);
+  const { output, error } = runForwardTransform(input, surface, tierProvider);
 
   if (expectError) {
     // Error cases: assert the transform throws, matching Go behavior.
