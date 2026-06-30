@@ -222,9 +222,8 @@ func deleteFiles(paths []string, r *RemovedComponent) error {
 // dotted key names. Preserves all other keys byte-for-byte (json.RawMessage
 // whole-doc pattern mirroring registerMCPServers in claude_json.go).
 //
-// Before the rewrite, a timestamped .bak-<ts> copy is created with mode 0o600
-// (INFO-r2-1: stronger than the 0o644 that copyFileRaw produces — fold the
-// security finding here, not in copyFileRaw which is used elsewhere).
+// Before the rewrite, a timestamped .bak-<ts> copy is created with mode 0o600,
+// since the settings doc may hold sensitive content.
 func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent) error {
 	// Read the existing doc as a raw map to preserve unknown keys byte-for-byte.
 	raw := map[string]json.RawMessage{}
@@ -238,7 +237,7 @@ func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent
 		}
 	}
 
-	// Backup before write (INFO-r2-1 fold: use 0o600, not 0o644).
+	// Backup before write, with owner-only 0o600 to protect sensitive content.
 	if len(existing) > 0 {
 		ts := time.Now().UTC().Format("20060102-150405")
 		bakPath := settingsDocPath + ".bak-" + ts
