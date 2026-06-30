@@ -192,14 +192,14 @@ result = subprocess.run(
 )
 if result.returncode != 0 or not result.stdout.strip():
     print("FALLBACK: curl failed or empty response", file=sys.stderr)
-    print(json.dumps({"error": "fetch_failed", "resolved": {}}))
+    print(json.dumps({"error": "fetch_failed", "provider": PROVIDER, "resolved": {}, "gaps": {}}))
     sys.exit(0)
 
 try:
     data = json.loads(result.stdout)
 except json.JSONDecodeError:
     print("FALLBACK: non-JSON response from models.dev", file=sys.stderr)
-    print(json.dumps({"error": "parse_failed", "resolved": {}}))
+    print(json.dumps({"error": "parse_failed", "provider": PROVIDER, "resolved": {}, "gaps": {}}))
     sys.exit(0)
 
 # Real models.dev shape: root keyed by provider; each provider carries a
@@ -211,7 +211,7 @@ models = provider_obj.get("models", {}) if isinstance(provider_obj, dict) else {
 
 if not models:
     print(f"FALLBACK: no models found for provider {PROVIDER!r} in response", file=sys.stderr)
-    print(json.dumps({"error": "no_models", "resolved": {}}))
+    print(json.dumps({"error": "no_models", "provider": PROVIDER, "resolved": {}, "gaps": {}}))
     sys.exit(0)
 
 # Group candidates by the model's "family" field — NOT by id-prefix matching.
@@ -317,8 +317,8 @@ update-models — planned changes
 Apply these changes? [Y/n]
 ```
 
-On `n` or empty (treat empty as `n`): print `No changes made.` and stop.
-On `Y`: proceed to step 6.
+On `n`, `N`, or empty (treat empty as `n`): print `No changes made.` and stop.
+On `Y` or `y` (case-insensitive): proceed to step 6.
 
 If the planned-rewrites list is empty (all files are already current, skipped, or in gap): report the outcome directly without a confirmation prompt (there is nothing to apply).
 
