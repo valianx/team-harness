@@ -13573,7 +13573,7 @@ _S59_DOCS_DEVMODE_INVARIANT_ANCHOR = "## Security Floor Non-Waivability"
 _S59_DOCS_DEVMODE_TRIAGE_ANCHOR = "## Triage Safety-Bias"
 _S59_CLAUDE_S14_ANCHOR = "## 14. Subagent Orchestration"
 _S59_SUBAGENT_DEV_ANCHOR = "## CC Top-Level Orchestration — Primary Path"
-_S59_CHECKPOINT_DEV_ANCHOR = "### Dev mode — Layer-1 hook"
+_S59_CHECKPOINT_DEV_ANCHOR = "### Layer 1 — Hook is the active floor at all three boundaries"
 
 _s59_style_antirush_slice = _slice_section(_s59_style, _S59_STYLE_ANTI_RUSHING_ANCHOR, _S59_STOP_H2)
 _s59_style_role_slice = _slice_section(_s59_style, _S59_STYLE_ROLE_ADOPT_ANCHOR, _S59_STOP_H2)
@@ -28577,13 +28577,15 @@ for _floor_name, _floor_content in _S117_FLOOR_HOOKS.items():
         f"{_floor_name} must NOT source _hook-profile.sh (AC-13 non-waivable security floor)",
     )
 
-# Gated observability hooks MUST source _hook-profile.sh
+# Gated observability hooks MUST source _hook-profile.sh.
+# subagent-trace.sh is intentionally excluded: its existence breadcrumb is
+# non-suppressible (runs unconditionally regardless of TH_HOOK_PROFILE).
+# See docs/observability.md § Non-suppressible breadcrumb.
 _S117_GATED_HOOKS = {
     "notify-windows.sh":         _s117_notify_win,
     "notify-mac.sh":             _s117_notify_mac,
     "notify-linux.sh":           _s117_notify_linux,
     "notify-stage.sh":           _s117_notify_stage,
-    "subagent-trace.sh":         _s117_subagent_trace,
     "precompact-snapshot.sh":    _s117_precompact,
 }
 
@@ -28600,6 +28602,23 @@ for _gated_name, _gated_content in _S117_GATED_HOOKS.items():
         "th_observability_enabled" in _gated_content,
         f"{_gated_name} must call th_observability_enabled to check the profile",
     )
+
+# subagent-trace.sh is NON-suppressible: it must NOT source _hook-profile.sh
+# and must NOT call th_observability_enabled (the breadcrumb runs unconditionally).
+check(
+    "suite117(ac13-subagent-trace-non-suppressible-no-profile-source): "
+    "subagent-trace.sh does NOT source _hook-profile.sh (non-suppressible breadcrumb)",
+    "_hook-profile.sh" not in _s117_subagent_trace,
+    "subagent-trace.sh must NOT source _hook-profile.sh — its breadcrumb is non-suppressible "
+    "(emission-determinism fix); see docs/observability.md § Non-suppressible breadcrumb",
+)
+check(
+    "suite117(ac13-subagent-trace-non-suppressible-no-observability-check): "
+    "subagent-trace.sh does NOT call th_observability_enabled (non-suppressible breadcrumb)",
+    "th_observability_enabled" not in _s117_subagent_trace,
+    "subagent-trace.sh must NOT call th_observability_enabled — its breadcrumb is non-suppressible "
+    "(emission-determinism fix); see docs/observability.md § Non-suppressible breadcrumb",
+)
 
 # ----------------------------------------------------------------
 # AC-13 continued — profile semantics: default-standard behavior
