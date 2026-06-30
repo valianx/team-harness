@@ -161,12 +161,35 @@ HIGH_CONFIDENCE_SECRETS = [
     (r"\bghp_[A-Za-z0-9]{36}\b", "GitHub personal access token (ghp_… pattern)"),
     (r"\bgithub_pat_[A-Za-z0-9_]{22,}\b", "GitHub fine-grained PAT (github_pat_… pattern)"),
     (r"-----BEGIN (?:RSA |EC |OPENSSL |DSA )?PRIVATE KEY-----", "PEM private key header"),
+    # Anthropic key — explicit label; also caught incidentally by the sk- rule below
+    # but the sk-ant- prefix is Anthropic-specific and deserves its own labelled deny.
+    (r"\bsk-ant-[A-Za-z0-9_-]{20,}\b", "Anthropic API key (sk-ant-… pattern)"),
+    # OpenAI and OpenAI-compatible keys (sk-proj- / sk-svcacct- / plain sk-)
     (r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b", "OpenAI-style secret key (sk-… pattern)"),
     (r"\bAIza[0-9A-Za-z_\-]{35}\b", "Google API key (AIza… pattern)"),
     (r"\b[rs]k_live_[0-9A-Za-z]{16,}\b", "Stripe live secret key (sk_live_/rk_live_ pattern)"),
     (r"\bglpat-[0-9A-Za-z_\-]{20}\b", "GitLab personal access token (glpat-… pattern)"),
     (r"\bgh[osru]_[A-Za-z0-9]{36}\b", "GitHub OAuth/server/refresh/user token (gho_/ghs_/ghr_/ghu_ pattern)"),
     (r"\bxoxb-[A-Za-z0-9-]{10,}\b", "Slack bot token (xoxb-… pattern)"),
+    # SendGrid: SG. + 22 base64url chars + . + 43 base64url chars (documented canonical format)
+    (r"\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b", "SendGrid API key (SG.… pattern)"),
+    # Twilio: account SID (AC + 32 hex) and auth token / API key SID (SK + 32 hex)
+    (r"\bAC[0-9a-f]{32}\b", "Twilio account SID (AC… pattern)"),
+    (r"\bSK[0-9a-f]{32}\b", "Twilio API key SID (SK… pattern)"),
+]
+
+# Medium-confidence additional patterns → ask (entropy-noisy forms).
+# These are in a separate list so they route to ask(), not deny().
+MEDIUM_CONFIDENCE_SECRETS_FIXED = [
+    # Generic JWT: three base64url segments separated by dots (eyJ header indicates JSON)
+    (r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b",
+     "possible JWT token (eyJ… three-segment base64url pattern)"),
+    # Bearer token keyword form: Bearer <value of ≥20 chars>
+    (r"\bBearer\s+[A-Za-z0-9_/+.=-]{20,}\b",
+     "possible Bearer token (Bearer … keyword pattern)"),
+    # Azure SAS token: sv= parameter is the canonical SAS signature anchor
+    (r"\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^\s'\"]{30,}\b",
+     "possible Azure SAS token (sv=… signature pattern)"),
 ]
 
 # Medium-confidence: generic keyword assignment + high-entropy value → ask.
@@ -238,6 +261,11 @@ def scan_for_secrets(content: str) -> None:
     for pattern, label in HIGH_CONFIDENCE_SECRETS:
         if re.search(pattern, content):
             deny(f"high-confidence secret detected: {label}")
+
+    # Medium-confidence fixed patterns (JWT, Bearer, Azure SAS) — route to ask.
+    for pattern, label in MEDIUM_CONFIDENCE_SECRETS_FIXED:
+        if re.search(pattern, content):
+            ask(f"possible secret detected: {label}")
 
     for match in MEDIUM_CONFIDENCE_PATTERN.finditer(content):
         # Strip any trailing quote that was captured as part of the ≥20-char value.
@@ -374,9 +402,19 @@ if tool == "Bash":
     if check_no_verify_tokenized(cmd):
         deny("--no-verify (bypasses pre-commit hooks)")
 
-    # Secret scan on commit-Bash commands only (covers inline -m "..." secrets).
-    # File-redirection / heredoc forms are a documented residual limit (parity with dev-guard.sh).
-    if re.search(r"\bgit\s+commit\b", cmd):
+    # Secret scan on Bash commands that can carry secrets inline.
+    # Broadened from git-commit-only to also cover curl/wget --data forms,
+    # tee redirection (tee file << EOF), and env/export assignments.
+    # File-redirection / heredoc forms remain a documented residual limit.
+    _should_scan_bash = (
+        bool(re.search(r"\bgit\s+commit\b", cmd))
+        or bool(re.search(r"\bcurl\b.*--data(?:-[a-z]+)?\b", cmd, re.IGNORECASE))
+        or bool(re.search(r"\bwget\b.*--post-(?:data|file)\b", cmd, re.IGNORECASE))
+        or bool(re.search(r"\btee\b", cmd))
+        or bool(re.search(r"\bexport\s+\w+\s*=", cmd))
+        or bool(re.search(r"\benv\s+\w+=", cmd))
+    )
+    if _should_scan_bash:
         scan_for_secrets(cmd)
 
 elif tool == "Read":
@@ -719,8 +757,24 @@ if [ "$tool_name" = "Bash" ]; then
         _bash_deny "destructive SQL: TRUNCATE TABLE"
     fi
 
-    # HIGH_CONFIDENCE_SECRETS scan on commit-Bash commands (covers inline -m "..." secrets).
+    # HIGH_CONFIDENCE_SECRETS scan — broadened from git-commit-only to also
+    # cover curl --data, wget --post, tee, and export/env assignments.
+    _bash_should_scan=0
     if printf '%s' "$cmd" | grep -qE '\bgit[[:space:]]+commit\b' 2>/dev/null; then
+        _bash_should_scan=1
+    elif printf '%s' "$cmd" | grep -qiE '\bcurl\b.*--data(-[a-z]+)?\b' 2>/dev/null; then
+        _bash_should_scan=1
+    elif printf '%s' "$cmd" | grep -qiE '\bwget\b.*--post-(data|file)\b' 2>/dev/null; then
+        _bash_should_scan=1
+    elif printf '%s' "$cmd" | grep -qE '\btee\b' 2>/dev/null; then
+        _bash_should_scan=1
+    elif printf '%s' "$cmd" | grep -qE '\bexport[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=' 2>/dev/null; then
+        _bash_should_scan=1
+    elif printf '%s' "$cmd" | grep -qE '\benv[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=' 2>/dev/null; then
+        _bash_should_scan=1
+    fi
+
+    if [ "$_bash_should_scan" = "1" ]; then
         if printf '%s' "$cmd" | grep -qE 'AKIA[0-9A-Z]{16}' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: AWS access key (AKIA... pattern)"
         fi
@@ -732,6 +786,9 @@ if [ "$tool_name" = "Bash" ]; then
         fi
         if printf '%s' "$cmd" | grep -qE -- '-----BEGIN (RSA |EC |OPENSSL |DSA )?PRIVATE KEY-----' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: PEM private key header"
+        fi
+        if printf '%s' "$cmd" | grep -qE '\bsk-ant-[A-Za-z0-9_-]{20,}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Anthropic API key (sk-ant-... pattern)"
         fi
         if printf '%s' "$cmd" | grep -qE '\bsk-(proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: OpenAI-style secret key (sk-... pattern)"
@@ -750,6 +807,25 @@ if [ "$tool_name" = "Bash" ]; then
         fi
         if printf '%s' "$cmd" | grep -qE '\bxoxb-[A-Za-z0-9-]{10,}\b' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: Slack bot token (xoxb-... pattern)"
+        fi
+        if printf '%s' "$cmd" | grep -qE '\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: SendGrid API key (SG.... pattern)"
+        fi
+        if printf '%s' "$cmd" | grep -qE '\bAC[0-9a-f]{32}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Twilio account SID (AC... pattern)"
+        fi
+        if printf '%s' "$cmd" | grep -qE '\bSK[0-9a-f]{32}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Twilio API key SID (SK... pattern)"
+        fi
+        # Medium-confidence: JWT and Bearer — route to ask in bash path
+        if printf '%s' "$cmd" | grep -qE '\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b' 2>/dev/null; then
+            _bash_ask "possible JWT token (eyJ... three-segment base64url pattern)"
+        fi
+        if printf '%s' "$cmd" | grep -qE '\bBearer[[:space:]]+[A-Za-z0-9_/+.=-]{20,}\b' 2>/dev/null; then
+            _bash_ask "possible Bearer token (Bearer ... keyword pattern)"
+        fi
+        if printf '%s' "$cmd" | grep -qE '\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^[:space:]]{30,}' 2>/dev/null; then
+            _bash_ask "possible Azure SAS token (sv=... signature pattern)"
         fi
     fi
 
@@ -951,6 +1027,9 @@ if [ "$tool_name" = "Write" ] || [ "$tool_name" = "Edit" ] || [ "$tool_name" = "
         if printf '%s' "$_content" | grep -qE -- '-----BEGIN (RSA |EC |OPENSSL |DSA )?PRIVATE KEY-----' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: PEM private key header"
         fi
+        if printf '%s' "$_content" | grep -qE '\bsk-ant-[A-Za-z0-9_-]{20,}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Anthropic API key (sk-ant-... pattern)"
+        fi
         if printf '%s' "$_content" | grep -qE '\bsk-(proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: OpenAI-style secret key (sk-... pattern)"
         fi
@@ -968,6 +1047,28 @@ if [ "$tool_name" = "Write" ] || [ "$tool_name" = "Edit" ] || [ "$tool_name" = "
         fi
         if printf '%s' "$_content" | grep -qE '\bxoxb-[A-Za-z0-9-]{10,}\b' 2>/dev/null; then
             _bash_deny "high-confidence secret detected: Slack bot token (xoxb-... pattern)"
+        fi
+        # SEC-A-02 hardening: propagate new HIGH patterns to the Write/Edit content scan
+        # to match the python3 path. sk-ant- is listed above before the generic sk- check.
+        if printf '%s' "$_content" | grep -qE '\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: SendGrid API key (SG.... pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bAC[0-9a-f]{32}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Twilio account SID (AC... pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bSK[0-9a-f]{32}\b' 2>/dev/null; then
+            _bash_deny "high-confidence secret detected: Twilio API key SID (SK... pattern)"
+        fi
+        # Medium-confidence patterns for Write/Edit content — route to ask (not deny).
+        # These mirror MEDIUM_CONFIDENCE_SECRETS_FIXED in the python3 path.
+        if printf '%s' "$_content" | grep -qE '\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b' 2>/dev/null; then
+            _bash_ask "possible JWT token (eyJ... three-segment base64url pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bBearer[[:space:]]+[A-Za-z0-9_/+.=-]{20,}\b' 2>/dev/null; then
+            _bash_ask "possible Bearer token (Bearer ... keyword pattern)"
+        fi
+        if printf '%s' "$_content" | grep -qE '\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^[:space:]]{30,}' 2>/dev/null; then
+            _bash_ask "possible Azure SAS token (sv=... signature pattern)"
         fi
     fi
 

@@ -1,0 +1,2 @@
+### Fixed
+- `skills/recover/SKILL.md`: added explicit switch arms for the four blocked statuses the orchestrator writes — `blocked-no-dispatch` (dispatch-handoff/takeover path), `blocked-incomplete` (missing-artifact list + resume instructions), `blocked-manual-push` (manual push path referencing `gh-fallback.md`), `blocked-pr-pending` (PR-pending notice with URL). Previously these statuses fell through to the generic "proceed" branch, giving the operator no actionable guidance.

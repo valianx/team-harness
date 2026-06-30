@@ -20,7 +20,8 @@
 #   1. Push to a remote: git push (bare, git -C <path> push, GIT_DIR=... git push)
 #      Note: git push --force is already denied by policy-block.sh; this gate
 #      covers git push without --force — the important bypass.
-#   2. PR merge/review/comment endpoints by ANY binary, matched by DESTINATION:
+#   2. PR merge/review/comment/create endpoints by ANY binary, matched by DESTINATION:
+#      - gh pr create
 #      - gh pr merge
 #      - gh pr review / gh pr review --dismiss
 #      - gh pr comment
@@ -30,6 +31,7 @@
 #        addPullRequestReview, submitPullRequestReview, mergePullRequest);
 #        read-only reviewThreads listing queries stay nodecision
 #      - curl/wget with mutating method against api.github.com or those paths
+#      - gh issue create|edit|comment (mutating issue writes; read-only list/view stay ungated)
 #   3. ClickUp MCP outward writes (via mcp__.*__clickup_(update_task|create_task|...))
 #
 # WHAT THIS GATE DOES NOT COVER (documented residual limit):
@@ -121,7 +123,7 @@ fi
 # ClickUp write pattern: mcp__ + any server segment (including underscores, for multi-word
 # MCP server names that Claude Code normalizes spaces-to-underscores) + __clickup_(write verbs).
 # fix(dev-guard): SEC-001 — mirror wiring semantics (.+) so multi-word servers match (#304)
-_clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file)'
+_clickup_write_pattern='mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)'
 if printf '%s' "$_tool_name" | grep -qE "^${_clickup_write_pattern}" 2>/dev/null; then
     # ClickUp MCP outward write detected — unconditional ask (SEC-DR-2).
     ask "outward action — ClickUp MCP outward write ($_tool_name) requires explicit operator approval; preview the change before confirming (dev-guard.sh; see docs/dev-mode.md)"
@@ -183,7 +185,7 @@ fi
 # a Bash payload, scan the raw JSON for covered destination patterns and ask.
 # An extra ask is the fail-safe direction (never converts ask -> allow on error).
 if [ -z "$cmd" ] && printf '%s' "$input" | grep -q '"tool_name"[[:space:]]*:[[:space:]]*"Bash"' 2>/dev/null; then
-    if printf '%s' "$input" | grep -qE '(git\s+push|gh\s+pr\s+merge|gh\s+pr\s+review|gh\s+pr\s+comment|gh\s+api.*pulls|api\.github\.com)' 2>/dev/null; then
+    if printf '%s' "$input" | grep -qE '(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)' 2>/dev/null; then
         ask "outward action detected in raw payload (escape-aware extraction fallback); requires explicit operator approval (dev-guard.sh)"
     fi
 fi
@@ -208,27 +210,40 @@ if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*
     ask "outward action 'git push' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 2b. gh pr merge
+# 2b. gh pr create
+# Anchored to the mutating 'create' verb only — does NOT fire on read-only
+# gh pr view / gh pr list / gh pr status (those produce no outward action).
+if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+create(\s|$)' 2>/dev/null; then
+    ask "outward action 'gh pr create' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+fi
+
+# 2c. gh pr merge
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+merge(\s|$)' 2>/dev/null; then
     ask "outward action 'gh pr merge' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 2c. gh pr review (including --dismiss)
+# 2d. gh pr review (including --dismiss)
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+review(\s|$)' 2>/dev/null; then
     ask "outward action 'gh pr review' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 2d. gh pr comment
+# 2e. gh pr comment
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+pr\s+comment(\s|$)' 2>/dev/null; then
     ask "outward action 'gh pr comment' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 2e. gh api with mutating HTTP method against PR endpoints
+# 2e-ter. gh issue mutating writes (create, edit, comment).
+# Read-only gh issue list / gh issue view stay ungated (no outward side-effect).
+if printf '%s' "$cmd" | grep -qE '(^|[[:space:]|;`])gh\s+issue\s+(create|edit|comment)(\s|$)' 2>/dev/null; then
+    ask "outward action 'gh issue write' requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
+fi
+
+# 2f. gh api with mutating HTTP method against PR endpoints
 if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls' 2>/dev/null; then
     ask "outward action 'gh api' mutating PR endpoint requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 2e-bis. gh api graphql with a PR-write mutation name (reply/resolve/review).
+# 2g. gh api graphql with a PR-write mutation name (reply/resolve/review).
 # Read-only reviewThreads listing queries carry no mutation name -> stay nodecision
 # (parallel to gh pr view --comments, which is also ungated).
 # GraphQL always POSTs to /graphql with no -X flag, so the REST pattern (2e)
@@ -238,7 +253,7 @@ if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])gh\s+api\s+graphql' 2>/dev/
     ask "outward action 'gh api graphql' PR-mutating operation requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi
 
-# 2f. curl/wget with mutating method against api.github.com
+# 2h. curl/wget with mutating method against api.github.com
 if printf '%s' "$cmd" | grep -qiE '(^|[[:space:]|;`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com' 2>/dev/null; then
     ask "outward action via curl/wget to api.github.com with mutating method requires explicit operator approval (dev-guard.sh); see docs/dev-mode.md § Outward-Action Gate"
 fi

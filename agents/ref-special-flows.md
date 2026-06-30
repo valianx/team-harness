@@ -149,6 +149,8 @@ Use `/th:research-code --multi-repo` when the question is about understanding co
 
 When the user wants to quickly test a technical hypothesis without full pipeline ceremony:
 
+**Observability:** spike mode is a named observability exemption — it writes no `00-state.md` and no `00-execution-events` file. Its workspace is intentionally invisible to `/th:pipelines` and `/th:recover`. See `docs/observability.md § Lightweight direct-mode exemptions`.
+
 1. **Intake** — classify as `spike`, complexity always `simple`
 2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found.
 3. **Skip Design** — no architecture proposal needed

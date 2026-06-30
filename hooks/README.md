@@ -10,7 +10,7 @@ OS-native notification scripts plus the `config.json` template that wires them i
 | `notify-mac.sh` | macOS notification via `osascript`. Gated by `TH_HOOK_PROFILE`. |
 | `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). Gated by `TH_HOOK_PROFILE`. |
 | `notify-stage.sh` | Wrapper invoked by the orchestrator at stage boundaries (4 toasts/pipeline). Detects OS and routes to the matching `notify-{os}.sh`. Gated by `TH_HOOK_PROFILE`. |
-| `subagent-trace.sh` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
+| `subagent-trace.sh` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. **Breadcrumb is non-suppressible** — runs unconditionally regardless of `TH_HOOK_PROFILE`. |
 | `precompact-snapshot.sh` | PreCompact fail-open state snapshot. Copies `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling before context compaction so `/th:recover` can restore in-flight state. Appends a breadcrumb to `00-precompact.jsonl`. Never blocks compaction; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
 | `_hook-profile.sh` | Shared sourced helper — TH_HOOK_PROFILE resolver. Provides `th_hook_profile()` (normalizes the env var) and `th_observability_enabled <class>` (exits 0/1). Sourced only by observability/notification hooks; never by enforcement floors. |
 | `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). Always-on (never gated by `TH_HOOK_PROFILE`). |
@@ -47,7 +47,7 @@ The default preset is **`ultra-quiet`** — fires **only** when the user needs t
 | Event | Matcher | When it fires | Why it's in the default set |
 |---|---|---|---|
 | `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block.sh` silently. |
-| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard.sh`). |
+| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard.sh`, which gates both `git push` and `gh pr create` as outward actions requiring operator approval). |
 | `Notification` | `idle_prompt` only | Claude finished a turn and is waiting for the user. | High signal: you need to act for Claude to continue. One notification per user-blocking pause. |
 | `SubagentStop` | `th:.*` | When a Team Harness pipeline subagent finishes. | Observability backstop: deterministic proof that a `th:*` subagent boundary occurred. See below. |
 | `PreCompact` | `manual\|auto` | Before context compaction runs. | State snapshot: enables `/th:recover` to restore in-flight state after an auto-compact. See below. |
@@ -64,6 +64,11 @@ orchestrator's rich `phase.end` events:
   subagent boundary occurred — useful when the orchestrator drops a `phase.end`.
 - It writes its breadcrumb to `00-subagent-trace.jsonl` (NOT `00-execution-events`),
   preserving the orchestrator's exclusive-writer contract.
+- **Non-suppressible breadcrumb:** the breadcrumb write runs unconditionally —
+  `TH_HOOK_PROFILE=minimal` does NOT suppress it. Only the scope guard (non-`th:`
+  agent) and the base-path check (no resolvable workspace) produce a silent exit
+  without a write. Any future richer/optional behavior must be placed after a
+  profile gate sourced after the breadcrumb.
 - Fail-OPEN: the hook exits 0 on every path, never blocks the subagent, and emits
   nothing on stdout. Non-`th:` subagents are silently skipped.
 
@@ -97,20 +102,23 @@ notification hooks. The enforcement floors (`policy-block.sh`, `dev-guard.sh`,
 this setting — no profile value can disable, skip, or downgrade any enforcement
 hook.
 
-| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) |
-|---------|--------------------------------------|--------------------------------------|
-| `minimal` | suppressed | suppressed |
-| `standard` (default when unset) | **enabled** | **enabled** |
-| `strict` | **enabled** | **enabled** |
+| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) | `subagent-trace.sh` breadcrumb |
+|---------|--------------------------------------|--------------------------------------|-------------------------------|
+| `minimal` | suppressed | suppressed | **always written** |
+| `standard` (default when unset) | **enabled** | **enabled** | **always written** |
+| `strict` | **enabled** | **enabled** | **always written** |
 
 `standard` preserves exactly today's behavior for all existing installs.
 `minimal` is the quietest operator experience — all notifications and observability
-hooks are silent. `strict` is the most-verbose level (today identical to
-`standard` in effect; reserved as a forward extension point).
+hooks are silent, but the `subagent-trace.sh` existence breadcrumb is never
+suppressed (it is the only non-suppressible observability write). `strict` is the
+most-verbose level (today identical to `standard` in effect; reserved as a forward
+extension point).
 
 The profile is read via `_hook-profile.sh`, a shared sourced helper. Only
 observability/notification hooks source it. Enforcement floors never source it
-and are structurally unable to be gated by it.
+and are structurally unable to be gated by it. The `subagent-trace.sh` breadcrumb
+does not source `_hook-profile.sh` — its write path is unconditional.
 
 **What was removed from the previous default (and why).** Earlier versions of this repo also wired:
 
@@ -259,7 +267,7 @@ The `PreToolUse` hook `prepublish-guard.sh` catches two recurring papercuts at t
 - **BLOCK** (`permissionDecision: deny`): fires only when the checked condition is confirmed — missing version bump on push, or non-zero test exit at PR-creation.
 - **FAIL-OPEN** (`nodecision` + one-line stderr warning): fires on every guard-evaluation fault: `git` absent, not inside a work-tree, `origin/main` does not resolve, `git diff` error, config file unparseable, `prepublish_check` value rejected by the control-char guard, `timeout`/`gtimeout` binary absent, internal-timeout (exit 124), command-not-found (exit 127). A guard fault NEVER blocks the operator.
 
-This hook is a strictly **additive sibling** to `dev-guard.sh`. Both hooks co-match `git push` and `gh pr create` as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard.sh`'s `ask` into an allow.
+This hook is a strictly **additive sibling** to `dev-guard.sh`. `dev-guard.sh` gates `git push` and `gh pr create` (and `gh issue create|edit|comment`) as outward-action approvals (`ask`). This hook adds a second enforcement layer — version-bump and test guard — for those same commands. Both hooks fire as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard.sh`'s `ask` into an allow.
 
 ### Check 1 — Version-bump guard (fires on `git push`)
 

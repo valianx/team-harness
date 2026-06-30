@@ -562,6 +562,12 @@ Checks: (1) `opus` tier resolves to `anthropic/claude-opus-4-6` (newest by `rele
 
 Self-referential guard: `docs/testing.md` registers `Suite 128` + `update-models-resolver` marker; `CLAUDE.md §11` does NOT contain `Suite 128` (hygiene contract). Pure python3 file read against committed fixture — no network, no agent invocation, no paid spend. Written by implementer (2026-06-21). Marker: `update-models-resolver`.
 
+### Suite 129 — event-enum-reconcile
+
+12 checks (9 event-enum + 3 self-referential). Structural guard asserting that the expanded `00-execution-events.jsonl` event enum in `agents/orchestrator.md` includes the 9 new event types added in the event-enum-reconcile fix (finding 10 enum half): `research.lane.skipped`, `fanout.start`, `fanout.lane.start`, `fanout.lane.end`, `fanout.converge`, `artifact.missing`, `operation.started`, `operation.success`, `operation.failed`. File: `tests/test_agent_structure.py`. Wired into the default `python3 tests/test_agent_structure.py` run.
+
+Checks: (1–9) each of the 9 new event types appears in `agents/orchestrator.md`; (10) self-referential — test file contains `Suite 129` + `event-enum-reconcile`; (11) `docs/testing.md` registers `Suite 129` + `event-enum-reconcile`; (12) `CLAUDE.md §11` does NOT contain `Suite 129` (hygiene contract). Pure file reads — no network, no agent invocation, no paid spend. Written by implementer (2026-06-30). Marker: `event-enum-reconcile`.
+
 ### Suite 12 — security-self-scan
 
 5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).

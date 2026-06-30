@@ -21,9 +21,12 @@
 #   - agent_id is treated as an opaque correlation key (SEC-DR-007).
 #   - Writes only to a fixed-literal filename under a validated base.
 #
-# PROFILE GATE (AC-13):
-#   Sources _hook-profile.sh; exits 0 silently under TH_HOOK_PROFILE=minimal.
-#   Enforcement floors NEVER source _hook-profile.sh.
+# BREADCRUMB IS NON-SUPPRESSIBLE:
+#   The existence breadcrumb (Steps 1-6) runs unconditionally — it is NOT
+#   gated by TH_HOOK_PROFILE=minimal.  The profile gate must never suppress
+#   the only deterministic floor proving a th:* boundary occurred.
+#   Any future richer/optional behaviour added to this hook MUST be placed
+#   after a profile gate sourced AFTER the breadcrumb write.
 #
 # SCOPE GUARD:
 #   The SubagentStop matcher (th:.*) is the outer filter.  Defense-in-depth:
@@ -34,15 +37,6 @@
 #
 # Cross-platform: Git Bash on Windows, native bash on macOS/Linux.
 # Generic: no tokens, no private endpoints.  CLAUDE.md §12.
-
-# ---------------------------------------------------------------------------
-# Step 0 — Profile gate (AC-13 / pipeline-observability class)
-# ---------------------------------------------------------------------------
-# Source the shared helper from the same directory.
-# shellcheck source=./_hook-profile.sh
-. "$(dirname "$0")/_hook-profile.sh" 2>/dev/null || true
-
-th_observability_enabled "pipeline-observability" || exit 0
 
 # ---------------------------------------------------------------------------
 # Step 1 — Drain stdin (SubagentStop payload)

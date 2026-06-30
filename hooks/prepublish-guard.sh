@@ -113,8 +113,9 @@
 #   (fail-open). Even if the entry timeout fires first, the worst case is a missed
 #   BLOCK, never a false BLOCK.
 #
-# SEC-PPG-1 / AC-11: dev-guard.sh co-matches git push and gh pr create (outward-
-#   action gate). This hook is a SEPARATE additive sibling. Both fire as independent
+# SEC-PPG-1 / AC-11: dev-guard.sh gates both git push and gh pr create (outward-
+#   action approval). This hook is a SEPARATE additive sibling that adds a second
+#   enforcement layer (version-bump + test guard). Both fire as independent
 #   PreToolUse entries; most-restrictive decision wins. This hook never emits
 #   permissionDecision: "allow" — only "deny" or empty stdout — so it can never
 #   convert dev-guard's "ask" into an allow.

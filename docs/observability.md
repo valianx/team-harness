@@ -137,9 +137,13 @@ per-phase context. The orchestrator's `phase.end` events in `00-execution-events
 remain the authoritative rich observability record. The SubagentStop payload
 simply does not carry that data.
 
-**Gated by `TH_HOOK_PROFILE`.** Setting `TH_HOOK_PROFILE=minimal` suppresses
-this hook (and all other observability/notification hooks). The default when
-the variable is unset is `standard`, which enables it.
+**Non-suppressible breadcrumb.** The existence breadcrumb (the `subagent.stop`
+write) runs unconditionally — `TH_HOOK_PROFILE=minimal` does NOT suppress it.
+Only the scope guard (non-`th:` agent → silent exit) and the base-path check
+(no resolvable workspace directory → silent exit) cause a run without a write.
+This makes the breadcrumb a deterministic observability floor: any `TH_HOOK_PROFILE`
+value can suppress notifications and richer observability, but it cannot erase
+proof that a `th:*` boundary occurred.
 
 ### 00-precompact.jsonl — PreCompact breadcrumb
 
@@ -237,6 +241,18 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 **`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps) and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure.
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when a fan-out is actually dispatched. Single-project runs (`initiative: null`) and serial multi-project runs do not produce this file. The file is mandatory for any run where `fanout.start` fires — a fan-out that emits no initiative-level trace violates the observability contract.
+
+## Additional pipeline event types
+
+The following event types appear in `00-execution-events` in addition to the core `phase.*`, `gate.*`, `operation.*`, and `stage.*` families documented above:
+
+| Event | When emitted | Key fields |
+|-------|-------------|------------|
+| `gate` | When a human-checkpoint gate is reached (DOC-GATE, STAGE-GATE approval prompt) | `gate` (name), `action` (`stop`/`approved`) |
+| `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
+| `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
+
+Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 
 ## kg_write event
 
@@ -452,6 +468,17 @@ The `/trace <feature>` skill is the canonical 30-second answer to "did this pipe
 ### Tier 0 carve-out
 
 **Exception:** Tier 0 fixes (single-file ≤5-line trivial/docs, `workspaces: NONE` by design) are explicitly exempt from this observability invariant — they produce no workspace in which to write the events file. This is the only exception; all other pipeline types including Tier 1-4 bug fixes, features, refactors, and documentation flows are subject to the mandatory observability contract.
+
+### Lightweight direct-mode exemptions (diagram, spike)
+
+**diagram** and **spike** direct modes are named observability exemptions, by design:
+
+- **diagram** — writes `workspaces/{feature}/00-research.md` and the diagram output file, but no `00-state.md` and no `00-execution-events` file. The mode is not a pipeline; it is a one-shot generation task with no phase structure to track.
+- **spike** — writes `workspaces/{feature}/02-implementation.md` (and optionally `00-knowledge-context.md`), but no `00-state.md` and no `00-execution-events` file. The mode is an exploratory single-phase task by design.
+
+`/th:pipelines` and `/th:recover` scan for `00-state.md` as the pipeline-presence signal. Diagram and spike workspaces lack this file and are **intentionally invisible** to both tools — they are not "interrupted pipelines" and do not need recovery. When a user asks `/th:pipelines` and a workspace folder exists without `00-state.md`, report it as "untracked by design (diagram or spike mode)".
+
+**translate** direct mode is NOT exempt. It already writes `00-state.md`; the events file is initialized at Step 1 (see `agents/ref-direct-modes.md` § Translate Flow). Its workspace is visible to `/th:pipelines` and `/th:recover`.
 
 ---
 
