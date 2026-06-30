@@ -338,6 +338,71 @@ assert_nodecision "gh api graphql reviewThreads read-only listing" "$TMP" "$(mak
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
+# gh pr create + gh issue write gates (commit A1 coverage)
+# These verbs were added to the gate in commit A1. Each must produce ASK.
+# Read-only gh pr view/list and gh issue list/view must stay NODECISION
+# (over-match guard — the regex is anchored to the mutating verb only).
+# ---------------------------------------------------------------------------
+
+# Case A1-1 — ASK: gh pr create (mutating PR write; added by commit A1)
+echo
+echo "=== ASK: gh pr create (commit A1 — mutating PR write) ==="
+TMP=$(make_tmp)
+assert_ask "gh pr create" "$TMP" "$(make_payload 'gh pr create --title "Add feature" --body "Description"')"
+rm -rf "$TMP"
+
+# Case A1-2 — ASK: gh issue create (mutating issue write; added by commit A1)
+echo
+echo "=== ASK: gh issue create (commit A1 — mutating issue write) ==="
+TMP=$(make_tmp)
+assert_ask "gh issue create" "$TMP" "$(make_payload 'gh issue create --title "Bug report" --body "Steps to reproduce"')"
+rm -rf "$TMP"
+
+# Case A1-3 — ASK: gh issue edit (mutating issue write; added by commit A1)
+echo
+echo "=== ASK: gh issue edit (commit A1 — mutating issue write) ==="
+TMP=$(make_tmp)
+assert_ask "gh issue edit" "$TMP" "$(make_payload 'gh issue edit 42 --title "Updated bug title"')"
+rm -rf "$TMP"
+
+# Case A1-4 — ASK: gh issue comment (mutating issue write; added by commit A1)
+echo
+echo "=== ASK: gh issue comment (commit A1 — mutating issue write) ==="
+TMP=$(make_tmp)
+assert_ask "gh issue comment" "$TMP" "$(make_payload 'gh issue comment 42 --body "Thanks for the fix"')"
+rm -rf "$TMP"
+
+# Case A1-5 — NODECISION: gh pr view (read-only — over-match guard)
+# The gate regex is anchored to 'create|merge|review|comment'; 'view' must pass through.
+echo
+echo "=== NODECISION: gh pr view (read-only — over-match guard, must NOT gate) ==="
+TMP=$(make_tmp)
+assert_nodecision "gh pr view (read-only)" "$TMP" "$(make_payload 'gh pr view 42')"
+rm -rf "$TMP"
+
+# Case A1-6 — NODECISION: gh pr list (read-only — over-match guard)
+echo
+echo "=== NODECISION: gh pr list (read-only — over-match guard, must NOT gate) ==="
+TMP=$(make_tmp)
+assert_nodecision "gh pr list (read-only)" "$TMP" "$(make_payload 'gh pr list --state open')"
+rm -rf "$TMP"
+
+# Case A1-7 — NODECISION: gh issue list (read-only — over-match guard)
+# The gate regex covers 'create|edit|comment'; 'list' must pass through.
+echo
+echo "=== NODECISION: gh issue list (read-only — over-match guard, must NOT gate) ==="
+TMP=$(make_tmp)
+assert_nodecision "gh issue list (read-only)" "$TMP" "$(make_payload 'gh issue list --label bug')"
+rm -rf "$TMP"
+
+# Case A1-8 — NODECISION: gh issue view (read-only — over-match guard)
+echo
+echo "=== NODECISION: gh issue view (read-only — over-match guard, must NOT gate) ==="
+TMP=$(make_tmp)
+assert_nodecision "gh issue view (read-only)" "$TMP" "$(make_payload 'gh issue view 42')"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo

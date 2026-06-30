@@ -254,6 +254,21 @@ assert_deny "export with GitHub PAT" \
 assert_deny "tee with PEM private key" \
   '{"tool_name":"Bash","tool_input":{"command":"echo \"'"${_PEM_HEADER}"'\" | tee /tmp/key.pem"}}'
 
+# New patterns (commit A2): verify Anthropic sk-ant-, SendGrid SG., Twilio AC/SK
+# are caught by the broadened scan in curl/export/tee commands — not just in Write.
+# (_ANT_KEY, _SG_KEY, _TWILIO_SID, _TWILIO_SK_KEY defined above in the Write section.)
+assert_deny "curl --data with Anthropic sk-ant- key" \
+  '{"tool_name":"Bash","tool_input":{"command":"curl --data \"key='"${_ANT_KEY}"'\" https://api.anthropic.com/v1/messages"}}'
+
+assert_deny "export with SendGrid key" \
+  '{"tool_name":"Bash","tool_input":{"command":"export SENDGRID_KEY='"${_SG_KEY}"'"}}'
+
+assert_deny "tee with Twilio account SID" \
+  '{"tool_name":"Bash","tool_input":{"command":"echo \"account_sid='"${_TWILIO_SID}"'\" | tee config.env"}}'
+
+assert_deny "export with Twilio API key SID" \
+  '{"tool_name":"Bash","tool_input":{"command":"export TWILIO_SK='"${_TWILIO_SK_KEY}"'"}}'
+
 echo
 echo "=== Secret scanner: broadened Bash commands — no-secret (ALLOW) ==="
 assert_allow "curl GET without sensitive data" \
