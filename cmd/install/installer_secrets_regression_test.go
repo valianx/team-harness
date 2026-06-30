@@ -166,6 +166,76 @@ func TestRegisterMCPServers_BackupWrittenAt0600(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// B-L1 — copyBackupHardened: mode 0o600 and symlink rejection at backup dest
+// ---------------------------------------------------------------------------
+
+// TestCopyBackupHardened_Mode0600 verifies that copyBackupHardened creates the
+// destination file at mode 0o600. The backup contains the previous bearer token
+// and API key, so it must be owner-read/write only — same contract as the live
+// ~/.claude.json written by writeAtomicSecret.
+func TestCopyBackupHardened_Mode0600(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits not enforced on Windows")
+	}
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.json")
+	dest := filepath.Join(dir, "dest.json.bak")
+
+	if err := os.WriteFile(src, []byte(`{"mcpServers":{}}`+"\n"), 0o600); err != nil {
+		t.Fatalf("setup src: %v", err)
+	}
+
+	if err := copyBackupHardened(src, dest, 0o600); err != nil {
+		t.Fatalf("copyBackupHardened: %v", err)
+	}
+
+	info, err := os.Stat(dest)
+	if err != nil {
+		t.Fatalf("stat dest: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Errorf("backup mode = %04o, want 0o600 (B-L1: backup must protect old bearer token)", got)
+	}
+}
+
+// TestCopyBackupHardened_RejectsSymlinkAtDest verifies that copyBackupHardened
+// refuses to follow a symlink pre-placed at the backup destination path. Without
+// O_NOFOLLOW|O_EXCL, an attacker who knows the timestamped backup path could
+// redirect the old secret to a path they control.
+func TestCopyBackupHardened_RejectsSymlinkAtDest(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Symlink requires elevated privileges on Windows; O_NOFOLLOW is not available (documented residual)")
+	}
+
+	dir := t.TempDir()
+	outside := t.TempDir() // attacker-controlled escape target
+
+	src := filepath.Join(dir, "src.json")
+	if err := os.WriteFile(src, []byte(`{"token":"secret"}`+"\n"), 0o600); err != nil {
+		t.Fatalf("setup src: %v", err)
+	}
+
+	// Pre-plant a symlink at the backup destination pointing outside dir.
+	backupDest := filepath.Join(dir, ".claude.json.bak-20060102-150405")
+	escapeTarget := filepath.Join(outside, "stolen-secret.json")
+	if err := os.Symlink(escapeTarget, backupDest); err != nil {
+		t.Fatalf("create symlink at backup dest: %v", err)
+	}
+
+	err := copyBackupHardened(src, backupDest, 0o600)
+	if err == nil {
+		t.Fatal("copyBackupHardened returned nil — expected symlink at backup dest to be rejected (B-L1)")
+	}
+
+	// The escape target must NOT have been written.
+	if _, statErr := os.Stat(escapeTarget); !os.IsNotExist(statErr) {
+		content, _ := os.ReadFile(escapeTarget)
+		t.Errorf("secret was written to escape target through symlink (B-L1 regression): %q", content)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // B2 — malformed ~/.claude.json: os.Exit(1), file not modified
 // ---------------------------------------------------------------------------
 
