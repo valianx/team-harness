@@ -716,6 +716,120 @@ func TestApplyUpdateDiff_NonInteractive_BumpsConfigAndNoAssets(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Tests: persistResolvedTierProvider / applyUpdateDiff tier-provider persistence
+// ---------------------------------------------------------------------------
+
+// TestApplyUpdateDiff_PersistsResolvedTierProvider_Issue442 is the regression
+// guard for the PR #442 review finding: an "update --opencode-tier
+// <newprovider>" run must persist the NEW resolved provider into
+// .team-harness.json's opencode.cost_tier_provider key, not leave the stale
+// old provider in place. Without the fix, a later flag-less `update` would
+// resolve the stale persisted value (via resolveActiveTierProvider's
+// persisted-config fallback) and silently regenerate agent files back to the
+// old provider.
+//
+// A synthetic second curated provider is registered for this test only — the
+// shipped curated map has only "anthropic" today, but the persistence bug is
+// about the provider SWITCH, not about any specific provider's content.
+func TestApplyUpdateDiff_PersistsResolvedTierProvider_Issue442(t *testing.T) {
+	origFamily := providerTierFamily
+	defer func() { providerTierFamily = origFamily }()
+	providerTierFamily = map[string]map[string]string{
+		"anthropic":    origFamily["anthropic"],
+		"other-vendor": {"default": "other-model"},
+	}
+
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
+	runtimeFlag = "opencode"
+	opencodeTierFlag = "other-vendor"
+	opencodeTierFlagSet = true
+
+	dir := t.TempDir()
+	placer := newOpencodePlacerAt(dir)
+	cfgPath := opencodeSettingsConfigPath(dir)
+
+	seed := map[string]interface{}{
+		"installed_version":           "1.0.0",
+		"format_version":              "1",
+		"logs-mode":                   "local",
+		"opencode.cost_tier_provider": "anthropic",
+	}
+	seedBytes, _ := json.Marshal(seed)
+	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
+		t.Fatalf("seed write: %v", err)
+	}
+
+	applyUpdateDiff(PlanDiff{}, cfgPath, placer)
+
+	raw, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read after: %v", err)
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if result["opencode.cost_tier_provider"] != "other-vendor" {
+		t.Errorf("opencode.cost_tier_provider = %v, want %q (new provider must be persisted, not the stale old one)", result["opencode.cost_tier_provider"], "other-vendor")
+	}
+
+	// The silent-revert regression: a LATER flag-less update must resolve the
+	// NEW persisted provider, not the stale one.
+	opencodeTierFlag = ""
+	opencodeTierFlagSet = false
+	got, err := resolveActiveTierProvider(placer)
+	if err != nil {
+		t.Fatalf("resolveActiveTierProvider: %v", err)
+	}
+	if got != "other-vendor" {
+		t.Errorf("a later flag-less update resolved %q, want %q (silent-revert regression)", got, "other-vendor")
+	}
+}
+
+// TestApplyUpdateDiff_TierProviderClearedWhenFlagEmpty verifies that an
+// explicit "--opencode-tier=" (clear back to baseline) during update persists
+// the cleared state — the opencode.cost_tier_provider key is removed, not left
+// at its prior persisted value.
+func TestApplyUpdateDiff_TierProviderClearedWhenFlagEmpty(t *testing.T) {
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
+	runtimeFlag = "opencode"
+	parseDispatchFlags([]string{"--opencode-tier="})
+
+	dir := t.TempDir()
+	placer := newOpencodePlacerAt(dir)
+	cfgPath := opencodeSettingsConfigPath(dir)
+
+	seed := map[string]interface{}{
+		"installed_version":           "1.0.0",
+		"format_version":              "1",
+		"logs-mode":                   "local",
+		"opencode.cost_tier_provider": "anthropic",
+	}
+	seedBytes, _ := json.Marshal(seed)
+	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
+		t.Fatalf("seed write: %v", err)
+	}
+
+	applyUpdateDiff(PlanDiff{}, cfgPath, placer)
+
+	raw, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read after: %v", err)
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if _, ok := result["opencode.cost_tier_provider"]; ok {
+		t.Errorf("opencode.cost_tier_provider = %v, want absent (explicit empty flag must clear the persisted provider)", result["opencode.cost_tier_provider"])
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Tests: update-opencode.sh static verify — AC-9 / AC-10
 // ---------------------------------------------------------------------------
 

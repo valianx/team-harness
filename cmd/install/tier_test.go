@@ -129,11 +129,12 @@ func TestResolveTierMap_PrefersCheaperOverMoreExpensive_AC3(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestResolveActiveTierProvider_FlagTakesPrecedence_AC7(t *testing.T) {
-	prevRuntime, prevFlag := runtimeFlag, opencodeTierFlag
-	defer func() { runtimeFlag, opencodeTierFlag = prevRuntime, prevFlag }()
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
 
 	runtimeFlag = "opencode"
 	opencodeTierFlag = "anthropic"
+	opencodeTierFlagSet = true
 
 	placer := newOpencodePlacerAt(t.TempDir())
 	got, err := resolveActiveTierProvider(placer)
@@ -146,11 +147,12 @@ func TestResolveActiveTierProvider_FlagTakesPrecedence_AC7(t *testing.T) {
 }
 
 func TestResolveActiveTierProvider_AbsentEverywhereIsModelLess_AC7(t *testing.T) {
-	prevRuntime, prevFlag := runtimeFlag, opencodeTierFlag
-	defer func() { runtimeFlag, opencodeTierFlag = prevRuntime, prevFlag }()
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
 
 	runtimeFlag = "opencode"
 	opencodeTierFlag = ""
+	opencodeTierFlagSet = false // flag never passed (distinct from an explicit empty)
 
 	placer := newOpencodePlacerAt(t.TempDir())
 	got, err := resolveActiveTierProvider(placer)
@@ -167,11 +169,12 @@ func TestResolveActiveTierProvider_AbsentEverywhereIsModelLess_AC7(t *testing.T)
 // which only resolves precedence given a placer): the claude-code runtime
 // never tiers, even when --opencode-tier happens to be set.
 func TestSelectTransform_ClaudeCodeRuntimeIsAlwaysModelLess_AC7(t *testing.T) {
-	prevRuntime, prevFlag := runtimeFlag, opencodeTierFlag
-	defer func() { runtimeFlag, opencodeTierFlag = prevRuntime, prevFlag }()
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
 
 	runtimeFlag = "claude-code"
 	opencodeTierFlag = "anthropic" // even if set, claude-code never tiers
+	opencodeTierFlagSet = true
 
 	placer := newOpencodePlacerAt(t.TempDir())
 	transform, err := selectTransform(placer)
@@ -184,11 +187,12 @@ func TestSelectTransform_ClaudeCodeRuntimeIsAlwaysModelLess_AC7(t *testing.T) {
 }
 
 func TestResolveActiveTierProvider_UnknownProviderFailsClosed_AC7(t *testing.T) {
-	prevRuntime, prevFlag := runtimeFlag, opencodeTierFlag
-	defer func() { runtimeFlag, opencodeTierFlag = prevRuntime, prevFlag }()
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
 
 	runtimeFlag = "opencode"
 	opencodeTierFlag = "not-a-real-provider"
+	opencodeTierFlagSet = true
 
 	placer := newOpencodePlacerAt(t.TempDir())
 	_, err := resolveActiveTierProvider(placer)
@@ -198,11 +202,12 @@ func TestResolveActiveTierProvider_UnknownProviderFailsClosed_AC7(t *testing.T) 
 }
 
 func TestResolveActiveTierProvider_PersistedConfigReadOnRerun_AC7(t *testing.T) {
-	prevRuntime, prevFlag := runtimeFlag, opencodeTierFlag
-	defer func() { runtimeFlag, opencodeTierFlag = prevRuntime, prevFlag }()
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
 
 	runtimeFlag = "opencode"
-	opencodeTierFlag = "" // no flag on this re-run — must read the persisted value
+	opencodeTierFlag = ""       // no flag on this re-run — must read the persisted value
+	opencodeTierFlagSet = false // flag never passed (distinct from an explicit empty)
 
 	configRoot := t.TempDir()
 	cfgPath := opencodeSettingsConfigPath(configRoot)
@@ -217,6 +222,66 @@ func TestResolveActiveTierProvider_PersistedConfigReadOnRerun_AC7(t *testing.T) 
 	}
 	if got != "anthropic" {
 		t.Errorf("resolveActiveTierProvider() = %q, want %q (persisted config read on re-run)", got, "anthropic")
+	}
+}
+
+// TestResolveActiveTierProvider_ExplicitEmptyFlagOverridesPersisted_AC7 is the
+// regression guard for the precedence bug: an operator passing
+// "--opencode-tier=" explicitly (clearing back to baseline) is
+// indistinguishable from "the flag was never passed" by value alone — both
+// leave opencodeTierFlag == "". Without opencodeTierFlagSet, the code falls
+// through to the persisted-config fallback and silently re-applies the old
+// provider instead of honoring the explicit clear.
+func TestResolveActiveTierProvider_ExplicitEmptyFlagOverridesPersisted_AC7(t *testing.T) {
+	prevRuntime, prevFlag, prevFlagSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	defer func() { runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = prevRuntime, prevFlag, prevFlagSet }()
+
+	runtimeFlag = "opencode"
+
+	// Simulate the operator passing "--opencode-tier=" explicitly.
+	parseDispatchFlags([]string{"--opencode-tier="})
+
+	configRoot := t.TempDir()
+	cfgPath := opencodeSettingsConfigPath(configRoot)
+	if err := os.WriteFile(cfgPath, []byte(`{"opencode.cost_tier_provider":"anthropic"}`), 0o600); err != nil {
+		t.Fatalf("write fixture config: %v", err)
+	}
+
+	placer := newOpencodePlacerAt(configRoot)
+	got, err := resolveActiveTierProvider(placer)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Errorf("resolveActiveTierProvider() = %q, want \"\" (an explicit empty flag must win outright over a non-empty persisted value)", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Direct coverage: resolveFamilyForTier / resolveConcreteForTier
+// ---------------------------------------------------------------------------
+//
+// resolveFamilyForTier has no production caller (resolveTieredModel only uses
+// its sibling resolveConcreteForTier) but the JS port directly unit-tests it
+// (tools/harness-migrate/test_harness_migrate.mjs) for Go/JS multi-site
+// symmetry. These cases mirror that JS test.
+
+// TestResolveFamilyForTier_KnownProviderAndTier verifies the curated map
+// resolves directly for a populated (provider, tier) pair — mirrors the JS
+// assertion `resolveFamilyForTier("anthropic", "default") === "claude-opus"`.
+func TestResolveFamilyForTier_KnownProviderAndTier(t *testing.T) {
+	got, ok := resolveFamilyForTier("anthropic", "default")
+	if !ok || got != "claude-opus" {
+		t.Errorf("resolveFamilyForTier(anthropic, default) = (%q, %v), want (%q, true)", got, ok, "claude-opus")
+	}
+}
+
+// TestResolveFamilyForTier_UnknownProviderFailsClosed verifies that an
+// unrecognized provider returns ok=false rather than a guessed family.
+func TestResolveFamilyForTier_UnknownProviderFailsClosed(t *testing.T) {
+	got, ok := resolveFamilyForTier("no-such-provider", "default")
+	if ok || got != "" {
+		t.Errorf("resolveFamilyForTier(no-such-provider, default) = (%q, %v), want (\"\", false)", got, ok)
 	}
 }
 

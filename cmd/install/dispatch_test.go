@@ -251,6 +251,62 @@ func TestParseDispatchFlags_RuntimeFirstWins_MixedForms(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Suite -- --opencode-tier flag-set tracking (precedence fix)
+// ---------------------------------------------------------------------------
+
+// TestParseDispatchFlags_OpencodeTierFlagSet_EqualsFormEmpty verifies that
+// "--opencode-tier=" (explicit empty value) sets opencodeTierFlagSet to true
+// even though opencodeTierFlag itself ends up "". Without this, the explicit
+// clear-to-baseline is indistinguishable from "flag not passed".
+func TestParseDispatchFlags_OpencodeTierFlagSet_EqualsFormEmpty(t *testing.T) {
+	origFlag, origSet := opencodeTierFlag, opencodeTierFlagSet
+	defer func() { opencodeTierFlag, opencodeTierFlagSet = origFlag, origSet }()
+	opencodeTierFlag, opencodeTierFlagSet = "stale", false
+
+	parseDispatchFlags([]string{"--opencode-tier="})
+
+	if !opencodeTierFlagSet {
+		t.Error("opencodeTierFlagSet must be true after parsing \"--opencode-tier=\" (explicit empty)")
+	}
+	if opencodeTierFlag != "" {
+		t.Errorf("opencodeTierFlag = %q, want \"\" after \"--opencode-tier=\"", opencodeTierFlag)
+	}
+}
+
+// TestParseDispatchFlags_OpencodeTierFlagSet_SpaceForm verifies the
+// space-separated form also sets opencodeTierFlagSet.
+func TestParseDispatchFlags_OpencodeTierFlagSet_SpaceForm(t *testing.T) {
+	origFlag, origSet := opencodeTierFlag, opencodeTierFlagSet
+	defer func() { opencodeTierFlag, opencodeTierFlagSet = origFlag, origSet }()
+	opencodeTierFlag, opencodeTierFlagSet = "", false
+
+	parseDispatchFlags([]string{"--opencode-tier", "anthropic"})
+
+	if !opencodeTierFlagSet {
+		t.Error("opencodeTierFlagSet must be true after parsing \"--opencode-tier anthropic\"")
+	}
+	if opencodeTierFlag != "anthropic" {
+		t.Errorf("opencodeTierFlag = %q, want %q", opencodeTierFlag, "anthropic")
+	}
+}
+
+// TestParseDispatchFlags_OpencodeTierFlagSet_NotPassedStaysFalse verifies
+// that opencodeTierFlagSet remains false when --opencode-tier is absent from
+// args entirely -- this is the case that must still fall back to the
+// persisted config value in resolveActiveTierProvider.
+func TestParseDispatchFlags_OpencodeTierFlagSet_NotPassedStaysFalse(t *testing.T) {
+	origFlag, origSet := opencodeTierFlag, opencodeTierFlagSet
+	defer func() { opencodeTierFlag, opencodeTierFlagSet = origFlag, origSet }()
+	opencodeTierFlag, opencodeTierFlagSet = "", false
+
+	parseDispatchFlags([]string{"apply"})
+
+	if opencodeTierFlagSet {
+		t.Error("opencodeTierFlagSet must remain false when --opencode-tier was not passed")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Suite -- registerOpencodeMCPFromValues (refactored sink; AC-5, AC-6, AC-9)
 // ---------------------------------------------------------------------------
 

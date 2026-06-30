@@ -85,6 +85,30 @@ var allowlistedOpencodeKeys = map[string]bool{
 	"opencode.cost_tier_provider": true,
 }
 
+// cfgDerivedKeysWritten enumerates the literal keys writeOpencodeTeamHarnessConfig
+// writes from cfg-derived values. Kept in lockstep with allowlistedOpencodeKeys
+// and checked by assertCfgDerivedKeysMatchAllowlist so the allowlist stays the
+// actual source of truth rather than documentation that can silently drift.
+var cfgDerivedKeysWritten = []string{"logs-mode", "opencode.cost_tier_provider"}
+
+// assertCfgDerivedKeysMatchAllowlist panics when cfgDerivedKeysWritten and
+// allowlistedOpencodeKeys diverge — a developer added or removed a
+// cfg-derived key write without updating the allowlist this function's
+// contract is documented against (writeOpencodeTeamHarnessConfig's doc
+// comment). Fail fast: silently writing a key the allowlist doesn't expect
+// (or vice versa) is exactly the mass-assignment risk this allowlist exists
+// to prevent.
+func assertCfgDerivedKeysMatchAllowlist() {
+	if len(cfgDerivedKeysWritten) != len(allowlistedOpencodeKeys) {
+		panic(fmt.Sprintf("writeOpencodeTeamHarnessConfig: writes %d cfg-derived keys but allowlistedOpencodeKeys has %d entries — keep them in sync", len(cfgDerivedKeysWritten), len(allowlistedOpencodeKeys)))
+	}
+	for _, k := range cfgDerivedKeysWritten {
+		if !allowlistedOpencodeKeys[k] {
+			panic(fmt.Sprintf("writeOpencodeTeamHarnessConfig: writes key %q which is not in allowlistedOpencodeKeys", k))
+		}
+	}
+}
+
 // installerManagedKeys are always overwritten by the installer regardless of
 // what the existing file contains (SEC-OC-R4). A forged value from an
 // existing config is never accepted for these fields.
@@ -110,6 +134,8 @@ var installerManagedKeys = map[string]bool{
 //
 // A timestamped backup of the existing file is created before each write.
 func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer *opencodePlacer) error {
+	assertCfgDerivedKeysMatchAllowlist()
+
 	// Read existing JSON — silently start fresh if absent.
 	existing, readErr := os.ReadFile(path)
 	raw := map[string]json.RawMessage{}
@@ -219,6 +245,48 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 	}
 
 	// Serialize and write through the hardened placer path (SEC-OC-R2).
+	out, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal .team-harness.json: %w", err)
+	}
+	out = append(out, '\n')
+
+	if err := hardenedWriteFile(out, path, placer.ConfigRoot(), false); err != nil {
+		return fmt.Errorf("write .team-harness.json: %w", err)
+	}
+	return nil
+}
+
+// persistResolvedTierProvider writes the resolved per-provider cost-tiering
+// selection (#424) into the opencode.cost_tier_provider key of
+// .team-harness.json at path, preserving every other key byte-for-byte.
+//
+// This exists so `update --opencode-tier <newprovider>` persists the provider
+// it just baked into the regenerated agent files. Without it, a later `update`
+// run with no flag would resolve the STALE persisted provider (via
+// resolveActiveTierProvider's fallback) and silently regenerate files back to
+// the old provider.
+//
+// Deliberately separate from refreshManagedConfigKeys: that function's
+// contract (format_version/installed_version/updated_at only — SEC-OC-R4 /
+// AC-5) is unchanged for its other callers/keys; this function only ever
+// touches the one tiering key. provider == "" clears any persisted value
+// (matches the model-less baseline contract in writeOpencodeTeamHarnessConfig).
+func persistResolvedTierProvider(path, provider string, placer *opencodePlacer) error {
+	existing, readErr := os.ReadFile(path)
+	raw := map[string]json.RawMessage{}
+	if readErr == nil && len(existing) > 0 {
+		if err := json.Unmarshal(existing, &raw); err != nil {
+			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+		}
+	}
+
+	if provider != "" {
+		raw["opencode.cost_tier_provider"] = mustMarshalJSON(provider)
+	} else {
+		delete(raw, "opencode.cost_tier_provider")
+	}
+
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal .team-harness.json: %w", err)

@@ -30,6 +30,15 @@ var nonInteractiveFlag = false
 // the tiered transform bakes a concrete model: id per agent.
 var opencodeTierFlag = ""
 
+// opencodeTierFlagSet reports whether --opencode-tier was explicitly parsed
+// from os.Args (in either "--opencode-tier value" or "--opencode-tier=value"
+// form), including when the value is empty. This is required to distinguish
+// "operator passed --opencode-tier= to explicitly clear back to baseline"
+// from "the flag was never passed" — both leave opencodeTierFlag == "", but
+// only the former must short-circuit the persisted-config fallback in
+// resolveActiveTierProvider.
+var opencodeTierFlagSet = false
+
 // dispatchSubcommand checks os.Args for a plan|apply|uninstall subcommand and
 // runs it. Returns true if a subcommand was handled (caller should not run the
 // legacy interactive install). Returns false if no subcommand matched.
@@ -124,9 +133,11 @@ func parseDispatchFlags(args []string) []string {
 			i++
 		case arg == "--opencode-tier" && i+1 < len(args):
 			opencodeTierFlag = args[i+1]
+			opencodeTierFlagSet = true
 			i += 2
 		case strings.HasPrefix(arg, "--opencode-tier="):
 			opencodeTierFlag = strings.TrimPrefix(arg, "--opencode-tier=")
+			opencodeTierFlagSet = true
 			i++
 		default:
 			remaining = append(remaining, arg)
@@ -173,16 +184,21 @@ func selectTransform(placer Placer) (func([]byte, string, string) ([]byte, error
 
 // resolveActiveTierProvider resolves the opt-in per-provider cost-tiering
 // selection that the CC→opencode transform should bake into agent files.
-// Precedence: --opencode-tier flag (highest) > the value already persisted in
-// the opencode .team-harness.json from a prior install (re-run, AC-7) >
+// Precedence: --opencode-tier flag (highest, including an EXPLICIT empty
+// value used to clear back to baseline) > the value already persisted in the
+// opencode .team-harness.json from a prior install (re-run, AC-7) >
 // "" (absent — model-less baseline, unchanged default).
+//
+// An explicitly-passed "--opencode-tier=" (empty value) short-circuits the
+// persisted-config fallback entirely — opencodeTierFlagSet distinguishes that
+// case from "the flag was never passed", which DOES fall back to persisted.
 //
 // Returns an error when a non-empty selection names a provider absent from
 // the curated map (providerTierFamily) — fails closed rather than silently
 // falling back to model-less on a typo'd provider name.
 func resolveActiveTierProvider(placer Placer) (string, error) {
 	provider := opencodeTierFlag
-	if provider == "" {
+	if !opencodeTierFlagSet {
 		if opencodePlacer, ok := placer.(*opencodePlacer); ok {
 			cfgPath := opencodeSettingsConfigPath(opencodePlacer.ConfigRoot())
 			provider = extractStringFromRaw(detectExistingConfig(cfgPath), "opencode.cost_tier_provider")
