@@ -112,16 +112,17 @@ Pasted /context snapshot: when present, Stage 3 uses real figures instead of the
 
 ### Stage 4 — Recommend
 
-1. For every server classified "loaded upfront (not reliably deferred)" that is **not** pinned, emit the exact copy-pasteable edit:
-   - To disable every claude.ai connector at once: `{"disableClaudeAiConnectors": true}` added to `~/.claude/settings.json`.
-   - To deny one specific connector or server without disabling all: `{"deniedMcpServers": [{"serverName": "<display-name>"}]}` (or `{"serverUrl": "<url-pattern>"}` when the URL is known — more rename-robust than `serverName`).
-2. For every pinned server (default `memory`, plus any `--pin` names): recommend `"alwaysLoad": true` on that server's entry in `~/.claude.json` / `.mcp.json`. **Never** emit a `deniedMcpServers` or `disableClaudeAiConnectors` recommendation that would affect a pinned server.
-3. Report the current `ENABLE_TOOL_SEARCH` state:
+1. Before emitting any recommendation in this stage, check whether any pinned server (default `memory`, plus any `--pin` names) is itself a claude.ai connector (per the Stage 2 cross-reference). Record this as `pin_includes_cloud_connector` (true/false) — it gates step 2 below.
+2. For every server classified "loaded upfront (not reliably deferred)" that is **not** pinned, emit the exact copy-pasteable edit:
+   - To disable every claude.ai connector at once: `{"disableClaudeAiConnectors": true}` added to `~/.claude/settings.json` — **only when `pin_includes_cloud_connector` is false**. When `pin_includes_cloud_connector` is true, do NOT recommend this global lever (it would disable the pinned connector too, defeating the pin) — recommend only the targeted `deniedMcpServers` entries below for the specific unpinned connectors, and state explicitly that the global lever was skipped because a pinned server is a claude.ai connector.
+   - To deny one specific connector or server without disabling all: `{"deniedMcpServers": [{"serverName": "<display-name>"}]}` (or `{"serverUrl": "<url-pattern>"}` when the URL is known — more rename-robust than `serverName`). When emitting `serverUrl`, derive it as host+path only: strip userinfo (anything before `@` in the authority) and the query string before emitting. If stripping would leave the URL uninformative (e.g. empty path), fall back to `serverName` instead — never reproduce a raw URL that embedded credentials (per the Stage 1 no-secret rule, line 80).
+3. For every pinned server (default `memory`, plus any `--pin` names): recommend `"alwaysLoad": true` on that server's entry in `~/.claude.json` / `.mcp.json`. **Never** emit a `deniedMcpServers` or `disableClaudeAiConnectors` recommendation that would affect a pinned server — see step 1's `pin_includes_cloud_connector` gate.
+4. Report the current `ENABLE_TOOL_SEARCH` state:
    - Unset or `true` → "on by default; defers stdio servers but does not reliably defer HTTP/remote or claude.ai connectors (#40314) — does not address the dominant cost driver in most sessions."
    - Explicitly `false` → recommend removing the override (re-enabling default deferral) for stdio servers.
    - `auto`/`auto:N` → report the configured threshold; no change recommended.
-4. Summarize estimated savings if every non-pinned "loaded upfront" recommendation were applied: estimated tokens reclaimed, resulting percentage of the context window, and a rough qualitative per-session cost delta (e.g. "fewer tokens consumed at the start of every session"). Label every figure "estimate" unless derived from a pasted snapshot.
-5. Note any claude.ai connector toggle that lives in the cloud account UI (out of local reach) as a manual operator action, distinct from the local settings-file levers above.
+5. Summarize estimated savings if every non-pinned "loaded upfront" recommendation were applied: estimated tokens reclaimed, resulting percentage of the context window, and a rough qualitative per-session cost delta (e.g. "fewer tokens consumed at the start of every session"). Label every figure "estimate" unless derived from a pasted snapshot.
+6. Note any claude.ai connector toggle that lives in the cloud account UI (out of local reach) as a manual operator action, distinct from the local settings-file levers above.
 
 ---
 
@@ -132,13 +133,13 @@ Triggered only when `$ARGUMENTS` contains `--apply`. Runs after the Stage 1-4 re
 1. Build the list of apply-able changes from Stage 4 — config-file edits only. Never include a cloud/claude.ai account setting, never include an edit to the managed-policy file, and never include a deny/disable edit for a pinned server.
 2. For each change, present it individually in chat (file, exact key/value, one-line reason) and wait for an explicit operator reply before acting. A change with no explicit "yes" is skipped, not assumed.
 3. For each confirmed change:
-   a. Back up the target file first: copy it to `<file>.bak-<UTC timestamp>` (e.g. via Bash `cp`).
-   b. Validate the current file parses as JSON before editing (`python3 -c "import json; json.load(open('<path>'))"`, falling back to `node -e` if `python3` is unavailable). Abort this change and report the parse error if validation fails — do not write to a file that does not already parse.
+   a. Back up the target file first, to a fixed location OUTSIDE any git working tree: `~/.claude/.mcp-optimize-backups/<basename>.bak-<UTC timestamp>` (create the directory if absent). Never write the backup adjacent to a project-scoped target (`.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json`) — those live inside the project's git working tree and an accidental `git add` would commit secret material. After copying, set the backup file's mode to `0600` explicitly (e.g. `chmod 600 <backup-path>`) — do not rely on umask, since the source file (especially `~/.claude.json`, which may hold `env`/token values) can carry secrets. Backups are not auto-retained or auto-deleted; report the backup path to the operator so they can remove it once no longer needed.
+   b. Validate the current file parses as JSON before editing — pass the path as a positional argument, never interpolated into the `-c` source string: `python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "<path>"`, falling back to `node -e 'require(process.argv[1])' "<path>"` if `python3` is unavailable. Abort this change and report the parse error if validation fails — do not write to a file that does not already parse.
    c. Merge-write only the specific key for this change, preserving every other key and value untouched. Never replace the file wholesale.
-   d. Validate the file parses as JSON again after the write. If it does not, restore from the backup taken in step (a) and report the failure.
+   d. Validate the file parses as JSON again after the write (same positional-argument form as step b). If it does not, restore from the backup taken in step (a) and report the failure.
    e. Report the file changed, the key/value applied, and the backup path.
 4. If the operator declines every offered change, report "no changes applied" and stop. No file is touched.
-5. `--apply` never writes outside `~/.claude/settings.json` and `~/.claude.json` (or their project-scoped equivalents `.claude/settings.json` / `.claude/settings.local.json` / `.mcp.json` when the recommended edit targets a project-scoped server). It never touches the managed-policy file and never touches claude.ai account/cloud settings — those remain manual operator actions per Stage 4 step 5.
+5. `--apply` never writes outside `~/.claude/settings.json` and `~/.claude.json` (or their project-scoped equivalents `.claude/settings.json` / `.claude/settings.local.json` / `.mcp.json` when the recommended edit targets a project-scoped server). It never touches the managed-policy file and never touches claude.ai account/cloud settings — those remain manual operator actions per Stage 4 step 6.
 
 If `--apply` is NOT present, skip this section entirely — the run is REPORT-only and no file on disk is modified.
 
