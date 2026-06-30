@@ -78,7 +78,7 @@ This skill's UI vocabulary uses the CC alias names instead of the generic tier l
 1. `curl -sf https://models.dev/api.json` — fetch the registry. On non-zero exit, empty body, or non-JSON response → **fallback: warn, make NO change**.
 2. Read `data[provider]["models"]` for the selected provider (resolved in step 2 of the main flow below) — **not** the top level. Group the entries by each model's **`family`** field — **not** by prefix-matching the bare id.
 3. For each tier in `{default, medium, low}` (UI alias `{opus, sonnet, haiku}`):
-   - Resolve the tier's family via `PROVIDER_TIER_FAMILY[provider][tier]`, applying the nearest-cheaper-neighbor fallback when the provider's map omits that tier (walk `default → medium → low`, never backfill with a more expensive tier — AC-3).
+   - Resolve the tier's family via `PROVIDER_TIER_FAMILY[provider][tier]`, preferring the nearest cheaper neighbor when the provider's map omits that tier (walk `default → medium → low`); when no cheaper tier is populated either, fall back to the nearest more expensive tier as a last resort, so worst case one model serves all tiers (AC-3 — mirrors `cmd/install/transform.go::resolveTierMap`).
    - Among the models grouped under that family, pick the one with the **newest `release_date`** by chronological date comparison — **NEVER lexical string sort** (lexical sort picks `4-9` over `4-10`; date comparison on the `release_date` ISO value picks the truly newest).
    - Parse `release_date` as an ISO date (`YYYY-MM-DD`). If any candidate lacks a parseable `release_date`, skip it (do not guess).
    - Produce `<provider>/<bare-id>` as the resolved value.
@@ -159,12 +159,18 @@ TIER_TO_ALIAS = {"default": "opus", "medium": "sonnet", "low": "haiku"}
 
 def resolve_family_for_tier(provider, tier):
     """Nearest-cheaper-neighbor fallback (AC-3): walk TIER_ORDER from tier
-    downward until a populated family entry is found for provider."""
+    downward until a populated family entry is found for provider. When no
+    cheaper tier is populated either, fall back to the nearest more expensive
+    tier as a last resort — "worst case one model serves all tiers". Mirrors
+    cmd/install/transform.go::resolveTierMap — keep both in lockstep."""
     by_tier = PROVIDER_TIER_FAMILY.get(provider)
     if not by_tier or tier not in TIER_ORDER:
         return None
     start = TIER_ORDER.index(tier)
     for t in TIER_ORDER[start:]:
+        if t in by_tier:
+            return by_tier[t]
+    for t in reversed(TIER_ORDER[:start]):
         if t in by_tier:
             return by_tier[t]
     return None

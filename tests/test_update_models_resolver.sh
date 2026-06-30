@@ -22,6 +22,11 @@
 # regression assertion proves the OLD flattened shape ("anthropic/<id>" as a
 # top-level key) no longer resolves anything silently.
 #
+# #424 AC-3 (ragged tiers — more-expensive last resort): a synthetic
+# single-tier provider proves the resolver falls back to the nearest more
+# expensive populated tier when no cheaper tier exists, matching the Go and
+# JS resolvers (see tier_test.go and test_harness_migrate.mjs).
+#
 # Skips with exit 0 when python3 is absent (mirrors tests/test_opencode_agent_frontmatter.sh:25-29).
 #
 # Usage: bash tests/test_update_models_resolver.sh
@@ -78,12 +83,18 @@ TIER_TO_ALIAS = {"default": "opus", "medium": "sonnet", "low": "haiku"}
 
 def resolve_family_for_tier(provider, tier):
     """Nearest-cheaper-neighbor fallback (AC-3): walk TIER_ORDER from tier
-    downward until a populated family entry is found for provider."""
+    downward until a populated family entry is found for provider. When no
+    cheaper tier is populated either, fall back to the nearest more expensive
+    tier as a last resort — "worst case one model serves all tiers". Mirrors
+    cmd/install/transform.go::resolveTierMap — keep both in lockstep."""
     by_tier = PROVIDER_TIER_FAMILY.get(provider)
     if not by_tier or tier not in TIER_ORDER:
         return None
     start = TIER_ORDER.index(tier)
     for t in TIER_ORDER[start:]:
+        if t in by_tier:
+            return by_tier[t]
+    for t in reversed(TIER_ORDER[:start]):
         if t in by_tier:
             return by_tier[t]
     return None
@@ -222,6 +233,9 @@ def resolve_family_for_tier(provider, tier):
     for t in TIER_ORDER[start:]:
         if t in by_tier:
             return by_tier[t]
+    for t in reversed(TIER_ORDER[:start]):
+        if t in by_tier:
+            return by_tier[t]
     return None
 
 # Old (pre-#424) flattened fixture shape — top-level keyed by "anthropic/<id>".
@@ -262,9 +276,51 @@ assert_eq "AC-2 regression: old flattened shape resolves nothing" \
           "{}" \
           "${OLD_SHAPE_RESOLVED}"
 
+# #424 AC-3 ragged-tier lock: a synthetic provider whose curated map populates
+# only its most expensive tier ("default") must still resolve every tier —
+# "worst case one model serves all tiers". Requesting the cheapest tier
+# ("low") has no cheaper neighbor to walk toward, so the resolver must fall
+# back to the nearest MORE expensive populated tier ("default") as a last
+# resort. This is the same fully-ragged (single-tier) case locked in Go by
+# TestResolveTierMap_WorstCaseOneModelServesAllTiers_AC3 and in JS by
+# tools/harness-migrate/test_harness_migrate.mjs.
+RAGGED_RESULT=$(python3 - <<'PYEOF'
+import json
+
+PROVIDER_TIER_FAMILY = {
+    "ragged-test": {"default": "big-model"},
+}
+TIER_ORDER = ["default", "medium", "low"]
+
+def resolve_family_for_tier(provider, tier):
+    by_tier = PROVIDER_TIER_FAMILY.get(provider)
+    if not by_tier or tier not in TIER_ORDER:
+        return None
+    start = TIER_ORDER.index(tier)
+    for t in TIER_ORDER[start:]:
+        if t in by_tier:
+            return by_tier[t]
+    for t in reversed(TIER_ORDER[:start]):
+        if t in by_tier:
+            return by_tier[t]
+    return None
+
+print(json.dumps({
+    "low": resolve_family_for_tier("ragged-test", "low"),
+    "medium": resolve_family_for_tier("ragged-test", "medium"),
+    "default": resolve_family_for_tier("ragged-test", "default"),
+}))
+PYEOF
+)
+RAGGED_LOW=$(TH_RESULT="${RAGGED_RESULT}" python3 -c "import json,os; d=json.loads(os.environ['TH_RESULT']); print(d.get('low') or 'MISSING')")
+
+assert_eq "AC-3 ragged-tier: single-tier provider falls back to the more-expensive neighbor" \
+          "big-model" \
+          "${RAGGED_LOW}"
+
 echo ""
 if [ "${FAILED}" -eq 0 ]; then
-  echo "update-models resolver fixture test: PASS (5/5 assertions)"
+  echo "update-models resolver fixture test: PASS (6/6 assertions)"
   exit ${PASS}
 else
   echo "update-models resolver fixture test: FAIL (${FAILED} assertion(s) failed)"

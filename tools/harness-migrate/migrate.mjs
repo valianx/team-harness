@@ -99,16 +99,27 @@ const PROVIDER_TIER_CONCRETE = {
 
 /**
  * Walks TIER_ORDER from tier downward (cheaper) until it finds a populated
- * entry in tiers[provider]. Shared by resolveFamilyForTier and
- * resolveConcreteForTier so both stay aligned on the same fallback rule.
- * Returns null when the provider is unknown or has no entry at or below tier.
+ * entry in tiers[provider]. When no cheaper tier is populated either, falls
+ * back to the nearest MORE expensive tier as a last resort — this is the
+ * "worst case one model serves all tiers" guarantee (AC-3): a provider with
+ * only its most expensive tier curated still serves every tier request
+ * rather than leaving medium/low unresolved. Shared by resolveFamilyForTier
+ * and resolveConcreteForTier so both stay aligned on the same fallback rule.
+ * Mirrors cmd/install/transform.go::resolveTierMap — keep both in lockstep.
+ * Returns null when the provider is unknown or tier is unrecognized.
  */
 function resolveTierMap(tiers, provider, tier) {
   const byTier = tiers[provider];
   if (!byTier) return null;
   const startIdx = TIER_ORDER.indexOf(tier);
   if (startIdx < 0) return null;
+  // Prefer the nearest cheaper neighbor (toward the end of TIER_ORDER).
   for (let i = startIdx; i < TIER_ORDER.length; i++) {
+    const v = byTier[TIER_ORDER[i]];
+    if (v !== undefined) return v;
+  }
+  // No cheaper option exists — fall back to the nearest more expensive tier.
+  for (let i = startIdx - 1; i >= 0; i--) {
     const v = byTier[TIER_ORDER[i]];
     if (v !== undefined) return v;
   }
@@ -1427,6 +1438,8 @@ export {
   PROVIDER_TIER_FAMILY,
   PROVIDER_TIER_CONCRETE,
   CC_MODEL_ALIAS_TO_TIER,
+  TIER_ORDER,
+  resolveTierMap,
   resolveFamilyForTier,
   resolveConcreteForTier,
   resolveTieredModel,
