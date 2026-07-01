@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.121.0] - 2026-06-30
+
+### Added
+
+- `docs/code-comments.md`: consolidated code-comments contract — audience-visibility axis, per-surface KEEP/CUT/EXCEPTION tables (Go installer / Bash+TS hooks / agent-skill Markdown), rationale-routing decision tree, load-bearing exceptions list, and enforcement note. Sibling to `docs/voice-guide.md`.
+- `install update --runtime opencode --scope global` subcommand: version-delta check (update-available / already-current / installed-ahead), `ComputePlan` four-bucket diff preview, interactive `[Y/n]` confirm, `ApplyPlan` apply (all SEC-01..08 guards reused), managed-key-only config bump (`refreshManagedConfigKeys` overwrites only `installed_version`/`updated_at`/`format_version`, preserves all operator keys byte-for-byte), and a restart-to-activate honesty block.
+- `bin/update-opencode.sh` and `bin/update-opencode.ps1` bootstrap scripts: cheap `VERSION` pre-check (skips 8 MB binary download when already current), SHA256-verified binary download (anchored exact-asset-name match, case-insensitive hash compare, fail-closed — mirrors `install-opencode.{sh,ps1}`), and `binary update --runtime opencode` dispatch. Windows temp filename avoids UAC heuristic trigger words.
+- `dist/VERSION` release asset (bare semver, one line) emitted by `release.yml` so `releases/latest/download/VERSION` resolves without a GitHub API call.
+- `update-opencode.{sh,ps1}` staged to GitHub Pages by `pages.yml` with a smoke-probe for each (parity with install-script probes).
+
+### Changed
+
+- `agents/implementer.md`: bug-fix allowed comment form changed from `// fix(area-#N): {why}` to `// {why}` (issue-ID token dropped; issue linkage stays in the commit and PR). Forbidden-cruft list added to the comment guidance (no workspace/phase/stage/step/task/issue-ID/session comments) with pointer to `docs/code-comments.md`. Reviewability checklist extended to catch work-narration/session-cruft comments.
+- `agents/review-lenses/comment-rot.md`: work-narration/session-cruft trigger patterns added to `## When this lens fires`; new `### Work-narration and session cruft` subsection under `## What to look for`; SUGGESTION-severity row added to the severity table.
+- `agents/review-lenses/_index.md`: `comment-rot` trigger column extended with the new work-narration/session-cruft patterns (kept in sync with lens body and reviewer table).
+- `agents/reviewer.md`: `comment-rot` trigger column in the lens table extended with the new work-narration/session-cruft patterns (kept in sync with lens body and `_index.md`).
+- `CLAUDE.md §6.5`: prohibition bullet added — no work-narration/session-cruft comments in committed files.
+- `CLAUDE.md §9`: positive-pattern pointer added — self-documenting code first; WHY not WHAT; rationale to `/docs`.
+- Delivery and apply-review docs now name CodeRabbit as an automated reviewer that runs on every PR: a green test rollup with CodeRabbit still reviewing reads as `UNSTABLE`/`ci_state: pending` (the PR is not done until its review completes), and every CodeRabbit inline finding is dispositioned through the apply-review flow — including the Step 6 obligation to reply on every thread and resolve only fully-applied ones.
+
+### Fixed
+
+- `hooks/dev-guard.sh`: gate `gh pr create` (Step 2b) as an outward action requiring explicit operator approval; anchored to the mutating verb only so read-only `gh pr view`/`gh pr list` remain ungated.
+- `hooks/dev-guard.sh`: gate `gh issue create|edit|comment` (Step 2e-ter) as outward writes; read-only `gh issue list`/`gh issue view` remain ungated.
+- Reconciled four false co-match claims that incorrectly stated `dev-guard.sh` already covered `gh pr create`: `hooks/prepublish-guard.sh`, `hooks/README.md` (×2), `hooks/ts/entry/prepublish-guard.opencode.ts`.
+- `hooks/dev-guard.sh` + TS port: added `delete_task` to the ClickUp outward-write gate; read-only ClickUp verbs (e.g. `get_task_details`) remain ungated.
+- `hooks/ts/bodies/dev-guard.ts`: ported the `gh pr create` and `gh issue create|edit|comment` gates into the TypeScript evaluator (and its raw-payload fallback scan), closing a parity gap where the opencode path let those writes through ungated while `dev-guard.sh` already gated them.
+- `agents/delivery.md`: removed stale conditional framing ("when dev mode is active / `~/.claude/.dev-mode-active` contains `dev_mode: true`") from the outward-action gate description; rewrote to state the gate is unconditional (SEC-DR-2).
+- `docs/reasoning-checkpoint.md`: renamed "### Dev mode — Layer-1 hook is the active floor at all three boundaries" to "### Layer 1 — Hook is the active floor at all three boundaries"; removed the conditional `~/.claude/.dev-mode-active` qualification.
+- `README.md`: replaced the "## Developer mode" section (which described `/dev-mode` skill and `~/.claude/.dev-mode-active` marker as a live feature) with "## Orchestrator disposition" that accurately reflects the unconditional top-level orchestrator architecture.
+- `docs/install.md`: removed `~/.claude/.dev-mode-active` and the `/dev-mode` user-level skill from the list of fixed-path artifacts that `/th:update` re-syncs.
+- `hooks/subagent-trace.sh`: the existence breadcrumb (`subagent.stop` write to `00-subagent-trace.jsonl`) is now non-suppressible — the `TH_HOOK_PROFILE` gate was removed from the top of the hook so the breadcrumb runs unconditionally. `TH_HOOK_PROFILE=minimal` previously suppressed the only deterministic proof that a `th:*` subagent boundary occurred; that gap is now closed. Any future richer/optional behavior must be placed after a profile gate sourced after the breadcrumb write.
+- `hooks/README.md`: updated `subagent-trace.sh` description and `TH_HOOK_PROFILE` table to document the non-suppressible breadcrumb.
+- `docs/observability.md`: replaced the "Gated by `TH_HOOK_PROFILE`" note with an accurate "Non-suppressible breadcrumb" description of the new behavior.
+- `agents/orchestrator.md`: expanded the `00-execution-events.jsonl` event enum from 17 to 27 types; added `gate` (human-checkpoint, e.g. DOC-GATE), `research.lane.skipped`, `fanout.start`, `fanout.lane.start`, `fanout.lane.end`, `fanout.converge`, `artifact.missing`, `operation.started`, `operation.success`, `operation.failed`.
+- `docs/observability.md`: added "## Additional pipeline event types" section documenting the new `gate`, `research.lane.skipped`, and `artifact.missing` event types with field tables.
+- `tests/test_agent_structure.py`: added Suite 129 structural guard (12 checks) asserting that all 9 new event types are present in the orchestrator enum.
+- `docs/testing.md`: registered Suite 129 (`event-enum-reconcile`).
+- `skills/update/SKILL.md`: `/th:update` step-6 managed-block sync is now edit-safe and atomic. A `<!-- th-managed: <block> sha256=<hex> -->` provenance comment is co-located with each managed block; a five-row decision matrix skips overwriting operator-edited blocks by default (`preserved (operator-edited)`) and adopts only when the harness last wrote the content (or the block carries no prior stamp). The entire sync — both blocks, legacy-marker migration, and retired-block removal — is committed in a single atomic temp-write → `fsync` → rename operation, eliminating the mid-write corruption and partial-sync windows. `/th:update --force-blocks` opts in to adopting canonical content over operator edits. The rolling `.bak` is preserved for recovery. Identical five-row matrix implemented for both Unix/bash+python3 and Windows/PowerShell paths.
+- Added the canonical `## Untrusted content & prompt-injection floor` section (mirroring `agents/researcher.md`) to `agents/delivery.md`, `agents/implementer.md`, `agents/tester.md`, `agents/qa.md`, `agents/reviewer-consolidator.md`, `agents/research-consolidator.md`, and `agents/documenter.md`. These agents all ingest external content (GitHub issues, PRs, web pages, or user-supplied documents) and were missing the prompt-level injection defense.
+- `agents/code-researcher.md` already contained a custom-tailored equivalent floor (added previously) and was left unchanged.
+- `docs/observability.md`: added "Lightweight direct-mode exemptions" section declaring `diagram` and `spike` as named observability exemptions (no `00-state.md`, no events file by design); `translate` noted as non-exempt (now fully instrumented).
+- `agents/ref-direct-modes.md`: added observability-exemption notice to Diagram mode header; added events-file init step (Step 1.3) to Translate flow so its workspace produces a trace alongside the existing state file.
+- `agents/ref-special-flows.md`: added observability-exemption notice to Spike flow header.
+- `skills/pipelines/SKILL.md`: added "Workspace folders without 00-state.md" section — diagram/spike workspaces are reported as `untracked (diagram/spike)` rather than silently omitted.
+- `skills/recover/SKILL.md`: Mode 1 now distinguishes "folder exists, no state file" (diagram/spike — no recovery needed) from "folder absent" (unknown feature) before falling through to generic guidance.
+- `hooks/policy-block.sh`: broadened secret scan from `git commit` only to also cover `curl --data`, `wget --post-data`, `tee`, `export VAR=`, and `env VAR=` shell commands in both the Python path and the bash degraded path.
+- `hooks/policy-block.sh`: added Anthropic API key (`sk-ant-…`) as a high-confidence deny pattern with its own label, ensuring it fires before the generic `sk-…` catch-all.
+- `hooks/policy-block.sh`: added SendGrid (`SG.…`), Twilio account SID (`AC…`), and Twilio API key SID (`SK…`) as high-confidence deny patterns.
+- `hooks/policy-block.sh`: added JWT (`eyJ…` three-segment base64url), Bearer token keyword form, and Azure SAS (`sv=…`) as medium-confidence ask patterns (Python path; bash degraded command scan covers JWT, Bearer, and Azure SAS).
+- `tests/test_policy_block.sh`: added test fixtures for all new patterns (deny: sk-ant/SendGrid/Twilio/broadened-bash; ask: JWT/Bearer/Azure SAS/broadened-bash; allow: benign curl/export/tee).
+- `hooks/policy-block.sh`: propagated new HIGH patterns (sk-ant, SendGrid, Twilio AC/SK) and MEDIUM patterns (JWT, Bearer, Azure SAS) to the bash degraded path's Write/Edit content scan, closing the asymmetry with the Python path on hosts without python3 (SEC-A-02).
+- `tests/test_policy_block.sh`: added degraded-path Write/Edit test case verifying the new patterns fire when python3 is absent.
+- `skills/recover/SKILL.md`: added explicit switch arms for the four blocked statuses the orchestrator writes — `blocked-no-dispatch` (dispatch-handoff/takeover path), `blocked-incomplete` (missing-artifact list + resume instructions), `blocked-manual-push` (manual push path referencing `gh-fallback.md`), `blocked-pr-pending` (PR-pending notice with URL). Previously these statuses fell through to the generic "proceed" branch, giving the operator no actionable guidance.
+
+### Security
+
+- Go installer: `~/.claude.json` is now written at `0o600` (owner-read/write only) via atomic temp-file + `os.Rename`, so bearer tokens and API keys stored in the file are never world-readable and the live file is never observed in a truncated state.
+- Go installer: the `~/.claude.json` timestamped backup is also created at `0o600` (was `0o644`).
+- Go installer: the `~/.claude.json` backup write now uses `O_NOFOLLOW|O_EXCL` (POSIX) so a pre-placed symlink at the timestamped backup path cannot redirect the previous bearer token to an attacker-controlled location.
+- Go installer: `registerMCPServers` aborts with an explicit error when the existing `~/.claude.json` is malformed JSON, preventing silent key-loss from an empty-map fallback.
+- Go installer: `claudeCodePlacer.Place` now routes writes through `hardenedWriteFile` (per-component `Lstat` symlink rejection + `O_NOFOLLOW` leaf on POSIX), matching the protection already applied to the OpenCode placer.
+- `skills/setup/SKILL.md`: added mandatory atomic write (write-to-temp-then-rename) and explicit `0o600` permission instructions for every `~/.claude.json` merge-write. Previously the skill had no permission or atomicity requirement, leaving bearer tokens and API keys potentially world-readable (`0o644` default) and vulnerable to truncation on crash. `scanForSecrets` is explicitly not applied to the config bytes (the file intentionally contains secrets; `0o600` is the mitigation).
+- `skills/setup/SKILL.md`: added `chmod 600` instruction for the `.bak-*` backup file created before each write, matching the security posture of the primary write path and `cmd/install/` commit B1 (same secrets in both the live file and the backup).
+
 ## [2.120.0] - 2026-06-22
 
 ### Added
