@@ -462,8 +462,8 @@ pr_path = AGENTS_DIR / "plan-reviewer.md"
 if pr_path.exists():
     plan_reviewer = read(pr_path)
     pr_checks = [
-        ("Rule 1 (PR-count)", "Rule 1"),
-        ("Rule 2 (per-PR ACs)", "Rule 2"),
+        ("Rule 1 (Delivery Grouping)", "Rule 1"),
+        ("Rule 2 (per-task ACs)", "Rule 2"),
         ("Rule 3 (consolidated docs)", "Rule 3"),
         ("Rule 4 (cross-reference)", "Rule 4"),
         ("Rule 5 (service identity)", "Rule 5"),
@@ -508,7 +508,7 @@ check("architect.md declares the closed list of temporal-prod reasons",
 check("architect.md declares Services Touched section requirement",
       "Services Touched" in architect,
       "Services Touched requirement not documented")
-check("architect.md per-PR template uses Given/When/Then",
+check("architect.md per-task template uses Given/When/Then",
       "Given/When/Then" in architect or
       ("Given" in architect and "When" in architect and "Then" in architect),
       "Given/When/Then format not documented in architect")
@@ -536,18 +536,18 @@ check("architect.md allows 'No human-judgement decisions' as valid value",
       "No human-judgement decisions" in architect,
       "fallback bullet for zero decisions not documented")
 
-# qa.md must declare per-PR scoping when 01-plan.md § Task List is present
+# qa.md must declare per-task scoping when 01-plan.md § Task List is present
 qa_md = read(AGENTS_DIR / "qa.md")
-check("qa.md validate-mode reads 01-plan.md per PR",
+check("qa.md validate-mode reads 01-plan.md per task",
       "01-plan.md" in qa_md,
-      "01-plan.md per-PR scoping not documented in qa.md")
+      "01-plan.md per-task scoping not documented in qa.md")
 check("qa.md distinguishes Phase 1.5 (ratify) from Phase 1.6 (plan-review)",
       "Phase 1.5" in qa_md and "Phase 1.6" in qa_md and "plan-reviewer" in qa_md,
       "qa.md does not document the distinction with plan-reviewer")
 
-# implementer.md must declare per-PR scoping + SCOPE-DRIFT annotation
+# implementer.md must declare per-task scoping + SCOPE-DRIFT annotation
 impl_md = read(AGENTS_DIR / "implementer.md")
-check("implementer.md reads 01-plan.md for per-PR ACs",
+check("implementer.md reads 01-plan.md for per-task ACs",
       "01-plan.md" in impl_md,
       "implementer.md does not read 01-plan.md")
 check("implementer.md declares SCOPE-DRIFT annotation",
@@ -13258,7 +13258,7 @@ check(
 check(
     "plan-shape(a2): Consolidation rule declares the 'Consolidates:' field",
     "Consolidates:" in _s58_consol_slice,
-    "Consolidation rule must introduce the per-PR 'Consolidates:' field",
+    "Consolidation rule must introduce the per-task 'Consolidates:' field",
 )
 check(
     "plan-shape(a3): Consolidation rule lists condition (a) — declarative/doc/asset change",
@@ -29688,8 +29688,8 @@ check(
 # no new # Suite N: block needed — see docs/testing.md § "run-all hardcoded
 # suite list" note).
 # Item 7: skills/review-pr/SKILL.md detection block uses current pipeline filenames.
-# Item 9: both 01-plan.md templates in agents/architect.md carry Base column +
-#         **Base:** per-PR field.
+# Item 9: both 01-plan.md templates in agents/architect.md carry the Task
+#         Summary header + a Delivery Grouping block with a Base column.
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 124: contract-contradiction-sweep (issue #309) ===")

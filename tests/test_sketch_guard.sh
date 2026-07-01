@@ -251,7 +251,7 @@ make_state "$TMP12" "## Current State
 - destructive: false"
 cat > "$TMP12/01-plan.md" << 'PLANEOF'
 ## Task List
-### PR-1
+### Task-1
 - **Files:**
   - `src/routes/user.controller.ts` (modify)
 PLANEOF
