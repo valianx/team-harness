@@ -24,6 +24,21 @@ var memoryURLFlag = ""
 // the "tty present, no human" hang class (SEC-DR-7).
 var nonInteractiveFlag = false
 
+// opencodeTierFlag holds the --opencode-tier flag value (default: "", opt-in
+// per-provider cost tiering, #424). Unset ⇒ the model-less baseline transform
+// (opencodeRuntimeTransform); set to a curated provider (e.g. "anthropic") ⇒
+// the tiered transform bakes a concrete model: id per agent.
+var opencodeTierFlag = ""
+
+// opencodeTierFlagSet reports whether --opencode-tier was explicitly parsed
+// from os.Args (in either "--opencode-tier value" or "--opencode-tier=value"
+// form), including when the value is empty. This is required to distinguish
+// "operator passed --opencode-tier= to explicitly clear back to baseline"
+// from "the flag was never passed" — both leave opencodeTierFlag == "", but
+// only the former must short-circuit the persisted-config fallback in
+// resolveActiveTierProvider.
+var opencodeTierFlagSet = false
+
 // dispatchSubcommand checks os.Args for a plan|apply|uninstall subcommand and
 // runs it. Returns true if a subcommand was handled (caller should not run the
 // legacy interactive install). Returns false if no subcommand matched.
@@ -116,6 +131,14 @@ func parseDispatchFlags(args []string) []string {
 			// Both forms are accepted as aliases (SEC-DR-7).
 			nonInteractiveFlag = true
 			i++
+		case arg == "--opencode-tier" && i+1 < len(args):
+			opencodeTierFlag = args[i+1]
+			opencodeTierFlagSet = true
+			i += 2
+		case strings.HasPrefix(arg, "--opencode-tier="):
+			opencodeTierFlag = strings.TrimPrefix(arg, "--opencode-tier=")
+			opencodeTierFlagSet = true
+			i++
 		default:
 			remaining = append(remaining, arg)
 			i++
@@ -136,15 +159,58 @@ func selectPlacer() (Placer, error) {
 	}
 }
 
-// selectTransform returns the transform function for the configured runtime.
-// The function signature matches ComputePlan's transform parameter:
+// selectTransform returns the transform function for the configured runtime
+// and the active per-provider cost-tiering selection (#424), or an error when
+// --opencode-tier names a provider absent from the curated map. The function
+// signature matches ComputePlan's transform parameter:
 // func(src, kind, sourcePath) ([]byte, error).
-func selectTransform() func([]byte, string, string) ([]byte, error) {
-	if runtimeFlag == "opencode" {
-		return opencodeRuntimeTransform
+func selectTransform(placer Placer) (func([]byte, string, string) ([]byte, error), error) {
+	if runtimeFlag != "opencode" {
+		// claude-code: identity (nil is treated as identity by ComputePlan).
+		return nil, nil
 	}
-	// claude-code: identity (nil is treated as identity by ComputePlan).
-	return nil
+
+	provider, err := resolveActiveTierProvider(placer)
+	if err != nil {
+		return nil, err
+	}
+	if provider == "" {
+		return opencodeRuntimeTransform, nil
+	}
+	return func(src []byte, kind, sourcePath string) ([]byte, error) {
+		return opencodeRuntimeTransformTiered(src, kind, sourcePath, provider)
+	}, nil
+}
+
+// resolveActiveTierProvider resolves the opt-in per-provider cost-tiering
+// selection that the CC→opencode transform should bake into agent files.
+// Precedence: --opencode-tier flag (highest, including an EXPLICIT empty
+// value used to clear back to baseline) > the value already persisted in the
+// opencode .team-harness.json from a prior install (re-run, AC-7) >
+// "" (absent — model-less baseline, unchanged default).
+//
+// An explicitly-passed "--opencode-tier=" (empty value) short-circuits the
+// persisted-config fallback entirely — opencodeTierFlagSet distinguishes that
+// case from "the flag was never passed", which DOES fall back to persisted.
+//
+// Returns an error when a non-empty selection names a provider absent from
+// the curated map (providerTierFamily) — fails closed rather than silently
+// falling back to model-less on a typo'd provider name.
+func resolveActiveTierProvider(placer Placer) (string, error) {
+	provider := opencodeTierFlag
+	if !opencodeTierFlagSet {
+		if opencodePlacer, ok := placer.(*opencodePlacer); ok {
+			cfgPath := opencodeSettingsConfigPath(opencodePlacer.ConfigRoot())
+			provider = extractStringFromRaw(detectExistingConfig(cfgPath), "opencode.cost_tier_provider")
+		}
+	}
+	if provider == "" {
+		return "", nil
+	}
+	if _, ok := providerTierFamily[provider]; !ok {
+		return "", fmt.Errorf("--opencode-tier: unrecognized provider %q (supported: anthropic)", provider)
+	}
+	return provider, nil
 }
 
 // selectLedgerFilename returns the runtime-scoped ledger filename.
@@ -174,8 +240,14 @@ func runPlanCommand() {
 		os.Exit(1)
 	}
 
+	transform, err := selectTransform(placer)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "plan: %v\n", err)
+		os.Exit(1)
+	}
+
 	selected := allComponentIDs(components)
-	diff, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), selectTransform())
+	diff, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), transform)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "plan: compute: %v\n", err)
 		os.Exit(1)
@@ -213,8 +285,14 @@ func runApplyCommand() {
 		os.Exit(1)
 	}
 
+	transform, err := selectTransform(placer)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "apply: %v\n", err)
+		os.Exit(1)
+	}
+
 	selected := allComponentIDs(components)
-	diff, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), selectTransform())
+	diff, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), transform)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apply: compute plan: %v\n", err)
 		os.Exit(1)
@@ -342,6 +420,16 @@ func runOpencodePostApply(diff *PlanDiff, placer *opencodePlacer) {
 				Context7Key:  ccMigration.Context7Key,
 			}
 		}
+	}
+
+	// Resolve the per-provider cost-tiering selection (#424) — same precedence
+	// selectTransform already validated before ApplyPlan ran above, re-read
+	// here only because cfg was rebuilt by the interactive/non-interactive
+	// branch above and does not carry it. The provider name was already
+	// validated against providerTierFamily; an error here is unreachable in
+	// practice (runApplyCommand exits earlier on an invalid selection).
+	if provider, err := resolveActiveTierProvider(placer); err == nil {
+		cfg.CostTierProvider = provider
 	}
 
 	// Write the .team-harness.json through the hardened write path (SEC-OC-R2).

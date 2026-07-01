@@ -82,26 +82,12 @@ func copyFileRaw(src, dest string, mode os.FileMode) error {
 	return err
 }
 
-// writeBytesToDest writes the given bytes to dest and optionally sets executable bits.
-func writeBytesToDest(data []byte, dest string, executable bool) error {
-	if err := os.WriteFile(dest, data, 0o644); err != nil {
-		return err
-	}
-	if executable && !isWindows() {
-		info, err := os.Stat(dest)
-		if err != nil {
-			return err
-		}
-		return os.Chmod(dest, info.Mode()|0o111)
-	}
-	return nil
-}
-
 // copyEmbeddedFile installs a single file from the embedded FS with idempotency.
 // Files that already exist are overwritten unconditionally when they differ.
+// Writes route through hardenedWriteFile (configRoot = claudeDir) so the
+// production claude-code install rejects symlinked path components and leaf
+// symlinks the same way the placer engine does (SEC-DR-3).
 func copyEmbeddedFile(srcPath, dest string, executable bool) {
-	ensureDir(filepath.Dir(dest))
-
 	srcData, err := fs.ReadFile(EmbeddedAssets(), srcPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot read embedded %s: %v\n", srcPath, err)
@@ -110,7 +96,7 @@ func copyEmbeddedFile(srcPath, dest string, executable bool) {
 	srcHash := hashBytes(srcData)
 
 	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
-		if writeErr := writeBytesToDest(srcData, dest, executable); writeErr != nil {
+		if writeErr := hardenedWriteFile(srcData, dest, claudeDir, executable); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
 			installProgressCount.Add(1)
 			return
@@ -138,7 +124,7 @@ func copyEmbeddedFile(srcPath, dest string, executable bool) {
 	// Destination differs from source — overwrite unconditionally.
 	// Embedded files are canonical bytes from the repo; direct edits to the
 	// destination are not a supported customization path.
-	if writeErr := writeBytesToDest(srcData, dest, executable); writeErr != nil {
+	if writeErr := hardenedWriteFile(srcData, dest, claudeDir, executable); writeErr != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
 		installProgressCount.Add(1)
 		return
@@ -154,9 +140,11 @@ func copyEmbeddedFile(srcPath, dest string, executable bool) {
 // ModeStandard the bytes are passed through unchanged. The sha256 is computed
 // from the TRANSFORMED bytes — a same-mode re-install will hash-match and
 // report unchanged; a cross-mode re-install will diverge and overwrite.
+// Writes route through hardenedWriteFile (configRoot = claudeDir; agents are
+// never executable) so the production claude-code install rejects symlinked
+// path components and leaf symlinks the same way the placer engine does
+// (SEC-DR-3).
 func copyAgentFile(srcPath, dest string, mode InstallMode) {
-	ensureDir(filepath.Dir(dest))
-
 	srcBytes, err := fs.ReadFile(EmbeddedAssets(), srcPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot read embedded %s: %v\n", srcPath, err)
@@ -173,7 +161,7 @@ func copyAgentFile(srcPath, dest string, mode InstallMode) {
 	transformedHash := hashBytes(transformed)
 
 	if _, statErr := os.Stat(dest); os.IsNotExist(statErr) {
-		if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
+		if writeErr := hardenedWriteFile(transformed, dest, claudeDir, false); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "  [warn] cannot install %s: %v\n", dest, writeErr)
 			installProgressCount.Add(1)
 			return
@@ -201,7 +189,7 @@ func copyAgentFile(srcPath, dest string, mode InstallMode) {
 	// Destination differs from what this mode would produce — overwrite unconditionally.
 	// Embedded agent files are canonical bytes from the repo; direct edits to the
 	// destination are not a supported customization path.
-	if writeErr := os.WriteFile(dest, transformed, 0o644); writeErr != nil {
+	if writeErr := hardenedWriteFile(transformed, dest, claudeDir, false); writeErr != nil {
 		fmt.Fprintf(os.Stderr, "  [warn] cannot update %s: %v\n", dest, writeErr)
 		installProgressCount.Add(1)
 		return

@@ -463,3 +463,26 @@ func opencodeRuntimeTransform(src []byte, kind, sourcePath string) ([]byte, erro
 
 	return applyModeByRole(transformed, agentName)
 }
+
+// opencodeRuntimeTransformTiered is opencodeRuntimeTransform's opt-in
+// counterpart (#424): it bakes a concrete model: line for provider (derived
+// from each agent's CC source tier) instead of dropping model: entirely, then
+// applies the same mode-by-role layer. Selected by selectTransform only when
+// the operator has opted into per-provider cost tiering; the model-less
+// default path (opencodeRuntimeTransform) is unaffected.
+func opencodeRuntimeTransformTiered(src []byte, kind, sourcePath, provider string) ([]byte, error) {
+	transformed, err := transformToOpencodeTiered(src, kind, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	if kind != TransformKindAgent {
+		return transformed, nil
+	}
+
+	parts := strings.Split(sourcePath, "/")
+	filename := parts[len(parts)-1]
+	agentName := strings.TrimSuffix(filename, ".md")
+
+	return applyModeByRole(transformed, agentName)
+}

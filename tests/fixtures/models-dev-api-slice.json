@@ -1,72 +1,84 @@
 {
-  "anthropic/claude-opus-4-6": {
-    "id": "claude-opus-4-6",
-    "name": "Claude Opus 4.6",
-    "family": "claude-opus",
-    "release_date": "2026-02-05",
-    "last_updated": "2026-02-05"
+  "anthropic": {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "models": {
+      "claude-opus-4-6": {
+        "id": "claude-opus-4-6",
+        "name": "Claude Opus 4.6",
+        "family": "claude-opus",
+        "release_date": "2026-02-05",
+        "last_updated": "2026-02-05"
+      },
+      "claude-opus-4-5": {
+        "id": "claude-opus-4-5",
+        "name": "Claude Opus 4.5",
+        "family": "claude-opus",
+        "release_date": "2025-10-14",
+        "last_updated": "2025-10-14"
+      },
+      "claude-opus-4-1": {
+        "id": "claude-opus-4-1",
+        "name": "Claude Opus 4.1",
+        "family": "claude-opus",
+        "release_date": "2025-07-07",
+        "last_updated": "2025-07-07"
+      },
+      "claude-opus-4": {
+        "id": "claude-opus-4",
+        "name": "Claude Opus 4",
+        "family": "claude-opus",
+        "release_date": "2025-05-22",
+        "last_updated": "2025-05-22"
+      },
+      "claude-sonnet-4-6": {
+        "id": "claude-sonnet-4-6",
+        "name": "Claude Sonnet 4.6",
+        "family": "claude-sonnet",
+        "release_date": "2026-02-05",
+        "last_updated": "2026-02-05"
+      },
+      "claude-sonnet-4-5": {
+        "id": "claude-sonnet-4-5",
+        "name": "Claude Sonnet 4.5",
+        "family": "claude-sonnet",
+        "release_date": "2025-10-14",
+        "last_updated": "2025-10-14"
+      },
+      "claude-sonnet-4-10": {
+        "id": "claude-sonnet-4-10",
+        "name": "Claude Sonnet 4.10 (hypothetical adjacency fixture)",
+        "family": "claude-sonnet",
+        "release_date": "2027-01-15",
+        "last_updated": "2027-01-15"
+      },
+      "claude-sonnet-4-9": {
+        "id": "claude-sonnet-4-9",
+        "name": "Claude Sonnet 4.9 (hypothetical adjacency fixture)",
+        "family": "claude-sonnet",
+        "release_date": "2026-11-10",
+        "last_updated": "2026-11-10"
+      },
+      "claude-haiku-4-5": {
+        "id": "claude-haiku-4-5",
+        "name": "Claude Haiku 4.5",
+        "family": "claude-haiku",
+        "release_date": "2025-08-12",
+        "last_updated": "2025-08-12"
+      }
+    }
   },
-  "anthropic/claude-opus-4-5": {
-    "id": "claude-opus-4-5",
-    "name": "Claude Opus 4.5",
-    "family": "claude-opus",
-    "release_date": "2025-10-14",
-    "last_updated": "2025-10-14"
-  },
-  "anthropic/claude-opus-4-1": {
-    "id": "claude-opus-4-1",
-    "name": "Claude Opus 4.1",
-    "family": "claude-opus",
-    "release_date": "2025-07-07",
-    "last_updated": "2025-07-07"
-  },
-  "anthropic/claude-opus-4": {
-    "id": "claude-opus-4",
-    "name": "Claude Opus 4",
-    "family": "claude-opus",
-    "release_date": "2025-05-22",
-    "last_updated": "2025-05-22"
-  },
-  "anthropic/claude-sonnet-4-6": {
-    "id": "claude-sonnet-4-6",
-    "name": "Claude Sonnet 4.6",
-    "family": "claude-sonnet",
-    "release_date": "2026-02-05",
-    "last_updated": "2026-02-05"
-  },
-  "anthropic/claude-sonnet-4-5": {
-    "id": "claude-sonnet-4-5",
-    "name": "Claude Sonnet 4.5",
-    "family": "claude-sonnet",
-    "release_date": "2025-10-14",
-    "last_updated": "2025-10-14"
-  },
-  "anthropic/claude-sonnet-4-10": {
-    "id": "claude-sonnet-4-10",
-    "name": "Claude Sonnet 4.10 (hypothetical adjacency fixture)",
-    "family": "claude-sonnet",
-    "release_date": "2027-01-15",
-    "last_updated": "2027-01-15"
-  },
-  "anthropic/claude-sonnet-4-9": {
-    "id": "claude-sonnet-4-9",
-    "name": "Claude Sonnet 4.9 (hypothetical adjacency fixture)",
-    "family": "claude-sonnet",
-    "release_date": "2026-11-10",
-    "last_updated": "2026-11-10"
-  },
-  "anthropic/claude-haiku-4-5": {
-    "id": "claude-haiku-4-5",
-    "name": "Claude Haiku 4.5",
-    "family": "claude-haiku",
-    "release_date": "2025-08-12",
-    "last_updated": "2025-08-12"
-  },
-  "openai/gpt-4o": {
-    "id": "gpt-4o",
-    "name": "GPT-4o",
-    "family": "gpt-4",
-    "release_date": "2024-05-13",
-    "last_updated": "2024-05-13"
+  "openai": {
+    "id": "openai",
+    "name": "OpenAI",
+    "models": {
+      "gpt-4o": {
+        "id": "gpt-4o",
+        "name": "GPT-4o",
+        "family": "gpt-4",
+        "release_date": "2024-05-13",
+        "last_updated": "2024-05-13"
+      }
+    }
   }
 }

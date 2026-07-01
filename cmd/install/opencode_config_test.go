@@ -153,6 +153,40 @@ func TestWriteOpencodeTeamHarnessConfig_InstallerManagedKeysAlwaysSet(t *testing
 	}
 }
 
+// TestAssertCfgDerivedKeysMatchAllowlist_DoesNotPanicOnCurrentMaps verifies
+// that the live cfgDerivedKeysWritten / allowlistedOpencodeKeys pair stays in
+// sync (the normal, expected state) — assertCfgDerivedKeysMatchAllowlist must
+// not panic when called with the package's real maps. This is exercised
+// indirectly on every writeOpencodeTeamHarnessConfig call; this test isolates
+// the guard itself so a future drift between the two maps is caught at the
+// guard, not only via a downstream write-path failure.
+func TestAssertCfgDerivedKeysMatchAllowlist_DoesNotPanicOnCurrentMaps(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("assertCfgDerivedKeysMatchAllowlist panicked on the current maps: %v", r)
+		}
+	}()
+	assertCfgDerivedKeysMatchAllowlist()
+}
+
+// TestAssertCfgDerivedKeysMatchAllowlist_PanicsOnDrift verifies the guard is
+// load-bearing: when cfgDerivedKeysWritten and allowlistedOpencodeKeys
+// diverge, the assertion panics rather than silently allowing the mismatch.
+// This makes allowlistedOpencodeKeys an actual consulted source of truth
+// instead of documentation that can drift unnoticed.
+func TestAssertCfgDerivedKeysMatchAllowlist_PanicsOnDrift(t *testing.T) {
+	origWritten := cfgDerivedKeysWritten
+	defer func() { cfgDerivedKeysWritten = origWritten }()
+	cfgDerivedKeysWritten = []string{"logs-mode", "opencode.cost_tier_provider", "an-extra-key-not-in-allowlist"}
+
+	defer func() {
+		if recover() == nil {
+			t.Error("assertCfgDerivedKeysMatchAllowlist did not panic on a drifted key set")
+		}
+	}()
+	assertCfgDerivedKeysMatchAllowlist()
+}
+
 // TestWriteOpencodeTeamHarnessConfig_HardenedPath verifies that the writer
 // rejects a destination that is not under the placer's config root. This
 // exercises the SEC-OC-R2 hardened-write requirement — the write must go

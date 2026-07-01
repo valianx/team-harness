@@ -129,8 +129,12 @@ func computeUpdatePlan(placer Placer) (PlanDiff, error) {
 	if err != nil {
 		return PlanDiff{}, fmt.Errorf("load manifests: %w", err)
 	}
+	transform, err := selectTransform(placer)
+	if err != nil {
+		return PlanDiff{}, err
+	}
 	selected := allComponentIDs(components)
-	return ComputePlan(modules, components, selected, placer, EmbeddedAssets(), selectTransform())
+	return ComputePlan(modules, components, selected, placer, EmbeddedAssets(), transform)
 }
 
 // applyUpdateDiff surfaces ledger errors, prints the plan, confirms with the
@@ -169,6 +173,23 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 		fmt.Fprintf(os.Stderr, "update: refresh config keys: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Persist the resolved per-provider cost-tiering selection (#424) so a
+	// later `update` run with no --opencode-tier flag re-reads the provider
+	// that was JUST applied to the regenerated agent files, not a stale value
+	// left over from before a provider switch. Re-resolved here (rather than
+	// threaded through computeUpdatePlan) because applyUpdateDiff is the
+	// single call site and the placer is already available.
+	if provider, err := resolveActiveTierProvider(placer); err == nil {
+		if err := persistResolvedTierProvider(cfgPath, provider, placer); err != nil {
+			fmt.Fprintf(os.Stderr, "update: persist tier provider: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	// An error here is unreachable in practice: computeUpdatePlan already
+	// resolved (and validated) the same provider via selectTransform earlier
+	// in runUpdateCommand, which would have exited non-zero on an invalid
+	// selection before applyUpdateDiff was ever called.
 
 	// AC-4 / AC-6: restart-to-activate honesty block.
 	fmt.Println()

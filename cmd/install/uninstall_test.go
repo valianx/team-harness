@@ -429,6 +429,125 @@ func TestUninstall_SettingsDocBackup_BeforeRewrite(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// AC-1, AC-2, AC-3, AC-5: settings-doc live rewrite is atomic 0o600 (CWE-276)
+// ---------------------------------------------------------------------------
+
+// TestDeleteConfigKeys_LiveRewrite_Mode0600 verifies AC-1 and AC-5: after
+// deleteConfigKeys rewrites the settings doc, the live (non-backup) file is
+// mode 0o600 — not the prior 0o644. POSIX only; mode bits are not enforced on
+// Windows (mirrors the AC-12 Windows clause in opencode_json_test.go).
+func TestDeleteConfigKeys_LiveRewrite_Mode0600(t *testing.T) {
+	if isWindows() {
+		t.Skip("file mode bits are not enforced on Windows (AC-5 Windows clause)")
+	}
+
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "opencode.json")
+
+	settingsDoc := map[string]json.RawMessage{
+		"mcp": json.RawMessage(`{"memory":{"type":"remote"}}`),
+	}
+	settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
+	if err := os.WriteFile(settingsPath, settingsBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var removed RemovedComponent
+	if err := deleteConfigKeys(settingsPath, []string{"mcp.memory"}, &removed); err != nil {
+		t.Fatalf("deleteConfigKeys: %v", err)
+	}
+
+	info, err := os.Stat(settingsPath)
+	if err != nil {
+		t.Fatalf("stat settings doc: %v", err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o600 {
+		t.Errorf("live settings doc mode=%o, want 0o600 (CWE-276 residual: was 0o644)", mode)
+	}
+}
+
+// TestDeleteConfigKeys_LiveRewrite_GuaranteesMode0600_RegardlessOfPriorMode
+// verifies AC-2: even when the settings doc pre-exists at 0o644, the rewrite
+// guarantees 0o600 on the live file — proving the atomic temp-file+rename
+// write (not a bare os.WriteFile, which never chmods an existing file).
+func TestDeleteConfigKeys_LiveRewrite_GuaranteesMode0600_RegardlessOfPriorMode(t *testing.T) {
+	if isWindows() {
+		t.Skip("file mode bits are not enforced on Windows (AC-5 Windows clause)")
+	}
+
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "opencode.json")
+
+	settingsDoc := map[string]json.RawMessage{
+		"mcp": json.RawMessage(`{"memory":{"type":"remote"}}`),
+	}
+	settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
+	if err := os.WriteFile(settingsPath, settingsBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var removed RemovedComponent
+	if err := deleteConfigKeys(settingsPath, []string{"mcp.memory"}, &removed); err != nil {
+		t.Fatalf("deleteConfigKeys: %v", err)
+	}
+
+	info, err := os.Stat(settingsPath)
+	if err != nil {
+		t.Fatalf("stat settings doc: %v", err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o600 {
+		t.Errorf("live settings doc mode=%o, want 0o600 even though the file pre-existed at 0o644", mode)
+	}
+}
+
+// TestDeleteConfigKeys_PreservesNonOwnedKeys verifies AC-3: the atomic
+// rewrite preserves operator-owned keys (other mcp.* entries, unknown
+// top-level keys) byte-for-byte and removes only the th-owned key — no
+// regression of the preserve-unknown-keys contract.
+func TestDeleteConfigKeys_PreservesNonOwnedKeys(t *testing.T) {
+	dir := t.TempDir()
+	settingsPath := filepath.Join(dir, "opencode.json")
+
+	settingsDoc := map[string]json.RawMessage{
+		"mcp": json.RawMessage(`{"memory":{"type":"remote"},"operator-server":{"type":"remote","url":"https://op.example.com"}}`),
+		"some-unknown-key": json.RawMessage(`"keep-me"`),
+	}
+	settingsBytes, _ := json.MarshalIndent(settingsDoc, "", "  ")
+	if err := os.WriteFile(settingsPath, settingsBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var removed RemovedComponent
+	if err := deleteConfigKeys(settingsPath, []string{"mcp.memory"}, &removed); err != nil {
+		t.Fatalf("deleteConfigKeys: %v", err)
+	}
+
+	rewritten, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read rewritten settings doc: %v", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rewritten, &raw); err != nil {
+		t.Fatalf("unmarshal rewritten settings doc: %v", err)
+	}
+
+	if string(raw["some-unknown-key"]) != `"keep-me"` {
+		t.Errorf("unknown top-level key not preserved: got %s", raw["some-unknown-key"])
+	}
+
+	var mcpMap map[string]json.RawMessage
+	if err := json.Unmarshal(raw["mcp"], &mcpMap); err != nil {
+		t.Fatalf("unmarshal mcp map: %v", err)
+	}
+	if _, ok := mcpMap["memory"]; ok {
+		t.Errorf("th-owned mcp.memory key should have been removed")
+	}
+	if _, ok := mcpMap["operator-server"]; !ok {
+		t.Errorf("operator-owned mcp.operator-server key should be preserved")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // AC-8: Placer seam + claude-code proving target
 // ---------------------------------------------------------------------------
 
