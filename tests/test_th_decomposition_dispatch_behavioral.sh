@@ -159,6 +159,10 @@ assert "Response contains ASKED_PARALLELISM field" \
     "grep -q '^ASKED_PARALLELISM:' <<< \"\$RESPONSE\"" \
     "structured response shape is missing ASKED_PARALLELISM"
 
+assert "Response contains GATES_MENTIONED field" \
+    "grep -q '^GATES_MENTIONED:' <<< \"\$RESPONSE\"" \
+    "structured response shape is missing GATES_MENTIONED"
+
 # (i) Always-attempt-decomposition
 assert "DECOMPOSITION_RAN is 'yes' (analysis always runs, per Step 9 MANDATORY)" \
     "grep -q '^DECOMPOSITION_RAN: yes' <<< \"\$RESPONSE\"" \
@@ -177,6 +181,13 @@ assert "DISPATCH_MODE is 'parallel' (Multi-Task Orchestration default for 2+ tas
 assert "ASKED_PARALLELISM is 'no' (no sequential-or-parallel question before parallelizing)" \
     "grep -q '^ASKED_PARALLELISM: no' <<< \"\$RESPONSE\"" \
     "orchestrator asked the operator to choose sequential vs parallel — the ungated single-project multi-task default regressed (do not confuse with the legitimate multi-PROJECT fan-out confirm gate, which is a distinct axis)"
+
+# (iv) Legitimate entry gates (Discover-disposition, write-mode Y/n) survive the
+# no-parallelism-ask contract — the orchestrator must still name them, even
+# though it does not ask a sequential-or-parallel question.
+assert "GATES_MENTIONED reflects the preserved Discover-disposition / write-mode gates" \
+    "grep -iE '^GATES_MENTIONED: .*(discover|write-mode)' <<< \"\$RESPONSE\"" \
+    "orchestrator did not name the legitimate upstream entry gates (Discover-disposition, write-mode Y/n) it would still apply before dispatching"
 
 # Summary
 echo
