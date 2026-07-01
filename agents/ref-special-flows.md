@@ -323,7 +323,7 @@ Status values: `pending` → `implementing` → `complete`. One row per mileston
 
 ## Parallel Dispatch Flow (DEFAULT for 2+ tasks)
 
-Parallel dispatch is defined in the orchestrator's **Multi-Task Orchestration** section. It is the **default behavior** whenever the orchestrator has 2+ tasks, regardless of entry point.
+Parallel dispatch is defined in the orchestrator's **Multi-Task Orchestration** section. It is the **default behavior** whenever the orchestrator has 2+ tasks, regardless of entry point. **Scope note:** this is single-project, multi-task dispatch — ungated by a parallelism confirm. It is distinct from the multi-PROJECT initiative fan-out (`agents/orchestrator.md § Parallel Multi-Project Dispatch`), which is scoped to ≥2 projects and IS confirm-gated.
 
 **Entry points that lead here:**
 - `/th:plan plan-and-execute` → architect produces task breakdown → dispatch

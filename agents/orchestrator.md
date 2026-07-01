@@ -1326,7 +1326,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    
    **Default: plan first, then batch.** If the scope is non-trivial (more than a single-file change), run Phase 0b (Specify) → Phase 1 (Design in planning mode) to produce a task breakdown in `01-planning.md`, then jump to **Multi-Task Orchestration** with the resulting tasks. This is the `plan-and-execute` flow — you do NOT need `/th:plan` to trigger it.
    
-   **Rule: Parallel dispatch is the DEFAULT for 2+ tasks.** You never run multiple tasks sequentially in a single session. If you have multiple tasks, you ALWAYS use Multi-Task Orchestration (worktrees + tmux). The only exception is a round with exactly 1 task (optimization: run in current session).
+   **Rule: Parallel dispatch is the DEFAULT for 2+ tasks (single-project scope, ungated by a parallelism confirm).** You never run multiple tasks sequentially in a single session. If you have multiple tasks, you ALWAYS use Multi-Task Orchestration (worktrees + tmux). The only exception is a round with exactly 1 task (optimization: run in current session). This rule is distinct from the multi-PROJECT initiative fan-out gate (§ Parallel Multi-Project Dispatch), which is scoped to ≥2 projects and is confirm-gated — do not confuse the two axes.
    
    **When NOT to batch:** Only run as a single pipeline when the task is clearly a single, focused change (one file, one behavior, ≤3 AC) with no opportunity for parallelism.
 10. **If type is `spike`**, jump to **Spike Flow** in Special Flows section.
@@ -3872,6 +3872,8 @@ The guarantee mirrors the KG passive-capture pattern in `agents/delivery.md` § 
 
 ## Multi-Task Orchestration
 
+**Scope: single-project, multi-TASK dispatch.** This section governs how 2+ tasks WITHIN ONE REPOSITORY are dispatched; it is parallel-by-default and is NOT gated by a parallelism confirmation. It is distinct from the multi-PROJECT initiative fan-out (§ Parallel Multi-Project Dispatch below), which has its own confirm gate. The only upstream operator gates on this path are the Discover-disposition confirm and the write-mode Y/n (both gate ENTRY into the pipeline, not the sequential-vs-parallel execution choice).
+
 **DEFAULT behavior for 2+ tasks.** Whenever you have multiple tasks — from `/th:issue` batch, `/th:plan plan-and-execute`, user request for batch work, or your own breakdown of a broad scope — dispatch them using dependency analysis, parallel worktrees, and event-driven monitoring via hooks. You NEVER run multiple tasks sequentially in a single session.
 
 **Consolidation default — a same-repo task batch ships as ONE PR.** When the batch is single-repo, the default outcome is ONE consolidated PR: all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work (Step 5d). This is the default, not a special case — do NOT open one PR per batched task. This consolidation default and the milestone anti-split invariant ("a single task is never split across delivery groups," `agents/ref-special-flows.md § Milestone-Build Flow`) are the same rule read two ways: a task is never SPLIT across delivery groups, and a same-repo batch consolidates INTO one PR. The consolidated batch ships via the **same delivery flow** and the same PR lifecycle as a single task — the same `delivery` agent (Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge, `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path; the only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a), not a single task branch. The version bumps once per this default; a consuming repo may declare its own repo-local deferral rule (a documented versioning/release convention delivery honors instead — see `agents/delivery.md § Step 9`).
@@ -4331,6 +4333,8 @@ Run this deterministic test only when `initiative != null` and ≥2 projects exi
 
 ### Fan-out confirm gate (mandatory before any concurrent dispatch)
 
+**Scope: this gate governs ONLY the multi-PROJECT initiative fan-out (≥2 projects in an initiative).** It does NOT apply to multi-task dispatch within a single project, which is parallel-by-default and ungated (§ Multi-Task Orchestration).
+
 When the eligible set has ≥2 members, emit this confirmation prompt and WAIT for explicit operator approval. Never auto-fan-out:
 
 ```
@@ -4363,7 +4367,7 @@ When the eligible set has ≥2 members, emit this confirmation prompt and WAIT f
 
 - **Security unchanged.** Per-project security gates run exactly as today within each lane (Phase 3 security agent when `security-sensitive: true` or for `type: fix/hotfix` Tier 3+). Fan-out does not waive, batch, or weaken any security gate — each lane runs its own.
 - **Never parallelize across an in-flux shared contract.** Hard exclusion in the eligibility test: a project whose consumed cross-project contract is not yet stable is excluded from the concurrent set.
-- **Operator can always force serial.** `--serial` / "one at a time" bypasses the fan-out confirm gate and runs sequentially. The fan-out is opt-in and confirmed; it is never automatic.
+- **Operator can always force serial.** `--serial` / "one at a time" bypasses the fan-out confirm gate and runs sequentially. The multi-PROJECT fan-out is opt-in and confirmed; it is never automatic — this scoping does not apply to single-project multi-task dispatch, which is parallel-by-default (§ Multi-Task Orchestration).
 - **Backward-compat floor.** All new behaviour is gated on `initiative != null` AND explicit fan-out confirmation. With `initiative: null` (single-project) or no confirmation, the pipeline path is byte-identical to today.
 
 ### Observability under concurrent projects
