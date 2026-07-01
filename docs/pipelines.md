@@ -78,7 +78,7 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 
 *`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true`.
 
-**STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires **per-round** (once per round of PRs, between rounds) and is skipped when the operator granted `approve-autonomous` at GATE-1. A "round" is all PRs that share the same dependency depth; independent PRs run in parallel within a round, and STAGE-GATE-2 fires once when the whole round completes — not once per PR.
+**STAGE-GATE-1** is mandatory and cannot be skipped. **STAGE-GATE-3** is mandatory and cannot be skipped. **STAGE-GATE-2** fires **per-round** (once per round of tasks, between rounds) and is skipped when the operator granted `approve-autonomous` at GATE-1. A "round" is all tasks that share the same dependency depth; independent tasks run in parallel within a round, and STAGE-GATE-2 fires once when the whole round completes — not once per task.
 
 **Phase ordering note.** Phase 1.7 executes before Phase 1.5 in time (assigned a higher number for observability-identity continuity, following the same precedent as Phase 3.75 which executes before Phase 3.6). Phase 2.7 (test authoring) must complete before Phase 3 (verify).
 
@@ -217,7 +217,7 @@ Full contract: `skills/plan/SKILL.md` and [`agents/ref-special-flows.md`](../age
 
 **When to use.** Design-only run: the operator wants the architecture proposal and task list for a single feature but will not immediately implement. Triggered by `/design <feature>` or `@th:orchestrator give me the work plan`.
 
-Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `01-plan.md` — the merged architecture + task list with per-PR Given/When/Then AC. No implementation dispatched. The operator can resume implementation later via `@th:orchestrator implement it`.
+Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `01-plan.md` — the merged architecture + task list with per-task Given/When/Then AC. No implementation dispatched. The operator can resume implementation later via `@th:orchestrator implement it`.
 
 | File | Consumer | Purpose |
 |------|---------|---------|
@@ -227,7 +227,7 @@ Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `0
 
 ## Milestone-Build Flow (single-repo `type: plan`)
 
-**When to use.** One project decomposed into milestones (M0…MN), executed as a step-by-step build. The entire build ships as ONE PR opened after all milestones are complete. Triggered by a broad single-repo build request that the architect decomposes into milestones.
+**When to use.** One project decomposed into milestones (M0…MN), executed as a step-by-step build. The entire build ships as ONE PR under the default `all-tasks-one-pr` Delivery Grouping, opened after all milestones are complete. Triggered by a broad single-repo build request that the architect decomposes into milestones.
 
 **Key invariants:**
 

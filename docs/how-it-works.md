@@ -31,20 +31,20 @@ You tell the orchestrator: `@th:orchestrator give me the work plan for this task
 
 The `orchestrator` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal before dispatching the architect. Only after that signal does it create `workspaces/daily-reports/` and route to the `architect`.
 
-The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per PR, with Given/When/Then acceptance criteria). It also writes plan sketches (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) when the change touches those surfaces. `qa` runs Phase 1.5 to confirm every AC maps to a Work Plan step. `plan-reviewer` runs Phase 1.6 to audit the plan-shape; its verdict is appended directly to `01-plan.md § Plan Review`.
+The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per task, with Given/When/Then acceptance criteria, plus a `§ Delivery Grouping` declaring how tasks map to PRs). It also writes plan sketches (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) when the change touches those surfaces. `qa` runs Phase 1.5 to confirm every AC maps to a Work Plan step. `plan-reviewer` runs Phase 1.6 to audit the plan-shape; its verdict is appended directly to `01-plan.md § Plan Review`.
 
-You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the PR table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` (per-PR stops in Stage 2) or `approve autonomous` (skip the per-PR stops).
+You receive **STAGE-GATE-1** — a STOP block with the TL;DR, the human-review decisions, and the Task table. `hooks/sketch-guard.sh` validates that required sketches are present before the gate opens. Reply `approve` (per-task stops in Stage 2) or `approve autonomous` (skip the per-task stops).
 
-### Stage 2 — Implementation (one PR at a time)
+### Stage 2 — Implementation (one task at a time)
 
-PRs run in parallel rounds computed from their `Depends on:` field (round 1 is everything with no dependencies). For each PR:
+Tasks run in parallel rounds computed from their `Depends on:` field (round 1 is everything with no dependencies). For each task:
 
-- The `implementer` writes code strictly scoped to that PR's `Files:`. If a hidden constraint surfaces, it annotates the constraint and Phase 2.5 **Constraint Reconciliation** decides keep / amend / drop.
+- The `implementer` writes code strictly scoped to that task's `Files:`. If a hidden constraint surfaces, it annotates the constraint and Phase 2.5 **Constraint Reconciliation** decides keep / amend / drop.
 - The `tester` writes tests, the `qa` validates against the AC list, `security` audits if the change is security-sensitive — all in parallel.
 - The Acceptance Gate (Phase 3.5) re-reads the three artifacts; if any AC is missing a passing test it routes back to the implementer.
 - Phase 3.6 (`acceptance-checker`) independently compares the original spec against the delivered work.
 
-**STAGE-GATE-2** fires **per-round** (once per round of PRs, between rounds) — unless you granted autonomy at GATE-1.
+**STAGE-GATE-2** fires **per-round** (once per round of tasks, between rounds) — unless you granted autonomy at GATE-1.
 
 ### Stage 3 — Delivery
 
@@ -66,7 +66,7 @@ When the orchestrator classifies a request as `type: fix` or `type: hotfix` (via
 
 | Stage | Bug-fix difference |
 |---|---|
-| Stage 1 — Analysis | The architect runs in **root-cause mode** and produces `01-root-cause.md` (1 page max, focused on file:line + mechanism + scope) instead of `01-plan.md`. plan-reviewer gains Rules 7 + 8 (Regression Test Approach declared in `01-root-cause.md`; regression test cross-referenced in every PR's AC). |
+| Stage 1 — Analysis | The architect runs in **root-cause mode** and produces `01-root-cause.md` (1 page max, focused on file:line + mechanism + scope) instead of `01-plan.md`. plan-reviewer gains Rules 7 + 8 (Regression Test Approach declared in `01-root-cause.md`; regression test cross-referenced in every task's AC). |
 | Phase 2.0 — Regression Test (NEW, between STAGE-GATE-1 and Phase 2) | The tester authors a **failing test** in `02-regression-test.md` BEFORE the implementer touches source code. The test becomes the implementer's contract. Mandatory always; there is no fallback. |
 | Stage 2 — Implementation | The implementer runs under a **scope-discipline contract**: zero tangential refactors, no "while I'm here" cleanups. Spotted issues go to `## Follow-ups Spotted`, not into the diff. |
 | Stage 2 — Verify | `security` agent runs **always** in parallel with `tester` and `qa`, regardless of any other criterion. Defense-in-depth: many bugs have non-obvious security implications. |
@@ -98,7 +98,7 @@ Full flow definition: [`agents/ref-special-flows.md`](../agents/ref-special-flow
 
 All state lives in files. `/recover {feature-name}` reads `00-state.md` and continues from `next_action`. Works across compactions, across sessions, across machines (as long as `workspaces/` travels with the repo).
 
-Open `01-plan.md § Task List` at any point and you see PR-level `Status:` (`pending | in-progress | verified | merged | blocked`) and AC checkboxes flipped to `- [x]` on PASS. No cross-referencing required.
+Open `01-plan.md § Task List` at any point and you see task-level `Status:` (`pending | in-progress | verified | merged | blocked`) and AC checkboxes flipped to `- [x]` on PASS. No cross-referencing required.
 
 ---
 
@@ -112,7 +112,7 @@ Chat-driven Claude Code, run unguided, has documented failure modes that compoun
 | Plans accumulate iteration cruft (`v1 → v6`, "previously decided", parallel review files) | `architect` forbids version markers; `qa` cannot write sibling review files — analysis docs read as one polished pass |
 | Reviews get punted to the human ("the harness blocked it") | Phase 1.6 plan-review is inviolable — dispatched as a subagent, never escalated to the user without a verdict; there is no degraded inline mode |
 | Multi-PR splits leave the WHY in nobody's head | Base PRs carry `Cleanup PR:` with operational rationale; secondary PRs carry `Base PR:` back-reference |
-| "Did the AC pass?" requires reading three files | `01-plan.md § Task List` self-describes: `Status:` per PR + AC checkboxes flipped on PASS |
+| "Did the AC pass?" requires reading three files | `01-plan.md § Task List` self-describes: `Status:` per task + AC checkboxes flipped on PASS |
 | Agents silently disappear when their frontmatter has invalid YAML | A structural test parses every agent and fails on broken YAML |
 | Destructive commands slip through inattention | `PreToolUse` policy blocks `rm -rf`, force push, secret-file writes |
 
