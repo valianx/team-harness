@@ -221,6 +221,8 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or orchestrator judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
+**Reconciling clause — decomposition vs division.** This invariant governs DIVISION of a single task; it does NOT prohibit the orchestrator's always-run decomposition analysis (`agents/orchestrator.md` Step 9). A scope that decomposes into genuinely-independent tasks is identified by that analysis and handed to Multi-Task Orchestration, which consolidates the result into one PR by default — that is not "dividing a task." Decomposition operates at the TASK-IDENTIFICATION axis (finding independent tasks up front, always run, autonomous); this invariant governs the DELIVERY axis (never fragment one already-identified task, never mint separate operator-facing workspaces without operator sign-off). The two are complementary, not in tension.
+
 ### Batch consolidation vs the anti-split invariant
 
 These two rules are the same constraint read from two directions:
