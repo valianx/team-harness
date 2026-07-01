@@ -170,7 +170,7 @@ All commands run from the repo root.
 - **Orchestrator disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the orchestrator; no marker required; outward actions gated by `dev-guard.sh`. See `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.
 - **Obsidian-mode diagram embed.** D2/LikeC4 render to vault + `![[…]]` embed in `05-diagram.md`. See `docs/conventions.md`.
-- **Milestone standard.** milestones = commits, NOT PRs; one task = one PR; same-repo batch defaults to ONE consolidated PR. See `agents/ref-special-flows.md § Milestone-Build Flow`.
+- **Milestone standard.** milestones = commits, NOT PRs; a single task is never split across delivery groups; default `Delivery Grouping` is `all-tasks-one-pr` (same-repo batch consolidates into ONE PR). See `agents/ref-special-flows.md § Milestone-Build Flow`.
 - **Hook enforcement floors.** `policy-block.sh` + `checkpoint-guard.sh`. See `docs/reasoning-checkpoint.md`.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
 - **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
