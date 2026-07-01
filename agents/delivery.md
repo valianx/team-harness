@@ -165,7 +165,7 @@ These flags affect Steps 2, 3, 10, and 11. All other steps run identically.
 
 **Always create a dedicated branch for the delivery commit. The base branch is always `main`, never a sibling branch. Stacked PRs (child branch off a parent PR's branch) are PROHIBITED — when a parent PR merges, GitHub automatically re-targets child PRs to the parent's base; under rapid serial merges this re-targeting is asynchronous and races the merge, silently losing commits (see https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches).**
 
-**Multi-PR plans (valid split reason from the closed list):** open and merge PRs serially — PR-N+1 opens only AFTER PR-N lands on `main`. Branch each subsequent PR from the updated `main` (`git checkout main && git pull --ff-only origin main && git checkout -b {branch}`). Before merging each PR after the first, rebase it on the current `main` (`git fetch origin && git rebase origin/main`) to incorporate all prior merges cleanly.
+**Multi-group deliveries (`§ Delivery Grouping` declares N > 1 groups with a valid split reason from the closed list):** open and merge PRs serially — group N+1's PR opens only AFTER group N's PR lands on `main`. Branch each subsequent group's PR from the updated `main` (`git checkout main && git pull --ff-only origin main && git checkout -b {branch}`). Before merging each PR after the first, rebase it on the current `main` (`git fetch origin && git rebase origin/main`) to incorporate all prior merges cleanly.
 
 **Step 3.1 — Check current branch:**
 - Run `git rev-parse --abbrev-ref HEAD` to get the current branch name.
@@ -754,9 +754,9 @@ Do NOT stage unrelated files.
 
 **If `has_gh: false`:** do NOT skip. Use the Tier B fallback chain from `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When neither `gh` nor a token is available, emit the compare URL and body file and report `status: blocked-manual-push` (see Return Protocol).
 
-**Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For multi-PR plans, follow the serial-merge contract: open PR-N+1 only after PR-N is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
+**Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For a multi-group `§ Delivery Grouping`, follow the serial-merge contract: open group N+1's PR only after group N's PR is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
 
-**One approved Task List = one PR set.** Open only the PR(s) declared in the approved `01-plan.md § Task List`. Never open an additional PR that is not in the approved set (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orchestrator post-approval-division rule).
+**One approved Task List = one delivery per `§ Delivery Grouping`.** Open only the PR(s) declared by the approved `01-plan.md § Task List` → `§ Delivery Grouping` (default: all tasks ship as ONE PR). Never open an additional PR that is not covered by the approved grouping (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orchestrator post-approval-division rule).
 
 **Step 11.0 — Check for existing PR:**
 

@@ -177,7 +177,7 @@ When the user wants to quickly test a technical hypothesis without full pipeline
 
 Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeline per task).
 
-**Distinction from normal pipeline mode.** Plan flow's architect output is `01-planning.md` — a task breakdown for **multi-task batch orchestration** across worktrees, with dispatch labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and size estimates. This is structurally different from `01-plan.md`, which the architect produces in **normal pipeline mode** (single-feature, sequential PRs, per-PR ACs in Given/When/Then). The two files coexist for different consumers:
+**Distinction from normal pipeline mode.** Plan flow's architect output is `01-planning.md` — a task breakdown for **multi-task batch orchestration** across worktrees, with dispatch labels (BLOCKER / PARALLEL / CONVERGENCE / SEQUENTIAL) and size estimates. This is structurally different from `01-plan.md`, which the architect produces in **normal pipeline mode** (single-feature, sequential tasks, per-task ACs in Given/When/Then). The two files coexist for different consumers:
 
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
@@ -186,7 +186,7 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + full pipeli
 
 **Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 
-Inside each task dispatched by `plan-and-execute`, the child orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between PRs → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's PRs. The parent batch orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
+Inside each task dispatched by `plan-and-execute`, the child orchestrator runs the full single-feature pipeline (Stage 1 → STAGE-GATE-1 → Stage 2 → STAGE-GATE-2 between tasks → Stage 3 → STAGE-GATE-3), which DOES produce its own `01-plan.md` for that task's own sub-tasks. The parent batch orchestrator gates at task boundaries via the multi-task progress tracker — it does NOT additionally fire STAGE-GATE-1/2/3 at the batch level. **No double-gating.**
 
 ### Planning phase (both modes)
 
@@ -209,7 +209,7 @@ Inside each task dispatched by `plan-and-execute`, the child orchestrator runs t
 
 ## Milestone-Build Flow (single-repo `type: plan`)
 
-A milestone build is when one project is decomposed into milestones (M0…MN) and the operator executes each milestone as a step of the plan. This is the **one-build-one-workspace model**: one task = one plan (`01-plan.md`) = one workspace = ONE PR (opened only when ALL milestones are complete).
+A milestone build is when one project is decomposed into milestones (M0…MN) and the operator executes each milestone as a step of the plan. This is the **one-build-one-workspace model**: one task = one plan (`01-plan.md`) = one workspace, shipping under the default `all-tasks-one-pr` Delivery Grouping as ONE PR (opened only when ALL milestones are complete).
 
 **Governing invariant:** a build is identified by IDENTITY, never the date. The orchestrator MUST NEVER create a new plan or workspace because the date changed. No code path may branch "new date → new workspace."
 
@@ -219,18 +219,18 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **Stage files are FLAT, whole-task, and there is exactly ONE set per workspace.** No suffix of ANY kind is permitted on a stage filename. This prohibits not only per-milestone suffixes (`02-implementation-m{N}.md`) and `{NN}_{milestone}/` child folders, but ALSO any "second-cycle" / "second delivery cycle" suffix such as `02b-implementation.md`, `03b-testing.md`, `04b-*.md`. There is no "second delivery cycle" convention in team-harness — inventing an undocumented file-naming convention is itself a defect. One task = one workspace = one set of stage files (`02-implementation.md`, `03-testing.md`, `04-security.md`, `04-validation.md`), each whole-task. A second PR or a second pass within the same workspace REUSES these flat files; it never mints a parallel suffixed set.
 
-**Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple PRs, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or orchestrator judges a scope too large for one task/PR, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
+**Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or orchestrator judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
 ### Batch consolidation vs the anti-split invariant
 
 These two rules are the same constraint read from two directions:
 
-- **Anti-split invariant (single-task reading):** A single task is NEVER split across multiple PRs. The Operator-authority invariant above is the governing statement — no agent divides a task's plan or implementation on its own authority. "One task = one PR" means exactly this: do not split ONE task across N PRs.
-- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default. The orchestrator's `## Multi-Task Orchestration` **Consolidation default** paragraph is the governing statement — all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
+- **Anti-split invariant (single-task reading):** A single task is NEVER split across multiple delivery groups. The Operator-authority invariant above is the governing statement — no agent divides a task's plan or implementation on its own authority. A single task always belongs to exactly one group in `§ Delivery Grouping`.
+- **Consolidation default (multi-task reading):** A same-repo batch of independent tasks consolidates into ONE PR by default (`Delivery Grouping: all-tasks-one-pr`). The orchestrator's `## Multi-Task Orchestration` **Consolidation default** paragraph is the governing statement — all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work. Do NOT open one PR per batched task.
 
-Read together: a task is never SPLIT across PRs (anti-split), and a same-repo batch consolidates INTO one PR (consolidation default). There is no contradiction — one rule prevents explosion outward (splitting), the other prevents explosion inward (one PR per task in a batch). The wording "one task = one PR" refers only to the anti-split direction: a single task is never divided across PRs.
+Read together: a task is never SPLIT across delivery groups (anti-split), and a same-repo batch consolidates INTO one PR by default (consolidation default). There is no contradiction — one rule prevents explosion outward (splitting a task across groups), the other prevents explosion inward (one PR per task in a batch). Neither rule claims a fixed "one task = one PR" identity; the actual task-to-PR mapping is declared per plan by `§ Delivery Grouping`.
 
-**Operator opt-out.** The operator — and only the operator — may override the consolidation default by requesting separate PRs ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open PR-N+1 only after PR-N lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
+**Operator opt-out.** The operator — and only the operator — may override the consolidation default by requesting separate PRs ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open Task-N+1's PR only after Task-N's PR lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
 
 **Genuine blocker (the only non-opt-out reason for separate PRs in a same-repo batch).** Absent an operator opt-out, the orchestrator splits a batch into separate PRs ONLY for: (a) an UNRESOLVABLE merge conflict between task branches at consolidation Step 5a; or (b) a temporal-prod / cross-repo deploy reason from the plan-reviewer's existing closed list — `coexistence window`, `production signal`, `cross-repo deploy gate` (see `agents/plan-reviewer.md § Rule 1`). No new blocker categories exist.
 
@@ -453,7 +453,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
 | 1.5 Plan ratification | qa-plan (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
 | 1.6 Plan review | plan-reviewer | `01-plan.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
-| STAGE-GATE-1 | orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + PR Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
+| STAGE-GATE-1 | orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + Task Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
 | **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback. Distinct from the AC-test authoring of Phase 2.7 — this test captures the bug before the implementer runs. |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
 | 2.5 Reconcile | orchestrator + qa-plan (reconcile) | — | Same as feature flow |
@@ -591,12 +591,12 @@ v1 detects hotfix by keyword in natural language (auto-classification + operator
 When `type: refactor`:
 
 1. **Specify** — ACs focus on `VERIFY:` format (same API, same behavior, improved structure)
-2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline_version 2). Per-PR ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then — both formats are accepted by the `plan-reviewer` Rule 2 regex.
-3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-PR scope from `01-plan.md` (§ Task List) `Files:` field still applies."
+2. **Design** — architect focuses on target structure, not new features. The single-file output contract applies: `01-plan.md` (pipeline_version 2). Per-task ACs in refactor mode use the `VERIFY:` format predominantly rather than Given/When/Then — both formats are accepted by the `plan-reviewer` Rule 2 regex.
+3. **Implement** — implementer receives: "This is a refactor. Do NOT change behavior. Existing tests are your contract. Only change structure/organization. Per-task scope from `01-plan.md` (§ Task List) `Files:` field still applies."
 4. **Verify** — tester runs **existing tests first** before writing new ones. If existing tests fail → the refactor broke something. New tests only for structural improvements (e.g., new module boundaries).
 5. **Delivery** — as normal, gated by STAGE-GATE-3.
 
-The key difference: existing passing tests are the safety net. If they break, the refactor is wrong. **The 3-stage gates still apply**: STAGE-GATE-1 (human approves the refactor plan), STAGE-GATE-2 between PRs in autonomous-skippable interactive mode, STAGE-GATE-3 before push.
+The key difference: existing passing tests are the safety net. If they break, the refactor is wrong. **The 3-stage gates still apply**: STAGE-GATE-1 (human approves the refactor plan), STAGE-GATE-2 between tasks in autonomous-skippable interactive mode, STAGE-GATE-3 before push.
 
 ---
 
@@ -1194,7 +1194,7 @@ This section defines which task types and tiers produce a classification block a
 | `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | Yes (minimum 4-line AC) | None (all-false by orchestrator self-author) | Yes — no-op pass (empty required set) |
 | `fix` Tier 0 / `docs` Tier 0 | **Exempt** — no workspace (CLAUDE.md §5 observability exemption) | n/a | n/a | Not invoked (no `00-state.md`) |
 | `docs` flow (Tier ≥1) | Architect docs-research mode → orchestrator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
-| Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-PR AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
+| Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-task AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
 
 **Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md`, it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
 
