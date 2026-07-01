@@ -435,7 +435,7 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contains exactly one line: `patch`, `minor`, or `major`. The `version.d/` directory is tracked by git (not gitignored) so the deferred release step on a fresh checkout sees the markers. Stage it in Step 10.0 alongside the changelog fragment.
 
-**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump: SKIPPED (repo-local deferral convention, skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
+**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
 
 **If the orchestrator passed `release-mode: true` → continue below through Step 9-R and then Steps 9.0–9e.**
 

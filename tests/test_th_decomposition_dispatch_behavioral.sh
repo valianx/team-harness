@@ -35,16 +35,21 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PASSED=0
 FAILED=0
 FAIL_DETAILS=()
 
+# assert NAME PATTERN [DETAIL] [ci]
+# Matches PATTERN (grep -E) against $RESPONSE. $RESPONSE is only ever data to
+# grep — never re-parsed as shell code (no eval). Pass "ci" as the 4th arg for
+# a case-insensitive match.
 assert() {
     local name="$1"
-    local condition="$2"
+    local pattern="$2"
     local detail="${3:-}"
-    if eval "$condition"; then
+    local flags="-qE"
+    [ "${4:-}" = "ci" ] && flags="-qiE"
+    if grep "$flags" -- "$pattern" <<< "$RESPONSE"; then
         echo "  [PASS] $name"
         PASSED=$((PASSED + 1))
     else
@@ -148,46 +153,47 @@ echo
 
 # Structured-shape assertions
 assert "Response contains DECOMPOSITION_RAN field" \
-    "grep -q '^DECOMPOSITION_RAN:' <<< \"\$RESPONSE\"" \
+    '^DECOMPOSITION_RAN:' \
     "structured response shape is missing — orchestrator did not produce the contracted output"
 
 assert "Response contains DISPATCH_MODE field" \
-    "grep -q '^DISPATCH_MODE:' <<< \"\$RESPONSE\"" \
+    '^DISPATCH_MODE:' \
     "structured response shape is missing DISPATCH_MODE"
 
 assert "Response contains ASKED_PARALLELISM field" \
-    "grep -q '^ASKED_PARALLELISM:' <<< \"\$RESPONSE\"" \
+    '^ASKED_PARALLELISM:' \
     "structured response shape is missing ASKED_PARALLELISM"
 
 assert "Response contains GATES_MENTIONED field" \
-    "grep -q '^GATES_MENTIONED:' <<< \"\$RESPONSE\"" \
+    '^GATES_MENTIONED:' \
     "structured response shape is missing GATES_MENTIONED"
 
 # (i) Always-attempt-decomposition
 assert "DECOMPOSITION_RAN is 'yes' (analysis always runs, per Step 9 MANDATORY)" \
-    "grep -q '^DECOMPOSITION_RAN: yes' <<< \"\$RESPONSE\"" \
+    '^DECOMPOSITION_RAN: yes' \
     "orchestrator did not run the decomposition analysis — Step 9's 'always run' contract regressed"
 
 assert "TASK_COUNT is 2 or more (scope is genuinely two independent tasks)" \
-    "grep -qE '^TASK_COUNT: [2-9][0-9]*' <<< \"\$RESPONSE\"" \
+    '^TASK_COUNT: [2-9][0-9]*' \
     "orchestrator did not identify the scope as 2+ independent tasks"
 
 # (ii) Parallel-by-default for multi-task
 assert "DISPATCH_MODE is 'parallel' (Multi-Task Orchestration default for 2+ tasks)" \
-    "grep -q '^DISPATCH_MODE: parallel' <<< \"\$RESPONSE\"" \
+    '^DISPATCH_MODE: parallel' \
     "orchestrator did not default to parallel dispatch for a single-repo multi-task scope — the parallel-by-default rule regressed"
 
 # (iii) No parallelism-ask, while legitimate entry gates may still fire
 assert "ASKED_PARALLELISM is 'no' (no sequential-or-parallel question before parallelizing)" \
-    "grep -q '^ASKED_PARALLELISM: no' <<< \"\$RESPONSE\"" \
+    '^ASKED_PARALLELISM: no' \
     "orchestrator asked the operator to choose sequential vs parallel — the ungated single-project multi-task default regressed (do not confuse with the legitimate multi-PROJECT fan-out confirm gate, which is a distinct axis)"
 
 # (iv) Legitimate entry gates (Discover-disposition, write-mode Y/n) survive the
 # no-parallelism-ask contract — the orchestrator must still name them, even
 # though it does not ask a sequential-or-parallel question.
 assert "GATES_MENTIONED reflects the preserved Discover-disposition / write-mode gates" \
-    "grep -iE '^GATES_MENTIONED: .*(discover|write-mode)' <<< \"\$RESPONSE\"" \
-    "orchestrator did not name the legitimate upstream entry gates (Discover-disposition, write-mode Y/n) it would still apply before dispatching"
+    '^GATES_MENTIONED: .*(discover|write-mode)' \
+    "orchestrator did not name the legitimate upstream entry gates (Discover-disposition, write-mode Y/n) it would still apply before dispatching" \
+    ci
 
 # Summary
 echo

@@ -91,7 +91,7 @@ Run the rules in order. Each rule produces 0..N findings. The total set of findi
 
 **What to check:**
 
-1. Parse the `### Delivery Grouping` block from `01-plan.md` (§ Task List). It declares either `Grouping: all-tasks-one-pr` (default) or a table of N groups, each with `Tasks`, `Base`, and `Reason` columns.
+1. Parse the `### Delivery Grouping` block from `01-plan.md` (§ Task List). It declares either `Grouping: all-tasks-one-pr` (default) or a table of N groups, each with `PR`, `Tasks`, `Base`, and `Reason` columns (the `PR` column is the group identifier — see `agents/architect.md § Delivery Grouping`; `group.pr` in the detection algorithms below refers to it).
 2. If `### Delivery Grouping` is absent → finding "Rule 1: `### Delivery Grouping` block missing from § Task List".
 3. If the block declares `all-tasks-one-pr` → no further check (trivially satisfied).
 4. If the block declares N > 1 groups, every group MUST have a `Reason` field whose value matches exactly one of the three valid reasons (closed list).
@@ -142,9 +142,11 @@ elif grouping.mode == "groups":
 
 **Detection regex (per task's AC block):**
 
+```text
+(?m)^\s*-\s*\[\s\]\s+\*\*AC-\d+\*\*:\s+(Given\b[^\n]*\bWhen\b[^\n]*\bThen\b|VERIFY:)
 ```
-(?ms)^\s*-\s*\[\s\]\s+\*\*AC-\d+\*\*:\s+(Given|VERIFY:)
-```
+
+A `Given`-based criterion matches only when the same line also carries `When` and `Then` — a bare `Given …` without the full shape is NOT a match.
 
 For each task:
 - If no `Acceptance Criteria` section is found → finding "Rule 2: task has no AC section".

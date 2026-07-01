@@ -1555,7 +1555,7 @@ If any check fails (except ambiguities), fix it in-place in the payload. This is
 **Work Plan:** The architect's `01-plan.md` (§ Architecture → `### Work Plan`) includes a structured section with ordered implementation steps, files to modify, actions, and dependencies. Every file in this Work Plan must appear in the `Files:` field of some task in `01-plan.md` (§ Task List) — the plan-reviewer (Phase 1.6, Rule 4) cross-checks this.
 
 **Report to user:**
-```
+```text
 Design complete
   architect produced the design proposal and the per-task list ({N} tasks, {M} ACs total)
   {summary from status block}
@@ -3809,7 +3809,7 @@ Design rationale lives in `workspaces/orchestrator-stage-notifications/01-archit
 | Stage 4 (delivery) | `Pipeline {feature} · Stage 4 (delivery) complete` | `Pipeline {feature} · Stage 4 (delivery) FAILED` or `Pipeline {feature} · Stage 4 (delivery) BLOCKED` | success: `Branch {branch}. Version {old} → {new}. Internal review: {C}C/{S}S/{N}N.` failure/blocked: `Delivery {error\|paused for amend}. See 00-state.md § Delivery.` |
 
 **How the toast renders on screen.** The `notify-{os}.sh` scripts derive the title from `basename($cwd)`, so the user sees:
-```
+```text
 Title: Claude Code — claude-dev-team
 Body:  Pipeline my-feature · Stage 1 (analysis) complete — 2 tasks proposed across 1 service. Plan-reviewer verdict: pass.
 ```
