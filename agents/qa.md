@@ -53,7 +53,7 @@ Every mode has exactly one canonical output. If a request does not map to one of
 
 | Mode | Output file | Append or overwrite | Notes |
 |---|---|---|---|
-| Validate (default, Phase 3) | `workspaces/{feature}/04-validation.md` | overwrite per iteration | Per-PR validation report (deep per-AC detail) |
+| Validate (default, Phase 3) | `workspaces/{feature}/04-validation.md` | overwrite per iteration | Per-task validation report (deep per-AC detail) |
 | Validate (default, Phase 3) — AC checkbox mirror | `workspaces/{feature}/01-plan.md` (§ Task List, checkbox flips only) | targeted edit, see below | Mirror each PASS AC to its checkbox; NEVER touch other fields |
 | Validate (default, Phase 3) — Validation Outcome fold-in | `workspaces/{feature}/01-plan.md` (§ `## Validation Outcome`, append in place) | append in place; replace any prior copy | Final verdict + reference to 04-validation.md; deep detail stays in 04-validation.md |
 | Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
@@ -88,14 +88,14 @@ This is the **only** edit you are allowed to make on `01-plan.md` beyond the che
 Hard rule: when asked to "review", "audit", or "validate" a plan / inventory / task list / architecture document, do **not** create any of the following. They have been observed as failure modes; they fragment the deliverable and force the user to read in parallel.
 
 - `01-coverage-review.md`, `02-flow-coverage.md`, `01-substance-review.md`, or any other `*-review.md` sibling to `01-plan.md`.
-- A `qa-reports/` directory, or any per-PR audit file (`qa-reports/PR-N.md`, `PR-N-review.md`) **before implementation exists**. Pre-implementation per-PR concerns belong inside the AC block of that PR in `01-plan.md` (§ Task List).
+- A `qa-reports/` directory, or any per-task audit file (`qa-reports/Task-N.md`, `Task-N-review.md`) **before implementation exists**. Pre-implementation per-task concerns belong inside the AC block of that task in `01-plan.md` (§ Task List).
 - Any file mimicking the `## Plan Review` section that `plan-reviewer` appends to `01-plan.md`. The canonical plan-shape audit is `plan-reviewer`'s appended section; if substance review is needed, **edit `01-plan.md` in place** (see Routing below) instead of producing a parallel synthesis.
 
 ### Routing when asked to "review the plan"
 
 If the orchestrator passes a task like "review the plan", "audit substance", "validate coverage of the architecture", "revisa el plan":
 
-1. If the concern is **plan-shape** (one PR per service, per-PR ACs in GWT, consolidated docs, …) → return `status: blocked` with `summary: route to plan-reviewer agent`.
+1. If the concern is **plan-shape** (Delivery Grouping, per-task ACs in GWT, consolidated docs, …) → return `status: blocked` with `summary: route to plan-reviewer agent`.
 2. If the concern is **substance coverage of AC vs Work Plan** → invoke Ratify-Plan Mode (append to `01-plan.md`). Do NOT create a separate file.
 3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: route back to architect for in-place refinement of 01-plan.md`.
 
@@ -313,7 +313,7 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 **Before starting ANY work:**
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
-   - `01-plan.md` — AC block for this PR (the spec being validated)
+   - `01-plan.md` — AC block for this task (the spec being validated)
    - `02-implementation.md` — implementer output: files changed, deviations, scope-drift annotations
    - `03-testing.md` — test authoring record (which tests cover which AC)
    - `04-security.md` — security report (inform validation of security-related AC)
@@ -342,11 +342,11 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 **This phase runs in validate mode (default).** Read the acceptance criteria, then read source code and compare against them.
 
-**Per-PR scoping (pipeline_version: 2).** When the orchestrator invokes you in Stage 2 with a `PR identifier` (e.g., `PR-1`), read **the AC block of that specific PR** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-PR AC block is your validation scope: validate exactly those ACs against the code of this PR. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this PR (by construction the union of per-PR ACs covers it).
+**Per-task scoping (pipeline_version: 2).** When the orchestrator invokes you in Stage 2 with a `Task identifier` (e.g., `Task-1`), read **the AC block of that specific task** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-task AC block is your validation scope: validate exactly those ACs against the code of this task. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this task (by construction the union of per-task ACs covers it).
 
-**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a PR identifier — the orchestrator does not pass one in legacy mode.
+**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a task identifier — the orchestrator does not pass one in legacy mode.
 
-**Distinction from Phase 1.5 (ratify-plan mode) and Phase 1.6 (plan-reviewer).** Phase 1.5 (`qa-plan` agent, mode `ratify-plan`) validates that the Work Plan covers every AC — substance coverage. Phase 1.6 (the `plan-reviewer` agent — different file) audits plan-shape rules — one PR per service, per-PR ACs in GWT, consolidated documents. Validate-mode (this section) is Phase 3 (per PR in Stage 2): code vs AC. Three distinct phases, three distinct concerns.
+**Distinction from Phase 1.5 (ratify-plan mode) and Phase 1.6 (plan-reviewer).** Phase 1.5 (`qa-plan` agent, mode `ratify-plan`) validates that the Work Plan covers every AC — substance coverage. Phase 1.6 (the `plan-reviewer` agent — different file) audits plan-shape rules — Delivery Grouping, per-task ACs in GWT, consolidated documents. Validate-mode (this section) is Phase 3 (per task in Stage 2): code vs AC. Three distinct phases, three distinct concerns.
 
 **AC formats:** Accept both `Given/When/Then` and `VERIFY: {condition}` formats. For VERIFY criteria, check that the code satisfies the stated condition and provide file:line evidence just like GWT criteria.
 
