@@ -2669,7 +2669,7 @@ Then return your status block and exit.
 - Feature name for workspaces
 - workspaces path: {resolved_workspaces_path}
 - Summary of what was built, tested, and validated (from status block summaries, NOT re-reading workspaces)
-- **`skip-version: true`** — DEFAULT for all feature (non-release) deliveries. The plugin version is bumped at release-time via `/th:release`, not per-PR. Only delivery `release-mode` (invoked by `/th:release`) re-enables the bump. Pass `skip-version: false` ONLY when explicitly running in `release-mode`.
+- **`skip-version`** — the shipped default is `false` (or omitted): delivery bumps the project version once per PR at assembly. Pass `skip-version: true` ONLY when this repository documents its own repo-local versioning/release deferral convention (team-harness does — its plugin version is bumped at release-time via `/th:release`, not per-PR; see `CLAUDE.md §6.3`). When a repo-local deferral is active, only delivery `release-mode` (invoked by the repo-local release tool) re-enables the bump.
 
 **Gate (status-block):** The delivery agent returns a compact status block. Handle each outcome:
 
@@ -3874,7 +3874,7 @@ The guarantee mirrors the KG passive-capture pattern in `agents/delivery.md` § 
 
 **DEFAULT behavior for 2+ tasks.** Whenever you have multiple tasks — from `/th:issue` batch, `/th:plan plan-and-execute`, user request for batch work, or your own breakdown of a broad scope — dispatch them using dependency analysis, parallel worktrees, and event-driven monitoring via hooks. You NEVER run multiple tasks sequentially in a single session.
 
-**Consolidation default — a same-repo task batch ships as ONE PR.** When the batch is single-repo, the default outcome is ONE consolidated PR: all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work (Step 5d). This is the default, not a special case — do NOT open one PR per batched task. This consolidation default and the milestone anti-split invariant ("a single task is never split across PRs," `agents/ref-special-flows.md § Milestone-Build Flow`) are the same rule read two ways: a task is never SPLIT across PRs, and a same-repo batch consolidates INTO one PR. The consolidated batch ships via the **same delivery flow** and the same PR lifecycle as a single task — the same `delivery` agent (Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge, `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path; the only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a), not a single task branch.
+**Consolidation default — a same-repo task batch ships as ONE PR.** When the batch is single-repo, the default outcome is ONE consolidated PR: all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work (Step 5d). This is the default, not a special case — do NOT open one PR per batched task. This consolidation default and the milestone anti-split invariant ("a single task is never split across delivery groups," `agents/ref-special-flows.md § Milestone-Build Flow`) are the same rule read two ways: a task is never SPLIT across delivery groups, and a same-repo batch consolidates INTO one PR. The consolidated batch ships via the **same delivery flow** and the same PR lifecycle as a single task — the same `delivery` agent (Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge, `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path; the only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a), not a single task branch. The version bumps once per this default; a consuming repo may declare its own repo-local deferral rule (a documented versioning/release convention delivery honors instead — see `agents/delivery.md § Step 9`).
 
 **Operator opt-out.** The operator — and only the operator — may request separate PRs by saying so ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open Task-N+1 only after Task-N lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
 
@@ -4117,11 +4117,11 @@ If any task in the batch had `security-sensitive: true`, invoke `security` (pipe
 git diff main...batch/{batch-name}-verify
 ```
 
-**5d. Run delivery (feature-mode — version bump deferred to release):**
+**5d. Run delivery (shipped default — version bumps once for the consolidated batch):**
 Invoke `delivery` with:
 - Feature name: the batch name
 - Summary: aggregated from all tasks
-- `skip-version: true` (DEFAULT — the plugin version is bumped at release-time via `/th:release`, not per batch delivery. The delivery agent will write a `changelog.d/` fragment covering all batch tasks. Only delivery `release-mode` re-enables the bump.)
+- `skip-version` — the shipped default is `false` (or omitted): delivery bumps the project version once, for the whole consolidated batch, at assembly. Pass `skip-version: true` ONLY when this repository documents its own repo-local versioning/release deferral convention (team-harness does — see `CLAUDE.md §6.3`); in that case the delivery agent writes a `changelog.d/` fragment covering all batch tasks instead, and only delivery `release-mode` re-enables the bump.
 - All branches are already merged into the verify branch
 
 The delivery agent will:
