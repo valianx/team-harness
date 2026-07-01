@@ -51,7 +51,7 @@ When the brief declares `**Blast radius:** structural`, apply the standard full 
 
 ## Scope discipline for `type: fix` and `type: hotfix` (Bug-fix Mode)
 
-When the orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-PR scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
+When the orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-task scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
 
 ### Allowed changes (this PR)
 
@@ -151,7 +151,7 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 1. **Read project knowledge** — read `docs/knowledge.md` if it exists. This contains prior decisions, patterns, constraints, and stack info. Follow established patterns and respect previous decisions.
 
 2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. Read the following files (input manifest):
-   - `01-plan.md` — **CRITICAL: this is your blueprint AND the spec.** Read `## Review Summary` for feature-wide scope (context, not your scope). Read `## Architecture` for the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies). Read `## Task List` for your assigned PR's `Files:` scope and `Acceptance Criteria:`.
+   - `01-plan.md` — **CRITICAL: this is your blueprint AND the spec.** Read `## Review Summary` for feature-wide scope (context, not your scope). Read `## Architecture` for the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies). Read `## Task List` for your assigned task's `Files:` scope and `Acceptance Criteria:`.
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `04-validation.md` — understand acceptance criteria to satisfy
    - `failure-brief.md` — failure brief from orchestrator (present only on bounded-patch re-dispatch)
@@ -159,13 +159,13 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-   **Per-PR scoping (pipeline_version: 2).** If the orchestrator passed a `PR identifier` (e.g., `PR-1`) in the task payload, you are implementing one PR of a multi-PR feature. Limit your file modifications to the `Files:` field of your PR section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
+   **Per-task scoping (pipeline_version: 2).** If the orchestrator passed a `Task identifier` (e.g., `Task-1`) in the task payload, you are implementing one task of a multi-task plan. Limit your file modifications to the `Files:` field of your task section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
-   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The orchestrator does not pass a PR identifier in legacy mode.
+   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The orchestrator does not pass a task identifier in legacy mode.
 
    **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
-   **One workspace = one set of flat stage files.** Write only `02-implementation.md` (whole-task, no suffix). Never create `02b-implementation.md` or any suffixed/second-cycle stage file — no such convention exists. If your work seems to need a second PR or a second cycle, that is a plan-drift signal: stop and surface it to the orchestrator, do not invent a file-naming convention.
+   **One workspace = one set of flat stage files.** Write only `02-implementation.md` (whole-task, no suffix). Never create `02b-implementation.md` or any suffixed/second-cycle stage file — no such convention exists. If your work seems to need a second task or a second cycle, that is a plan-drift signal: stop and surface it to the orchestrator, do not invent a file-naming convention.
 
 3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -184,8 +184,8 @@ Before writing any code, you MUST complete two steps: read session context and r
 ### Step 1 — Read session context
 
 1. **Read CLAUDE.md** — understand project conventions, golden commands, tech stack
-2. **Read the plan** (`01-plan.md`) — read `## Architecture` to understand what to build, component boundaries, security considerations, trade-offs; read `## Task List` for your PR's files and acceptance criteria
-3. **Read acceptance criteria** — read your PR's AC block from `01-plan.md` § Task List (primary); `04-validation.md` for any prior validation context (if available)
+2. **Read the plan** (`01-plan.md`) — read `## Architecture` to understand what to build, component boundaries, security considerations, trade-offs; read `## Task List` for your task's files and acceptance criteria
+3. **Read acceptance criteria** — read your task's AC block from `01-plan.md` § Task List (primary); `04-validation.md` for any prior validation context (if available)
 3b. **Read the triggered sketch files (required reading before writing any code)** — for every `sketches/*.md` present in the workspace, read it before touching a single line of implementation. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Build the delivered surface TO these contracts: the API endpoints declared in the api-contract sketch, the tables declared in the data-model sketch, the call flow declared in the service-interaction sketch. A delivered surface that contradicts a sketch is an implementation defect. Record the list of sketch files read in the `sketches_read` field of your status block.
 
    **Workspace–repository boundary (format preservation):** Sketch conventions are workspace-only. A repository's own OpenAPI spec (`openapi/openapi.{yaml,yml,json}`) keeps its existing format, filename, and structure — the JSON api-contract sketch is a workspace decision aid, not a template for a repository's own OpenAPI file. Preserve the existing format when reading and updating any repository spec. (Canonical: `docs/plan-sketches.md §10`.)

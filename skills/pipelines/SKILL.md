@@ -227,9 +227,9 @@ The Timeline section consumes these 11 event types from the JSONL trace:
 | `stage.gate` | `■ STAGE-GATE-{N} EMITTED at {ts} — verdict: {verdict}` (with `after_round` if `stage: 2`) |
 | `stage.gate.release` | `→ STAGE-GATE-{N} RELEASED at {ts} — decision: {decision}` |
 | `stage.gate.skipped` | `↷ STAGE-GATE-{N} SKIPPED at {ts} — reason: {reason}` (with `after_round`) |
-| `phase.end` where `phase` starts with `2-` | `▸ PR-{i} Phase 2 (implementer) — {duration}s — {status} — "{summary}"` |
-| `phase.end` where `phase` starts with `3-verify` | `▸ PR-{i} Phase 3 verify — {duration} — {status}` |
-| `phase.end` where `phase` starts with `3.5-` | `▸ PR-{i} Phase 3.5 acceptance-gate — {status} — "{summary}"` |
+| `phase.end` where `phase` starts with `2-` | `▸ Task-{i} Phase 2 (implementer) — {duration}s — {status} — "{summary}"` |
+| `phase.end` where `phase` starts with `3-verify` | `▸ Task-{i} Phase 3 verify — {duration} — {status}` |
+| `phase.end` where `phase` starts with `3.5-` | `▸ Task-{i} Phase 3.5 acceptance-gate — {status} — "{summary}"` |
 | `gate.pass` | `✓ {phase} verdict: pass — "{summary}"` |
 | `gate.fail` | `✗ {phase} verdict: fail — "{summary}"` |
 | `iteration.start` | `↻ ITERATION {iteration} START — {summary}` |
@@ -244,9 +244,9 @@ Other event types (`phase.start`, other `phase.end`) are read for grouping purpo
 - Events with the same `ts` value to the second are rendered in file order.
 - The renderer does NOT re-sort by parsed timestamp — file order is authoritative.
 
-### Concurrent PR grouping (round blocks)
+### Concurrent task grouping (round blocks)
 
-When Stage 2 is active and multiple PRs run in parallel within a round, the JSONL receives interleaved `phase.start` / `phase.end` events. The renderer groups these into a single **round block**:
+When Stage 2 is active and multiple tasks run in parallel within a round, the JSONL receives interleaved `phase.start` / `phase.end` events. The renderer groups these into a single **round block**:
 
 - **Round 1** opens at the first `stage.gate.release` with `stage: 1`.
 - **Round R+1** opens at each `stage.gate.release` with `stage: 2, after_round: R{R}`.
@@ -254,11 +254,11 @@ When Stage 2 is active and multiple PRs run in parallel within a round, the JSON
 
 Render each round as a single block:
 ```
-Round R{R} ({N} PRs, started {ts}, closed {ts}):
-  PR-1: Phase 2 → Phase 3 → Phase 3.5 → Phase 3.6 [duration / status per phase]
-  PR-2: Phase 2 → Phase 3 → ... ↻ ITERATION 1 → Phase 3 → ...
+Round R{R} ({N} tasks, started {ts}, closed {ts}):
+  Task-1: Phase 2 → Phase 3 → Phase 3.5 → Phase 3.6 [duration / status per phase]
+  Task-2: Phase 2 → Phase 3 → ... ↻ ITERATION 1 → Phase 3 → ...
 ```
-PRs within a round are listed in ascending PR identifier order, regardless of which finished first.
+Tasks within a round are listed in ascending task identifier order, regardless of which finished first.
 
 ### Formatting conventions
 
@@ -295,16 +295,16 @@ Current State
 -------------
   pipeline_version: 2 | phase: 6 | stage: 3 | status: complete
   autonomous: true | autonomous_granted_at: STAGE-GATE-1
-  iteration: 1/3 | total_rounds: 2 | prs_completed: [PR-1, PR-2, PR-3]
+  iteration: 1/3 | total_rounds: 2 | prs_completed: [Task-1, Task-2, Task-3]
 
 Agent Results
 -------------
 | Agent          | Phase                 | Status   | Summary                                     |
 |----------------|-----------------------|----------|---------------------------------------------|
 | orchestrator   | 0a-intake             | success  | feature classified standard, 8 AC           |
-| architect      | 1-design              | success  | 3 PRs, 11 AC                                |
-| implementer    | 2-implement (PR-1)    | success  | jwt issuance endpoint                       |
-| tester         | 3-verify (PR-3) iter 0| fail     | AC-3 null check missing in login.ts:42      |
+| architect      | 1-design              | success  | 3 tasks, 11 AC                              |
+| implementer    | 2-implement (Task-1)    | success  | jwt issuance endpoint                       |
+| tester         | 3-verify (Task-3) iter 0| fail     | AC-3 null check missing in login.ts:42      |
 
 Hot Context
 -----------
@@ -314,20 +314,20 @@ Timeline
 --------
 --- PIPELINE START at 13:58:14 ---
 ▸ Phase 0a intake — 12s — success
-▸ Phase 1 design (architect) — 2m 41s — success — "3 PRs, 11 AC"
+▸ Phase 1 design (architect) — 2m 41s — success — "3 tasks, 11 AC"
 ✓ Phase 1.5 ratify-plan verdict: pass — "11/11 AC covered"
 ✓ Phase 1.6 plan-review verdict: pass — "0 findings"
 ■ STAGE-GATE-1 EMITTED at 14:05:23 — verdict: pass
 → STAGE-GATE-1 RELEASED at 14:08:01 — decision: approved-autonomous
 
-Round R1 (2 PRs, started 14:08:02, closed 14:21:47):
-  PR-1: Phase 2 (1m 48s, success) → Phase 3 verify (2m 12s, pass) → Phase 3.5 (PASS) → Phase 3.6 (pass)
-  PR-2: Phase 2 (1m 21s, success) → Phase 3 verify (1m 55s, pass) → Phase 3.5 (PASS) → Phase 3.6 (skipped)
+Round R1 (2 tasks, started 14:08:02, closed 14:21:47):
+  Task-1: Phase 2 (1m 48s, success) → Phase 3 verify (2m 12s, pass) → Phase 3.5 (PASS) → Phase 3.6 (pass)
+  Task-2: Phase 2 (1m 21s, success) → Phase 3 verify (1m 55s, pass) → Phase 3.5 (PASS) → Phase 3.6 (skipped)
 
 ↷ STAGE-GATE-2 SKIPPED at 14:21:48 — reason: autonomous, after_round: R1
 
-Round R2 (1 PR, started 14:21:49, closed 14:31:02):
-  PR-3: Phase 2 (2m 04s, success) → Phase 3 verify (1m 47s, fail) ↻ ITERATION 1 START — "AC-3 missing null check"
+Round R2 (1 task, started 14:21:49, closed 14:31:02):
+  Task-3: Phase 2 (2m 04s, success) → Phase 3 verify (1m 47s, fail) ↻ ITERATION 1 START — "AC-3 missing null check"
         → Phase 2 (38s, success) → Phase 3 verify (1m 41s, pass) → Phase 3.5 (PASS) → Phase 3.6 (pass)
 
 ▸ Phase 4 delivery — 22s — success — "branch feat/auth-jwt, version 1.5"

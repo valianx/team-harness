@@ -31,7 +31,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** modify feature code — you only update docs, changelog, version, and commit
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
-- **NEVER** bump the version when the orchestrator passes `skip-version: true` in the task context. If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: orchestrator requested skip"
+- **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
 - **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: blocked`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
@@ -165,7 +165,7 @@ These flags affect Steps 2, 3, 10, and 11. All other steps run identically.
 
 **Always create a dedicated branch for the delivery commit. The base branch is always `main`, never a sibling branch. Stacked PRs (child branch off a parent PR's branch) are PROHIBITED — when a parent PR merges, GitHub automatically re-targets child PRs to the parent's base; under rapid serial merges this re-targeting is asynchronous and races the merge, silently losing commits (see https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches).**
 
-**Multi-PR plans (valid split reason from the closed list):** open and merge PRs serially — PR-N+1 opens only AFTER PR-N lands on `main`. Branch each subsequent PR from the updated `main` (`git checkout main && git pull --ff-only origin main && git checkout -b {branch}`). Before merging each PR after the first, rebase it on the current `main` (`git fetch origin && git rebase origin/main`) to incorporate all prior merges cleanly.
+**Multi-group deliveries (`§ Delivery Grouping` declares N > 1 groups with a valid split reason from the closed list):** open and merge PRs serially — group N+1's PR opens only AFTER group N's PR lands on `main`. Branch each subsequent group's PR from the updated `main` (`git checkout main && git pull --ff-only origin main && git checkout -b {branch}`). Before merging each PR after the first, rebase it on the current `main` (`git fetch origin && git rebase origin/main`) to incorporate all prior merges cleanly.
 
 **Step 3.1 — Check current branch:**
 - Run `git rev-parse --abbrev-ref HEAD` to get the current branch name.
@@ -417,26 +417,29 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 ### Step 9 — Version bump
 
-**Sole version-bump site.** Delivery is the ONLY agent that sets the project version. No implementer, inline, or orchestrator step may set or modify the plugin version (`plugin.json`, `marketplace.json`, or any equivalent version site). If a version change is detected in the diff that was not authored by this delivery run, flag it as an unauthorized bump and do NOT proceed with Step 9 until the unauthorized change is reverted or confirmed intentional by the operator. An over-bump above the mechanical SemVer floor (e.g., a MINOR applied to a PATCH-floor diff) requires a `bump-override: minor — <reason>` justification committed as a trailer in the PR body or as a git commit trailer, matching the prepublish-guard hard-deny token (see `hooks/prepublish-guard.sh` bump-floor sub-stage). Without that justification, the `prepublish-guard.sh` hook will deny the push at `git push` time.
+**Sole version-bump site.** Delivery is the ONLY agent that sets the project version. No implementer, inline, or orchestrator step may set or modify the project version (its version manifest, or any equivalent version site). If a version change is detected in the diff that was not authored by this delivery run, flag it as an unauthorized bump and do NOT proceed with Step 9 until the unauthorized change is reverted or confirmed intentional by the operator. An over-bump above the mechanical SemVer floor (e.g., a MINOR applied to a PATCH-floor diff) requires a `bump-override: minor — <reason>` justification committed as a trailer in the PR body or as a git commit trailer, matching the prepublish-guard hard-deny token (see `hooks/prepublish-guard.sh` bump-floor sub-stage). Without that justification, the `prepublish-guard.sh` hook will deny the push at `git push` time.
 
-**Feature-mode (default) vs release-mode:**
+**Shipped default vs repo-local deferral:**
 
 | Mode | Signal | Behavior |
 |------|--------|----------|
-| Feature-mode | `skip-version: true` (orchestrator default for all feature/batch deliveries) | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). If this change is a consumer-facing bump that produces no `changelog.d/` fragment (internal refactor), write a `version.d/{slug}.bump` marker (one line: `patch`, `minor`, or `major`) so the release step can include it. |
-| Release-mode | `release-mode: true` (passed by `/th:release` via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. |
+| **Per-PR bump (shipped default)** | no `skip-version` flag, or `skip-version: false` | Proceed with Step 9. Bump the project version once at assembly (min one, max one) and update the CHANGELOG directly (or via a `changelog.d/` fragment where that convention exists — see Step 9e). |
+| **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (e.g., team-harness's own `CLAUDE.md §6.3`) | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). If this change is a consumer-facing bump that produces no `changelog.d/` fragment (internal refactor), write a `version.d/{slug}.bump` marker (one line: `patch`, `minor`, or `major`) so the deferred release step can include it. |
+| **Deferred release cut (opt-in, NOT a shipped default)** | `release-mode: true` (passed by a repo-local release tool — e.g. team-harness's own `/th:release` — via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. |
 
-**`version.d/` marker discipline (feature-mode only).** Write `version.d/{slug}.bump` ONLY when ALL of the following are true:
+**Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true` and `release-mode: true` exist for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally.
+
+**`version.d/` marker discipline (repo-local-deferral mode only).** Write `version.d/{slug}.bump` ONLY when ALL of the following are true:
 1. The change reaches the consumer (it is not repo-internal docs/tests/CI only).
 2. No `changelog.d/` fragment is being written for this delivery (fragment-less internal bump).
 
-The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contains exactly one line: `patch`, `minor`, or `major`. The `version.d/` directory is tracked by git (not gitignored) so the release step on a fresh checkout sees the markers. Stage it in Step 10.0 alongside the changelog fragment.
+The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contains exactly one line: `patch`, `minor`, or `major`. The `version.d/` directory is tracked by git (not gitignored) so the deferred release step on a fresh checkout sees the markers. Stage it in Step 10.0 alongside the changelog fragment.
 
-**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump: SKIPPED (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
+**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
 
 **If the orchestrator passed `release-mode: true` → continue below through Step 9-R and then Steps 9.0–9e.**
 
-### Step 9-R — Release-mode bump-level discovery (runs ONLY when `release-mode: true`)
+### Step 9-R — Deferred release-cut bump-level discovery (runs ONLY when `release-mode: true`, a repo-local deferral convention)
 
 Before choosing the SemVer level in Step 9.2, aggregate pending fragments and markers:
 
@@ -462,20 +465,15 @@ Proceed to Step 9.0 with the derived level as the input to Step 9.2 (skip the gi
 
 ### Step 9.0 — Version sites (explicit enumeration)
 
-For repos that maintain version literals in multiple synchronized files, edit **each** of the following sites explicitly — do NOT rely on Glob-first-match, which structurally finds only one site and leaves the rest out of sync.
+For repos that maintain version literals in multiple synchronized files, edit **each** of the declared sites explicitly — do NOT rely on Glob-first-match, which structurally finds only one site and leaves the rest out of sync.
 
-**This repo's canonical version sites — mandatory for plugin-asset changes (`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` + `CLAUDE.md §3`):**
-
-| Site | File | Field / location |
-|------|------|-----------------|
-| Plugin manifest | `.claude-plugin/plugin.json` | `"version"` field |
-| Marketplace entry | `.claude-plugin/marketplace.json` | `plugins[0].version` — the per-plugin version inside the `plugins` array |
-| CLAUDE.md §3 | `CLAUDE.md` | `**Current version:** \`X.Y.Z\`` line |
-| Go installer | `cmd/install/main.go` | `var version = "X.Y.Z"` literal — **legacy-installer** anchor; update only on installer releases, NOT on plugin-asset-only changes |
-| CHANGELOG.md | `CHANGELOG.md` | Release heading `## [X.Y.Z] - YYYY-MM-DD` (cut in Step 9e, not part of the synchronized "sites" set) |
+**Site discovery order:**
+1. If `01-plan.md § Review Summary` declares a `### Multi-site invariants` block for a version-bump invariant, use that as the authoritative site list for this delivery (Step 9.4a below verifies all declared sites match).
+2. Else, if the consuming repository documents its own canonical multi-site version table in `CLAUDE.md` or an equivalent contributor doc (a repo-local convention — e.g. team-harness's own three-site table is documented in its `CLAUDE.md §6.3`), follow that table.
+3. Else, fall back to Step 9.1's Glob-first-match (appropriate when the repo has only one version file).
 
 **FENCED OFF — do NOT touch:**
-The top-level `"version"` field in `.claude-plugin/marketplace.json` (value `"1.1.0"`) is the schema/format version of the marketplace document, not the plugin version. It is a different field from `plugins[0].version`. Never modify the schema version.
+A top-level schema/format-version field of a manifest or registry file (distinct from the project's own version field) is never a version-bump site. Confirm which field a declared site's "version" key actually names before editing it.
 
 For other project types (Node, Python, Rust, etc.) that do not maintain multiple synchronized version sites, proceed directly to Step 9.1 (Glob-first-match is appropriate when there is only one version file).
 
@@ -754,9 +752,9 @@ Do NOT stage unrelated files.
 
 **If `has_gh: false`:** do NOT skip. Use the Tier B fallback chain from `agents/_shared/gh-fallback.md` § "Tier B — write that needs auth". When neither `gh` nor a token is available, emit the compare URL and body file and report `status: blocked-manual-push` (see Return Protocol).
 
-**Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For multi-PR plans, follow the serial-merge contract: open PR-N+1 only after PR-N is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
+**Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For a multi-group `§ Delivery Grouping`, follow the serial-merge contract: open group N+1's PR only after group N's PR is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
 
-**One approved Task List = one PR set.** Open only the PR(s) declared in the approved `01-plan.md § Task List`. Never open an additional PR that is not in the approved set (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orchestrator post-approval-division rule).
+**One approved Task List = one delivery per `§ Delivery Grouping`.** Open only the PR(s) declared by the approved `01-plan.md § Task List` → `§ Delivery Grouping` (default: all tasks ship as ONE PR). Never open an additional PR that is not covered by the approved grouping (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orchestrator post-approval-division rule).
 
 **Step 11.0 — Check for existing PR:**
 

@@ -7,6 +7,8 @@ Analyze the input: $ARGUMENTS
 
 ---
 
+**Team-harness-internal release tooling.** This skill hardcodes team-harness's own three plugin version sites and its `changelog.d/`/`version.d/` deferred-batch model (see `CLAUDE.md §6.3`, `docs/cost-and-caching.md`). It is NOT part of the shipped default delivery flow — a consuming repository's per-PR delivery bumps its own project version directly and never invokes this skill.
+
 ## What this skill does
 
 `/th:release` cuts a plugin release by:

@@ -83,7 +83,7 @@ STAGE-GATE-1 and `plan-reviewer` Rule 11 can audit consistency.
 
 | Sketch | Trigger | Format | Tool | Fidelity ceiling | Representation ceiling | Home |
 |--------|---------|--------|------|-----------------|----------------------|------|
-| Functional acceptance criteria | always | Given/When/Then text | none | per-PR AC, no implementation detail | markdown | collapses into `01-plan.md § Task List` per-PR AC block (no standalone file) |
+| Functional acceptance criteria | always | Given/When/Then text | none | per-task AC, no implementation detail | markdown | collapses into `01-plan.md § Task List` per-task AC block (no standalone file) |
 | Non-functional notes | always | bullet list (auth, perf, rate-limit, errors; a11y if frontend) | none | bullets only, no design | markdown | collapses into `01-plan.md § Architecture` Security/Performance Assessment (no standalone file) |
 
 The two always-sketches collapse into existing surfaces and are NOT separate files.
@@ -202,7 +202,7 @@ also see the classification block and the diff signal. The check is `concerns`-s
 | Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness per-project (shape-only, fail-OPEN parity); each project's block audited independently in multi-project dispatch |
 | STAGE-GATE-1 | orchestrator | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
 | Stage 2 Implementation | implementer | **Required reading:** reads every triggered `sketches/*.md` file (or consolidated `{overview_root}/sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
-| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*.md` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-PR AC; emits `sketches_read` in status block |
+| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*.md` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-task AC; emits `sketches_read` in status block |
 | Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*.md` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
 | Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `sketches/*.md` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
 | Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `sketches/*.md` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `{overview_root}/sketches/` paths in multi-project workspaces |
@@ -226,7 +226,7 @@ also see the classification block and the diff signal. The check is `concerns`-s
 
 | Artifact | Carries | Lifecycle | Handoff rule |
 |----------|---------|-----------|-------------|
-| `00-spec-seed.md` | Functional INTENT from E2 co-authoring (developer's settled intent, dissent record) | Produced pre-Design; a strong prior | The functional-acceptance sketch (per-PR AC) DERIVES from the spec-seed's functional surface when a seed exists |
+| `00-spec-seed.md` | Functional INTENT from E2 co-authoring (developer's settled intent, dissent record) | Produced pre-Design; a strong prior | The functional-acceptance sketch (per-task AC) DERIVES from the spec-seed's functional surface when a seed exists |
 | `sketches/*.md` | Result CONTRACTS (checkable: what API, what tables, what payload) | Produced by architect in Design, alongside `01-plan.md` | Conditional sketches (API/UI/data/...) have NO spec-seed counterpart; they stand alone. No duplication: the seed states intent in prose, the sketch states the contract in a fixed shape. |
 
 **When a spec-seed exists**, the architect adds a one-line provenance note to the

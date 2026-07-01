@@ -178,7 +178,7 @@ lookup rather than a search:
 ```
 
 ```markdown
-# in 01-plan.md ## Task List / PR-1 block
+# in 01-plan.md ## Task List / Task-1 block
 - **Worktree:** `<path>` — branch `<branch>`, base `<base>`
 ```
 

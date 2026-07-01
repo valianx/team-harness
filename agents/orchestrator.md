@@ -189,7 +189,7 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
 | 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
 | 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — |
-| STAGE-GATE-2 | human (skippable if autonomous) | between PRs | next / stop | default STOP |
+| STAGE-GATE-2 | human (skippable if autonomous) | between tasks | next / stop | default STOP |
 | 4 — Delivery | `delivery` | all workspaces | branch + commit | — |
 | **STAGE-GATE-3** | **human** | PR ready | ship / amend / abort | **MANDATORY STOP** |
 | 5 — GitHub Update | orchestrator | PR | issue comment + board update | — |
@@ -591,8 +591,8 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - autonomous_granted_at: {STAGE-GATE-1 | STAGE-GATE-2-after-round-R{N} | null}
 - current_round: {R1 | R2 | ... | null}      # null outside Stage 2
 - total_rounds: {N | null}                   # null outside Stage 2
-- prs_in_current_round: {[PR-1, PR-2, ...] | null}
-- prs_completed: {[PR-1, ...] | []}          # cumulative across rounds
+- prs_in_current_round: {[Task-1, Task-2, ...] | null}
+- prs_completed: {[Task-1, ...] | []}          # cumulative across rounds
 - last_completed: {phase-name}
 - next_action: {what to do next}
 - regression_test_path: {path | null}        # set at Phase 2.0 (type: fix | hotfix); null otherwise
@@ -643,14 +643,14 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
      Skipping a phase without marking it [x] or [~skipped: reason] is a contract violation.
      Phases 2.0, 2.5, 4.5, and STAGE-GATE-2 are tracked via JSONL events only
      (phase.start/phase.end) and are not top-level checklist rows — they are conditional
-     or inter-PR phases. Phase 2.7 is a top-level row (it has an explicit mark instruction). -->
+     or inter-task phases. Phase 2.7 is a top-level row (it has an explicit mark instruction). -->
 - [ ] 0a — Intake (classify, create workspaces)
 - [ ] 0b — Specify (investigate codebase, build/verify AC)
 - [ ] 1 — Design (architect → 01-plan.md)
 - [ ] 1.5 — Plan Ratification (qa validates AC)
 - [ ] 1.6 — Plan Review (plan-reviewer audits plan shape)
 - [ ] STAGE-GATE-1 — Human review (mandatory stop)
-- [ ] 2 — Implement (per PR)
+- [ ] 2 — Implement (per task)
 - [ ] 2.7 — Test Authoring (tester authoring mode)
 - [ ] 3 — Verify (tester + qa + security in parallel)
 - [ ] 3.5 — Acceptance Gate
@@ -755,15 +755,15 @@ If no GitHub data is present (plain text task from user), proceed normally witho
 
 ```
 +================ STAGE 1 ================+   +============= STAGE 2 =============+   +======== STAGE 3 ========+
-| 0a Intake                                |   | 2 Implement (per PR)              |   | 4 Delivery               |
+| 0a Intake                                |   | 2 Implement (per task)            |   | 4 Delivery               |
 | 0b Specify                               |   | 2.5 Reconcile (constraints)       |   | 4.5 Internal Review      |
 | 1 Design (architect) → 01-plan.md        |   | 3 Verify (test/qa/security)       |   | (reviewer agent)         |
-|   (architecture + task list merged)      |   | 3.5 Acceptance Gate (per PR)      |   | 5 GitHub Update          |
+|   (architecture + task list merged)      |   | 3.5 Acceptance Gate (per task)    |   | 5 GitHub Update          |
 | 1.5 Plan Ratification (qa)               |   | 3.6 Acceptance Check (external)   |   | 6 KG Save                |
 | 1.6 Plan Review (plan-reviewer) — NEW    |   +-----------------------------------+   +--------------------------+
 +==========================================+              |                                    |
                 |                                          v                                    v
-                v                              STAGE-GATE-2 (between PRs)            STAGE-GATE-3 (mandatory)
+                v                              STAGE-GATE-2 (between tasks)          STAGE-GATE-3 (mandatory)
         STAGE-GATE-1 (mandatory)               default: STOP for human;              human approves "ship" /
         plan-reviewer verdict → STOP for       autonomous mode (from GATE-1):        "amend" / "abort"
         human review. Reply with:              skip silently.                        BEFORE Phase 5 push.
@@ -780,18 +780,18 @@ If no GitHub data is present (plain text task from user), proceed normally witho
                                                         * only if security-sensitive
 ```
 
-**Stages and phases.** The 7 existing phases are unchanged in semantics; the orchestrator now also groups them into three **stages** with mandatory human checkpoints (STAGE-GATEs) at the close of Stage 1 and Stage 3, and a default-on (autonomous-skippable) checkpoint between PRs in Stage 2. Stages are the governance unit; phases stay the operational unit.
+**Stages and phases.** The 7 existing phases are unchanged in semantics; the orchestrator now also groups them into three **stages** with mandatory human checkpoints (STAGE-GATEs) at the close of Stage 1 and Stage 3, and a default-on (autonomous-skippable) checkpoint between tasks in Stage 2. Stages are the governance unit; phases stay the operational unit.
 
 | Stage | Phases | Closing gate | Skippable in autonomous? |
 |-------|--------|--------------|--------------------------|
 | **Stage 1 — Analysis** | 0a Intake, 0b Specify, 1 Design, 1.5 Plan Ratification, **1.6 Plan Review (NEW)** | STAGE-GATE-1 | **No** |
-| **Stage 2 — Implementation** | 2 Implement, 2.5 Reconcile, 3 Verify, 3.5 Acceptance Gate, 3.6 Acceptance Check | STAGE-GATE-2 (between PRs only) | **Yes** (between PRs only, if user said `approve autonomous` at GATE-1) |
+| **Stage 2 — Implementation** | 2 Implement, 2.5 Reconcile, 3 Verify, 3.5 Acceptance Gate, 3.6 Acceptance Check | STAGE-GATE-2 (between tasks only) | **Yes** (between tasks only, if user said `approve autonomous` at GATE-1) |
 | **Stage 3 — Delivery** | 4 Delivery, 4.5 Internal Review, 5 GitHub Update, 6 KG Save | STAGE-GATE-3 | **No** |
 
 **Pipeline version field.** Pipelines created by this orchestrator set `pipeline_version: 2` in `00-state.md` at Phase 0a (Intake). Pipelines with `pipeline_version: 1` or missing the field are pre-refactor — the orchestrator detects this at Phase 1.6 entry, logs one warning line `pipeline_version<2 detected — skipping Phase 1.6 and STAGE-GATE-1 (legacy)`, and proceeds to Stage 2 with the legacy contract. New pipelines ALWAYS write the field.
 
 **MANDATORY — FULL PIPELINE BY DEFAULT:**
-Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify (tester + qa in parallel) → Acceptance Gate → STAGE-GATE-2 (between PRs) → Delivery → Internal Review → STAGE-GATE-3 → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The ONLY reason to skip a phase is if the user explicitly asks for it. STAGE-GATE-1 and STAGE-GATE-3 are mandatory even when the user grants autonomy — autonomy is granted AT a gate, not before it, and Stage 3 push is irreversible. Research and spike have their own flows — see Special Flows.
+Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify (tester + qa in parallel) → Acceptance Gate → STAGE-GATE-2 (between tasks) → Delivery → Internal Review → STAGE-GATE-3 → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The ONLY reason to skip a phase is if the user explicitly asks for it. STAGE-GATE-1 and STAGE-GATE-3 are mandatory even when the user grants autonomy — autonomy is granted AT a gate, not before it, and Stage 3 push is irreversible. Research and spike have their own flows — see Special Flows.
 
 ---
 
@@ -993,7 +993,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
    - "Review this PR / revisa el PR #N / @th:orchestrator review PR" → `/th:review-pr` skill flow (read-only, auto-route). DISTINCT from `plan-review` (which audits a design artifact, not a GitHub PR) and from `full pipeline` (the PR already exists — no new development pipeline). The orchestrator routes to the skill flow and does NOT bare-dispatch the `reviewer` agent; the skill flow manages worktree, tier classification, behavioral verification, multi-reviewer panel, consolidation, and atomic submission. This is a **hard trigger**: do NOT improvise an inline review, do NOT review the primary working tree, and do NOT substitute the currently checked-out branch as the PR. If the PR head cannot be resolved from GitHub, STOP and surface `cannot reach PR — authenticate or paste the diff` (see `agents/_shared/gh-fallback.md` § "Tier A — read a single PR" → STOP-on-access-failure contract). The binding is prompt-level, not a deterministic gate — the host native agent-selector residual at line 166 still applies.
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
-   - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/PR-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
+   - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/Task-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
    - "Apply the review comments on PR #N / incorporá los comentarios del review" → `apply-review` direct mode (AUTHOR side — incorporate reviewer comments into the PR's code under the conservative disposition). DISTINCT from `review` / `/th:review-pr` (REVIEWER side — produce a review of a PR, no code change) and from `full pipeline` (the PR already exists; this incorporates comments, it does not start new development). The `apply-review` direct mode is the explicit, deterministic complement to the orchestrator's automatic lifecycle-bound apply-review handling.
    - **Diagram engine disambiguation** — Three diagram engines are available. "D2 / diagrama D2 / D2 diagram / dot" → `d2-diagram` mode (D2 graph language, structural diagrams). "LikeC4 / C4 / architecture-as-code / diagrama C4" → `likec4-diagram` mode (LikeC4 architecture views). Generic "diagrama / diagram / visualizar arquitectura" → `diagram` mode (Excalidraw, DEFAULT — use when no engine is specified). The `diagram` (Excalidraw) route is the default; engine-specific routes are additive and take precedence when the engine name is mentioned.
 
@@ -1316,7 +1316,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - Verify these prerequisites exist: `CLAUDE.md`, `CHANGELOG.md`, `.gitignore` with `/workspaces` entry
    - If ANY is missing → invoke `init` agent via Task tool before continuing
    - If all exist → proceed normally
-9. **Multi-task detection (MANDATORY — default to batch)** — evaluate whether this work can be parallelized. **Batch (Multi-Task Orchestration) is the preferred execution mode whenever possible.** Jump to it if ANY of these is true:
+9. **Decomposition analysis (MANDATORY — always run, never skipped)** — evaluate whether this scope comprises N independent tasks. Skipping this analysis is a defect, regardless of the outcome. Three valid outcomes: **(1)** one atomic task → single pipeline run (a valid RESULT of running the analysis, not a bypass of it — see "When NOT to batch" below); **(2)** N independent tasks → Multi-Task Orchestration (parallel worktrees), consolidating into ONE PR by default; **(3)** one cohesive-but-oversized task → SURFACE it to the operator (a `### Decisions for human review` item or a STAGE-GATE STOP) rather than force a split. This analysis is mandatory at every level, including each per-project lane's own Stage-1 architect analysis in a multi-project initiative (§ Parallel Multi-Project Dispatch). **Decomposition vs division:** decomposition (this step) identifies whether a scope is N independent tasks — always run, autonomous, and outcome (2) consolidates into ONE PR. Division — fragmenting ONE task's plan/implementation across multiple workspaces/PRs/stage-cycles — is never autonomous; see `agents/ref-special-flows.md § Operator-authority invariant`. Identifying independent tasks is not dividing a task. **Batch (Multi-Task Orchestration) is the preferred execution mode whenever possible.** Jump to it if ANY of these is true:
    - Multiple issues were received (batch from `/th:issue`)
    - User explicitly requests batch, parallel, or multi-task execution
    - The task description decomposes into 2+ deliverables (even if user didn't say "batch")
@@ -1326,9 +1326,9 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    
    **Default: plan first, then batch.** If the scope is non-trivial (more than a single-file change), run Phase 0b (Specify) → Phase 1 (Design in planning mode) to produce a task breakdown in `01-planning.md`, then jump to **Multi-Task Orchestration** with the resulting tasks. This is the `plan-and-execute` flow — you do NOT need `/th:plan` to trigger it.
    
-   **Rule: Parallel dispatch is the DEFAULT for 2+ tasks.** You never run multiple tasks sequentially in a single session. If you have multiple tasks, you ALWAYS use Multi-Task Orchestration (worktrees + tmux). The only exception is a round with exactly 1 task (optimization: run in current session).
+   **Rule: Parallel dispatch is the DEFAULT for 2+ tasks (single-project scope, ungated by a parallelism confirm).** You never run multiple tasks sequentially in a single session. If you have multiple tasks, you ALWAYS use Multi-Task Orchestration (worktrees + tmux). The only exception is a round with exactly 1 task (optimization: run in current session). This rule is distinct from the multi-PROJECT initiative fan-out gate (§ Parallel Multi-Project Dispatch), which is scoped to ≥2 projects and is confirm-gated — do not confuse the two axes.
    
-   **When NOT to batch:** Only run as a single pipeline when the task is clearly a single, focused change (one file, one behavior, ≤3 AC) with no opportunity for parallelism.
+   **When NOT to batch (outcome 1 of the decomposition analysis above — a valid result, not a bypass):** run as a single pipeline when the task is clearly a single, focused change (one file, one behavior, ≤3 AC) with no opportunity for parallelism. The analysis was still run; it concluded "one atomic task."
 10. **If type is `spike`**, jump to **Spike Flow** in Special Flows section.
 10b. **If type is `docs`**, jump to **Documentation Flow** in Special Flows section (`ref-special-flows.md` § Documentation Flow). This flow has its own phase structure (0 → 1 → 2a → 2b → 3 → DOC-GATE) and does not use the standard development pipeline. Multi-topic requests are handled via parallel dispatch within the Documentation Flow.
 11. **Test-pipeline auto-detection (MANDATORY)** — if the user request matches ANY of these patterns, route to `test-pipeline` mode (see `ref-special-flows.md` § Test Pipeline Flow). Do NOT use the `test` direct mode for these:
@@ -1550,19 +1550,19 @@ If any check fails (except ambiguities), fix it in-place in the payload. This is
 
 **Do NOT read `01-plan.md`, `01-root-cause.md` on happy path.** Trust the status block for success cases. The implementer will read them directly.
 
-**Single-file output (Stage 1 contract).** In Design Mode, the architect produces ONE file: `01-plan.md` (merged architecture proposal with Work Plan + task list with per-PR acceptance criteria in Given/When/Then format). In Root-Cause mode (`type: fix`), the architect produces `01-root-cause.md` AND `01-plan.md` (typically 1 PR in § Task List). Both files are required for STAGE-GATE-1 in fix mode; only `01-plan.md` in feature mode. The architect's prompt and `agents/architect.md` document this contract. If the status block reports `01-plan.md` is missing, request the architect to produce it before advancing — Phase 1.6 (Plan Review) requires it.
+**Single-file output (Stage 1 contract).** In Design Mode, the architect produces ONE file: `01-plan.md` (merged architecture proposal with Work Plan + task list with per-task acceptance criteria in Given/When/Then format). In Root-Cause mode (`type: fix`), the architect produces `01-root-cause.md` AND `01-plan.md` (typically 1 task in § Task List). Both files are required for STAGE-GATE-1 in fix mode; only `01-plan.md` in feature mode. The architect's prompt and `agents/architect.md` document this contract. If the status block reports `01-plan.md` is missing, request the architect to produce it before advancing — Phase 1.6 (Plan Review) requires it.
 
-**Work Plan:** The architect's `01-plan.md` (§ Architecture → `### Work Plan`) includes a structured section with ordered implementation steps, files to modify, actions, and dependencies. Every file in this Work Plan must appear in the `Files:` field of some PR in `01-plan.md` (§ Task List) — the plan-reviewer (Phase 1.6, Rule 4) cross-checks this.
+**Work Plan:** The architect's `01-plan.md` (§ Architecture → `### Work Plan`) includes a structured section with ordered implementation steps, files to modify, actions, and dependencies. Every file in this Work Plan must appear in the `Files:` field of some task in `01-plan.md` (§ Task List) — the plan-reviewer (Phase 1.6, Rule 4) cross-checks this.
 
 **Report to user:**
-```
+```text
 Design complete
-  architect produced the design proposal and the per-PR task list ({N} PRs, {M} ACs total)
+  architect produced the design proposal and the per-task list ({N} tasks, {M} ACs total)
   {summary from status block}
 Next: ratify the plan (qa checks every AC has a Work Plan step)
 ```
 
-**Rewrite TL;DR** (row 3 of §5.2): `Now`: "Phase 1.5 plan-ratification running (qa checking AC coverage)." `Last`: "Phase 1 architect proposed {N} PRs across {M} services with {K} AC." `Next`: "Phase 1.6 plan-reviewer, then STAGE-GATE-1." `Open issues`: any `[CONSTRAINT-DISCOVERED]` annotations.
+**Rewrite TL;DR** (row 3 of §5.2): `Now`: "Phase 1.5 plan-ratification running (qa checking AC coverage)." `Last`: "Phase 1 architect proposed {N} tasks across {M} services with {K} AC." `Next`: "Phase 1.6 plan-reviewer, then STAGE-GATE-1." `Open issues`: any `[CONSTRAINT-DISCOVERED]` annotations.
 
 ### Defect-aware KG enrichment (Phase 1 end / Phase 1.5 entry)
 
@@ -1602,7 +1602,7 @@ Append a `phase.start` event to `{docs_root}/{events_file}`:
 - workspaces path: {resolved_workspaces_path}
 - Mode: `enrich`
 - Pointer to `01-plan.md` (architect's design proposal and task list)
-- Instruction: "Read `01-plan.md`. Identify all UI-facing changes. Write `01-ux-review.md` with recommended UI/UX AC additions and findings. **Pin the recommended AC into `01-plan.md` § Task List** (append to the per-PR AC block using Given/When/Then format) in addition to writing them in `01-ux-review.md`. The gate source-of-truth for all AC is `01-plan.md § Task List` — AC that live only in `01-ux-review.md` will not be tested by the acceptance gate."
+- Instruction: "Read `01-plan.md`. Identify all UI-facing changes. Write `01-ux-review.md` with recommended UI/UX AC additions and findings. **Pin the recommended AC into `01-plan.md` § Task List** (append to the per-task AC block using Given/When/Then format) in addition to writing them in `01-ux-review.md`. The gate source-of-truth for all AC is `01-plan.md § Task List` — AC that live only in `01-ux-review.md` will not be tested by the acceptance gate."
 
 **Gate (status-block):** If `status: success` → update `00-state.md`, proceed to Phase 1.5. If `status: failed` or `status: blocked` → log the issue and proceed to Phase 1.5 (ux-reviewer enrich is non-blocking; its absence does not stop the pipeline — the pipeline continues without UI/UX AC).
 
@@ -1676,7 +1676,7 @@ Routing to architect to revise Work Plan
 
 **Agent:** `plan-reviewer`
 
-**Why this phase exists.** Phase 1.5 (ratify-plan) checks that the Work Plan covers every AC — *substance* coverage. Phase 1.6 checks that the Stage 1 deliverable (`01-plan.md`) conforms to the team's *plan-shape rules*: one PR per service (unless a temporal-prod reason is cited), per-PR ACs in Given/When/Then format, consolidated documents (no version markers, strikethrough, "previously decided", inline changelogs), Work Plan coverage in the Task List, and service identity. This is what the human at STAGE-GATE-1 expects to see before reading the plan; the audit is mechanical and deterministic so the human only reviews plans that already meet the contract.
+**Why this phase exists.** Phase 1.5 (ratify-plan) checks that the Work Plan covers every AC — *substance* coverage. Phase 1.6 checks that the Stage 1 deliverable (`01-plan.md`) conforms to the team's *plan-shape rules*: Delivery Grouping (default `all-tasks-one-pr`, unless a temporal-prod reason is cited for a split), per-task ACs in Given/When/Then format, consolidated documents (no version markers, strikethrough, "previously decided", inline changelogs), Work Plan coverage in the Task List, and service identity. This is what the human at STAGE-GATE-1 expects to see before reading the plan; the audit is mechanical and deterministic so the human only reviews plans that already meet the contract.
 
 **Skip condition.** If `pipeline_version` in `00-state.md` is `1` or absent, log `pipeline_version<2 detected — skipping Phase 1.6 and STAGE-GATE-1 (legacy)`, skip directly to Phase 2 with the legacy contract. New pipelines (`pipeline_version: 2`) ALWAYS run this phase.
 
@@ -1733,7 +1733,7 @@ Next: STAGE-GATE-1 (human approval required)
 If `verdict: fail` and routing to architect:
 ```
 Plan review — verdict: fail
-  Blocking rules: {rule-1 | rule-2} — {short reason per affected PR}
+  Blocking rules: {rule-1 | rule-2} — {short reason per affected task}
 Routing to architect to revise plan (iteration {N}/3)
 ```
 
@@ -1762,7 +1762,7 @@ fi
 ```
 > **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, the idempotency `python3` command reads through the `.md` wrapper. Wrap the file read with the `events_content` extraction pattern before piping to the JSON parse (see `## Content extraction for dual-format events file`).
 
-**Rewrite TL;DR** (row 5 of §5.2): On `pass` or `concerns`: `Now`: "STAGE-GATE-1 about to emit." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: any concerns (rules 3/4/5/6 hits, if any). On `fail`: `Now`: "Architect revising plan (iter N/3) — rules {1, 2} failing." `Open issues`: failing rule numbers and affected PRs.
+**Rewrite TL;DR** (row 5 of §5.2): On `pass` or `concerns`: `Now`: "STAGE-GATE-1 about to emit." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: any concerns (rules 3/4/5/6 hits, if any). On `fail`: `Now`: "Architect revising plan (iter N/3) — rules {1, 2} failing." `Open issues`: failing rule numbers and affected tasks.
 
 ### Plan-review panel centralization contract
 
@@ -1845,7 +1845,7 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
   render "Confidence: not stated". The band MUST appear on every plan
   presentation; never omit it.}
 
- ── PR Summary ─────────────────────────
+ ── Task Summary ────────────────────────
  {verbatim contents of ### Summary table from 01-plan.md (§ Task List), rendered compactly}
 
  Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)
@@ -1880,8 +1880,8 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
 
 | Reply | Action |
 |---|---|
-| `approve` | Set `autonomous: false` and `gate1_release: approved` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 fires between PRs. |
-| `approve autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, and `gate1_release: approved-autonomous` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved-autonomous`. Proceed to Phase 2 for PR-1. STAGE-GATE-2 is silently skipped between PRs. |
+| `approve` | Set `autonomous: false` and `gate1_release: approved` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved`. Proceed to Phase 2 for Task-1. STAGE-GATE-2 fires between tasks. |
+| `approve autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, and `gate1_release: approved-autonomous` in `00-state.md`. Append `stage.gate.release` event with `stage: 1, decision: approved-autonomous`. Proceed to Phase 2 for Task-1. STAGE-GATE-2 is silently skipped between tasks. |
 | `reject {reason}` | Set `gate1_release: rejected` in `00-state.md`. Route back to architect with the user's reason. Re-run Phase 1 → 1.5 → 1.6 → STAGE-GATE-1. Iteration counts toward the architect's max-3 budget. |
 | `edit` | Set `gate1_release: edit` in `00-state.md`. Pause. Wait for the user to edit `01-plan.md` manually. On the user's next `approve`, re-run Phase 1.6 (plan-reviewer) before re-emitting STAGE-GATE-1 (the user's edits could violate the rules). |
 
@@ -1889,11 +1889,11 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
 
 **JSONL trace:** append `stage.gate` event with `stage: 1, verdict: {pass|concerns|fail}` when the gate fires; append `stage.gate.release` with `stage: 1, decision: {approved|approved-autonomous|rejected|edit}` when the user replies.
 
-**Schema update in `00-state.md`:** under `## Current State`, add fields `autonomous: true|false` and `autonomous_granted_at: STAGE-GATE-1 | STAGE-GATE-2-after-PR-{N} | null`. `compaction` recovery and `/th:recover` must preserve these.
+**Schema update in `00-state.md`:** under `## Current State`, add fields `autonomous: true|false` and `autonomous_granted_at: STAGE-GATE-1 | STAGE-GATE-2-after-Task-{N} | null`. `compaction` recovery and `/th:recover` must preserve these.
 
 **Rewrite TL;DR when STAGE-GATE-1 emits** (row 6 of §5.2): `Now`: "STAGE-GATE-1 emitted at {HH:MM}, waiting for human." `Last`: "Phase 1.6 combined verdict: {pass|concerns|fail}." `Next`: "Waiting for human approve/reject/edit/approve autonomous." `Open issues`: concerns listed (or "none" on pass).
 
-**Rewrite TL;DR when STAGE-GATE-1 is released** (row 7 of §5.2): On `approve`: `Now`: "Phase 2 starting for PR-1 in Round 1." `Last`: "STAGE-GATE-1 released with approve (interactive) — Combined verdict was {pass|concerns}." `Next`: "Phase 2 implementer, then Phase 3 verify." On `approve autonomous`: `Last`: "STAGE-GATE-1 released with approve autonomous — STAGE-GATE-2 will be skipped." On `reject`/`edit`: update `Now` and `Next` to reflect the routing back to architect.
+**Rewrite TL;DR when STAGE-GATE-1 is released** (row 7 of §5.2): On `approve`: `Now`: "Phase 2 starting for Task-1 in Round 1." `Last`: "STAGE-GATE-1 released with approve (interactive) — Combined verdict was {pass|concerns}." `Next`: "Phase 2 implementer, then Phase 3 verify." On `approve autonomous`: `Last`: "STAGE-GATE-1 released with approve autonomous — STAGE-GATE-2 will be skipped." On `reject`/`edit`: update `Now` and `Next` to reflect the routing back to architect.
 
 **For `type: fix` and `type: hotfix`:** the next phase after STAGE-GATE-1 release is **Phase 2.0 — Regression Test Authoring** (see below), not Phase 2 directly. The implementer is dispatched only after the failing regression test exists.
 
@@ -1966,54 +1966,54 @@ Next: implementation
 
 **Agent:** `implementer`
 
-### Mirror PR-level progress into `01-plan.md`
+### Mirror task-level progress into `01-plan.md`
 
-Every state transition on a PR mirrors into the `**Status:**` field of that PR's section in `01-plan.md` (§ Task List). This keeps the task list self-describing — a reader opening the file sees current progress without cross-referencing `00-state.md`. The mirror is mandatory at each transition listed below; missing it leaves the task list stale and breaks the self-describing contract.
+Every state transition on a task mirrors into the `**Status:**` field of that task's section in `01-plan.md` (§ Task List). This keeps the task list self-describing — a reader opening the file sees current progress without cross-referencing `00-state.md`. The mirror is mandatory at each transition listed below; missing it leaves the task list stale and breaks the self-describing contract.
 
-| PR transition | New `Status:` value | Mirrors into `00-state.md` |
+| Task transition | New `Status:` value | Mirrors into `00-state.md` |
 |---|---|---|
-| PR enters Phase 2 (implementer invoked for this PR) | `in-progress` | added to `prs_in_current_round` |
-| PR's Phase 3.5 acceptance gate returns PASS | `verified` | (no mirror — internal milestone) |
-| PR's Phase 4 delivery completes (commit pushed, PR opened) | `merged` | added to `prs_completed` |
-| PR blocked by `[CONSTRAINT-DISCOVERED]` or unsatisfied hard dependency | `blocked` | reflected in `Blockers:` section of `00-state.md` |
+| Task enters Phase 2 (implementer invoked for this task) | `in-progress` | added to `prs_in_current_round` |
+| Task's Phase 3.5 acceptance gate returns PASS | `verified` | (no mirror — internal milestone) |
+| Task's Phase 4 delivery completes (commit pushed, PR opened) | `merged` | added to `prs_completed` |
+| Task blocked by `[CONSTRAINT-DISCOVERED]` or unsatisfied hard dependency | `blocked` | reflected in `Blockers:` section of `00-state.md` |
 
-The `01-plan.md` (§ Task List) mutations the orchestrator makes are scoped EXCLUSIVELY to the `**Status:**` field of one PR header at a time. The orchestrator never touches `Files:`, AC text, dependencies, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:` — those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if a change there is needed, route back to `architect` for an explicit in-place refinement and re-run Phase 1.6.
+The `01-plan.md` (§ Task List) mutations the orchestrator makes are scoped EXCLUSIVELY to the `**Status:**` field of one task header at a time. The orchestrator never touches `Files:`, AC text, dependencies, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:` — those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if a change there is needed, route back to `architect` for an explicit in-place refinement and re-run Phase 1.6.
 
-**The orchestrator never divides one task's plan or implementation.** It does not open a PR that is not in the approved `§ Task List`, does not mint a second stage-cycle, and does not split a workspace. If a delivered scope appears to need division, it routes back to the architect (re-run Phase 1.6) and surfaces the question to the operator. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
+**The orchestrator never divides one task's plan or implementation.** It does not open a PR that is not covered by the approved `§ Task List` / `§ Delivery Grouping`, does not mint a second stage-cycle, and does not split a workspace. If a delivered scope appears to need division, it routes back to the architect (re-run Phase 1.6) and surfaces the question to the operator. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
 
-**Post-approval division is a hard re-gate trigger.** After STAGE-GATE-1, the approved `§ Task List` is the complete PR set and the flat stage-file set is the complete document set. If, mid-workspace, an agent (a) opens or proposes a PR that is not in the approved `§ Task List`, OR (b) creates a stage file with any suffix (`-m{N}`, `-b`, `02b-*`, second-cycle), the orchestrator MUST treat this as plan drift: route back to `architect` for an explicit in-place plan refinement, re-run Phase 1.6 (plan-reviewer), and re-surface STAGE-GATE-1 to the operator for confirmation before any delivery proceeds. The pipeline never silently absorbs an unapproved second PR or a suffixed stage file.
+**Post-approval division is a hard re-gate trigger.** After STAGE-GATE-1, the approved `§ Task List` + `§ Delivery Grouping` is the complete delivery contract and the flat stage-file set is the complete document set. If, mid-workspace, an agent (a) opens or proposes a PR that is not covered by the approved contract, OR (b) creates a stage file with any suffix (`-m{N}`, `-b`, `02b-*`, second-cycle), the orchestrator MUST treat this as plan drift: route back to `architect` for an explicit in-place plan refinement, re-run Phase 1.6 (plan-reviewer), and re-surface STAGE-GATE-1 to the operator for confirmation before any delivery proceeds. The pipeline never silently absorbs an unapproved additional PR or a suffixed stage file.
 
 The `delivery` agent owns the `merged` transition: it is the only agent that flips `verified` → `merged` after the GitHub PR is pushed. The `qa` agent does NOT touch `Status:` — it only mirrors AC PASS/FAIL into the checkboxes (see `agents/qa.md`).
 
-**Stage 2 scheduler (DAG by `Depends on:`).** Phase 2 → 2.5 → 3 → 3.5 → 3.6 is the per-PR cycle. The orchestrator does NOT run the cycle sequentially across PRs. Instead, it builds a directed acyclic graph from each PR's `Depends on:` field in `01-plan.md` (§ Task List) and computes rounds topologically:
+**Stage 2 scheduler (DAG by `Depends on:`).** Phase 2 → 2.5 → 3 → 3.5 → 3.6 is the per-task cycle. The orchestrator does NOT run the cycle sequentially across tasks. Instead, it builds a directed acyclic graph from each task's `Depends on:` field in `01-plan.md` (§ Task List) and computes rounds topologically:
 
-- **Round 1** = every PR with `Depends on: none` (or no `Depends on:` field).
-- **Round N (N ≥ 2)** = every PR whose `Depends on:` set is fully contained in completed rounds 1..N-1.
+- **Round 1** = every task with `Depends on: none` (or no `Depends on:` field).
+- **Round N (N ≥ 2)** = every task whose `Depends on:` set is fully contained in completed rounds 1..N-1.
 
-PRs within the same round run **in parallel** in separate worktrees (same worktree mechanism documented under "Parallel Dispatch Flow" in `agents/ref-special-flows.md`). Each parallel implementer is invoked with its `PR identifier` and scopes work to that PR's `Files:` and AC block from `01-plan.md` (§ Task List). Hooks + event-driven monitoring (`inotifywait` on Linux/macOS, equivalent on Windows) signal completion of each parallel branch back to the parent orchestrator.
+Tasks within the same round run **in parallel** in separate worktrees (same worktree mechanism documented under "Parallel Dispatch Flow" in `agents/ref-special-flows.md`). Each parallel implementer is invoked with its `Task identifier` and scopes work to that task's `Files:` and AC block from `01-plan.md` (§ Task List). Hooks + event-driven monitoring (`inotifywait` on Linux/macOS, equivalent on Windows) signal completion of each parallel branch back to the parent orchestrator.
 
-**Why this works:** PRs without `Depends on:` between them touch disjoint code paths by definition of the architect's design — if they did not, the architect would have either consolidated them or declared the dependency explicitly. Conflict on shared files is a plan error (architect's job to fix before Phase 1.6 passes), not a runtime concern.
+**Why this works:** tasks without `Depends on:` between them touch disjoint code paths by definition of the architect's design — if they did not, the architect would have either consolidated them or declared the dependency explicitly. Conflict on shared files is a plan error (architect's job to fix before Phase 1.6 passes), not a runtime concern.
 
 **Round boundaries:**
-- When ALL PRs of a round complete with `success`, the round closes and STAGE-GATE-2 fires once with the round's summary (see STAGE-GATE-2 below).
-- If ANY PR in a round fails after its iteration budget, the orchestrator pauses the round, escalates to the user (same escalation pattern as Iteration Rules), and does NOT start the next round. Sibling PRs in the same round continue to completion (no premature cancellation — wasted work is worse than serialised recovery).
+- When ALL tasks of a round complete with `success`, the round closes and STAGE-GATE-2 fires once with the round's summary (see STAGE-GATE-2 below).
+- If ANY task in a round fails after its iteration budget, the orchestrator pauses the round, escalates to the user (same escalation pattern as Iteration Rules), and does NOT start the next round. Sibling tasks in the same round continue to completion (no premature cancellation — wasted work is worse than serialised recovery).
 - Subsequent rounds wait for the failed round to be resolved (user fix or skip) before scheduling.
 
-**Sequential fallback:** if every PR has a chained `Depends on:` (PR-2 depends on PR-1, PR-3 depends on PR-2, etc.), the DAG degenerates into a line and the rounds become 1-PR rounds — identical to the legacy per-PR behaviour. The scheduler is correct in that case too. No special-casing.
+**Sequential fallback:** if every task has a chained `Depends on:` (Task-2 depends on Task-1, Task-3 depends on Task-2, etc.), the DAG degenerates into a line and the rounds become 1-task rounds — identical to the legacy per-task behaviour. The scheduler is correct in that case too. No special-casing.
 
-**Implementation order vs merge order (these are distinct concerns).** The DAG governs **implementation order** — which worktrees run in parallel and which wait for their dependencies. It does NOT govern merge order to `main`. Parallel rounds (PRs in the same DAG round running in separate worktrees simultaneously) do NOT authorize parallel merge to `main`. The merge order is always serial and is governed exclusively by the contract in `agents/delivery.md`: PR-N+1 opens and merges to `main` only after PR-N has landed. Each subsequent branch is cut from the updated `main` after the prior merge. This distinction matters for multi-PR plans: the work can be implemented in parallel, but it ships to `main` one PR at a time, serially.
+**Implementation order vs merge order (these are distinct concerns).** The DAG governs **implementation order** — which worktrees run in parallel and which wait for their dependencies. It does NOT govern merge order to `main`. Parallel rounds (tasks in the same DAG round running in separate worktrees simultaneously) do NOT authorize parallel merge to `main`. The merge order is always serial and is governed exclusively by the contract in `agents/delivery.md`, per the declared `§ Delivery Grouping`: for a split grouping, group N+1's PR opens and merges to `main` only after group N's PR has landed. Each subsequent branch is cut from the updated `main` after the prior merge. This distinction matters for multi-group deliveries: the work can be implemented in parallel, but it ships to `main` one PR at a time, serially.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces.
 - workspaces path: {resolved_workspaces_path}
-- **PR identifier** (e.g., `PR-1`) — the implementer scopes its work to this PR's section in `01-plan.md` (§ Task List).
+- **Task identifier** (e.g., `Task-1`) — the implementer scopes its work to this task's section in `01-plan.md` (§ Task List).
 - Brief summary of architecture decisions (from architect's status block summary, NOT from re-reading `01-plan.md`).
 - Reference to `00-knowledge-context.md` (if it exists — agent reads it directly).
-- **Per-PR contract instruction:** "Read your assigned PR's section in `01-plan.md` (§ Task List). The `Files:` and `Acceptance Criteria:` fields are your contract. Do not exceed the `Files:` scope without annotating `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md`."
-- **Work Plan instruction:** "Follow the Work Plan in `01-plan.md` (§ Architecture → `### Work Plan`) for steps belonging to your PR. Report any deviations in `02-implementation.md`."
+- **Per-task contract instruction:** "Read your assigned task's section in `01-plan.md` (§ Task List). The `Files:` and `Acceptance Criteria:` fields are your contract. Do not exceed the `Files:` scope without annotating `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md`."
+- **Work Plan instruction:** "Follow the Work Plan in `01-plan.md` (§ Architecture → `### Work Plan`) for steps belonging to your task. Report any deviations in `02-implementation.md`."
 - **Spec feedback instruction:** "If implementation reveals a constraint that affects an AC, annotate `01-plan.md` § Review Summary with `[CONSTRAINT-DISCOVERED: description]` next to the affected AC. Make the best implementation decision and keep moving."
 
-**Backward compat.** If `01-plan.md` does not exist (`pipeline_version: 1`), the implementer follows any available Work Plan and AC from session context as before. Do NOT inject a `PR identifier` in that case — the legacy contract has no per-PR scoping.
+**Backward compat.** If `01-plan.md` does not exist (`pipeline_version: 1`), the implementer follows any available Work Plan and AC from session context as before. Do NOT inject a `Task identifier` in that case — the legacy contract has no per-task scoping.
 
 **Gate (status-block):** The implementer returns a compact status block. If `status: success` → update `00-state.md`, add result to Agent Results table, extract hot context (e.g., new dependencies, gotchas), proceed to Phase 3. If `status: failed` → read `02-implementation.md` to understand the issue.
 
@@ -2023,7 +2023,7 @@ If build/lint fails, the implementer fixes it before finishing (internal loop).
 
 **Report to user:**
 ```
-Implementation complete for PR-{i}
+Implementation complete for Task-{i}
   implementer | Output: 02-implementation.md
   {summary from status block}
 Next: verify (tester + qa in parallel)
@@ -2031,17 +2031,17 @@ Next: verify (tester + qa in parallel)
 
 **CRITICAL: Immediately proceed to Phase 3. Do NOT stop here, do NOT ask the user, do NOT report "done". Implementation without verification is incomplete.**
 
-**Rewrite TL;DR when Phase 2 per-PR starts** (row 8 of §5.2): `Now`: "Phase 2 implementer working on PR-{i} in Round R{R}." `Last`: prior PR or round result. `Next`: "Phase 2.5 reconcile, then Phase 2.7 test authoring, then Phase 3 verify." For parallel rounds with N>1, rewrite once when the round opens and once at each PR completion.
+**Rewrite TL;DR when Phase 2 per-task starts** (row 8 of §5.2): `Now`: "Phase 2 implementer working on Task-{i} in Round R{R}." `Last`: prior task or round result. `Next`: "Phase 2.5 reconcile, then Phase 2.7 test authoring, then Phase 3 verify." For parallel rounds with N>1, rewrite once when the round opens and once at each task completion.
 
-**Rewrite TL;DR when Phase 2 per-PR ends** (row 9 of §5.2): `Now`: "Phase 2.7 test authoring launching for PR-{i}." `Last`: "PR-{i} Phase 2 done — {N} files touched, build clean." `Next`: "Phase 2.7 tester authoring, then Phase 3 tester (run-only) + qa in parallel." `Open issues`: any CONSTRAINT-DISCOVERED annotations.
+**Rewrite TL;DR when Phase 2 per-task ends** (row 9 of §5.2): `Now`: "Phase 2.7 test authoring launching for Task-{i}." `Last`: "Task-{i} Phase 2 done — {N} files touched, build clean." `Next`: "Phase 2.7 tester authoring, then Phase 3 tester (run-only) + qa in parallel." `Open issues`: any CONSTRAINT-DISCOVERED annotations.
 
-**Emit Stage 2 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 2 of the **last PR in the last round** completes — not after every PR's Phase 2. Determine "last PR in last round" from the DAG: the round has no successor rounds, and all PRs in that round have returned `status: success` from Phase 2. Status: `complete` on success, `FAILED` if iteration budget was exhausted in Phase 2.
+**Emit Stage 2 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 2 of the **last task in the last round** completes — not after every task's Phase 2. Determine "last task in last round" from the DAG: the round has no successor rounds, and all tasks in that round have returned `status: success` from Phase 2. Status: `complete` on success, `FAILED` if iteration budget was exhausted in Phase 2.
 
 ```bash
-# Fire only when this is the last PR's Phase 2 in the last round
+# Fire only when this is the last task's Phase 2 in the last round
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==2))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
-    python3 -c "import json,sys; print(json.dumps({'stage':2,'label':'implementation batch','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N} PRs implemented across {M} rounds. {K} files touched." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+    python3 -c "import json,sys; print(json.dumps({'stage':2,'label':'implementation batch','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N} tasks implemented across {M} rounds. {K} files touched." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
   else
     cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":2,"reason":"wrapper-missing"}
@@ -2123,8 +2123,8 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 **When to run:** After Phase 2.5 (Constraint Reconciliation) and the Phase 2-close scope check complete. Before launching Phase 3. Applies to all pipeline types (`feature`, `refactor`, `enhancement`, `fix`, `hotfix`).
 
 **Dispatch via Task tool:**
-- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-PR AC block)** — the tester must map each AC to at least one test and run the suite once to confirm all authored tests pass. Reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
-- Instruction: "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this PR. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
+- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-task AC block)** — the tester must map each AC to at least one test and run the suite once to confirm all authored tests pass. Reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
+- Instruction: "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this task. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
 
 **Scope constraint (security advisory):** The `authoring` mode must not become a seam to touch production code. The tester writes and edits test files exclusively — the same "test files only" invariant that governs all other tester modes.
 
@@ -2234,7 +2234,7 @@ Verify complete (or ITERATING)
 Next: delivery (or: iterating — implementer fixing N issues)
 ```
 
-**Rewrite TL;DR** (row 11 of §5.2): On all success: `Now`: "Phase 3.5 acceptance-gate running for PR-{i}." `Last`: "PR-{i} Phase 3 verify done — tester pass, qa pass, security {clean|N findings}." `Next`: "Phase 3.5 acceptance-gate." On any iteration: `Now`: "Phase 3 iterating for PR-{i} (iter N/3) — {root cause}." `Open issues`: failing AC identifiers and file:line hints.
+**Rewrite TL;DR** (row 11 of §5.2): On all success: `Now`: "Phase 3.5 acceptance-gate running for Task-{i}." `Last`: "Task-{i} Phase 3 verify done — tester pass, qa pass, security {clean|N findings}." `Next`: "Phase 3.5 acceptance-gate." On any iteration: `Now`: "Phase 3 iterating for Task-{i} (iter N/3) — {root cause}." `Open issues`: failing AC identifiers and file:line hints.
 
 ### If any agent fails → ITERATE
 
@@ -2339,7 +2339,7 @@ After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceab
 
 **Additional gate for `type: fix` / `type: hotfix` Tier 2-4 — regression-still-passing:** Confirm `regression_test_path` (from `00-state.md`) shows PASS in `03-testing.md`, AND the named test from `02-regression-test.md` still exists in the suite without `skip`, `xfail`, or a comment removing it. If the regression test is absent or not passing → fail the gate and route back to tester (counts against the max-3 budget).
 
-1. **Read `workspaces/{feature-name}/01-plan.md`** (§ Task List, the AC block for this PR) and count the total AC.
+1. **Read `workspaces/{feature-name}/01-plan.md`** (§ Task List, the AC block for this task) and count the total AC.
 2. **Read `workspaces/{feature-name}/04-validation.md`** (qa) and count `PASS` vs `FAIL` per AC.
 3. **Read `workspaces/{feature-name}/03-testing.md`** AC Coverage table and verify every AC has at least one test marked PASS.
 4. **If `04-security.md` exists**, confirm there are no Critical/High findings unresolved.
@@ -2390,7 +2390,7 @@ Iterating ({N}/3): routing to implementer
 
 This phase costs almost no tokens — it parses 2-3 small tables. The cost-vs-confidence tradeoff is heavily on the side of correctness.
 
-**Rewrite TL;DR** (row 12 of §5.2): On pass: `Now`: "Phase 3.75 build-verification running." `Last`: "PR-{i} Phase 3.5 PASS — {N}/{N} AC verified, test-ratchet OK." `Next`: "Phase 3.75 build check, then Phase 3.6 acceptance-check." On fail: `Now`: "Iterating (iter N/3) for PR-{i}." `Last`: "Phase 3.5 FAIL — {failing AC list}." `Open issues`: failing AC identifiers.
+**Rewrite TL;DR** (row 12 of §5.2): On pass: `Now`: "Phase 3.75 build-verification running." `Last`: "Task-{i} Phase 3.5 PASS — {N}/{N} AC verified, test-ratchet OK." `Next`: "Phase 3.75 build check, then Phase 3.6 acceptance-check." On fail: `Now`: "Iterating (iter N/3) for Task-{i}." `Last`: "Phase 3.5 FAIL — {failing AC list}." `Open issues`: failing AC identifiers.
 
 ### KG write on security findings
 
@@ -2503,15 +2503,15 @@ Next: {delivery | iterate | escalate}
 
 If verdict is `concerns`, list each concern as one line in the report so the user sees them before delivery proceeds.
 
-**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "PR-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "PR-{i} Phase 3.6 verdict={pass|concerns}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
+**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "Task-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "Task-{i} Phase 3.6 verdict={pass|concerns}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
 
-**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 of the **last PR** completes — not after every PR's Phase 3. Determine "last PR" as the final PR in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
+**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 of the **last task** completes — not after every task's Phase 3. Determine "last task" as the final task in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
 
 ```bash
-# Fire only when this is the last PR's Phase 3.6 in the last round (or Phase 3.5 for hotfix+single-file)
+# Fire only when this is the last task's Phase 3.6 in the last round (or Phase 3.5 for hotfix+single-file)
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -x ~/.claude/hooks/notify-stage.sh; then
-    python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} PRs. Tests: {sum}. Security: {clean|N findings}." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+    python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean|N findings}." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
   else
     cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":3,"reason":"wrapper-missing"}
@@ -2532,9 +2532,9 @@ fi
 
 ## STAGE-GATE-2 — Between rounds in Stage 2 (autonomous-skippable)
 
-**Trigger:** completion of a Stage 2 round — every PR in the current round has finished its full cycle (Phase 2 → 2.5 → 3 → 3.5 → 3.6) with `status: success`, AND there is at least one more round remaining in the DAG.
+**Trigger:** completion of a Stage 2 round — every task in the current round has finished its full cycle (Phase 2 → 2.5 → 3 → 3.5 → 3.6) with `status: success`, AND there is at least one more round remaining in the DAG.
 
-**Granularity is per-round, not per-PR.** When PRs run in parallel within a round, the orchestrator does NOT emit one gate per PR (that would surface them in arbitrary order as they finish, race-conditioning with each other). It waits for the round to close, then emits a single STAGE-GATE-2 listing all PRs completed in the round and all PRs scheduled for the next round. If a round has a single PR (sequential chain in the DAG), the gate looks the same — just with N=1 in the table.
+**Granularity is per-round, not per-task.** When tasks run in parallel within a round, the orchestrator does NOT emit one gate per task (that would surface them in arbitrary order as they finish, race-conditioning with each other). It waits for the round to close, then emits a single STAGE-GATE-2 listing all tasks completed in the round and all tasks scheduled for the next round. If a round has a single task (sequential chain in the DAG), the gate looks the same — just with N=1 in the table.
 
 **Skip condition:** if `autonomous: true` in `00-state.md` (granted at STAGE-GATE-1 with `approve autonomous`, or promoted at a prior STAGE-GATE-2 with `next autonomous`), this gate is silently skipped. Append `stage.gate.skipped` event with `stage: 2, reason: autonomous, after_round: R{N}` to the JSONL trace. **It does NOT emit a STOP block.** Proceed directly to the next round.
 
@@ -2547,29 +2547,29 @@ fi
  STAGE-GATE-2 — Round {R}/{total_rounds} completed
 ====================================
  Feature: {feature-name}
- Round completed: R{R} — {N} PR(s) in parallel
+ Round completed: R{R} — {N} task(s) in parallel
 
- PRs completed in this round:
-   - PR-{i}: {title} ({service}) — AC {N}/{N} PASS — branch {branch}
-   - PR-{j}: {title} ({service}) — AC {N}/{N} PASS — branch {branch}
+ Tasks completed in this round:
+   - Task-{i}: {title} ({service}) — AC {N}/{N} PASS — branch {branch}
+   - Task-{j}: {title} ({service}) — AC {N}/{N} PASS — branch {branch}
    - ...
 
  Aggregated stats:
-   Tests added: {sum across PRs}
-   Security findings: {sum across PRs, or "clean"}
-   Acceptance-check: {worst verdict across PRs: pass|concerns|skipped}
+   Tests added: {sum across tasks}
+   Security findings: {sum across tasks, or "clean"}
+   Acceptance-check: {worst verdict across tasks: pass|concerns|skipped}
    Accumulated cost: ~{N}K tokens (~${X}) (or: price table not configured)
 
- Next round: R{R+1} — {M} PR(s) scheduled
-   - PR-{k}: {title} ({service})
-   - PR-{l}: {title} ({service})
+ Next round: R{R+1} — {M} task(s) scheduled
+   - Task-{k}: {title} ({service})
+   - Task-{l}: {title} ({service})
 
  Reply with:
    - "next"            → proceed to round R{R+1} (this stop only)
    - "next autonomous" → proceed AND skip subsequent STAGE-GATE-2 stops
    - "stop"            → halt the pipeline; you decide what to do
-   - "redo PR-{i}"     → reopen one PR in the just-completed round for revisions
-                         (sibling PRs in the same round are preserved)
+   - "redo Task-{i}"     → reopen one task in the just-completed round for revisions
+                         (sibling tasks in the same round are preserved)
 ====================================
 ```
 
@@ -2580,17 +2580,17 @@ fi
 | `next` | Set `gate2_release_last: next` in `00-state.md`. Append `stage.gate.release` with `stage: 2, decision: next, after_round: R{R}`. Schedule round R+1 in parallel. |
 | `next autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-2-after-round-R{R}`, and `gate2_release_last: next-autonomous` in `00-state.md`. Append `stage.gate.release` with `decision: next-autonomous`. Schedule round R+1; subsequent STAGE-GATE-2 events are silently skipped. |
 | `stop` | Set `gate2_release_last: stop` in `00-state.md`. Mark pipeline `status: paused`. Append `stage.gate.release` with `decision: stop`. Exit. User can resume with `/th:recover`. |
-| `redo PR-{i}` | Set `gate2_release_last: redo` in `00-state.md`. Route back to implementer for PR-{i} only. Sibling PRs from round R{R} remain in their completed state. Re-run Phase 2 → 3.6 for PR-{i}; on success, re-emit STAGE-GATE-2 for round R{R}. |
+| `redo Task-{i}` | Set `gate2_release_last: redo` in `00-state.md`. Route back to implementer for Task-{i} only. Sibling tasks from round R{R} remain in their completed state. Re-run Phase 2 → 3.6 for Task-{i}; on success, re-emit STAGE-GATE-2 for round R{R}. |
 
-**Partial-round failure handling.** If any PR in round R{R} fails after exhausting its iteration budget, the orchestrator does NOT close the round. Sibling PRs in flight are allowed to complete (no cancellation — preserves their work). After all in-flight PRs settle, the orchestrator emits a `stage.gate` event with `stage: 2, verdict: partial-fail`, lists the failing PR(s) and the completed sibling(s), and escalates to the user (same escalation pattern as Iteration Rules). Subsequent rounds wait until the failed PR is resolved.
+**Partial-round failure handling.** If any task in round R{R} fails after exhausting its iteration budget, the orchestrator does NOT close the round. Sibling tasks in flight are allowed to complete (no cancellation — preserves their work). After all in-flight tasks settle, the orchestrator emits a `stage.gate` event with `stage: 2, verdict: partial-fail`, lists the failing task(s) and the completed sibling(s), and escalates to the user (same escalation pattern as Iteration Rules). Subsequent rounds wait until the failed task is resolved.
 
 **JSONL trace:** `stage.gate` (`stage: 2, after_round: R{R}, verdict: pass|partial-fail`) when the gate fires interactive; `stage.gate.skipped` when bypassed by autonomous; `stage.gate.release` on user reply with `decision` and `after_round`.
 
-**Rewrite TL;DR when STAGE-GATE-2 emits** (row 14 of §5.2): `Now`: "STAGE-GATE-2 emitted after Round R{R}, waiting for human next/stop/redo." `Last`: "Round R{R} closed — {N} PRs shipped." `Next`: "Round R{R+1} — {M} PRs scheduled." `Open issues`: any partial-fail PRs.
+**Rewrite TL;DR when STAGE-GATE-2 emits** (row 14 of §5.2): `Now`: "STAGE-GATE-2 emitted after Round R{R}, waiting for human next/stop/redo." `Last`: "Round R{R} closed — {N} tasks shipped." `Next`: "Round R{R+1} — {M} tasks scheduled." `Open issues`: any partial-fail tasks.
 
 **Rewrite TL;DR when STAGE-GATE-2 is released** (row 15 of §5.2): On `next`: `Now`: "Round R{R+1} dispatching." `Last`: "STAGE-GATE-2 released with next." On `next autonomous`: `Now`: "Round R{R+1} dispatching (autonomous from this point)." On `stop`/`redo`: update `Now` and `Next` accordingly.
 
-**Rewrite TL;DR when STAGE-GATE-2 is skipped** (row 16 of §5.2): `Now`: "Round R{R+1} dispatching (autonomous — gate skipped)." `Last`: "Round R{R} closed — all PRs shipped clean." `Next`: "Phase 2 implementer for next round PRs." `Open issues`: "none".
+**Rewrite TL;DR when STAGE-GATE-2 is skipped** (row 16 of §5.2): `Now`: "Round R{R+1} dispatching (autonomous — gate skipped)." `Last`: "Round R{R} closed — all tasks shipped clean." `Next`: "Phase 2 implementer for next round tasks." `Open issues`: "none".
 
 ---
 
@@ -2669,7 +2669,7 @@ Then return your status block and exit.
 - Feature name for workspaces
 - workspaces path: {resolved_workspaces_path}
 - Summary of what was built, tested, and validated (from status block summaries, NOT re-reading workspaces)
-- **`skip-version: true`** — DEFAULT for all feature (non-release) deliveries. The plugin version is bumped at release-time via `/th:release`, not per-PR. Only delivery `release-mode` (invoked by `/th:release`) re-enables the bump. Pass `skip-version: false` ONLY when explicitly running in `release-mode`.
+- **`skip-version`** — the shipped default is `false` (or omitted): delivery bumps the project version once per PR at assembly. Pass `skip-version: true` ONLY when this repository documents its own repo-local versioning/release deferral convention (team-harness does — its plugin version is bumped at release-time via `/th:release`, not per-PR; see `CLAUDE.md §6.3`). When a repo-local deferral is active, only delivery `release-mode` (invoked by the repo-local release tool) re-enables the bump.
 
 **Gate (status-block):** The delivery agent returns a compact status block. Handle each outcome:
 
@@ -3137,13 +3137,13 @@ Pipeline complete. (See handoff prompt above before next feature.)
 
 ## Autonomous Mode
 
-Autonomous mode allows the orchestrator to chain PRs in Stage 2 without stopping at STAGE-GATE-2 between them. It is the ONLY gate-skipping behaviour available; STAGE-GATE-1 and STAGE-GATE-3 NEVER skip.
+Autonomous mode allows the orchestrator to chain tasks in Stage 2 without stopping at STAGE-GATE-2 between them. It is the ONLY gate-skipping behaviour available; STAGE-GATE-1 and STAGE-GATE-3 NEVER skip.
 
 ### Activation
 
 Autonomous mode is activated **only** via explicit human declaration at a stage gate:
-- `approve autonomous` at STAGE-GATE-1 → autonomous mode is ON from PR-1 onward.
-- `next autonomous` at any STAGE-GATE-2 → autonomous mode is ON from the next PR onward (promotion mid-Stage-2).
+- `approve autonomous` at STAGE-GATE-1 → autonomous mode is ON from Task-1 onward.
+- `next autonomous` at any STAGE-GATE-2 → autonomous mode is ON from the next task onward (promotion mid-Stage-2).
 
 It is NOT activated by:
 - CLI flags (no `--auto`, no `--unattended` flag is honoured at the orchestrator level).
@@ -3151,14 +3151,14 @@ It is NOT activated by:
 - Environment variables.
 - Skill-level metadata.
 
-The single activation vector is the gate response. The decision is made AT the gate where the human has the plan-reviewer's verdict (GATE-1) or the just-completed PR's results (GATE-2) in front of them.
+The single activation vector is the gate response. The decision is made AT the gate where the human has the plan-reviewer's verdict (GATE-1) or the just-completed task's results (GATE-2) in front of them.
 
 ### What it skips
 
 | Checkpoint | Interactive | Autonomous |
 |---|---|---|
 | STAGE-GATE-1 (plan review STOP) | STOP | **STOP** (never skipped) |
-| STAGE-GATE-2 (between-PR STOP) | STOP | skipped silently |
+| STAGE-GATE-2 (between-task STOP) | STOP | skipped silently |
 | STAGE-GATE-3 (delivery STOP) | STOP | **STOP** (never skipped) |
 | Phase 3 verify failure (iterate) | iterate | iterate |
 | Phase 3.5 acceptance-gate failure (iterate) | iterate | iterate |
@@ -3166,11 +3166,11 @@ The single activation vector is the gate response. The decision is made AT the g
 | Phase 4.5 internal-review `criticals_count > 0` | proceed with warning | proceed with warning |
 | Hard errors (gh push rejected, agent broke) | escalate to user | escalate to user |
 
-**Failure within a PR breaks autonomy at the PR boundary, not at the gate.** If PR-N's verify fails and the iteration budget exhausts, the orchestrator escalates to the user regardless of `autonomous: true`. Autonomous mode does not silence real failures.
+**Failure within a task breaks autonomy at the task boundary, not at the gate.** If Task-N's verify fails and the iteration budget exhausts, the orchestrator escalates to the user regardless of `autonomous: true`. Autonomous mode does not silence real failures.
 
 ### Persistence and recovery
 
-The `autonomous: true|false` and `autonomous_granted_at` fields in `00-state.md` persist across `/th:recover` invocations. If a pipeline is recovered mid-Stage-2 with `autonomous: true`, the orchestrator continues without stopping between PRs. Resetting autonomous mode requires the user to invoke `stop` at the next gate or to edit `00-state.md` manually.
+The `autonomous: true|false` and `autonomous_granted_at` fields in `00-state.md` persist across `/th:recover` invocations. If a pipeline is recovered mid-Stage-2 with `autonomous: true`, the orchestrator continues without stopping between tasks. Resetting autonomous mode requires the user to invoke `stop` at the next gate or to edit `00-state.md` manually.
 
 ---
 
@@ -3468,10 +3468,10 @@ Every line is a JSON object with these fields:
 | `tokens_out` | optional | Output tokens (breakdown). Optional — same conditions as `tokens_in`. |
 | `tokens_estimated` | conditional | Boolean, `true` when `tokens` was computed via the heuristic rather than extracted from real metadata. Absent means the value was measured. Required whenever `tokens` is estimated. |
 | `iteration` | optional | Iteration number (0 for first pass, 1+ for retries). |
-| `verdict` | conditional | `pass` / `concerns` / `fail` / `partial-fail`. Required for `gate.*` and `stage.gate` events from Phases 1.5, 1.6, 3.6, STAGE-GATE-1. `partial-fail` is specific to `stage.gate stage: 2` when at least one PR in the round failed. |
+| `verdict` | conditional | `pass` / `concerns` / `fail` / `partial-fail`. Required for `gate.*` and `stage.gate` events from Phases 1.5, 1.6, 3.6, STAGE-GATE-1. `partial-fail` is specific to `stage.gate stage: 2` when at least one task in the round failed. |
 | `decision` | conditional | User reply at a stage gate: `approved` / `approved-autonomous` / `rejected` / `edit` / `next` / `next-autonomous` / `stop` / `redo` / `ship` / `amend` / `abort`. Required for `stage.gate.release`. |
 | `after_round` | conditional | Round identifier the gate fires after (e.g., `R1`, `R2`). Required for `stage.gate*` events with `stage: 2`. |
-| `round_prs` | conditional | List of PR identifiers in the round (e.g., `["PR-1", "PR-2"]`). Recommended for `stage.gate stage: 2` to record which PRs ran in parallel. |
+| `round_prs` | conditional | List of task identifiers in the round (e.g., `["Task-1", "Task-2"]`). Recommended for `stage.gate stage: 2` to record which tasks ran in parallel. |
 | `reason` | conditional | Reason a gate was skipped (e.g., `autonomous`, `legacy`). Required for `stage.gate.skipped`. |
 | `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
 | `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
@@ -3795,23 +3795,23 @@ Design rationale lives in `workspaces/orchestrator-stage-notifications/01-archit
 | User-facing stage | Toast fires at the end of | Maps to canonical |
 |---|---|---|
 | Stage 1 (analysis) | Phase 1.6 — after `gate.pass`/`gate.fail` written, immediately before the STAGE-GATE-1 STOP block | Stage 1 |
-| Stage 2 (implementation batch) | Phase 2 of the **last PR in the last round** — after the implementer's success status block, before Phase 3 launches | Stage 2 |
-| Stage 3 (verify) | Phase 3.6 of the **last PR** (or Phase 3.5 if 3.6 was skipped) — after the closing verdict, before Phase 4 | Stage 2 |
+| Stage 2 (implementation batch) | Phase 2 of the **last task in the last round** — after the implementer's success status block, before Phase 3 launches | Stage 2 |
+| Stage 3 (verify) | Phase 3.6 of the **last task** (or Phase 3.5 if 3.6 was skipped) — after the closing verdict, before Phase 4 | Stage 2 |
 | Stage 4 (delivery) | Phase 4.5 — after reviewer returns (or is skipped), immediately before the STAGE-GATE-3 STOP block | Stage 3 |
 
 ### Toast Mapping Table
 
 | Stage | Title on success | Title on failure/blocked | Body |
 |---|---|---|---|
-| Stage 1 (analysis) | `Pipeline {feature} · Stage 1 (analysis) complete` | `Pipeline {feature} · Stage 1 (analysis) FAILED` | success: `{N} PRs proposed across {M} services. Plan-reviewer verdict: {pass\|concerns}.` failure: `Plan-reviewer fail after {N} iterations. Failing rules: {list}.` |
-| Stage 2 (implementation batch) | `Pipeline {feature} · Stage 2 (implementation batch) complete` | `Pipeline {feature} · Stage 2 (implementation batch) FAILED` | success: `{N} PRs implemented across {M} rounds. {K} files touched.` failure: `PR-{i} implementation failed after {N} iterations. Reason: {1-line root cause}.` |
-| Stage 3 (verify) | `Pipeline {feature} · Stage 3 (verify) complete` | `Pipeline {feature} · Stage 3 (verify) FAILED` | success: `{N}/{N} AC verified across {M} PRs. Tests: {sum}. Security: {clean\|N findings}.` failure: `PR-{i} verify failed: {tester\|qa\|security} verdict failed. {1-line summary}.` |
+| Stage 1 (analysis) | `Pipeline {feature} · Stage 1 (analysis) complete` | `Pipeline {feature} · Stage 1 (analysis) FAILED` | success: `{N} tasks proposed across {M} services. Plan-reviewer verdict: {pass\|concerns}.` failure: `Plan-reviewer fail after {N} iterations. Failing rules: {list}.` |
+| Stage 2 (implementation batch) | `Pipeline {feature} · Stage 2 (implementation batch) complete` | `Pipeline {feature} · Stage 2 (implementation batch) FAILED` | success: `{N} tasks implemented across {M} rounds. {K} files touched.` failure: `Task-{i} implementation failed after {N} iterations. Reason: {1-line root cause}.` |
+| Stage 3 (verify) | `Pipeline {feature} · Stage 3 (verify) complete` | `Pipeline {feature} · Stage 3 (verify) FAILED` | success: `{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean\|N findings}.` failure: `Task-{i} verify failed: {tester\|qa\|security} verdict failed. {1-line summary}.` |
 | Stage 4 (delivery) | `Pipeline {feature} · Stage 4 (delivery) complete` | `Pipeline {feature} · Stage 4 (delivery) FAILED` or `Pipeline {feature} · Stage 4 (delivery) BLOCKED` | success: `Branch {branch}. Version {old} → {new}. Internal review: {C}C/{S}S/{N}N.` failure/blocked: `Delivery {error\|paused for amend}. See 00-state.md § Delivery.` |
 
 **How the toast renders on screen.** The `notify-{os}.sh` scripts derive the title from `basename($cwd)`, so the user sees:
-```
+```text
 Title: Claude Code — claude-dev-team
-Body:  Pipeline my-feature · Stage 1 (analysis) complete — 2 PRs proposed across 1 service. Plan-reviewer verdict: pass.
+Body:  Pipeline my-feature · Stage 1 (analysis) complete — 2 tasks proposed across 1 service. Plan-reviewer verdict: pass.
 ```
 
 ### JSON payload schema
@@ -3872,11 +3872,13 @@ The guarantee mirrors the KG passive-capture pattern in `agents/delivery.md` § 
 
 ## Multi-Task Orchestration
 
+**Scope: single-project, multi-TASK dispatch.** This section governs how 2+ tasks WITHIN ONE REPOSITORY are dispatched; it is parallel-by-default and is NOT gated by a parallelism confirmation. It is distinct from the multi-PROJECT initiative fan-out (§ Parallel Multi-Project Dispatch below), which has its own confirm gate. The only upstream operator gates on this path are the Discover-disposition confirm and the write-mode Y/n (both gate ENTRY into the pipeline, not the sequential-vs-parallel execution choice).
+
 **DEFAULT behavior for 2+ tasks.** Whenever you have multiple tasks — from `/th:issue` batch, `/th:plan plan-and-execute`, user request for batch work, or your own breakdown of a broad scope — dispatch them using dependency analysis, parallel worktrees, and event-driven monitoring via hooks. You NEVER run multiple tasks sequentially in a single session.
 
-**Consolidation default — a same-repo task batch ships as ONE PR.** When the batch is single-repo, the default outcome is ONE consolidated PR: all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work (Step 5d). This is the default, not a special case — do NOT open one PR per batched task. This consolidation default and the milestone anti-split invariant ("a single task is never split across PRs," `agents/ref-special-flows.md § Milestone-Build Flow`) are the same rule read two ways: a task is never SPLIT across PRs, and a same-repo batch consolidates INTO one PR. The consolidated batch ships via the **same delivery flow** and the same PR lifecycle as a single task — the same `delivery` agent (Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge, `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path; the only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a), not a single task branch.
+**Consolidation default — a same-repo task batch ships as ONE PR.** When the batch is single-repo, the default outcome is ONE consolidated PR: all task branches merge into one `batch/<name>-verify` branch, the version bumps once, the changelog is one consolidated entry, and exactly one PR covers all batch work (Step 5d). This is the default, not a special case — do NOT open one PR per batched task. This consolidation default and the milestone anti-split invariant ("a single task is never split across delivery groups," `agents/ref-special-flows.md § Milestone-Build Flow`) are the same rule read two ways: a task is never SPLIT across delivery groups, and a same-repo batch consolidates INTO one PR. The consolidated batch ships via the **same delivery flow** and the same PR lifecycle as a single task — the same `delivery` agent (Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge, `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path; the only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a), not a single task branch. The version bumps once per this default; a consuming repo may declare its own repo-local deferral rule (a documented versioning/release convention delivery honors instead — see `agents/delivery.md § Step 9`).
 
-**Operator opt-out.** The operator — and only the operator — may request separate PRs by saying so ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open PR-N+1 only after PR-N lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
+**Operator opt-out.** The operator — and only the operator — may request separate PRs by saying so ("keep them as separate PRs" / "separate PRs"). On opt-out, each task ships as its own PR via serial merge (open Task-N+1 only after Task-N lands on fresh `main`; never stacked). The orchestrator never chooses separate PRs on its own authority.
 
 **Genuine blocker (the only non-opt-out reason for separate PRs).** Absent an operator opt-out, the orchestrator splits a batch into separate PRs ONLY for a genuine blocker: (a) an UNRESOLVABLE merge conflict between task branches at Step 5a — Step 5a already pauses and asks the operator; or (b) a temporal-prod / cross-repo deploy reason drawn from the plan-reviewer's existing closed list (`coexistence window`, `production signal`, `cross-repo deploy gate` — see `plan-reviewer.md § Rule 1`). No new blocker categories are introduced.
 
@@ -4117,11 +4119,11 @@ If any task in the batch had `security-sensitive: true`, invoke `security` (pipe
 git diff main...batch/{batch-name}-verify
 ```
 
-**5d. Run delivery (feature-mode — version bump deferred to release):**
+**5d. Run delivery (shipped default — version bumps once for the consolidated batch):**
 Invoke `delivery` with:
 - Feature name: the batch name
 - Summary: aggregated from all tasks
-- `skip-version: true` (DEFAULT — the plugin version is bumped at release-time via `/th:release`, not per batch delivery. The delivery agent will write a `changelog.d/` fragment covering all batch tasks. Only delivery `release-mode` re-enables the bump.)
+- `skip-version` — the shipped default is `false` (or omitted): delivery bumps the project version once, for the whole consolidated batch, at assembly. Pass `skip-version: true` ONLY when this repository documents its own repo-local versioning/release deferral convention (team-harness does — see `CLAUDE.md §6.3`); in that case the delivery agent writes a `changelog.d/` fragment covering all batch tasks instead, and only delivery `release-mode` re-enables the bump.
 - All branches are already merged into the verify branch
 
 The delivery agent will:
@@ -4297,7 +4299,7 @@ Each eligible project runs its full Stage 1 independently and serially: Design �
 
 Once ≥2 projects are eligible and the fan-out confirm gate is approved, the orchestrator **fans out the Stage-2 implement+verify work concurrently** — one lane per project. Each lane is an isolated implement→verify loop dispatched via concurrent `Task` calls in the parent session, exactly the in-message mechanism already live in Phase 3 for a single project's `tester+qa+security` trio. Sibling lanes run simultaneously and independently. No Workflow tool is needed; no nested-dispatch is required — the feature stays entirely within the dev-mode top-level Task-parallelism capability.
 
-The parallel region re-converges at delivery: the orchestrator waits for all lanes to reach the Stage-2 boundary (every PR of each lane verified), then runs per-project ACCEPTANCE and emits a batched STAGE-GATE-3 with per-project ship/amend/abort decisions, followed by per-project delivery.
+The parallel region re-converges at delivery: the orchestrator waits for all lanes to reach the Stage-2 boundary (every task of each lane verified), then runs per-project ACCEPTANCE and emits a batched STAGE-GATE-3 with per-project ship/amend/abort decisions, followed by per-project delivery.
 
 **Flow at a glance:**
 
@@ -4331,6 +4333,8 @@ Run this deterministic test only when `initiative != null` and ≥2 projects exi
 
 ### Fan-out confirm gate (mandatory before any concurrent dispatch)
 
+**Scope: this gate governs ONLY the multi-PROJECT initiative fan-out (≥2 projects in an initiative).** It does NOT apply to multi-task dispatch within a single project, which is parallel-by-default and ungated (§ Multi-Task Orchestration).
+
 When the eligible set has ≥2 members, emit this confirmation prompt and WAIT for explicit operator approval. Never auto-fan-out:
 
 ```
@@ -4355,7 +4359,7 @@ When the eligible set has ≥2 members, emit this confirmation prompt and WAIT f
 ### Gate semantics with N concurrent projects
 
 - **STAGE-GATE-1:** stays **per-project, always serial**. Each project clears its own Design → plan-review → STAGE-GATE-1 before it becomes eligible. The operator reviews one plan at a time; STAGE-GATE-1 is never batched across projects.
-- **ACCEPTANCE (the Stage-2 internal acceptance gate, per-PR Phase 3.5/3.6):** within each lane, acceptance is per-PR exactly as today. The batched lane-level report surfaces only at the fan-out re-convergence: the orchestrator waits for all lanes to reach the Stage-2 boundary (all PRs of each lane verified), then reports a single consolidated status listing each lane's verdict.
+- **ACCEPTANCE (the Stage-2 internal acceptance gate, per-task Phase 3.5/3.6):** within each lane, acceptance is per-task exactly as today. The batched lane-level report surfaces only at the fan-out re-convergence: the orchestrator waits for all lanes to reach the Stage-2 boundary (all tasks of each lane verified), then reports a single consolidated status listing each lane's verdict.
 - **STAGE-GATE-3 (delivery): batched at re-convergence.** The orchestrator waits for all lanes to complete Stage 2, then emits ONE STAGE-GATE-3 block listing every project's PR ready to ship, with a per-project ship/amend/abort choice. This mirrors the existing per-round STAGE-GATE-2 batching rule. Delivery then runs per-project.
 - **One lane's fail/iteration does NOT block sibling lanes.** A lane that fails verify enters its own implementer↔verify iteration loop (counts toward that lane's own max-3 budget). Sibling lanes continue. At the batched re-convergence report, a failing lane is shown as `iterating` or `blocked`; passing lanes are shown ready. The operator can ship passing lanes and let the failing lane continue (the batched STAGE-GATE-3 offers per-project decisions). Failure isolation is a hard property of the design.
 
@@ -4363,7 +4367,7 @@ When the eligible set has ≥2 members, emit this confirmation prompt and WAIT f
 
 - **Security unchanged.** Per-project security gates run exactly as today within each lane (Phase 3 security agent when `security-sensitive: true` or for `type: fix/hotfix` Tier 3+). Fan-out does not waive, batch, or weaken any security gate — each lane runs its own.
 - **Never parallelize across an in-flux shared contract.** Hard exclusion in the eligibility test: a project whose consumed cross-project contract is not yet stable is excluded from the concurrent set.
-- **Operator can always force serial.** `--serial` / "one at a time" bypasses the fan-out confirm gate and runs sequentially. The fan-out is opt-in and confirmed; it is never automatic.
+- **Operator can always force serial.** `--serial` / "one at a time" bypasses the fan-out confirm gate and runs sequentially. The multi-PROJECT fan-out is opt-in and confirmed; it is never automatic — this scoping does not apply to single-project multi-task dispatch, which is parallel-by-default (§ Multi-Task Orchestration).
 - **Backward-compat floor.** All new behaviour is gated on `initiative != null` AND explicit fan-out confirmation. With `initiative: null` (single-project) or no confirmation, the pipeline path is byte-identical to today.
 
 ### Observability under concurrent projects

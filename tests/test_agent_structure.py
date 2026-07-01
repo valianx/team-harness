@@ -168,7 +168,7 @@ checks_orch = [
     ("after_round JSONL field", "after_round"),
     ("STAGE-GATE-1 surfaces TL;DR inline", "TL;DR"),
     ("STAGE-GATE-1 surfaces Review Summary inline", "Review Summary"),
-    ("STAGE-GATE-1 surfaces PR Summary inline", "PR Summary"),
+    ("STAGE-GATE-1 surfaces Task Summary inline", "Task Summary"),
     ("STAGE-GATE-1 protects against giant Summary table", "+{N-10} more"),
     ("test-ratchet", "Test-ratchet check"),
     ("done.yml schema", "done.yml"),
@@ -462,8 +462,8 @@ pr_path = AGENTS_DIR / "plan-reviewer.md"
 if pr_path.exists():
     plan_reviewer = read(pr_path)
     pr_checks = [
-        ("Rule 1 (PR-count)", "Rule 1"),
-        ("Rule 2 (per-PR ACs)", "Rule 2"),
+        ("Rule 1 (Delivery Grouping)", "Rule 1"),
+        ("Rule 2 (per-task ACs)", "Rule 2"),
         ("Rule 3 (consolidated docs)", "Rule 3"),
         ("Rule 4 (cross-reference)", "Rule 4"),
         ("Rule 5 (service identity)", "Rule 5"),
@@ -508,7 +508,7 @@ check("architect.md declares the closed list of temporal-prod reasons",
 check("architect.md declares Services Touched section requirement",
       "Services Touched" in architect,
       "Services Touched requirement not documented")
-check("architect.md per-PR template uses Given/When/Then",
+check("architect.md per-task template uses Given/When/Then",
       "Given/When/Then" in architect or
       ("Given" in architect and "When" in architect and "Then" in architect),
       "Given/When/Then format not documented in architect")
@@ -536,18 +536,18 @@ check("architect.md allows 'No human-judgement decisions' as valid value",
       "No human-judgement decisions" in architect,
       "fallback bullet for zero decisions not documented")
 
-# qa.md must declare per-PR scoping when 01-plan.md § Task List is present
+# qa.md must declare per-task scoping when 01-plan.md § Task List is present
 qa_md = read(AGENTS_DIR / "qa.md")
-check("qa.md validate-mode reads 01-plan.md per PR",
+check("qa.md validate-mode reads 01-plan.md per task",
       "01-plan.md" in qa_md,
-      "01-plan.md per-PR scoping not documented in qa.md")
+      "01-plan.md per-task scoping not documented in qa.md")
 check("qa.md distinguishes Phase 1.5 (ratify) from Phase 1.6 (plan-review)",
       "Phase 1.5" in qa_md and "Phase 1.6" in qa_md and "plan-reviewer" in qa_md,
       "qa.md does not document the distinction with plan-reviewer")
 
-# implementer.md must declare per-PR scoping + SCOPE-DRIFT annotation
+# implementer.md must declare per-task scoping + SCOPE-DRIFT annotation
 impl_md = read(AGENTS_DIR / "implementer.md")
-check("implementer.md reads 01-plan.md for per-PR ACs",
+check("implementer.md reads 01-plan.md for per-task ACs",
       "01-plan.md" in impl_md,
       "implementer.md does not read 01-plan.md")
 check("implementer.md declares SCOPE-DRIFT annotation",
@@ -935,9 +935,9 @@ check("qa.md restricts edits on 01-plan.md to checkbox flips",
       or "only edit you are allowed to make on 01-plan.md" in qa_md,
       "qa.md does not pin its edit scope on 01-plan.md to checkbox flips")
 
-# 14. orchestrator.md mirrors PR transitions to the Status field
-check("orchestrator.md declares Mirror PR-level progress into 01-plan.md",
-      "Mirror PR-level progress into `01-plan.md`" in orchestrator_md,
+# 14. orchestrator.md mirrors task transitions to the Status field
+check("orchestrator.md declares Mirror task-level progress into 01-plan.md",
+      "Mirror task-level progress into `01-plan.md`" in orchestrator_md,
       "orchestrator.md does not declare the Status mirror contract")
 for transition in ("in-progress", "verified", "merged", "blocked"):
     check(f"orchestrator.md Status mirror table names '{transition}'",
@@ -9100,6 +9100,7 @@ print("=== Suite 43: pr-e-delivery-hardening — delivery flow hardening ===")
 _s43_delivery    = read(AGENTS_DIR / "delivery.md")
 _s43_ghfallback  = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
 _s43_testing_md  = read(REPO_ROOT / "docs" / "testing.md")
+_s43_costcaching = read(REPO_ROOT / "docs" / "cost-and-caching.md")
 _s43_self        = Path(__file__).read_text(encoding="utf-8")
 
 # ---- canonical anchors -------------------------------------------------------
@@ -9107,27 +9108,28 @@ _S43_STEP2B_ANCHOR   = "### Step 2b — Active gh account capture"
 _S43_STEP90_ANCHOR   = "### Step 9.0 — Version sites (explicit enumeration)"
 _S43_STEP9E_ANCHOR   = "### Step 9e — CHANGELOG release cut"
 _S43_BLOCKED_ANCHOR  = "## status: blocked-pr-pending"
+_S43_SITES_ANCHOR    = "**team-harness's own version sites"
 
 # ---- slices ------------------------------------------------------------------
 _s43_step2b_slice   = _slice_section(_s43_delivery,   _S43_STEP2B_ANCHOR)
 _s43_step90_slice   = _slice_section(_s43_delivery,   _S43_STEP90_ANCHOR)
 _s43_step9e_slice   = _slice_section(_s43_delivery,   _S43_STEP9E_ANCHOR)
 _s43_blocked_slice  = _slice_section(_s43_ghfallback, _S43_BLOCKED_ANCHOR)
+_s43_sites_slice    = _slice_section(_s43_costcaching, _S43_SITES_ANCHOR)
 
 # ---------------------------------------------------------------------------
-# Check (1) / AC-1 — delivery.md Step 9.0 — explicit enumeration of all 5
-# version sites. The Glob-first-match discovery is replaced by a named list
-# that includes: plugins[0].version (marketplace.json, NOT the schema top-level),
-# cmd/install/main.go (or main.go), CLAUDE.md §3 (or CLAUDE.md), CHANGELOG.md.
-# The schema/top-level version must be fenced off (excluded).
-# Tokens required:
+# Check (1) / AC-1 — team-harness's own 5-site version enumeration. Issue #444
+# relocated this from delivery.md's shipped Step 9.0 (which is now generic —
+# no consuming repo may assume it is a plugin) to docs/cost-and-caching.md, an
+# internal-distribution-rule file for team-harness itself (CLAUDE.md §6.3
+# points here). The generic Step 9.0 in delivery.md still fences off the
+# schema/top-level version field and points to a repo's own declared table.
+# Tokens required in the cost-and-caching.md site-enumeration paragraph:
 #   "plugins[0].version"  — the exact marketplace.json field (not schema)
 #   "cmd/install/main.go" or "main.go"  — the Go installer version literal
 #   "CLAUDE.md"           — §3 Current version site
 #   "CHANGELOG.md"        — release heading site
 #   one of "schema" / "top-level" / "1.1.0"  — the exclusion language
-# Negative token: "Glob" MUST NOT be present in this slice as the discovery
-# mechanism (the Glob-first-match pattern is replaced).
 # ---------------------------------------------------------------------------
 _S43_STEP90_REQUIRED = (
     "plugins[0].version",
@@ -9138,19 +9140,18 @@ _S43_STEP90_MAIN_ALTS   = ("cmd/install/main.go", "main.go")
 _S43_STEP90_SCHEMA_ALTS = ("schema", "top-level", "1.1.0")
 
 check(
-    "delivery-hardening(1/ac-1): delivery.md Step 9.0 anchor enumerates the 5"
-    " version sites explicitly (plugins[0].version + main.go + CLAUDE.md +"
-    " CHANGELOG.md) and fences off the schema/top-level marketplace version;"
-    " Glob first-match is NOT the discovery mechanism in this slice",
-    bool(_s43_step90_slice)
-    and all(t in _s43_step90_slice for t in _S43_STEP90_REQUIRED)
-    and any(a in _s43_step90_slice for a in _S43_STEP90_MAIN_ALTS)
-    and any(a in _s43_step90_slice for a in _S43_STEP90_SCHEMA_ALTS),
-    f"anchor '{_S43_STEP90_ANCHOR}' missing or required tokens absent;"
-    f" anchor present: {bool(_s43_step90_slice)};"
-    + " ".join(f" '{t}' present: {t in _s43_step90_slice};" for t in _S43_STEP90_REQUIRED)
-    + f" main.go alt found: {any(a in _s43_step90_slice for a in _S43_STEP90_MAIN_ALTS)};"
-    f" schema-fence alt found: {any(a in _s43_step90_slice for a in _S43_STEP90_SCHEMA_ALTS)}",
+    "delivery-hardening(1/ac-1): docs/cost-and-caching.md enumerates team-harness's"
+    " 5 version sites explicitly (plugins[0].version + main.go + CLAUDE.md +"
+    " CHANGELOG.md) and fences off the schema/top-level marketplace version",
+    bool(_s43_sites_slice)
+    and all(t in _s43_sites_slice for t in _S43_STEP90_REQUIRED)
+    and any(a in _s43_sites_slice for a in _S43_STEP90_MAIN_ALTS)
+    and any(a in _s43_sites_slice for a in _S43_STEP90_SCHEMA_ALTS),
+    f"anchor '{_S43_SITES_ANCHOR}' missing or required tokens absent;"
+    f" anchor present: {bool(_s43_sites_slice)};"
+    + " ".join(f" '{t}' present: {t in _s43_sites_slice};" for t in _S43_STEP90_REQUIRED)
+    + f" main.go alt found: {any(a in _s43_sites_slice for a in _S43_STEP90_MAIN_ALTS)};"
+    f" schema-fence alt found: {any(a in _s43_sites_slice for a in _S43_STEP90_SCHEMA_ALTS)}",
 )
 
 # ---------------------------------------------------------------------------
@@ -13257,7 +13258,7 @@ check(
 check(
     "plan-shape(a2): Consolidation rule declares the 'Consolidates:' field",
     "Consolidates:" in _s58_consol_slice,
-    "Consolidation rule must introduce the per-PR 'Consolidates:' field",
+    "Consolidation rule must introduce the per-task 'Consolidates:' field",
 )
 check(
     "plan-shape(a3): Consolidation rule lists condition (a) — declarative/doc/asset change",
@@ -13354,21 +13355,17 @@ check(
     "Rule 10 must explicitly state it is disjoint from Rule 1 and Rule 9",
 )
 check(
-    "plan-shape(b4): Rule 10 affirms Rule 1 closed-list of Split reason values is UNCHANGED",
+    "plan-shape(b4): Rule 10 affirms Rule 1 closed-list of Reason values is UNCHANGED",
     bool(_s58_rule10_slice)
-    and "Split reason" in _s58_rule10_slice
+    and "Reason" in _s58_rule10_slice
     and ("unchanged" in _s58_rule10_slice.lower() or "unchanged" in _s58_pr.lower()),
-    "Rule 10 must affirm that Rule 1's closed-list of Split reason values is unchanged",
+    "Rule 10 must affirm that Rule 1's closed-list of Reason values is unchanged",
 )
 check(
-    "plan-shape(b5): Rule 10 affirms default one-PR-per-service is UNCHANGED",
+    "plan-shape(b5): Rule 10 affirms the default delivery-grouping behaviour is UNCHANGED",
     bool(_s58_rule10_slice)
-    and (
-        "one PR per service" in _s58_rule10_slice.lower()
-        or "one-PR-per-service" in _s58_rule10_slice
-        or "one pr per service" in _s58_rule10_slice.lower()
-    ),
-    "Rule 10 must affirm that the default one-PR-per-service rule is unchanged",
+    and "delivery-grouping" in _s58_rule10_slice.lower(),
+    "Rule 10 must affirm that the default delivery-grouping behaviour is unchanged",
 )
 check(
     "plan-shape(b6): Rule 10 affirms PR-stacking prohibition (Rule 9) is UNCHANGED",
@@ -14505,30 +14502,33 @@ check(
     "(AC-2 — markers: 'OMIT' uppercase + 'no linked issue')",
 )
 
-# Locate the Step 9.0 region (from "Step 9.0" to "Step 9.1")
-_s62_step90_start = _s62_delivery.find("Step 9.0")
-_s62_step90_end = _s62_delivery.find("Step 9.1", _s62_step90_start)
-_s62_step90 = (
-    _s62_delivery[_s62_step90_start:_s62_step90_end]
-    if _s62_step90_start != -1 and _s62_step90_end != -1 and _s62_step90_end > _s62_step90_start
+# Locate team-harness's own site-enumeration region. Issue #444 relocated this
+# from delivery.md's shipped (now generic) Step 9.0 to docs/cost-and-caching.md
+# — an internal-distribution-rule file for team-harness itself.
+_s62_costcaching = read(REPO_ROOT / "docs" / "cost-and-caching.md")
+_s62_sites_start = _s62_costcaching.find("**team-harness's own version sites")
+_s62_sites_end = _s62_costcaching.find("\n\n", _s62_sites_start)
+_s62_sites = (
+    _s62_costcaching[_s62_sites_start:_s62_sites_end]
+    if _s62_sites_start != -1 and _s62_sites_end != -1 and _s62_sites_end > _s62_sites_start
     else ""
 )
 
-# Assertion 3 (AC-3): Step 9.0 reconciles version sites.
+# Assertion 3 (AC-3): the site-enumeration paragraph reconciles version sites.
 # NEGATIVE: "all five must be updated together" must be absent (the erroneous caption).
 # POSITIVE: "legacy-installer" must be present (marks main.go as the legacy anchor).
 # POSITIVE: 3-site mandatory set named (plugin.json + marketplace.json + CLAUDE.md).
 check(
-    "delivery.md Step 9.0 no longer asserts 'all five must be updated together' (AC-3 negative guard)",
-    "all five must be updated together" not in _s62_step90,
-    "Step 9.0 still contains the erroneous caption 'all five must be updated together'; "
+    "docs/cost-and-caching.md site enumeration no longer asserts 'all five must be updated together' (AC-3 negative guard)",
+    "all five must be updated together" not in _s62_sites,
+    "the site-enumeration paragraph still contains the erroneous caption 'all five must be updated together'; "
     "it must be replaced with a split that marks plugin.json + marketplace.json + CLAUDE.md §3 "
     "as mandatory and cmd/install/main.go as a legacy-installer anchor (AC-3)",
 )
 check(
-    "delivery.md Step 9.0 marks main.go as a 'legacy-installer' anchor (AC-3 positive)",
-    "legacy-installer" in _s62_step90,
-    "Step 9.0 must mark 'cmd/install/main.go' as a legacy-installer anchor — "
+    "docs/cost-and-caching.md marks main.go as a 'legacy-installer' anchor (AC-3 positive)",
+    "legacy-installer" in _s62_sites,
+    "the site-enumeration paragraph must mark 'cmd/install/main.go' as a legacy-installer anchor — "
     "updated only on installer releases, not on plugin-asset-only changes (AC-3)",
 )
 
@@ -16654,7 +16654,7 @@ check(
 )
 
 # (ii) architect.md carries a one-line guard referencing the operator-authority invariant
-_S70G_ARCH_GUARD_ANCHOR = "#### Default: one PR per service"
+_S70G_ARCH_GUARD_ANCHOR = "#### Default: delivery grouping"
 _S70G_ARCH_STOP         = ("\n## ", "\n### ", "\n#### ", "\n---\n")
 _s70g_arch_pr_slice = _slice_section(_s70g_arch, _S70G_ARCH_GUARD_ANCHOR, _S70G_ARCH_STOP)
 
@@ -16665,7 +16665,7 @@ check(
         "never split" in _s70g_arch_pr_slice or "never divides" in _s70g_arch_pr_slice
         or "pipeline never divides" in _s70g_arch_pr_slice
     ) and "ref-special-flows.md" in _s70g_arch_pr_slice,
-    "architect.md '#### Default: one PR per service' slice must contain a one-line guard"
+    "architect.md '#### Default: delivery grouping' slice must contain a one-line guard"
     " stating the pipeline never splits on its own authority, referencing ref-special-flows.md (AC-3)",
 )
 
@@ -29688,8 +29688,8 @@ check(
 # no new # Suite N: block needed — see docs/testing.md § "run-all hardcoded
 # suite list" note).
 # Item 7: skills/review-pr/SKILL.md detection block uses current pipeline filenames.
-# Item 9: both 01-plan.md templates in agents/architect.md carry Base column +
-#         **Base:** per-PR field.
+# Item 9: both 01-plan.md templates in agents/architect.md carry the Task
+#         Summary header + a Delivery Grouping block with a Base column.
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 124: contract-contradiction-sweep (issue #309) ===")
@@ -29727,27 +29727,32 @@ check(
     " in the detection block — was causing qa workspaces to be silently skipped",
 )
 
-# Item 9 — both 01-plan.md templates in agents/architect.md carry Base column + **Base:** field
+# Item 9 — both 01-plan.md templates in agents/architect.md carry the Task
+# Summary header + a Delivery Grouping block with a Base column (issue #444
+# renamed the drifted-copy guard's target shape: Base moved off the per-task
+# Summary row onto the Delivery Grouping table, but the two templates must
+# still stay consistent with EACH OTHER).
 check(
     "suite124(item9): agents/architect.md first 01-plan.md template contains"
-    " '| PR | Service | Base |' — contract-contradiction-sweep",
-    "| PR | Service | Base |" in _s124_architect,
-    "agents/architect.md first (Schema) template must include Base column"
-    " — required so plan-reviewer can verify the base branch",
+    " '| Task | Service | Files | AC count | Depends on |' — contract-contradiction-sweep",
+    "| Task | Service | Files | AC count | Depends on |" in _s124_architect,
+    "agents/architect.md first (Schema) template must include the Task Summary header",
 )
 check(
     "suite124(item9): agents/architect.md BOTH 01-plan.md templates contain"
-    " '| PR | Service | Base |' (count >= 2) — contract-contradiction-sweep",
-    _s124_architect.count("| PR | Service | Base |") >= 2,
-    "agents/architect.md must have the Base column in BOTH templates"
-    " (Schema + Full) — second (Full) template was the drifted copy",
+    " '| Task | Service | Files | AC count | Depends on |' (count >= 2) — contract-contradiction-sweep",
+    _s124_architect.count("| Task | Service | Files | AC count | Depends on |") >= 2,
+    "agents/architect.md must have the Task Summary header in BOTH templates"
+    " (Schema + Full) — the two templates must not drift apart",
 )
 check(
-    "suite124(item9): agents/architect.md contains '**Base:**' per-PR field"
-    " in both templates (count >= 2) — contract-contradiction-sweep",
-    _s124_architect.count("**Base:**") >= 2,
-    "agents/architect.md must have '**Base:**' per-PR field in BOTH templates"
-    " — second (Full) template was missing it",
+    "suite124(item9): agents/architect.md contains a '### Delivery Grouping' block"
+    " in both templates (count >= 2), with the Base column documented at least once"
+    " — contract-contradiction-sweep",
+    _s124_architect.count("### Delivery Grouping") >= 2
+    and "| PR | Tasks | Base | Reason |" in _s124_architect,
+    "agents/architect.md must have a '### Delivery Grouping' block in BOTH templates,"
+    " and the Base column documented — required so plan-reviewer can verify the base branch",
 )
 
 # Self-referential guards
@@ -30564,6 +30569,190 @@ check(
 )
 
 # Marker: event-enum-reconcile
+
+# ---------------------------------------------------------------------------
+# Suite 130 — dispatch-disambiguation (issue #444, concern 2)
+# ---------------------------------------------------------------------------
+# Structural backstop (cheap, alongside the expensive behavioral suite in
+# tests/test_th_decomposition_dispatch_behavioral.sh) asserting the
+# scoping qualifiers that disambiguate single-project multi-TASK dispatch
+# (parallel-by-default, ungated) from multi-PROJECT initiative fan-out
+# (confirm-gated), plus the always-run decomposition + decomposition-vs-
+# division reconciliation wording.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 130: dispatch-disambiguation structural checks ===")
+
+_s130_orch = read(AGENTS_DIR / "orchestrator.md")
+_s130_refspecial = read(AGENTS_DIR / "ref-special-flows.md")
+
+_S130_MULTITASK_ANCHOR = "## Multi-Task Orchestration"
+_S130_MULTITASK_STOP = ("\n### Step 1",)
+_s130_multitask_slice = _slice_section(
+    _s130_orch, _S130_MULTITASK_ANCHOR, _S130_MULTITASK_STOP
+)
+check(
+    "s130(a1): orchestrator.md § Multi-Task Orchestration anchor present + slice non-empty",
+    bool(_s130_multitask_slice),
+    "'## Multi-Task Orchestration' section not found in agents/orchestrator.md",
+)
+check(
+    "s130(a2): § Multi-Task Orchestration scopes itself to single-project multi-TASK dispatch",
+    "single-project, multi-TASK dispatch" in _s130_multitask_slice,
+    "Multi-Task Orchestration must state it governs single-project multi-TASK dispatch",
+)
+check(
+    "s130(a3): § Multi-Task Orchestration states it is NOT gated by a parallelism confirmation",
+    "NOT gated by a parallelism confirmation" in _s130_multitask_slice,
+    "Multi-Task Orchestration must state it is ungated by a parallelism confirm",
+)
+check(
+    "s130(a4): § Multi-Task Orchestration cross-references the multi-PROJECT fan-out as distinct",
+    "multi-PROJECT initiative fan-out" in _s130_multitask_slice,
+    "Multi-Task Orchestration must distinguish itself from the multi-PROJECT fan-out gate",
+)
+
+_S130_DECOMP_ANCHOR = "9. **Decomposition analysis (MANDATORY"
+_S130_DECOMP_STOP = ("\n## ",)
+_s130_decomp_slice = _slice_section(_s130_orch, _S130_DECOMP_ANCHOR, _S130_DECOMP_STOP)
+check(
+    "s130(b1): orchestrator.md Step 9 decomposition-analysis anchor present + slice non-empty",
+    bool(_s130_decomp_slice),
+    "Step 9 'Decomposition analysis (MANDATORY' item not found in agents/orchestrator.md",
+)
+check(
+    "s130(b2): Step 9 states the analysis always runs (never skipped)",
+    "always run, never skipped" in _s130_decomp_slice,
+    "Step 9 must state the decomposition analysis is always run, never skipped",
+)
+check(
+    "s130(b3): Step 9 enumerates the three valid outcomes (atomic / N-independent / oversized-surface)",
+    "one atomic task" in _s130_decomp_slice
+    and "N independent tasks" in _s130_decomp_slice
+    and "SURFACE it to the operator" in _s130_decomp_slice,
+    "Step 9 must enumerate all three valid decomposition outcomes",
+)
+check(
+    "s130(b4): Step 9 draws the decomposition-vs-division distinction",
+    "Decomposition vs division" in _s130_decomp_slice,
+    "Step 9 must cross-reference the decomposition-vs-division distinction",
+)
+check(
+    "s130(b5): Step 9's parallel-dispatch rule is scoped single-project and ungated",
+    "single-project scope, ungated by a parallelism confirm" in _s130_decomp_slice,
+    "the 'Parallel dispatch is the DEFAULT for 2+ tasks' rule must carry the single-project/ungated qualifier",
+)
+check(
+    "s130(b6): 'When NOT to batch' is reframed as a valid outcome, not a bypass",
+    "a valid result, not a bypass" in _s130_decomp_slice,
+    "'When NOT to batch' must be reframed as outcome (1) of the always-run analysis, not a skip",
+)
+
+_S130_FANOUT_ANCHOR = "### Fan-out confirm gate"
+_S130_FANOUT_STOP = ("\n### Gate semantics",)
+_s130_fanout_slice = _slice_section(_s130_orch, _S130_FANOUT_ANCHOR, _S130_FANOUT_STOP)
+check(
+    "s130(c1): orchestrator.md § Fan-out confirm gate anchor present + slice non-empty",
+    bool(_s130_fanout_slice),
+    "'### Fan-out confirm gate' section not found in agents/orchestrator.md",
+)
+check(
+    "s130(c2): Fan-out confirm gate scopes itself to the multi-PROJECT axis only",
+    "governs ONLY the multi-PROJECT initiative fan-out" in _s130_fanout_slice,
+    "Fan-out confirm gate must state it governs ONLY the multi-PROJECT axis",
+)
+check(
+    "s130(c3): Fan-out confirm gate distinguishes itself from single-project multi-task dispatch",
+    "does NOT apply to multi-task dispatch within a single project" in _s130_fanout_slice,
+    "Fan-out confirm gate must state it does not apply to single-project multi-task dispatch",
+)
+
+_S130_PDF_ANCHOR = "## Parallel Dispatch Flow (DEFAULT for 2+ tasks)"
+_S130_PDF_STOP = ("\n## ", "\n---\n")
+_s130_pdf_slice = _slice_section(_s130_refspecial, _S130_PDF_ANCHOR, _S130_PDF_STOP)
+check(
+    "s130(d1): ref-special-flows.md § Parallel Dispatch Flow anchor present + slice non-empty",
+    bool(_s130_pdf_slice),
+    "'## Parallel Dispatch Flow' section not found in agents/ref-special-flows.md",
+)
+check(
+    "s130(d2): § Parallel Dispatch Flow carries the single-project/multi-PROJECT scope note",
+    "Scope note:" in _s130_pdf_slice and "IS confirm-gated" in _s130_pdf_slice,
+    "§ Parallel Dispatch Flow must carry a scope note distinguishing it from the confirm-gated multi-PROJECT fan-out",
+)
+
+_S130_OAI_ANCHOR = "**Operator-authority invariant"
+_S130_OAI_STOP = ("\n### Batch consolidation",)
+_s130_oai_slice = _slice_section(_s130_refspecial, _S130_OAI_ANCHOR, _S130_OAI_STOP)
+check(
+    "s130(e1): ref-special-flows.md § Operator-authority invariant anchor present + slice non-empty",
+    bool(_s130_oai_slice),
+    "'Operator-authority invariant' section not found in agents/ref-special-flows.md",
+)
+check(
+    "s130(e2): Operator-authority invariant carries the decomposition-vs-division reconciling clause",
+    "Reconciling clause" in _s130_oai_slice
+    and "decomposition vs division" in _s130_oai_slice,
+    "Operator-authority invariant must carry the reconciling clause distinguishing decomposition (always-run) from division (never-autonomous)",
+)
+
+# Behavioral suite existence + auto-discovery + not wired into run-all.sh
+_S130_BEHAVIORAL_TEST = (
+    REPO_ROOT / "tests" / "test_th_decomposition_dispatch_behavioral.sh"
+)
+check(
+    "s130(f1): tests/test_th_decomposition_dispatch_behavioral.sh exists",
+    _S130_BEHAVIORAL_TEST.is_file(),
+    "the concern-2c behavioral suite file is missing",
+)
+if _S130_BEHAVIORAL_TEST.is_file():
+    _s130_behavioral_src = read(_S130_BEHAVIORAL_TEST)
+    check(
+        "s130(f2): behavioral suite asserts always-attempt-decomposition",
+        "DECOMPOSITION_RAN" in _s130_behavioral_src,
+        "behavioral suite must assert the decomposition analysis always runs",
+    )
+    check(
+        "s130(f3): behavioral suite asserts parallel-by-default for multi-task",
+        "DISPATCH_MODE" in _s130_behavioral_src,
+        "behavioral suite must assert parallel dispatch is the default for multi-task scope",
+    )
+    check(
+        "s130(f4): behavioral suite asserts no-parallelism-ask",
+        "ASKED_PARALLELISM" in _s130_behavioral_src,
+        "behavioral suite must assert the orchestrator does not ask sequential-vs-parallel",
+    )
+
+_s130_runall = read(REPO_ROOT / "tests" / "run-all.sh")
+check(
+    "s130(f5): the new behavioral suite is NOT wired into tests/run-all.sh",
+    "test_th_decomposition_dispatch_behavioral" not in _s130_runall,
+    "behavioral tests must stay out of run-all.sh — they are cost-gated, run via run-behavioral.sh",
+)
+
+# Self-referential guards (hygiene contract)
+_s130_own = read(Path(__file__))
+check(
+    "suite130(self-ref): test file contains 'Suite 130' and 'dispatch-disambiguation'",
+    "Suite 130" in _s130_own and "dispatch-disambiguation" in _s130_own,
+    "test file must self-reference Suite 130 and the marker 'dispatch-disambiguation'",
+)
+
+_s130_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite130(registry): docs/testing.md registers 'Suite 130' and 'dispatch-disambiguation'",
+    "Suite 130" in _s130_testing_md and "dispatch-disambiguation" in _s130_testing_md,
+    "docs/testing.md must register Suite 130 and the 'dispatch-disambiguation' marker",
+)
+
+_s130_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite130(hygiene): CLAUDE.md does NOT contain 'Suite 130' (§11 hygiene contract)",
+    "Suite 130" not in _s130_claude_md,
+    "CLAUDE.md must not mention Suite 130 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: dispatch-disambiguation
 
 # ---------------------------------------------------------------------------
 # Summary

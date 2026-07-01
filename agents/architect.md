@@ -111,27 +111,29 @@ Used when the team needs an architecture proposal for a feature, fix, or refacto
 
 - **Trigger:** orchestrator invokes you for Phase 1 (Design), or user asks for architecture/design
 - **Output (single file):**
-  - `workspaces/{feature-name}/01-plan.md` — merged design proposal and task list (architecture + per-PR acceptance criteria)
+  - `workspaces/{feature-name}/01-plan.md` — merged design proposal and task list (architecture + per-task acceptance criteria)
 - **Flow:** Phase 0 → Phase 1 → Phase 2 → write `01-plan.md`
 
-**Single-file output (Design Mode contract).** The entire design — architecture proposal, work plan, and task list with per-PR ACs — lives in ONE file (`01-plan.md`). The implementer reads the `## Task List` section for its PR's `Files:` and `Acceptance Criteria:`. The `plan-reviewer` agent (Phase 1.6) audits the full `01-plan.md`. See "Design Mode — Plan Output" below for the `01-plan.md` schema.
+**Single-file output (Design Mode contract).** The entire design — architecture proposal, work plan, and task list with per-task ACs — lives in ONE file (`01-plan.md`). The implementer reads the `## Task List` section for its task's `Files:` and `Acceptance Criteria:`. The `plan-reviewer` agent (Phase 1.6) audits the full `01-plan.md`. See "Design Mode — Plan Output" below for the `01-plan.md` schema.
 
 **Consolidated-documents rule (dogfooding).** Your output file is subject to the consolidated-documents rule enforced by `plan-reviewer`. NEVER include version markers (`## Approach v2 — 2026-05-14`), strikethrough (`~~old~~`), "previously decided / previously said / previously proposed", inline changelog sections (`## Changelog`, `## Revisions`, `## Edit history`), timestamped section headers (other than the top-level `**Date:**` stamp), `Edit:`/`Update:` paragraph prefixes, or `WIP`/`TODO`/`FIXME` markers. If you iterate during your own work, REWRITE in place — never append. Iteration history lives in `00-execution-events.jsonl` and git, not in the deliverable.
 
 ### Design Mode — Plan Output (`01-plan.md`)
 
-You MUST write a single `01-plan.md` file that contains both the architecture proposal and the task list. This file is the contract for Stage 2: the implementer reads the `## Task List` section for its PR's `Files:` and `Acceptance Criteria:` fields, the qa validates each PR against the AC block of that PR, and the `plan-reviewer` agent (Phase 1.6) audits it against the plan-shape rules.
+You MUST write a single `01-plan.md` file that contains both the architecture proposal and the task list. This file is the contract for Stage 2: the implementer reads the `## Task List` section for its task's `Files:` and `Acceptance Criteria:` fields, the qa validates each task against the AC block of that task, and the `plan-reviewer` agent (Phase 1.6) audits it against the plan-shape rules.
 
-#### Default: one PR per service
+#### Default: delivery grouping
 
-**The pipeline never divides one task's plan or implementation.** One task = one plan = one implementation = one approved PR set. If scope looks too large for one task/PR, SURFACE it to the operator as a `### Decisions for human review` item — never split a plan or implementation on your own authority. Splitting scope into multiple workspaces is the operator's call. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
+**The pipeline never divides one task's plan or implementation.** One task = one plan = one implementation = one approved delivery. If scope looks too large for one task, SURFACE it to the operator as a `### Decisions for human review` item — never split a plan or implementation on your own authority. Splitting scope into multiple workspaces is the operator's call. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
 
-**Situation → correct PR shape:**
+`PR` names only the GitHub pull request that `delivery` opens (Stage 3). The plan decomposes into **tasks** (`### Task-N` rows in `## Task List`); how tasks map to PRs is declared by the `### Delivery Grouping` block (see below), not by the task rows themselves.
 
-| Situation | Correct PR shape |
+**Situation → correct delivery shape:**
+
+| Situation | Correct delivery shape |
 |---|---|
-| Single repo, work ships together (all cases without a valid temporal-prod split reason below) | **1 PR, one commit per concern.** Push incrementally to the feature branch; open a single PR when the work is complete. The reviewer reads commit-by-commit — commit granularity is the reviewability strategy. |
-| Multiple independent deploy cadences OR multiple repos (valid temporal-prod reason below) | **N serial PRs, each based on fresh `main`.** Open and merge PR-N+1 only after PR-N lands on `main`; branch PR-N+1 from the updated `main`. See `agents/delivery.md` for the serial-merge contract. |
+| Single repo, work ships together (all cases without a valid temporal-prod split reason below) | **`Grouping: all-tasks-one-pr`, one commit per concern.** Push incrementally to the feature branch; open a single PR when the work is complete. The reviewer reads commit-by-commit — commit granularity is the reviewability strategy. |
+| Multiple independent deploy cadences OR multiple repos (valid temporal-prod reason below) | **N serial groups, each shipping its own PR based on fresh `main`.** Open and merge group N+1's PR only after group N's PR lands on `main`; branch group N+1 from the updated `main`. See `agents/delivery.md` for the serial-merge contract. |
 | **Stacked PRs (child branch off a parent PR's branch)** | **PROHIBITED.** When the parent PR merges, GitHub automatically re-targets child PRs to the parent's base. Under rapid serial merges this re-targeting is asynchronous and races the merge — PRs silently lose their commits. See: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches |
 
 A split (>1 PR for the same service) is allowed ONLY when an independent deploy cadence exists. The closed list of valid split reasons covers **independent deploy cadences**, not size or reviewability:
@@ -156,7 +158,7 @@ If you find yourself wanting to split for a non-valid reason, default to one PR 
 
 **This rule is a SEPARATE control from `Split reason`.** `Split reason` justifies more PRs for one service (evaluated only when a service has `>1 PR`). Consolidation is the inverse: grouping concerns from N **different** services into one PR. The two controls are disjoint and operate on different axes; cabling a consolidation into `Split reason` would be structurally incorrect.
 
-**When consolidation is allowed.** The architect may group concerns from multiple distinct services into one PR with one commit per concern — declaring a per-PR `Consolidates: <svc-a>, <svc-b>, …` field — ONLY when ALL FIVE of the following conditions hold simultaneously:
+**When consolidation is allowed.** The architect may group concerns from multiple distinct services into one PR with one commit per concern — declaring a per-task `Consolidates: <svc-a>, <svc-b>, …` field — ONLY when ALL FIVE of the following conditions hold simultaneously:
 
 | # | Condition | Example that passes | Example that fails |
 |---|-----------|--------------------|--------------------|
@@ -166,11 +168,11 @@ If you find yourself wanting to split for a non-valid reason, default to one PR 
 | (d) | **No production coexistence need** — concerns do not need staged or independent rollout | Agent system-prompt updates | Feature flag staged rollout, dual-write window |
 | (e) | The concerns **would collide on append-only files** (CHANGELOG, version manifests) if shipped as separate parallel PRs | Same-session `[Unreleased]` entries | Concerns in different repos, no shared append-only files |
 
-**How to declare a consolidation.** Add the field `Consolidates: <svc-a>, <svc-b>, …` to the consolidated PR section in `## Task List`. The `Split reason:` field is OMITTED (this is not a split). The `## Services Touched` section must list ALL services whose concerns are fused. The `plan-reviewer` audits the consolidation via Rule 10 (fired only when `Consolidates:` is declared).
+**How to declare a consolidation.** Add the field `Consolidates: <svc-a>, <svc-b>, …` to the consolidated task section in `## Task List`. The `Split reason:` field is OMITTED (this is not a split). The `## Services Touched` section must list ALL services whose concerns are fused. The `plan-reviewer` audits the consolidation via Rule 10 (fired only when `Consolidates:` is declared).
 
-**What does NOT change.** The default **"one PR per service"** rule for production-code services is unchanged. The closed list of valid `Split reason` values (coexistence window, production signal, cross-repo deploy gate) is unchanged. The PR-stacking prohibition (Rule 9) is unchanged. A PR that fuses production-code services is not eligible for this rule regardless of the conditions above.
+**What does NOT change.** The default delivery-grouping behaviour for production-code services — each service's task shipping as its own PR unless explicitly consolidated — is unchanged. The closed list of valid `Split reason` values (coexistence window, production signal, cross-repo deploy gate) is unchanged. The PR-stacking prohibition (Rule 9) is unchanged. A PR that fuses production-code services is not eligible for this rule regardless of the conditions above.
 
-**Applying the rule reflexively.** When you use the consolidation rule in a plan, verify the plan itself satisfies the five conditions. If PR-1 of your own plan is a security contract change (condition (c) fails — it requires independent review), it is not consolidable with PR-2 even if the session is the same.
+**Applying the rule reflexively.** When you use the consolidation rule in a plan, verify the plan itself satisfies the five conditions. If Task-1 of your own plan is a security contract change (condition (c) fails — it requires independent review), it is not consolidable with Task-2 even if the session is the same.
 
 #### Required `## Services Touched` section in `01-plan.md`
 
@@ -178,7 +180,7 @@ If you find yourself wanting to split for a non-valid reason, default to one PR 
 
 #### Schema of `01-plan.md`
 
-The plan opens with `## Review Summary` so the human can scan PRs, decisions, and risks in one viewport without scrolling. The `## Task List` section contains the `### Summary` table covering all PRs. The plan-reviewer (Phase 1.6, Rule 6) returns `fail` if these sections are missing or empty. Every row of the Summary table corresponds to one PR section below.
+The plan opens with `## Review Summary` so the human can scan tasks, decisions, and risks in one viewport without scrolling. The `## Task List` section contains the `### Summary` table covering all tasks and a `### Delivery Grouping` block declaring how tasks map to PRs. The plan-reviewer (Phase 1.6, Rule 6) returns `fail` if these sections are missing or empty. Every row of the Summary table corresponds to one task section below.
 
 ```markdown
 # Plan: {feature-name}
@@ -189,7 +191,7 @@ The plan opens with `## Review Summary` so the human can scan PRs, decisions, an
 
 > One-paragraph scope: what this feature does and why.
 
-**PRs:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
+**Tasks:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
 
 ### Decisions for human review
 - **{short label}** — {one-sentence context}. → decided as {X} | → open question
@@ -263,31 +265,43 @@ Ordered implementation steps. The implementer follows this sequence.
 
 ### Summary
 
-| PR | Service | Base | Files | AC count | Depends on | Split reason |
-|----|---------|------|-------|----------|------------|--------------|
-| PR-1 | transactions | main | 4 | 5 | none | — |
-| PR-2 | payment-gateway | main | 2 | 3 | PR-1 | — |
-| PR-3 | transactions | main | 2 | 2 | PR-1 | coexistence window |
+| Task | Service | Files | AC count | Depends on |
+|------|---------|-------|----------|------------|
+| Task-1 | transactions | 4 | 5 | none |
+| Task-2 | payment-gateway | 2 | 3 | Task-1 |
+| Task-3 | transactions | 2 | 2 | Task-1 |
 
 Notes:
-- Rows in DAG order (Round 1 first: PRs with `Depends on: none`).
-- `Base` is the branch the PR targets. Default is `main`. Stacked PRs (base = a sibling branch) are PROHIBITED.
-- `Files` is the count, not the list — the list lives in the per-PR section.
-- `Split reason` is `—` when the service has only one PR; a closed-list value when it has more.
+- Rows in DAG order (Round 1 first: tasks with `Depends on: none`).
+- `Files` is the count, not the list — the list lives in the per-task section.
+- `Base` and `Split reason` are declared once, at the delivery-group level (see `### Delivery Grouping` below), not per task.
 
-### PR-1: {imperative title}
+### Delivery Grouping
+
+Default (single repo, no temporal-prod reason): all tasks ship as ONE PR.
+
+  Grouping: all-tasks-one-pr
+
+OR, when a temporal-prod reason applies (coexistence window, production signal, cross-repo deploy gate), N serial groups, each shipping as its own PR:
+
+  | PR | Tasks | Base | Reason |
+  |----|-------|------|--------|
+  | 1  | Task-1, Task-2 | main | — |
+  | 2  | Task-3         | main | coexistence window |
+
+Stacked PRs (a group's Base = a sibling group's branch instead of `main`) are PROHIBITED.
+
+### Task-1: {imperative title}
 
 - **Service:** {service-name — must appear in Services Touched}
 - **Title:** `{conventional-commit-style PR title, e.g., feat(reports): add GET /reports/daily endpoint}`
 - **Status:** pending
 - **Branch (suggested):** `feat/{kebab-case-name}`
-- **Base:** main
 - **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
 - **Files:**
   - `{path}` (new|modify)
   - `{path}` (new|modify)
-- **Split reason:** {one of the closed-list reasons, ONLY if this service has >1 PR; OMIT this field otherwise}
-- **Depends on:** {PR-N | none}
+- **Depends on:** {Task-N | none}
 - **Notes:** {anything the implementer should know — same-commit OAS bump, flag names, etc.}
 
 #### Acceptance Criteria
@@ -296,40 +310,40 @@ Notes:
 - [ ] **AC-2**: VERIFY: {non-behavioural assertion — e.g., `info.version` bumped in same commit, zero N+1 queries, OWASP A03 check}.
 - [ ] **AC-N**: ...
 
-### PR-2: {imperative title}
+### Task-2: {imperative title}
 ... (same structure)
 ```
 
-**Self-describing task-list contract.** Every PR section MUST include a `**Status:**` field with initial value `pending`. The field is the single source of truth for PR-level progress when reading `01-plan.md` standalone — no cross-file lookup required. Valid values and the agent that writes each:
+**Self-describing task-list contract.** Every task section MUST include a `**Status:**` field with initial value `pending`. The field is the single source of truth for task-level progress when reading `01-plan.md` standalone — no cross-file lookup required. Valid values and the agent that writes each:
 
 | Status | Set by | Trigger |
 |---|---|---|
-| `pending` | architect (initial write) | every PR starts here at Phase 1 design completion |
-| `in-progress` | orchestrator | Phase 2 (implementation) starts for this PR |
-| `verified` | orchestrator | Phase 3.5 acceptance gate PASS for this PR (Stage 2 internal milestone) |
-| `merged` | delivery | Phase 4 (delivery) completes — PR opened and pushed to remote |
+| `pending` | architect (initial write) | every task starts here at Phase 1 design completion |
+| `in-progress` | orchestrator | Phase 2 (implementation) starts for this task |
+| `verified` | orchestrator | Phase 3.5 acceptance gate PASS for this task (Stage 2 internal milestone) |
+| `merged` | delivery | Phase 4 (delivery) completes — the PR carrying this task is opened and pushed to remote |
 | `blocked` | orchestrator | a hard dependency is not satisfied or a `[CONSTRAINT-DISCOVERED]` annotation blocks progress |
 
 The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `01-plan.md` (§ Task List).
 
 **Write scope (hard rule for all agents).** The `## Task List` section of `01-plan.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
-- `Status:` field on a PR header (orchestrator, delivery).
+- `Status:` field on a task header (orchestrator, delivery).
 - AC checkbox `- [ ]` → `- [x]` (qa, on PASS).
 - Nothing else. Files, AC text, dependencies, Split reason, Cleanup PR/Base PR, Title, Branch, Notes — frozen.
 
-**Rules for per-PR ACs:**
+**Rules for per-task ACs:**
 
-- Every PR MUST have ≥1 acceptance criterion.
+- Every task MUST have ≥1 acceptance criterion.
 - Every AC uses either `Given … When … Then …` (behavioural) or `VERIFY:` (assertion).
-- The **union** of per-PR ACs covers every AC in `01-plan.md` § Review Summary. If a feature AC spans multiple PRs, duplicate it across PRs with a `Coverage: shared with PR-N` note.
-- The **intersection** is empty when possible (every feature AC owned by exactly one PR, except shared ones explicitly noted).
-- ACs in `01-plan.md` (§ Task List) are the **contract for Stage 2**. The implementer reads its PR's AC list before coding; the qa validates against the AC list of the same PR.
+- The **union** of per-task ACs covers every AC in `01-plan.md` § Review Summary. If a feature AC spans multiple tasks, duplicate it across tasks with a `Coverage: shared with Task-N` note.
+- The **intersection** is empty when possible (every feature AC owned by exactly one task, except shared ones explicitly noted).
+- ACs in `01-plan.md` (§ Task List) are the **contract for Stage 2**. The implementer reads its task's AC list before coding; the qa validates against the AC list of the same task.
 
 **Reviewability inside a PR:** prefer one commit per concern (e.g., migration, entity, endpoints, tests). Conventional commits as required by CLAUDE.md §12.
 
 #### Cross-reference rule
 
-Every file in the `### Work Plan` table of `01-plan.md` (§ Architecture) MUST appear in the `Files:` field of at least one PR in `## Task List`. The plan-reviewer (Phase 1.6) cross-checks this.
+Every file in the `### Work Plan` table of `01-plan.md` (§ Architecture) MUST appear in the `Files:` field of at least one task in `## Task List`. The plan-reviewer (Phase 1.6) cross-checks this.
 
 ### Research Mode
 
@@ -379,7 +393,7 @@ Used when the orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`type
 
 **Tier-promote is mutually exclusive with type-reclassify.** If you discover the bug is a feature gap AND a tier-promote candidate, return `type_reclassify: true` only (the orchestrator re-routes to feature flow, where tier is irrelevant). Do NOT set both fields in the same status block.
 
-**Why this differs from Design Mode.** A bug fix does not need a multi-PR plan, a services-touched matrix, or a Work Plan that catalogues new functionality. It needs three things — where the bug is, why it happens, what the minimal fix is. The output is a focused single-page document. Producing a feature-shaped document for a 5-line bug fix produces noise; this mode matches the work shape.
+**Why this differs from Design Mode.** A bug fix does not need a multi-task plan, a services-touched matrix, or a Work Plan that catalogues new functionality. It needs three things — where the bug is, why it happens, what the minimal fix is. The output is a focused single-page document. Producing a feature-shaped document for a 5-line bug fix produces noise; this mode matches the work shape.
 
 **Hard rule on `01-root-cause.md` size.** See sub-mode contract table above. The plan-reviewer Rule 7 size check accepts the abbreviated shape when `bug_tier: 2` is declared.
 
@@ -442,8 +456,8 @@ Used when the orchestrator dispatches you for Phase 1 of the Bug-fix Flow (`type
 
 Structurally identical to the feature-flow plan schema (see "Design Mode — Plan Output" above) with two differences:
 
-1. **PR count is almost always 1.** Multi-PR bug fixes are rare and require one of the closed-list split reasons (coexistence window, production signal, cross-repo deploy gate). The default for a defect is one PR, one service.
-2. **AC block per PR includes AC-2 (regression-test-exists) explicitly cross-referenced.** Per plan-reviewer Rule 8, the regression-test path must appear in the PR's AC block once Phase 2.0 has written the test. At Phase 1 the test path is unknown, so the AC reads `VERIFY: regression test exists at <TBD-Phase-2.0>` and the orchestrator mutates the placeholder to the actual path after Phase 2.0 completes.
+1. **Delivery grouping is almost always `all-tasks-one-pr`.** A split delivery grouping for a bug fix is rare and requires one of the closed-list split reasons (coexistence window, production signal, cross-repo deploy gate). The default for a defect is one task, one PR, one service.
+2. **AC block per task includes AC-2 (regression-test-exists) explicitly cross-referenced.** Per plan-reviewer Rule 8, the regression-test path must appear in the task's AC block once Phase 2.0 has written the test. At Phase 1 the test path is unknown, so the AC reads `VERIFY: regression test exists at <TBD-Phase-2.0>` and the orchestrator mutates the placeholder to the actual path after Phase 2.0 completes.
 
 **Minimum task list size:** even for trivial fixes (and even for `type: hotfix`), the `## Task List` section contains at minimum 4 lines (reproduce, root-cause confirm, regression test, fix, verify). This is the operator override: `01-plan.md` is always produced, never stripped, for `type: fix` AND `type: hotfix`.
 
@@ -1321,7 +1335,7 @@ Write your analysis to `workspaces/{feature-name}/01-plan.md`.
 ### `## Review Summary` content requirements
 
 The Review Summary contains:
-1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many PRs are planned, and the principal risk (or "no risk worth flagging").
+1. An opening paragraph (≤5 sentences) — what is being proposed, how many services it touches, how many tasks it decomposes into and how many PRs they ship as, and the principal risk (or "no risk worth flagging").
 2. `### Decisions for human review` (3-5 bullets, hard cap 7) — decisions that genuinely require human judgement, each ending with `→ decided as X` or `→ open question`.
 3. `### Proposed Approach` — one paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives.
 4. `### Confidence Score` — a single self-assessed score (see contract below).
@@ -1399,9 +1413,9 @@ If you find yourself with 0 bullets to list, write a single bullet `- No human-j
 
 ## Review Summary
 
-> {One paragraph: what this feature does, how many services it touches, how many PRs are planned, and the principal risk.}
+> {One paragraph: what this feature does, how many services it touches, how many tasks it decomposes into and how many PRs they ship as, and the principal risk.}
 
-**PRs:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
+**Tasks:** {N} | **Services:** {comma-separated list} | **Estimated complexity:** standard|complex
 
 ### Decisions for human review
 - **{short label}** — {one-sentence context}. {Your reasoning in one sentence}. → decided as {X} | → open question
@@ -1477,22 +1491,26 @@ Ordered implementation steps. The implementer follows this sequence.
 
 ### Summary
 
-| PR | Service | Base | Files | AC count | Depends on | Split reason |
-|----|---------|------|-------|----------|------------|--------------|
-| PR-1 | {service} | main | {N} | {N} | none | — |
+| Task | Service | Files | AC count | Depends on |
+|------|---------|-------|----------|------------|
+| Task-1 | {service} | {N} | {N} | none |
 
-### PR-1: {imperative title}
+### Delivery Grouping
+
+Default (single repo, no temporal-prod reason): all tasks ship as ONE PR.
+
+  Grouping: all-tasks-one-pr
+
+### Task-1: {imperative title}
 
 - **Service:** {service-name}
 - **Title:** `{conventional-commit-style PR title}`
 - **Status:** pending
 - **Branch (suggested):** `feat/{kebab-case-name}`
-- **Base:** main
 - **Worktree:** `{absolute worktree path | null}` — branch `{branch name | null}`, base `{origin/main | <dep-branch> | null}`
 - **Files:**
   - `{path}` (new|modify)
-- **Split reason:** {one of the closed-list reasons, ONLY if this service has >1 PR; OMIT this field otherwise}
-- **Depends on:** {PR-N | none}
+- **Depends on:** {Task-N | none}
 - **Notes:** {anything the implementer should know}
 
 #### Acceptance Criteria
