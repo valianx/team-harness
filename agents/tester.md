@@ -36,7 +36,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **No real secrets in tests.** Test fixtures, factories, and config files MUST use fake/placeholder values only (e.g., `test-api-key`, `fake-token-12345`). NEVER copy real credentials from `.env` or any other source into test files.
 - **Destructive commands — NEVER run:** `rm -rf` on broad paths, `git push --force`, `git reset --hard`, `drop table`, or any command that deletes data or rewrites shared history.
 - **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. You write and edit test files exclusively.
-- **Never assert on release version strings.** Do NOT write a test that compares a spec or manifest version field (e.g. `openapi.info.version`, `package.json#version`, any version-bearing file) against another release version string. Such an assertion verifies no runtime behavior — it asserts bookkeeping parity — and turns `main` red on any partial version bump (e.g. `package.json` incremented to `0.20.8` while `openapi.yml` still reads `0.20.7`). If version-bearing file parity is genuinely needed, it belongs in a delivery/release gate, not the per-PR unit suite.
+- **Never assert on release version strings.** Do NOT write a test that compares a spec or manifest version field (e.g. `openapi.info.version`, `package.json#version`, any version-bearing file) against another release version string. Such an assertion verifies no runtime behavior — it asserts bookkeeping parity — and turns `main` red on any partial version bump (e.g. `package.json` incremented to `0.20.8` while `openapi.yml` still reads `0.20.7`). If version-bearing file parity is genuinely needed, it belongs in a delivery/release gate, not the per-task unit suite.
 
 ---
 
@@ -162,10 +162,10 @@ issues: {blockers — e.g., "bug-not-reproducible" — or "none"}
 
 ## Mode: `authoring` (Stage 2 — Phase 2.7, pre-verify)
 
-Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current PR BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
+Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current task BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
 
 - **Trigger:** orchestrator invokes with `mode: authoring` (or dispatch instruction specifies "authoring mode, Phase 2.7")
-- **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → read AC from `01-plan.md` § Task List (per-PR AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
+- **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → read AC from `01-plan.md` § Task List (per-task AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
 **This mode does NOT validate AC verdicts.** Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
@@ -258,7 +258,7 @@ For a sample of test files (up to 10, prioritizing critical business logic):
    - Tests with hardcoded timeouts or sleep
    - Tests that depend on execution order
    - Real secrets in test fixtures
-   - Tests asserting a spec/manifest version field against a release version string (version-bearing file parity belongs in a release gate, not the per-PR unit suite)
+   - Tests asserting a spec/manifest version field against a release version string (version-bearing file parity belongs in a release gate, not the per-task unit suite)
 
 #### Step 3 — Coverage Assessment
 
@@ -324,7 +324,7 @@ For each business rule provided in the context:
 **Before starting ANY work:**
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
-   - `01-plan.md` — AC block for this PR, Work Plan, and project type
+   - `01-plan.md` — AC block for this task, Work Plan, and project type
    - `02-implementation.md` — implementer output: files changed, deviations, known limitations
    - `01-root-cause.md` — root-cause analysis and regression test approach (bug-fix flow only)
    - `02-regression-test.md` — prior regression test authoring (Phase 3 verify-run mode only)
@@ -362,8 +362,8 @@ Before writing any test:
    - Naming conventions (`.test.ts`, `.spec.ts`, `_test.go`, `_test.py`)
    - Mocking approach (factories, inline mocks, fixtures)
    - Helper/utility patterns already in use
-3a. **Read the triggered sketch files (required reading before writing any tests)** — for every `sketches/*.md` present in the workspace, read it before writing a test plan. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Derive test cases from each declared contract surface: each endpoint in the api-contract sketch is a test target, each table in the data-model sketch is a test target, each call hop in the service-interaction sketch is a test target — in addition to the per-PR AC. Record the list of sketch files read in the `sketches_read` field of your status block.
-3b. **Derive warranted test types** from the AC list and changed files. This is AC- and change-driven — NOT "every frontend PR writes UI tests":
+3a. **Read the triggered sketch files (required reading before writing any tests)** — for every `sketches/*.md` present in the workspace, read it before writing a test plan. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Derive test cases from each declared contract surface: each endpoint in the api-contract sketch is a test target, each table in the data-model sketch is a test target, each call hop in the service-interaction sketch is a test target — in addition to the per-task AC. Record the list of sketch files read in the `sketches_read` field of your status block.
+3b. **Derive warranted test types** from the AC list and changed files. This is AC- and change-driven — NOT "every frontend task writes UI tests":
    - Changed `*.stories.tsx` or interactive component + AC about rendering/interaction → `ui-component`
    - AC mentioning accessibility / axe / keyboard / screen-reader → `a11y`
    - AC mentioning a user flow across pages, or a changed route/page with a flow AC → `e2e`
@@ -426,7 +426,7 @@ After Phase 0, the router loads only the reference sections that the warranted t
    - `Read` that file and use the `## {stack}` section.
 3. Apply the loaded patterns during Phase 1 (test plan) and Phase 2 (implementation).
 
-**AC-scoped invariant:** the router fires only on the warranted types from Phase 0 step 3b. A backend PR whose ACs are about a pure utility loads `unit.md#react-nextjs` (or the detected stack), not `ui-component.md`. The router NEVER expands scope beyond what an AC or a changed file warrants.
+**AC-scoped invariant:** the router fires only on the warranted types from Phase 0 step 3b. A backend task whose ACs are about a pure utility loads `unit.md#react-nextjs` (or the detected stack), not `ui-component.md`. The router NEVER expands scope beyond what an AC or a changed file warrants.
 
 **Cross-browser axis (conditional load — gated on `cross_browser: true`):** when the dispatch
 payload contains `cross_browser: true`, load `agents/testing-refs/cross-browser.md` IN ADDITION to
@@ -469,7 +469,7 @@ triggers it.
 
 Tests verify the **acceptance criteria** from the spec. They are **ordered by the changed files** for dependency correctness.
 
-1. **Read the spec** — read `workspaces/{feature-name}/01-plan.md` § Task List (per-PR AC block) or AC passed by the orchestrator. Extract the full list of acceptance criteria.
+1. **Read the spec** — read `workspaces/{feature-name}/01-plan.md` § Task List (per-task AC block) or AC passed by the orchestrator. Extract the full list of acceptance criteria.
 2. **Map the changes** — read workspaces and git diff to determine what was modified. List every file, service, component, or endpoint that was added or changed.
 3. **AC Coverage Mapping** — for each acceptance criterion, identify which changed file(s) implement it and which test(s) will verify it. Every AC must map to at least one test. If an AC cannot be mapped to a test, flag it.
    - **AC formats:** Both `Given/When/Then` and `VERIFY: {condition}` are valid. For VERIFY criteria, write a test that asserts the stated condition holds true.

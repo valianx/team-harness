@@ -66,7 +66,7 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 **Browser-real signal hints:** when an AC depends on real browser behavior — layout geometry (`getBoundingClientRect`/`offsetWidth`), `IntersectionObserver`/`ResizeObserver`, `matchMedia`/viewport breakpoints (375px/768px/1024px), Web Animations/CSS transitions, or computed CSS — state that dependency EXPLICITLY in the Then clause. Example: `…Then the lazy image loads when it intersects the viewport (IntersectionObserver)`. The tester routes such AC to browser-real environments; AC that omit the signal default to jsdom.
 
-**AC format:** append to the existing PR's AC list using Given/When/Then format:
+**AC format:** append to the existing task's AC list using Given/When/Then format:
 ```
 - [ ] Given a screen reader, When navigating the {component}, Then all interactive elements are announced with their role and label
 - [ ] Given a mobile viewport (375px), When viewing {page}, Then content reflows without horizontal scroll
@@ -74,14 +74,14 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 ### AC sink — 01-plan.md § Task List
 
-**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-PR AC block), not only into `01-ux-review.md`. The acceptance gate at Phase 3.5 and the acceptance-checker at Phase 3.6 both read AC from `01-plan.md § Task List` — AC that exist only in `01-ux-review.md` are never evaluated by any gate.
+**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-task AC block), not only into `01-ux-review.md`. The acceptance gate at Phase 3.5 and the acceptance-checker at Phase 3.6 both read AC from `01-plan.md § Task List` — AC that exist only in `01-ux-review.md` are never evaluated by any gate.
 
 **Procedure:**
 1. Write the full UX narrative (findings, checklist evaluation, existing patterns) in `01-ux-review.md`.
 2. Extract the recommended AC additions (Given/When/Then format) from `## Recommended AC Additions`.
-3. Append those AC to `01-plan.md § Task List` in the per-PR AC block, using contiguous numbering after the architect's last AC.
+3. Append those AC to `01-plan.md § Task List` in the per-task AC block, using contiguous numbering after the architect's last AC.
 
-**Resolution of prior contradiction:** the output field at the top of this mode (`Output: 01-ux-review.md`) describes the UX narrative file. The text "append to the existing PR's AC list" at the AC format section means append to `01-plan.md § Task List` — not exclusively to `01-ux-review.md`. Both files receive the AC: `01-ux-review.md` as narrative context, `01-plan.md § Task List` as the gate-binding pin. `01-plan.md § Task List` is the primary, authoritative AC sink.
+**Resolution of prior contradiction:** the output field at the top of this mode (`Output: 01-ux-review.md`) describes the UX narrative file. The text "append to the existing task's AC list" at the AC format section means append to `01-plan.md § Task List` — not exclusively to `01-ux-review.md`. Both files receive the AC: `01-ux-review.md` as narrative context, `01-plan.md § Task List` as the gate-binding pin. `01-plan.md § Task List` is the primary, authoritative AC sink.
 
 ### Mode: validate (Stage 3 — invoked in parallel with tester/qa/security)
 
@@ -138,7 +138,7 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 
 ## Recommended AC Additions
 
-### PR {N}: {title}
+### Task-{N}: {title}
 - [ ] {Given/When/Then AC}
 - [ ] {Given/When/Then AC}
 
