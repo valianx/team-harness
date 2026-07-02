@@ -26,6 +26,13 @@ knowledge-graph/server.log
 mise.toml
 .mise.toml
 
-# Phase-4 TS hook build artifacts (contributor/build-time; not committed)
-hooks/ts/dist/
+# Phase-4 TS hook build artifacts — node_modules stays untracked; dist/ is
+# committed (the CC plugin distributes the git tree with no build step).
 hooks/ts/node_modules/
+
+# opencode test suites (test_opencode_session_enforcement.sh, test_opencode_config_resolver.sh)
+# compile scratch CJS bundles of *.opencode.ts entries straight into dist/ for their own
+# in-process Node execution. Those entries ship as raw TS to the opencode runtime (never
+# bundled by `npm run build`), so the scratch bundles are test-local, not distributed.
+hooks/ts/dist/*.opencode.cjs
+hooks/ts/dist/opencode-plugin.cjs
