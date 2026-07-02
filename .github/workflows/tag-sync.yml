@@ -34,6 +34,10 @@ jobs:
             echo "Error: could not read .version from .claude-plugin/plugin.json" >&2
             exit 1
           fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: .version '${VERSION}' is not a strict X.Y.Z SemVer — refusing to build a tag from it." >&2
+            exit 1
+          fi
           TAG="v${VERSION}"
 
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "refs/tags/${TAG}"; then

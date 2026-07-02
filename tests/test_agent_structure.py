@@ -13974,6 +13974,22 @@ check(
     ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into session-start.sh",
 )
 
+# subagent.start breadcrumb — .claude-plugin/hooks.json wires the TS hook on the Task matcher
+_ph_pretool = _plugin_hooks.get("hooks", {}).get("PreToolUse", [])
+_ph_subagent_start_cmds = [
+    hk.get("command", "")
+    for entry in _ph_pretool
+    if "Task" in entry.get("matcher", "")
+    for hk in entry.get("hooks", [])
+    if "subagent-start" in hk.get("command", "")
+]
+check(
+    "subagent-start(plugin-hooks-wired): .claude-plugin/hooks.json wires subagent-start.cjs on the Task matcher",
+    len(_ph_subagent_start_cmds) == 1
+    and "hooks/ts/dist/subagent-start.cjs" in _ph_subagent_start_cmds[0],
+    ".claude-plugin/hooks.json must wire node hooks/ts/dist/subagent-start.cjs under a PreToolUse Task matcher — the deterministic subagent.start breadcrumb (issue #452); losing this wiring silently drops in-flight lane observability",
+)
+
 # ---------------------------------------------------------------------------
 # AC-8 / AC-13 — docs/dev-mode.md: gate + disposition mechanism + reconciliation
 # ---------------------------------------------------------------------------
