@@ -61,6 +61,12 @@ trap cleanup_all EXIT
 #     exit-nonzero    — valid JS that calls process.exit(3)
 #     garbage-stdout  — valid JS that prints non-JSON, non-decision text
 #     good-none       — real logic that emits a legitimate empty decision
+#     fake-decision-substring — non-JSON text containing the literal
+#                       "permissionDecision" substring (proves the launcher
+#                       parses the envelope instead of grepping for it)
+#     nonzero-silent  — valid JS that calls process.exit(7) with no stdout
+#                       (proves the fail-open capture path swallows the
+#                       non-zero exit instead of propagating it)
 #   Prints the fixture root path.
 # ---------------------------------------------------------------------------
 make_fixture() {
@@ -89,6 +95,12 @@ make_fixture() {
             ;;
         good-none)
             printf 'process.stdout.write("");\nprocess.exit(0);\n' > "$cjs"
+            ;;
+        fake-decision-substring)
+            printf 'process.stdout.write("corrupt artifact but mentions permissionDecision anyway");\n' > "$cjs"
+            ;;
+        nonzero-silent)
+            printf 'process.exit(7);\n' > "$cjs"
             ;;
     esac
     echo "$tmp"
@@ -159,6 +171,19 @@ for hook in policy-block dev-guard gcp-guard prepublish-guard checkpoint-guard; 
 done
 
 # ---------------------------------------------------------------------------
+# Deny-floors — non-JSON output that merely CONTAINS the literal
+# "permissionDecision" substring must still deny. Proves the launcher parses
+# the envelope (JSON.parse + field check) instead of grepping for the
+# substring, which a corrupt artifact could fake.
+# ---------------------------------------------------------------------------
+echo
+echo "=== Deny-floors: fake substring match (not real JSON) -> DENY ==="
+for hook in policy-block dev-guard gcp-guard prepublish-guard checkpoint-guard; do
+    root=$(make_fixture "$hook" "fake-decision-substring")
+    assert_deny "$hook / fake-decision-substring" "$root" "$hook"
+done
+
+# ---------------------------------------------------------------------------
 # Deny-floors — a legitimate "none" decision (real logic, empty stdout,
 # exit 0) still passes through unchanged. This is the load-bearing check
 # that the hardening does not regress the common case: most tool calls
@@ -192,6 +217,19 @@ for mode in $FAILURE_MODES; do
     root=$(make_fixture "notify-stage" "$mode")
     assert_no_deny_decision "notify-stage / $mode" "$root" "notify-stage"
 done
+
+# ---------------------------------------------------------------------------
+# worktree-guard (advisory) and observational (notify-stage) — a node
+# runtime that exits non-zero with no stdout must not propagate that exit
+# status. The launcher captures output instead of exec-replacing the shell,
+# so the failure is swallowed and the launcher itself always exits 0.
+# ---------------------------------------------------------------------------
+echo
+echo "=== advisory/observational: node exits non-zero -> launcher exits 0 silently ==="
+root=$(make_fixture "worktree-guard" "nonzero-silent")
+assert_silent_exit0 "worktree-guard / node exits non-zero" "$root" "worktree-guard"
+root=$(make_fixture "notify-stage" "nonzero-silent")
+assert_silent_exit0 "notify-stage / node exits non-zero" "$root" "notify-stage"
 
 # ---------------------------------------------------------------------------
 # Regression guard: real dist artifacts still pass through on a benign

@@ -106,7 +106,7 @@ get_hooks_for_matcher() {
     local matcher="$1"
     if command -v python3 >/dev/null 2>&1; then
         python3 - "$HOOKS_JSON" "$matcher" "$REPO_ROOT" <<'PYEOF'
-import json, sys, os, re
+import json, sys, os, re, shlex
 
 hooks_json_path = sys.argv[1]
 target_matcher  = sys.argv[2]
@@ -126,8 +126,10 @@ for entry in data.get("hooks", {}).get("PreToolUse", []):
             # Extract the interpreter's argv: "bash <script> [args...]" or
             # "node <script>" — parts[0] is the interpreter, parts[1] is the
             # script, parts[2:] are the args passed to it (e.g. the hook name
-            # for run-ts-hook.sh).
-            parts = cmd.strip().split()
+            # for run-ts-hook.sh). shlex.split (not str.split) so a quoted
+            # script path ("$VAR/…/run-ts-hook.sh") resolves to the bare path,
+            # not a token still carrying its quote characters.
+            parts = shlex.split(cmd.strip())
             if len(parts) >= 2 and parts[0] in ("bash", "node"):
                 script = parts[1]
                 args = " ".join(parts[2:])
@@ -140,6 +142,7 @@ PYEOF
             | grep '"command"' \
             | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/' \
             | sed "s|\${CLAUDE_PLUGIN_ROOT}|${REPO_ROOT}|g" \
+            | sed 's/\\"//g' \
             | awk '{args=""; for(i=3;i<=NF;i++){args=args (i>3?" ":"") $i}; print $2"\t"args}'
     fi
 }

@@ -62,11 +62,14 @@ if [ ! -f "$CJS" ]; then
   exit 0
 fi
 
-# worktree-guard and observational hooks keep the original exec-replace path:
-# any failure here is fail-open by contract (silent exit 0), so there is
-# nothing to inspect after the fact.
+# worktree-guard and observational hooks are fail-open by contract: a node
+# runtime failure must not propagate a non-zero exit (that would look like a
+# tool-call block). Capture output instead of exec-replacing the shell, so a
+# crash here is swallowed rather than surfaced.
 if [ "$CLASS" != "deny-floor" ]; then
-  exec node "$CJS"
+  OUTPUT="$(node "$CJS" 2>/dev/null)" || exit 0
+  [ -n "$OUTPUT" ] && printf '%s\n' "$OUTPUT"
+  exit 0
 fi
 
 # Deny-floors only, from here on (SEC-PR2-001).
@@ -91,11 +94,24 @@ fi
 
 # A non-empty stdout that isn't a well-formed decision envelope (e.g. a
 # partial write, or a node body that printed something other than the
-# expected JSON) is corruption, not a legitimate decision — deny. Every
-# real decision (allow/ask/deny) carries "permissionDecision"; "none" is
-# legitimately empty and was already ruled out by the STATUS/size checks
-# above, so it is not re-flagged here.
-if [ -n "$OUTPUT" ] && ! printf '%s' "$OUTPUT" | grep -q '"permissionDecision"'; then
+# expected JSON) is corruption, not a legitimate decision — deny. A substring
+# grep on "permissionDecision" is not enough: a corrupt artifact could print
+# non-JSON text that merely contains the literal string. Parse the envelope
+# for real and confirm the decision value is one of the three valid ones.
+# "none" is legitimately empty and was already ruled out by the STATUS/size
+# checks above, so it is not re-flagged here.
+if [ -n "$OUTPUT" ] && ! printf '%s' "$OUTPUT" | node -e '
+  let raw = "";
+  process.stdin.on("data", (chunk) => { raw += chunk; });
+  process.stdin.on("end", () => {
+    try {
+      const decision = JSON.parse(raw).hookSpecificOutput.permissionDecision;
+      process.exit(["allow", "ask", "deny"].includes(decision) ? 0 : 1);
+    } catch {
+      process.exit(1);
+    }
+  });
+' 2>/dev/null; then
   deny "hook runtime produced no valid decision"
 fi
 

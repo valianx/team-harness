@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh language-user-prompt",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" language-user-prompt",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh session-start",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" session-start",
             "timeout": 5
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh policy-block",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" policy-block",
             "timeout": 5
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh dev-guard",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" dev-guard",
             "timeout": 5
           }
         ]
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh gcp-guard",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" gcp-guard",
             "timeout": 5
           }
         ]
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh worktree-guard",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" worktree-guard",
             "timeout": 5
           }
         ]
@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh prepublish-guard",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" prepublish-guard",
             "timeout": 120
           }
         ]
@@ -80,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh checkpoint-guard",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" checkpoint-guard",
             "timeout": 5
           }
         ]
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh dev-guard",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" dev-guard",
             "timeout": 5
           }
         ]
@@ -112,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" notify-stage",
             "timeout": 5
           }
         ]
@@ -124,7 +124,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh subagent-trace",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" subagent-trace",
             "timeout": 5
           }
         ]
@@ -136,7 +136,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh precompact-snapshot",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh\" precompact-snapshot",
             "timeout": 5
           }
         ]

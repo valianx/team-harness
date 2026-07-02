@@ -373,7 +373,7 @@ assert_file_contains \
 assert_file_contains \
     "AC-5b: hooks.json UserPromptSubmit entry invokes run-ts-hook.sh language-user-prompt" \
     "$PLUGIN_HOOKS" \
-    "run-ts-hook.sh language-user-prompt"
+    'run-ts-hook.sh\" language-user-prompt'
 
 # ---------------------------------------------------------------------------
 # Summary

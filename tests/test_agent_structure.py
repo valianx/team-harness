@@ -40,6 +40,18 @@ def check(name: str, condition: bool, detail: str = "") -> None:
     print(f"  [{status}] {name}{suffix}")
 
 
+def invokes_launcher(command: str, hook_name: str) -> bool:
+    """True if `command` routes through run-ts-hook.sh with `hook_name`.
+
+    The script path may or may not be double-quoted (`"${VAR}/…/run-ts-hook.sh"`
+    vs the unquoted legacy form) — both are valid invocations of the launcher.
+    Matches both a parsed JSON string (a literal `"`) and the raw hooks.json
+    file text (an escaped `\"`).
+    """
+    pattern = r"run-ts-hook\.sh(\\)?\"?\s+" + re.escape(hook_name) + r"\b"
+    return re.search(pattern, command) is not None
+
+
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -407,7 +419,7 @@ if _ptu_bash_entry:
     _ptu_bash_cmd = (_ptu_bash_entry.get("hooks", [{}])[0]).get("command", "")
     check(
         "hooks.json PreToolUse command routes through run-ts-hook.sh policy-block",
-        "run-ts-hook.sh policy-block" in _ptu_bash_cmd,
+        invokes_launcher(_ptu_bash_cmd, "policy-block"),
         f"command does not invoke the launcher with policy-block: '{_ptu_bash_cmd}'",
     )
 
@@ -12574,7 +12586,7 @@ if _s55_checkpoint_task_entry:
     _s55_task_cmd = (_s55_checkpoint_task_entry.get("hooks", [{}])[0]).get("command", "")
     check(
         "Suite 55(3b): hooks.json Task entry routes through run-ts-hook.sh checkpoint-guard",
-        "run-ts-hook.sh checkpoint-guard" in _s55_task_cmd,
+        invokes_launcher(_s55_task_cmd, "checkpoint-guard"),
         f"Task hook command does not invoke the launcher with checkpoint-guard: '{_s55_task_cmd}'",
     )
 
@@ -13943,7 +13955,7 @@ check(
 )
 check(
     "dev-mode(plugin-hooks-sessionstart-wired): .claude-plugin/hooks.json wires session-start via run-ts-hook.sh",
-    "run-ts-hook.sh session-start" in _ph_ss_cmd,
+    invokes_launcher(_ph_ss_cmd, "session-start"),
     ".claude-plugin/hooks.json must wire the launcher with session-start for SessionStart — the consolidated hook that loads dev-mode, language, and workspace-mode",
 )
 check(
@@ -21148,13 +21160,13 @@ check(
 check(
     "suite93(ac9-hooks-json-registered): .claude-plugin/hooks.json registers "
     "worktree-guard for the plugin-runtime path",
-    "run-ts-hook.sh worktree-guard" in _s93_hooks_json,
+    invokes_launcher(_s93_hooks_json, "worktree-guard"),
     ".claude-plugin/hooks.json must wire the launcher with worktree-guard",
 )
 check(
     "suite93(ac9-hooks-json-bash-matcher): .claude-plugin/hooks.json worktree-guard entry "
     "is under PreToolUse with Bash matcher",
-    "run-ts-hook.sh worktree-guard" in _s93_hooks_json
+    invokes_launcher(_s93_hooks_json, "worktree-guard")
     and "PreToolUse" in _s93_hooks_json
     and '"Bash"' in _s93_hooks_json,
     ".claude-plugin/hooks.json worktree-guard must be a PreToolUse Bash-matched entry",
@@ -28213,7 +28225,7 @@ _s117_hj_hooks = _s117_hooks_json.get("hooks", {})
 _hj_subagent_entries = _s117_hj_hooks.get("SubagentStop", [])
 _hj_has_subagent = any(
     any(
-        "run-ts-hook.sh subagent-trace" in h.get("command", "")
+        invokes_launcher(h.get("command", ""), "subagent-trace")
         for h in entry.get("hooks", [])
     )
     for entry in _hj_subagent_entries
@@ -28234,7 +28246,7 @@ check(
 _hj_precompact_entries = _s117_hj_hooks.get("PreCompact", [])
 _hj_has_precompact = any(
     any(
-        "run-ts-hook.sh precompact-snapshot" in h.get("command", "")
+        invokes_launcher(h.get("command", ""), "precompact-snapshot")
         for h in entry.get("hooks", [])
     )
     for entry in _hj_precompact_entries
@@ -28326,7 +28338,7 @@ _S117_FLOORS = ["policy-block", "dev-guard", "gcp-guard", "worktree-guard", "che
 _hj_pretooluse = _s117_hj_hooks.get("PreToolUse", [])
 for _floor_name in _S117_FLOORS:
     _hj_floor_present = any(
-        any(f"run-ts-hook.sh {_floor_name}" in h.get("command", "") for h in entry.get("hooks", []))
+        any(invokes_launcher(h.get("command", ""), _floor_name) for h in entry.get("hooks", []))
         for entry in _hj_pretooluse
     )
     check(
@@ -28714,7 +28726,7 @@ _s118_hj_hooks = _s118_hooks_json.get("hooks", {})
 _s118_hj_pretooluse = _s118_hj_hooks.get("PreToolUse", [])
 _hj118_prepublish_entries = [
     e for e in _s118_hj_pretooluse
-    if any("run-ts-hook.sh prepublish-guard" in h.get("command", "") for h in e.get("hooks", []))
+    if any(invokes_launcher(h.get("command", ""), "prepublish-guard") for h in e.get("hooks", []))
 ]
 check(
     "suite118(ac11-hooks-json-prepublish-own-entry): .claude-plugin/hooks.json has prepublish-guard as its OWN PreToolUse entry",
@@ -28723,7 +28735,7 @@ check(
 )
 _hj118_devguard_bash_entries = [
     e for e in _s118_hj_pretooluse
-    if any("run-ts-hook.sh dev-guard" in h.get("command", "") for h in e.get("hooks", []))
+    if any(invokes_launcher(h.get("command", ""), "dev-guard") for h in e.get("hooks", []))
     and e.get("matcher", "") == "Bash"
 ]
 check(
@@ -28733,8 +28745,8 @@ check(
 )
 _hj118_combined = [
     e for e in _s118_hj_pretooluse
-    if any("run-ts-hook.sh prepublish-guard" in h.get("command", "") for h in e.get("hooks", []))
-    and any("run-ts-hook.sh dev-guard" in h.get("command", "") for h in e.get("hooks", []))
+    if any(invokes_launcher(h.get("command", ""), "prepublish-guard") for h in e.get("hooks", []))
+    and any(invokes_launcher(h.get("command", ""), "dev-guard") for h in e.get("hooks", []))
 ]
 check(
     "suite118(ac11-no-combined-entry): hooks.json does NOT merge prepublish-guard and dev-guard into one entry",
@@ -28833,7 +28845,7 @@ check(
 _hj118_prepublish_timeout = None
 for _entry in _s118_hj_pretooluse:
     for _h in _entry.get("hooks", []):
-        if "run-ts-hook.sh prepublish-guard" in _h.get("command", ""):
+        if invokes_launcher(_h.get("command", ""), "prepublish-guard"):
             _hj118_prepublish_timeout = _h.get("timeout")
 check(
     "suite118(ac16-wiring-timeout-hooks-json): .claude-plugin/hooks.json prepublish-guard entry has timeout: 120",
