@@ -1,3 +1,0 @@
-### Security
-- `gcp-guard`'s raw-payload catastrophic fail-safe (`RAW_CATASTROPHIC_RE`) used an invalid POSIX bracket class (`[^[:space:]"]`) instead of a JS non-whitespace class (`[^\s"]`), so the `organizations <arg> delete` alternative never matched a real payload — the org-delete variant of the fail-safe added by SEC-PR2-002 was unreachable. Fixed to `[^\s"]+` and covered by a new regression case.
-- `policy-block`'s curl secret-scan predicate (`curlCarriesAuthHeader`) matched only the `-H` flag; `curl --header 'Authorization: Bearer …'` bypassed the secret scan because curl treats `-H` and `--header` as equivalent. Broadened to match both flag forms.
