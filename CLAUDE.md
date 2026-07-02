@@ -74,7 +74,8 @@ team-harness/
 ├── .github/
 │   └── workflows/
 │       ├── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
-│       └── pages.yml    Publish bootstrap scripts to GitHub Pages on release
+│       ├── pages.yml    Publish bootstrap scripts to GitHub Pages on release
+│       └── test.yml     PR/main verification: policy-block + structure + frontmatter suites
 ├── assets.go            go:embed entry point (package teamharness) — embeds agents/, skills/, hooks/
 ├── go.mod               Go module (Go 1.23)
 ├── docs/
