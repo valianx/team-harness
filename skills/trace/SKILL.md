@@ -486,6 +486,39 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 
 ---
 
+## Parallel region rendering (fan-out)
+
+**When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § Initiative-level fan-out trace`). No new flag — this is additive output on the existing default-mode invocation.
+
+**Source:** the initiative-level file lives at the initiative root, not inside `workspaces/{feature-name}/`:
+```
+{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/00-execution-events.jsonl   (local mode)
+{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md  (obsidian mode)
+```
+Detect the `.md` variant first (Glob), then `.jsonl`, applying the same fence-extraction as every other mode above.
+
+**Derivation.** Filter to `fanout.*` events. Group `fanout.lane.start` / `fanout.lane.end` pairs by `project` (matched on the shared `project` key). A lane with a `start` and no matching `end` is still running; a lane with both is closed, with `end.status` (`success`/`failed`/`iterating`) as its outcome. `fanout.converge` marks the region's closing boundary — its `lanes[]` array is the authoritative per-lane final status when present.
+
+**Render:**
+```
+Parallel region — {initiative}
+=============================
+fanout.start  {ts}  eligible: {eligible_projects joined by ", "}  cap: {cap}
+
+  {project-a}   {ts_start} → {ts_end | "running"}   {status}
+  {project-b}   {ts_start} → {ts_end | "running"}   {status}
+
+fanout.converge  {ts | "(not yet — region still open)"}
+```
+
+Lanes render side-by-side in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while a region is open.
+
+**`--cost` interaction.** When a `fanout.start`/`fanout.converge` pair is present, `--cost` sums token counts across all lanes' own `{project}/00-execution-events.*` files (each lane keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`.
+
+**Fail-soft.** No `initiative` field, no initiative-level events file, no `fanout.*` events, or a read/parse error → omit this section silently. It never blocks or degrades any other mode.
+
+---
+
 ## Error handling
 
 - **Feature name not found / no workspaces folder:** report and suggest `/th:pipelines` to see available features. Exit cleanly.

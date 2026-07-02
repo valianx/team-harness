@@ -145,6 +145,60 @@ This makes the breadcrumb a deterministic observability floor: any `TH_HOOK_PROF
 value can suppress notifications and richer observability, but it cannot erase
 proof that a `th:*` boundary occurred.
 
+### subagent.start — PreToolUse breadcrumb (start-side twin)
+
+Written by `hooks/ts/dist/subagent-start.cjs` (PreToolUse event, matcher
+`Task`). This is the first hook authored under Decision A (CLAUDE.md §6.3)
+with no Bash body — TypeScript is the single source, not a port. It fires
+BEFORE a Team Harness pipeline subagent (`subagent_type` starting with
+`th:`) is dispatched and appends one line to the SAME `00-subagent-trace.jsonl`
+sink as the `subagent.stop` breadcrumb above, so start/stop pairs are
+derivable from a single file.
+
+Line schema:
+```json
+{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>"}
+```
+
+`agent_id` is intentionally absent — at PreToolUse time the runtime has not
+yet assigned one (it only becomes observable on the corresponding
+`SubagentStop` payload). Readers pair a `subagent.start` line with the next
+`subagent.stop` line carrying the same `agent_type` in file order.
+
+**Complements, never replaces, `phase.end`.** Same relationship as the stop
+breadcrumb: this file proves a `th:*` boundary occurred and, paired with the
+stop line, how long it has been in flight — it carries no tokens, no
+per-phase detail, no result. The orchestrator's `phase.end` events remain the
+authoritative rich record.
+
+**Wiring asymmetry (temporary).** `.claude-plugin/hooks.json` wires this hook
+directly to `node ${CLAUDE_PLUGIN_ROOT}/hooks/ts/dist/subagent-start.cjs` —
+there is no fail-closed launcher yet (that mechanism lands with the
+Bash→TS hook cutover). `hooks/config.json` (the legacy Go-installer path)
+does NOT wire this hook: the legacy installer does not yet copy
+`hooks/ts/dist/` to `~/.claude/hooks/`, so a launcher-less direct `node`
+command would point at a path that does not exist on that install path. The
+cutover task closes this asymmetry by teaching `installHooks` to copy
+`hooks/ts/dist/*.cjs` and wiring both paths through the same launcher.
+
+**Fail-open, not fail-closed.** Absent `node`, a missing `.cjs`, or any
+internal error degrades to a lost breadcrumb — it never blocks the `Task`
+dispatch. This is deliberate: this hook pilots the `node → dist/*.cjs`
+execution mechanism on a live fleet, at a cost of a lost breadcrumb, ahead of
+the security floors adopting the same mechanism behind a fail-closed launcher.
+
+**Non-suppressible by design.** Unlike `subagent-trace.ts` (the stop-side TS
+body, which is gated by `observabilityEnabled("pipeline-observability")`),
+the start-side body does NOT import the hook-profile helper — it inherits the
+Bash oracle's original invariant that this class of breadcrumb must never be
+erasable by `TH_HOOK_PROFILE`.
+
+**Reader.** `/th:pipelines` derives in-flight lanes (agent type + elapsed
+time since start) from unpaired `subagent.start` lines and shows duration for
+complete start/stop pairs; the render is fail-soft (no file, or no pairs,
+omits the section silently). See `skills/pipelines/SKILL.md § In-flight
+lanes`.
+
 ### 00-precompact.jsonl — PreCompact breadcrumb
 
 Written by `hooks/precompact-snapshot.sh` (PreCompact event, matcher
@@ -241,6 +295,8 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 **`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps) and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure.
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when a fan-out is actually dispatched. Single-project runs (`initiative: null`) and serial multi-project runs do not produce this file. The file is mandatory for any run where `fanout.start` fires — a fan-out that emits no initiative-level trace violates the observability contract.
+
+**Implementation status.** Both renderers documented above are implemented: `skills/pipelines/SKILL.md § Initiative fan-out — parent/child lane rows` and `skills/trace/SKILL.md § Parallel region rendering (fan-out)`.
 
 ## Additional pipeline event types
 

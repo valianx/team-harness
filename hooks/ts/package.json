@@ -15,7 +15,8 @@
     "build:language-user-prompt": "npx esbuild entry/language-user-prompt.cc.ts --bundle --platform=node --format=cjs --outfile=dist/language-user-prompt.cjs --external:node:*",
     "build:subagent-trace": "npx esbuild entry/subagent-trace.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-trace.cjs --external:node:*",
     "build:precompact-snapshot": "npx esbuild entry/precompact-snapshot.cc.ts --bundle --platform=node --format=cjs --outfile=dist/precompact-snapshot.cjs --external:node:*",
-    "build": "npm run build:dev-guard && npm run build:policy-block && npm run build:checkpoint-guard && npm run build:prepublish-guard && npm run build:gcp-guard && npm run build:worktree-guard && npm run build:session-start && npm run build:language-user-prompt && npm run build:subagent-trace && npm run build:precompact-snapshot && echo 'all builds ok'",
+    "build:subagent-start": "npx esbuild entry/subagent-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-start.cjs --external:node:*",
+    "build": "npm run build:dev-guard && npm run build:policy-block && npm run build:checkpoint-guard && npm run build:prepublish-guard && npm run build:gcp-guard && npm run build:worktree-guard && npm run build:session-start && npm run build:language-user-prompt && npm run build:subagent-trace && npm run build:precompact-snapshot && npm run build:subagent-start && echo 'all builds ok'",
     "typecheck": "npx tsc --noEmit"
   }
 }
