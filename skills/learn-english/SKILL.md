@@ -84,7 +84,7 @@ If the file is simply absent: for `on`/`off`, treat as an empty document `{}` an
 3. Merge-write: set `english_learning` to the JSON boolean `true`. Do NOT touch `language` in this step. All other keys preserved.
 4. Emit the immersion prompt:
 
-```
+```text
 th learn-english — enabled
 
   english_learning    true
@@ -102,7 +102,7 @@ Also set English as the response language for immersion? [y/N]
 
    **Final report (no-immersion path):**
 
-   ```
+   ```text
    th learn-english — enabled
 
      english_learning    true
@@ -112,7 +112,7 @@ Also set English as the response language for immersion? [y/N]
 
    **Final report (immersion path):**
 
-   ```
+   ```text
    th learn-english — enabled
 
      english_learning    true

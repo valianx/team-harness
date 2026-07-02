@@ -491,7 +491,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
 **When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § Initiative-level fan-out trace`). No new flag — this is additive output on the existing default-mode invocation.
 
 **Source:** the initiative-level file lives at the initiative root, not inside `workspaces/{feature-name}/`:
-```
+```text
 {common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/00-execution-events.jsonl   (local mode)
 {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md  (obsidian mode)
 ```
@@ -500,7 +500,7 @@ Detect the `.md` variant first (Glob), then `.jsonl`, applying the same fence-ex
 **Derivation.** Filter to `fanout.*` events. Group `fanout.lane.start` / `fanout.lane.end` pairs by `project` (matched on the shared `project` key). A lane with a `start` and no matching `end` is still running; a lane with both is closed, with `end.status` (`success`/`failed`/`iterating`) as its outcome. `fanout.converge` marks the region's closing boundary — its `lanes[]` array is the authoritative per-lane final status when present.
 
 **Render:**
-```
+```text
 Parallel region — {initiative}
 =============================
 fanout.start  {ts}  eligible: {eligible_projects joined by ", "}  cap: {cap}
