@@ -116,20 +116,47 @@ const CONFIG_WEAKENING_PATTERNS: Array<[RegExp, string]> = [
 ];
 
 // ---------------------------------------------------------------------------
-// HIGH_CONFIDENCE_SECRETS — verbatim from policy-block.sh (10 classes)
+// HIGH_CONFIDENCE_SECRETS — verbatim from policy-block.sh (14 classes)
 // Reason names the CLASS, never the matched value (CWE-200 / AC-15).
+// sk-ant- MUST precede the generic sk-(proj-|svcacct-)? pattern (same fire
+// order as the Bash oracle) so an Anthropic key gets its own labelled deny
+// instead of falling through to the generic OpenAI-style label.
 // ---------------------------------------------------------------------------
 const HIGH_CONFIDENCE_SECRETS: Array<[RegExp, string]> = [
   [/AKIA[0-9A-Z]{16}/, "AWS access key (AKIA… pattern)"],
   [/\bghp_[A-Za-z0-9]{36}\b/, "GitHub personal access token (ghp_… pattern)"],
   [/\bgithub_pat_[A-Za-z0-9_]{22,}\b/, "GitHub fine-grained PAT (github_pat_… pattern)"],
   [/-----BEGIN (?:RSA |EC |OPENSSL |DSA )?PRIVATE KEY-----/, "PEM private key header"],
+  [/\bsk-ant-[A-Za-z0-9_-]{20,}\b/, "Anthropic API key (sk-ant-… pattern)"],
   [/\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/, "OpenAI-style secret key (sk-… pattern)"],
   [/\bAIza[0-9A-Za-z_\-]{35}\b/, "Google API key (AIza… pattern)"],
   [/\b[rs]k_live_[0-9A-Za-z]{16,}\b/, "Stripe live secret key (sk_live_/rk_live_ pattern)"],
   [/\bglpat-[0-9A-Za-z_\-]{20}\b/, "GitLab personal access token (glpat-… pattern)"],
   [/\bgh[osru]_[A-Za-z0-9]{36}\b/, "GitHub OAuth/server/refresh/user token (gho_/ghs_/ghr_/ghu_ pattern)"],
   [/\bxoxb-[A-Za-z0-9-]{10,}\b/, "Slack bot token (xoxb-… pattern)"],
+  [/\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/, "SendGrid API key (SG.… pattern)"],
+  [/\bAC[0-9a-f]{32}\b/, "Twilio account SID (AC… pattern)"],
+  [/\bSK[0-9a-f]{32}\b/, "Twilio API key SID (SK… pattern)"],
+];
+
+// ---------------------------------------------------------------------------
+// MEDIUM_CONFIDENCE_SECRETS_FIXED — verbatim from policy-block.sh (3 classes)
+// Fixed-shape medium-confidence patterns, routed to ask() (not deny()) —
+// entropy gating does not apply to these (the shape itself is the signal).
+// ---------------------------------------------------------------------------
+const MEDIUM_CONFIDENCE_SECRETS_FIXED: Array<[RegExp, string]> = [
+  [
+    /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/,
+    "possible JWT token (eyJ… three-segment base64url pattern)",
+  ],
+  [
+    /\bBearer\s+[A-Za-z0-9_/+.=-]{20,}\b/,
+    "possible Bearer token (Bearer … keyword pattern)",
+  ],
+  [
+    /\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^\s'"]{30,}\b/,
+    "possible Azure SAS token (sv=… signature pattern)",
+  ],
 ];
 
 // ---------------------------------------------------------------------------
@@ -362,6 +389,13 @@ function scanForSecrets(content: string): NormalizedDecision | null {
     }
   }
 
+  // Medium-confidence fixed-shape patterns (JWT, Bearer, Azure SAS) — ask.
+  for (const [pattern, label] of MEDIUM_CONFIDENCE_SECRETS_FIXED) {
+    if (pattern.test(content)) {
+      return ask(`possible secret detected: ${label}`);
+    }
+  }
+
   // Medium-confidence: entropy-gated ask.
   // Reset global regex lastIndex before iteration.
   MEDIUM_CONFIDENCE_PATTERN.lastIndex = 0;
@@ -405,8 +439,18 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
       return deny("--no-verify (bypasses pre-commit hooks)");
     }
 
-    // Secret scan on commit-Bash commands only.
-    if (/\bgit\s+commit\b/.test(cmd)) {
+    // Secret scan on Bash commands that can carry secrets inline.
+    // Broadened from git-commit-only to also cover curl/wget --data forms,
+    // tee redirection (tee file << EOF), and env/export assignments —
+    // verbatim parity with policy-block.sh's _should_scan_bash gate.
+    const shouldScanBash =
+      /\bgit\s+commit\b/.test(cmd) ||
+      /\bcurl\b.*--data(?:-[a-z]+)?\b/i.test(cmd) ||
+      /\bwget\b.*--post-(?:data|file)\b/i.test(cmd) ||
+      /\btee\b/.test(cmd) ||
+      /\bexport\s+\w+\s*=/.test(cmd) ||
+      /\benv\s+\w+=/.test(cmd);
+    if (shouldScanBash) {
       const secretDecision = scanForSecrets(cmd);
       if (secretDecision !== null) return secretDecision;
     }
