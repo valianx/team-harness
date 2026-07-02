@@ -463,7 +463,7 @@ echo
 echo "=== F008-RT-1: mcp__claude_ai_ClickUp__clickup_update_task (unconditional) -> EXACT ASK ==="
 TMP_F008_RT1=$(make_tmp_with_marker)
 F008_RT1_PAYLOAD='{"tool_name":"mcp__claude_ai_ClickUp__clickup_update_task","tool_input":{}}'
-OUT_F008_RT1=$( ( export PATH="/usr/bin:/bin"; HOME="$TMP_F008_RT1" node "$DEV_GUARD_HOOK" <<< "$F008_RT1_PAYLOAD" 2>/dev/null ) || true )
+OUT_F008_RT1=$( ( HOME="$TMP_F008_RT1" node "$DEV_GUARD_HOOK" <<< "$F008_RT1_PAYLOAD" 2>/dev/null ) || true )
 assert_exact_ask "F008-RT-1: multi-word ClickUp server (underscore segment) outward write -> ask" "$OUT_F008_RT1"
 
 # Case F008-RT-2: single-word ClickUp server (no underscores in server segment)
@@ -473,7 +473,7 @@ echo
 echo "=== F008-RT-2 (regression guard): mcp__clickup__clickup_create_task (unconditional) -> EXACT ASK ==="
 TMP_F008_RT2=$(make_tmp_with_marker)
 F008_RT2_PAYLOAD='{"tool_name":"mcp__clickup__clickup_create_task","tool_input":{}}'
-OUT_F008_RT2=$( ( export PATH="/usr/bin:/bin"; HOME="$TMP_F008_RT2" node "$DEV_GUARD_HOOK" <<< "$F008_RT2_PAYLOAD" 2>/dev/null ) || true )
+OUT_F008_RT2=$( ( HOME="$TMP_F008_RT2" node "$DEV_GUARD_HOOK" <<< "$F008_RT2_PAYLOAD" 2>/dev/null ) || true )
 assert_exact_ask "F008-RT-2: single-word ClickUp server outward write -> ask (regression guard)" "$OUT_F008_RT2"
 
 # Case F008-RT-3: ClickUp read/GET tool (not in write alternation) -> NO DECISION (no over-match)
@@ -482,7 +482,7 @@ echo
 echo "=== F008-RT-3: mcp__claude_ai_ClickUp__clickup_get_task (read verb) -> NODECISION (not over-matched) ==="
 TMP_F008_RT3=$(make_tmp_with_marker)
 F008_RT3_PAYLOAD='{"tool_name":"mcp__claude_ai_ClickUp__clickup_get_task","tool_input":{}}'
-OUT_F008_RT3=$( ( export PATH="/usr/bin:/bin"; HOME="$TMP_F008_RT3" node "$DEV_GUARD_HOOK" <<< "$F008_RT3_PAYLOAD" 2>/dev/null ) || true )
+OUT_F008_RT3=$( ( HOME="$TMP_F008_RT3" node "$DEV_GUARD_HOOK" <<< "$F008_RT3_PAYLOAD" 2>/dev/null ) || true )
 assert_nodecision "F008-RT-3: ClickUp read tool (get_task) -> nodecision (write gate does not over-match reads)" "$OUT_F008_RT3"
 
 
