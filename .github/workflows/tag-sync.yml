@@ -41,19 +41,20 @@ jobs:
           TAG="v${VERSION}"
 
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "refs/tags/${TAG}"; then
-            echo "Tag ${TAG} already exists on origin — no-op."
-            exit 0
+            echo "Tag ${TAG} already exists on origin — skipping tag creation, still dispatching release.yml (idempotent: a re-dispatch on an existing tag does not strand the release)."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "${TAG}"
+            git push origin "${TAG}"
+            echo "Pushed tag ${TAG}."
           fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${TAG}"
-          git push origin "${TAG}"
-          echo "Pushed tag ${TAG}."
 
           # A tag created via GITHUB_TOKEN does not trigger other workflows'
           # `on: push: tags` listeners (GitHub's Actions recursion
           # prevention), so release.yml must be dispatched explicitly with
           # the tag it expects (release.yml workflow_dispatch input: tag).
-          gh workflow run release.yml --ref main -f tag="${TAG}"
+          # --ref pins the dispatch to the tag itself so release.yml builds
+          # the tagged commit, not a possibly-drifted main.
+          gh workflow run release.yml --ref "${TAG}" -f tag="${TAG}"
           echo "Dispatched release.yml for ${TAG}."
