@@ -353,7 +353,10 @@ echo "############################################################"
 echo "# F-010: checkpoint-guard obsidian logs-mode resolution"
 echo "############################################################"
 
-TASK_PAYLOAD='{"subagent_type":"th:architect","prompt":"plan this"}'
+# Realistic Claude Code PreToolUse Task payload shape: subagent_type lives
+# under tool_input, not at the payload root (T6c — checkpoint-guard.sh and
+# its fixtures were corrected together to the nested shape).
+TASK_PAYLOAD='{"tool_name":"Task","tool_input":{"subagent_type":"th:architect","prompt":"plan this"}}'
 
 # Case F010-1: armed state in vault path outside CWD → DENY
 echo
