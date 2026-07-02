@@ -424,7 +424,7 @@ function evaluate(input) {
       return deny("--no-verify (bypasses pre-commit hooks)");
     }
     const curlCarriesData = /\bcurl\b.*(?:--data(?:-[a-z]+)?\b|\s-d\b|--json\b|\s-F\b|--form\b)/i.test(cmd);
-    const curlCarriesAuthHeader = /\bcurl\b.*-H\s+['"]?Authorization:\s*Bearer\b/i.test(cmd);
+    const curlCarriesAuthHeader = /\bcurl\b.*(?:-H|--header)\s+['"]?Authorization:\s*Bearer\b/i.test(cmd);
     const shouldScanBash = /\bgit\s+commit\b/.test(cmd) || curlCarriesData || curlCarriesAuthHeader || /\bwget\b.*--post-(?:data|file)\b/i.test(cmd) || /\btee\b/.test(cmd) || /\bexport\s+\w+\s*=/.test(cmd) || /\benv\s+\w+=/.test(cmd);
     if (shouldScanBash) {
       const secretDecision = scanForSecrets(cmd);

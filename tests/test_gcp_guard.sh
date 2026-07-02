@@ -396,6 +396,21 @@ assert_nodecision \
     "$_case11b_payload"
 
 # ---------------------------------------------------------------------------
+# Case 12 — CodeRabbit finding [5]: RAW_CATASTROPHIC_RE used an invalid POSIX
+# class [^[:space:]"] (matches literal chars [, :, s, p, a, c, e, ], " — NOT
+# non-whitespace) instead of [^\s"], so the "organizations <arg> delete"
+# alternative of the Step-5 raw-payload fail-safe never matched a real org
+# name. Regression test for the fix: command field absent + raw payload
+# contains "organizations <org> delete" -> DENY.
+# ---------------------------------------------------------------------------
+echo
+echo "=== Case 12: command field absent + 'organizations abc delete' in raw payload -> DENY (RAW_CATASTROPHIC_RE org fix) ==="
+_case12_payload='{"tool_name":"Bash","tool_input":{"raw_input":"gcloud organizations abc delete"}}'
+assert_deny \
+    "command absent, catastrophic org-delete verb elsewhere in tool_input -> deny (fail-safe reachable)" \
+    "$_case12_payload"
+
+# ---------------------------------------------------------------------------
 # Additional contract validations
 # ---------------------------------------------------------------------------
 

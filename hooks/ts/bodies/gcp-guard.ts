@@ -55,7 +55,7 @@ const CATASTROPHIC_ORGS_RE = /gcloud\s+.*organizations\s+[^\s"]+\s+delete([\s"]|
 
 // Fail-safe raw-payload patterns (Step 5 equivalent).
 const RAW_CATASTROPHIC_RE =
-  /projects\s+delete|resource-manager\s+folders\s+delete|organizations\s+[^[:space:]"]+\s+delete([\s"]|$)/;
+  /projects\s+delete|resource-manager\s+folders\s+delete|organizations\s+[^\s"]+\s+delete([\s"]|$)/;
 const RAW_DESTRUCTIVE_RE =
   /(^|\s)(delete|remove-[a-z]|purge|clear-[a-z]|destroy)(\s|$|")/;
 
