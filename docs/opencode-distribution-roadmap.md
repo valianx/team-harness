@@ -1,6 +1,6 @@
 # Opencode Distribution-Layer Roadmap
 
-> **Status: built (opencode installer in production).** The Go installer (`cmd/install/`) ships a full plan/apply/uninstall engine with an append-only ownership ledger and all SEC-01..08 guards, wired for the opencode runtime. The updater (`install update`) and bootstrap scripts (`bin/update-opencode.{sh,ps1}`) are production-ready. This document records what is built, what is genuinely residual, and the design contracts that govern the residual work.
+> **Status: beta — installer core production-ready; hook cutover and lifecycle unification in progress.** The Go installer (`cmd/install/`) ships a full plan/apply/uninstall engine with an append-only ownership ledger and all SEC-01..08 guards, wired for the opencode runtime. The updater (`install update`) and bootstrap scripts (`bin/update-opencode.{sh,ps1}`) are production-ready. This document records what is built, what is genuinely residual, and the design contracts that govern the residual work.
 
 ## Build status — buildable-now-vs-defer
 
