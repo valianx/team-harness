@@ -30755,6 +30755,137 @@ check(
 # Marker: dispatch-disambiguation
 
 # ---------------------------------------------------------------------------
+# Suite 131 — release-tag-sync (issue #450)
+#
+# Structural guard for the release-tag unification fix: an explicit
+# post-merge tag step in both operator-facing (skills/release/SKILL.md) and
+# agent-contract (agents/delivery.md) surfaces, plus (when present) the
+# deterministic tag-sync.yml workflow that dispatches release.yml — since a
+# GITHUB_TOKEN-created tag does not itself trigger release.yml's
+# `on: push: tags` listener (Actions recursion prevention).
+#
+# AC coverage:
+#   AC-1 — skills/release/SKILL.md and agents/delivery.md both document the
+#          explicit post-merge tag step (dev-guard gated).
+#   AC-2/AC-4/AC-5 — if tag-sync.yml exists: path-filtered trigger, version
+#          read, idempotent no-op guard, workflow_dispatch of release.yml
+#          with the `tag` input, minimal pinned permissions.
+#
+# Marker: release-tag-sync
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 131: release-tag-sync structural checks ===")
+
+_s131_skill = read(REPO_ROOT / "skills" / "release" / "SKILL.md")
+_s131_delivery = read(AGENTS_DIR / "delivery.md")
+
+_S131_SKILL_STOPS = ("\n## ", "\n---\n")
+_s131_skill_slice = _slice_section(
+    _s131_skill, "## Step 3 — Create and push the release tag", _S131_SKILL_STOPS
+)
+check(
+    "s131(a1): skills/release/SKILL.md documents an explicit post-merge tag step",
+    bool(_s131_skill_slice),
+    "'## Step 3 — Create and push the release tag' not found in skills/release/SKILL.md",
+)
+check(
+    "s131(a2): SKILL.md tag step includes 'git tag' and 'git push'",
+    "git tag" in _s131_skill_slice and "git push" in _s131_skill_slice,
+    "SKILL.md tag step must show the actual git tag + push commands",
+)
+check(
+    "s131(a3): SKILL.md tag step states it is dev-guard gated",
+    "dev-guard" in _s131_skill_slice,
+    "SKILL.md tag step must state the push is gated by hooks/dev-guard.sh",
+)
+
+_S131_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
+_s131_delivery_slice = _slice_section(
+    _s131_delivery, "### Step 11.4c — Release tag creation", _S131_DELIVERY_STOPS
+)
+check(
+    "s131(b1): agents/delivery.md documents the release tag step in its Return Protocol contract",
+    bool(_s131_delivery_slice),
+    "'### Step 11.4c — Release tag creation' not found in agents/delivery.md",
+)
+check(
+    "s131(b2): delivery.md tag step is gated on release-mode and PR-merged",
+    "release-mode: true" in _s131_delivery_slice and "confirmed merged" in _s131_delivery_slice,
+    "delivery.md tag step must gate on release-mode: true AND the PR being confirmed merged",
+)
+check(
+    "s131(b3): delivery.md tag step includes 'git tag' and states dev-guard gating",
+    "git tag" in _s131_delivery_slice and "dev-guard.sh" in _s131_delivery_slice,
+    "delivery.md tag step must show the git tag command and state hooks/dev-guard.sh gating",
+)
+check(
+    "s131(b4): delivery.md Return Protocol status block declares 'release_tag:'",
+    "release_tag:" in _s131_delivery,
+    "agents/delivery.md Return Protocol status block must declare a 'release_tag:' field",
+)
+
+_S131_TAG_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "tag-sync.yml"
+_s131_tag_sync_exists = _S131_TAG_SYNC_PATH.is_file()
+if _s131_tag_sync_exists:
+    _s131_tag_sync = read(_S131_TAG_SYNC_PATH)
+    check(
+        "s131(c1): tag-sync.yml triggers on push to main filtered to .claude-plugin/plugin.json",
+        "branches: [main]" in _s131_tag_sync
+        and ".claude-plugin/plugin.json" in _s131_tag_sync,
+        "tag-sync.yml must trigger on push to main, paths-filtered to .claude-plugin/plugin.json",
+    )
+    check(
+        "s131(c2): tag-sync.yml reads the version from plugin.json",
+        ".version" in _s131_tag_sync,
+        "tag-sync.yml must read the 'version' field out of .claude-plugin/plugin.json",
+    )
+    check(
+        "s131(c3): tag-sync.yml guards tag creation with an existing-tag check (idempotent no-op)",
+        "already exists" in _s131_tag_sync,
+        "tag-sync.yml must no-op cleanly when the tag already exists",
+    )
+    check(
+        "s131(c4): tag-sync.yml dispatches release.yml via workflow_dispatch with the 'tag' input",
+        "gh workflow run release.yml" in _s131_tag_sync and "tag=" in _s131_tag_sync,
+        "tag-sync.yml must dispatch release.yml via workflow_dispatch, passing the 'tag' input "
+        "(a GITHUB_TOKEN-created tag push does not itself trigger release.yml)",
+    )
+    check(
+        "s131(c5): tag-sync.yml permissions are exactly contents:write + actions:write",
+        "contents: write" in _s131_tag_sync and "actions: write" in _s131_tag_sync,
+        "tag-sync.yml must declare contents: write and actions: write permissions",
+    )
+    check(
+        "s131(c6): tag-sync.yml pins third-party actions to a version tag (no unpinned 'uses:')",
+        "actions/checkout@v" in _s131_tag_sync,
+        "tag-sync.yml must pin actions/checkout to a version tag",
+    )
+
+# Self-referential guards (hygiene contract)
+_s131_own = read(Path(__file__))
+check(
+    "suite131(self-ref): test file contains 'Suite 131' and 'release-tag-sync'",
+    "Suite 131" in _s131_own and "release-tag-sync" in _s131_own,
+    "test file must self-reference Suite 131 and the marker 'release-tag-sync'",
+)
+
+_s131_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite131(registry): docs/testing.md registers 'Suite 131' and 'release-tag-sync'",
+    "Suite 131" in _s131_testing_md and "release-tag-sync" in _s131_testing_md,
+    "docs/testing.md must register Suite 131 and the 'release-tag-sync' marker",
+)
+
+_s131_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite131(hygiene): CLAUDE.md does NOT contain 'Suite 131' (§11 hygiene contract)",
+    "Suite 131" not in _s131_claude_md,
+    "CLAUDE.md must not mention Suite 131 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: release-tag-sync
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

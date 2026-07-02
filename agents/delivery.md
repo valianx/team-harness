@@ -1040,6 +1040,34 @@ worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-presen
 
 ---
 
+### Step 11.4c — Release tag creation (post-merge, release-mode; conditional)
+
+**Gate:** run only when BOTH of the following are true:
+1. `release-mode: true` was passed in the task context (this is `/th:release`'s deferred-cut convention, not the shipped default — see Step 9's release-mode row).
+2. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
+
+When either condition is false, this step is a no-op — log `release_tag: skipped: not-release-mode` or `release_tag: skipped: pr-not-merged` and continue.
+
+**Create and push the tag:**
+
+```bash
+git checkout main
+git pull origin main
+git tag v{X.Y.Z}
+git push origin v{X.Y.Z}
+```
+
+`{X.Y.Z}` is the version bumped in Step 9 for this release. The `git push` is an outward action — it is gated by `hooks/dev-guard.sh` like any other push and requires operator approval; it is never auto-approved.
+
+**Why this step exists.** `.github/workflows/release.yml` (the opencode artifact pipeline — cross-compiled install binaries, `VERSION` asset, GitHub Release) triggers only on `push: tags: ["v*"]`. Without an explicit tag push, that pipeline never runs and opencode operators silently fall behind CC operators, who receive the new version through `claude plugin update` as soon as the PR merges. `.github/workflows/tag-sync.yml` is a deterministic backstop that watches `main` for changes to `.claude-plugin/plugin.json` and pushes the same tag if this step is skipped — it does not replace this step; both exist so a forgotten tag is not the only line of defense.
+
+**Log the outcome** — add one line to the delivery status block:
+```
+release_tag: created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged
+```
+
+---
+
 ### Step 11.5 — Persist a process-insight to the knowledge graph (passive capture)
 
 **Best-effort** — if the Memory MCP server is unavailable, log the skip and continue. Never fail the delivery on KG errors.
@@ -1459,6 +1487,7 @@ dod: {pass | no gates discovered | failed: <command>}
 mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
 ci_state: passing | failing | pending | none | not-verified
 worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
+release_tag: created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged   # release-mode only (Step 11.4c); omit outside release-mode
 context7_consult: hit:N miss:N skipped:N
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a delivery decision; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
