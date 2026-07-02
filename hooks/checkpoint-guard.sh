@@ -70,9 +70,13 @@ except Exception:
 " <<< "$input" 2>/dev/null || true)
 else
     # Fallback: minimal grep-based extraction (conservative — only exact key
-    # match). Not JSON-structure-aware, so it matches "subagent_type" anywhere
-    # in the payload regardless of nesting — already tool_input-agnostic.
-    subagent_type=$(printf '%s' "$input" | grep -o '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"subagent_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
+    # match). Not JSON-structure-aware, so first isolate the tool_input object
+    # (a flat Task-argument object: subagent_type, prompt, description — no
+    # nested braces in practice) and search within it, matching the python3
+    # path's tool_input scoping instead of matching "subagent_type" anywhere
+    # in the payload.
+    tool_input_json=$(printf '%s' "$input" | grep -o '"tool_input"[[:space:]]*:[[:space:]]*{[^}]*}' | head -1 || true)
+    subagent_type=$(printf '%s' "$tool_input_json" | grep -o '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"subagent_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
 fi
 
 # ---------------------------------------------------------------------------
