@@ -65,7 +65,7 @@ function makeReader(): PrepublishReader {
       }
     },
 
-    gitDiffNameStatus(): Array<{ status: string; path: string }> | null {
+    gitDiffNameStatus(): Array<{ status: string; path: string; oldPath?: string }> | null {
       try {
         // MSYS_NO_PATHCONV=1 to prevent Git Bash path conversion on Windows.
         const out = execFileSync("git", ["diff", "--name-status", "origin/main...HEAD"], {
@@ -78,9 +78,13 @@ function makeReader(): PrepublishReader {
           .map((line) => {
             const fields = line.split("\t");
             const status = fields[0] ?? "";
-            // Rename lines (R<score>\told\tnew) carry the destination path last.
-            const filePath = fields.length > 2 ? fields[fields.length - 1] : fields[1] ?? "";
-            return { status, path: filePath };
+            // Rename lines (R<score>\told\tnew) carry the source path second-to-
+            // last and the destination path last; both are surfaced so the body
+            // can evaluate the shipped-asset surface on either side of the move.
+            const isRename = fields.length > 2;
+            const filePath = isRename ? fields[fields.length - 1] : fields[1] ?? "";
+            const oldPath = isRename ? fields[fields.length - 2] : undefined;
+            return { status, path: filePath, oldPath };
           });
       } catch {
         return null;

@@ -198,6 +198,9 @@ var MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
 var CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
 var OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
 var CONTROL_CHAR_RE = /[\x00-\x09\x0b-\x1f\x7f]/;
+function touchesShippedPath(c) {
+  return SHIPPED_PATH_RE.test(c.path) || c.oldPath !== void 0 && SHIPPED_PATH_RE.test(c.oldPath);
+}
 function semverDelta(oldVer, newVer) {
   const SEMVER_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
   if (!SEMVER_RE.test(oldVer) || !SEMVER_RE.test(newVer)) return "unknown";
@@ -286,9 +289,9 @@ function deriveFloor(changed) {
   let sawAdded = false;
   let sawRemovedOrRenamed = false;
   let sawModified = false;
-  for (const { status, path: path2 } of changed) {
-    if (!SHIPPED_PATH_RE.test(path2)) continue;
-    const kind = status.charAt(0);
+  for (const c of changed) {
+    if (!touchesShippedPath(c)) continue;
+    const kind = c.status.charAt(0);
     if (kind === "A") sawAdded = true;
     else if (kind === "D" || kind === "R") sawRemovedOrRenamed = true;
     else sawModified = true;
@@ -416,7 +419,7 @@ function runVersionBumpCheck(reader) {
   if (changed === null) {
     return null;
   }
-  const touchesAssets = changed.some((c) => SHIPPED_PATH_RE.test(c.path));
+  const touchesAssets = changed.some(touchesShippedPath);
   if (!touchesAssets) {
     const pluginHead = extractJsonVersion(reader.readFile(".claude-plugin/plugin.json"));
     const pluginOrigin = extractJsonVersion(reader.gitShow("origin/main:.claude-plugin/plugin.json"));
@@ -517,8 +520,10 @@ function makeReader() {
         return out.split("\n").filter((line) => line.trim().length > 0).map((line) => {
           const fields = line.split("	");
           const status = fields[0] ?? "";
-          const filePath = fields.length > 2 ? fields[fields.length - 1] : fields[1] ?? "";
-          return { status, path: filePath };
+          const isRename = fields.length > 2;
+          const filePath = isRename ? fields[fields.length - 1] : fields[1] ?? "";
+          const oldPath = isRename ? fields[fields.length - 2] : void 0;
+          return { status, path: filePath, oldPath };
         });
       } catch {
         return null;

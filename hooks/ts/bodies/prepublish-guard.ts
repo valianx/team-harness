@@ -41,8 +41,10 @@ export interface PrepublishReader {
   /** Read ~/.claude/.team-harness.json; returns null on any error. */
   readConfig(): Record<string, unknown> | null;
   /** git diff --name-status origin/main...HEAD; returns null on any error.
-   *  For rename lines, `path` is the destination (new) path. */
-  gitDiffNameStatus(): Array<{ status: string; path: string }> | null;
+   *  For rename lines, `path` is the destination (new) path and `oldPath` is
+   *  the source (old) path — both are evaluated against the shipped-asset
+   *  surface (see touchesShippedPath). */
+  gitDiffNameStatus(): Array<{ status: string; path: string; oldPath?: string }> | null;
   /** git show <ref>; returns null on any error. */
   gitShow(ref: string): string | null;
   /** git rev-parse --abbrev-ref HEAD; returns null on any error. */
@@ -80,7 +82,15 @@ const OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
 export const CONTROL_CHAR_RE = /[\x00-\x09\x0b-\x1f\x7f]/;
 
 type SemverDelta = "major" | "minor" | "patch" | "none" | "unknown";
-type ChangedFile = { status: string; path: string };
+type ChangedFile = { status: string; path: string; oldPath?: string };
+
+// A rename record (R*) only carries the destination path in `path`; the
+// source lives in `oldPath`. A rename FROM a shipped path (agents/|skills/|
+// hooks/) INTO a non-shipped location removes a public surface just as a
+// plain delete does, so both sides of a rename must be checked (CodeRabbit #6).
+function touchesShippedPath(c: ChangedFile): boolean {
+  return SHIPPED_PATH_RE.test(c.path) || (c.oldPath !== undefined && SHIPPED_PATH_RE.test(c.oldPath));
+}
 
 // ---------------------------------------------------------------------------
 // semver_delta — verbatim port of prepublish-guard.sh's awk-based comparator.
@@ -220,9 +230,9 @@ function deriveFloor(changed: ChangedFile[]): "major" | "minor" | "patch" | "non
   let sawRemovedOrRenamed = false;
   let sawModified = false;
 
-  for (const { status, path } of changed) {
-    if (!SHIPPED_PATH_RE.test(path)) continue;
-    const kind = status.charAt(0);
+  for (const c of changed) {
+    if (!touchesShippedPath(c)) continue;
+    const kind = c.status.charAt(0);
     if (kind === "A") sawAdded = true;
     else if (kind === "D" || kind === "R") sawRemovedOrRenamed = true;
     else sawModified = true;
@@ -410,7 +420,7 @@ function runVersionBumpCheck(reader: PrepublishReader): NormalizedDecision | nul
     return null; // preflight/diff fault → fail-open
   }
 
-  const touchesAssets = changed.some((c) => SHIPPED_PATH_RE.test(c.path));
+  const touchesAssets = changed.some(touchesShippedPath);
   if (!touchesAssets) {
     const pluginHead = extractJsonVersion(reader.readFile(".claude-plugin/plugin.json"));
     const pluginOrigin = extractJsonVersion(reader.gitShow("origin/main:.claude-plugin/plugin.json"));
