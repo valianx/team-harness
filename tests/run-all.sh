@@ -23,38 +23,33 @@ report_skip_or_fail() {
     fi
 }
 
-# run_dual_target_suite <suite_label> <test_script>
-# Runs the bash leg unconditionally (existing behavior, unchanged), then the
-# same test script a second time with HOOK_IMPL=ts against the compiled TS
-# artifact when node is present. A missing node under TH_REQUIRE_RUNTIMES=1
-# reports FAIL via report_skip_or_fail — the ts leg can never silently skip
-# in CI. Used by the 8 functional suites that dual-target a hook family
-# (policy-block, checkpoint-guard, dev-guard, session-start,
-# language-user-prompt, prepublish-guard, gcp-guard, worktree-guard).
-run_dual_target_suite() {
+# run_ts_hook_suite <suite_label> <test_script>
+# Runs the test script against the compiled TS artifact when node is present.
+# A missing node under TH_REQUIRE_RUNTIMES=1 reports FAIL via
+# report_skip_or_fail — this leg can never silently skip in CI. Used by the
+# 8 functional suites that exercise a hook family (policy-block,
+# checkpoint-guard, dev-guard, session-start, language-user-prompt,
+# prepublish-guard, gcp-guard, worktree-guard). The Bash oracle leg was
+# retired with the hook Bash->TS cutover (issue #446) — the TS artifact is
+# now the single source of gate logic.
+run_ts_hook_suite() {
     local label="$1" script="$2"
-    if bash "$TESTS_DIR/$script"; then
-        echo "${label} (bash): PASS"
-    else
-        echo "${label} (bash): FAIL"
-        FAILED=$((FAILED + 1))
-    fi
     if command -v node >/dev/null 2>&1; then
-        if HOOK_IMPL=ts bash "$TESTS_DIR/$script"; then
-            echo "${label} (ts): PASS"
+        if bash "$TESTS_DIR/$script"; then
+            echo "${label}: PASS"
         else
-            echo "${label} (ts): FAIL"
+            echo "${label}: FAIL"
             FAILED=$((FAILED + 1))
         fi
     else
-        report_skip_or_fail "${label} (ts)" "node not found"
+        report_skip_or_fail "${label}" "node not found"
     fi
 }
 
 echo "############################################################"
-echo "# Suite 1: hooks/policy-block.sh — functional tests (dual-target bash|ts)"
+echo "# Suite 1: hooks/ts/bodies/policy-block.ts — functional tests"
 echo "############################################################"
-run_dual_target_suite "policy-block" "test_policy_block.sh"
+run_ts_hook_suite "policy-block" "test_policy_block.sh"
 
 echo
 echo "############################################################"
@@ -80,27 +75,27 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 4: hooks/checkpoint-guard.sh — functional tests (dual-target bash|ts)"
+echo "# Suite 4: hooks/ts/bodies/checkpoint-guard.ts — functional tests"
 echo "############################################################"
-run_dual_target_suite "checkpoint-guard" "test_checkpoint_guard.sh"
+run_ts_hook_suite "checkpoint-guard" "test_checkpoint_guard.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 5: hooks/dev-guard.sh — behavioral tests (dual-target bash|ts)"
+echo "# Suite 5: hooks/ts/bodies/dev-guard.ts — behavioral tests"
 echo "############################################################"
-run_dual_target_suite "dev-guard" "test_dev_guard.sh"
+run_ts_hook_suite "dev-guard" "test_dev_guard.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 6: hooks/session-start.sh — functional tests (dual-target bash|ts)"
+echo "# Suite 6: hooks/ts/bodies/session-start.ts — functional tests"
 echo "############################################################"
-run_dual_target_suite "session-start" "test_session_start.sh"
+run_ts_hook_suite "session-start" "test_session_start.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 7: hooks/language-user-prompt.sh — functional tests (dual-target bash|ts)"
+echo "# Suite 7: hooks/ts/bodies/language-user-prompt.ts — functional tests"
 echo "############################################################"
-run_dual_target_suite "language-user-prompt" "test_language_user_prompt.sh"
+run_ts_hook_suite "language-user-prompt" "test_language_user_prompt.sh"
 
 echo
 echo "############################################################"
@@ -215,21 +210,33 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 16: hooks/prepublish-guard.sh — bump-floor advisory (registry Suite 120, dual-target bash|ts)"
+echo "# Suite 16: hooks/ts/bodies/prepublish-guard.ts — bump-floor advisory (registry Suite 120)"
 echo "############################################################"
-run_dual_target_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
+run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 87: hooks/gcp-guard.sh — gcp-guard-hook-behavior (dual-target bash|ts)"
+echo "# Suite 25: hooks/ts/bodies/prepublish-guard.ts — Check 2 command-execution (registry Suite 135)"
 echo "############################################################"
-run_dual_target_suite "gcp-guard" "test_gcp_guard.sh"
+run_ts_hook_suite "prepublish-guard" "test_prepublish_guard.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 133: hooks/worktree-guard.sh — worktree-guard-hook-behavior (dual-target bash|ts)"
+echo "# Suite 87: hooks/ts/bodies/gcp-guard.ts — gcp-guard-hook-behavior"
 echo "############################################################"
-run_dual_target_suite "worktree-guard" "test_worktree_guard.sh"
+run_ts_hook_suite "gcp-guard" "test_gcp_guard.sh"
+
+echo
+echo "############################################################"
+echo "# Suite 133: hooks/ts/bodies/worktree-guard.ts — worktree-guard-hook-behavior"
+echo "############################################################"
+run_ts_hook_suite "worktree-guard" "test_worktree_guard.sh"
+
+echo
+echo "############################################################"
+echo "# Suite 136: hooks/run-ts-hook.sh — launcher-fail-closed-on-corrupt-artifact"
+echo "############################################################"
+run_ts_hook_suite "launcher-fail-closed" "test_launcher_fail_closed.sh"
 
 echo
 echo "############################################################"

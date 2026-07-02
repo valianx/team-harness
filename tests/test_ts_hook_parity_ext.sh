@@ -1,6 +1,8 @@
 #!/bin/bash
 # Extension sections 8-12 for test_ts_hook_parity.sh
-# Run gate parity checks for all rewritten hook bodies (AC-9, AC-10, AC-11).
+# Golden-fixture regression checks for all rewritten hook bodies (AC-9, AC-10,
+# AC-11) — converted from Bash<->TS parity to literal expected-decision
+# assertions once the Bash oracle was retired (issue #446).
 # This file is SOURCED by test_ts_hook_parity.sh after Section 7.
 # Variables PASS, FAIL, FAILURES, REPO_ROOT are inherited from the parent.
 
@@ -16,26 +18,28 @@ ext_decision() {
 }
 
 # ---------------------------------------------------------------------------
-# Section 8 — policy-block parity (AC-9, AC-10)
+# Section 8 — policy-block golden-fixture regression (AC-9, AC-10)
+# Converted from Bash<->TS parity to literal expected-decision assertions —
+# the Bash oracle (hooks/policy-block.sh) was retired in the hook Bash->TS
+# cutover (issue #446). Coverage for these fixtures is duplicated by
+# tests/test_policy_block.sh (Suite 1); this section stays as an additional
+# regression layer scoped to the entropy/regex-divergence cases below.
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Section 8: policy-block parity (AC-9, AC-10) ---"
+echo "--- Section 8: policy-block golden-fixture regression (AC-9, AC-10) ---"
 
-PB_BASH_HOOK="$REPO_ROOT/hooks/policy-block.sh"
 PB_TS_CJS="$REPO_ROOT/hooks/ts/dist/policy-block.cjs"
 
-pb_assert_match() {
-    local label="$1" payload="$2"
-    local bash_out ts_out bash_dec ts_dec
-    bash_out=$(echo "$payload" | bash "$PB_BASH_HOOK" 2>/dev/null)
+pb_assert_expected() {
+    local label="$1" payload="$2" expected="$3"
+    local ts_out ts_dec
     ts_out=$(echo "$payload" | node "$PB_TS_CJS" 2>/dev/null)
-    bash_dec=$(ext_decision "$bash_out")
     ts_dec=$(ext_decision "$ts_out")
-    if [ "$bash_dec" = "$ts_dec" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] $label (Bash=$bash_dec TS=$ts_dec)"
+    if [ "$ts_dec" = "$expected" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] $label (TS=$ts_dec)"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-9/10 policy-block: $label (Bash=$bash_dec TS=$ts_dec)")
-        echo "  [FAIL] $label (Bash=$bash_dec TS=$ts_dec)"
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-9/10 policy-block: $label (expected=$expected TS=$ts_dec)")
+        echo "  [FAIL] $label (expected=$expected TS=$ts_dec)"
     fi
 }
 
@@ -45,29 +49,35 @@ else
     # Build test payloads via python3 to avoid shell quoting issues.
     # DENIED_BASH patterns
     p1=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'rm -rf /'}}))")
-    pb_assert_match "rm -rf / (deny)" "$p1"
+    pb_assert_expected "rm -rf /" "$p1" "deny"
     p2=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git push --force origin main'}}))")
-    pb_assert_match "git push --force (deny)" "$p2"
+    pb_assert_expected "git push --force" "$p2" "deny"
     p3=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git reset --hard HEAD~1'}}))")
-    pb_assert_match "git reset --hard (deny)" "$p3"
+    pb_assert_expected "git reset --hard" "$p3" "deny"
     p4=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git clean -f'}}))")
-    pb_assert_match "git clean -f (deny)" "$p4"
+    pb_assert_expected "git clean -f" "$p4" "deny"
     p5=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'psql -c \"DROP TABLE users\"'}}))")
-    pb_assert_match "DROP TABLE (deny)" "$p5"
+    pb_assert_expected "DROP TABLE" "$p5" "deny"
     p6=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git commit --no-verify -m msg'}}))")
-    pb_assert_match "git commit --no-verify (deny)" "$p6"
+    pb_assert_expected "git commit --no-verify" "$p6" "deny"
     p7=$(python3 -c "import json; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/home/user/.env','content':'SECRET=abc'}}))")
-    pb_assert_match "Write .env path (deny)" "$p7"
+    pb_assert_expected "Write .env path" "$p7" "deny"
     p8=$(python3 -c "import json; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/home/user/.env.example','content':'SECRET=placeholder'}}))")
-    pb_assert_match ".env.example allowlisted (none)" "$p8"
+    pb_assert_expected ".env.example allowlisted" "$p8" "none"
     # GitHub PAT test fixture — syntactically valid known test pattern (NOT a real token).
+    # NOTE: the 40-char filler + \b-boundary regex (ghp_[A-Za-z0-9]{36}\b) means
+    # this exact fixture does not match the pattern on EITHER runtime (verified
+    # against the retired Bash oracle before deletion — both produced "none");
+    # a corrected 36-char fixture is covered by tests/test_policy_block.sh
+    # ("Write: GitHub PAT ghp_", Suite 1). Preserved here as a smoke check on
+    # the actually-observed behavior, not a coverage claim.
     gh_pat_token="ghp_$(python3 -c "print('a'*40)")"
     p9=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/out.py','content':'token = ' + repr(sys.argv[1])}}))" "$gh_pat_token")
-    pb_assert_match "GitHub PAT in Write (deny)" "$p9"
+    pb_assert_expected "GitHub PAT in Write (malformed fixture, see note)" "$p9" "none"
     p10=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'ls -la'}}))")
-    pb_assert_match "ls -la (none)" "$p10"
+    pb_assert_expected "ls -la" "$p10" "none"
     p11=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'echo hello'}}))")
-    pb_assert_match "echo hello (none)" "$p11"
+    pb_assert_expected "echo hello" "$p11" "none"
 
     # AC-9 entropy: low entropy value (all same char, ~0 bits/char) → none
     low_ent_p=$(python3 -c "import json; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'API_KEY=aaaaaaaaaaaaaaaaaaaaa'}}))")
@@ -163,92 +173,63 @@ print(f'{-sum((f/n)*math.log2(f/n) for f in freq.values()):.6f}')
     fi
 
     # ---------------------------------------------------------------------------
-    # AC-9 SEC-DR-E: Python re vs JS RegExp divergence fixtures.
+    # AC-9 SEC-DR-E: regex-anchor and compound-name-prefix regression fixtures.
     #
-    # Tests MULTILINE (^ in JS /m flag matches start-of-line, same as re.MULTILINE)
-    # and compound-name prefixes (\w+_ before the keyword, e.g. SMTP_TOKEN, DB_PASSWORD).
-    # Both engines must agree on these cases, matching the entropy-gated ask path.
-    # Uses the above-boundary value (H=3.5219) for all divergence fixtures.
+    # Tests MULTILINE (^ matches start-of-line) and compound-name prefixes
+    # (\w+_ before the keyword, e.g. SMTP_TOKEN, DB_PASSWORD) — both must
+    # trigger the entropy-gated ask path. These fixtures previously verified
+    # Python re vs JS RegExp agreement; now they assert directly against the
+    # TS gate (the sole implementation post-cutover).
+    # Uses the above-boundary value (H=3.5219) for all fixtures.
     # ---------------------------------------------------------------------------
 
-    # MULTILINE: high-entropy token appears after a newline (^ start-of-line anchor)
-    # Python re.MULTILINE matches ^ at start of each line; JS /m flag does the same.
+    # MULTILINE: high-entropy token appears after a newline (^ start-of-line anchor).
     multiline_content="first_line_prefix
 API_KEY=${boundary_above_val}"
     multiline_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':sys.argv[1]}}))" "$multiline_content")
-    multiline_bash_out=$(echo "$multiline_p" | bash "$PB_BASH_HOOK" 2>/dev/null)
-    multiline_ts_out=$(echo "$multiline_p" | node "$PB_TS_CJS" 2>/dev/null)
-    multiline_bash_dec=$(ext_decision "$multiline_bash_out")
-    multiline_ts_dec=$(ext_decision "$multiline_ts_out")
-    if [ "$multiline_bash_dec" = "$multiline_ts_dec" ] && [ "$multiline_ts_dec" = "ask" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: MULTILINE parity (newline before API_KEY) Bash=$multiline_bash_dec TS=$multiline_ts_dec"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: MULTILINE parity mismatch Bash=$multiline_bash_dec TS=$multiline_ts_dec")
-        echo "  [FAIL] AC-9 SEC-DR-E: MULTILINE parity Bash=$multiline_bash_dec TS=$multiline_ts_dec (both expected ask)"
-    fi
+    pb_assert_expected "SEC-DR-E: MULTILINE (newline before API_KEY)" "$multiline_p" "ask"
 
     # Compound-name prefix: SMTP_TOKEN= (\\w+_ before TOKEN keyword)
     smtp_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'SMTP_TOKEN='+sys.argv[1]}}))" "$boundary_above_val")
-    smtp_bash_out=$(echo "$smtp_p" | bash "$PB_BASH_HOOK" 2>/dev/null)
-    smtp_ts_out=$(echo "$smtp_p" | node "$PB_TS_CJS" 2>/dev/null)
-    smtp_bash_dec=$(ext_decision "$smtp_bash_out")
-    smtp_ts_dec=$(ext_decision "$smtp_ts_out")
-    if [ "$smtp_bash_dec" = "$smtp_ts_dec" ] && [ "$smtp_ts_dec" = "ask" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: compound-name SMTP_TOKEN parity Bash=$smtp_bash_dec TS=$smtp_ts_dec"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: compound SMTP_TOKEN parity mismatch Bash=$smtp_bash_dec TS=$smtp_ts_dec")
-        echo "  [FAIL] AC-9 SEC-DR-E: compound-name SMTP_TOKEN parity Bash=$smtp_bash_dec TS=$smtp_ts_dec (both expected ask)"
-    fi
+    pb_assert_expected "SEC-DR-E: compound-name SMTP_TOKEN" "$smtp_p" "ask"
 
     # Compound-name prefix: DB_PASSWORD= (\\w+_ before PASSWORD keyword)
     dbpw_p=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Write','tool_input':{'file_path':'/tmp/t.py','content':'DB_PASSWORD='+sys.argv[1]}}))" "$boundary_above_val")
-    dbpw_bash_out=$(echo "$dbpw_p" | bash "$PB_BASH_HOOK" 2>/dev/null)
-    dbpw_ts_out=$(echo "$dbpw_p" | node "$PB_TS_CJS" 2>/dev/null)
-    dbpw_bash_dec=$(ext_decision "$dbpw_bash_out")
-    dbpw_ts_dec=$(ext_decision "$dbpw_ts_out")
-    if [ "$dbpw_bash_dec" = "$dbpw_ts_dec" ] && [ "$dbpw_ts_dec" = "ask" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-9 SEC-DR-E: compound-name DB_PASSWORD parity Bash=$dbpw_bash_dec TS=$dbpw_ts_dec"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-9 SEC-DR-E: compound DB_PASSWORD parity mismatch Bash=$dbpw_bash_dec TS=$dbpw_ts_dec")
-        echo "  [FAIL] AC-9 SEC-DR-E: compound-name DB_PASSWORD parity Bash=$dbpw_bash_dec TS=$dbpw_ts_dec (both expected ask)"
-    fi
+    pb_assert_expected "SEC-DR-E: compound-name DB_PASSWORD" "$dbpw_p" "ask"
 fi
 
 # ---------------------------------------------------------------------------
-# Section 9 — gcp-guard parity (AC-10)
+# Section 9 — gcp-guard golden-fixture smoke check (AC-10)
+# The exhaustive gcp-guard suite lives in tests/test_gcp_guard.sh (Suite 87);
+# this section stays as a lightweight cross-check exercised from this harness.
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Section 9: gcp-guard parity (AC-10) ---"
-GCP_BASH_HOOK="$REPO_ROOT/hooks/gcp-guard.sh"
+echo "--- Section 9: gcp-guard golden-fixture smoke check (AC-10) ---"
 GCP_TS_CJS="$REPO_ROOT/hooks/ts/dist/gcp-guard.cjs"
 
-gcp_assert_match() {
-    local label="$1" cmd="$2"
-    local payload bash_out ts_out bash_dec ts_dec
+gcp_assert_expected() {
+    local label="$1" cmd="$2" expected="$3"
+    local payload ts_out ts_dec
     payload=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Bash','tool_input':{'command':sys.argv[1]}}))" "$cmd" 2>/dev/null)
-    bash_out=$(echo "$payload" | bash "$GCP_BASH_HOOK" 2>/dev/null)
     ts_out=$(echo "$payload" | node "$GCP_TS_CJS" 2>/dev/null)
-    bash_dec=$(ext_decision "$bash_out")
     ts_dec=$(ext_decision "$ts_out")
-    if [ "$bash_dec" = "$ts_dec" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] $label (Bash=$bash_dec TS=$ts_dec)"
+    if [ "$ts_dec" = "$expected" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] $label (TS=$ts_dec)"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10 gcp-guard: $label (Bash=$bash_dec TS=$ts_dec)")
-        echo "  [FAIL] $label (Bash=$bash_dec TS=$ts_dec)"
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-10 gcp-guard: $label (expected=$expected TS=$ts_dec)")
+        echo "  [FAIL] $label (expected=$expected TS=$ts_dec)"
     fi
 }
 
 if [ ! -f "$GCP_TS_CJS" ]; then
     echo "  [SKIP] gcp-guard.cjs not found"
-elif [ ! -x "$GCP_BASH_HOOK" ]; then
-    echo "  [SKIP] gcp-guard.sh not executable"
 else
-    gcp_assert_match "gcloud list (none)" "gcloud compute instances list"
-    gcp_assert_match "gcloud describe (none)" "gcloud compute instances describe my-vm"
-    gcp_assert_match "gcloud create (ask)" "gcloud compute instances create my-vm"
-    gcp_assert_match "gcloud delete (ask)" "gcloud compute instances delete my-vm"
-    gcp_assert_match "gcloud projects delete (deny)" "gcloud projects delete my-project"
-    gcp_assert_match "non-gcloud ls (none)" "ls -la"
+    gcp_assert_expected "gcloud list" "gcloud compute instances list" "none"
+    gcp_assert_expected "gcloud describe" "gcloud compute instances describe my-vm" "none"
+    gcp_assert_expected "gcloud create" "gcloud compute instances create my-vm" "ask"
+    gcp_assert_expected "gcloud delete" "gcloud compute instances delete my-vm" "ask"
+    gcp_assert_expected "gcloud projects delete" "gcloud projects delete my-project" "deny"
+    gcp_assert_expected "non-gcloud ls" "ls -la" "none"
 fi
 
 # ---------------------------------------------------------------------------

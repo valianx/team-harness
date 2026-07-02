@@ -1,13 +1,13 @@
 # Opencode Distribution-Layer Roadmap
 
-> **Status: beta — installer core production-ready; hook cutover and lifecycle unification in progress.** The Go installer (`cmd/install/`) ships a full plan/apply/uninstall engine with an append-only ownership ledger and all SEC-01..08 guards, wired for the opencode runtime. The updater (`install update`) and bootstrap scripts (`bin/update-opencode.{sh,ps1}`) are production-ready. This document records what is built, what is genuinely residual, and the design contracts that govern the residual work.
+> **Status: see [`docs/lifecycle.md`](./lifecycle.md) for the current stage-by-stage maturity of the opencode runtime.** The Go installer (`cmd/install/`) ships a full plan/apply/uninstall engine with an append-only ownership ledger and all SEC-01..08 guards, wired for the opencode runtime exclusively — it does not install Claude Code (the marketplace plugin is the only CC channel). The updater (`install update`) and bootstrap scripts (`bin/update-opencode.{sh,ps1}`) are production-ready. The hook Bash→TS cutover (issue #446) is complete: TypeScript is the single source of gate logic for both runtimes. This document records what is built, what is genuinely residual, and the design contracts that govern the residual work.
 
 ## Build status — buildable-now-vs-defer
 
 | Item | Mechanism | Status | Notes |
 |------|-----------|--------|-------|
 | 1 | Adapter registry + format-shim | **PARTIAL** | Descriptor shape and shim normalization contract specified (see Item 1 below). Canonical agent bodies built; the emit-time frontmatter delta (opencode-specific `model` IDs, `permission` objects) is applied by `opencodeRuntimeTransform` in `cmd/install/transform.go`. The **descriptor-consuming projector** (the code that reads adapter descriptors and projects canonical bodies) is NOT built — entry files are hand-authored and the transform is hard-coded in Go. |
-| 2 | Two-layer install manifest + managed-ownership state | **BUILT** (opencode path) | `ComputePlan`/`ApplyPlan`/`appendLedger`/`readLedger` implement the plan/apply/ledger contract in `cmd/install/plan.go`, `apply.go`, `ledger.go`. All SEC-04/05/06 guards enforced. The CC path through the manifest engine is a deliberate empty no-op (the CC runtime uses the legacy file-copy path in `main.go`); routing it through the manifest engine is a known residual gap. |
+| 2 | Two-layer install manifest + managed-ownership state | **BUILT** (opencode path) | `ComputePlan`/`ApplyPlan`/`appendLedger`/`readLedger` implement the plan/apply/ledger contract in `cmd/install/plan.go`, `apply.go`, `ledger.go`. All SEC-04/05/06 guards enforced. `--runtime claude-code` through the manifest engine is a deliberate empty no-op — the former legacy file-copy path (`installAgents`/`installSkills`/`installHooks` in `main.go`) was retired with the hook Bash→TS cutover (issue #446); Claude Code installs exclusively through the marketplace plugin, so there is no CC path left to unify into the manifest engine (see Genuine residual gaps, item 2, [RESOLVED]). |
 | 3 | Single data-home resolver | **BUILT** | `ResolveDataHome()` in `cmd/install/datahome.go` implements the five-branch resolution order with full SEC-01/02/03/08 enforcement. |
 | 4 | Updater (`install update`) | **BUILT** | `cmd/install/update.go` + `bin/update-opencode.{sh,ps1}`. Three-state version-delta (update-available / already-current / installed-ahead). `ComputePlan` diff preview, interactive `[Y/n]` confirm (operator "n" → zero writes), `ApplyPlan` apply, managed-key-only config bump (`refreshManagedConfigKeys`), restart-to-activate honesty block. `dist/VERSION` release asset for cheap pre-check. |
 
@@ -32,7 +32,7 @@ The following items are NOT built and are tracked as future work:
 
 1. **Adapter projector (Item 1 descriptor-consuming build).** `opencodeRuntimeTransform` in `transform.go` hard-codes the CC→opencode frontmatter delta in Go. A descriptor-consuming projector that reads adapter YAML and generates the transform at install time does not exist. Entry files (e.g. `opencode.json`, `agents/*.md` for opencode) are hand-authored. When a third runtime target appears, this becomes the blocker.
 
-2. **CC path through the manifest engine.** The Claude Code runtime (`--runtime claude-code`) uses the legacy file-copy path in `main.go` (`installAgents`/`installSkills`/`installHooks`). It does NOT go through `ComputePlan`/`ApplyPlan`. Routing the CC path through the manifest engine would unify the two paths and enable `plan`/`update`/`uninstall` for Claude Code users. This is additive (does not break the opencode path).
+2. **[RESOLVED, hook Bash→TS cutover] CC path through the manifest engine.** Superseded, not built: the operator directive that closed issue #446 retired the Claude Code install path from this binary entirely — the former legacy file-copy path (`installAgents`/`installSkills`/`installHooks` in `main.go`) is unreachable from a bare invocation (it now prints a marketplace redirect notice), and `--runtime claude-code` through the manifest engine (`ComputePlan`/`ApplyPlan`) resolves to empty manifests, a deliberate no-op. Claude Code installs exclusively through the marketplace plugin; there is no CC path left to unify into the manifest engine. See `docs/lifecycle.md`.
 
 3. **Per-component operator selection surface.** `install update` updates the full default-install set (matching `install apply`). A `clack groupMultiselect`-style opt-in tree for selecting individual components (filtered by `cost`/`stability`/`defaultInstall` flags) is not built. This is additive (the current full-set apply is a safe, correct default).
 
@@ -162,7 +162,7 @@ The schema and the ownership-tracking model are implemented in `cmd/install/`. T
 | **Rules / context** (`CLAUDE.md`) | `AGENTS.md` (cross-tool standard) | **Yes** — falls back to `CLAUDE.md` when no `AGENTS.md` exists | **Near-zero** — optionally add `AGENTS.md` as an entry point |
 | **Agents** (`.md` + frontmatter) | Same Markdown + frontmatter; CC-compatible agent directories are partially read | Partially — structure matches, but `permission`/`model`/`mode` fields differ | **Light** — emit-time frontmatter delta (tool permissions → `permission` object, provider-prefixed model IDs, explicit `mode`); built in `opencodeRuntimeTransform` |
 | **Commands** (`.md`) | Markdown + frontmatter in `.opencode/commands/`; `$ARGUMENTS` placeholder | Partially — `$ARGUMENTS` vs `{input}`, relocation to `.opencode/commands/` | **Light** — frontmatter delta + path relocation |
-| **Hooks** | TypeScript/JS plugins on Bun (async event callbacks, 23+ events), in `.opencode/plugins/` | **No** — no shell-script hook execution; the official migrator skips hooks entirely | **Hard** — rewrite to a TS plugin (Decision A = TypeScript) |
+| **Hooks** | TypeScript/JS plugins on Bun (async event callbacks, 23+ events), in `.opencode/plugins/` | **No** — no shell-script hook execution; the official migrator skips hooks entirely | **Done** — TS is the single source of gate logic for both runtimes (issue #446 cutover complete) |
 
 ---
 
@@ -172,7 +172,7 @@ Every new distributed implementation must be authorable for both Claude Code and
 
 - **Skills and rules** incur no or near-zero cross-harness effort. Author once; both harnesses read them.
 - **Agents and commands** are authored against the canonical frontmatter. The emit-time frontmatter delta is applied by `opencodeRuntimeTransform` at install time — not hand-duplicated into a per-harness copy.
-- **Hooks are authored in TypeScript (Decision A = A2, CLOSED).** A single TS/JS body runs natively on Claude Code (Node) and opencode (Bun). The existing 18 Bash hooks are a future migration tracked in `docs/opencode-migration-guide.md`.
+- **Hooks are authored in TypeScript (Decision A = A2, CLOSED).** A single TS/JS body runs natively on Claude Code (Node) and opencode (Bun). The Bash→TS cutover is complete (issue #446): TypeScript is the single source of gate logic for both runtimes, and the Claude Code plugin wires every gate through `hooks/run-ts-hook.sh`, a fail-closed launcher with no gate logic of its own. See `docs/opencode-migration-guide.md` for the design record.
 
 ### Actionable now (enforceable as review discipline)
 
@@ -185,7 +185,6 @@ Every new distributed implementation must be authorable for both Claude Code and
 
 - Actual descriptor-driven projection and the first non-identity adapter (Item 1 projector build).
 - The materialized `.opencode/` directory structure via the projector.
-- Rewriting the existing 18 Bash hooks to TypeScript.
 - Dual-runtime test execution in CI.
 
 ### Honest enforceability statement

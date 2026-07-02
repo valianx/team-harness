@@ -158,7 +158,7 @@ function outboundCC(d) {
 function deny(reason) {
   return {
     decision: "deny",
-    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/config.json.`,
+    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/ts/bodies/policy-block.ts.`,
     mutations: null
   };
 }
@@ -423,7 +423,9 @@ function evaluate(input) {
     if (checkNoVerifyTokenized(cmd)) {
       return deny("--no-verify (bypasses pre-commit hooks)");
     }
-    const shouldScanBash = /\bgit\s+commit\b/.test(cmd) || /\bcurl\b.*--data(?:-[a-z]+)?\b/i.test(cmd) || /\bwget\b.*--post-(?:data|file)\b/i.test(cmd) || /\btee\b/.test(cmd) || /\bexport\s+\w+\s*=/.test(cmd) || /\benv\s+\w+=/.test(cmd);
+    const curlCarriesData = /\bcurl\b.*(?:--data(?:-[a-z]+)?\b|\s-d\b|--json\b|\s-F\b|--form\b)/i.test(cmd);
+    const curlCarriesAuthHeader = /\bcurl\b.*(?:-H|--header)\s+['"]?Authorization:\s*Bearer\b/i.test(cmd);
+    const shouldScanBash = /\bgit\s+commit\b/.test(cmd) || curlCarriesData || curlCarriesAuthHeader || /\bwget\b.*--post-(?:data|file)\b/i.test(cmd) || /\btee\b/.test(cmd) || /\bexport\s+\w+\s*=/.test(cmd) || /\benv\s+\w+=/.test(cmd);
     if (shouldScanBash) {
       const secretDecision = scanForSecrets(cmd);
       if (secretDecision !== null) return secretDecision;
@@ -503,7 +505,16 @@ async function main() {
     outboundCC(decision);
   } catch (err) {
     if (err instanceof ShimRejectError && isParseFailure(err)) {
-      outboundCC({ decision: "none", reason: "", mutations: null });
+      if (raw.trim().length === 0) {
+        outboundCC({ decision: "none", reason: "", mutations: null });
+      } else {
+        const fallback = {
+          decision: "ask",
+          reason: "policy-block: payload is non-empty but failed to parse as JSON \u2014 cannot evaluate safety. Manual review required before proceeding (policy-block.cc.ts SEC-07).",
+          mutations: null
+        };
+        outboundCC(fallback);
+      }
     } else if (err instanceof ShimRejectError) {
       const fallback = {
         decision: "ask",

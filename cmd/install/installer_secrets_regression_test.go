@@ -494,14 +494,14 @@ func TestCopyEmbeddedFile_RejectsSymlinkInParentPath(t *testing.T) {
 	}
 
 	stats.Installed, stats.Updated, stats.Unchanged = nil, nil, nil
-	destPath := filepath.Join(claudeDir, "hooks", "checkpoint-guard.sh")
-	copyEmbeddedFile("hooks/checkpoint-guard.sh", destPath, true)
+	destPath := filepath.Join(claudeDir, "hooks", "run-ts-hook.sh")
+	copyEmbeddedFile("hooks/run-ts-hook.sh", destPath, true)
 
 	if len(stats.Installed) != 0 {
 		t.Error("copyEmbeddedFile reported the file installed despite a symlinked parent component (finding 5 regression)")
 	}
 
-	escapedPath := filepath.Join(outside, "checkpoint-guard.sh")
+	escapedPath := filepath.Join(outside, "run-ts-hook.sh")
 	if _, statErr := os.Stat(escapedPath); !os.IsNotExist(statErr) {
 		t.Error("file was written through symlink into outside/ — directory-symlink escape succeeded (finding 5 regression)")
 	}
@@ -522,14 +522,14 @@ func TestCopyEmbeddedFile_RejectsSymlinkAtLeaf(t *testing.T) {
 		t.Fatalf("mkdir hooks: %v", err)
 	}
 
-	leafSymlink := filepath.Join(hooksDir, "checkpoint-guard.sh")
-	escapeTarget := filepath.Join(outside, "checkpoint-guard.sh")
+	leafSymlink := filepath.Join(hooksDir, "run-ts-hook.sh")
+	escapeTarget := filepath.Join(outside, "run-ts-hook.sh")
 	if err := os.Symlink(escapeTarget, leafSymlink); err != nil {
 		t.Fatalf("create leaf symlink: %v", err)
 	}
 
 	stats.Installed, stats.Updated, stats.Unchanged = nil, nil, nil
-	copyEmbeddedFile("hooks/checkpoint-guard.sh", leafSymlink, true)
+	copyEmbeddedFile("hooks/run-ts-hook.sh", leafSymlink, true)
 
 	if _, statErr := os.Stat(escapeTarget); !os.IsNotExist(statErr) {
 		content, _ := os.ReadFile(escapeTarget)
@@ -548,8 +548,8 @@ func TestCopyEmbeddedFile_ExecutableModeMatchesLegacyBehavior(t *testing.T) {
 	_, cleanup := testEnv(t)
 	defer cleanup()
 
-	destPath := filepath.Join(claudeDir, "hooks", "checkpoint-guard.sh")
-	copyEmbeddedFile("hooks/checkpoint-guard.sh", destPath, true)
+	destPath := filepath.Join(claudeDir, "hooks", "run-ts-hook.sh")
+	copyEmbeddedFile("hooks/run-ts-hook.sh", destPath, true)
 
 	info, err := os.Stat(destPath)
 	if err != nil {

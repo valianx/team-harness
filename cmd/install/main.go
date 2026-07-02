@@ -1,22 +1,23 @@
-// Package main is the team-harness installer.
+// Package main is the team-harness installer for the opencode runtime.
 //
-// It installs agents, skills, hooks, and registers the memory + context7 MCP
-// servers in ~/.claude/ and ~/.claude.json. The Memory MCP server is an
-// external service (context-harness-mcp or compatible); this installer does
-// not bundle or copy any server source code.
+// Claude Code installs exclusively through the marketplace plugin
+// (/plugin marketplace add valianx/team-harness) — this binary's former CC
+// install path (bare invocation, no subcommand) is retired and only prints a
+// redirect notice. The manifest engine (`install plan|apply|uninstall
+// --runtime opencode`) installs agents, skills, and the opencode plugin, and
+// registers the memory + context7 MCP servers in opencode.json. The Memory
+// MCP server is an external service (context-harness-mcp or compatible);
+// this installer does not bundle or copy any server source code.
 //
 // Flags:
 //
-//	--force   bypass preservation of existing mcpServer entries in ~/.claude.json.
-//	          Has no effect on file installation — agents/skills/hooks are always
-//	          overwritten unconditionally regardless of this flag.
+//	--force   bypass preservation of existing mcpServer entries.
 package main
 
 import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -43,75 +44,39 @@ var claudeDir string
 // claudeJSON is ~/.claude.json
 var claudeJSON string
 
-// printDeprecationBanner writes a DEPRECATED notice to stderr before any
-// installer work begins. The Go installer is the legacy install path as of
-// v2.33.0; the canonical path is the Claude Code plugin.
-func printDeprecationBanner() {
-	fmt.Fprintln(os.Stderr, "==== DEPRECATED ====")
-	fmt.Fprintln(os.Stderr, "The Go installer is now the legacy install path.")
-	fmt.Fprintln(os.Stderr, "Canonical install: /plugin marketplace add valianx/team-harness")
-	fmt.Fprintln(os.Stderr, "                   /plugin install th && /th:setup")
-	fmt.Fprintln(os.Stderr, "=====================")
-}
-
 func main() {
 	parseFlags()
 
-	// plan|apply|uninstall subcommands are handled before the interactive install.
-	// The no-arg path falls through to the existing legacy interactive install.
+	// plan|apply|uninstall|update subcommands (the manifest engine — the only
+	// install path this binary still serves for Claude Code — --runtime
+	// claude-code resolves to empty manifests, a deliberate no-op; the real
+	// runtime here is opencode) are handled before the retired legacy path.
 	if dispatchSubcommand() {
 		return
 	}
 
-	printDeprecationBanner()
-	resolveClaudePaths()
-	resolveSettingsJSON()
+	// The legacy no-arg interactive path used to install Claude Code
+	// hooks/agents/skills directly into ~/.claude/. Retired: Claude Code
+	// installs exclusively through the marketplace plugin as of the hook
+	// Bash->TS cutover (issue #446). This binary remains the installer for
+	// the opencode runtime only (`install apply --runtime opencode`).
+	printClaudeCodeRetiredNotice()
+}
 
-	printWelcomeBanner()
-
-	fmt.Printf("team-harness installer %s\n", colorValue("v"+version))
-	fmt.Printf("  source:   %s\n", colorLabel("embedded"))
-	fmt.Printf("  target:   %s\n", colorValue(claudeDir))
-	fmt.Printf("  platform: %s\n", colorLabel(runtime.GOOS))
+// printClaudeCodeRetiredNotice tells an operator who ran the bare binary (the
+// former Claude Code interactive install) that Claude Code now installs
+// exclusively through the marketplace plugin. The binary itself remains the
+// installer for the opencode runtime.
+func printClaudeCodeRetiredNotice() {
+	fmt.Println("team-harness installer — Claude Code install path retired.")
 	fmt.Println()
-
-	ensureDir(claudeDir)
-	loadManifest()
-	if prev := manifest.InstalledVersion; prev != "" {
-		fmt.Printf("Detected previous install (version %s). Updating...\n", prev)
-	} else {
-		fmt.Println("Fresh install.")
-	}
+	fmt.Println("Claude Code now installs exclusively through the marketplace plugin:")
+	fmt.Println("  /plugin marketplace add valianx/team-harness")
+	fmt.Println("  /plugin install th")
+	fmt.Println("  /th:setup")
 	fmt.Println()
-
-	sectionHeader("Dependencies")
-	checkDependencies()
-
-	// Collect all configuration through the TUI (interactive) or env-var paths
-	// (non-interactive / CI).
-	context7Key, memChoice, installMode := collectConfig()
-
-	// File installation with progress spinner.
-	sectionHeader("Installing Files")
-	runInstallWithSpinner(installMode)
-
-	// Determine whether the context7 key changed for accurate summary reporting.
-	existing := readExistingMCPServers()
-	existingC7 := mapGet(existing, "context7")
-	existingC7Key := strings.TrimSpace(mapGetString(existingC7, "headers", "CONTEXT7_API_KEY"))
-	context7Preserved := context7Key == existingC7Key && isValidContext7Key(existingC7Key)
-
-	sectionHeader("Global Config")
-	ensureGlobalClaudeMD()
-	registerHooks()
-
-	fmt.Println("Registering MCP servers in ~/.claude.json...")
-	backupPath := registerMCPServers(context7Key, memChoice)
-
-	saveManifest()
-
-	printSummary(backupPath, memChoice, context7Preserved, installMode)
-	pressEnterToExit()
+	fmt.Println("This binary remains the installer for the opencode runtime:")
+	fmt.Println("  install apply --runtime opencode")
 }
 
 // collectConfig determines context7 key, memory MCP choice, and install mode

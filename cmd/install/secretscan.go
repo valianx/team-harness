@@ -12,7 +12,7 @@ type secretClass struct {
 }
 
 // highConfidenceSecrets is the Go port of the HIGH_CONFIDENCE_SECRETS list in
-// hooks/policy-block.sh (lines 159-170). The 10 classes are byte-equivalent.
+// hooks/ts/bodies/policy-block.ts. The 10 classes are byte-equivalent.
 // The reason names the pattern CLASS, never the matched value (SEC-04).
 var highConfidenceSecrets = []secretClass{
 	{

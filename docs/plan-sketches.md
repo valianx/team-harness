@@ -176,8 +176,9 @@ The gate blocks plan approval if the work triggers a sketch and it is missing. D
 is bounded booleans, not judgment.
 
 **Gate script:** `hooks/sketch-guard.sh` is invoked by the orchestrator at STAGE-GATE-1.
-It is an orchestrator-invoked gate script (like `notify-stage.sh`), NOT a `PreToolUse`
-event hook. Do NOT add it to `hooks/config.json` or `.claude-plugin/hooks.json`.
+It is an orchestrator-invoked gate script (like the TS-based `notify-stage` hook,
+run via `hooks/run-ts-hook.sh notify-stage`), NOT a `PreToolUse` event hook. Do NOT
+add it to `.claude-plugin/hooks.json`.
 
 **Fail-OPEN:** the verifier fails safe-allow (same pattern as `checkpoint-guard.sh:20-22`).
 This is a completeness gate, not a security gate. The plan-reviewer (agent) and the human

@@ -22,7 +22,7 @@ import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.
 function deny(reason: string): NormalizedDecision {
   return {
     decision: "deny",
-    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/config.json.`,
+    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/ts/bodies/policy-block.ts.`,
     mutations: null,
   };
 }
@@ -443,9 +443,20 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
     // Broadened from git-commit-only to also cover curl/wget --data forms,
     // tee redirection (tee file << EOF), and env/export assignments —
     // verbatim parity with policy-block.sh's _should_scan_bash gate.
+    //
+    // The curl predicate covers every flag shape that can carry a body or a
+    // credential: -d/--data(-raw|-binary|-urlencode), --json, -F/--form
+    // (multipart), and an Authorization: Bearer header via -H or --header
+    // (curl treats them as equivalent) — curl -H 'Authorization: Bearer …'
+    // has no --data at all yet still exfiltrates a secret, which the
+    // original --data-only predicate missed.
+    const curlCarriesData =
+      /\bcurl\b.*(?:--data(?:-[a-z]+)?\b|\s-d\b|--json\b|\s-F\b|--form\b)/i.test(cmd);
+    const curlCarriesAuthHeader = /\bcurl\b.*(?:-H|--header)\s+['"]?Authorization:\s*Bearer\b/i.test(cmd);
     const shouldScanBash =
       /\bgit\s+commit\b/.test(cmd) ||
-      /\bcurl\b.*--data(?:-[a-z]+)?\b/i.test(cmd) ||
+      curlCarriesData ||
+      curlCarriesAuthHeader ||
       /\bwget\b.*--post-(?:data|file)\b/i.test(cmd) ||
       /\btee\b/.test(cmd) ||
       /\bexport\s+\w+\s*=/.test(cmd) ||

@@ -7,15 +7,15 @@
 # non-covered paths in an environment with zero personal-config bleed.
 #
 # SCOPE — CAN prove (deterministic in headless CI):
-#   - The wired hook chain (policy-block.sh + dev-guard.sh), resolved from
+#   - The wired hook chain (policy-block + dev-guard), resolved from
 #     .claude-plugin/hooks.json, defers (emits no permissionDecision) on
 #     non-covered paths in a clean HOME.
 #   - An Edit/Write payload (no command field) with dev mode OFF is NOT
 #     auto-approved — the exact #298 signal.
-#   - Edit/Write payloads are routed only to policy-block.sh per the
-#     Bash|Write|Edit|NotebookEdit matcher, never to dev-guard.sh (Bash only).
+#   - Edit/Write payloads are routed only to policy-block per the
+#     Bash|Write|Edit|NotebookEdit matcher, never to dev-guard (Bash only).
 #   - Covered outward actions produce "ask" unconditionally (SEC-DR-2, v2.89.0).
-#   - Destructive Bash produces "deny" (policy-block.sh deny path).
+#   - Destructive Bash produces "deny" (policy-block deny path).
 #
 # CANNOT prove (out of CI reach):
 #   - That Claude Code's real GUI permission dialog renders when the chain
@@ -27,7 +27,7 @@
 #     chain in production. This harness uses a documented minimal emulation:
 #     manifest order, first-decision-wins, else defer.
 #
-# Design property: FAILS on pre-#298 dev-guard.sh (default allow) and
+# Design property: FAILS on pre-#298 dev-guard (default allow) and
 # PASSES on the fixed (≥v2.71.x) code.
 #
 # Chain emulation semantics:
@@ -80,7 +80,7 @@ make_clean_home() {
 
 make_home_with_marker() {
     # Retained for call-site compatibility with Scenarios 2, 5, 6.
-    # As of v2.89.0 SEC-DR-2 re-founding, dev-guard.sh no longer reads any
+    # As of v2.89.0 SEC-DR-2 re-founding, dev-guard no longer reads any
     # marker — the gate is unconditional. The marker is not written here.
     make_clean_home
 }
@@ -88,20 +88,25 @@ make_home_with_marker() {
 # ---------------------------------------------------------------------------
 # Parse hook command lists from .claude-plugin/hooks.json
 #
-# Returns the ordered list of hook script paths for a given PreToolUse matcher.
+# Returns the ordered list of hook invocations for a given PreToolUse matcher.
 # The harness resolves from the SAME manifest the plugin ships, so a future
 # hook added to a matcher is picked up automatically.
+#
+# Every gate is wired through hooks/run-ts-hook.sh <hook-name> (fail-closed
+# launcher, issue #446 cutover) — so a hook invocation is "script<TAB>args...",
+# not a bare script path. The launcher itself has no args when run node-direct
+# (subagent-start), which is why args may be empty.
 #
 # Usage: get_hooks_for_matcher <matcher_string>
 #   matcher_string — the exact "matcher" value in hooks.json (e.g. "Bash" or
 #                    "Bash|Write|Edit|NotebookEdit")
-# Output: one absolute hook script path per line
+# Output: one "script_path<TAB>args" line per hook (args may be empty)
 # ---------------------------------------------------------------------------
 get_hooks_for_matcher() {
     local matcher="$1"
     if command -v python3 >/dev/null 2>&1; then
         python3 - "$HOOKS_JSON" "$matcher" "$REPO_ROOT" <<'PYEOF'
-import json, sys, os, re
+import json, sys, os, re, shlex
 
 hooks_json_path = sys.argv[1]
 target_matcher  = sys.argv[2]
@@ -118,22 +123,27 @@ for entry in data.get("hooks", {}).get("PreToolUse", []):
             cmd = hook.get("command", "")
             # Replace ${CLAUDE_PLUGIN_ROOT} with repo_root (our local checkout)
             cmd = cmd.replace(plugin_root_placeholder, repo_root)
-            # Extract the script path (last space-separated token after "bash ")
-            parts = cmd.strip().split()
-            if len(parts) >= 2 and parts[0] == "bash":
-                print(parts[1])
+            # Extract the interpreter's argv: "bash <script> [args...]" or
+            # "node <script>" — parts[0] is the interpreter, parts[1] is the
+            # script, parts[2:] are the args passed to it (e.g. the hook name
+            # for run-ts-hook.sh). shlex.split (not str.split) so a quoted
+            # script path ("$VAR/…/run-ts-hook.sh") resolves to the bare path,
+            # not a token still carrying its quote characters.
+            parts = shlex.split(cmd.strip())
+            if len(parts) >= 2 and parts[0] in ("bash", "node"):
+                script = parts[1]
+                args = " ".join(parts[2:])
+                print(f"{script}\t{args}")
 PYEOF
     else
         # grep/sed fallback: parse the JSON manually for the given matcher.
         # This is a best-effort fallback; python3 is strongly preferred.
-        local in_pretooluse=0
-        local in_entry=0
-        local found_matcher=0
         grep -A5 "\"matcher\"[[:space:]]*:[[:space:]]*\"${matcher}\"" "$HOOKS_JSON" \
             | grep '"command"' \
             | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/' \
             | sed "s|\${CLAUDE_PLUGIN_ROOT}|${REPO_ROOT}|g" \
-            | awk '{print $NF}'
+            | sed 's/\\"//g' \
+            | awk '{args=""; for(i=3;i<=NF;i++){args=args (i>3?" ":"") $i}; print $2"\t"args}'
     fi
 }
 
@@ -141,9 +151,9 @@ PYEOF
 # Resolve hook command lists for the two PreToolUse matchers
 # ---------------------------------------------------------------------------
 
-# Hooks for Bash|Write|Edit|NotebookEdit (policy-block.sh)
+# Hooks for Bash|Write|Edit|NotebookEdit (policy-block)
 MULTI_TOOL_MATCHER="Bash|Write|Edit|NotebookEdit"
-# Hooks for Bash only (dev-guard.sh)
+# Hooks for Bash only (dev-guard)
 BASH_ONLY_MATCHER="Bash"
 
 # Read into arrays
@@ -174,10 +184,10 @@ run_chain() {
     # - Bash only matcher fires for Bash only.
     #
     # Claude Code runs entries in the order they appear in hooks.json:
-    #   entry[0] = Bash|Write|Edit|NotebookEdit -> policy-block.sh
-    #   entry[1] = Bash                          -> dev-guard.sh
+    #   entry[0] = Bash|Write|Edit|NotebookEdit -> policy-block
+    #   entry[1] = Bash                          -> dev-guard
     # Within each entry, hooks run in the order listed in the entry's hooks array.
-    # The two entries are independent: if policy-block.sh emits a decision for a
+    # The two entries are independent: if policy-block emits a decision for a
     # Bash payload, Claude Code stops (first-decision-wins at the entry level too).
     # We model this: collect hooks in manifest order across ALL matching entries,
     # then run until the first decision.
@@ -200,12 +210,16 @@ run_chain() {
     fi
 
     local decision=""
-    for hook_script in "${ordered_hooks[@]+"${ordered_hooks[@]}"}"; do
+    for hook_entry in "${ordered_hooks[@]+"${ordered_hooks[@]}"}"; do
+        local hook_script="${hook_entry%%$'\t'*}"
+        local hook_args="${hook_entry#*$'\t'}"
         if [ ! -f "$hook_script" ]; then
             continue
         fi
         local out
-        out=$(HOME="$clean_home" bash "$hook_script" <<< "$payload" 2>/dev/null || true)
+        # shellcheck disable=SC2086 — hook_args is a controlled single token
+        # (the hook name), safe to word-split.
+        out=$(HOME="$clean_home" bash "$hook_script" $hook_args <<< "$payload" 2>/dev/null || true)
         if [ -n "$out" ] && echo "$out" | grep -q '"permissionDecision"'; then
             decision="$out"
             break  # first decision wins
@@ -300,15 +314,15 @@ make_write_payload() {
 # ---------------------------------------------------------------------------
 # AC-9 helper: verify matcher separation
 #
-# Verifies that Edit/Write payloads are routed ONLY to policy-block.sh
-# (Bash|Write|Edit|NotebookEdit matcher), never to dev-guard.sh (Bash only).
+# Verifies that Edit/Write payloads are routed ONLY to policy-block
+# (Bash|Write|Edit|NotebookEdit matcher), never to dev-guard (Bash only).
 # This is a structural assertion against the resolved hook lists.
 # ---------------------------------------------------------------------------
 assert_matcher_separation() {
     echo
     echo "=== AC-9: Matcher separation — Edit/Write never routed to Bash-only hooks ==="
 
-    # The Bash-only hooks (dev-guard.sh) must NOT appear in the ordered chain
+    # The Bash-only hooks (dev-guard) must NOT appear in the ordered chain
     # for Edit or Write payloads.
     local edit_payload
     edit_payload=$(make_edit_payload)
@@ -337,8 +351,8 @@ assert_matcher_separation() {
         echo "  [PASS] AC-9: Bash-only hooks (dev-guard) not in Edit chain"
     else
         FAIL=$((FAIL + 1))
-        FAILURES+=("AC-9: dev-guard.sh found in Edit chain — matcher separation violated")
-        echo "  [FAIL] AC-9: dev-guard.sh found in Edit chain (should be Bash-only)"
+        FAILURES+=("AC-9: dev-guard found in Edit chain — matcher separation violated")
+        echo "  [FAIL] AC-9: dev-guard found in Edit chain (should be Bash-only)"
     fi
 
     # Also verify the resolved hook lists are non-empty (harness wiring is live)
@@ -377,10 +391,10 @@ echo "============================================================"
 # Edit payload (no command field) -> CHAIN DEFERS
 #
 # With an Edit-shaped payload the entire hook chain must emit NO
-# permissionDecision. In pre-#298 dev-guard.sh this would have emitted allow
-# (the bug). The fix made dev-guard.sh emit no decision; but dev-guard.sh
+# permissionDecision. In pre-#298 dev-guard this would have emitted allow
+# (the bug). The fix made dev-guard emit no decision; but dev-guard
 # never sees Edit payloads anyway (Bash-only matcher). The real check:
-# policy-block.sh also defers for this payload (no secret patterns matched).
+# policy-block also defers for this payload (no secret patterns matched).
 # Net result: chain defers. Gate is unconditional (v2.89.0) — no marker needed.
 # ---------------------------------------------------------------------------
 echo
@@ -393,7 +407,7 @@ assert_chain_defer \
 # ---------------------------------------------------------------------------
 # Scenario 2:
 # Edit payload -> CHAIN DEFERS
-# dev-guard.sh doesn't see Edit (Bash-only matcher); policy-block.sh defers
+# dev-guard doesn't see Edit (Bash-only matcher); policy-block defers
 # (no secret patterns matched). Gate is unconditional — no marker required.
 # ---------------------------------------------------------------------------
 echo
@@ -418,8 +432,8 @@ assert_chain_defer \
 # ---------------------------------------------------------------------------
 # Scenario 4:
 # Benign Bash (git status) -> CHAIN DEFERS
-# policy-block.sh: no deny pattern matched.
-# dev-guard.sh: git status is not a covered outward action -> nodecision.
+# policy-block: no deny pattern matched.
+# dev-guard: git status is not a covered outward action -> nodecision.
 # Gate is unconditional but only fires on covered actions (not on all Bash).
 # ---------------------------------------------------------------------------
 echo
@@ -432,8 +446,8 @@ assert_chain_defer \
 # ---------------------------------------------------------------------------
 # Scenario 5:
 # Benign Bash (git status) -> CHAIN DEFERS
-# policy-block.sh: no deny pattern matched.
-# dev-guard.sh: git status is not a covered outward action -> nodecision.
+# policy-block: no deny pattern matched.
+# dev-guard: git status is not a covered outward action -> nodecision.
 # Unconditional gate (v2.89.0) — no marker needed or read.
 # ---------------------------------------------------------------------------
 echo
@@ -446,8 +460,8 @@ assert_chain_defer \
 # ---------------------------------------------------------------------------
 # Scenario 6 (AC-8 — non-vacuous):
 # Covered outward action (gh pr merge 1) -> CHAIN ASK (unconditional)
-# policy-block.sh: no deny pattern for gh pr merge.
-# dev-guard.sh: covered outward action -> ask (SEC-DR-2, unconditional, v2.89.0).
+# policy-block: no deny pattern for gh pr merge.
+# dev-guard: covered outward action -> ask (SEC-DR-2, unconditional, v2.89.0).
 # ---------------------------------------------------------------------------
 echo
 echo "=== Scenario 6 (AC-8): 'gh pr merge 1' -> CHAIN ASK (unconditional) ==="
@@ -459,7 +473,7 @@ assert_chain_ask \
 # ---------------------------------------------------------------------------
 # Scenario 7 (SEC-DR-2 re-founding, v2.89.0):
 # Covered outward action (gh pr merge 1) in clean HOME -> CHAIN ASK
-# dev-guard.sh: gate fires unconditionally — no marker needed.
+# dev-guard: gate fires unconditionally — no marker needed.
 # Old behavior (pre-v2.89.0): CHAIN DEFERS when marker absent.
 # New behavior: CHAIN ASK (gate is always armed).
 # ---------------------------------------------------------------------------
@@ -473,14 +487,14 @@ assert_chain_ask \
 # ---------------------------------------------------------------------------
 # Scenario 8 (AC-8 — non-vacuous):
 # dev mode OFF, destructive Bash (rm -rf ~) -> CHAIN DENY
-# policy-block.sh fires: rm -rf targeting ~ -> deny.
+# policy-block fires: rm -rf targeting ~ -> deny.
 # Proves policy-block's deny path survives the clean-env chain.
 # ---------------------------------------------------------------------------
 echo
 echo "=== Scenario 8 (AC-8): dev OFF, 'rm -rf ~' -> CHAIN DENY ==="
 H=$(make_clean_home)
 assert_chain_deny \
-    "S8: clean HOME, rm -rf ~ -> deny (policy-block.sh destructive pattern)" \
+    "S8: clean HOME, rm -rf ~ -> deny (policy-block destructive pattern)" \
     "$H" "Bash" "$(make_bash_payload 'rm -rf ~')"
 
 # ---------------------------------------------------------------------------

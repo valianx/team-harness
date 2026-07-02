@@ -1,21 +1,21 @@
 #!/bin/bash
 # tests/test_prepublish_guard.sh
-# Behavioral tests for hooks/prepublish-guard.sh
+# Functional tests for hooks/ts/bodies/prepublish-guard.ts (compiled to
+# hooks/ts/dist/prepublish-guard.cjs — the TS body is the single source of
+# gate logic post hook Bash->TS cutover, issue #446).
+#
+# Scope — Check 2 (gh pr create / prepublish_check command execution):
+#   command-routing, no-config fault-path, passing/failing command outcomes,
+#   CWE-209 (captured output must never leak into the deny reason),
+#   the SEC-DR-A control-char guard, and deny-JSON shape validation.
+#   Check 1 (git push / bump-floor / over-bump / stray-bump) has its own
+#   dedicated real-git-fixture suite: test_prepublish_bump_floor.sh. This
+#   suite covers only the minimal Check 1 routing sanity case (non-git
+#   directory → fail-open) that the fixture suite does not exercise.
 #
 # Tests the block-on-condition / open-on-fault contract:
 #   - "deny" cases must produce JSON with permissionDecision: "deny"
 #   - "nodecision" cases must produce empty stdout (hook passes through)
-#
-# The hook performs two distinct checks:
-#   Check 1 (git push): verifies plugin.json + marketplace.json version bumped vs origin/main
-#   Check 2 (gh pr create): runs the operator-configured prepublish_check command
-#
-# IMPORTANT — skipped scenarios:
-#   Check 1 requires a real git repo with origin/main and actual plugin.json changes — those
-#   conditions cannot be reliably reproduced in a unit-test context without mocking git state.
-#   This suite focuses on: command-routing (non-Bash → nodecision), non-matching Bash commands
-#   (nodecision), Check 2 fault-path behavior (no config key → nodecision; failing command →
-#   deny), control-char guard (nodecision), and CWE-209 (output not in reason).
 #
 # Usage:
 #   ./tests/test_prepublish_guard.sh
@@ -25,11 +25,16 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/prepublish-guard.sh"
+HOOK="$REPO_ROOT/hooks/ts/dist/prepublish-guard.cjs"
 
-if [ ! -x "$HOOK" ]; then
-    chmod +x "$HOOK"
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
+
+_exec_hook() {
+    node "$HOOK"
+}
 
 PASS=0
 FAIL=0
@@ -43,8 +48,8 @@ assert_deny() {
     local name="$1"
     local payload="$2"
     local out
-    out=$(echo "$payload" | bash "$HOOK" 2>/dev/null)
-    if echo "$out" | grep -q '"permissionDecision": "deny"'; then
+    out=$(echo "$payload" | _exec_hook 2>/dev/null)
+    if echo "$out" | grep -qE '"permissionDecision":[[:space:]]*"deny"'; then
         PASS=$((PASS + 1))
         echo "  [PASS] DENY: $name"
     else
@@ -58,7 +63,7 @@ assert_nodecision() {
     local name="$1"
     local payload="$2"
     local out
-    out=$(echo "$payload" | bash "$HOOK" 2>/dev/null)
+    out=$(echo "$payload" | _exec_hook 2>/dev/null)
     if [ -z "$out" ]; then
         PASS=$((PASS + 1))
         echo "  [PASS] NODECISION: $name"
@@ -76,7 +81,7 @@ assert_deny_reason_absent() {
     local payload="$2"
     local forbidden="$3"
     local out
-    out=$(echo "$payload" | bash "$HOOK" 2>/dev/null)
+    out=$(echo "$payload" | _exec_hook 2>/dev/null)
     if echo "$out" | grep -q "permissionDecisionReason" && echo "$out" | grep -qF "$forbidden"; then
         FAIL=$((FAIL + 1))
         FAILURES+=("CWE-209: forbidden string found in deny reason: $name | forbidden: $forbidden")
@@ -109,11 +114,12 @@ write_fake_config() {
 EOF
 }
 
-# The hook reads from $HOME/.claude/.team-harness.json — we override HOME to point at our temp dir.
+# The hook reads from os.homedir()/.claude/.team-harness.json — override HOME
+# to point at our temp dir (os.homedir() resolves via $HOME on POSIX).
 export HOME="$FAKE_CONFIG_DIR"
 
 # ---------------------------------------------------------------------------
-# Suite: command routing — non-Bash tool → nodecision
+# Suite: command routing — non-Bash tool_name → nodecision
 # ---------------------------------------------------------------------------
 
 echo "=== Non-Bash tool_name → nodecision (hook must not intervene) ==="
@@ -287,7 +293,7 @@ echo "=== Check 2: deny reason is valid JSON ==="
 
 write_fake_config "false"
 _deny_out=$(echo '{"tool_name":"Bash","tool_input":{"command":"gh pr create --title x"}}' \
-    | bash "$HOOK" 2>/dev/null)
+    | _exec_hook 2>/dev/null)
 
 if echo "$_deny_out" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
     PASS=$((PASS + 1))
@@ -322,18 +328,19 @@ fi
 
 # ---------------------------------------------------------------------------
 # Suite: git push non-matching patterns → nodecision
-# (Check 1 of the hook requires real git state; these test routing only)
+# (Check 1 real-git-fixture cases live in test_prepublish_bump_floor.sh; this
+# suite only covers the minimal routing/fault-path sanity check below.)
 # ---------------------------------------------------------------------------
 
 echo
-echo "=== git push routing (non-force push routed to Check 1 — no version bump expected in test env) ==="
+echo "=== git push routing (non-git directory — Check 1 fault-path sanity) ==="
 
 # In a non-git or no-origin-main environment the hook should fail-open (nodecision).
 # This tests the fault-path contracts for Check 1.
 # We run from a temp dir that is NOT a git repo — hook must nodecision.
 _tmp_non_git=$(mktemp -d)
 _result=$(cd "$_tmp_non_git" && echo '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}' \
-    | bash "$HOOK" 2>/dev/null)
+    | _exec_hook 2>/dev/null)
 rm -rf "$_tmp_non_git"
 
 if [ -z "$_result" ]; then
@@ -341,7 +348,7 @@ if [ -z "$_result" ]; then
     echo "  [PASS] git push from non-git dir → nodecision (fault-open for no git worktree)"
 else
     # If deny is returned, the hook incorrectly blocked outside a git worktree
-    if echo "$_result" | grep -q '"permissionDecision": "deny"'; then
+    if echo "$_result" | grep -qE '"permissionDecision":[[:space:]]*"deny"'; then
         FAIL=$((FAIL + 1))
         FAILURES+=("git push from non-git dir must nodecision but got deny")
         echo "  [FAIL] git push from non-git dir → should be nodecision but got deny"

@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> **opencode support is in beta — installer core production-ready; hook cutover and lifecycle unification in progress.** Team Harness now runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; hooks ship as a dual-runtime TypeScript layer. See the [migration guide](./docs/opencode-migration-guide.md) and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
+> Team Harness runs under both **Claude Code** and **opencode**. Agents, skills, and rules are cross-harness; hooks are single-source TypeScript. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime (author, build, test, release, install, update), the [migration guide](./docs/opencode-migration-guide.md), and the [distribution roadmap](./docs/opencode-distribution-roadmap.md).
 
 ---
 
@@ -30,7 +30,7 @@
 
 ### Install into opencode
 
-opencode support is in beta. Install Team Harness into opencode with:
+See [`docs/lifecycle.md`](./docs/lifecycle.md) for the current maturity of the opencode runtime. Install Team Harness into opencode with:
 
 **Linux / macOS (bash):**
 ```
@@ -169,7 +169,7 @@ Full contract: docs/dev-mode.md.
 ## Requirements
 
 **Required:**
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. **opencode is supported in beta — installer core production-ready; hook cutover and lifecycle unification in progress** — agents, skills, and rules run as-is; hooks run through the dual-runtime TypeScript layer (see the [migration guide](./docs/opencode-migration-guide.md))
+- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. opencode is also supported — agents, skills, and rules run as-is; hooks are single-source TypeScript. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime and the [migration guide](./docs/opencode-migration-guide.md)
 - [context7](https://context7.com/) API key — for library docs retrieval
 - A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — there is no default URL; `/th:setup` requires an explicit value
 
@@ -185,6 +185,7 @@ Full contract: docs/dev-mode.md.
 | [Vision](./docs/vision.md) | Where team-harness is headed — the developer amplified by a trusted agent team |
 | [Roadmap](./docs/roadmap.md) | What we are building next — the sequenced path toward the vision |
 | [How it works](./docs/how-it-works.md) | Pipeline walkthrough, why a harness, what ships |
+| [Dual-runtime lifecycle](./docs/lifecycle.md) | How a change reaches Claude Code and opencode — author, build, test, release, install, update, activate, deprecate |
 | [Pipelines reference](./docs/pipelines.md) | All 8+ pipelines, tier classification, phase tables, gate semantics |
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |

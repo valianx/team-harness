@@ -62,7 +62,7 @@ Report shape (per proposed rule):
   Severity        — ask (default) | deny (destructive-action class only)
   Rationale       — why this recurrence warrants a hook
   False-pos risk  — known cases where the sketch would fire incorrectly
-  Suggested hook  — policy-block.sh (content/command guard) | dev-guard.sh (outward-action guard) | new file
+  Suggested hook  — policy-block (content/command guard) | dev-guard (outward-action guard) | new TS hook body
   Manual step     — what the operator must do to wire the rule
 
 REPORT-only boundary:
@@ -71,7 +71,7 @@ REPORT-only boundary:
 
 Severity defaults:
   ask   — default for all proposed rules (a sketch is unverified; prompt is the safe default)
-  deny  — proposed only for the destructive-action class already denied by policy-block.sh
+  deny  — proposed only for the destructive-action class already denied by policy-block
 ```
 
 ### Analysis path (no `--help`)
@@ -87,15 +87,15 @@ Severity defaults:
 
 **Phase 2 — Map signals to candidate hook rules**
 
-For each recurring friction signal (operator-supplied or trace-derived), map it onto the deterministic-hook vocabulary used by `hooks/policy-block.sh` and `hooks/dev-guard.sh`:
+For each recurring friction signal (operator-supplied or trace-derived), map it onto the deterministic-hook vocabulary used by the `policy-block` and `dev-guard` gates (TypeScript bodies at `hooks/ts/bodies/policy-block.ts` and `hooks/ts/bodies/dev-guard.ts` — TS is the single source of gate logic for both Claude Code and opencode; each body compiles to `hooks/ts/dist/<name>.cjs` and is wired via `.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh <name>`):
 
 | Field | Description |
 |-------|-------------|
 | Trigger event | `PreToolUse` (before a tool call) · `PostToolUse` (after) · `Stop` (on agent stop) |
 | Matcher | The `tool_name` or MCP verb pattern the hook intercepts |
 | Match sketch | An illustrative regex or string pattern (not production-ready — the operator must verify and harden it) |
-| Severity | `ask` by default. `deny` only when the pattern maps to the destructive-action class (e.g., `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`) that `policy-block.sh` already denies. |
-| Suggested hook | `policy-block.sh` for content/command guards; `dev-guard.sh` for outward-action gates; a new file for novel coverage. |
+| Severity | `ask` by default. `deny` only when the pattern maps to the destructive-action class (e.g., `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`) that `policy-block` already denies. |
+| Suggested hook | `policy-block` (`hooks/ts/bodies/policy-block.ts`) for content/command guards; `dev-guard` (`hooks/ts/bodies/dev-guard.ts`) for outward-action gates; a new TS body under `hooks/ts/bodies/` for novel coverage. |
 
 A signal qualifies for a candidate rule when it has recurred at least twice and maps to a detectable, deterministic pattern (a specific command shape, a file path, an MCP verb). Single-occurrence or underdetermined signals are listed as `Insufficient signal — observe further` and excluded from the proposed rules.
 
@@ -124,7 +124,7 @@ Match sketch:   {illustrative regex or pattern — NOT production-ready}
 Severity:       {ask | deny} — {one-line justification}
 Rationale:      {why this recurrence warrants a hook}
 False-pos risk: {known patterns that would fire incorrectly}
-Suggested hook: {policy-block.sh | dev-guard.sh | new file}
+Suggested hook: {policy-block | dev-guard | new TS hook body}
 Manual step:    {what the operator must do to wire this rule}
 
 {repeat for each qualified candidate}
@@ -138,9 +138,11 @@ Manual step:    {what the operator must do to wire this rule}
 ====================================
 - All proposed sketches are illustrative. Verify and harden each regex before wiring.
 - Default severity is `ask`. Elevate to `deny` only for the destructive-action class
-  (see hooks/policy-block.sh for the canonical deny list).
-- Wire rules in hooks/policy-block.sh (content/command guard) or hooks/dev-guard.sh
-  (outward-action gate), or create a new hook file for novel coverage.
+  (see hooks/ts/bodies/policy-block.ts for the canonical deny list).
+- Wire rules in hooks/ts/bodies/policy-block.ts (content/command guard) or
+  hooks/ts/bodies/dev-guard.ts (outward-action gate), then rebuild with
+  `npm run build` (hooks/ts/) so the compiled hooks/ts/dist/<name>.cjs picks up
+  the change — or create a new TS body under hooks/ts/bodies/ for novel coverage.
 - This report does not write any file. The operator owns all wiring.
 ====================================
 ```

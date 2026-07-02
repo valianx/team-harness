@@ -2,7 +2,9 @@
 # tests/test_gcp_guard.sh
 # Suite 87 — gcp-guard-hook-behavior
 #
-# Behavioral tests for hooks/gcp-guard.sh
+# Behavioral tests for hooks/ts/bodies/gcp-guard.ts (compiled to
+# hooks/ts/dist/gcp-guard.cjs — the single source of gate logic post-cutover,
+# issue #446).
 #
 # The hook is a PreToolUse gate that classifies gcloud verbs and returns:
 #   - nodecision (exit 0, empty stdout)     for non-gcloud Bash, read-only verbs,
@@ -26,12 +28,8 @@
 #   empty/malformed stdin with gcloud token           -> fail-safe (never allow)
 #   strongest class across all gcloud invocations wins
 #
-# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
-# the compiled TS artifact (hooks/ts/dist/gcp-guard.cjs) when HOOK_IMPL=ts.
-#
 # Usage:
 #   bash tests/test_gcp_guard.sh
-#   HOOK_IMPL=ts bash tests/test_gcp_guard.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
@@ -40,25 +38,11 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK_IMPL="${HOOK_IMPL:-bash}"
-HOOK_BASH="$REPO_ROOT/hooks/gcp-guard.sh"
-HOOK_TS="$REPO_ROOT/hooks/ts/dist/gcp-guard.cjs"
+HOOK="$REPO_ROOT/hooks/ts/dist/gcp-guard.cjs"
 
-if [ "$HOOK_IMPL" = "ts" ]; then
-    HOOK="$HOOK_TS"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
-        exit 1
-    fi
-else
-    HOOK="$HOOK_BASH"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: hooks/gcp-guard.sh not found at $HOOK"
-        exit 1
-    fi
-    if [ ! -x "$HOOK" ]; then
-        chmod +x "$HOOK"
-    fi
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
 
 PASS=0
@@ -102,11 +86,7 @@ print(json.dumps(payload))
 # Run the hook; print stdout (decision JSON or empty).
 run_hook() {
     local payload="$1"
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        node "$HOOK" <<< "$payload" 2>&1
-    else
-        bash "$HOOK" <<< "$payload" 2>&1
-    fi
+    node "$HOOK" <<< "$payload" 2>&1
 }
 
 # Assert hook emits "ask".
@@ -393,6 +373,42 @@ else
     PASS=$((PASS + 1))
     echo "  [PASS] NEVER-ALLOW (10c): unparseable gcloud+projects+delete did not emit allow (got: ${_case10c_out:-<nodecision>})"
 fi
+
+# ---------------------------------------------------------------------------
+# Case 11 — SEC-PR2-002: command field absent (well-formed JSON, malformed
+# tool_input shape) but a catastrophic verb present elsewhere in tool_input
+# -> DENY. Regression test for the Step-5 raw-catastrophic-scan fail-safe,
+# which was dead code before the fix (an absent command field produced ""
+# rather than null, short-circuiting to none() before Step 5 could run).
+# ---------------------------------------------------------------------------
+echo
+echo "=== Case 11: command field absent + 'projects delete' in raw payload -> DENY (SEC-PR2-002 fail-safe) ==="
+_case11_payload='{"tool_name":"Bash","tool_input":{"raw_input":"gcloud projects delete my-dangerous-project"}}'
+assert_deny \
+    "command absent, catastrophic verb elsewhere in tool_input -> deny (fail-safe reachable)" \
+    "$_case11_payload"
+
+echo
+echo "=== Case 11b: command field absent + no gcloud token anywhere -> NODECISION (fail-safe does not over-trigger) ==="
+_case11b_payload='{"tool_name":"Bash","tool_input":{"raw_input":"echo hello world"}}'
+assert_nodecision \
+    "command absent, no gcloud token -> nodecision" \
+    "$_case11b_payload"
+
+# ---------------------------------------------------------------------------
+# Case 12 — CodeRabbit finding [5]: RAW_CATASTROPHIC_RE used an invalid POSIX
+# class [^[:space:]"] (matches literal chars [, :, s, p, a, c, e, ], " — NOT
+# non-whitespace) instead of [^\s"], so the "organizations <arg> delete"
+# alternative of the Step-5 raw-payload fail-safe never matched a real org
+# name. Regression test for the fix: command field absent + raw payload
+# contains "organizations <org> delete" -> DENY.
+# ---------------------------------------------------------------------------
+echo
+echo "=== Case 12: command field absent + 'organizations abc delete' in raw payload -> DENY (RAW_CATASTROPHIC_RE org fix) ==="
+_case12_payload='{"tool_name":"Bash","tool_input":{"raw_input":"gcloud organizations abc delete"}}'
+assert_deny \
+    "command absent, catastrophic org-delete verb elsewhere in tool_input -> deny (fail-safe reachable)" \
+    "$_case12_payload"
 
 # ---------------------------------------------------------------------------
 # Additional contract validations

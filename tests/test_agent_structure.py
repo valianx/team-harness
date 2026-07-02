@@ -40,6 +40,18 @@ def check(name: str, condition: bool, detail: str = "") -> None:
     print(f"  [{status}] {name}{suffix}")
 
 
+def invokes_launcher(command: str, hook_name: str) -> bool:
+    """True if `command` routes through run-ts-hook.sh with `hook_name`.
+
+    The script path may or may not be double-quoted (`"${VAR}/…/run-ts-hook.sh"`
+    vs the unquoted legacy form) — both are valid invocations of the launcher.
+    Matches both a parsed JSON string (a literal `"`) and the raw hooks.json
+    file text (an escaped `\"`).
+    """
+    pattern = r"run-ts-hook\.sh(\\)?\"?\s+" + re.escape(hook_name) + r"(?=$|[\s\"])"
+    return re.search(pattern, command) is not None
+
+
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -381,28 +393,35 @@ for label, marker in checks_delivery:
           f"marker '{marker}' not found")
 
 # ---------------------------------------------------------------------------
-# Suite 9 — hooks/config.json wires PreToolUse for all OS
+# Suite 9 — .claude-plugin/hooks.json wires PreToolUse via the fail-closed
+# launcher (RETIRED hooks/config.json — the Go installer's CC wiring
+# template — at the hook Bash->TS cutover, issue #446; the marketplace
+# plugin is the only CC wiring path now).
 # ---------------------------------------------------------------------------
 print()
-print("=== Suite 9: hooks/config.json PreToolUse wiring ===")
+print("=== Suite 9: .claude-plugin/hooks.json PreToolUse wiring ===")
 
-cfg = json.loads(read(HOOKS_DIR / "config.json"))
-for os_key in ("windows", "macos", "linux"):
-    section = cfg.get(os_key, {})
-    hooks = section.get("hooks", {})
-    pretool = hooks.get("PreToolUse", [])
-    check(f"hooks/config.json[{os_key}] has PreToolUse entry",
-          len(pretool) > 0,
-          "PreToolUse missing or empty")
-    if pretool:
-        matcher = pretool[0].get("matcher", "")
-        cmd = (pretool[0].get("hooks", [{}])[0]).get("command", "")
-        check(f"hooks/config.json[{os_key}] PreToolUse matcher includes Bash",
-              "Bash" in matcher,
-              f"matcher does not include Bash: '{matcher}'")
-        check(f"hooks/config.json[{os_key}] PreToolUse command points to policy-block.sh",
-              "policy-block.sh" in cmd,
-              f"command does not invoke policy-block.sh: '{cmd}'")
+check(
+    "hooks/config.json retired (Go installer CC path removed)",
+    not (HOOKS_DIR / "config.json").exists(),
+    "hooks/config.json still exists — the Go installer's CC wiring template should have been deleted",
+)
+
+_plugin_hooks_cfg = json.loads(read(REPO_ROOT / ".claude-plugin" / "hooks.json"))
+_ptu_entries = _plugin_hooks_cfg.get("hooks", {}).get("PreToolUse", [])
+_ptu_bash_entry = next((e for e in _ptu_entries if e.get("matcher", "") == "Bash|Write|Edit|NotebookEdit"), None)
+check(
+    ".claude-plugin/hooks.json has a PreToolUse entry matching Bash|Write|Edit|NotebookEdit",
+    _ptu_bash_entry is not None,
+    "PreToolUse entry for the multi-tool matcher missing",
+)
+if _ptu_bash_entry:
+    _ptu_bash_cmd = (_ptu_bash_entry.get("hooks", [{}])[0]).get("command", "")
+    check(
+        "hooks.json PreToolUse command routes through run-ts-hook.sh policy-block",
+        invokes_launcher(_ptu_bash_cmd, "policy-block"),
+        f"command does not invoke the launcher with policy-block: '{_ptu_bash_cmd}'",
+    )
 
 # ---------------------------------------------------------------------------
 # Suite 10 — skills/background.md exists and is sane
@@ -2089,7 +2108,8 @@ for label, condition in orch_session_checks:
 print()
 print("=== Suite 22: Stage-end notification protocol ===")
 
-NOTIFY_STAGE = REPO_ROOT / "hooks" / "notify-stage.sh"
+NOTIFY_STAGE_ENTRY = REPO_ROOT / "hooks" / "ts" / "entry" / "notify-stage.cc.ts"
+NOTIFY_STAGE_DIST = REPO_ROOT / "hooks" / "ts" / "dist" / "notify-stage.cjs"
 
 check(
     "orchestrator.md has ## Stage-end notification protocol section",
@@ -2104,9 +2124,9 @@ check(
 )
 
 check(
-    "Stage-end protocol section names hooks/notify-stage.sh",
-    "hooks/notify-stage.sh" in orch,
-    "hooks/notify-stage.sh not referenced in orchestrator.md Stage-end notification protocol",
+    "Stage-end protocol section names hooks/ts/dist/notify-stage.cjs",
+    "hooks/ts/dist/notify-stage.cjs" in orch,
+    "hooks/ts/dist/notify-stage.cjs not referenced in orchestrator.md Stage-end notification protocol",
 )
 
 check(
@@ -2116,35 +2136,33 @@ check(
 )
 
 check(
-    "hooks/notify-stage.sh file exists",
-    NOTIFY_STAGE.exists(),
-    "hooks/notify-stage.sh does not exist",
+    "hooks/ts/entry/notify-stage.cc.ts file exists",
+    NOTIFY_STAGE_ENTRY.exists(),
+    "hooks/ts/entry/notify-stage.cc.ts does not exist",
 )
 
-# Executable check — skip on Windows where permission bits are not meaningful.
-if os.name != "nt":
-    check(
-        "hooks/notify-stage.sh is executable",
-        os.access(NOTIFY_STAGE, os.X_OK),
-        "hooks/notify-stage.sh is not executable",
-    )
+check(
+    "hooks/ts/dist/notify-stage.cjs compiled artifact exists (tracked, no build step at install)",
+    NOTIFY_STAGE_DIST.exists(),
+    "hooks/ts/dist/notify-stage.cjs does not exist",
+)
 
-notify_stage_content = read(NOTIFY_STAGE)
+notify_stage_content = read(NOTIFY_STAGE_ENTRY)
 
 check(
-    "notify-stage.sh branches on darwin (macOS)",
-    "darwin" in notify_stage_content,
-    "notify-stage.sh missing darwin branch",
+    "notify-stage entry branches on mac (darwin)",
+    '"mac"' in notify_stage_content and "darwin" in notify_stage_content,
+    "notify-stage entry missing mac/darwin branch",
 )
 check(
-    "notify-stage.sh branches on linux",
-    "linux" in notify_stage_content,
-    "notify-stage.sh missing linux branch",
+    "notify-stage entry branches on linux",
+    '"linux"' in notify_stage_content,
+    "notify-stage entry missing linux branch",
 )
 check(
-    "notify-stage.sh branches on Windows (msys or cygwin or win32)",
-    any(k in notify_stage_content for k in ("msys", "cygwin", "win32")),
-    "notify-stage.sh missing Windows (msys/cygwin/win32) branch",
+    "notify-stage entry branches on Windows (win32)",
+    "win32" in notify_stage_content,
+    "notify-stage entry missing Windows (win32) branch",
 )
 
 check(
@@ -2174,19 +2192,20 @@ check(
     "### Failure-safety sub-heading missing — best-effort/never-blocks contract may have been removed",
 )
 
-# (k) hooks/README.md documents notify-stage.sh (installer/documentation propagation check).
+# (k) hooks/README.md documents notify-stage (installer/documentation propagation check).
 hooks_readme_content = read(REPO_ROOT / "hooks" / "README.md")
 check(
-    "hooks/README.md documents notify-stage.sh",
-    "notify-stage.sh" in hooks_readme_content,
-    "hooks/README.md does not mention notify-stage.sh — documentation incomplete",
+    "hooks/README.md documents notify-stage",
+    "notify-stage" in hooks_readme_content,
+    "hooks/README.md does not mention notify-stage — documentation incomplete",
 )
 
-# (l) notify-stage.sh exits 0 on every path (failure-safety contract on the script itself).
+# (l) notify-stage entry never propagates an error to the orchestrator (failure-safety
+# contract): the top-level main().catch() always exits 0.
 check(
-    "notify-stage.sh unconditionally exits 0 (failure-safety contract)",
-    notify_stage_content.rstrip().endswith("exit 0"),
-    "notify-stage.sh does not end with 'exit 0' — wrapper may propagate errors to orchestrator",
+    "notify-stage entry unconditionally exits 0 on any failure (failure-safety contract)",
+    "process.exit(0)" in notify_stage_content,
+    "notify-stage entry does not exit 0 on failure — errors may propagate to the orchestrator",
 )
 
 # (m) AC-8: CHANGELOG [Unreleased] section mentions stage-end notifications + idempotency.
@@ -2227,25 +2246,24 @@ check(
     "idempotency may have reverted to unanchored grep -c (CWE-20 false-positive risk)",
 )
 
-# (q) SEC-004 regression guard: notify-windows.sh uses '' (PowerShell double-quote escape)
-# NOT \' (backslash escape, which is invalid in PowerShell single-quoted strings).
-notify_windows_content = read(REPO_ROOT / "hooks" / "notify-windows.sh")
+# (q) SEC-004 regression guard: the notify-stage entry's Windows sender uses a doubled
+# single-quote (PowerShell string-literal escape), never a bare backslash escape
+# (invalid in PowerShell single-quoted strings).
 check(
-    "SEC-004 guard: notify-windows.sh uses PowerShell-correct '' escape (not broken \\' escape)",
-    "s/'/''/g" in notify_windows_content and "s/'/\\\\'/g" not in notify_windows_content,
-    "SEC-004 regression: notify-windows.sh uses s/'/\\\\'/g (broken PowerShell escape) — "
-    "correct escape is s/'/''/g (doubling the quote per PowerShell single-quoted string rules)",
+    "SEC-004 guard: notify-stage entry uses PowerShell-correct '' escape (not broken \\' escape)",
+    "replace(/'/g, \"''\")" in notify_stage_content and "replace(/'/g, \"\\\\'\")" not in notify_stage_content,
+    "SEC-004 regression: notify-stage entry does not double single-quotes for PowerShell — "
+    "correct escape doubles the quote per PowerShell single-quoted string rules",
 )
 
-# (r) SEC-005 regression guard: notify-mac.sh body construction uses printf pipe to osascript
-# NOT osascript -e with bash double-quoting (which allows $(...) interpolation before osascript sees it).
-notify_mac_content = read(REPO_ROOT / "hooks" / "notify-mac.sh")
+# (r) SEC-005 regression guard: the notify-stage entry's mac sender pipes the AppleScript
+# body to osascript via stdin (execFileSync input), never interpolates it into a
+# shell -e string (which would allow $(...) subshell expansion before osascript sees it).
 check(
-    "SEC-005 guard: notify-mac.sh uses printf pipe to osascript (not bash double-quoted -e string)",
-    'printf \'display notification' in notify_mac_content
-    and 'osascript -e "display notification' not in notify_mac_content,
-    "SEC-005 regression: notify-mac.sh reverted to osascript -e with bash double-quoting — "
-    "this allows $(...) subshell expansion in the body before osascript evaluates the string",
+    "SEC-005 guard: notify-stage entry pipes AppleScript body to osascript via stdin (not -e interpolation)",
+    'execFileSync("osascript"' in notify_stage_content and "input: script" in notify_stage_content,
+    "SEC-005 regression: notify-stage entry does not pipe the AppleScript body via stdin — "
+    "an -e flag with string interpolation would allow $(...) subshell expansion in the body",
 )
 
 # ---------------------------------------------------------------------------
@@ -12490,7 +12508,7 @@ _s55_orch = read(AGENTS_DIR / "orchestrator.md")
 _s55_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
 _s55_checkpoint = read(REPO_ROOT / "docs" / "reasoning-checkpoint.md")
 _s55_hooks = REPO_ROOT / "hooks"
-_s55_config = json.loads(read(_s55_hooks / "config.json"))
+_s55_plugin_hooks = json.loads(read(REPO_ROOT / ".claude-plugin" / "hooks.json"))
 _STOP_SECTION = ("\n## ", "\n### ", "\n---\n")
 
 # -- (1) docs/reasoning-checkpoint.md exists and names the 3 boundaries ------
@@ -12506,62 +12524,71 @@ for _boundary_id in ("intake-plan", "research-next", "postverify-next"):
         f"boundary '{_boundary_id}' not found in docs/reasoning-checkpoint.md",
     )
 
-# -- (2) hooks/checkpoint-guard.sh exists and names deny + matcher Task ------
-_s55_guard_path = _s55_hooks / "checkpoint-guard.sh"
+# -- (2) hooks/ts/bodies/checkpoint-guard.ts exists and names deny + skip markers --
+# (checked against the TS body — the single source of gate logic post-cutover,
+# issue #446. Suite 55(2e)'s "grep -q strict line-token parsing" check is
+# RETIRED — that was a Bash-implementation detail with no TS equivalent; the
+# TS body reads fields via a typed parser rather than substring search, which
+# structurally guarantees exact-field matching without needing a grep flag.)
+_s55_guard_path = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.ts"
 check(
-    "Suite 55(2a): hooks/checkpoint-guard.sh exists",
+    "Suite 55(2a): hooks/ts/bodies/checkpoint-guard.ts exists",
     _s55_guard_path.exists(),
-    "hooks/checkpoint-guard.sh does not exist",
+    "hooks/ts/bodies/checkpoint-guard.ts does not exist",
 )
 if _s55_guard_path.exists():
     _s55_guard = read(_s55_guard_path)
     check(
-        "Suite 55(2b): checkpoint-guard.sh emits permissionDecision deny",
+        "Suite 55(2b): checkpoint-guard.ts emits permissionDecision deny",
         "permissionDecision" in _s55_guard and "deny" in _s55_guard,
-        "guard script does not reference permissionDecision:deny",
+        "guard body does not reference permissionDecision:deny",
     )
     check(
-        "Suite 55(2c): checkpoint-guard.sh checks checkpoint_advance_fresh",
+        "Suite 55(2c): checkpoint-guard.ts checks checkpoint_advance_fresh",
         "checkpoint_advance_fresh" in _s55_guard,
-        "guard script does not check checkpoint_advance_fresh",
+        "guard body does not check checkpoint_advance_fresh",
     )
     check(
-        "Suite 55(2d): checkpoint-guard.sh checks functional_clarity_confirmed",
+        "Suite 55(2d): checkpoint-guard.ts checks functional_clarity_confirmed",
         "functional_clarity_confirmed" in _s55_guard,
-        "guard script does not check functional_clarity_confirmed",
+        "guard body does not check functional_clarity_confirmed",
     )
     check(
-        "Suite 55(2e): checkpoint-guard.sh uses strict line-token parsing (grep -q pattern)",
-        "grep -q" in _s55_guard,
-        "guard script does not use strict grep -q line-token parsing",
-    )
-    check(
-        "Suite 55(2f): checkpoint-guard.sh honors skip markers (fast_mode / bug_tier / discover_state)",
+        "Suite 55(2f): checkpoint-guard.ts honors skip markers (fast_mode / bug_tier / discover_state)",
         "fast_mode" in _s55_guard and "bug_tier" in _s55_guard and "bypassed" in _s55_guard,
-        "guard script does not honor all three skip-marker signals",
+        "guard body does not honor all three skip-marker signals",
     )
     check(
-        "Suite 55(2g): checkpoint-guard.sh does NOT read security_sensitive",
+        "Suite 55(2g): checkpoint-guard.ts does NOT read security_sensitive",
         "security_sensitive" not in _s55_guard,
-        "guard script reads security_sensitive — must not touch security fields",
+        "guard body reads security_sensitive — must not touch security fields",
     )
 
-# -- (3) hooks/config.json wires checkpoint-guard.sh for Task on all 3 OS ----
-for _os_key in ("windows", "macos", "linux"):
-    _os_hooks = _s55_config.get(_os_key, {}).get("hooks", {}).get("PreToolUse", [])
-    _task_entries = [e for e in _os_hooks if e.get("matcher") == "Task"]
+# -- (3) .claude-plugin/hooks.json wires checkpoint-guard for Task via the launcher --
+# (RETIRED per-OS hooks/config.json wiring — the Go installer's CC path was
+# removed at the hook Bash->TS cutover; the marketplace plugin's
+# .claude-plugin/hooks.json is the only CC wiring path now.)
+_s55_ptu_task_entries = [
+    e for e in _s55_plugin_hooks.get("hooks", {}).get("PreToolUse", [])
+    if e.get("matcher") == "Task"
+]
+_s55_checkpoint_task_entry = next(
+    (e for e in _s55_ptu_task_entries
+     if "checkpoint-guard" in (e.get("hooks", [{}])[0]).get("command", "")),
+    None,
+)
+check(
+    "Suite 55(3a): .claude-plugin/hooks.json has a Task PreToolUse entry for checkpoint-guard",
+    _s55_checkpoint_task_entry is not None,
+    "no Task PreToolUse entry invoking checkpoint-guard found in hooks.json",
+)
+if _s55_checkpoint_task_entry:
+    _s55_task_cmd = (_s55_checkpoint_task_entry.get("hooks", [{}])[0]).get("command", "")
     check(
-        f"Suite 55(3a): hooks/config.json[{_os_key}] has Task PreToolUse entry",
-        len(_task_entries) > 0,
-        f"no Task PreToolUse entry found for OS '{_os_key}'",
+        "Suite 55(3b): hooks.json Task entry routes through run-ts-hook.sh checkpoint-guard",
+        invokes_launcher(_s55_task_cmd, "checkpoint-guard"),
+        f"Task hook command does not invoke the launcher with checkpoint-guard: '{_s55_task_cmd}'",
     )
-    if _task_entries:
-        _task_cmd = (_task_entries[0].get("hooks", [{}])[0]).get("command", "")
-        check(
-            f"Suite 55(3b): hooks/config.json[{_os_key}] Task entry invokes checkpoint-guard.sh",
-            "checkpoint-guard.sh" in _task_cmd,
-            f"Task hook command does not invoke checkpoint-guard.sh: '{_task_cmd}'",
-        )
 
 # -- (4) AC-A5: orchestrator.md self-check for all 3 boundaries + nested-context limitation --
 _s55_orch_6d = _slice_section(_s55_orch, "Step 6d", _STOP_SECTION)
@@ -12628,11 +12655,10 @@ check(
     "3.1" in _s55_disc_3 and "skip marker" in _s55_disc_3.lower(),
     "docs/discover-phase.md §3 no longer documents the skip-marker bypass in §3.1",
 )
-check(
-    "Suite 55(7c): hooks/checkpoint-guard.sh is cross-platform (bash shebang)",
-    _s55_guard_path.exists() and read(_s55_guard_path).startswith("#!/usr/bin/env bash"),
-    "checkpoint-guard.sh does not use #!/usr/bin/env bash (cross-platform shebang)",
-)
+# Suite 55(7c) RETIRED: it asserted a Bash shebang for cross-platform behavior
+# — a Bash-implementation detail with no TS equivalent. The TS artifact is
+# invoked explicitly via `node <path>` by the launcher (hooks/run-ts-hook.sh);
+# node itself is the cross-platform runtime, so no shebang convention applies.
 
 # -- (8) SEC-AC-1: HI-2 non-waivable at all THREE boundaries ----------------
 # Slice § Enforcement to the next ## heading only (not ###), so Layer 1 + Layer 2 bodies are included.
@@ -13622,7 +13648,7 @@ check(
 check(
     "dev-mode(unconditional-gate): developer-mode.md states gate fires unconditionally (no marker)",
     "unconditionally" in _s59_style or "UNCONDITIONAL" in _s59_style or "no marker" in _s59_style,
-    "output-styles/developer-mode.md must state that hooks/dev-guard.sh fires unconditionally with no filesystem marker (SEC-DR-2 re-founding)",
+    "output-styles/developer-mode.md must state that the dev-guard hook fires unconditionally with no filesystem marker (SEC-DR-2 re-founding)",
 )
 
 # ---------------------------------------------------------------------------
@@ -13868,85 +13894,54 @@ check(
     "skills/dev-mode/SKILL.md must NOT exist — the /dev-mode skill is retired in v2.89.0 (orchestrator disposition is unconditional at every session start via SessionStart hook)",
 )
 
-# AC — SessionStart hook: unified session-start.sh loads orchestrator disposition
-# (unconditional), language, and workspace-mode.
-# v2.89.0 SEC-DR-2 re-founding: load_orchestrator fires on EVERY session —
-# no marker guard. load_dev_mode is replaced by load_orchestrator.
-_s59_ss_hook_path = HOOKS_DIR / "session-start.sh"
+# AC — SessionStart hook: unified session-start.ts loads orchestrator disposition
+# (unconditional), language, and workspace-mode. Checked against the TS body —
+# the single source of gate logic post hook Bash->TS cutover (issue #446); the
+# Go installer's per-OS hooks/config.json wiring was retired along with its
+# CC path — the marketplace plugin's .claude-plugin/hooks.json (checked below)
+# is the only CC wiring path now.
+# v2.89.0 SEC-DR-2 re-founding: loadOrchestrator fires on EVERY session —
+# no marker guard.
+_s59_ss_hook_path = HOOKS_DIR / "ts" / "bodies" / "session-start.ts"
 _s59_ss_hook = read(_s59_ss_hook_path) if _s59_ss_hook_path.exists() else ""
+_s59_ss_entry = read(HOOKS_DIR / "ts" / "entry" / "session-start.cc.ts")
 check(
-    "dev-mode(sessionstart-hook-exists): hooks/session-start.sh exists",
+    "dev-mode(sessionstart-hook-exists): hooks/ts/bodies/session-start.ts exists",
     _s59_ss_hook_path.exists(),
-    "hooks/session-start.sh must exist — the unified SessionStart hook loading orchestrator disposition, language, and workspace-mode",
+    "hooks/ts/bodies/session-start.ts must exist — the unified SessionStart hook loading orchestrator disposition, language, and workspace-mode",
 )
 check(
     "dev-mode(sessionstart-hook-unconditional): hook fires orchestrator disposition unconditionally — no marker guard",
-    "load_orchestrator" in _s59_ss_hook
+    "loadOrchestrator" in _s59_ss_hook
     and ".dev-mode-active" not in _s59_ss_hook,
-    "hooks/session-start.sh must use load_orchestrator (unconditional, no marker read) — not load_dev_mode. The .dev-mode-active path must be absent (SEC-DR-2 re-founding, v2.89.0)",
+    "hooks/ts/bodies/session-start.ts must use loadOrchestrator (unconditional, no marker read). The .dev-mode-active path must be absent (SEC-DR-2 re-founding, v2.89.0)",
 )
 check(
     "dev-mode(sessionstart-hook-injects-context): hook emits SessionStart additionalContext",
-    "additionalContext" in _s59_ss_hook and "SessionStart" in _s59_ss_hook,
-    "hooks/session-start.sh must emit hookSpecificOutput.additionalContext for the SessionStart event",
+    "additionalContext" in _s59_ss_entry and "SessionStart" in _s59_ss_entry,
+    "hooks/ts/entry/session-start.cc.ts must emit hookSpecificOutput.additionalContext for the SessionStart event",
 )
 check(
     "dev-mode(sessionstart-hook-silent): injected context forbids narrating the determination",
     "SILENT" in _s59_ss_hook and "re-verify" in _s59_ss_hook,
-    "hooks/session-start.sh injected context must instruct the agent to keep the determination SILENT and never re-verify mid-session",
+    "hooks/ts/bodies/session-start.ts injected context must instruct the agent to keep the determination SILENT and never re-verify mid-session",
 )
 check(
     "dev-mode(sessionstart-hook-no-systemmessage-banner): hook does NOT emit systemMessage (banner removed in de-mode)",
     "DEVELOPER MODE ACTIVE" not in _s59_ss_hook,
-    "hooks/session-start.sh must NOT emit the DEVELOPER MODE ACTIVE systemMessage banner (retired in v2.89.0 de-mode; disposition is silent)",
+    "hooks/ts/bodies/session-start.ts must NOT emit the DEVELOPER MODE ACTIVE systemMessage banner (retired in v2.89.0 de-mode; disposition is silent)",
 )
-# Old hook filenames must be absent — they were merged into session-start.sh
+# Old hook filenames must be absent — they were merged into session-start.ts
 check(
-    "dev-mode(sessionstart-old-hooks-absent): hooks/dev-mode-session-start.sh removed (merged into session-start.sh)",
+    "dev-mode(sessionstart-old-hooks-absent): hooks/dev-mode-session-start.sh removed (merged into session-start)",
     not (HOOKS_DIR / "dev-mode-session-start.sh").exists(),
-    "hooks/dev-mode-session-start.sh must be deleted — its functionality is now in hooks/session-start.sh",
+    "hooks/dev-mode-session-start.sh must be deleted — its functionality is now in hooks/ts/bodies/session-start.ts",
 )
 check(
-    "dev-mode(sessionstart-old-lang-hook-absent): hooks/language-session-start.sh removed (merged into session-start.sh)",
+    "dev-mode(sessionstart-old-lang-hook-absent): hooks/language-session-start.sh removed (merged into session-start)",
     not (HOOKS_DIR / "language-session-start.sh").exists(),
-    "hooks/language-session-start.sh must be deleted — its functionality is now in hooks/session-start.sh",
+    "hooks/language-session-start.sh must be deleted — its functionality is now in hooks/ts/bodies/session-start.ts",
 )
-for _os_key in ("windows", "macos", "linux"):
-    _ss = cfg.get(_os_key, {}).get("hooks", {}).get("SessionStart", [])
-    # Find the session-start.sh entry (there should be exactly one)
-    _ss_entries_count = len(_ss)
-    _ss_cmd = ""
-    _ss_matcher = ""
-    for _entry in _ss:
-        _cmd = (_entry.get("hooks", [{}])[0]).get("command", "") if _entry.get("hooks") else ""
-        if "session-start.sh" in _cmd:
-            _ss_cmd = _cmd
-            _ss_matcher = _entry.get("matcher", "")
-            break
-    check(
-        f"dev-mode(sessionstart-wired-{_os_key}): config.json[{_os_key}] wires SessionStart -> session-start.sh",
-        "session-start.sh" in _ss_cmd,
-        f"hooks/config.json[{_os_key}] must wire a SessionStart hook invoking session-start.sh (the unified hook)",
-    )
-    check(
-        f"dev-mode(sessionstart-single-entry-{_os_key}): config.json[{_os_key}] has exactly one SessionStart entry (consolidated)",
-        _ss_entries_count == 1,
-        f"hooks/config.json[{_os_key}] SessionStart must have exactly one entry — the old two-entry pattern (dev-mode + language) is now consolidated into session-start.sh",
-    )
-    check(
-        f"dev-mode(sessionstart-matcher-{_os_key}): config.json[{_os_key}] SessionStart entry declares a 'startup' matcher",
-        "startup" in _ss_matcher,
-        f"hooks/config.json[{_os_key}] SessionStart entry MUST declare a matcher (e.g. 'startup|resume|clear') — a SessionStart entry without a matcher is silently ignored by Claude Code",
-    )
-    # Old hook filenames must not appear in any SessionStart entry command
-    _all_ss_cmds = " ".join(
-        (_e.get("hooks", [{}])[0]).get("command", "") for _e in _ss if _e.get("hooks")
-    )
-    check(
-        f"dev-mode(sessionstart-no-old-hooks-{_os_key}): config.json[{_os_key}] SessionStart references no old hook filenames",
-        "dev-mode-session-start.sh" not in _all_ss_cmds and "language-session-start.sh" not in _all_ss_cmds,
-        f"hooks/config.json[{_os_key}] SessionStart must not reference dev-mode-session-start.sh or language-session-start.sh — both are replaced by session-start.sh",
-    )
 
 # AC-12 — .claude-plugin/hooks.json: plugin-path SessionStart wiring (active path for all plugin installs)
 _plugin_hooks_path = REPO_ROOT / ".claude-plugin" / "hooks.json"
@@ -13956,12 +13951,12 @@ _ph_ss_cmd = ((_ph_ss[0].get("hooks", [{}])[0]).get("command", "")) if _ph_ss el
 check(
     "dev-mode(plugin-hooks-sessionstart-single): .claude-plugin/hooks.json has exactly one SessionStart entry",
     len(_ph_ss) == 1,
-    ".claude-plugin/hooks.json SessionStart must have exactly one entry (consolidated session-start.sh) — a second entry would mean old hooks were reintroduced",
+    ".claude-plugin/hooks.json SessionStart must have exactly one entry (consolidated session-start hook) — a second entry would mean old hooks were reintroduced",
 )
 check(
-    "dev-mode(plugin-hooks-sessionstart-wired): .claude-plugin/hooks.json wires session-start.sh",
-    "session-start.sh" in _ph_ss_cmd,
-    ".claude-plugin/hooks.json must wire hooks/session-start.sh for SessionStart — the consolidated hook that loads dev-mode, language, and workspace-mode",
+    "dev-mode(plugin-hooks-sessionstart-wired): .claude-plugin/hooks.json wires session-start via run-ts-hook.sh",
+    invokes_launcher(_ph_ss_cmd, "session-start"),
+    ".claude-plugin/hooks.json must wire the launcher with session-start for SessionStart — the consolidated hook that loads dev-mode, language, and workspace-mode",
 )
 check(
     "dev-mode(plugin-hooks-sessionstart-matcher): .claude-plugin/hooks.json SessionStart has startup matcher",
@@ -13971,7 +13966,7 @@ check(
 check(
     "dev-mode(plugin-hooks-no-old-hooks): .claude-plugin/hooks.json SessionStart has no old hook filenames",
     "dev-mode-session-start.sh" not in _ph_ss_cmd and "language-session-start.sh" not in _ph_ss_cmd,
-    ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into session-start.sh",
+    ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into the session-start hook",
 )
 
 # subagent.start breadcrumb — .claude-plugin/hooks.json wires the TS hook on the Task matcher
@@ -14018,7 +14013,7 @@ check(
     "dev-mode(docs-devmode-outward-action-gate): docs/dev-mode.md documents the Outward-Action Gate section",
     "Outward-Action Gate" in _s59_docs_devmode
     or "outward-action gate" in _s59_docs_devmode.lower(),
-    "docs/dev-mode.md must contain an Outward-Action Gate section (dev-guard.sh contract)",
+    "docs/dev-mode.md must contain an Outward-Action Gate section (dev-guard hook contract)",
 )
 check(
     "dev-mode(docs-devmode-reconciliation-251-252): docs/dev-mode.md reconciles with #251/#252 publish-gate",
@@ -14068,7 +14063,7 @@ check(
         or "wired by matcher" in _s59_docs_devmode.lower()
     )
     and "PreToolUse" in _s59_docs_devmode,
-    "docs/dev-mode.md must declare that security floors (policy-block.sh, dev-guard.sh, checkpoint-guard.sh) "
+    "docs/dev-mode.md must declare that security floors (policy-block, dev-guard, checkpoint-guard) "
     "are PreToolUse hooks wired by matcher — prompt-independent — and survive the base-prompt replacement intact",
 )
 
@@ -18480,11 +18475,12 @@ check(
 # Structural assertions for Facet A (secret-scanner in policy-block.sh) and
 # Facet B (checkpoint-guard B2/B3 extension). Written FAILING-FIRST in Phase 2.0.
 #
-# Assertions:
-#   (a1) hooks/policy-block.sh references a high-confidence secret pattern ("AKIA")
-#   (a2) hooks/policy-block.sh contains an ask() decision helper ("ask")
-#   (b1) hooks/checkpoint-guard.sh references "research-next" (B2 boundary value)
-#   (b2) hooks/checkpoint-guard.sh references "postverify-next" (B3 boundary value)
+# Assertions (checked against hooks/ts/bodies/*.ts — the single source of
+# gate logic post hook Bash->TS cutover, issue #446):
+#   (a1) policy-block.ts references a high-confidence secret pattern ("AKIA")
+#   (a2) policy-block.ts contains an ask() decision helper ("ask")
+#   (b1) checkpoint-guard.ts references "research-next" (B2 boundary value)
+#   (b2) checkpoint-guard.ts references "postverify-next" (B3 boundary value)
 #   (c1-c4) packaging: plugin.json 2.68.0, marketplace.json 2.68.0,
 #            CLAUDE.md §3 2.68.0, CHANGELOG.md [2.68.0] section present
 #   (d1) self-referential guard: test file contains "Suite 75" +
@@ -18499,8 +18495,8 @@ check(
 print()
 print("=== Suite 75: hooks-secretscan-checkpoint-b2b3 (v2.68.0) ===")
 
-_s75_policy_block  = read(HOOKS_DIR / "policy-block.sh")
-_s75_chkpt_guard   = read(HOOKS_DIR / "checkpoint-guard.sh")
+_s75_policy_block  = read(HOOKS_DIR / "ts" / "bodies" / "policy-block.ts")
+_s75_chkpt_guard   = read(HOOKS_DIR / "ts" / "bodies" / "checkpoint-guard.ts")
 _s75_plugin_json   = read(REPO_ROOT / ".claude-plugin" / "plugin.json")
 _s75_marketplace   = read(REPO_ROOT / ".claude-plugin" / "marketplace.json")
 _s75_claude        = read(REPO_ROOT / "CLAUDE.md")
@@ -18508,36 +18504,36 @@ _s75_changelog     = read(REPO_ROOT / "CHANGELOG.md")
 _s75_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
 _s75_this_file     = read(Path(__file__))
 
-# (a1) policy-block.sh references the AWS high-confidence secret pattern (AKIA)
+# (a1) policy-block.ts references the AWS high-confidence secret pattern (AKIA)
 check(
-    "suite75(a1-policy-block-akia): hooks/policy-block.sh references AKIA secret pattern",
+    "suite75(a1-policy-block-akia): policy-block.ts references AKIA secret pattern",
     "AKIA" in _s75_policy_block,
-    "hooks/policy-block.sh must contain the AKIA[0-9A-Z]{16} AWS-key pattern"
+    "hooks/ts/bodies/policy-block.ts must contain the AKIA[0-9A-Z]{16} AWS-key pattern"
     " — absent pre-fix (Facet A secret-scanner not yet implemented)",
 )
 
-# (a2) policy-block.sh contains an ask() helper for medium-confidence tier
+# (a2) policy-block.ts contains an ask() helper for medium-confidence tier
 check(
-    "suite75(a2-policy-block-ask): hooks/policy-block.sh contains ask() decision",
+    "suite75(a2-policy-block-ask): policy-block.ts contains ask() decision",
     '"ask"' in _s75_policy_block or "permissionDecision.*ask" in _s75_policy_block
     or "ask" in _s75_policy_block,
-    "hooks/policy-block.sh must emit a permissionDecision: ask for medium-confidence patterns"
+    "hooks/ts/bodies/policy-block.ts must emit a permissionDecision: ask for medium-confidence patterns"
     " — absent pre-fix (ask helper not yet added)",
 )
 
-# (b1) checkpoint-guard.sh references the B2 boundary value "research-next"
+# (b1) checkpoint-guard.ts references the B2 boundary value "research-next"
 check(
-    "suite75(b1-checkpoint-guard-b2): hooks/checkpoint-guard.sh references 'research-next'",
+    "suite75(b1-checkpoint-guard-b2): checkpoint-guard.ts references 'research-next'",
     "research-next" in _s75_chkpt_guard,
-    "hooks/checkpoint-guard.sh must handle 'research-next' (B2 boundary)"
+    "hooks/ts/bodies/checkpoint-guard.ts must handle 'research-next' (B2 boundary)"
     " — absent pre-fix (only B1 implemented today)",
 )
 
-# (b2) checkpoint-guard.sh references the B3 boundary value "postverify-next"
+# (b2) checkpoint-guard.ts references the B3 boundary value "postverify-next"
 check(
-    "suite75(b2-checkpoint-guard-b3): hooks/checkpoint-guard.sh references 'postverify-next'",
+    "suite75(b2-checkpoint-guard-b3): checkpoint-guard.ts references 'postverify-next'",
     "postverify-next" in _s75_chkpt_guard,
-    "hooks/checkpoint-guard.sh must handle 'postverify-next' (B3 boundary)"
+    "hooks/ts/bodies/checkpoint-guard.ts must handle 'postverify-next' (B3 boundary)"
     " — absent pre-fix (only B1 implemented today)",
 )
 
@@ -18751,7 +18747,7 @@ check(
     "suite82(b2-guard-python3): hooks/sketch-guard.sh uses python3 with grep fallback",
     "python3" in _s82_sketch_guard and "grep" in _s82_sketch_guard,
     "hooks/sketch-guard.sh must prefer python3 with grep as fallback (cross-platform, "
-    "same pattern as checkpoint-guard.sh)",
+    "the still-bash advisory-guard pattern; deny-floor guards moved to TS)",
 )
 
 # (b3) sketch-guard.sh NEVER emits verdict=fail (completeness gate, not security gate)
@@ -18828,13 +18824,16 @@ check(
     " — absent pre-implementation",
 )
 
-# (d3) sketch-guard.sh is NOT listed as a PreToolUse hook in sketch-guard or config.json
-_s82_hooks_config = read(HOOKS_DIR / "config.json")
+# (d3) sketch-guard.sh is NOT listed as a PreToolUse hook in .claude-plugin/hooks.json
+# (RETIRED hooks/config.json check — the Go installer's CC wiring template was
+# deleted along with its CC path at the hook Bash->TS cutover, issue #446;
+# .claude-plugin/hooks.json is the only CC wiring path now).
+_s82_plugin_hooks_text = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
 check(
-    "suite82(d3-not-pretooluse-hook): sketch-guard.sh is NOT in hooks/config.json"
+    "suite82(d3-not-pretooluse-hook): sketch-guard.sh is NOT in .claude-plugin/hooks.json"
     " (not a PreToolUse hook)",
-    "sketch-guard" not in _s82_hooks_config,
-    "hooks/config.json must NOT contain sketch-guard — it is an orchestrator-invoked gate"
+    "sketch-guard" not in _s82_plugin_hooks_text,
+    ".claude-plugin/hooks.json must NOT contain sketch-guard — it is an orchestrator-invoked gate"
     " script, not a PreToolUse event hook",
 )
 
@@ -20769,9 +20768,10 @@ check(
 #   AC-7         — agents/delivery.md § Step 11.4b: post-merge teardown; Suite 53
 #                  "never from the active local branch" preserved ≥2× in orchestrator.md
 #   AC-8         — plugin.json + marketplace.json both at v2.88.0 or later (floor pin)
-#   AC-9         — hooks/worktree-guard.sh exists, fail-open, registered in all 3 OS
-#                  blocks of hooks/config.json AND in .claude-plugin/hooks.json; reason-
-#                  string states hook cannot cover own-terminal ops
+#   AC-9         — hooks/ts/bodies/worktree-guard.ts exists, fail-open, registered
+#                  in .claude-plugin/hooks.json (Go installer's per-OS hooks/config.json
+#                  CC wiring was retired); reason-string states hook cannot cover
+#                  own-terminal ops
 #
 # Self-referential guards:
 #   h1 — docs/testing.md registers 'Suite 93' + 'worktree-discipline' marker
@@ -20794,11 +20794,9 @@ _s93_changelog_frag = read(_s93_changelog_frag_path) if _s93_changelog_frag_path
 _s93_changelog_md = read(REPO_ROOT / "CHANGELOG.md")
 _s93_discipline_doc = REPO_ROOT / "docs" / "worktree-discipline.md"
 _s93_discipline     = read(_s93_discipline_doc) if _s93_discipline_doc.exists() else ""
-_s93_config_json_path = HOOKS_DIR / "config.json"
-_s93_config_json    = read(_s93_config_json_path) if _s93_config_json_path.exists() else ""
 _s93_hooks_json_path  = REPO_ROOT / ".claude-plugin" / "hooks.json"
 _s93_hooks_json     = read(_s93_hooks_json_path) if _s93_hooks_json_path.exists() else ""
-_s93_guard_sh_path  = HOOKS_DIR / "worktree-guard.sh"
+_s93_guard_sh_path  = HOOKS_DIR / "ts" / "bodies" / "worktree-guard.ts"
 _s93_guard_sh       = read(_s93_guard_sh_path) if _s93_guard_sh_path.exists() else ""
 _s93_plugin_json    = json.loads(read(REPO_ROOT / ".claude-plugin" / "plugin.json"))
 _s93_marketplace_json = json.loads(read(REPO_ROOT / ".claude-plugin" / "marketplace.json"))
@@ -21135,74 +21133,43 @@ check(
     f"marketplace.json plugins[0].version '{_s93_marketplace_version}'",
 )
 
-# --- AC-9: hooks/worktree-guard.sh exists, fail-open, registered everywhere ---
+# --- AC-9: hooks/ts/bodies/worktree-guard.ts exists, fail-open, registered ---
+# (RETIRED per-OS hooks/config.json checks — the Go installer's CC wiring
+# template was deleted along with its CC path at the hook Bash->TS cutover,
+# issue #446; .claude-plugin/hooks.json is the only CC wiring path now.)
 
 check(
-    "suite93(ac9-guard-sh-exists): hooks/worktree-guard.sh exists",
+    "suite93(ac9-guard-sh-exists): hooks/ts/bodies/worktree-guard.ts exists",
     _s93_guard_sh_path.exists(),
-    "hooks/worktree-guard.sh must exist — the advisory fail-open PreToolUse hook",
+    "hooks/ts/bodies/worktree-guard.ts must exist — the advisory fail-open PreToolUse hook",
 )
 check(
-    "suite93(ac9-guard-sh-fail-open): worktree-guard.sh is declared as fail-open",
+    "suite93(ac9-guard-sh-fail-open): worktree-guard.ts is declared as fail-open",
     "fail-open" in _s93_guard_sh.lower() or "FAIL-OPEN" in _s93_guard_sh
     or "fail open" in _s93_guard_sh.lower(),
-    "hooks/worktree-guard.sh must declare itself as fail-open "
-    "(parity with checkpoint-guard.sh / gcp-guard.sh contract)",
+    "hooks/ts/bodies/worktree-guard.ts must declare itself as fail-open "
+    "(parity with checkpoint-guard.ts / gcp-guard.ts contract)",
 )
 check(
-    "suite93(ac9-guard-sh-own-terminal-limit): worktree-guard.sh reason-string states "
+    "suite93(ac9-guard-sh-own-terminal-limit): worktree-guard.ts reason-string states "
     "it cannot cover own-terminal ops",
     "cannot intercept" in _s93_guard_sh or "cannot cover" in _s93_guard_sh,
-    "hooks/worktree-guard.sh must state in its reason-string / header that it cannot "
+    "hooks/ts/bodies/worktree-guard.ts must state in its reason-string / header that it cannot "
     "intercept a human's own-terminal git commands (the U1 boundary)",
-)
-# hooks/config.json registration: 3 OS blocks (windows / macos / linux) each must contain
-# "worktree-guard.sh" — verified by counting occurrences (≥3 = one per OS block)
-_s93_config_wt_count = _s93_config_json.count("worktree-guard.sh")
-check(
-    "suite93(ac9-config-json-3-os-blocks): hooks/config.json registers worktree-guard.sh "
-    "in at least 3 OS blocks (windows + macos + linux)",
-    _s93_config_wt_count >= 3,
-    f"hooks/config.json must register 'worktree-guard.sh' at least 3 times "
-    f"(one per OS block); found {_s93_config_wt_count} occurrences",
-)
-# Verify that a {"matcher":"Bash"} block contains "worktree-guard.sh".
-# Strategy: find each "worktree-guard.sh" occurrence in the command values and check
-# that a "Bash" matcher appears in the 300-char window before it (the JSON block structure
-# places the matcher line right before the hooks array which contains the command).
-_s93_config_bash_wt = False
-_s93_config_search = _s93_config_json
-_s93_config_offset = 0
-while True:
-    _s93_cmd_pos = _s93_config_search.find("worktree-guard.sh")
-    if _s93_cmd_pos == -1:
-        break
-    # Only consider occurrences that are in a "command": "..." value (not in _scripts comment)
-    _s93_window_before = _s93_config_search[max(0, _s93_cmd_pos - 300):_s93_cmd_pos]
-    if '"matcher": "Bash"' in _s93_window_before or '"matcher":"Bash"' in _s93_window_before:
-        _s93_config_bash_wt = True
-        break
-    _s93_config_search = _s93_config_search[_s93_cmd_pos + 1:]
-check(
-    "suite93(ac9-config-json-matcher-bash): hooks/config.json worktree-guard entry "
-    "uses matcher 'Bash'",
-    _s93_config_bash_wt,
-    "hooks/config.json must register worktree-guard.sh with a '\"Bash\"' matcher PreToolUse entry",
 )
 check(
     "suite93(ac9-hooks-json-registered): .claude-plugin/hooks.json registers "
-    "worktree-guard.sh for plugin-runtime path",
-    "worktree-guard.sh" in _s93_hooks_json,
-    ".claude-plugin/hooks.json must register worktree-guard.sh "
-    "(plugin-runtime equivalent of hooks/config.json)",
+    "worktree-guard for the plugin-runtime path",
+    invokes_launcher(_s93_hooks_json, "worktree-guard"),
+    ".claude-plugin/hooks.json must wire the launcher with worktree-guard",
 )
 check(
     "suite93(ac9-hooks-json-bash-matcher): .claude-plugin/hooks.json worktree-guard entry "
     "is under PreToolUse with Bash matcher",
-    "worktree-guard.sh" in _s93_hooks_json
+    invokes_launcher(_s93_hooks_json, "worktree-guard")
     and "PreToolUse" in _s93_hooks_json
     and '"Bash"' in _s93_hooks_json,
-    ".claude-plugin/hooks.json worktree-guard.sh must be a PreToolUse Bash-matched entry",
+    ".claude-plugin/hooks.json worktree-guard must be a PreToolUse Bash-matched entry",
 )
 
 # --- AC-10: reviewer.md — PR-review worktree lifecycle ---
@@ -26441,18 +26408,19 @@ check(
 )
 
 # (6) suite110(6-no-new-hook): no new hooks/*.sh gate file added by this change (AC-7 scope)
-#     The canonical hook set is: notify-windows.sh, notify-mac.sh, notify-linux.sh,
-#     notify-stage.sh, dev-guard.sh, policy-block.sh, checkpoint-guard.sh,
-#     worktree-guard.sh.  Any hook file not in this set triggers the assertion.
+#     Post hook Bash->TS cutover (issue #446), the canonical top-level
+#     hooks/*.sh set is exactly: sketch-guard.sh (not an event hook — invoked
+#     via the Bash tool, not wired in hooks.json) and run-ts-hook.sh (the
+#     fail-closed launcher every gate routes through). Every retired gate
+#     body (policy-block.sh, dev-guard.sh, gcp-guard.sh, worktree-guard.sh,
+#     prepublish-guard.sh, checkpoint-guard.sh, session-start.sh,
+#     language-user-prompt.sh, subagent-trace.sh, precompact-snapshot.sh,
+#     notify-{stage,windows,mac,linux}.sh) plus the _json-extract.sh and
+#     _hook-profile.sh helpers were deleted; their logic lives in
+#     hooks/ts/bodies/*.ts.
 _s110_CANONICAL_HOOKS = {
-    "notify-windows.sh", "notify-mac.sh", "notify-linux.sh", "notify-stage.sh",
-    "dev-guard.sh", "policy-block.sh", "checkpoint-guard.sh", "worktree-guard.sh",
-    "_json-extract.sh", "gcp-guard.sh", "language-user-prompt.sh",
-    "session-start.sh", "sketch-guard.sh",
-    # Added in v2.106.0 (uncovered-event-hooks feature)
-    "subagent-trace.sh", "precompact-snapshot.sh", "_hook-profile.sh",
-    # Added in v2.107.0 (prepublish-version-and-tests-gate feature)
-    "prepublish-guard.sh",
+    "sketch-guard.sh",
+    "run-ts-hook.sh",
 }
 _s110_actual_hooks = {p.name for p in _s110_hooks_dir.glob("*.sh")} if _s110_hooks_dir.exists() else set()
 _s110_extra_hooks = _s110_actual_hooks - _s110_CANONICAL_HOOKS
@@ -26971,7 +26939,7 @@ check(
 #   AC-2  — docs/worktree-discipline.md: Rule 1 table contains "ahead of
 #            origin/main" AND "at/behind"; U1 + fetch-and-base blocks intact
 #            (cross-check via Suite 93 token preservation)
-#   AC-3  — hooks/worktree-guard.sh: advisory reminder contains "ahead of
+#   AC-3  — hooks/ts/bodies/worktree-guard.ts: advisory reminder contains "ahead of
 #            origin/main"
 #   AC-4  — Suite 93 cross-check: "Rule 1", "origin/main", "worktree", and
 #            "dirty" or "non-main" still present in docs/worktree-discipline.md
@@ -26988,7 +26956,7 @@ print("=== Suite 113: worktree-isolation-ahead structural contract (v2.102.0) ==
 
 _s113_discipline_path = REPO_ROOT / "docs" / "worktree-discipline.md"
 _s113_discipline      = read(_s113_discipline_path) if _s113_discipline_path.exists() else ""
-_s113_guard_sh_path   = HOOKS_DIR / "worktree-guard.sh"
+_s113_guard_sh_path   = HOOKS_DIR / "ts" / "bodies" / "worktree-guard.ts"
 _s113_guard_sh        = read(_s113_guard_sh_path) if _s113_guard_sh_path.exists() else ""
 _s113_orchestrator    = read(AGENTS_DIR / "orchestrator.md")
 _s113_testing_md      = read(REPO_ROOT / "docs" / "testing.md")
@@ -27007,10 +26975,10 @@ check(
     "(start-gate re-keying, issue #352)",
 )
 check(
-    "suite113(ac3-guard-sh-ahead-token): hooks/worktree-guard.sh advisory reminder "
+    "suite113(ac3-guard-sh-ahead-token): worktree-guard.ts advisory reminder "
     "contains 'ahead of origin/main'",
     "ahead of origin/main" in _s113_guard_sh,
-    "hooks/worktree-guard.sh advisory reminder must contain 'ahead of origin/main' "
+    "hooks/ts/bodies/worktree-guard.ts advisory reminder must contain 'ahead of origin/main' "
     "(position-based condition, not branch-name proxy)",
 )
 check(
@@ -28065,31 +28033,25 @@ check(
 print()
 print("=== Suite 117: uncovered-event-hooks structural contract (v2.106.0) ===")
 
-# --- File reads ---
-_s117_subagent_trace    = read(HOOKS_DIR / "subagent-trace.sh") if (HOOKS_DIR / "subagent-trace.sh").exists() else ""
-_s117_precompact        = read(HOOKS_DIR / "precompact-snapshot.sh") if (HOOKS_DIR / "precompact-snapshot.sh").exists() else ""
-_s117_hook_profile      = read(HOOKS_DIR / "_hook-profile.sh") if (HOOKS_DIR / "_hook-profile.sh").exists() else ""
-_s117_notify_win        = read(HOOKS_DIR / "notify-windows.sh")
-_s117_notify_mac        = read(HOOKS_DIR / "notify-mac.sh")
-_s117_notify_linux      = read(HOOKS_DIR / "notify-linux.sh")
-_s117_notify_stage      = read(HOOKS_DIR / "notify-stage.sh")
-_s117_policy_block      = read(HOOKS_DIR / "policy-block.sh")
-_s117_dev_guard         = read(HOOKS_DIR / "dev-guard.sh")
-_s117_gcp_guard         = read(HOOKS_DIR / "gcp-guard.sh")
-_s117_worktree_guard    = read(HOOKS_DIR / "worktree-guard.sh")
-_s117_checkpoint_guard  = read(HOOKS_DIR / "checkpoint-guard.sh")
-_s117_session_start     = read(HOOKS_DIR / "session-start.sh")
-_s117_lang_prompt       = read(HOOKS_DIR / "language-user-prompt.sh")
-_s117_config_json_raw   = read(HOOKS_DIR / "config.json")
+# --- File reads (TS bodies — the single source of gate logic post hook
+# Bash->TS cutover, issue #446; hooks/config.json per-OS wiring was retired
+# along with the Go installer's CC path) ---
+_s117_ts_bodies = HOOKS_DIR / "ts" / "bodies"
+_s117_subagent_trace    = read(_s117_ts_bodies / "subagent-trace.ts") if (_s117_ts_bodies / "subagent-trace.ts").exists() else ""
+_s117_precompact        = read(_s117_ts_bodies / "precompact-snapshot.ts") if (_s117_ts_bodies / "precompact-snapshot.ts").exists() else ""
+_s117_hook_profile      = read(_s117_ts_bodies / "hook-profile.ts") if (_s117_ts_bodies / "hook-profile.ts").exists() else ""
+_s117_notify_stage      = read(_s117_ts_bodies / "notify-stage.ts")
+_s117_notify_stage_entry = read(HOOKS_DIR / "ts" / "entry" / "notify-stage.cc.ts")
+_s117_policy_block      = read(_s117_ts_bodies / "policy-block.ts")
+_s117_dev_guard         = read(_s117_ts_bodies / "dev-guard.ts")
+_s117_gcp_guard         = read(_s117_ts_bodies / "gcp-guard.ts")
+_s117_worktree_guard    = read(_s117_ts_bodies / "worktree-guard.ts")
+_s117_checkpoint_guard  = read(_s117_ts_bodies / "checkpoint-guard.ts")
+_s117_session_start     = read(_s117_ts_bodies / "session-start.ts")
+_s117_lang_prompt       = read(_s117_ts_bodies / "language-user-prompt.ts")
 _s117_hooks_json_raw    = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
 _s117_testing_md        = read(REPO_ROOT / "docs" / "testing.md")
 _s117_claude_md         = read(REPO_ROOT / "CLAUDE.md")
-
-# Parse config.json to get per-OS blocks
-try:
-    _s117_config = json.loads(_s117_config_json_raw)
-except json.JSONDecodeError:
-    _s117_config = {}
 
 # Parse hooks.json
 try:
@@ -28098,108 +28060,75 @@ except json.JSONDecodeError:
     _s117_hooks_json = {}
 
 # ----------------------------------------------------------------
-# AC-1 — subagent-trace.sh structural existence + fail-open contract
+# AC-1 — subagent-trace.ts structural existence + fail-open contract
+# (Bash-syntax checks — >> append-only, 'exit 0' terminal — RETIRED: no TS
+# equivalent. TS achieves the same fail-open/file-only-write contract
+# structurally: writeTrace() only ever returns a value or null, and the CC
+# entry never writes to stdout — see AC-5 below.)
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac1-file-exists): hooks/subagent-trace.sh exists",
+    "suite117(ac1-file-exists): hooks/ts/bodies/subagent-trace.ts exists",
     bool(_s117_subagent_trace),
-    "hooks/subagent-trace.sh must exist",
+    "hooks/ts/bodies/subagent-trace.ts must exist",
 )
 check(
-    "suite117(ac1-append-only): subagent-trace.sh uses >> (file-append-only, never stdout)",
-    ">>" in _s117_subagent_trace,
-    "subagent-trace.sh must write to a file via >> (no stdout output)",
-)
-check(
-    "suite117(ac1-exit0-terminal): subagent-trace.sh terminates every path with exit 0",
-    "exit 0" in _s117_subagent_trace,
-    "subagent-trace.sh must terminate every path with 'exit 0'",
-)
-check(
-    "suite117(ac1-th-scope-guard): subagent-trace.sh contains th: scope guard",
+    "suite117(ac1-th-scope-guard): subagent-trace.ts contains th: scope guard",
     "th:" in _s117_subagent_trace,
-    "subagent-trace.sh must contain a 'th:' prefix scope guard",
+    "subagent-trace.ts must contain a 'th:' prefix scope guard",
 )
 check(
-    "suite117(ac1-no-transcript-open): subagent-trace.sh does not open transcript_path",
-    "transcript_path" not in _s117_subagent_trace
-    or (
-        "transcript_path" in _s117_subagent_trace
-        and "NEVER" in _s117_subagent_trace
-        and "cat" not in _s117_subagent_trace.replace("# cat", "").replace("#cat", "")
-    ),
-    "subagent-trace.sh must never open transcript_path",
+    "suite117(ac1-no-transcript-open): subagent-trace.ts does not open transcript_path",
+    "transcript_path" not in _s117_subagent_trace,
+    "subagent-trace.ts must never open transcript_path",
 )
 
 # ----------------------------------------------------------------
-# AC-2 — subagent-trace.sh: non-th: scope guard (exit 0 path)
+# AC-2 — subagent-trace.ts: non-th: scope guard (silent skip path)
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac2-nontH-guard): subagent-trace.sh has case/if guard for non-th: agent_type",
-    ("case \"$AGENT_TYPE\" in" in _s117_subagent_trace or "th:*" in _s117_subagent_trace),
-    "subagent-trace.sh must guard against non-th: agent_type values",
+    "suite117(ac2-nontH-guard): subagent-trace.ts guards non-th: agent_type",
+    "isTHAgent" in _s117_subagent_trace and "startsWith(\"th:\")" in _s117_subagent_trace,
+    "subagent-trace.ts must guard against non-th: agent_type values",
 )
 
 # ----------------------------------------------------------------
-# AC-3 — precompact-snapshot.sh structural existence + snapshot contract
+# AC-3 — precompact-snapshot.ts structural existence + snapshot contract
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac3-file-exists): hooks/precompact-snapshot.sh exists",
+    "suite117(ac3-file-exists): hooks/ts/bodies/precompact-snapshot.ts exists",
     bool(_s117_precompact),
-    "hooks/precompact-snapshot.sh must exist",
+    "hooks/ts/bodies/precompact-snapshot.ts must exist",
 )
 check(
-    "suite117(ac3-append-only): precompact-snapshot.sh uses >> (breadcrumb file-append-only)",
-    ">>" in _s117_precompact,
-    "precompact-snapshot.sh must write breadcrumb to a file via >>",
-)
-check(
-    "suite117(ac3-exit0-terminal): precompact-snapshot.sh terminates every path with exit 0",
-    "exit 0" in _s117_precompact,
-    "precompact-snapshot.sh must terminate every path with 'exit 0'",
-)
-check(
-    "suite117(ac3-snapshot-filename): precompact-snapshot.sh uses fixed sibling filename",
+    "suite117(ac3-snapshot-filename): precompact-snapshot.ts uses fixed sibling filename",
     "00-state.precompact-snapshot.md" in _s117_precompact,
-    "precompact-snapshot.sh must write to fixed filename '00-state.precompact-snapshot.md'",
+    "precompact-snapshot.ts must write to fixed filename '00-state.precompact-snapshot.md'",
 )
 check(
-    "suite117(ac3-rolling-file): precompact-snapshot.sh is one rolling file (overwrite-in-place)",
-    "00-state.precompact-snapshot.md" in _s117_precompact,
-    "precompact-snapshot.sh must use a single rolling snapshot file, not an ever-growing set",
-)
-check(
-    "suite117(ac3-copies-only-state): precompact-snapshot.sh copies 00-state.md",
+    "suite117(ac3-copies-only-state): precompact-snapshot.ts copies 00-state.md",
     "00-state.md" in _s117_precompact,
-    "precompact-snapshot.sh must copy 00-state.md",
+    "precompact-snapshot.ts must copy 00-state.md",
 )
 
 # ----------------------------------------------------------------
-# AC-4 — precompact-snapshot.sh: control-char guard + symlink guard
+# AC-4 — precompact-snapshot.ts: symlink guard
+# (Bash-syntax control-char/regular-file checks — [[:cntrl:]], [ -f ... ] —
+# RETIRED: TS reads via fs.readFileSync/statSync, which structurally cannot
+# follow a control-char-injected shell path since no shell interpolation
+# occurs; the symlink-escape guard below is the security-relevant invariant.)
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac4-control-char-guard): precompact-snapshot.sh has SEC-DR-A control-char check",
-    "[[:cntrl:]]" in _s117_precompact,
-    "precompact-snapshot.sh must contain the SEC-DR-A '[[:cntrl:]]' guard on logs-path",
-)
-check(
-    "suite117(ac4-regular-file-guard): precompact-snapshot.sh uses -f guard (regular file check)",
-    "[ -f " in _s117_precompact or "[-f " in _s117_precompact,
-    "precompact-snapshot.sh must use '[ -f ...]' guard before copying 00-state.md",
-)
-check(
-    "suite117(ac4-symlink-realpath-guard): precompact-snapshot.sh uses realpath to detect symlink escape",
-    "realpath" in _s117_precompact,
-    "precompact-snapshot.sh must use 'realpath' for SEC-DR-006 symlink/path-escape guard",
+    "suite117(ac4-symlink-realpath-guard): precompact-snapshot uses realpath to detect symlink escape",
+    "realpath" in _s117_precompact or "realpath" in read(HOOKS_DIR / "ts" / "entry" / "precompact-snapshot.cc.ts"),
+    "precompact-snapshot must use 'realpath' for SEC-DR-006 symlink/path-escape guard",
 )
 
 # ----------------------------------------------------------------
 # AC-5 — BOTH hooks: no forbidden decision/stdout tokens (SEC-DR-002)
-# The complete forbidden set from the plan.
 # ----------------------------------------------------------------
 
 _S117_FORBIDDEN_TOKENS = [
@@ -28207,180 +28136,88 @@ _S117_FORBIDDEN_TOKENS = [
     "hookSpecificOutput",
     "additionalContext",
     "systemMessage",
-    "stopReason",
 ]
+
+
+def _s117_emits_token(content: str, token: str) -> bool:
+    """True only if token appears in actual code (a quoted JSON key or field
+    access), not in a documentation comment stating the token is absent."""
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("*"):
+            continue
+        if token in line:
+            return True
+    return False
+
 
 for _tok in _S117_FORBIDDEN_TOKENS:
     check(
-        f"suite117(ac5-no-{_tok.lower()}-in-subagent-trace): subagent-trace.sh does not contain '{_tok}'",
-        _tok not in _s117_subagent_trace,
-        f"subagent-trace.sh must not contain the token '{_tok}' (SEC-DR-002 / #298 class)",
+        f"suite117(ac5-no-{_tok.lower()}-in-subagent-trace): subagent-trace.ts does not emit '{_tok}'",
+        not _s117_emits_token(_s117_subagent_trace, _tok),
+        f"subagent-trace.ts must not emit the token '{_tok}' (SEC-DR-002 / #298 class)",
     )
     check(
-        f"suite117(ac5-no-{_tok.lower()}-in-precompact): precompact-snapshot.sh does not contain '{_tok}'",
-        _tok not in _s117_precompact,
-        f"precompact-snapshot.sh must not contain the token '{_tok}' (SEC-DR-002 / #298 class)",
+        f"suite117(ac5-no-{_tok.lower()}-in-precompact): precompact-snapshot.ts does not emit '{_tok}'",
+        not _s117_emits_token(_s117_precompact, _tok),
+        f"precompact-snapshot.ts must not emit the token '{_tok}' (SEC-DR-002 / #298 class)",
     )
 
-# Also verify "decision" in a write/output sense is absent
-# (using a loose but adequate heuristic: no echo/printf/print to stdout with "decision")
-check(
-    "suite117(ac5-no-stdout-decision-subagent-trace): subagent-trace.sh has no stdout JSON emission",
-    # stdout output is forbidden; the hooks use >> to files only.
-    # We verify no bare 'echo' or 'printf' without >> redirection writes "decision" output.
-    # A grep for 'echo.*decision' or 'printf.*decision' in these hooks would indicate a violation.
-    "permissionDecision" not in _s117_subagent_trace
-    and "hookSpecificOutput" not in _s117_subagent_trace,
-    "subagent-trace.sh must not emit permissionDecision or hookSpecificOutput to stdout",
-)
-check(
-    "suite117(ac5-no-stdout-decision-precompact): precompact-snapshot.sh has no stdout JSON emission",
-    "permissionDecision" not in _s117_precompact
-    and "hookSpecificOutput" not in _s117_precompact,
-    "precompact-snapshot.sh must not emit permissionDecision or hookSpecificOutput to stdout",
-)
-
 # ----------------------------------------------------------------
-# AC-5 — _hook-profile.sh helper existence + shape
+# AC-5 — hook-profile.ts helper existence + shape
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac5-profile-helper-exists): hooks/_hook-profile.sh exists",
+    "suite117(ac5-profile-helper-exists): hooks/ts/bodies/hook-profile.ts exists",
     bool(_s117_hook_profile),
-    "hooks/_hook-profile.sh must exist",
+    "hooks/ts/bodies/hook-profile.ts must exist",
 )
 check(
-    "suite117(ac5-profile-helper-th-hook-profile): _hook-profile.sh defines th_hook_profile()",
-    "th_hook_profile" in _s117_hook_profile,
-    "_hook-profile.sh must define the th_hook_profile() function",
+    "suite117(ac5-profile-helper-get-hook-profile): hook-profile.ts defines getHookProfile()",
+    "getHookProfile" in _s117_hook_profile,
+    "hook-profile.ts must define the getHookProfile() function",
 )
 check(
-    "suite117(ac5-profile-helper-th-observability-enabled): _hook-profile.sh defines th_observability_enabled()",
-    "th_observability_enabled" in _s117_hook_profile,
-    "_hook-profile.sh must define the th_observability_enabled() function",
+    "suite117(ac5-profile-helper-observability-enabled): hook-profile.ts defines observabilityEnabled()",
+    "observabilityEnabled" in _s117_hook_profile,
+    "hook-profile.ts must define the observabilityEnabled() function",
 )
 check(
-    "suite117(ac5-profile-helper-minimal): _hook-profile.sh handles 'minimal' profile",
+    "suite117(ac5-profile-helper-minimal): hook-profile.ts handles 'minimal' profile",
     "minimal" in _s117_hook_profile,
-    "_hook-profile.sh must handle the 'minimal' profile level",
+    "hook-profile.ts must handle the 'minimal' profile level",
 )
 check(
-    "suite117(ac5-profile-helper-standard): _hook-profile.sh handles 'standard' profile (default)",
+    "suite117(ac5-profile-helper-standard): hook-profile.ts handles 'standard' profile (default)",
     "standard" in _s117_hook_profile,
-    "_hook-profile.sh must handle the 'standard' profile level (default when unset)",
+    "hook-profile.ts must handle the 'standard' profile level (default when unset)",
 )
 check(
-    "suite117(ac5-profile-helper-strict): _hook-profile.sh handles 'strict' profile",
+    "suite117(ac5-profile-helper-strict): hook-profile.ts handles 'strict' profile",
     "strict" in _s117_hook_profile,
-    "_hook-profile.sh must handle the 'strict' profile level",
+    "hook-profile.ts must handle the 'strict' profile level",
 )
 check(
-    "suite117(ac5-profile-helper-idle-notify-class): _hook-profile.sh supports idle-notify class",
+    "suite117(ac5-profile-helper-idle-notify-class): hook-profile.ts supports idle-notify class",
     "idle-notify" in _s117_hook_profile,
-    "_hook-profile.sh must support the 'idle-notify' observability class",
+    "hook-profile.ts must support the 'idle-notify' observability class",
 )
 check(
-    "suite117(ac5-profile-helper-pipeline-observability-class): _hook-profile.sh supports pipeline-observability class",
+    "suite117(ac5-profile-helper-pipeline-observability-class): hook-profile.ts supports pipeline-observability class",
     "pipeline-observability" in _s117_hook_profile,
-    "_hook-profile.sh must support the 'pipeline-observability' observability class",
+    "hook-profile.ts must support the 'pipeline-observability' observability class",
 )
 
 # ----------------------------------------------------------------
-# AC-6 — config.json: SubagentStop + PreCompact in ALL 3 OS blocks
+# AC-6 RETIRED: per-OS hooks/config.json SubagentStop + PreCompact wiring
+# was the Go installer's CC wiring template — deleted along with its CC
+# path at the hook Bash->TS cutover (issue #446). AC-7 (below) checks the
+# equivalent .claude-plugin/hooks.json wiring, the only CC path now.
 # ----------------------------------------------------------------
 
-_S117_OS_BLOCKS = ["windows", "macos", "linux"]
-
-for _os in _S117_OS_BLOCKS:
-    _os_block = _s117_config.get(_os, {})
-    _os_hooks  = _os_block.get("hooks", {})
-
-    # SubagentStop entry
-    _subagent_stop_entries = _os_hooks.get("SubagentStop", [])
-    _has_subagent_entry = any(
-        any(
-            "subagent-trace.sh" in h.get("command", "")
-            for h in entry.get("hooks", [])
-        )
-        for entry in _subagent_stop_entries
-    )
-    check(
-        f"suite117(ac6-subagent-stop-{_os}): config.json {_os} block has SubagentStop → subagent-trace.sh",
-        _has_subagent_entry,
-        f"config.json '{_os}' block must have a SubagentStop entry pointing to subagent-trace.sh",
-    )
-
-    # SubagentStop matcher must be th:.*
-    _subagent_matchers = [e.get("matcher", "") for e in _subagent_stop_entries]
-    check(
-        f"suite117(ac6-subagent-stop-matcher-{_os}): config.json {_os} SubagentStop matcher is 'th:.*'",
-        any("th:" in m for m in _subagent_matchers),
-        f"config.json '{_os}' SubagentStop matcher must include 'th:'",
-    )
-
-    # PreCompact entry
-    _precompact_entries = _os_hooks.get("PreCompact", [])
-    _has_precompact_entry = any(
-        any(
-            "precompact-snapshot.sh" in h.get("command", "")
-            for h in entry.get("hooks", [])
-        )
-        for entry in _precompact_entries
-    )
-    check(
-        f"suite117(ac6-precompact-{_os}): config.json {_os} block has PreCompact → precompact-snapshot.sh",
-        _has_precompact_entry,
-        f"config.json '{_os}' block must have a PreCompact entry pointing to precompact-snapshot.sh",
-    )
-
-    # PreCompact matcher must include manual|auto
-    _precompact_matchers = [e.get("matcher", "") for e in _precompact_entries]
-    check(
-        f"suite117(ac6-precompact-matcher-{_os}): config.json {_os} PreCompact matcher covers manual/auto",
-        any("manual" in m or "auto" in m for m in _precompact_matchers),
-        f"config.json '{_os}' PreCompact matcher must cover 'manual' and 'auto'",
-    )
-
-    # _scripts comment updated
-    _scripts_comment = _os_block.get("_scripts", "")
-    check(
-        f"suite117(ac6-scripts-comment-{_os}): config.json {_os} _scripts comment lists subagent-trace.sh",
-        "subagent-trace.sh" in _scripts_comment,
-        f"config.json '{_os}' _scripts comment must list 'subagent-trace.sh'",
-    )
-    check(
-        f"suite117(ac6-scripts-comment-precompact-{_os}): config.json {_os} _scripts comment lists precompact-snapshot.sh",
-        "precompact-snapshot.sh" in _scripts_comment,
-        f"config.json '{_os}' _scripts comment must list 'precompact-snapshot.sh'",
-    )
-    check(
-        f"suite117(ac6-scripts-comment-profile-{_os}): config.json {_os} _scripts comment lists _hook-profile.sh",
-        "_hook-profile.sh" in _scripts_comment,
-        f"config.json '{_os}' _scripts comment must list '_hook-profile.sh'",
-    )
-
-    # _events comment updated
-    _events_comment = _os_block.get("_events", "")
-    check(
-        f"suite117(ac6-events-comment-subagent-{_os}): config.json {_os} _events comment mentions SubagentStop",
-        "SubagentStop" in _events_comment,
-        f"config.json '{_os}' _events comment must mention SubagentStop",
-    )
-    check(
-        f"suite117(ac6-events-comment-precompact-{_os}): config.json {_os} _events comment mentions PreCompact",
-        "PreCompact" in _events_comment,
-        f"config.json '{_os}' _events comment must mention PreCompact",
-    )
-
-# JSON validity (already checked by json.loads above; surface as explicit check)
-check(
-    "suite117(ac6-config-json-valid): hooks/config.json parses as valid JSON",
-    bool(_s117_config),
-    "hooks/config.json must be valid JSON in all three OS blocks",
-)
-
 # ----------------------------------------------------------------
-# AC-7 — hooks.json: SubagentStop + PreCompact entries + _comment
+# AC-7 — hooks.json: SubagentStop + PreCompact entries route through the
+# fail-closed launcher (subagent-trace, precompact-snapshot); _comment updated
 # ----------------------------------------------------------------
 
 _s117_hj_hooks = _s117_hooks_json.get("hooks", {})
@@ -28388,15 +28225,15 @@ _s117_hj_hooks = _s117_hooks_json.get("hooks", {})
 _hj_subagent_entries = _s117_hj_hooks.get("SubagentStop", [])
 _hj_has_subagent = any(
     any(
-        "subagent-trace.sh" in h.get("command", "")
+        invokes_launcher(h.get("command", ""), "subagent-trace")
         for h in entry.get("hooks", [])
     )
     for entry in _hj_subagent_entries
 )
 check(
-    "suite117(ac7-hooks-json-subagent-stop): .claude-plugin/hooks.json has SubagentStop → subagent-trace.sh",
+    "suite117(ac7-hooks-json-subagent-stop): .claude-plugin/hooks.json has SubagentStop → subagent-trace",
     _hj_has_subagent,
-    ".claude-plugin/hooks.json must have a SubagentStop entry pointing to subagent-trace.sh",
+    ".claude-plugin/hooks.json must have a SubagentStop entry routing through the launcher to subagent-trace",
 )
 
 _hj_subagent_matchers = [e.get("matcher", "") for e in _hj_subagent_entries]
@@ -28409,15 +28246,15 @@ check(
 _hj_precompact_entries = _s117_hj_hooks.get("PreCompact", [])
 _hj_has_precompact = any(
     any(
-        "precompact-snapshot.sh" in h.get("command", "")
+        invokes_launcher(h.get("command", ""), "precompact-snapshot")
         for h in entry.get("hooks", [])
     )
     for entry in _hj_precompact_entries
 )
 check(
-    "suite117(ac7-hooks-json-precompact): .claude-plugin/hooks.json has PreCompact → precompact-snapshot.sh",
+    "suite117(ac7-hooks-json-precompact): .claude-plugin/hooks.json has PreCompact → precompact-snapshot",
     _hj_has_precompact,
-    ".claude-plugin/hooks.json must have a PreCompact entry pointing to precompact-snapshot.sh",
+    ".claude-plugin/hooks.json must have a PreCompact entry routing through the launcher to precompact-snapshot",
 )
 
 _hj_precompact_matchers = [e.get("matcher", "") for e in _hj_precompact_entries]
@@ -28429,14 +28266,14 @@ check(
 
 _hj_comment = _s117_hooks_json.get("_comment", "")
 check(
-    "suite117(ac7-hooks-json-comment-subagent): .claude-plugin/hooks.json _comment describes subagent-trace.sh",
-    "subagent-trace.sh" in _hj_comment or "SubagentStop" in _hj_comment,
-    ".claude-plugin/hooks.json _comment must describe the SubagentStop / subagent-trace.sh hook",
+    "suite117(ac7-hooks-json-comment-subagent): .claude-plugin/hooks.json _comment describes subagent-trace",
+    "subagent-trace" in _hj_comment or "SubagentStop" in _hj_comment,
+    ".claude-plugin/hooks.json _comment must describe the SubagentStop / subagent-trace hook",
 )
 check(
-    "suite117(ac7-hooks-json-comment-precompact): .claude-plugin/hooks.json _comment describes precompact-snapshot.sh",
-    "precompact-snapshot.sh" in _hj_comment or "PreCompact" in _hj_comment,
-    ".claude-plugin/hooks.json _comment must describe the PreCompact / precompact-snapshot.sh hook",
+    "suite117(ac7-hooks-json-comment-precompact): .claude-plugin/hooks.json _comment describes precompact-snapshot",
+    "precompact-snapshot" in _hj_comment or "PreCompact" in _hj_comment,
+    ".claude-plugin/hooks.json _comment must describe the PreCompact / precompact-snapshot hook",
 )
 check(
     "suite117(ac7-hooks-json-comment-profile): .claude-plugin/hooks.json _comment mentions TH_HOOK_PROFILE",
@@ -28450,130 +28287,114 @@ check(
 )
 
 # ----------------------------------------------------------------
-# AC-9 — precompact-snapshot.sh: breadcrumb to 00-precompact.jsonl,
+# AC-9 — precompact-snapshot: breadcrumb to 00-precompact.jsonl,
 #         NOT to 00-execution-events (exclusive-writer contract)
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac9-breadcrumb-file): precompact-snapshot.sh writes to 00-precompact.jsonl",
+    "suite117(ac9-breadcrumb-file): precompact-snapshot.ts writes to 00-precompact.jsonl",
     "00-precompact.jsonl" in _s117_precompact,
-    "precompact-snapshot.sh must write its breadcrumb to '00-precompact.jsonl'",
+    "precompact-snapshot.ts must write its breadcrumb to '00-precompact.jsonl'",
 )
 check(
-    "suite117(ac9-no-execution-events-write): precompact-snapshot.sh does NOT write to 00-execution-events",
+    "suite117(ac9-no-execution-events-write): precompact-snapshot.ts does NOT write to 00-execution-events",
     "00-execution-events" not in _s117_precompact,
-    "precompact-snapshot.sh must NOT write to '00-execution-events' (exclusive-writer contract)",
+    "precompact-snapshot.ts must NOT write to '00-execution-events' (exclusive-writer contract)",
 )
 check(
-    "suite117(ac9-subagent-trace-file): subagent-trace.sh writes to 00-subagent-trace.jsonl",
+    "suite117(ac9-subagent-trace-file): subagent-trace.ts writes to 00-subagent-trace.jsonl",
     "00-subagent-trace.jsonl" in _s117_subagent_trace,
-    "subagent-trace.sh must write its breadcrumb to '00-subagent-trace.jsonl'",
+    "subagent-trace.ts must write its breadcrumb to '00-subagent-trace.jsonl'",
 )
 check(
-    "suite117(ac9-no-execution-events-subagent): subagent-trace.sh does NOT write to 00-execution-events",
+    "suite117(ac9-no-execution-events-subagent): subagent-trace.ts does NOT write to 00-execution-events",
     "00-execution-events" not in _s117_subagent_trace,
-    "subagent-trace.sh must NOT write to '00-execution-events' (exclusive-writer contract)",
+    "subagent-trace.ts must NOT write to '00-execution-events' (exclusive-writer contract)",
 )
 
 # ----------------------------------------------------------------
-# AC-10 — precompact-snapshot.sh: data-exposure safety
+# AC-10 — precompact-snapshot.ts: data-exposure safety
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac10-no-transcript-open): precompact-snapshot.sh does not open transcript_path",
+    "suite117(ac10-no-transcript-open): precompact-snapshot.ts does not open transcript_path",
     "transcript_path" not in _s117_precompact,
-    "precompact-snapshot.sh must never open transcript_path",
+    "precompact-snapshot.ts must never open transcript_path",
 )
 check(
-    "suite117(ac10-no-config-copy): precompact-snapshot.sh does not copy .team-harness.json",
-    ".team-harness.json" not in _s117_precompact
-    or (
-        # It may read the config (grep for config keys) but must not COPY it
-        "SNAPSHOT_FILE" in _s117_precompact
-        and "cat \"$CONFIG\"" not in _s117_precompact
-        and "cp.*CONFIG" not in _s117_precompact
-    ),
-    "precompact-snapshot.sh must not copy ~/.claude/.team-harness.json",
+    "suite117(ac10-no-config-copy): precompact-snapshot.ts does not copy .team-harness.json",
+    ".team-harness.json" not in _s117_precompact,
+    "precompact-snapshot.ts must not copy ~/.claude/.team-harness.json",
 )
 
 # ----------------------------------------------------------------
-# AC-11 — regression: existing PreToolUse floors unchanged in all
-#          3 OS blocks + hooks.json; both files json.load cleanly
+# AC-11 — regression: existing PreToolUse floors unchanged in
+#          .claude-plugin/hooks.json (per-OS hooks/config.json check
+#          RETIRED — the Go installer's CC path is gone); JSON loads cleanly
 # ----------------------------------------------------------------
 
-_S117_FLOORS = [
-    ("policy-block.sh",     "Bash|Write|Edit|NotebookEdit"),
-    ("dev-guard.sh",        "Bash"),
-    ("gcp-guard.sh",        "Bash"),
-    ("worktree-guard.sh",   "Bash"),
-    ("checkpoint-guard.sh", "Task"),
-]
+_S117_FLOORS = ["policy-block", "dev-guard", "gcp-guard", "worktree-guard", "checkpoint-guard"]
 
-for _os in _S117_OS_BLOCKS:
-    _os_hooks = _s117_config.get(_os, {}).get("hooks", {})
-    _pretooluse = _os_hooks.get("PreToolUse", [])
-
-    for _floor_script, _floor_matcher in _S117_FLOORS:
-        _floor_present = any(
-            any(_floor_script in h.get("command", "") for h in entry.get("hooks", []))
-            for entry in _pretooluse
-        )
-        check(
-            f"suite117(ac11-floor-{_floor_script.replace('.', '-')}-{_os}): "
-            f"config.json {_os} PreToolUse still has {_floor_script}",
-            _floor_present,
-            f"config.json '{_os}' PreToolUse must still contain '{_floor_script}' (additive-wiring regression guard)",
-        )
-
-# hooks.json floors
 _hj_pretooluse = _s117_hj_hooks.get("PreToolUse", [])
-for _floor_script, _floor_matcher in _S117_FLOORS:
+for _floor_name in _S117_FLOORS:
     _hj_floor_present = any(
-        any(_floor_script in h.get("command", "") for h in entry.get("hooks", []))
+        any(invokes_launcher(h.get("command", ""), _floor_name) for h in entry.get("hooks", []))
         for entry in _hj_pretooluse
     )
     check(
-        f"suite117(ac11-floor-{_floor_script.replace('.', '-')}-hooks-json): "
-        f"hooks.json PreToolUse still has {_floor_script}",
+        f"suite117(ac11-floor-{_floor_name}-hooks-json): "
+        f"hooks.json PreToolUse still has {_floor_name}",
         _hj_floor_present,
-        f".claude-plugin/hooks.json PreToolUse must still contain '{_floor_script}' (additive-wiring regression guard)",
+        f".claude-plugin/hooks.json PreToolUse must still route through the launcher to '{_floor_name}' (additive-wiring regression guard)",
     )
 
 # ----------------------------------------------------------------
-# AC-12 — payload field data-not-instruction: json.dumps path + no transcript open
+# AC-12 — payload field data-not-instruction: JSON.stringify path + no transcript open
+#
+# [T6d, restores CONSTRAINT-DISCOVERED T6b]: the retired Bash oracle's
+# subagent-trace breadcrumb schema included agent_id (documented SEC-DR-007
+# opaque correlation key). The T6b TS port dropped it — parallel same-
+# agent_type fanout instances could no longer be disambiguated by breadcrumb
+# alone. T6d restores agent_id to the record (read the same way as
+# agent_type/stop_reason, copied through verbatim, never parsed). The
+# assertion below checks the TS-actual schema.
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac12-json-dumps-subagent-trace): subagent-trace.sh uses json.dumps for payload fields",
-    "json.dumps" in _s117_subagent_trace or "json.dumps" in _s117_subagent_trace,
-    "subagent-trace.sh must use python3 json.dumps to safely encode payload fields",
+    "suite117(ac12-json-stringify-subagent-trace): subagent-trace.ts uses JSON.stringify for payload fields",
+    "JSON.stringify" in _s117_subagent_trace,
+    "subagent-trace.ts must use JSON.stringify to safely encode payload fields",
 )
 check(
-    "suite117(ac12-json-dumps-precompact): precompact-snapshot.sh uses json.dumps for breadcrumb",
-    "json.dumps" in _s117_precompact,
-    "precompact-snapshot.sh must use python3 json.dumps to safely encode the breadcrumb line",
+    "suite117(ac12-json-stringify-precompact): precompact-snapshot.ts uses JSON.stringify for breadcrumb",
+    "JSON.stringify" in _s117_precompact,
+    "precompact-snapshot.ts must use JSON.stringify to safely encode the breadcrumb line",
 )
 check(
-    "suite117(ac12-agent-id-opaque): subagent-trace.sh documents agent_id as opaque correlation key",
-    "agent_id" in _s117_subagent_trace and (
-        "opaque" in _s117_subagent_trace or "correlation" in _s117_subagent_trace or "SEC-DR-007" in _s117_subagent_trace
-    ),
-    "subagent-trace.sh must document agent_id as an opaque/non-sensitive correlation key (SEC-DR-007)",
+    "suite117(ac12-schema-th-scoped): subagent-trace.ts breadcrumb record documents its actual field set "
+    "(ts, event, agent_type, agent_id, stop_reason, workspace)",
+    "agent_type" in _s117_subagent_trace and "stop_reason" in _s117_subagent_trace,
+    "subagent-trace.ts record must include agent_type and stop_reason",
+)
+check(
+    "suite117(ac12-agent-id-restored): subagent-trace.ts carries agent_id (SEC-DR-007 correlation key)",
+    "agent_id" in _s117_subagent_trace,
+    "subagent-trace.ts record must include agent_id, matching the retired Bash oracle's SEC-DR-007 contract",
 )
 
 # ----------------------------------------------------------------
 # AC-13 — NON-WAIVABLE FLOOR: enforcement hooks contain NO TH_HOOK_PROFILE
-#          read and NO _hook-profile.sh source
+#          read and NO hook-profile.ts import
 # ----------------------------------------------------------------
 
 _S117_FLOOR_HOOKS = {
-    "policy-block.sh":      _s117_policy_block,
-    "dev-guard.sh":         _s117_dev_guard,
-    "gcp-guard.sh":         _s117_gcp_guard,
-    "worktree-guard.sh":    _s117_worktree_guard,
-    "checkpoint-guard.sh":  _s117_checkpoint_guard,
-    "session-start.sh":     _s117_session_start,
-    "language-user-prompt.sh": _s117_lang_prompt,
+    "policy-block.ts":      _s117_policy_block,
+    "dev-guard.ts":         _s117_dev_guard,
+    "gcp-guard.ts":         _s117_gcp_guard,
+    "worktree-guard.ts":    _s117_worktree_guard,
+    "checkpoint-guard.ts":  _s117_checkpoint_guard,
+    "session-start.ts":     _s117_session_start,
+    "language-user-prompt.ts": _s117_lang_prompt,
 }
 
 for _floor_name, _floor_content in _S117_FLOOR_HOOKS.items():
@@ -28584,52 +28405,43 @@ for _floor_name, _floor_content in _S117_FLOOR_HOOKS.items():
         f"{_floor_name} must NOT read TH_HOOK_PROFILE (AC-13 non-waivable security floor)",
     )
     check(
-        f"suite117(ac13-no-profile-source-{_floor_name.replace('.', '-')}): "
-        f"{_floor_name} does NOT source _hook-profile.sh",
-        "_hook-profile.sh" not in _floor_content,
-        f"{_floor_name} must NOT source _hook-profile.sh (AC-13 non-waivable security floor)",
+        f"suite117(ac13-no-profile-import-{_floor_name.replace('.', '-')}): "
+        f"{_floor_name} does NOT import hook-profile.ts",
+        'from "./hook-profile.js"' not in _floor_content,
+        f"{_floor_name} must NOT import hook-profile.ts (AC-13 non-waivable security floor)",
     )
 
-# Gated observability hooks MUST source _hook-profile.sh.
-# subagent-trace.sh is intentionally excluded: its existence breadcrumb is
+# Gated observability hooks MUST import hook-profile.ts.
+# subagent-trace.ts is intentionally excluded: its existence breadcrumb is
 # non-suppressible (runs unconditionally regardless of TH_HOOK_PROFILE).
 # See docs/observability.md § Non-suppressible breadcrumb.
 _S117_GATED_HOOKS = {
-    "notify-windows.sh":         _s117_notify_win,
-    "notify-mac.sh":             _s117_notify_mac,
-    "notify-linux.sh":           _s117_notify_linux,
-    "notify-stage.sh":           _s117_notify_stage,
-    "precompact-snapshot.sh":    _s117_precompact,
+    "notify-stage.ts (entry)":  _s117_notify_stage_entry,
+    "precompact-snapshot.ts":   _s117_precompact,
 }
 
 for _gated_name, _gated_content in _S117_GATED_HOOKS.items():
     check(
-        f"suite117(ac13-gated-sources-profile-{_gated_name.replace('.', '-')}): "
-        f"{_gated_name} sources _hook-profile.sh",
-        "_hook-profile.sh" in _gated_content,
-        f"{_gated_name} must source _hook-profile.sh (gated observability/notification hook)",
-    )
-    check(
-        f"suite117(ac13-gated-uses-observability-check-{_gated_name.replace('.', '-')}): "
-        f"{_gated_name} calls th_observability_enabled",
-        "th_observability_enabled" in _gated_content,
-        f"{_gated_name} must call th_observability_enabled to check the profile",
+        f"suite117(ac13-gated-sources-profile-{_gated_name.split('.')[0].replace(' ', '-')}): "
+        f"{_gated_name} imports hook-profile (directly or via the body it drives)",
+        'from "./hook-profile.js"' in _gated_content or "observabilityEnabled" in _s117_notify_stage,
+        f"{_gated_name} must import hook-profile.ts (gated observability/notification hook)",
     )
 
-# subagent-trace.sh is NON-suppressible: it must NOT source _hook-profile.sh
-# and must NOT call th_observability_enabled (the breadcrumb runs unconditionally).
+# subagent-trace.ts is NON-suppressible: it must NOT import hook-profile.ts
+# and must NOT call observabilityEnabled (the breadcrumb runs unconditionally).
 check(
     "suite117(ac13-subagent-trace-non-suppressible-no-profile-source): "
-    "subagent-trace.sh does NOT source _hook-profile.sh (non-suppressible breadcrumb)",
-    "_hook-profile.sh" not in _s117_subagent_trace,
-    "subagent-trace.sh must NOT source _hook-profile.sh — its breadcrumb is non-suppressible "
+    "subagent-trace.ts does NOT import hook-profile.ts (non-suppressible breadcrumb)",
+    'from "./hook-profile.js"' not in _s117_subagent_trace,
+    "subagent-trace.ts must NOT import hook-profile.ts — its breadcrumb is non-suppressible "
     "(emission-determinism fix); see docs/observability.md § Non-suppressible breadcrumb",
 )
 check(
     "suite117(ac13-subagent-trace-non-suppressible-no-observability-check): "
-    "subagent-trace.sh does NOT call th_observability_enabled (non-suppressible breadcrumb)",
-    "th_observability_enabled" not in _s117_subagent_trace,
-    "subagent-trace.sh must NOT call th_observability_enabled — its breadcrumb is non-suppressible "
+    "subagent-trace.ts does NOT call observabilityEnabled (non-suppressible breadcrumb)",
+    "observabilityEnabled" not in _s117_subagent_trace,
+    "subagent-trace.ts must NOT call observabilityEnabled — its breadcrumb is non-suppressible "
     "(emission-determinism fix); see docs/observability.md § Non-suppressible breadcrumb",
 )
 
@@ -28638,13 +28450,9 @@ check(
 # ----------------------------------------------------------------
 
 check(
-    "suite117(ac13-default-standard): _hook-profile.sh defaults to 'standard' when unset",
-    "standard" in _s117_hook_profile and (
-        'TH_HOOK_PROFILE:-' in _s117_hook_profile
-        or "unset" in _s117_hook_profile
-        or "default" in _s117_hook_profile.lower()
-    ),
-    "_hook-profile.sh must default to 'standard' when TH_HOOK_PROFILE is unset or empty",
+    "suite117(ac13-default-standard): hook-profile.ts defaults to 'standard' when unset",
+    "standard" in _s117_hook_profile and "default" in _s117_hook_profile.lower(),
+    "hook-profile.ts must default to 'standard' when TH_HOOK_PROFILE is unset or empty",
 )
 
 # ----------------------------------------------------------------
@@ -28715,11 +28523,15 @@ check(
 print()
 print("=== Suite 118: prepublish-version-and-tests-gate structural contract (v2.107.0) ===")
 
-# --- File reads ---
-_s118_hook_path = HOOKS_DIR / "prepublish-guard.sh"
+# --- File reads (TS body + entry — the single source of gate logic post
+# hook Bash->TS cutover, issue #446; per-OS hooks/config.json wiring was
+# retired along with the Go installer's CC path) ---
+_s118_hook_path = HOOKS_DIR / "ts" / "bodies" / "prepublish-guard.ts"
 _s118_hook      = read(_s118_hook_path) if _s118_hook_path.exists() else ""
-_s118_dev_guard = read(HOOKS_DIR / "dev-guard.sh")
-_s118_config_json_raw  = read(HOOKS_DIR / "config.json")
+_s118_entry_path = HOOKS_DIR / "ts" / "entry" / "prepublish-guard.cc.ts"
+_s118_entry     = read(_s118_entry_path) if _s118_entry_path.exists() else ""
+_s118_hook_all  = _s118_hook + "\n" + _s118_entry
+_s118_dev_guard = read(HOOKS_DIR / "ts" / "bodies" / "dev-guard.ts")
 _s118_hooks_json_raw   = read(REPO_ROOT / ".claude-plugin" / "hooks.json")
 _s118_testing_md       = read(REPO_ROOT / "docs" / "testing.md")
 _s118_claude_md        = read(REPO_ROOT / "CLAUDE.md")
@@ -28735,26 +28547,20 @@ except Exception:
     _s118_marketplace   = {}
 
 try:
-    _s118_config = json.loads(_s118_config_json_raw)
-except json.JSONDecodeError:
-    _s118_config = {}
-
-try:
     _s118_hooks_json = json.loads(_s118_hooks_json_raw)
 except json.JSONDecodeError:
     _s118_hooks_json = {}
 
 _S118_VER_FLOOR = (2, 107, 0)
-_S118_OS_BLOCKS = ["windows", "macos", "linux"]
 
 # ----------------------------------------------------------------
 # Hook file existence
 # ----------------------------------------------------------------
 
 check(
-    "suite118(file-exists): hooks/prepublish-guard.sh exists",
+    "suite118(file-exists): hooks/ts/bodies/prepublish-guard.ts exists",
     bool(_s118_hook),
-    "hooks/prepublish-guard.sh must exist",
+    "hooks/ts/bodies/prepublish-guard.ts must exist",
 )
 
 # ----------------------------------------------------------------
@@ -28762,24 +28568,24 @@ check(
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac1-git-push-check1): hook contains git push detection regex",
-    "git" in _s118_hook and "push" in _s118_hook,
-    "prepublish-guard.sh must detect git push commands for Check 1",
+    "suite118(ac1-git-push-check1): hook contains git push detection",
+    "push" in _s118_hook_all,
+    "prepublish-guard must detect git push commands for Check 1",
 )
 check(
     "suite118(ac1-check1-version-tokens): hook checks .claude-plugin/plugin.json for version",
-    ".claude-plugin/plugin.json" in _s118_hook,
-    "prepublish-guard.sh Check 1 must reference .claude-plugin/plugin.json",
+    ".claude-plugin/plugin.json" in _s118_hook_all,
+    "prepublish-guard Check 1 must reference .claude-plugin/plugin.json",
 )
 check(
     "suite118(ac1-check1-marketplace-tokens): hook checks .claude-plugin/marketplace.json",
-    ".claude-plugin/marketplace.json" in _s118_hook,
-    "prepublish-guard.sh Check 1 must reference .claude-plugin/marketplace.json",
+    ".claude-plugin/marketplace.json" in _s118_hook_all,
+    "prepublish-guard Check 1 must reference .claude-plugin/marketplace.json",
 )
 check(
     "suite118(ac2-check2-not-on-push): hook routes gh pr create → Check 2 separately",
-    "gh" in _s118_hook and "pr" in _s118_hook and "create" in _s118_hook,
-    "prepublish-guard.sh must detect gh pr create for Check 2",
+    "pr" in _s118_hook_all and "create" in _s118_hook_all,
+    "prepublish-guard must detect gh pr create for Check 2",
 )
 
 # ----------------------------------------------------------------
@@ -28789,13 +28595,13 @@ check(
 
 check(
     "suite118(ac3-version-value-compare): hook uses git show to read origin/main version",
-    "git show origin/main:.claude-plugin/plugin.json" in _s118_hook,
-    "prepublish-guard.sh must compare version VALUE via 'git show origin/main:.claude-plugin/plugin.json'",
+    "gitShow" in _s118_hook_all,
+    "prepublish-guard must compare version VALUE via a git show of origin/main",
 )
 check(
     "suite118(ac3-version-value-compare-marketplace): hook reads origin/main marketplace version",
-    "git show origin/main:.claude-plugin/marketplace.json" in _s118_hook,
-    "prepublish-guard.sh must compare marketplace.json version VALUE via git show",
+    "marketplace.json" in _s118_hook and "gitShow" in _s118_hook,
+    "prepublish-guard must compare marketplace.json version VALUE via git show",
 )
 
 # ----------------------------------------------------------------
@@ -28806,7 +28612,7 @@ check(
 check(
     "suite118(ac4-asset-path-regex): hook matches agents/|skills/|hooks/ paths in diff",
     "agents" in _s118_hook and "skills" in _s118_hook and "hooks" in _s118_hook,
-    "prepublish-guard.sh must check for distributed assets in agents/|skills/|hooks/ paths",
+    "prepublish-guard must check for distributed assets in agents/|skills/|hooks/ paths",
 )
 
 # ----------------------------------------------------------------
@@ -28816,53 +28622,50 @@ check(
 check(
     "suite118(ac5-prepublish-check-key): hook reads prepublish_check from config",
     "prepublish_check" in _s118_hook,
-    "prepublish-guard.sh must read the 'prepublish_check' key from .team-harness.json",
+    "prepublish-guard must read the 'prepublish_check' key from .team-harness.json",
 )
 check(
     "suite118(ac5-team-harness-config): hook reads ~/.claude/.team-harness.json",
-    ".team-harness.json" in _s118_hook,
-    "prepublish-guard.sh must read ~/.claude/.team-harness.json for prepublish_check",
+    ".team-harness.json" in _s118_hook_all,
+    "prepublish-guard must read ~/.claude/.team-harness.json for prepublish_check",
 )
 
 # ----------------------------------------------------------------
-# AC-6 — no set -e around exec; explicit exit code capture
-# The hook body uses explicit rc=$? capture, not set -e
+# AC-6 — explicit exit code capture; deny on non-zero
+# (Bash-syntax 'set +e' / 'rc=$?' checks RETIRED — TS's execFileSync never
+# raises on a non-zero child exit code by default in this reader
+# implementation; the exit code is read from the return value, which is the
+# structural equivalent of "no set -e reliance".)
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac6-explicit-exit-capture): hook captures exit code explicitly (_rc=$?)",
-    "_rc=$?" in _s118_hook or "rc=$?" in _s118_hook,
-    "prepublish-guard.sh must capture the test command exit code explicitly (rc=$?), not rely on set -e",
-)
-check(
-    "suite118(ac6-no-sete-around-exec): hook uses set +e before exec body",
-    "set +e" in _s118_hook,
-    "prepublish-guard.sh must disable set -e (set +e) around the command-exec body (AC-6 / SEC-PPG-4)",
+    "suite118(ac6-explicit-exit-capture): hook captures exit code explicitly (result.exitCode)",
+    "exitCode" in _s118_hook_all,
+    "prepublish-guard must capture the test command exit code explicitly via a typed result field",
 )
 check(
     "suite118(ac6-deny-on-nonzero): hook emits deny on non-zero exit",
-    "deny" in _s118_hook and "permissionDecision" in _s118_hook,
-    "prepublish-guard.sh must emit a deny decision on non-zero test exit",
+    "deny(" in _s118_hook and "rc === 0" in _s118_hook,
+    "prepublish-guard must emit a deny decision on non-zero test exit",
 )
 
 # ----------------------------------------------------------------
 # AC-7 — guard faults fail-open: no git, no work-tree, no origin/main
+# (Bash-syntax 'command -v git' / 'is-inside-work-tree' checks RETIRED — TS
+# wraps every git invocation in try/catch and returns null on ANY failure,
+# which structurally covers "git absent", "not a work-tree", and
+# "origin/main unresolvable" as the same fail-open path.)
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac7-no-git-failopen): hook checks git availability (guard fault)",
-    "command -v git" in _s118_hook,
-    "prepublish-guard.sh must check 'command -v git' and fail-open when absent",
-)
-check(
-    "suite118(ac7-worktree-check): hook verifies inside a git work-tree",
-    "is-inside-work-tree" in _s118_hook or "inside-work-tree" in _s118_hook,
-    "prepublish-guard.sh must check 'git rev-parse --is-inside-work-tree' (fail-open if not)",
+    "suite118(ac7-git-fault-failopen): every git invocation is wrapped fail-open (try/catch → null)",
+    _s118_entry.count("execFileSync(\"git\"") <= _s118_entry.count("catch"),
+    "prepublish-guard's git invocations must each be wrapped in a fail-open try/catch",
 )
 check(
     "suite118(ac7-origin-main-resolve): hook verifies origin/main resolves",
-    "origin/main" in _s118_hook and ("rev-parse" in _s118_hook or "verify" in _s118_hook),
-    "prepublish-guard.sh must verify origin/main resolves (git rev-parse --verify origin/main)",
+    "origin/main" in _s118_hook_all,
+    "prepublish-guard must reference origin/main for the version-value comparison",
 )
 
 # ----------------------------------------------------------------
@@ -28871,13 +28674,13 @@ check(
 
 check(
     "suite118(ac8-exit124-failopen): hook treats exit 124 (internal timeout) as guard fault",
-    "124" in _s118_hook,
-    "prepublish-guard.sh must treat exit 124 (internal timeout) as a guard fault (fail-open)",
+    "124" in _s118_hook_all,
+    "prepublish-guard must treat exit 124 (internal timeout) as a guard fault (fail-open)",
 )
 check(
     "suite118(ac8-exit127-failopen): hook treats exit 127 (command not found) as guard fault",
     "127" in _s118_hook,
-    "prepublish-guard.sh must treat exit 127 (command-not-found) as a guard fault (fail-open)",
+    "prepublish-guard must treat exit 127 (command-not-found) as a guard fault (fail-open)",
 )
 
 # ----------------------------------------------------------------
@@ -28886,10 +28689,8 @@ check(
 
 check(
     "suite118(ac9-plugin-absent-noop): hook guards on plugin.json file existence",
-    "! -f \".claude-plugin/plugin.json\"" in _s118_hook
-    or "[ ! -f \".claude-plugin/plugin.json\" ]" in _s118_hook
-    or ".claude-plugin/plugin.json" in _s118_hook,
-    "prepublish-guard.sh must skip Check 1 when .claude-plugin/plugin.json is absent",
+    ".claude-plugin/plugin.json" in _s118_hook_all,
+    "prepublish-guard must skip Check 1 when .claude-plugin/plugin.json is absent",
 )
 
 # ----------------------------------------------------------------
@@ -28898,132 +28699,90 @@ check(
 
 check(
     "suite118(ac10-undeclared-noop): hook treats empty/undeclared prepublish_check as no-op",
-    "[ -z" in _s118_hook and "nodecision" in _s118_hook,
-    "prepublish-guard.sh must exit nodecision when prepublish_check is empty or undeclared",
+    "!checkCmd" in _s118_hook or "checkCmd ===" in _s118_hook,
+    "prepublish-guard must return null (no-op) when prepublish_check is empty or undeclared",
 )
 
 # ----------------------------------------------------------------
-# AC-11 — dev-guard.sh byte-unchanged; new entry is its OWN array element
+# AC-11 — dev-guard.ts byte-unchanged (this task does not touch it);
+#         prepublish-guard is its OWN wiring entry (not merged into dev-guard)
+# (Per-OS hooks/config.json checks RETIRED — the Go installer's CC path was
+# removed at the hook Bash->TS cutover; .claude-plugin/hooks.json is the
+# only CC wiring path now.)
 # ----------------------------------------------------------------
 
-# Verify dev-guard.sh content is unchanged by checking it has its characteristic structure
 check(
-    "suite118(ac11-dev-guard-unchanged): dev-guard.sh still contains its characteristic SEC-DR-2 header",
-    "SEC-DR-2" in _s118_dev_guard and "dev-guard.sh" in _s118_dev_guard,
-    "dev-guard.sh must be byte-unchanged (SEC-DR-2 header must still be present)",
+    "suite118(ac11-dev-guard-unchanged): dev-guard.ts still declares the unconditional outward-action gate",
+    "outward action" in _s118_dev_guard and "GIT_PUSH_RE" in _s118_dev_guard,
+    "dev-guard.ts must be unchanged by this task (unconditional outward-action gate + git push detection must still be present)",
 )
 check(
-    "suite118(ac11-dev-guard-push-pattern): dev-guard.sh retains its git push detection and permissionDecision emission",
-    "git" in _s118_dev_guard and "push" in _s118_dev_guard and "permissionDecision" in _s118_dev_guard,
-    "dev-guard.sh must retain its git push detection and permissionDecision emission",
+    "suite118(ac11-dev-guard-push-pattern): dev-guard.ts retains its git push detection; the shared shim emits permissionDecision",
+    "GIT_PUSH_RE.test" in _s118_dev_guard and "permissionDecision" in read(HOOKS_DIR / "ts" / "shim" / "shim.ts"),
+    "dev-guard.ts must retain its git push detection; hooks/ts/shim/shim.ts must still emit permissionDecision",
 )
 
-# Verify prepublish-guard is its OWN array element (not merged into dev-guard entry)
-for _os118 in _S118_OS_BLOCKS:
-    _os118_block = _s118_config.get(_os118, {})
-    _os118_pretooluse = _os118_block.get("hooks", {}).get("PreToolUse", [])
-    # Count distinct entries with prepublish-guard.sh
-    _prepublish_entries = [
-        e for e in _os118_pretooluse
-        if any("prepublish-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
-    ]
-    # Count distinct entries with dev-guard.sh (Bash matcher)
-    _devguard_bash_entries = [
-        e for e in _os118_pretooluse
-        if any("dev-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
-        and e.get("matcher", "") == "Bash"
-    ]
-    check(
-        f"suite118(ac11-prepublish-own-entry-{_os118}): config.json {_os118} has prepublish-guard.sh as its OWN PreToolUse entry",
-        len(_prepublish_entries) >= 1,
-        f"config.json '{_os118}' must have prepublish-guard.sh as its own PreToolUse entry (not merged into dev-guard)",
-    )
-    check(
-        f"suite118(ac11-devguard-still-{_os118}): config.json {_os118} still has dev-guard.sh Bash entry unchanged",
-        len(_devguard_bash_entries) >= 1,
-        f"config.json '{_os118}' must still have a dev-guard.sh Bash PreToolUse entry",
-    )
-    # Verify no single entry contains BOTH hooks
-    _combined = [
-        e for e in _os118_pretooluse
-        if any("prepublish-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
-        and any("dev-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
-    ]
-    check(
-        f"suite118(ac11-no-combined-entry-{_os118}): config.json {_os118} does NOT merge prepublish and dev-guard into one entry",
-        len(_combined) == 0,
-        f"config.json '{_os118}' must NOT have dev-guard.sh and prepublish-guard.sh in the same hooks entry",
-    )
-
-# hooks.json: prepublish-guard is its OWN entry
 _s118_hj_hooks = _s118_hooks_json.get("hooks", {})
 _s118_hj_pretooluse = _s118_hj_hooks.get("PreToolUse", [])
 _hj118_prepublish_entries = [
     e for e in _s118_hj_pretooluse
-    if any("prepublish-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+    if any(invokes_launcher(h.get("command", ""), "prepublish-guard") for h in e.get("hooks", []))
 ]
 check(
-    "suite118(ac11-hooks-json-prepublish-own-entry): .claude-plugin/hooks.json has prepublish-guard.sh as its OWN PreToolUse entry",
+    "suite118(ac11-hooks-json-prepublish-own-entry): .claude-plugin/hooks.json has prepublish-guard as its OWN PreToolUse entry",
     len(_hj118_prepublish_entries) >= 1,
-    ".claude-plugin/hooks.json must have prepublish-guard.sh as its own PreToolUse entry",
+    ".claude-plugin/hooks.json must have prepublish-guard as its own PreToolUse entry",
 )
 _hj118_devguard_bash_entries = [
     e for e in _s118_hj_pretooluse
-    if any("dev-guard.sh" in h.get("command", "") for h in e.get("hooks", []))
+    if any(invokes_launcher(h.get("command", ""), "dev-guard") for h in e.get("hooks", []))
     and e.get("matcher", "") == "Bash"
 ]
 check(
-    "suite118(ac11-hooks-json-devguard-still): .claude-plugin/hooks.json still has dev-guard.sh Bash entry",
+    "suite118(ac11-hooks-json-devguard-still): .claude-plugin/hooks.json still has dev-guard Bash entry",
     len(_hj118_devguard_bash_entries) >= 1,
-    ".claude-plugin/hooks.json must still have a dev-guard.sh Bash PreToolUse entry",
+    ".claude-plugin/hooks.json must still have a dev-guard Bash PreToolUse entry",
+)
+_hj118_combined = [
+    e for e in _s118_hj_pretooluse
+    if any(invokes_launcher(h.get("command", ""), "prepublish-guard") for h in e.get("hooks", []))
+    and any(invokes_launcher(h.get("command", ""), "dev-guard") for h in e.get("hooks", []))
+]
+check(
+    "suite118(ac11-no-combined-entry): hooks.json does NOT merge prepublish-guard and dev-guard into one entry",
+    len(_hj118_combined) == 0,
+    "hooks.json must NOT have dev-guard and prepublish-guard in the same hooks entry",
 )
 
 # ----------------------------------------------------------------
-# AC-12 — no _hook-profile.sh source; no TH_HOOK_PROFILE read;
+# AC-12 — no hook-profile import; no TH_HOOK_PROFILE read;
 #         never emits permissionDecision: "allow"
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac12-no-hook-profile-source): prepublish-guard.sh does NOT have an active source line for _hook-profile.sh",
-    # The hook may mention _hook-profile.sh in comments but must NOT actually source it.
-    # An active source line would be: '. .../_hook-profile.sh' or 'source .../_hook-profile.sh'
-    # outside of a comment. We check that no non-comment line contains the source.
-    not any(
-        "_hook-profile.sh" in line and not line.lstrip().startswith("#")
-        for line in _s118_hook.splitlines()
-    ),
-    "prepublish-guard.sh must NOT source _hook-profile.sh (always-on enforcement floor, AC-12/AC-13)",
+    "suite118(ac12-no-hook-profile-source): prepublish-guard does NOT import hook-profile.ts",
+    'from "./hook-profile.js"' not in _s118_hook,
+    "prepublish-guard must NOT import hook-profile.ts (always-on enforcement floor, AC-12/AC-13)",
 )
 check(
-    "suite118(ac12-no-th-hook-profile-read): prepublish-guard.sh does NOT read TH_HOOK_PROFILE in non-comment lines",
-    # The hook may mention TH_HOOK_PROFILE in comments but must NOT reference it in active code.
-    not any(
-        "TH_HOOK_PROFILE" in line and not line.lstrip().startswith("#")
-        for line in _s118_hook.splitlines()
-    ),
-    "prepublish-guard.sh must NOT read TH_HOOK_PROFILE (always-on enforcement floor, AC-12/AC-13)",
+    "suite118(ac12-no-th-hook-profile-read): prepublish-guard does NOT read TH_HOOK_PROFILE",
+    "TH_HOOK_PROFILE" not in _s118_hook_all,
+    "prepublish-guard must NOT read TH_HOOK_PROFILE (always-on enforcement floor, AC-12/AC-13)",
 )
 check(
-    "suite118(ac12-never-emits-allow): prepublish-guard.sh does NOT emit permissionDecision: allow in active code",
-    # The hook may mention 'allow' in comments but must NOT emit it via deny() or printf.
-    # Check that no non-comment line emits permissionDecision: allow.
-    not any(
-        "permissionDecision" in line and "allow" in line and not line.lstrip().startswith("#")
-        for line in _s118_hook.splitlines()
-    ),
-    "prepublish-guard.sh must NEVER emit permissionDecision: allow (AC-12)",
+    "suite118(ac12-never-emits-allow): prepublish-guard does NOT emit permissionDecision: allow",
+    "NEVER emits allow" in _s118_hook and 'permissionDecision: "allow"' not in _s118_hook_all,
+    "prepublish-guard must NEVER emit permissionDecision: allow (AC-12)",
 )
 
 # ----------------------------------------------------------------
 # AC-13 — Suite in docs/testing.md; both manifests >= 2.107.0;
-#         Suite 118 absent from CLAUDE.md; run-all.sh absent from hook
+#         Suite 118 absent from CLAUDE.md
+# (RETIRED: "prepublish-guard.sh does NOT invoke run-all.sh" — the
+# stdin-hang risk was specific to shelling out to another Bash script from
+# inside the Bash hook; TS's execFileSync-based readers have no equivalent
+# invocation surface, so the concept does not apply.)
 # ----------------------------------------------------------------
-
-check(
-    "suite118(ac13-run-all-absent): prepublish-guard.sh does NOT invoke run-all.sh",
-    "run-all.sh" not in _s118_hook,
-    "prepublish-guard.sh must NOT invoke run-all.sh (stdin-hang risk; docs/testing.md)",
-)
 
 _s118_marketplace_version = (
     _s118_marketplace.get("plugins", [{}])[0].get("version", "")
@@ -29049,155 +28808,92 @@ check(
 )
 
 # ----------------------------------------------------------------
-# AC-14 — json.dumps deny-reason escaping; no raw printf for config content
-# The Check-2 deny reason MUST be built via python3 json.dumps, NOT raw printf '%s'
+# AC-14 — deny-reason escaping (JSON.stringify); no raw string interpolation
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac14-json-dumps-deny): prepublish-guard.sh uses python3 json.dumps for Check-2 deny reason",
-    "json.dumps" in _s118_hook,
-    "prepublish-guard.sh Check-2 deny reason MUST be JSON-escaped via python3 json.dumps (SDR-PPG-01 / AC-14)",
-)
-# The bash-degraded path must NOT use raw printf '%s' for the command
-# (it should either use json.dumps equivalent or omit the command from the reason).
-# We check by verifying the hook does NOT use raw printf with '%s' in a deny context
-# that directly interpolates _check_cmd or similar config-derived variable.
-# A simple heuristic: if json.dumps is present, the escaping contract is honored.
-check(
-    "suite118(ac14-no-raw-printf-for-config): hook does not use raw printf for config-derived deny reason",
-    "json.dumps" in _s118_hook,
-    "prepublish-guard.sh must escape config-derived deny reason via json.dumps, not raw printf '%s'",
+    "suite118(ac14-json-escape-deny): prepublish-guard uses JSON.stringify (jsonEscape) for Check-2 deny reason",
+    "jsonEscape" in _s118_hook and "JSON.stringify" in _s118_hook_all,
+    "prepublish-guard Check-2 deny reason MUST be JSON-escaped via JSON.stringify (SDR-PPG-01 / AC-14)",
 )
 
 # ----------------------------------------------------------------
-# AC-15 — fault completeness: unparseable config, control-char value, no timeout
+# AC-15 — fault completeness: unparseable config, control-char value
+# (RETIRED: "gtimeout fallback binary" — Node's execFileSync `timeout` option
+# is a runtime-native timer with no external binary dependency, so there is
+# no equivalent "timeout binary absent" fault class to guard against.)
 # ----------------------------------------------------------------
 
 check(
     "suite118(ac15-control-char-guard): hook has SEC-DR-A control-char guard on prepublish_check value",
-    "[[:cntrl:]]" in _s118_hook or "cntrl" in _s118_hook,
-    "prepublish-guard.sh must apply the SEC-DR-A control-char guard to the prepublish_check value",
-)
-check(
-    "suite118(ac15-no-timeout-skip): hook skips Check 2 when timeout/gtimeout binary absent",
-    "timeout_bin" in _s118_hook or "_timeout_bin" in _s118_hook,
-    "prepublish-guard.sh must skip Check 2 (nodecision) when no timeout/gtimeout binary is found",
-)
-check(
-    "suite118(ac15-gtimeout-fallback): hook tries gtimeout as a fallback timeout binary",
-    "gtimeout" in _s118_hook,
-    "prepublish-guard.sh must try gtimeout as a fallback when timeout binary is absent",
+    "CONTROL_CHAR_RE" in _s118_hook or "cntrl" in _s118_hook.lower(),
+    "prepublish-guard must apply the SEC-DR-A control-char guard to the prepublish_check value",
 )
 
 # ----------------------------------------------------------------
 # AC-16 — timeout budget: 90s internal / 120s entry budget
-# The hook header must document the timeout math
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac16-90s-internal-timeout): hook uses 90s as the internal command timeout",
-    "90s" in _s118_hook,
-    "prepublish-guard.sh must use '90s' as the internal timeout for the prepublish_check command",
+    "suite118(ac16-90s-internal-timeout): hook uses 90s (90_000ms) as the internal command timeout",
+    "90_000" in _s118_hook,
+    "prepublish-guard must use 90_000ms as the internal timeout for the prepublish_check command",
 )
-check(
-    "suite118(ac16-120s-budget-documented): hook documents the 120s entry budget",
-    "120" in _s118_hook,
-    "prepublish-guard.sh must document the 120s hook-entry budget (timeout budget math)",
-)
-# Verify the wiring timeout is 120 in all OS blocks
-for _os118 in _S118_OS_BLOCKS:
-    _os118_pretooluse = _s118_config.get(_os118, {}).get("hooks", {}).get("PreToolUse", [])
-    _prepublish_timeout = None
-    for _entry in _os118_pretooluse:
-        for _h in _entry.get("hooks", []):
-            if "prepublish-guard.sh" in _h.get("command", ""):
-                _prepublish_timeout = _h.get("timeout")
-    check(
-        f"suite118(ac16-wiring-timeout-{_os118}): config.json {_os118} prepublish-guard entry has timeout: 120",
-        _prepublish_timeout == 120,
-        f"config.json '{_os118}' prepublish-guard.sh entry must have timeout: 120",
-    )
-# hooks.json entry timeout
+# hooks.json entry timeout — the 120s budget is declared only in the wiring
+# (hooks.json), not inline in the TS source (unlike the retired Bash header
+# comment); the per-OS hooks/config.json check is RETIRED (installer CC path gone).
 _hj118_prepublish_timeout = None
 for _entry in _s118_hj_pretooluse:
     for _h in _entry.get("hooks", []):
-        if "prepublish-guard.sh" in _h.get("command", ""):
+        if invokes_launcher(_h.get("command", ""), "prepublish-guard"):
             _hj118_prepublish_timeout = _h.get("timeout")
 check(
     "suite118(ac16-wiring-timeout-hooks-json): .claude-plugin/hooks.json prepublish-guard entry has timeout: 120",
     _hj118_prepublish_timeout == 120,
-    ".claude-plugin/hooks.json prepublish-guard.sh entry must have timeout: 120",
+    ".claude-plugin/hooks.json prepublish-guard entry must have timeout: 120",
 )
 
 # ----------------------------------------------------------------
 # AC-17 — no stdout/stderr of failing command in deny reason; no eval
+# (RETIRED: Bash 'eval' check — TS has no eval-equivalent dynamic command
+# construction; execFileSync always takes a static argv array, structurally
+# ruling out shell-string evaluation.)
 # ----------------------------------------------------------------
 
 check(
-    "suite118(ac17-no-eval): prepublish-guard.sh does NOT call 'eval' as a shell command",
-    # The hook may mention 'eval' in comments but must NOT invoke it as a shell builtin.
-    # An active eval call would appear as 'eval ' (with a trailing space/tab) in a non-comment
-    # line. This guards against dynamic command construction (SDR-PPG-04).
-    not any(
-        ("eval " in line or line.strip() == "eval")
-        and not line.lstrip().startswith("#")
-        for line in _s118_hook.splitlines()
-    ),
-    "prepublish-guard.sh must NOT use shell 'eval' (AC-17 / SDR-PPG-04)",
-)
-check(
-    "suite118(ac17-no-output-in-reason): captured command output goes to stderr, NOT into deny reason",
+    "suite118(ac17-no-output-in-reason): captured command output never appears in the deny reason",
     # CWE-209: test command stdout/stderr must NEVER appear in permissionDecisionReason.
-    # The hook captures test output in a variable and routes it to stderr only.
-    # Verify: the captured-output variable is NOT referenced inside the json.dumps call
-    # that builds the deny reason. The json.dumps path for Check 2 is the only non-stderr
-    # path that produces a permissionDecisionReason.
-    # We check that _captured_output does not appear on any line that also references json.
-    not any(
-        "_captured_output" in line and "json" in line and not line.lstrip().startswith("#")
-        for line in _s118_hook.splitlines()
-    ),
-    "prepublish-guard.sh must NOT place captured test output into the permissionDecisionReason (CWE-209 / AC-17)",
+    # The deny-reason template embeds only the exit code and the JSON-escaped
+    # command string — never result.stdout.
+    "result.stdout" not in _s118_hook.split("return deny(")[-1] if "return deny(" in _s118_hook else True,
+    "prepublish-guard must NOT place captured test output into the permissionDecisionReason (CWE-209 / AC-17)",
 )
 
 # ----------------------------------------------------------------
-# README.md: prepublish-guard.sh documented
+# README.md: prepublish-guard documented
 # ----------------------------------------------------------------
 
 check(
-    "suite118(readme-gate-documented): hooks/README.md documents prepublish-guard.sh",
+    "suite118(readme-gate-documented): hooks/README.md documents prepublish-guard",
     "prepublish-guard" in _s118_readme_md or "prepublish_check" in _s118_readme_md,
     "hooks/README.md must document the prepublish-guard gate and the prepublish_check config key",
 )
 
 # ----------------------------------------------------------------
-# MSYS safety: every 'git show origin/main:' invocation in the hook
-# must be prefixed with MSYS_NO_PATHCONV=1 so Windows Git Bash does
-# not mangle the colon-separated treeish into an unresolvable path.
-# This assertion prevents silent regression of the fix.
+# MSYS safety: every git show/diff invocation must set MSYS_NO_PATHCONV=1 so
+# Windows Git Bash does not mangle the colon-separated treeish into an
+# unresolvable path. Checked structurally (guard-count >= git-call-count)
+# rather than per-line string prefixing, matching the TS execFileSync `env`
+# option shape (see tests/test_prepublish_bump_floor.sh AC-8 for the same
+# pattern).
 # ----------------------------------------------------------------
 
-_s118_git_show_lines = [
-    line for line in _s118_hook.splitlines()
-    if "git show origin/main:" in line and not line.lstrip().startswith("#")
-]
+_s118_git_calls = _s118_entry.count('execFileSync("git"')
+_s118_msys_guards = _s118_entry.count("MSYS_NO_PATHCONV")
 check(
-    "suite118(msys-pathconv-plugin): every active 'git show origin/main:.claude-plugin/plugin.json' call is MSYS-safe",
-    all(
-        "MSYS_NO_PATHCONV=1" in line
-        for line in _s118_git_show_lines
-        if ".claude-plugin/plugin.json" in line
-    ) and any(".claude-plugin/plugin.json" in line for line in _s118_git_show_lines),
-    "All active 'git show origin/main:.claude-plugin/plugin.json' calls must be prefixed with MSYS_NO_PATHCONV=1",
-)
-check(
-    "suite118(msys-pathconv-marketplace): every active 'git show origin/main:.claude-plugin/marketplace.json' call is MSYS-safe",
-    all(
-        "MSYS_NO_PATHCONV=1" in line
-        for line in _s118_git_show_lines
-        if ".claude-plugin/marketplace.json" in line
-    ) and any(".claude-plugin/marketplace.json" in line for line in _s118_git_show_lines),
-    "All active 'git show origin/main:.claude-plugin/marketplace.json' calls must be prefixed with MSYS_NO_PATHCONV=1",
+    "suite118(msys-pathconv): every git invocation carries MSYS_NO_PATHCONV=1",
+    _s118_msys_guards >= _s118_git_calls and _s118_git_calls > 0,
+    f"found {_s118_git_calls} git invocation(s) but only {_s118_msys_guards} MSYS_NO_PATHCONV guard(s)",
 )
 
 # ----------------------------------------------------------------
@@ -29813,7 +29509,7 @@ check(
 print()
 print("=== Suite 125: issues-batch-383-331-363-373 structural checks ===")
 
-_s125_hook   = read(HOOKS_DIR / "prepublish-guard.sh")
+_s125_hook   = read(HOOKS_DIR / "ts" / "bodies" / "prepublish-guard.ts")
 _s125_del    = read(AGENTS_DIR / "delivery.md")
 _s125_bmode  = read(AGENTS_DIR / "testing-refs" / "browser-mode.md")
 _s125_tester = read(AGENTS_DIR / "tester.md")
@@ -29825,52 +29521,55 @@ _s125_adv    = read(AGENTS_DIR / "adversary.md")
 _s125_readme = read(AGENTS_DIR / "README.md")
 
 # -------------------------------------------------------------------
-# AC-1 (#383) — over-bump hard-deny branch in prepublish-guard.sh
+# AC-1 (#383) — over-bump hard-deny branch in prepublish-guard.ts
 # -------------------------------------------------------------------
 check(
-    "s125/AC-1: prepublish-guard.sh over-bump deny branch present",
-    "deny \"prepublish-guard: version bump level exceeds the mechanical SemVer floor"
+    "s125/AC-1: prepublish-guard.ts over-bump deny branch present",
+    "prepublish-guard: version bump level exceeds the mechanical SemVer floor"
     in _s125_hook,
-    "marker 'deny ...version bump level exceeds the mechanical SemVer floor' not found "
-    "in hooks/prepublish-guard.sh — AC-1 (#383) over-bump hard-deny branch missing",
+    "marker 'version bump level exceeds the mechanical SemVer floor' not found "
+    "in hooks/ts/bodies/prepublish-guard.ts — AC-1 (#383) over-bump hard-deny branch missing",
 )
 
 # -------------------------------------------------------------------
 # AC-2 (#383) — bump-override token parse + SEC-DR-A control-char guard
 # -------------------------------------------------------------------
 check(
-    "s125/AC-2a: prepublish-guard.sh bump-override token regex present",
+    "s125/AC-2a: prepublish-guard.ts bump-override token regex present",
     "bump-override: (minor|major) — .+$" in _s125_hook,
-    "marker 'bump-override: (minor|major) — .+$' not found in hooks/prepublish-guard.sh "
+    "marker 'bump-override: (minor|major) — .+$' not found in hooks/ts/bodies/prepublish-guard.ts "
     "— AC-2 (#383) override token regex missing",
 )
 check(
-    "s125/AC-2b: prepublish-guard.sh SEC-DR-A control-char guard referenced",
+    "s125/AC-2b: prepublish-guard.ts SEC-DR-A control-char guard referenced",
     "SEC-DR-A control-char guard" in _s125_hook,
-    "marker 'SEC-DR-A control-char guard' not found in hooks/prepublish-guard.sh "
+    "marker 'SEC-DR-A control-char guard' not found in hooks/ts/bodies/prepublish-guard.ts "
     "— AC-2 (#383) SEC-DR-A guard comment missing",
 )
 check(
-    "s125/AC-2c: prepublish-guard.sh control-char guard code (grep -qP '[[:cntrl:]]')",
-    "grep -qP '[[:cntrl:]]'" in _s125_hook,
-    "marker \"grep -qP '[[:cntrl:]]'\" not found in hooks/prepublish-guard.sh "
+    "s125/AC-2c: prepublish-guard.ts control-char guard code (CONTROL_CHAR_RE.test)",
+    "CONTROL_CHAR_RE.test(checkCmd)" in _s125_hook,
+    "marker 'CONTROL_CHAR_RE.test(checkCmd)' not found in hooks/ts/bodies/prepublish-guard.ts "
     "— AC-2 (#383) control-char guard implementation missing",
 )
 
 # -------------------------------------------------------------------
 # AC-3 (#383) — existing WARN and hard-block UNCHANGED (regression guard)
+# (AC-3a's original marker was a retired Bash-source COMMENT, not the
+# actual warn message — checked here against the real warnUnderBump()
+# message content, which the TS port carries verbatim.)
 # -------------------------------------------------------------------
 check(
-    "s125/AC-3a: prepublish-guard.sh under-bump WARN still present",
-    "UNDER-BUMP: actual level is below the mechanical floor." in _s125_hook,
-    "marker 'UNDER-BUMP: actual level is below the mechanical floor.' not found "
-    "in hooks/prepublish-guard.sh — AC-3 (#383) existing under-bump WARN removed",
+    "s125/AC-3a: prepublish-guard.ts under-bump WARN still present",
+    "warnUnderBump" in _s125_hook and "SemVer suggests MAJOR" in _s125_hook and "SemVer suggests MINOR" in _s125_hook,
+    "warnUnderBump() (or its MAJOR/MINOR advisory text) not found "
+    "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) existing under-bump WARN removed",
 )
 check(
-    "s125/AC-3b: prepublish-guard.sh no-bump hard-block still present",
-    "deny \"prepublish-guard: distributed assets" in _s125_hook,
-    "marker 'deny ...prepublish-guard: distributed assets' not found "
-    "in hooks/prepublish-guard.sh — AC-3 (#383) no-bump hard-block removed",
+    "s125/AC-3b: prepublish-guard.ts no-bump hard-block still present",
+    "prepublish-guard: distributed assets" in _s125_hook,
+    "marker 'prepublish-guard: distributed assets' not found "
+    "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) no-bump hard-block removed",
 )
 
 # -------------------------------------------------------------------

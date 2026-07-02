@@ -1,44 +1,71 @@
 # hooks/
 
-OS-native notification scripts plus the `config.json` template that wires them into Claude Code.
+The Claude Code plugin's gate and observability hooks. `.claude-plugin/hooks.json` is the
+only CC wiring path — the Go installer's CC path is retired (it now installs the opencode
+runtime only; see `docs/lifecycle.md`).
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `notify-windows.sh` | Windows toast notification via PowerShell. Gated by `TH_HOOK_PROFILE`. |
-| `notify-mac.sh` | macOS notification via `osascript`. Gated by `TH_HOOK_PROFILE`. |
-| `notify-linux.sh` | Linux desktop notification via `notify-send` (libnotify). Gated by `TH_HOOK_PROFILE`. |
-| `notify-stage.sh` | Wrapper invoked by the orchestrator at stage boundaries (4 toasts/pipeline). Detects OS and routes to the matching `notify-{os}.sh`. Gated by `TH_HOOK_PROFILE`. |
-| `subagent-trace.sh` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. **Breadcrumb is non-suppressible** — runs unconditionally regardless of `TH_HOOK_PROFILE`. |
-| `precompact-snapshot.sh` | PreCompact fail-open state snapshot. Copies `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling before context compaction so `/th:recover` can restore in-flight state. Appends a breadcrumb to `00-precompact.jsonl`. Never blocks compaction; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
-| `_hook-profile.sh` | Shared sourced helper — TH_HOOK_PROFILE resolver. Provides `th_hook_profile()` (normalizes the env var) and `th_observability_enabled <class>` (exits 0/1). Sourced only by observability/notification hooks; never by enforcement floors. |
-| `policy-block.sh` | PreToolUse policy gate. Blocks destructive Bash commands and writes to sensitive files. Cross-platform (bash + python3). Always-on (never gated by `TH_HOOK_PROFILE`). |
-| `prepublish-guard.sh` | PreToolUse pre-publish papercut gate. `git push` → Check 1 (version-bump guard); `gh pr create` → Check 2 (`prepublish_check` test guard). Block-on-condition / open-on-fault. Always-on enforcement floor (never gated by `TH_HOOK_PROFILE`). See § Pre-publish gate below. |
-| `config.json` | Per-OS hook template — copy the section for your OS into `~/.claude/settings.json`. |
+| `run-ts-hook.sh` | Fail-closed launcher — invoked by `.claude-plugin/hooks.json` for every gate below. No gate logic of its own: execs `node hooks/ts/dist/<name>.cjs`. Emits an explicit deny envelope when node or the `.cjs` artifact is missing for a deny-floor hook; silent exit 0 for the advisory and observational hooks. See § Launcher contract below. |
+| `hooks/ts/bodies/policy-block.ts` | PreToolUse policy gate logic. Blocks destructive Bash commands and writes to sensitive files. Always-on (never gated by `TH_HOOK_PROFILE`). |
+| `hooks/ts/bodies/dev-guard.ts` | PreToolUse outward-action gate logic (`git push`, `gh pr ...`, ClickUp writes). Always-on. |
+| `hooks/ts/bodies/gcp-guard.ts` | PreToolUse gcloud verb-classifying gate logic. Always-on. |
+| `hooks/ts/bodies/worktree-guard.ts` | PreToolUse worktree advisory gate logic. Fail-open by contract. |
+| `hooks/ts/bodies/prepublish-guard.ts` | PreToolUse pre-publish papercut gate logic. `git push` → Check 1 (version-bump guard); `gh pr create` → Check 2 (`prepublish_check` test guard). Block-on-condition / open-on-fault. Always-on. See § Pre-publish gate below. |
+| `hooks/ts/bodies/checkpoint-guard.ts` | PreToolUse reasoning-checkpoint gate logic (`Task` matcher). Always-on. |
+| `hooks/ts/bodies/session-start.ts` | SessionStart loader logic — dev-mode disposition, language, workspace-mode, english-learning. |
+| `hooks/ts/bodies/language-user-prompt.ts` | UserPromptSubmit language-reminder logic. |
+| `hooks/ts/bodies/subagent-trace.ts` | SubagentStop fail-open backstop. Appends a coarse `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a `th:*` pipeline subagent finishes. Never blocks; emits nothing on stdout. **Breadcrumb is non-suppressible** — runs unconditionally regardless of `TH_HOOK_PROFILE`. |
+| `hooks/ts/bodies/subagent-start.ts` | PreToolUse breadcrumb logic (`Task` matcher, `th:*` scope) — the start-side twin of `subagent-trace.ts`. Wired node-direct (not through the launcher — observational, fail-open). |
+| `hooks/ts/bodies/precompact-snapshot.ts` | PreCompact fail-open state snapshot. Copies `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling before context compaction so `/th:recover` can restore in-flight state. Appends a breadcrumb to `00-precompact.jsonl`. Never blocks compaction; emits nothing on stdout. Gated by `TH_HOOK_PROFILE`. |
+| `hooks/ts/bodies/notify-stage.ts` + `hooks/ts/entry/notify-stage.cc.ts` | Stage-boundary OS-native toast (Windows/macOS/Linux native senders live directly in the CC entry — no shell-out to a sibling script). Gated by `TH_HOOK_PROFILE`. |
+| `hooks/ts/bodies/hook-profile.ts` | Shared `TH_HOOK_PROFILE` resolver. Provides `getHookProfile()` and `observabilityEnabled(class)`. Imported only by observability/notification bodies; never by enforcement floors. |
+| `sketch-guard.sh` | NOT an event hook — invoked by the orchestrator via the Bash tool, not wired in `hooks.json`. Unaffected by the TS cutover. |
 
-All scripts are Bash and cross-platform:
-- Windows runs them via Git Bash.
-- macOS and Linux run them natively.
+`run-ts-hook.sh` and `sketch-guard.sh` are the only `.sh` files at the top level of this
+folder — every gate's decision logic is TypeScript, compiled to `hooks/ts/dist/*.cjs`
+(tracked in the repo so the marketplace plugin can serve it with no build step).
+
+## Launcher contract (`run-ts-hook.sh`)
+
+Three classes, gated on node/artifact availability:
+
+1. **deny-floors** (`policy-block`, `dev-guard`, `gcp-guard`, `prepublish-guard`,
+   `checkpoint-guard`) — node absent OR the `.cjs` missing → emit an explicit deny
+   envelope and block. Never pass-through.
+2. **advisory** (`worktree-guard`) — fail-open by contract; node/`.cjs` absent →
+   silent exit 0 (loses only the reminder, never escalates to deny).
+3. **observational** (`notify-stage`, `subagent-trace`, `precompact-snapshot`,
+   `language-user-prompt`, `session-start`) — node/`.cjs` absent → silent exit 0.
 
 ## Script contract
 
-Each script reads the Claude Code hook payload from stdin (JSON), extracts `last_assistant_message` and `cwd`, and fires an OS-native notification. Scripts exit silently on errors so they never block Claude Code.
+Each gate body reads the Claude Code hook payload from stdin (JSON) and returns a hook
+decision (`permissionDecision: allow|ask|deny`, or empty stdout for a no-decision).
+Observability/notification bodies never emit a decision — they read stdin, do their
+side effect (toast, breadcrumb, snapshot), and always exit 0.
 
-**Required runtime dependencies:**
-- `python3` — used by `policy-block.sh` for the full gate (DENIED_BASH + SENSITIVE_PATHS + HIGH_CONFIDENCE_SECRETS + medium-confidence entropy scan). Preinstalled on macOS and most Linux distros; on Windows + Git Bash, requires a Python install. When python3 is absent, `policy-block.sh` falls back to a bash-native degraded gate that still enforces the DENIED_BASH, SENSITIVE_PATHS, and HIGH_CONFIDENCE_SECRETS floors; the entropy scan is the single degraded-mode coverage gap. Run `/th:setup` or `/th:update` for guided python3 install.
-- Windows: `powershell.exe` (included in Windows).
-- macOS: `osascript` (built-in).
-- Linux: `notify-send` (package `libnotify-bin` on Debian/Ubuntu).
+**Required runtime dependency:** `node` (any version supporting the compiled `.cjs`
+bundles — see `hooks/ts/tsconfig.json` for the target). Every hook wired through
+`run-ts-hook.sh` fails closed (deny-floors) or fails silently open (advisory,
+observational) when node is missing — see § Launcher contract above. Native
+notifications additionally shell out to a platform binary: `powershell.exe` (Windows,
+included in Windows), `osascript` (macOS, built-in), `notify-send` (Linux, package
+`libnotify-bin` on Debian/Ubuntu) — a missing binary is caught and treated as a
+failed (non-fatal) notification.
 
 ## Enabling hooks after install
 
-The installer copies these scripts into `~/.claude/hooks/` but does **not** modify `~/.claude/settings.json`. To activate them:
+The marketplace plugin wires every hook automatically via `.claude-plugin/hooks.json` —
+no manual `settings.json` merge is required. Install with:
 
-1. Open `config.json` in this folder.
-2. Copy the `hooks` object under your OS key (`windows`, `macos`, or `linux`).
-3. Merge it into `~/.claude/settings.json` under the top-level `"hooks"` key.
-4. Restart Claude Code.
+```sh
+/plugin marketplace add valianx/team-harness
+/plugin install th
+/th:setup
+```
 
 ## Events covered
 
@@ -46,15 +73,15 @@ The default preset is **`ultra-quiet`** — fires **only** when the user needs t
 
 | Event | Matcher | When it fires | Why it's in the default set |
 |---|---|---|---|
-| `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block.sh` silently. |
-| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard.sh`, which gates both `git push` and `gh pr create` as outward actions requiring operator approval). |
+| `PreToolUse` | `Bash\|Write\|Edit\|NotebookEdit` | Before any of those tool invocations. | Hard guardrail: blocks destructive commands and writes to sensitive files before they run. Does NOT send a notification — runs `policy-block` silently via `run-ts-hook.sh`. |
+| `PreToolUse` | `Bash` | Before `git push` or `gh pr create`. | Pre-publish papercut guard: `git push` → version-bump check; `gh pr create` → declared test-command check. Runs `prepublish-guard` via `run-ts-hook.sh`. Block-on-condition / open-on-fault (separate additive sibling to `dev-guard`, which gates both `git push` and `gh pr create` as outward actions requiring operator approval). |
 | `Notification` | `idle_prompt` only | Claude finished a turn and is waiting for the user. | High signal: you need to act for Claude to continue. One notification per user-blocking pause. |
 | `SubagentStop` | `th:.*` | When a Team Harness pipeline subagent finishes. | Observability backstop: deterministic proof that a `th:*` subagent boundary occurred. See below. |
 | `PreCompact` | `manual\|auto` | Before context compaction runs. | State snapshot: enables `/th:recover` to restore in-flight state after an auto-compact. See below. |
 
 ### SubagentStop + PreCompact (observability/state hooks)
 
-**`subagent-trace.sh` (SubagentStop, matcher `th:.*`)** appends a coarse
+**`subagent-trace` (SubagentStop, matcher `th:.*`)** appends a coarse
 `subagent.stop` breadcrumb to `00-subagent-trace.jsonl` when a Team Harness
 pipeline subagent finishes. This is a **backstop**, not a replacement for the
 orchestrator's rich `phase.end` events:
@@ -72,7 +99,7 @@ orchestrator's rich `phase.end` events:
 - Fail-OPEN: the hook exits 0 on every path, never blocks the subagent, and emits
   nothing on stdout. Non-`th:` subagents are silently skipped.
 
-**`precompact-snapshot.sh` (PreCompact, matcher `manual|auto`)** copies
+**`precompact-snapshot` (PreCompact, matcher `manual|auto`)** copies
 `00-state.md` to a rolling `00-state.precompact-snapshot.md` sibling
 (overwrite-in-place, never an ever-growing set) before context compaction.
 
@@ -96,13 +123,13 @@ orchestrator's rich `phase.end` events:
 ### `TH_HOOK_PROFILE` (minimal/standard/strict)
 
 Set the `TH_HOOK_PROFILE` environment variable to control the observability/
-notification hooks. The enforcement floors (`policy-block.sh`, `dev-guard.sh`,
-`gcp-guard.sh`, `worktree-guard.sh`, `checkpoint-guard.sh`) and
-`session-start.sh` / `language-user-prompt.sh` are **always-on** regardless of
+notification hooks. The enforcement floors (`policy-block`, `dev-guard`,
+`gcp-guard`, `worktree-guard`, `checkpoint-guard`) and
+`session-start` / `language-user-prompt` are **always-on** regardless of
 this setting — no profile value can disable, skip, or downgrade any enforcement
 hook.
 
-| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) | `subagent-trace.sh` breadcrumb |
+| Profile | `idle-notify` (toast notifications) | `pipeline-observability` (new hooks) | `subagent-trace` breadcrumb |
 |---------|--------------------------------------|--------------------------------------|-------------------------------|
 | `minimal` | suppressed | suppressed | **always written** |
 | `standard` (default when unset) | **enabled** | **enabled** | **always written** |
@@ -110,15 +137,15 @@ hook.
 
 `standard` preserves exactly today's behavior for all existing installs.
 `minimal` is the quietest operator experience — all notifications and observability
-hooks are silent, but the `subagent-trace.sh` existence breadcrumb is never
+hooks are silent, but the `subagent-trace` existence breadcrumb is never
 suppressed (it is the only non-suppressible observability write). `strict` is the
 most-verbose level (today identical to `standard` in effect; reserved as a forward
 extension point).
 
-The profile is read via `_hook-profile.sh`, a shared sourced helper. Only
-observability/notification hooks source it. Enforcement floors never source it
-and are structurally unable to be gated by it. The `subagent-trace.sh` breadcrumb
-does not source `_hook-profile.sh` — its write path is unconditional.
+The profile is read via `hooks/ts/bodies/hook-profile.ts`, imported only by
+observability/notification bodies. Enforcement floors never import it and are
+structurally unable to be gated by it. The `subagent-trace` breadcrumb does not
+import `hook-profile.ts` — its write path is unconditional.
 
 **What was removed from the previous default (and why).** Earlier versions of this repo also wired:
 
@@ -131,7 +158,7 @@ Both were noisy without being actionable. They were removed because the goal is 
 
 ## Why Windows users see notifications as "push in the system bar"
 
-On Windows, `notify-windows.sh` uses `Windows.UI.Notifications.ToastNotificationManager`. That API does **two** things:
+On Windows, the notify-stage entry's native sender uses `Windows.UI.Notifications.ToastNotificationManager`. That API does **two** things:
 
 1. Pops a transient toast in the bottom-right corner for a few seconds.
 2. **Persists the toast in the Action Center / notification bar** until the user explicitly clears it.
@@ -152,18 +179,18 @@ Notifies **only** when Claude is waiting for the user. No toasts for permission 
 "hooks": {
   "PreToolUse": [
     { "matcher": "Bash|Write|Edit|NotebookEdit", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/policy-block.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh policy-block", "timeout": 5 }
     ]}
   ],
   "Notification": [
     { "matcher": "idle_prompt", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage", "timeout": 5 }
     ]}
   ]
 }
 ```
 
-**Use this when:** you have `skipDangerousModePermissionPrompt: true` or a similar autonomy setting and don't want a Windows Action Center full of look-alike toasts. This is the new default in `hooks/config.json`.
+**Use this when:** you have `skipDangerousModePermissionPrompt: true` or a similar autonomy setting and don't want a Windows Action Center full of look-alike toasts. This is the default the marketplace plugin wires via `.claude-plugin/hooks.json`.
 
 **Trade-off:** you will not be notified when a tool fails. You'll see the failure in Claude's output if you're watching — and `gate.fail` events still land in `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode) for pipeline runs (queryable via `/trace <feature> --fails`).
 
@@ -175,17 +202,17 @@ Notifies on idle, permission prompts, and tool failures. This was the default in
 "hooks": {
   "PreToolUse": [
     { "matcher": "Bash|Write|Edit|NotebookEdit", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/policy-block.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh policy-block", "timeout": 5 }
     ]}
   ],
   "Notification": [
     { "matcher": "idle_prompt|permission_prompt", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage", "timeout": 5 }
     ]}
   ],
   "PostToolUseFailure": [
     { "matcher": "*", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage", "timeout": 5 }
     ]}
   ]
 }
@@ -202,17 +229,17 @@ Adds `Stop` on top of `default-quiet` — fires every time Claude finishes a tur
   "PreToolUse": [ /* same as above */ ],
   "Notification": [
     { "matcher": "idle_prompt|permission_prompt", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage", "timeout": 5 }
     ]}
   ],
   "PostToolUseFailure": [
     { "matcher": "*", "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage", "timeout": 5 }
     ]}
   ],
   "Stop": [
     { "hooks": [
-      { "type": "command", "command": "bash ~/.claude/hooks/notify-windows.sh", "timeout": 5 }
+      { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/run-ts-hook.sh notify-stage", "timeout": 5 }
     ]}
   ]
 }
@@ -224,16 +251,16 @@ Adds `Stop` on top of `default-quiet` — fires every time Claude finishes a tur
 
 1. Open `~/.claude/settings.json`.
 2. Back it up: `cp ~/.claude/settings.json ~/.claude/settings.json.bak-$(date +%Y%m%d-%H%M)`.
-3. Replace the `"hooks": { ... }` object with one of the snippets above (swap `notify-windows.sh` for `notify-mac.sh` or `notify-linux.sh` on other platforms).
+3. Replace the `"hooks": { ... }` object with one of the snippets above — `notify-stage` detects the OS itself, no per-platform swap needed.
 4. Restart Claude Code (the settings file is read at startup).
 
 ### Interaction with `agentPushNotifEnabled`
 
 `~/.claude/settings.json` also accepts `"agentPushNotifEnabled": true`. This is a **separate notification channel** that uses Anthropic's push infrastructure — it does not go through `hooks/`. If you have it on AND a verbose hook preset, you may get duplicate notifications per event (one toast via hook, one push via Anthropic). Pick one channel or accept the duplication consciously.
 
-## Policy gate (`policy-block.sh`)
+## Policy gate (`policy-block`)
 
-The `PreToolUse` hook routes through `policy-block.sh`. It reads the tool call JSON from stdin, evaluates it against a denylist, and returns a hook decision that either lets the call proceed (default) or blocks it with a clear reason.
+The `PreToolUse` hook routes through `policy-block` (via `run-ts-hook.sh`). It reads the tool call JSON from stdin, evaluates it against a denylist, and returns a hook decision that either lets the call proceed (default) or blocks it with a clear reason.
 
 **What it blocks (Bash):**
 - `rm -rf` (in any flag order, case-insensitive) targeting `/`, `~`, `$HOME`, or a bare wildcard `*`.
@@ -254,20 +281,20 @@ The `PreToolUse` hook routes through `policy-block.sh`. It reads the tool call J
 - It is not a sandbox. A determined LLM can obfuscate its way around (e.g., split `rm -rf /` across variables). The point is to catch accidents and force visibility on intent — the reviewer remains the last line of defense.
 - It does not read files or call external services. The check is purely pattern-matching on the tool call.
 
-**Bypassing for a specific case.** If you genuinely need a denied command (e.g., a one-off cleanup script), run it manually outside Claude. Editing `policy-block.sh` to scope an exception is also fine, but commit the exception so the rest of the team sees it.
+**Bypassing for a specific case.** If you genuinely need a denied command (e.g., a one-off cleanup script), run it manually outside Claude. Editing `hooks/ts/bodies/policy-block.ts` to scope an exception is also fine, but commit the exception (and rebuild `dist/policy-block.cjs`) so the rest of the team sees it.
 
-**Performance.** python3 path: single-digit milliseconds (one Python process, regex match). Bash degraded path: sub-millisecond (pure grep/sed). Timeout is 5s in both cases.
+**Performance.** Single node process per invocation (regex match, no external dependency). Timeout is 5s.
 
-## Pre-publish gate (`prepublish-guard.sh`)
+## Pre-publish gate (`prepublish-guard`)
 
-The `PreToolUse` hook `prepublish-guard.sh` catches two recurring papercuts at the earliest possible moment. It fires only on `git push` (Check 1) and `gh pr create` (Check 2); all other Bash commands exit immediately with no decision.
+The `PreToolUse` hook `prepublish-guard` (via `run-ts-hook.sh`) catches two recurring papercuts at the earliest possible moment. It fires only on `git push` (Check 1) and `gh pr create` (Check 2); all other Bash commands exit immediately with no decision.
 
 ### Gate design: block-on-condition / open-on-fault
 
 - **BLOCK** (`permissionDecision: deny`): fires only when the checked condition is confirmed — missing version bump on push, or non-zero test exit at PR-creation.
 - **FAIL-OPEN** (`nodecision` + one-line stderr warning): fires on every guard-evaluation fault: `git` absent, not inside a work-tree, `origin/main` does not resolve, `git diff` error, config file unparseable, `prepublish_check` value rejected by the control-char guard, `timeout`/`gtimeout` binary absent, internal-timeout (exit 124), command-not-found (exit 127). A guard fault NEVER blocks the operator.
 
-This hook is a strictly **additive sibling** to `dev-guard.sh`. `dev-guard.sh` gates `git push` and `gh pr create` (and `gh issue create|edit|comment`) as outward-action approvals (`ask`). This hook adds a second enforcement layer — version-bump and test guard — for those same commands. Both hooks fire as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard.sh`'s `ask` into an allow.
+This hook is a strictly **additive sibling** to `dev-guard`. `dev-guard` gates `git push` and `gh pr create` (and `gh issue create|edit|comment`) as outward-action approvals (`ask`). This hook adds a second enforcement layer — version-bump and test guard — for those same commands. Both hooks fire as independent `PreToolUse` entries; Claude Code evaluates each independently (most-restrictive decision wins). This hook never emits `permissionDecision: allow`, so it cannot convert `dev-guard`'s `ask` into an allow.
 
 ### Check 1 — Version-bump guard (fires on `git push`)
 
@@ -301,7 +328,7 @@ timeout 90s bash -lc "$prepublish_check"
 
 **Why at PR-creation?** The declared test command runs once per `gh pr create`, not on every push. For team-harness the structural suite is a few seconds; cost is bounded by the operator-declared command + the 90s internal timeout.
 
-**Deny reason:** names the (JSON-escaped) command and the exit code — never the captured stdout/stderr of the test command (CWE-209 information-disclosure prevention). The bash-degraded path (no `python3`) omits the command entirely.
+**Deny reason:** names the (JSON-escaped) command and the exit code — never the captured stdout/stderr of the test command (CWE-209 information-disclosure prevention).
 
 ### Timeout budget (SDR-PPG-03)
 
@@ -320,26 +347,25 @@ A PR opened via the GitHub web UI bypasses Check 2 — no `gh pr create` Bash co
 
 ## Opt-in: notify when Claude finishes a turn
 
-Covered by the `noisy` preset under **Tuning presets** above. In short: add a `Stop` hook entry pointing to your platform's `notify-*.sh`. Remove it when you go back to interactive work — it fires dozens of times per hour during active development.
+Covered by the `noisy` preset under **Tuning presets** above. In short: add a `Stop` hook entry pointing to `run-ts-hook.sh notify-stage`. Remove it when you go back to interactive work — it fires dozens of times per hour during active development.
 
 ## Stage-end notifications (orchestrator pipeline)
 
-`notify-stage.sh` is invoked by the orchestrator — not by a Claude Code hook event — at the close of each of the four user-facing pipeline stages. It fires regardless of the `autonomous` mode and regardless of the ultra-quiet hook preset: the preset controls which Claude Code events trigger a toast; this script is called directly by the orchestrator's own `Bash` tool.
+The compiled `hooks/ts/dist/notify-stage.cjs` bundle is invoked by the orchestrator — not by a Claude Code hook event — at the close of each of the four user-facing pipeline stages. It fires regardless of the `autonomous` mode and regardless of the ultra-quiet hook preset: the preset controls which Claude Code events trigger a toast; this bundle is called directly by the orchestrator's own `Bash` tool via `node`.
 
-The orchestrator pipes a JSON payload of the form `{"stage":N,"label":"...","status":"...","feature":"...","summary":"...","cwd":"..."}` to stdin. The wrapper derives a one-line message (`Pipeline {feature} · Stage N ({label}) {STATUS} — {summary}`), rebuilds a `{last_assistant_message, cwd}` payload, and routes to the matching `notify-{os}.sh` script in the same directory.
+The orchestrator pipes a JSON payload of the form `{"stage":N,"label":"...","status":"...","feature":"...","summary":"...","cwd":"..."}` to stdin. The entry derives a one-line message (`Pipeline {feature} · Stage N ({label}) {STATUS} — {summary}`) and sends it directly to the detected OS's native notifier — no intermediate payload, no sibling script.
 
-**To silence stage notifications:** remove `~/.claude/hooks/notify-stage.sh` after install. The orchestrator checks `test -x ~/.claude/hooks/notify-stage.sh` before calling it; if the file is absent, it logs `stage.notify.skipped` with `reason: wrapper-missing` and continues the pipeline without emitting a toast.
+**To silence stage notifications:** remove `~/.claude/hooks/ts/dist/notify-stage.cjs` after install. The orchestrator checks `test -f ~/.claude/hooks/ts/dist/notify-stage.cjs` before calling it; if the file is absent, it logs `stage.notify.skipped` with `reason: wrapper-missing` and continues the pipeline without emitting a toast.
 
-**If a `permission_prompt` fires for the orchestrator's bash call:** add `Bash(bash ~/.claude/hooks/notify-stage.sh:*)` to `permissions.allow` in your `~/.claude/settings.json`. Under the default ultra-quiet preset this is not required, but users who enable a louder preset may encounter one prompt per stage call.
+**If a `permission_prompt` fires for the orchestrator's bash call:** add `Bash(node ~/.claude/hooks/ts/dist/notify-stage.cjs:*)` to `permissions.allow` in your `~/.claude/settings.json`. Under the default ultra-quiet preset this is not required, but users who enable a louder preset may encounter one prompt per stage call.
 
 ## Adding support for another OS
 
-1. Add `notify-<os>.sh` following the existing pattern (read stdin, parse JSON, fire native notification, exit silently on failure).
-2. Add a matching section to `config.json` under the new OS key.
-3. Update the platform label map in `bin/install.py` if needed.
-4. Document the new OS's requirements in this README.
+1. Add a `sendNotification` branch to `hooks/ts/entry/notify-stage.cc.ts` (native command, argv-based via `execFileSync` — never shell-interpolated) and a matching case in `detectOS()`.
+2. Rebuild: `npm --prefix hooks/ts run build:notify-stage` (commit the regenerated `dist/notify-stage.cjs`).
+3. Document the new OS's runtime requirements in this README (§ Script contract).
 
 ## Notes
 
-- `README.md` in this folder is contributor documentation; the installer does **not** copy it to `~/.claude/hooks/`.
+- `README.md` in this folder is contributor documentation; it is not itself a distributed artifact.
 - Hooks must stay **generic and portable**. No personal tokens, private URLs, or OpenClaw-style integrations in this folder — those belong in each developer's local `~/.claude/hooks/`.
