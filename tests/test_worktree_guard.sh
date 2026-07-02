@@ -192,6 +192,12 @@ assert_ask "tool_input is an array (extraction fails, raw trigger present)" \
     '{"tool_name":"Bash","tool_input":["git checkout -b feat/x"]}'
 
 echo
+echo "=== Structured extraction succeeds → raw payload is NOT scanned, even if a trigger"
+echo "    token sits in an unrelated field → NODECISION (no spurious ask) ==="
+assert_nodecision "structured command extracted, trigger token only in a different field" \
+    '{"tool_name":"Bash","tool_input":{"command":"git status","description":"git checkout -b feat/x"}}'
+
+echo
 echo "=== Known-bad: malformed tool_input (command not a string) → NODECISION or ASK, never deny/allow ==="
 assert_never_gate "tool_input.command is a number" \
     '{"tool_name":"Bash","tool_input":{"command":12345}}'

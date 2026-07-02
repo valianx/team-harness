@@ -165,8 +165,9 @@ var TRIGGER_RE = /git\s+(checkout\s+-b|switch\s+-c|worktree\s+add)/;
 function evaluate(input, rawPayload) {
   const toolName = input.tool?.name ?? "";
   if (toolName !== "Bash") return none();
-  const cmd = typeof input.tool?.input?.["command"] === "string" ? input.tool.input["command"] : "";
-  const triggered = TRIGGER_RE.test(cmd) || rawPayload !== void 0 && TRIGGER_RE.test(rawPayload);
+  const rawCommand = input.tool?.input?.["command"];
+  const commandExtracted = typeof rawCommand === "string";
+  const triggered = commandExtracted ? TRIGGER_RE.test(rawCommand) : rawPayload !== void 0 && TRIGGER_RE.test(rawPayload);
   if (!triggered) {
     return none();
   }

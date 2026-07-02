@@ -51,13 +51,17 @@ export function evaluate(input: NormalizedInput, rawPayload?: string): Normalize
   const toolName = input.tool?.name ?? "";
   if (toolName !== "Bash") return none();
 
-  const cmd = typeof input.tool?.input?.["command"] === "string"
-    ? (input.tool.input["command"] as string)
-    : "";
+  const rawCommand = input.tool?.input?.["command"];
+  const commandExtracted = typeof rawCommand === "string";
 
-  // Fast-exit: structured command carries the trigger → ask directly.
-  // Otherwise, fall back to a raw-text scan (fail-safe for malformed tool_input).
-  const triggered = TRIGGER_RE.test(cmd) || (rawPayload !== undefined && TRIGGER_RE.test(rawPayload));
+  // The raw-payload fallback exists only to cover a missing/malformed
+  // `command` field (see contract note above). When structured extraction
+  // succeeds, decide on that value alone — scanning the raw payload too
+  // would false-positive on a trigger token sitting in an unrelated field
+  // of a safe, non-triggering command.
+  const triggered = commandExtracted
+    ? TRIGGER_RE.test(rawCommand)
+    : (rawPayload !== undefined && TRIGGER_RE.test(rawPayload));
   if (!triggered) {
     return none();
   }
