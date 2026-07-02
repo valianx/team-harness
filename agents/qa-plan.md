@@ -121,7 +121,7 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: {list of uncovered AC, or "none"}
 ```
 
-This mode is read-only and short — typical run is 2-3 minutes of agent time, ~3-5K tokens. Worth it only when the Work Plan has 4+ steps or 4+ AC; for trivial tasks the orchestrator should skip Phase 1.5.
+This mode is read-only and short — typical run is 2-3 minutes of agent time (measured June 2026: median 56K tokens, n=14). Worth it only when the Work Plan has 4+ steps or 4+ AC; for trivial tasks the orchestrator should skip Phase 1.5.
 
 ---
 
@@ -174,7 +174,7 @@ issues: {list of dropped AC with one-line reason, or "none"}
 
 `verdict: clean` means every constraint resolved into "keep". `amendments` means at least one AC needs rewording (orchestrator applies). `drops` means the orchestrator must stop and confirm with the user before continuing to Phase 3.
 
-This mode is read-only and short — typical run is 2-3 minutes of agent time, ~2-4K tokens. Skipped entirely when no `[CONSTRAINT-DISCOVERED]` annotations exist or when all constraints are trivial (orchestrator handles those inline).
+This mode is read-only and short — typical run is 2-3 minutes of agent time (estimate — not present in the June 2026 measurement sample). Skipped entirely when no `[CONSTRAINT-DISCOVERED]` annotations exist or when all constraints are trivial (orchestrator handles those inline).
 
 ---
 

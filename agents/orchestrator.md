@@ -452,6 +452,8 @@ After EVERY phase transition, update `{docs_root}/00-state.md`. This is your per
 
 At EVERY phase boundary, execute these three steps as a single atomic unit. Skipping any step is a contract violation — if you realize mid-run that you skipped one, stop and backfill immediately before continuing.
 
+**Atomic coupling (mandatory).** Marking a Phase Checklist item `[x]` (step 2) and appending its `phase.end` event (step 1) are ONE inseparable step, not two independently-skippable ones — never write one without the other in the same phase-boundary pass. A checklist mark with no matching `phase.end` event is a contract violation the moment it happens, not only when later audited (see Final Pipeline Sanity Check step 8 and the stage-gate reconciliation backstop below, which catch violations that slipped through this write-time rule).
+
 1. **Append event to `{events_file}`.**
    - When a phase completes: append `{"ts":"<ISO>","event":"phase.end","phase":"<N>","name":"<name>","agent":"<agent>","status":"<status>","tools":{...},"tokens":<N>,"duration_ms":<N>}`. Extract `tokens` (total_tokens) and `duration_ms` from the Agent() call result metadata.
    - When a phase starts: append `{"ts":"<ISO>","event":"phase.start","phase":"<N>","name":"<name>","agent":"<agent>"}`.
@@ -544,7 +546,7 @@ After `delivery` returns `status: success` at Phase 4, and before any reporting 
 
 **Observability artifact verification (mandatory extension):** After the per-agent artifact check (steps 1–5 above), perform a dedicated check for the two observability files that are orchestrator-owned and never appear in `§ Agent Results`:
 
-6. Verify `{docs_root}/00-pipeline-summary.md` exists and is non-empty.
+6. Verify `{docs_root}/00-pipeline-summary.md` exists, is non-empty, AND contains a `## Cost` section. A missing `## Cost` section is added to `missing_artifacts` alongside a missing file — the assert does not distinguish "file absent" from "file present but incomplete".
 7. Verify `{docs_root}/{events_file}` exists and is non-empty.
 8. Read `{docs_root}/00-state.md § Phase Checklist` and count the number of phases marked `[x]` (completed). Read `{docs_root}/{events_file}` and count `phase.end` events. Assert: the events file contains ≥1 `phase.end` per `[x]` phase in the Phase Checklist.
 
@@ -720,7 +722,7 @@ If reading this after context compaction:
 - Update BEFORE starting each new phase
 - On happy path: update status, add agent result row, **mark the completed phase `[x]` in the Phase Checklist**, proceed
 - On failure: record failure details, iteration count, what needs fixing
-- **Phase Checklist enforcement:** at every phase transition, the orchestrator MUST mark the completed phase `[x]` in the checklist BEFORE advancing to the next. To skip a phase (only when explicitly authorized by the operator or by tier rules), mark it `[~skipped: {reason}]`. An unmarked phase between two marked phases is a contract violation — the orchestrator must stop and backfill the missing phase before continuing. This checklist is the structural guardrail that prevents phase skipping.
+- **Phase Checklist enforcement:** at every phase transition, the orchestrator MUST mark the completed phase `[x]` in the checklist BEFORE advancing to the next, and that mark MUST carry its `phase.end` event as one inseparable step (see Phase Transition Protocol → "Atomic coupling") — a checklist mark without its event is a contract violation, not a deferred cleanup item. To skip a phase (only when explicitly authorized by the operator or by tier rules), mark it `[~skipped: {reason}]`. An unmarked phase between two marked phases is a contract violation — the orchestrator must stop and backfill the missing phase before continuing. This checklist is the structural guardrail that prevents phase skipping.
 - Always keep "Recovery Instructions" current with the exact next step
 - Keep "Hot Context" updated with pipeline-specific insights only (e.g., "DB uses soft deletes", "auth middleware already validates JWT"). Knowledge graph results go in `00-knowledge-context.md`, not here.
 
@@ -1642,7 +1644,7 @@ Append a `phase.end` event:
 
 **Agent:** `qa-plan` (mode: `ratify-plan`)
 
-**Why this phase exists:** the most expensive iteration is one where the implementer codes against a Work Plan that does not actually cover all AC, and the gap is only discovered in Phase 3 — costing a full implementer + tester + qa + security re-run. Ratifying the plan against the AC before any code is written turns that loop into a cheap read-only check (~3-5K tokens). This is the **sprint contract** pattern from Anthropic's harness-design article: generator and evaluator agree on "what done looks like" before generating.
+**Why this phase exists:** the most expensive iteration is one where the implementer codes against a Work Plan that does not actually cover all AC, and the gap is only discovered in Phase 3 — costing a full implementer + tester + qa + security re-run. Ratifying the plan against the AC before any code is written turns that loop into a read-only check (measured June 2026: median 56K tokens, n=14 — an order of magnitude above the original estimate; still ~2.5× cheaper than the full Stage-2 iteration it prevents). This is the **sprint contract** pattern from Anthropic's harness-design article: generator and evaluator agree on "what done looks like" before generating.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces
@@ -1659,7 +1661,7 @@ Append a `phase.end` event:
 | `success` | `fail` | Route back to `architect` with the list of uncovered AC. The architect updates the Work Plan; re-run Phase 1.5. Iteration of Phase 1.5 counts toward the same max-3 budget as Phase 3. |
 | `failed` / `blocked` | (any) | Audit broke. Read the issue, retry once, then proceed (this phase is non-blocking by design — its absence does not stop the pipeline). |
 
-**Cost:** one qa invocation (~3-5K tokens). **Saves:** entire implementer + tester + qa + security iteration when the Work Plan was incomplete (~20-50K tokens).
+**Cost:** one qa-plan invocation (measured June 2026: median 56K, n=14). **Saves:** a full implementer + verify-block iteration (measured June 2026: verify block alone median 86K; full iteration ≥120K). Break-even: ratification pays when the probability of an uncovered-AC gap exceeds roughly one in three — skip-rule retuning deferred to post-A8 measurement.
 
 **Skip when:** `complexity: standard` AND fewer than 4 AC (the Work Plan is trivial enough that gaps are rare; ratification is overhead). Always run for `complexity: complex` or any task with ≥4 AC.
 
@@ -1729,7 +1731,7 @@ This ensures the plan-review panel runs via the real `plan-reviewer` agent — i
 | `success` | `fail` | Do NOT surface the plan to the user. Route back to architect with the failing rules (rules 1 and 2 are the only fail-blocking ones). Re-run Phase 1.6 after the architect's revision. Iteration counts toward a separate max-3 budget for plan-review round trips. If exceeded, escalate to the user with the full report. |
 | `failed` / `blocked` | (any) | Audit broke. Read `01-plan.md § Plan Review` if it exists, retry once, then escalate. |
 
-**Cost:** one plan-reviewer invocation (~2-4K tokens). **Saves:** human time at STAGE-GATE-1, and a cascading Stage-2 cycle that would otherwise discover the structural gap mid-implementation.
+**Cost:** one plan-reviewer invocation (measured June 2026: the full 1.6 panel median 57K, n=16; the shape audit is a fraction of that figure). **Saves:** human time at STAGE-GATE-1, and a cascading Stage-2 cycle that would otherwise discover the structural gap mid-implementation.
 
 **Report to user (intermediate, before STAGE-GATE-1):**
 ```
@@ -2104,7 +2106,7 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 **Rewrite TL;DR** (row 10 of §5.2): If no constraints: skip TL;DR rewrite (no semantic change). If qa-plan reconcile ran: `Now`: "Phase 3 verify launching." `Last`: "Reconciliation: {N} trivial / {M} non-trivial / {K} dropped." `Open issues`: any dropped AC identifiers.
 
-**Cost:** typically zero (no annotations) or one qa invocation (~2-4K tokens). **Saves:** an entire iteration cycle when a non-trivial constraint would otherwise be silently absorbed and surfaced as an acceptance-checker concern at Phase 3.6.
+**Cost:** typically zero (no annotations) or one qa invocation (estimate — not present in the June 2026 measurement sample). **Saves:** an entire iteration cycle when a non-trivial constraint would otherwise be silently absorbed and surfaced as an acceptance-checker concern at Phase 3.6.
 
 ---
 
@@ -3661,6 +3663,16 @@ When an agent returns, parse its status block for the `model:` and `effort:` lin
 
 This is the source-of-truth for the effective model a dispatch actually ran under, particularly when a session model override (see Phase 0a Step 6a, "Session model override") is active — the frontmatter `model:` declared in `agents/{agent}.md` is only the *default*, and the status-block field is what actually ran. Downstream cost classification (`docs/observability.md § Derivation rule`, `skills/trace/SKILL.md`) reads `event.model` first, before falling back to frontmatter inference.
 
+### Stage-gate reconciliation backstop (self-healing emission)
+
+The atomic coupling rule (§ Phase Transition Protocol) prevents new gaps at write time; this backstop closes gaps that already exist by the time a STAGE-GATE is reached — the write-time rule is prevention, this is detection-and-repair for whatever slipped through anyway (a prior compaction, an aborted resume, a legacy workspace). At EVERY STAGE-GATE emission (1, 2, or 3) — points where the orchestrator already stops for human review — run this 3-step reconciliation before emitting the gate STOP block:
+
+1. **Count.** Read `00-state.md § Phase Checklist` and count phases marked `[x]`. Read `{events_file}` and count `phase.end` events. Any `[x]` phase with no matching `phase.end` is a gap.
+2. **Backfill each gap.** Append one `phase.end` event for the gap, carrying BOTH `tokens_estimated: true` and `backfilled: true`. Derive `duration_ms` from the paired `subagent.start`/`subagent.stop` breadcrumbs in `00-subagent-trace.jsonl` (local mode: `workspaces/00-subagent-trace.jsonl`; obsidian mode: `{logs-path}/{logs-subfolder}/00-subagent-trace.jsonl`), filtering by `agent_type` and the pipeline's time window — the trace file sits at the workspace-root level, so time-window filtering is the JOIN key against a single feature's events (a documented coarseness, not a precision guarantee).
+3. **Fall back when no breadcrumb pair exists.** Apply the existing duration heuristic (`duration_min × 1500` opus / `× 800` sonnet) for `duration_ms`, still marking `tokens_estimated: true` and `backfilled: true`.
+
+**Invariant:** a measured `phase.end` event (no `backfilled` field, or `backfilled: false`) is NEVER overwritten by this reconciliation — the backstop only appends events for gaps, it never edits or replaces an existing line. `00-subagent-trace.jsonl` is the reconciliation source this backstop reads; see `docs/observability.md § 00-subagent-trace` for its role and retention.
+
 ---
 
 ## Decision Ledger
@@ -3726,12 +3738,16 @@ LEDGER
 
 ### When to rewrite (full rewrite, never append)
 
-- End of each phase (after the `phase.end` event for the phase's primary agent).
-- Whenever an iteration starts (so the iteration count + last failure are visible).
-- After every gate event (`gate.pass`, `gate.fail`, `stage.gate*`).
-- At `pipeline.end`.
+**4 mandatory checkpoints.** These are the ONLY rewrites that are contract-enforced (see the Final Pipeline Sanity Check assert below); every one is bound to an event the orchestrator already emits, so compliance never depends on a separate "remember to rewrite" step:
 
-A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsistency risks of partial updates.
+1. **STAGE-GATE-1 emission** — the summary and `## Cost` reflect Stage 1 (0a through 1.6).
+2. **Stage-2 close** — after the last task's Phase 3.6.
+3. **Every `iteration.start`** — so a failing pipeline stays visible (existing rationale preserved).
+4. **`pipeline.complete` / `pipeline.end`.**
+
+**Every-transition rewrite is best-effort, not enforced.** Rewriting after each additional phase (`gate.pass`/`gate.fail`, other `stage.gate*` events) is still encouraged when convenient — a fresher summary is strictly better for the operator — but only the 4 checkpoints above are gated by the Final Pipeline Sanity Check. This split exists because the prior "every transition" wording measured at 2/168 compliance: a lighter contract that is actually executed beats a heavier one that is skipped wholesale.
+
+A full rewrite per checkpoint is cheap (the file is ~30 lines) and avoids the inconsistency risks of partial updates.
 
 ### Schema (rigid — match exactly)
 
