@@ -118,7 +118,7 @@ exclusive-writer contract by writing to their own dedicated sibling files.
 
 ### 00-subagent-trace.jsonl — SubagentStop backstop (coarse)
 
-Written by `hooks/subagent-trace.sh` (SubagentStop event, matcher `th:.*`).
+Written by `hooks/ts/dist/subagent-trace.cjs` (SubagentStop event, matcher `th:.*`).
 Appended to **only** when a Team Harness pipeline subagent (`th:architect`,
 `th:implementer`, etc.) finishes. The file sits beside the orchestrator's trace
 files in the resolved workspace:
@@ -171,15 +171,16 @@ stop line, how long it has been in flight — it carries no tokens, no
 per-phase detail, no result. The orchestrator's `phase.end` events remain the
 authoritative rich record.
 
-**Wiring asymmetry (temporary).** `.claude-plugin/hooks.json` wires this hook
-directly to `node ${CLAUDE_PLUGIN_ROOT}/hooks/ts/dist/subagent-start.cjs` —
-there is no fail-closed launcher yet (that mechanism lands with the
-Bash→TS hook cutover). `hooks/config.json` (the legacy Go-installer path)
-does NOT wire this hook: the legacy installer does not yet copy
-`hooks/ts/dist/` to `~/.claude/hooks/`, so a launcher-less direct `node`
-command would point at a path that does not exist on that install path. The
-cutover task closes this asymmetry by teaching `installHooks` to copy
-`hooks/ts/dist/*.cjs` and wiring both paths through the same launcher.
+**Direct wiring by design (not the launcher).** `.claude-plugin/hooks.json`
+wires this hook directly to `node ${CLAUDE_PLUGIN_ROOT}/hooks/ts/dist/subagent-start.cjs`
+— unlike the security floors and the other observational hooks, it does NOT
+route through `hooks/run-ts-hook.sh`, the fail-closed launcher the
+Bash→TS hook cutover introduced for the rest of the fleet. This is
+intentional: `subagent-start` is observational and fail-open by its own
+design, so a launcher indirection buys no additional safety and only adds a
+process hop on the hot dispatch path. The marketplace plugin — the only
+Claude Code install path (the Go installer's CC path is retired) — ships
+`hooks/ts/dist/` in its own cache, so the target path always exists.
 
 **Fail-open, not fail-closed.** Absent `node`, a missing `.cjs`, or any
 internal error degrades to a lost breadcrumb — it never blocks the `Task`
@@ -201,7 +202,7 @@ lanes`.
 
 ### 00-precompact.jsonl — PreCompact breadcrumb
 
-Written by `hooks/precompact-snapshot.sh` (PreCompact event, matcher
+Written by `hooks/ts/dist/precompact-snapshot.cjs` (PreCompact event, matcher
 `manual|auto`). Appended to when the hook successfully snapshots `00-state.md`
 before context compaction. The file sits in the same directory as the snapshot:
 
@@ -586,7 +587,7 @@ Every line is a JSON object. One JSON object per line, append-only, never rewrit
 | `rationale` | always | One free-text sentence (≤240 chars) — WHY this verdict/approval/disposition. `"no reason given"` is the explicit value when the operator gave none. **Secret prohibition applies** — the `rationale` field MUST NOT contain tokens, credentials, private URLs, or user-path identifiers. Use mechanical context only (same policy as `operation.*` `detail` fields). |
 | `action` | conditional | For `dry-run-enforced`: the deploy/migration action that was gated (e.g. `gcloud sql instances patch`, `prisma migrate deploy`). Required for `dry-run-enforced`. |
 | `dry_run_ref` | conditional | For `dry-run-enforced`: how the dry-run was performed (`--dry-run`, `--validate-only`, `plan-only`, `migrate diff`). Required for `dry-run-enforced`. |
-| `guard` | conditional | For `dry-run-enforced`: which existing deterministic floor gated the apply (`gcp-guard.sh`, `dev-guard.sh`, `policy-block.sh`). Required for `dry-run-enforced` — names the enforcement layer the ledger is auditing. |
+| `guard` | conditional | For `dry-run-enforced`: which existing deterministic floor gated the apply (`gcp-guard`, `dev-guard`, `policy-block`). Required for `dry-run-enforced` — names the enforcement layer the ledger is auditing. |
 
 **Disposition vocabulary** (`decision` field when `event == "disposition"`): `accept` (finding acknowledged and accepted as-is), `watch` (accept-with-followup; operator adds to a deferred list), `reject` (finding dismissed as non-applicable).
 
@@ -608,7 +609,7 @@ Mirrors `00-execution-events` exactly:
 {"ts":"2026-06-15T10:00:01-03:00","event":"gate-verdict","feature":"auth-jwt","phase":"1.6-plan-review","decision":"concerns","rationale":"Reviewer raised SEC-001: missing rate-limit on /login; AC-3 scope adjusted."}
 {"ts":"2026-06-15T10:05:33-03:00","event":"operator-approval","feature":"auth-jwt","stage":"1","decision":"approved","rationale":"Operator accepted concerns; SEC-001 filed as follow-up issue #99."}
 {"ts":"2026-06-15T10:42:11-03:00","event":"disposition","feature":"auth-jwt","phase":"3-verify","decision":"watch","subject":"SEC-finding: token expiry uses Date.now() without UTC normalisation","rationale":"Low-risk today; timezone bug possible in DST transition. Filed follow-up."}
-{"ts":"2026-06-15T11:00:00-03:00","event":"dry-run-enforced","feature":"auth-jwt","action":"gcloud sql instances patch","dry_run_ref":"--validate-only","guard":"gcp-guard.sh","rationale":"Schema migration validated before apply; separate apply approval required."}
+{"ts":"2026-06-15T11:00:00-03:00","event":"dry-run-enforced","feature":"auth-jwt","action":"gcloud sql instances patch","dry_run_ref":"--validate-only","guard":"gcp-guard","rationale":"Schema migration validated before apply; separate apply approval required."}
 ```
 
 ### Relationship to 00-execution-events

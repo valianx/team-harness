@@ -1,14 +1,14 @@
 # Orchestrator Disposition — Contract
 
-The top-level Claude Code agent IS the orchestrator. This is the CC native architecture, not a mode that activates or deactivates. The security property that protects outward actions is enforced by `hooks/dev-guard.sh`, which fires UNCONDITIONALLY for covered outward actions — no filesystem marker required or consulted.
+The top-level Claude Code agent IS the orchestrator. This is the CC native architecture, not a mode that activates or deactivates. The security property that protects outward actions is enforced by the `dev-guard` gate (`.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh dev-guard` → `hooks/ts/dist/dev-guard.cjs`), which fires UNCONDITIONALLY for covered outward actions — no filesystem marker required or consulted.
 
 **SEC-DR-2 re-founding (v2.89.0).** The former "dev mode" was a conditional disposition controlled by `~/.claude/.dev-mode-active`. That model was retired when empirical testing (M1 probe, 2026-06-14) confirmed that nested foreground subagents retain the `Task` tool — the foundational premise behind the handoff machinery was obsolete on the CC path. The disposition is now unconditional: the general agent is always the orchestrator, and the gate is always armed.
 
 ---
 
-## Outward-Action Gate (`dev-guard.sh`)
+## Outward-Action Gate (`dev-guard`)
 
-The deterministic security layer is the PreToolUse hook `hooks/dev-guard.sh`, wired in its own dedicated `Bash`-only PreToolUse entry in both `hooks/config.json` (Go installer, 3 OS) and `.claude-plugin/hooks.json` (plugin runtime). `policy-block.sh` is in a separate entry with matcher `Bash|Write|Edit|NotebookEdit` so it continues to secret-scan write/edit content — dev-guard never fires on Edit/Write/NotebookEdit. This is the GUARANTEE — not the disposition.
+The deterministic security layer is the PreToolUse hook `dev-guard`, wired in its own dedicated `Bash`-only PreToolUse entry in `.claude-plugin/hooks.json` — the marketplace plugin's runtime, the only Claude Code install path (the Go installer's CC path is retired; `hooks/config.json`, its per-OS wiring template, no longer exists). The entry runs `hooks/run-ts-hook.sh dev-guard`, a fail-closed launcher with no gate logic of its own that execs `node` against `hooks/ts/dist/dev-guard.cjs` — TypeScript is the single source of gate logic, shared with the opencode runtime. `policy-block` is in a separate entry with matcher `Bash|Write|Edit|NotebookEdit` so it continues to secret-scan write/edit content — dev-guard never fires on Edit/Write/NotebookEdit. This is the GUARANTEE — not the disposition.
 
 The gate fires UNCONDITIONALLY for covered outward actions. No filesystem marker is read; no session state is checked.
 
@@ -34,7 +34,7 @@ The gate fires UNCONDITIONALLY for covered outward actions. No filesystem marker
 
 **No authorisation file.** A file that the agent can write with `echo authorized > ...` is forgeable by the same subject the gate protects — it is not a control. The authorisation is `ask` (human), not a file.
 
-**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc is a known limit of any string-matching gate (parity with `policy-block.sh`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates.
+**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates.
 
 ---
 
@@ -49,7 +49,7 @@ This condition is satisfied in every normal CC session. No separate activation s
 
 **Prohibited case:** executing orchestration inline is PROHIBITED only when the top-level agent is itself running as a subagent inside another orchestrator. In that case, the nested-handoff/takeover machinery in `docs/subagent-orchestration.md` is the FALLBACK (opencode/legacy path).
 
-**Previous framing (retired):** before v2.89.0, SEC-DR-2 required `~/.claude/.dev-mode-active` to contain `dev_mode: true`. That observable was retired when the foundational premise (nested orchestrator loses `Task`) was disproven by the M1 empirical probe. The gate — `hooks/dev-guard.sh` — is now unconditional.
+**Previous framing (retired):** before v2.89.0, SEC-DR-2 required `~/.claude/.dev-mode-active` to contain `dev_mode: true`. That observable was retired when the foundational premise (nested orchestrator loses `Task`) was disproven by the M1 empirical probe. The gate — `dev-guard` — is now unconditional.
 
 ---
 
@@ -66,14 +66,14 @@ The Claude Code docs describe this flag precisely: *"Custom output styles leave 
 This distinction is load-bearing:
 - **What is discarded:** SWE WORKFLOW guidance (how to scope, comment, verify). This is disposition of process, NOT a security control. Its absence degrades workflow tidiness, not safety. The orchestrator contract loaded by the style replaces this guidance with a more explicit version: the SDD pipeline IS scoping + verification.
 - **What is NOT discarded:** The model's harm-rejection and safety layer ("what Claude knows" — Anthropic's constitutional training). An output style adjusts the system prompt; it does NOT disarm the model's refusal to produce harmful outputs, exfiltrate data, or follow malicious instructions. That layer does not live in the "software engineering instructions" block.
-- **Security floors are PROMPT-INDEPENDENT (hooks, not prompt):** the security guarantees of this harness are PreToolUse hooks wired by matcher — they fire regardless of which system prompt is active. The enumerated catalogue (Bash-command gates + the new MCP-write gate) is:
-  - `hooks/policy-block.sh` — matcher `Bash|Write|Edit|NotebookEdit`. Blocks `rm -rf / ~ $HOME`, `git push --force`, `git reset --hard`, `git clean -f`, `--no-verify`, destructive SQL, and writes to sensitive file paths (`.env`, `.pem`, `.ssh/`, credentials). Survives the output-style swap intact.
-  - `hooks/dev-guard.sh` — two dedicated PreToolUse entries: (a) `Bash`-only: gates outward/mutating Bash actions unconditionally (git push, gh pr merge/review/comment, gh api mutating PR endpoints, curl/wget to api.github.com; see § Outward-Action Gate); (b) `mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`: gates ClickUp MCP outward writes unconditionally — issues `ask` on any write. Both entries survive the output-style swap intact.
-  - `hooks/checkpoint-guard.sh` — matcher `Task`. Gates phase dispatch at reasoning-checkpoint boundaries. Survives intact.
+- **Security floors are PROMPT-INDEPENDENT (hooks, not prompt):** the security guarantees of this harness are PreToolUse hooks wired by matcher — they fire regardless of which system prompt is active. Every gate below runs through `hooks/run-ts-hook.sh <name>`, a fail-closed launcher that execs `node` against the matching `hooks/ts/dist/<name>.cjs` bundle (TypeScript is the single source of gate logic for CC and opencode). The enumerated catalogue (Bash-command gates + the MCP-write gate) is:
+  - `policy-block` — matcher `Bash|Write|Edit|NotebookEdit`. Blocks `rm -rf / ~ $HOME`, `git push --force`, `git reset --hard`, `git clean -f`, `--no-verify`, destructive SQL, and writes to sensitive file paths (`.env`, `.pem`, `.ssh/`, credentials). Survives the output-style swap intact.
+  - `dev-guard` — two dedicated PreToolUse entries: (a) `Bash`-only: gates outward/mutating Bash actions unconditionally (git push, gh pr merge/review/comment, gh api mutating PR endpoints, curl/wget to api.github.com; see § Outward-Action Gate); (b) `mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`: gates ClickUp MCP outward writes unconditionally — issues `ask` on any write. Both entries survive the output-style swap intact.
+  - `checkpoint-guard` — matcher `Task`. Gates phase dispatch at reasoning-checkpoint boundaries. Survives intact.
 
 **Conclusion:** `keep-coding-instructions: false` is safe for this harness because the security floors are hooks, not prompt. No security-relevant default lives exclusively in the discarded SWE instructions that the orchestrator contract + hooks do not re-establish.
 
-**Default-on disposition (v2.89.0+):** The `SessionStart` hook (`hooks/session-start.sh`) fires an orchestrator disposition directive at every session start — no marker needed. Operators can optionally select the `developer-mode` output style via `/config` → Output style → `developer-mode` for the strong base-replacement (`keep-coding-instructions: false`).
+**Default-on disposition (v2.89.0+):** The `SessionStart` hook (`session-start`, run via `hooks/run-ts-hook.sh session-start`) fires an orchestrator disposition directive at every session start — no marker needed. Operators can optionally select the `developer-mode` output style via `/config` → Output style → `developer-mode` for the strong base-replacement (`keep-coding-instructions: false`).
 
 **`force-for-plugin` is NOT set** on the `developer-mode` output style — it is never applied automatically via the plugin mechanism. The output style is an opt-in strong floor. `force-for-plugin` is intentionally omitted to preserve the per-operator escape hatch.
 
@@ -103,7 +103,7 @@ The general agent's default disposition ("be helpful / make progress") is replac
 
 ## Reasoning Checkpoint Promotion
 
-In standard mode (orchestrator as subagent, `Task` stripped on opencode path), only the Layer-2 self-check (orchestrator's own contract discipline) enforces the reasoning checkpoint at boundaries B1/B2/B3. The Layer-1 hook (`hooks/checkpoint-guard.sh`, `PreToolUse`/matcher `Task`) never fires because there is no `Task` call to intercept.
+In standard mode (orchestrator as subagent, `Task` stripped on opencode path), only the Layer-2 self-check (orchestrator's own contract discipline) enforces the reasoning checkpoint at boundaries B1/B2/B3. The Layer-1 hook (`checkpoint-guard`, `PreToolUse`/matcher `Task`) never fires because there is no `Task` call to intercept.
 
 On the CC foreground path (top-level, `Task` available), the Layer-1 hook fires on every leaf dispatch. B1/B2/B3 are enforced by a harness-level deterministic floor, not just the orchestrator's own discipline. This is a strengthening of the checkpoint. Security floors remain independent of the checkpoint state in both modes (see `docs/reasoning-checkpoint.md § Enforcement`).
 
@@ -133,7 +133,7 @@ The review-mode hard gates (merged in #251/#252) and the outward-action gate add
 | Approval mechanism | Preview-and-confirm, `--auto-publish` opt-in | `permissionDecision: "ask"` (human out-of-band, agent cannot auto-approve) | MIRRORS preview-and-confirm |
 | Coverage | `gh pr review`, `POST /reviews`, replies, dismiss | by DESTINATION: push to remote; `pulls/.../merge|reviews|comments` via any binary | SUPERSET of #252 vocabulary |
 
-The gate does NOT re-implement the review-mode publish gate. It reinforces it with a floor that the agent cannot rationalise through. Where #252 covers review-mode at prompt level, `dev-guard.sh` covers at hook level — and by extension it also protects the "top-level inline execution" site that #252 identified as the highest-risk gap. See `agents/ref-direct-modes.md § Publish Gate` for the review-mode contract.
+The gate does NOT re-implement the review-mode publish gate. It reinforces it with a floor that the agent cannot rationalise through. Where #252 covers review-mode at prompt level, `dev-guard` covers at hook level — and by extension it also protects the "top-level inline execution" site that #252 identified as the highest-risk gap. See `agents/ref-direct-modes.md § Publish Gate` for the review-mode contract.
 
 ---
 

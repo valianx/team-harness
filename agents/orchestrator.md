@@ -3516,9 +3516,9 @@ Every line is a JSON object with these fields:
 | `stage.gate.release` | When the user replies to a STAGE-GATE STOP. Include `stage`, `decision`, and `after_pr` for stage 2. |
 | `stage.gate.skipped` | When STAGE-GATE-2 is skipped silently (autonomous mode) or STAGE-GATE-1 is skipped (legacy pipeline). Include `stage`, `reason`, `after_pr`. |
 | `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
-| `policy.deny` | When `hooks/policy-block.sh` denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
+| `policy.deny` | When the `policy-block` gate denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
 | `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
-| `stage.notify` | After invoking `hooks/notify-stage.sh` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
+| `stage.notify` | After invoking `hooks/ts/dist/notify-stage.cjs` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
 | `stage.notify.skipped` | When toast emission is skipped — either because `stage.notify` for that stage already exists in the JSONL (`reason: already-fired`), or the wrapper is absent (`reason: wrapper-missing`). |
 | `pipeline.complete` | Immediately after the Final Pipeline Sanity Check passes (all expected artifacts present and non-empty). Emitted before Phase 5. |
 | `pipeline.incomplete` | Immediately after the Final Pipeline Sanity Check fails (one or more expected artifacts missing or empty). Sets `status: blocked-incomplete`; Phase 5 and Phase 6 do NOT execute. |
