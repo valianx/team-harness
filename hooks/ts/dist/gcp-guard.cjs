@@ -229,11 +229,9 @@ function classifySegment(segment) {
 function evaluate(input) {
   const toolName = input.tool?.name ?? "";
   if (toolName !== "Bash") return none();
-  const cmd = typeof input.tool?.input?.["command"] === "string" ? input.tool.input["command"] : "";
-  if (!cmd.includes("gcloud")) {
-    return none();
-  }
-  if (!cmd && input.tool?.input?.["command"] === null) {
+  const cmdRaw = input.tool?.input?.["command"];
+  const cmd = typeof cmdRaw === "string" ? cmdRaw : null;
+  if (cmd === null) {
     const rawRepr = JSON.stringify(input.tool?.input ?? {});
     if (RAW_CATASTROPHIC_RE.test(rawRepr)) {
       return deny(
@@ -245,6 +243,9 @@ function evaluate(input) {
         "gcp-guard: destructive gcloud verb detected in unparseable payload \u2014 operation requires explicit operator approval; irreversible, cannot be undone (gcp-guard.ts)"
       );
     }
+    return none();
+  }
+  if (!cmd.includes("gcloud")) {
     return none();
   }
   const segments = cmd.split(/[;&|\n]+/).map((s) => s.trim()).filter(Boolean);

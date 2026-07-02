@@ -375,6 +375,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Case 11 — SEC-PR2-002: command field absent (well-formed JSON, malformed
+# tool_input shape) but a catastrophic verb present elsewhere in tool_input
+# -> DENY. Regression test for the Step-5 raw-catastrophic-scan fail-safe,
+# which was dead code before the fix (an absent command field produced ""
+# rather than null, short-circuiting to none() before Step 5 could run).
+# ---------------------------------------------------------------------------
+echo
+echo "=== Case 11: command field absent + 'projects delete' in raw payload -> DENY (SEC-PR2-002 fail-safe) ==="
+_case11_payload='{"tool_name":"Bash","tool_input":{"raw_input":"gcloud projects delete my-dangerous-project"}}'
+assert_deny \
+    "command absent, catastrophic verb elsewhere in tool_input -> deny (fail-safe reachable)" \
+    "$_case11_payload"
+
+echo
+echo "=== Case 11b: command field absent + no gcloud token anywhere -> NODECISION (fail-safe does not over-trigger) ==="
+_case11b_payload='{"tool_name":"Bash","tool_input":{"raw_input":"echo hello world"}}'
+assert_nodecision \
+    "command absent, no gcloud token -> nodecision" \
+    "$_case11b_payload"
+
+# ---------------------------------------------------------------------------
 # Additional contract validations
 # ---------------------------------------------------------------------------
 

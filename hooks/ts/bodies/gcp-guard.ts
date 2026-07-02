@@ -135,28 +135,19 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
   const toolName = input.tool?.name ?? "";
   if (toolName !== "Bash") return none();
 
-  const cmd = typeof input.tool?.input?.["command"] === "string"
-    ? (input.tool.input["command"] as string)
-    : "";
-
-  // No gcloud token at all → fast-exit.
-  if (!cmd.includes("gcloud")) {
-    return none();
-  }
-
-  // If extraction failed (cmd is empty) but we know gcloud is in the raw payload,
-  // this would have been caught above. If cmd is empty, it means the tool wasn't Bash
-  // or had no command — already handled.
+  // Extract command from tool.input.command (absent/non-string → null, never
+  // an empty string) — mirrors dev-guard.ts's cmdStr derivation so an absent
+  // field routes to the raw-payload fail-safe below instead of short-circuiting.
+  const cmdRaw = input.tool?.input?.["command"];
+  const cmd = typeof cmdRaw === "string" ? cmdRaw : null;
 
   // ---------------------------------------------------------------------------
-  // Step 5 — Fail-safe path: if cmd is empty but "gcloud" appears (from extraction
-  // failure scenarios). In the TS path, cmd is always from the parsed payload,
-  // so if cmd has content, we use it directly. If cmd is empty here, it means
-  // the raw payload contained gcloud but cmd was missing — scan raw input.
+  // Step 5 — Fail-safe path: command field absent or non-string. Scan the raw
+  // payload representation for catastrophic/destructive tokens before giving
+  // up — a malformed payload must never silently defer past a catastrophic
+  // gcloud verb just because the structured command could not be extracted.
   // ---------------------------------------------------------------------------
-  if (!cmd && input.tool?.input?.["command"] === null) {
-    // This branch handles the case where command field is absent (null from shim).
-    // The gate should scan raw input representation.
+  if (cmd === null) {
     const rawRepr = JSON.stringify(input.tool?.input ?? {});
     if (RAW_CATASTROPHIC_RE.test(rawRepr)) {
       return deny(
@@ -168,6 +159,11 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
         "gcp-guard: destructive gcloud verb detected in unparseable payload — operation requires explicit operator approval; irreversible, cannot be undone (gcp-guard.ts)"
       );
     }
+    return none();
+  }
+
+  // No gcloud token at all → fast-exit.
+  if (!cmd.includes("gcloud")) {
     return none();
   }
 
