@@ -106,6 +106,23 @@ The orchestrator routes to the `delivery` agent in `release-mode`, which:
 
 ---
 
+## Step 3 — Create and push the release tag (post-merge)
+
+Once the operator merges the `release/v{X.Y.Z}` PR into `main`, create and push the release tag:
+
+```bash
+git checkout main
+git pull origin main
+git tag v{X.Y.Z}
+git push origin v{X.Y.Z}
+```
+
+The `git push` above is an outward action — it is gated by `hooks/dev-guard.sh` like any other push and requires operator approval. `.github/workflows/tag-sync.yml` also watches `main` for changes to `.claude-plugin/plugin.json` and pushes the same tag on its own if this step is skipped, so a forgotten manual tag no longer silently strands the opencode artifact pipeline — but do not rely on the workflow as a substitute for this step; push the tag as part of closing out the release.
+
+Pushing the tag is what feeds the opencode release pipeline: `.github/workflows/release.yml` triggers on `push: tags: ["v*"]` and cross-compiles the install binaries, writes the `VERSION` asset, and publishes the GitHub Release that `bin/update-opencode.sh` checks against.
+
+---
+
 ## Mode — No input provided
 
 When `$ARGUMENTS` is empty, proceed directly to Step 1 (discovery). No feature name is required — the release always aggregates ALL pending `changelog.d/` and `version.d/` work.
@@ -117,5 +134,5 @@ When `$ARGUMENTS` is empty, proceed directly to Step 1 (discovery). No feature n
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly.
 - The `release/vX.Y.Z` branch name is the release-PR discriminator used by `hooks/prepublish-guard.sh`. The guard requires all three version sites bumped and matching the branch version.
 - Do NOT skip the confirmation gate at Step 1e — the operator must confirm before any version change is made.
-- After the PR is merged to `main`, `claude plugin update` will serve the new version to all operators.
-- Output: `release/vX.Y.Z` branch, CHANGELOG.md updated, all three version sites bumped, `changelog.d/` emptied, `version.d/` emptied, PR opened.
+- After the PR is merged to `main`, `claude plugin update` will serve the new version to all operators, and Step 3 above ships the tag that feeds the opencode artifact pipeline (`release.yml`).
+- Output: `release/vX.Y.Z` branch, CHANGELOG.md updated, all three version sites bumped, `changelog.d/` emptied, `version.d/` emptied, PR opened, `vX.Y.Z` tag created and pushed post-merge.
