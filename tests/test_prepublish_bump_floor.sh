@@ -666,6 +666,50 @@ assert_stderr_contains "AC-4: mentions MAJOR" "MAJOR"
 assert_stderr_contains "AC-4: advisory note present" "advisory"
 
 # ---------------------------------------------------------------------------
+# AC-4b (CodeRabbit #6): RENAME agents/rn.md -> docs/rn.md (shipped -> non-
+# shipped) + MINOR delta → MAJOR-candidate WARN; nodecision
+#
+# git records a rename as R<score>\t<src>\t<dst>. The diff parser used to
+# keep only the destination path, so a rename OUT of a shipped path into a
+# non-shipped location (docs/) never matched SHIPPED_PATH_RE and silently
+# skipped the major bump-floor for a removed public surface. This asserts
+# the source side of the rename is also evaluated.
+# ---------------------------------------------------------------------------
+echo
+echo "--- AC-4b (#6): release/v2.108.0 + RENAME agents/rn.md -> docs/rn.md + MINOR delta → MAJOR-candidate WARN ---"
+
+_bare4b=$(_new_tmp)
+_clone4b=$(_new_tmp)
+_make_repo "$_bare4b" "$_clone4b" "2.107.0"
+
+(
+    cd "$_clone4b"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p agents
+    echo "# renamed agent" > agents/rn.md
+    git add agents/rn.md
+    git commit -m "base: add agents/rn.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Release branch: rename the shipped asset OUT of agents/ into docs/
+    # (non-shipped) + MINOR bump (under-bump for a removed public surface).
+    git checkout -b release/v2.108.0 -q 2>/dev/null
+    mkdir -p docs
+    git mv agents/rn.md docs/rn.md
+    _write_plugin_json "2.108.0" .claude-plugin/plugin.json
+    _write_market_json "2.108.0" .claude-plugin/marketplace.json
+    git add .claude-plugin/
+    git commit -m "release: v2.108.0 — rename agents/rn.md to docs/rn.md (minor bump — under-bump for RENAME-OUT)" -q 2>/dev/null
+)
+
+_run_hook "$_clone4b"
+
+assert_nodecision "AC-4b: release/v2.108.0 + RENAME shipped->non-shipped + MINOR delta — stdout empty"
+assert_stderr_contains "AC-4b: MAJOR-candidate WARN present" "WARN"
+assert_stderr_contains "AC-4b: mentions MAJOR" "MAJOR"
+assert_stderr_contains "AC-4b: advisory note present" "advisory"
+
+# ---------------------------------------------------------------------------
 # Suite 15 AC-5: MODIFY hooks/x.sh (M only) + PATCH delta → NO WARN; nodecision
 #
 # Uses a release branch — version bumps only on release/vX.Y.Z in the new model.
