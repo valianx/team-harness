@@ -179,6 +179,8 @@ Note: {one line}
 Thread action: {reply + resolve | reply, left open}
 ```
 
+**Decision-ledger append.** Immediately after emitting the per-comment output above, the orchestrator appends one `disposition` line to `00-decision-ledger.*` for that comment, with `phase: "4.5-review"`, `subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text. The `Decision` value above maps deterministically to the ledger's `accept | watch | reject` vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. See `agents/orchestrator.md § Decision Ledger` for the write mechanics and the full mapping table. This is a ledger-only write — per the anti-redundancy invariant (`docs/observability.md` § "Decision Ledger"), it is never mirrored into `00-execution-events`.
+
 ## Step 6 — Reply and resolve on the thread
 
 After producing the per-comment output (Step 5), act on each inline review

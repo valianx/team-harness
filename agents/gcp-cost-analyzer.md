@@ -817,6 +817,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: gcp-cost-analyzer
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/00-gcp-costs.md
 summary: {1-2 sentences: N projects analyzed, total monthly spend ${N}, potential savings ${N}/mo, top finding}
 context7_consult: hit:N miss:N skipped:N

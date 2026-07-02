@@ -168,6 +168,7 @@ No workspaces with AC found for this PR. QA validation skipped.
 ```
 agent: qa
 status: success | failed | blocked
+model: {effective-model-id}
 mode: pr-review-qa
 output: .claude/pr-review-qa.md
 qa_status: pass | fail | partial | skipped-no-ac
@@ -501,6 +502,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: qa
 mode: validate | pr-review-qa | docs-validation | review
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/04-validation.md
 summary: {1-2 sentences: N/N AC passed, any critical findings}
 sketches_read: [sketches/api-contract.md, ...]  # list every sketches/*.md read; [] when none present

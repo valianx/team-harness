@@ -106,6 +106,7 @@ When the design introduces or modifies a control path, a safety enforcement mech
 ```
 agent: security
 status: success | failed | blocked
+model: {effective-model-id}
 mode: design-review
 security_design_verdict: clean | risks-found
 output: workspaces/{feature-name}/01-plan.md (Security Assessment section + ## Plan Review sub-verdict)
@@ -186,6 +187,7 @@ No security findings in the scanned diff and changed files.
 ```
 agent: security
 status: success | failed | blocked
+model: {effective-model-id}
 mode: pr-review-security
 output: .claude/pr-review-security.md
 summary: {N critical, M high findings, or "no findings"}
@@ -888,6 +890,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: security
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/04-security.md
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}
 context7_consult: hit:N miss:N skipped:M

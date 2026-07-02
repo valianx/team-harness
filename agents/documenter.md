@@ -253,6 +253,7 @@ End every run with a status block:
 ```
 agent: documenter
 status: success | blocked | failed
+model: {effective-model-id}
 output: workspaces/{feature-name}/02-documentation.md
 vault_path: {vault path used}
 folder: {folder name}

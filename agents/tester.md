@@ -137,6 +137,7 @@ If existing tests fail because of the new test, your test is leaking state. Fix 
 agent: tester
 mode: pre-fix-regression
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/02-regression-test.md
 regression_test_path: {test-file-path}
 regression_test_status: failing
@@ -183,6 +184,7 @@ If newly authored tests fail, diagnose and fix the tests before returning (max 3
 agent: tester
 mode: authoring
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/03-testing.md
 summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
 tests_count: {N}
@@ -870,6 +872,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: tester
 mode: default | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
 summary: {1-2 sentences: N tests, N passed, N failed, coverage %}
 warranted_types: [browser-mode, a11y]   # final warranted type tokens from Phase 0 step 3b; [] when none apply

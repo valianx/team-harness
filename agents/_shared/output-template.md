@@ -57,6 +57,25 @@ These skills surface internal pipeline state because the operator explicitly
 requested it. The narration lint (`tests/test_agent_structure.py` Suite 31)
 does not scan them.
 
+## Status block — common fields
+
+<!-- Consumed by: every leaf agent's Return Protocol status-block template. -->
+
+Every leaf agent's final status block declares its effective model on the line immediately after `status:`:
+
+```
+agent: {name}
+status: success | failed | blocked
+model: {effective-model-id}
+effort: {effective-effort-level}   # optional — include when known
+...
+```
+
+- **`model:`** — mandatory. The literal model ID the agent ran under for this dispatch (e.g. `claude-opus-4-6`, `claude-sonnet-5`), not the frontmatter default. The agent is the only party that reliably knows its effective model, particularly under a session model override (see `agents/orchestrator.md` § "Session model override") — the orchestrator cannot infer it after the fact.
+- **`effort:`** — optional. Include the line when the agent's effective reasoning-effort level is known (e.g. from its own frontmatter or an explicit override); omit the line entirely otherwise. Do not emit `effort: unknown` — omission is the "unknown" signal.
+
+The orchestrator propagates both fields verbatim onto the corresponding `phase.end` event, following the same mechanism already used for the `tools` field (see `agents/orchestrator.md` events schema). Downstream cost classification (`docs/observability.md`, `skills/trace/SKILL.md`) prefers `event.model` over frontmatter-derived inference when the field is present.
+
 ## How to reference this file
 
 In your agent or skill, add a short `## Output Discipline` section that

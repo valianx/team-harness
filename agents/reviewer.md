@@ -669,6 +669,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: reviewer
 status: success | failed | blocked
+model: {effective-model-id}
 mode: fresh
 output: inline
 decision: APPROVE | CHANGES_REQUESTED
@@ -722,6 +723,7 @@ issues: {lista de problemas criticos, o "ninguno"}
 ```
 agent: reviewer
 status: success | failed | blocked
+model: {effective-model-id}
 mode: update-body
 output: inline
 summary: Updated review summary for PR #{number}
@@ -741,6 +743,7 @@ review_body: |
 ```
 agent: reviewer
 status: success | failed | blocked
+model: {effective-model-id}
 mode: reply
 output: inline
 thread_id: {comment_id}
@@ -756,6 +759,7 @@ reply_body: |
 ```
 agent: reviewer
 status: success | failed | blocked
+model: {effective-model-id}
 mode: internal
 output: workspaces/{feature-name}/04-internal-review.md
 summary: |

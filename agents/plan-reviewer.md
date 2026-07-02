@@ -676,6 +676,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: plan-reviewer
 status: success | failed | blocked
+model: {effective-model-id}
 verdict: pass | concerns | fail
 output: workspaces/{feature-name}/01-plan.md § Plan Review
 summary: {1-2 sentences: verdict + most relevant finding, or "plan-shape OK"}

@@ -30754,6 +30754,36 @@ check(
 
 # Marker: dispatch-disambiguation
 
+# --- Leaf-agent status blocks declare `model:` (observability R1, issue #451) ---
+#
+# Every leaf agent with a Return Protocol must declare `model: {effective-model-id}`
+# in its status-block template — see `agents/_shared/output-template.md` §
+# "Status block — common fields". The universe is every `agents/*.md` file EXCEPT
+# `orchestrator.md`, `README.md`, and the `ref-*.md` reference docs (those hold
+# cross-cutting routing tables and shared flow contracts, not a single agent's own
+# Return Protocol).
+_MODEL_LINE = "model: {effective-model-id}"
+_leaf_agent_files = sorted(
+    p for p in AGENTS_DIR.glob("*.md")
+    if p.name not in {"orchestrator.md", "README.md"} and not p.name.startswith("ref-")
+)
+check(
+    "leaf-agent universe for the model: check has the expected size (26 agents)",
+    len(_leaf_agent_files) == 26,
+    f"found {len(_leaf_agent_files)} agents/*.md files eligible (excluding orchestrator/README/ref-*) "
+    "— update this count if an agent was added or removed",
+)
+for _agent_path in _leaf_agent_files:
+    _agent_src = read(_agent_path)
+    if "Return Protocol" not in _agent_src:
+        continue
+    check(
+        f"agents/{_agent_path.name}: status-block template declares `model:` line",
+        _MODEL_LINE in _agent_src,
+        "agents/_shared/output-template.md § \"Status block — common fields\" requires "
+        "every leaf agent's Return Protocol to include `model: {effective-model-id}`",
+    )
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

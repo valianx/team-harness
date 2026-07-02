@@ -291,6 +291,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: d2-diagrammer
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature}/diagram.d2
 svg: workspaces/{feature}/diagram.svg
 render: done | skipped   # obsidian mode only; omit in local mode
