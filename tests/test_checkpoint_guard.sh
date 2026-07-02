@@ -114,8 +114,14 @@ assert_allow() {
 # Payloads
 # ---------------------------------------------------------------------------
 
-ARCHITECT_PAYLOAD='{"subagent_type":"th:architect","prompt":"plan this"}'
-IMPLEMENTER_PAYLOAD='{"subagent_type":"th:implementer","prompt":"implement this"}'
+# Realistic Claude Code PreToolUse Task payload shape: subagent_type is a Task
+# tool argument, so it lives under tool_input — not at the payload root. The
+# oracle previously read the root (matching only these fixtures, not real CC
+# traffic); both the oracle and these fixtures were corrected together to the
+# nested shape so boundary B1 actually fires in production (T6c, [CONSTRAINT-
+# DISCOVERED] resolution, option a).
+ARCHITECT_PAYLOAD='{"tool_name":"Task","tool_input":{"subagent_type":"th:architect","prompt":"plan this"}}'
+IMPLEMENTER_PAYLOAD='{"tool_name":"Task","tool_input":{"subagent_type":"th:implementer","prompt":"implement this"}}'
 
 # ---------------------------------------------------------------------------
 # Case 1 — DENY: checkpoint armed, both conditions missing

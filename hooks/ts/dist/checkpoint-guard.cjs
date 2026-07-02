@@ -183,7 +183,7 @@ function outboundCC(d) {
 
 // bodies/checkpoint-guard.ts
 function allow() {
-  return { decision: "none", reason: "", mutations: null };
+  return { decision: "allow", reason: "", mutations: null };
 }
 function deny(reason) {
   return { decision: "deny", reason, mutations: null };

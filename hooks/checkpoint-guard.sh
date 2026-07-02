@@ -45,6 +45,12 @@ input="$(cat)"
 
 # ---------------------------------------------------------------------------
 # Step 2 — Extract subagent_type from the JSON payload.
+#
+# subagent_type is a Task tool ARGUMENT, so in Claude Code's real PreToolUse
+# payload it lives under tool_input.subagent_type — not at the payload root
+# (code.claude.com/docs/en/hooks-guide: PreToolUse tool arguments travel in
+# tool_input). Reading the root only matched a flat test fixture, never a
+# real CC payload — corrected together with the fixtures (T6c).
 # ---------------------------------------------------------------------------
 
 # Strict line-level extraction: look for "subagent_type" key, take its value.
@@ -55,12 +61,17 @@ if command -v python3 >/dev/null 2>&1; then
 import json, sys
 try:
     data = json.loads(sys.stdin.read())
-    print(data.get('subagent_type', ''))
+    tool_input = data.get('tool_input', {})
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    print(tool_input.get('subagent_type', ''))
 except Exception:
     print('')
 " <<< "$input" 2>/dev/null || true)
 else
-    # Fallback: minimal grep-based extraction (conservative — only exact key match).
+    # Fallback: minimal grep-based extraction (conservative — only exact key
+    # match). Not JSON-structure-aware, so it matches "subagent_type" anywhere
+    # in the payload regardless of nesting — already tool_input-agnostic.
     subagent_type=$(printf '%s' "$input" | grep -o '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"subagent_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
 fi
 
