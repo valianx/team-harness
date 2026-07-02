@@ -22,7 +22,7 @@ async function main(): Promise<void> {
 
   try {
     const normalized = inboundCC(raw);
-    const decision = evaluate(normalized);
+    const decision = evaluate(normalized, raw);
     outboundCC(decision);
   } catch (err) {
     if (err instanceof ShimRejectError) {

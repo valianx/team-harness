@@ -12,6 +12,11 @@
 #     an unreachable workspace path, and an oversize (SEC-07) payload all
 #     fail open — exit 0, empty stdout, no crash, dispatch never blocked.
 #
+# Also asserts (Section 4, T6c): hooks/ts/dist/subagent-trace.cjs (the
+# STOP-side twin, SubagentStop) writes its breadcrumb even under
+# TH_HOOK_PROFILE=minimal — the breadcrumb is non-suppressible, matching the
+# Bash oracle hooks/subagent-trace.sh (which has no profile gate at all).
+#
 # Usage: bash tests/test_subagent_start.sh
 # Exit code: 0 all cases pass, 1 otherwise.
 
@@ -188,6 +193,51 @@ assert_true "oversize payload exits 0 (SEC-07 reject, fail-open)" "$r"
 assert_true "oversize payload emits no stdout" "$r"
 [ ! -f "$TRACE_FILE" ] && r=1 || r=0
 assert_true "oversize payload does NOT write the trace file" "$r"
+
+# ---------------------------------------------------------------------------
+# Section 4 — regression: subagent-trace.cjs (SubagentStop, the STOP-side
+# twin of this hook) breadcrumb is NON-SUPPRESSIBLE under
+# TH_HOOK_PROFILE=minimal (T6c). The Bash oracle (hooks/subagent-trace.sh)
+# has no hook-profile gate at all — the breadcrumb must fire unconditionally,
+# same as the start-side hook tested above. See docs/reasoning-checkpoint.md
+# SEC-DR-002/004/005/007.
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Section 4: subagent-trace.cjs non-suppressible under TH_HOOK_PROFILE=minimal ---"
+
+STOP_CJS="$REPO_ROOT/hooks/ts/dist/subagent-trace.cjs"
+
+if [ ! -f "$STOP_CJS" ]; then
+    echo "  [SKIP] subagent-trace.cjs not found at $STOP_CJS — run 'npm --prefix hooks/ts run build:subagent-trace' first."
+else
+    make_stop_payload() {
+        local agent_type="$1"
+        python3 -c "
+import json, sys
+print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.argv[1], 'stop_reason': 'complete'}}))
+" "$agent_type"
+    }
+
+    rm -f "$TRACE_FILE"
+    stop_payload="$(make_stop_payload "th:tester")"
+    out="$(cd "$WORKDIR" && echo "$stop_payload" | TH_HOOK_PROFILE=minimal node "$STOP_CJS" 2>/dev/null)"
+    rc=$?
+
+    [ "$rc" -eq 0 ] && r=1 || r=0
+    assert_true "TH_HOOK_PROFILE=minimal: subagent-trace exits 0" "$r"
+
+    [ -z "$out" ] && r=1 || r=0
+    assert_true "TH_HOOK_PROFILE=minimal: subagent-trace emits no stdout" "$r"
+
+    [ -f "$TRACE_FILE" ] && r=1 || r=0
+    assert_true "TH_HOOK_PROFILE=minimal: subagent-trace STILL writes the breadcrumb (non-suppressible)" "$r"
+
+    if [ -f "$TRACE_FILE" ]; then
+        LINE="$(cat "$TRACE_FILE")"
+        if echo "$LINE" | grep -q '"event":"subagent.stop"'; then r=1; else r=0; fi
+        assert_true "TH_HOOK_PROFILE=minimal: trace line has event=subagent.stop" "$r"
+    fi
+fi
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

@@ -229,12 +229,30 @@ var HIGH_CONFIDENCE_SECRETS = [
   [/\bghp_[A-Za-z0-9]{36}\b/, "GitHub personal access token (ghp_\u2026 pattern)"],
   [/\bgithub_pat_[A-Za-z0-9_]{22,}\b/, "GitHub fine-grained PAT (github_pat_\u2026 pattern)"],
   [/-----BEGIN (?:RSA |EC |OPENSSL |DSA )?PRIVATE KEY-----/, "PEM private key header"],
+  [/\bsk-ant-[A-Za-z0-9_-]{20,}\b/, "Anthropic API key (sk-ant-\u2026 pattern)"],
   [/\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/, "OpenAI-style secret key (sk-\u2026 pattern)"],
   [/\bAIza[0-9A-Za-z_\-]{35}\b/, "Google API key (AIza\u2026 pattern)"],
   [/\b[rs]k_live_[0-9A-Za-z]{16,}\b/, "Stripe live secret key (sk_live_/rk_live_ pattern)"],
   [/\bglpat-[0-9A-Za-z_\-]{20}\b/, "GitLab personal access token (glpat-\u2026 pattern)"],
   [/\bgh[osru]_[A-Za-z0-9]{36}\b/, "GitHub OAuth/server/refresh/user token (gho_/ghs_/ghr_/ghu_ pattern)"],
-  [/\bxoxb-[A-Za-z0-9-]{10,}\b/, "Slack bot token (xoxb-\u2026 pattern)"]
+  [/\bxoxb-[A-Za-z0-9-]{10,}\b/, "Slack bot token (xoxb-\u2026 pattern)"],
+  [/\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/, "SendGrid API key (SG.\u2026 pattern)"],
+  [/\bAC[0-9a-f]{32}\b/, "Twilio account SID (AC\u2026 pattern)"],
+  [/\bSK[0-9a-f]{32}\b/, "Twilio API key SID (SK\u2026 pattern)"]
+];
+var MEDIUM_CONFIDENCE_SECRETS_FIXED = [
+  [
+    /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/,
+    "possible JWT token (eyJ\u2026 three-segment base64url pattern)"
+  ],
+  [
+    /\bBearer\s+[A-Za-z0-9_/+.=-]{20,}\b/,
+    "possible Bearer token (Bearer \u2026 keyword pattern)"
+  ],
+  [
+    /\bsv=[0-9]{4}-[0-9]{2}-[0-9]{2}&[^\s'"]{30,}\b/,
+    "possible Azure SAS token (sv=\u2026 signature pattern)"
+  ]
 ];
 var MEDIUM_CONFIDENCE_PATTERN = /(?:^|[\s\x00-\x1f])(?:\w+_)?(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)\s*[:=]\s*["']?([A-Za-z0-9_/+.]{20,})["']?/gim;
 function shannonEntropy(value) {
@@ -376,6 +394,11 @@ function scanForSecrets(content) {
       return deny(`high-confidence secret detected: ${label}`);
     }
   }
+  for (const [pattern, label] of MEDIUM_CONFIDENCE_SECRETS_FIXED) {
+    if (pattern.test(content)) {
+      return ask(`possible secret detected: ${label}`);
+    }
+  }
   MEDIUM_CONFIDENCE_PATTERN.lastIndex = 0;
   let match;
   while ((match = MEDIUM_CONFIDENCE_PATTERN.exec(content)) !== null) {
@@ -400,7 +423,8 @@ function evaluate(input) {
     if (checkNoVerifyTokenized(cmd)) {
       return deny("--no-verify (bypasses pre-commit hooks)");
     }
-    if (/\bgit\s+commit\b/.test(cmd)) {
+    const shouldScanBash = /\bgit\s+commit\b/.test(cmd) || /\bcurl\b.*--data(?:-[a-z]+)?\b/i.test(cmd) || /\bwget\b.*--post-(?:data|file)\b/i.test(cmd) || /\btee\b/.test(cmd) || /\bexport\s+\w+\s*=/.test(cmd) || /\benv\s+\w+=/.test(cmd);
+    if (shouldScanBash) {
       const secretDecision = scanForSecrets(cmd);
       if (secretDecision !== null) return secretDecision;
     }
@@ -457,6 +481,13 @@ function evaluate(input) {
 }
 
 // entry/policy-block.cc.ts
+var PARSE_FAILURE_MESSAGES = [
+  "SEC-07: payload is not valid JSON",
+  "SEC-07: payload must be a JSON object"
+];
+function isParseFailure(err) {
+  return PARSE_FAILURE_MESSAGES.some((msg) => err.message === msg);
+}
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) {
@@ -471,7 +502,9 @@ async function main() {
     const decision = evaluate(normalized);
     outboundCC(decision);
   } catch (err) {
-    if (err instanceof ShimRejectError) {
+    if (err instanceof ShimRejectError && isParseFailure(err)) {
+      outboundCC({ decision: "none", reason: "", mutations: null });
+    } else if (err instanceof ShimRejectError) {
       const fallback = {
         decision: "ask",
         reason: "policy-block: payload failed shim validation (size/depth/pollution guard) \u2014 cannot evaluate safety. Manual review required before proceeding (policy-block.cc.ts SEC-07).",

@@ -165,34 +165,12 @@ function inboundCC(raw) {
   return buildNormalized(mapped, "claude-code");
 }
 
-// bodies/hook-profile.ts
-function getHookProfile() {
-  const val = (typeof process !== "undefined" ? process.env["TH_HOOK_PROFILE"] : void 0) ?? "";
-  if (val === "minimal" || val === "standard" || val === "strict") {
-    return val;
-  }
-  return "standard";
-}
-function observabilityEnabled(cls) {
-  const profile = getHookProfile();
-  if (profile === "minimal") {
-    if (cls === "idle-notify" || cls === "pipeline-observability") {
-      return false;
-    }
-    return true;
-  }
-  return true;
-}
-
 // bodies/subagent-trace.ts
 var TRACE_FILENAME = "00-subagent-trace.jsonl";
 function isTHAgent(agentType) {
   return agentType.startsWith("th:");
 }
 function writeTrace(input, writer) {
-  if (!observabilityEnabled("pipeline-observability")) {
-    return null;
-  }
   const agentType = typeof input.tool?.input?.["agent_type"] === "string" ? input.tool.input["agent_type"] : "";
   if (!agentType || !isTHAgent(agentType)) {
     return null;

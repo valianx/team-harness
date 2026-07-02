@@ -275,7 +275,12 @@ async function main() {
     const output = evaluateSessionStart(normalized, reader);
     if (output.additionalContext !== null) {
       process.stdout.write(
-        JSON.stringify({ additionalContext: output.additionalContext }) + "\n"
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: output.additionalContext
+          }
+        }) + "\n"
       );
     }
   } catch (err) {

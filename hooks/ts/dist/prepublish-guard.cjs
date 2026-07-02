@@ -191,79 +191,245 @@ function none() {
 }
 var GIT_PUSH_RE = /(^|[\s|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)/;
 var GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
-var CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
+var SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
+var RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
+var FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
+var MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
+var CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
+var OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
+var CONTROL_CHAR_RE = /[\x00-\x09\x0b-\x1f\x7f]/;
+function semverDelta(oldVer, newVer) {
+  const SEMVER_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
+  if (!SEMVER_RE.test(oldVer) || !SEMVER_RE.test(newVer)) return "unknown";
+  const [oM, oMin, oP] = oldVer.split(".").map(Number);
+  const [nM, nMin, nP] = newVer.split(".").map(Number);
+  if (nM > oM) return "major";
+  if (nM === oM && nMin > oMin) return "minor";
+  if (nM === oM && nMin === oMin && nP > oP) return "patch";
+  if (nM === oM && nMin === oMin && nP === oP) return "none";
+  return "unknown";
+}
+function rankOf(level) {
+  switch (level) {
+    case "none":
+      return 0;
+    case "patch":
+      return 1;
+    case "minor":
+      return 2;
+    case "major":
+      return 3;
+    default:
+      return -1;
+  }
+}
+function extractJsonVersion(content) {
+  if (!content) return "";
+  try {
+    const obj = JSON.parse(content);
+    return typeof obj["version"] === "string" ? obj["version"] : "";
+  } catch {
+    return "";
+  }
+}
+function extractMarketVersion(content) {
+  if (!content) return "";
+  try {
+    const obj = JSON.parse(content);
+    const plugins = obj["plugins"];
+    if (Array.isArray(plugins) && plugins.length > 0) {
+      const first = plugins[0];
+      return typeof first["version"] === "string" ? first["version"] : "";
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+function extractClaudeVersion(content) {
+  if (!content) return "";
+  const m = CLAUDE_VERSION_RE.exec(content);
+  return m ? m[1] : "";
+}
+function isBumped(head, origin) {
+  if (head && origin) return head !== origin;
+  if (head && !origin) return true;
+  return false;
+}
+function readVersionSites(reader) {
+  const pluginHead = extractJsonVersion(reader.readFile(".claude-plugin/plugin.json"));
+  const marketHead = extractMarketVersion(reader.readFile(".claude-plugin/marketplace.json"));
+  const claudeHead = extractClaudeVersion(reader.readFile("CLAUDE.md"));
+  const pluginOrigin = extractJsonVersion(reader.gitShow("origin/main:.claude-plugin/plugin.json"));
+  const marketOrigin = extractMarketVersion(reader.gitShow("origin/main:.claude-plugin/marketplace.json"));
+  const claudeOrigin = extractClaudeVersion(reader.gitShow("origin/main:CLAUDE.md"));
+  return {
+    pluginHead,
+    pluginOrigin,
+    pluginBumped: isBumped(pluginHead, pluginOrigin),
+    marketHead,
+    marketOrigin,
+    marketBumped: isBumped(marketHead, marketOrigin),
+    claudeHead,
+    claudeOrigin,
+    claudeBumped: isBumped(claudeHead, claudeOrigin)
+  };
+}
+function resolveBranch(reader) {
+  const raw = reader.gitCurrentBranch();
+  if (raw === null) return null;
+  const branch = CONTROL_CHAR_RE.test(raw) ? "__invalid__" : raw;
+  const m = RELEASE_BRANCH_RE.exec(branch);
+  return m ? { isRelease: true, version: m[1] } : { isRelease: false, version: "" };
+}
+function deriveFloor(changed) {
+  let sawAdded = false;
+  let sawRemovedOrRenamed = false;
+  let sawModified = false;
+  for (const { status, path: path2 } of changed) {
+    if (!SHIPPED_PATH_RE.test(path2)) continue;
+    const kind = status.charAt(0);
+    if (kind === "A") sawAdded = true;
+    else if (kind === "D" || kind === "R") sawRemovedOrRenamed = true;
+    else sawModified = true;
+  }
+  if (sawRemovedOrRenamed) return "major";
+  if (sawAdded) return "minor";
+  if (sawModified) return "patch";
+  return "none";
+}
+function hasFragmentOrMarker(changed) {
+  return changed.some((c) => FRAGMENT_RE.test(c.path) || MARKER_RE.test(c.path));
+}
+function findOverrideToken(reader) {
+  let src = "";
+  const commitMsg = reader.readEnv("GIT_COMMIT_MSG");
+  if (commitMsg) src += commitMsg;
+  const count = parseInt(reader.readEnv("GIT_PUSH_OPTION_COUNT") ?? "0", 10);
+  if (Number.isFinite(count) && count > 0) {
+    for (let i = 0; i < count; i++) {
+      const opt = reader.readEnv(`GIT_PUSH_OPTION_${i}`);
+      if (opt) src += `
+${opt}`;
+    }
+  }
+  if (!src) return false;
+  if (CONTROL_CHAR_RE.test(src)) {
+    reader.warn(
+      "prepublish-guard: bump-override source contains control characters; treating as absent (SEC-DR-A). Over-bump check proceeds."
+    );
+    return false;
+  }
+  return OVERRIDE_TOKEN_RE.test(src);
+}
+function runNoAssetAdvisory(reader, pluginOrigin, pluginHead) {
+  if (!pluginOrigin || !pluginHead) return;
+  const actual = semverDelta(pluginOrigin, pluginHead);
+  if (actual === "unknown") return;
+  if (rankOf(actual) >= rankOf("minor")) {
+    reader.warn(
+      `prepublish-guard: WARN \u2014 no distributed asset (agents/|skills/|hooks/) changed in this diff, but the version bump is ${actual} (>= MINOR). A docs/tests/CI-only change is typically none or PATCH. Confirm the level is intentional. (advisory; push not blocked)`
+    );
+  }
+}
+function runFeaturePath(reader, changed, sites) {
+  if (sites.pluginBumped || sites.marketBumped || sites.claudeBumped) {
+    return deny(
+      "prepublish-guard: feature branch (non-release/vX.Y.Z) strays a version bump on a version site. Version bumps are reserved for release/vX.Y.Z branches cut by /th:release. Remove the version change or use the release flow. Push blocked."
+    );
+  }
+  if (!hasFragmentOrMarker(changed)) {
+    return deny(
+      "prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but neither a changelog.d/ fragment nor a version.d/ marker was found in the diff. Write a changelog.d/{pr-slug}.md fragment (for user-visible changes) or a version.d/{pr-slug}.bump marker (for internal consumer-received changes with no changelog entry) and re-push. See CLAUDE.md \xA76.3 and agents/delivery.md Step 9. Push blocked."
+    );
+  }
+  return null;
+}
+function runReleasePath(reader, changed, branchVersion, sites) {
+  if (!sites.pluginBumped || !sites.marketBumped) {
+    return deny(
+      "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73), but at least one was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+    );
+  }
+  if (sites.claudeHead && !sites.claudeBumped) {
+    return deny(
+      "prepublish-guard: release branch requires all three version sites bumped (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md \xA73), but CLAUDE.md \xA73 was not changed vs origin/main. Bump all three to the same X.Y.Z matching the branch name and re-push. Push blocked."
+    );
+  }
+  if (branchVersion && sites.pluginHead && sites.pluginHead !== branchVersion) {
+    return deny(
+      `prepublish-guard: release branch is release/v${branchVersion} but .claude-plugin/plugin.json version is '${sites.pluginHead}'. They must match. Update the version files to ${branchVersion} or rename the branch. Push blocked.`
+    );
+  }
+  if (branchVersion && sites.marketHead && sites.marketHead !== branchVersion) {
+    return deny(
+      `prepublish-guard: release branch is release/v${branchVersion} but .claude-plugin/marketplace.json plugins[0].version is '${sites.marketHead}'. They must match. Push blocked.`
+    );
+  }
+  if (branchVersion && sites.claudeHead && sites.claudeHead !== branchVersion) {
+    return deny(
+      `prepublish-guard: release branch is release/v${branchVersion} but CLAUDE.md \xA73 Current version is '${sites.claudeHead}'. All three version sites must match the branch version. Push blocked.`
+    );
+  }
+  return runBumpFloorSubstage(reader, changed, sites.pluginOrigin, sites.pluginHead);
+}
+function warnUnderBump(reader, floor, actual) {
+  if (floor === "major") {
+    reader.warn(
+      `prepublish-guard: WARN \u2014 a shipped asset was DELETED or RENAMED (removed public surface) but the version bump is ${actual}. SemVer suggests MAJOR. If the deleted/renamed file is not a public invocable surface (e.g. an internal include), ignore. (advisory; push not blocked)`
+    );
+  } else if (floor === "minor") {
+    reader.warn(
+      `prepublish-guard: WARN \u2014 a NEW shipped file was added (new invocable surface) but the version bump is ${actual}. SemVer suggests MINOR. If the new file is not a new invocable surface (e.g. a _shared include), ignore. (advisory; push not blocked)`
+    );
+  }
+}
+function resolveOverBump(reader, floor, actual) {
+  if (findOverrideToken(reader)) {
+    reader.warn(`prepublish-guard: over-bump allowed by bump-override token (actual=${actual} floor=${floor})`);
+    return null;
+  }
+  return deny(
+    `prepublish-guard: version bump level exceeds the mechanical SemVer floor for this diff. The changed shipped paths (agents/|skills/|hooks/) only warrant a ${floor} bump, but a ${actual} was applied. If this over-bump is intentional (e.g. a fix + new surface in the same PR), add a commit trailer or push option: bump-override: ${actual} \u2014 <reason>. See CLAUDE.md \xA76.3 and agents/delivery.md Step 9. Push blocked.`
+  );
+}
+function runBumpFloorSubstage(reader, changed, pluginOrigin, pluginHead) {
+  const floor = deriveFloor(changed);
+  const actual = semverDelta(pluginOrigin, pluginHead);
+  if (actual === "unknown") {
+    reader.warn(
+      `prepublish-guard: version not X.Y.Z (old=${pluginOrigin} new=${pluginHead}); skipping bump-floor check`
+    );
+    return null;
+  }
+  const rankActual = rankOf(actual);
+  const rankFloor = rankOf(floor);
+  if (rankActual < rankFloor) warnUnderBump(reader, floor, actual);
+  if (rankActual > rankFloor) return resolveOverBump(reader, floor, actual);
+  return null;
+}
 function runVersionBumpCheck(reader) {
   if (!reader.fileExists(".claude-plugin/plugin.json")) {
     return null;
   }
-  const changed = reader.gitDiffOriginMain();
+  const changed = reader.gitDiffNameStatus();
   if (changed === null) {
     return null;
   }
-  const touchesAssets = changed.some((f) => /^(agents|skills|hooks)\//.test(f));
+  const touchesAssets = changed.some((c) => SHIPPED_PATH_RE.test(c.path));
   if (!touchesAssets) {
+    const pluginHead = extractJsonVersion(reader.readFile(".claude-plugin/plugin.json"));
+    const pluginOrigin = extractJsonVersion(reader.gitShow("origin/main:.claude-plugin/plugin.json"));
+    runNoAssetAdvisory(reader, pluginOrigin, pluginHead);
     return null;
   }
-  const pluginContent = reader.readFile(".claude-plugin/plugin.json");
-  const marketContent = reader.readFile(".claude-plugin/marketplace.json");
-  let pluginHead = "";
-  let marketHead = "";
-  if (pluginContent) {
-    try {
-      const obj = JSON.parse(pluginContent);
-      pluginHead = typeof obj["version"] === "string" ? obj["version"] : "";
-    } catch {
-      return null;
-    }
-  } else {
-    return null;
+  const branch = resolveBranch(reader);
+  if (branch === null) return null;
+  const sites = readVersionSites(reader);
+  if (!branch.isRelease) {
+    return runFeaturePath(reader, changed, sites);
   }
-  if (marketContent) {
-    try {
-      const obj = JSON.parse(marketContent);
-      const plugins = obj["plugins"];
-      if (Array.isArray(plugins) && plugins.length > 0) {
-        const first = plugins[0];
-        marketHead = typeof first["version"] === "string" ? first["version"] : "";
-      }
-    } catch {
-      return null;
-    }
-  } else {
-    return null;
-  }
-  const pluginOriginJson = reader.gitShow("origin/main:.claude-plugin/plugin.json");
-  let pluginOrigin = "";
-  if (pluginOriginJson !== null) {
-    try {
-      const obj = JSON.parse(pluginOriginJson);
-      pluginOrigin = typeof obj["version"] === "string" ? obj["version"] : "";
-    } catch {
-      return null;
-    }
-  }
-  const marketOriginJson = reader.gitShow("origin/main:.claude-plugin/marketplace.json");
-  let marketOrigin = "";
-  if (marketOriginJson !== null) {
-    try {
-      const obj = JSON.parse(marketOriginJson);
-      const plugins = obj["plugins"];
-      if (Array.isArray(plugins) && plugins.length > 0) {
-        const first = plugins[0];
-        marketOrigin = typeof first["version"] === "string" ? first["version"] : "";
-      }
-    } catch {
-      return null;
-    }
-  }
-  const pluginBumped = pluginHead && pluginOrigin && pluginHead !== pluginOrigin || pluginHead && !pluginOrigin;
-  const marketBumped = marketHead && marketOrigin && marketHead !== marketOrigin || marketHead && !marketOrigin;
-  if (!pluginBumped || !marketBumped) {
-    return deny(
-      'prepublish-guard: distributed assets (agents/|skills/|hooks/) changed but the plugin version was not bumped. Bump "version" in BOTH .claude-plugin/plugin.json AND .claude-plugin/marketplace.json (matched semver) in this push, or the marketplace serves nothing (CLAUDE.md \xA76.3). Push blocked.'
-    );
-  }
-  return null;
+  return runReleasePath(reader, changed, branch.version, sites);
 }
 function runPrepublishCheck(reader) {
   const config = reader.readConfig();
@@ -342,13 +508,18 @@ function makeReader() {
         return null;
       }
     },
-    gitDiffOriginMain() {
+    gitDiffNameStatus() {
       try {
-        const out = (0, import_node_child_process.execFileSync)("git", ["diff", "--name-only", "origin/main...HEAD"], {
+        const out = (0, import_node_child_process.execFileSync)("git", ["diff", "--name-status", "origin/main...HEAD"], {
           encoding: "utf8",
           env: { ...process.env, MSYS_NO_PATHCONV: "1" }
         });
-        return out.split("\n").map((l) => l.trim()).filter(Boolean);
+        return out.split("\n").filter((line) => line.trim().length > 0).map((line) => {
+          const fields = line.split("	");
+          const status = fields[0] ?? "";
+          const filePath = fields.length > 2 ? fields[fields.length - 1] : fields[1] ?? "";
+          return { status, path: filePath };
+        });
       } catch {
         return null;
       }
@@ -363,6 +534,19 @@ function makeReader() {
         return null;
       }
     },
+    gitCurrentBranch() {
+      try {
+        return (0, import_node_child_process.execFileSync)("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
+      } catch {
+        return null;
+      }
+    },
+    readEnv(name) {
+      return process.env[name];
+    },
+    warn(msg) {
+      process.stderr.write(msg + "\n");
+    },
     jsonEscape(s) {
       return JSON.stringify(s);
     }
@@ -375,8 +559,46 @@ async function readStdin() {
   }
   return Buffer.concat(chunks).toString("utf8");
 }
+function extractCwdFromRaw(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const cwd = parsed["cwd"];
+      if (typeof cwd === "string") return cwd;
+    }
+  } catch {
+  }
+  return "";
+}
+function isDirectory(dirPath) {
+  try {
+    return fs.statSync(dirPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function resolveWorktreeCwd(raw) {
+  const cwd = extractCwdFromRaw(raw);
+  if (!cwd) return;
+  if (CONTROL_CHAR_RE.test(cwd)) {
+    process.stderr.write(
+      "prepublish-guard: payload cwd contains control characters; skipping cd (SEC-DR-A, fail-open)\n"
+    );
+    return;
+  }
+  if (!isDirectory(cwd)) {
+    process.stderr.write("prepublish-guard: payload cwd does not exist as a directory; skipping cd (fail-open)\n");
+    return;
+  }
+  try {
+    process.chdir(cwd);
+  } catch {
+    process.stderr.write("prepublish-guard: cd into payload cwd failed; continuing with process CWD (fail-open)\n");
+  }
+}
 async function main() {
   const raw = await readStdin();
+  resolveWorktreeCwd(raw);
   const reader = makeReader();
   try {
     const normalized = inboundCC(raw);

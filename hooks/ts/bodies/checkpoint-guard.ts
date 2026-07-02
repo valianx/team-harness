@@ -24,12 +24,12 @@ import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.
 // Decision helpers
 // ---------------------------------------------------------------------------
 
-// fail-open returns "none" — matching the Bash oracle's "exit 0, no JSON"
-// behavior. CC interprets both "none" and absent-output as implicit allow.
-// "allow" would be semantically correct too, but "none" keeps parity with
-// the Bash oracle for test consistency.
+// The Bash oracle's allow() emits an explicit permissionDecision:"allow" JSON
+// envelope (checkpoint-guard.sh:30-33) — it does NOT exit with empty stdout.
+// "none" would diverge from that documented contract (empty stdout is a
+// DIFFERENT signal — no decision at all, not an explicit allow).
 function allow(): NormalizedDecision {
-  return { decision: "none", reason: "", mutations: null };
+  return { decision: "allow", reason: "", mutations: null };
 }
 
 function deny(reason: string): NormalizedDecision {

@@ -218,7 +218,12 @@ async function main() {
     const output = evaluateLanguagePrompt(normalized, reader);
     if (output.additionalContext !== null) {
       process.stdout.write(
-        JSON.stringify({ additionalContext: output.additionalContext }) + "\n"
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "UserPromptSubmit",
+            additionalContext: output.additionalContext
+          }
+        }) + "\n"
       );
     }
   } catch (err) {
