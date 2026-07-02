@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io/fs"
 	"strings"
 	"testing"
@@ -159,22 +158,16 @@ func TestEmbeddedAssets_HooksPresent(t *testing.T) {
 	}
 }
 
-// TestEmbeddedAssets_HooksConfigJSON asserts that hooks/config.json exists,
-// is non-empty, and parses as valid JSON. This file is required by the installer
-// summary ("copy the <os> section from ~/.claude/hooks/config.json").
-func TestEmbeddedAssets_HooksConfigJSON(t *testing.T) {
+// TestEmbeddedAssets_HooksConfigJSONRetired asserts that hooks/config.json —
+// the Go installer's CC wiring template — no longer exists in the embedded
+// FS. The CC install path was retired in the hook Bash->TS cutover (#446):
+// the marketplace plugin's .claude-plugin/hooks.json is the only CC wiring
+// path now, and config.json is not rewired to it.
+func TestEmbeddedAssets_HooksConfigJSONRetired(t *testing.T) {
 	embedded := EmbeddedAssets()
 
-	data, err := fs.ReadFile(embedded, "hooks/config.json")
-	if err != nil {
-		t.Fatalf("hooks/config.json not found in embedded FS: %v", err)
-	}
-	if len(data) == 0 {
-		t.Fatal("hooks/config.json is empty in embedded FS")
-	}
-	var obj interface{}
-	if jsonErr := json.Unmarshal(data, &obj); jsonErr != nil {
-		t.Errorf("hooks/config.json does not parse as valid JSON: %v", jsonErr)
+	if _, err := fs.ReadFile(embedded, "hooks/config.json"); err == nil {
+		t.Fatal("hooks/config.json still present in embedded FS — the Go installer's CC path was retired and this file should have been deleted")
 	}
 }
 

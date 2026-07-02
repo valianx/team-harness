@@ -158,7 +158,7 @@ function outboundCC(d) {
 function deny(reason) {
   return {
     decision: "deny",
-    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/config.json.`,
+    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/ts/bodies/policy-block.ts.`,
     mutations: null
   };
 }

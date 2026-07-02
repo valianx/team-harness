@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # tests/test_prepublish_bump_floor.sh
-# Regression suite for the bump-floor advisory sub-stage of hooks/prepublish-guard.sh.
+# Regression suite for the bump-floor advisory sub-stage of
+# hooks/ts/bodies/prepublish-guard.ts (compiled to
+# hooks/ts/dist/prepublish-guard.cjs — the single source of gate logic
+# post-cutover, issue #446).
 #
 # Covers Check 1 git-state cases that test_prepublish_guard.sh explicitly skips —
 # those require a real throwaway git repo with a resolvable origin/main ref and
@@ -9,7 +12,7 @@
 #   2. Clones the remote → establishes origin/main at OLD_VER.
 #   3. Makes a feature commit (add/modify/delete/rename under agents|skills|hooks|docs)
 #      with NEW_VER set in .claude-plugin/plugin.json + marketplace.json.
-#   4. Runs hooks/prepublish-guard.sh with a git-push payload from inside the clone.
+#   4. Runs the hook with a git-push payload from inside the clone.
 #   5. Asserts stdout (nodecision = empty) and stderr (WARN present/absent).
 #
 # Version pins (AC-9 floor pattern — never exact ==):
@@ -17,18 +20,8 @@
 #   MINOR bump (2.108.1 on feat/prepublish-bump-floor at time of authoring).
 #   The _ver_ge() helper mirrors the _s59_ver_tuple floor pattern.
 #
-# Dual-target (HOOK_IMPL=bash|ts, default bash): the git-state cases run
-# against the compiled TS artifact (hooks/ts/dist/prepublish-guard.cjs) when
-# HOOK_IMPL=ts. AC-8 structural checks (grep the Bash source for
-# --name-status / MSYS_NO_PATHCONV / "ask" tokens) are bash-leg-only — no TS
-# equivalent contract. See 02-implementation-t6a.md "Divergences found" for
-# the confirmed payload-cwd gap: the TS body has no equivalent to the Bash
-# worktree-scope fix (Suite 18 / NEW-1..NEW-6), so those cases are expected
-# to diverge on the ts leg.
-#
 # Usage:
 #   bash tests/test_prepublish_bump_floor.sh
-#   HOOK_IMPL=ts bash tests/test_prepublish_bump_floor.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
@@ -37,30 +30,15 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK_IMPL="${HOOK_IMPL:-bash}"
-HOOK_BASH="$REPO_ROOT/hooks/prepublish-guard.sh"
-HOOK_TS="$REPO_ROOT/hooks/ts/dist/prepublish-guard.cjs"
+HOOK="$REPO_ROOT/hooks/ts/dist/prepublish-guard.cjs"
 
-if [ "$HOOK_IMPL" = "ts" ]; then
-    HOOK="$HOOK_TS"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
-        exit 1
-    fi
-else
-    HOOK="$HOOK_BASH"
-    if [ ! -x "$HOOK" ]; then
-        chmod +x "$HOOK"
-    fi
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
 
-# Dispatch to the runtime under test.
 _exec_hook() {
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        node "$HOOK"
-    else
-        bash "$HOOK"
-    fi
+    node "$HOOK"
 }
 
 PASS=0
@@ -1190,39 +1168,43 @@ git clone "$_bare_s17c" "$_clone_s17c" -q 2>/dev/null
 _run_hook "$_clone_s17c"
 assert_nodecision "SEC-001-C: release/v2.107.1 + all three sites bumped+matching → nodecision (ALLOW)"
 
-# AC-8 structural check: --name-status in hook; no new git show without MSYS guard
-# Bash-source-specific — bash leg only (no TS equivalent contract).
+# AC-8 structural check: --name-status in the git invocation; every git show
+# call carries the MSYS_NO_PATHCONV Windows git-bash guard. Checked against
+# the TS entry (hooks/ts/entry/prepublish-guard.cc.ts) — the single source of
+# these invariants post-cutover; the retired Bash source these checks used to
+# grep no longer exists.
 # ---------------------------------------------------------------------------
-if [ "$HOOK_IMPL" = "bash" ]; then
+_TS_ENTRY="$REPO_ROOT/hooks/ts/entry/prepublish-guard.cc.ts"
+
 echo
 echo "--- AC-8: --name-status and MSYS_NO_PATHCONV structural guard ---"
 
-if grep -q -- '--name-status' "$HOOK" 2>/dev/null; then
+if grep -q -- '--name-status' "$_TS_ENTRY" 2>/dev/null; then
     pass "AC-8: hook uses --name-status diff"
 else
     fail "AC-8: --name-status diff" "hook does not use --name-status"
 fi
 
-# Any git show call must have MSYS_NO_PATHCONV=1 prefix (Windows git-bash guard).
-# Extract non-comment, non-blank lines with 'git show' and verify they all carry the prefix.
-_git_show_lines=$(grep 'git show' "$HOOK" 2>/dev/null \
-    | grep -v '^[[:space:]]*#' \
-    | grep -v '^[[:space:]]*$' || true)
-_unguarded=$(printf '%s\n' "$_git_show_lines" | grep -v 'MSYS_NO_PATHCONV=1' || true)
-if [ -z "$_unguarded" ]; then
-    pass "AC-8: all git show calls carry MSYS_NO_PATHCONV=1"
+# Every git show/diff invocation must set MSYS_NO_PATHCONV=1 (Windows git-bash
+# guard). The TS entry sets it once via execFileSync's env option per call —
+# assert the token appears once per git invocation site.
+_git_calls=$(grep -c 'execFileSync("git"' "$_TS_ENTRY" 2>/dev/null || echo 0)
+_msys_guards=$(grep -c 'MSYS_NO_PATHCONV' "$_TS_ENTRY" 2>/dev/null || echo 0)
+if [ "$_msys_guards" -ge "$_git_calls" ] && [ "$_git_calls" -gt 0 ]; then
+    pass "AC-8: all $_git_calls git invocation(s) carry MSYS_NO_PATHCONV=1 ($_msys_guards guard(s) found)"
 else
-    fail "AC-8: MSYS guard" "found git show without MSYS_NO_PATHCONV=1: $_unguarded"
+    fail "AC-8: MSYS guard" "found $_git_calls git invocation(s) but only $_msys_guards MSYS_NO_PATHCONV guard(s)"
 fi
 
-# AC-6 structural: no 'ask' token introduced in floor branches
-_ask_in_floor=$(sed -n '/Bump-floor sub-stage/,/nodecision$/p' "$HOOK" 2>/dev/null | grep '"ask"' || true)
+# AC-6 structural: no 'ask' token anywhere in the TS body or entry — the
+# block-on-condition / open-on-fault contract never emits ask.
+_TS_BODY="$REPO_ROOT/hooks/ts/bodies/prepublish-guard.ts"
+_ask_in_floor=$(grep -h '"ask"' "$_TS_BODY" "$_TS_ENTRY" 2>/dev/null || true)
 if [ -z "$_ask_in_floor" ]; then
-    pass "AC-6/AC-8: no 'ask' permissionDecision in floor sub-stage"
+    pass "AC-6/AC-8: no 'ask' permissionDecision anywhere in the TS source"
 else
-    fail "AC-6/AC-8: ask token" "floor sub-stage contains 'ask' decision: $_ask_in_floor"
+    fail "AC-6/AC-8: ask token" "TS source contains 'ask' decision: $_ask_in_floor"
 fi
-fi # HOOK_IMPL = bash (AC-8 structural checks)
 
 # ---------------------------------------------------------------------------
 # Suite 18: Worktree-scope fix — guard reads payload cwd, not process CWD

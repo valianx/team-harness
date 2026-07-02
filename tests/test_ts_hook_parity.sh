@@ -1,13 +1,17 @@
 #!/bin/bash
 # tests/test_ts_hook_parity.sh
-# Gate-parity harness for the Phase-4 dev-guard TS spike.
+# Golden-fixture regression harness for the dev-guard TS gate (issue #446 —
+# converted from Bash<->TS decision parity to a golden-fixture regression
+# once the Bash oracle was retired: each fixture's expected decision is now a
+# literal value asserted directly against the TS gate, not derived by running
+# a sibling Bash script).
 #
 # Asserts:
-#   - Decision parity: TS gate produces the SAME permissionDecision as dev-guard.sh
-#     for every fixture in test_dev_guard.sh (AC-1, AC-2).
-#   - Reason parity: FULL decision object compared (permissionDecision AND
-#     permissionDecisionReason field presence), not the decision field alone
-#     (AC-1, AC-8, AC-15 — SEC-DR-A).
+#   - Decision correctness: TS gate produces the documented permissionDecision
+#     for every fixture ported from the retired test_dev_guard.sh Bash-oracle
+#     suite (AC-1, AC-2).
+#   - Reason presence (AC-1, AC-8, AC-15 — SEC-DR-A): permissionDecisionReason
+#     is present and non-empty whenever a decision fires.
 #   - SEC-07 SEC enforcement (AC-3, AC-4, AC-5, AC-6):
 #       AC-3  — wrong-type 'event' field → hard-reject (fail-closed)
 #       AC-4  — malformed JSON → fail-closed (none/no-decision for dev-guard)
@@ -19,18 +23,17 @@
 #   - Reason-no-leak (AC-15, CWE-200): reason names CLASS not value.
 #   - ClickUp no-command boundary (AC-16, SEC-DR-B): tool.name match, absent command → ask.
 #   - Cold-start latency (AC-17): Node entry < 5s gate timeout.
-#   - Dual-runtime parity (AC-8): Node AND Bun (or recorded bun-not-present).
+#   - Dual-runtime parity (AC-8): Node AND Bun (or recorded bun-not-present)
+#     produce the SAME decision — this is TS-vs-TS (cross-runtime), not
+#     Bash-vs-TS; the Bun leg still has real value post-cutover.
 #
-# SCOPE NOTE (issue batch #446-452, T6a): this harness remains the dedicated
-# dev-guard parity spike (Node+Bun dual-runtime, SEC-07 hardening, cold-start
-# latency) — its scope is NOT widened to the other 5 floors + session-start +
-# language-user-prompt. The BROAD Bash<->TS conformance lock across every
-# wired hook family now lives in the dual-target functional-suite mechanism
-# (`HOOK_IMPL=bash|ts`, wired per-suite in tests/run-all.sh — Suites 1, 4, 5,
-# 6, 7, 16, 87, 133), which reuses the existing Bash-oracle test cases instead
-# of hand-authored parity fixtures. See docs/opencode-migration-guide.md
-# "Interim canonicality" for the Bash-is-canonical declaration this locks
-# against.
+# SCOPE NOTE (issue batch #446-452): this harness remains the dedicated
+# dev-guard fixture regression (Node+Bun dual-runtime, SEC-07 hardening,
+# cold-start latency) — its scope is NOT widened to the other 5 floors +
+# session-start + language-user-prompt, which have their own functional
+# suites (tests/run-all.sh — Suites 1, 4, 5, 6, 7, 16, 87, 133). TS is the
+# single source of gate logic for CC and opencode post-cutover
+# (docs/opencode-migration-guide.md).
 #
 # Usage:
 #   bash tests/test_ts_hook_parity.sh [--verbose]
@@ -40,7 +43,6 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BASH_HOOK="$REPO_ROOT/hooks/dev-guard.sh"
 TS_CJS="$REPO_ROOT/hooks/ts/dist/dev-guard.cjs"
 TS_OPENCODE_ENTRY="$REPO_ROOT/hooks/ts/entry/dev-guard.opencode.ts"
 
@@ -67,8 +69,7 @@ else
     BUN_STATUS="bun-present: $($BUN_BIN --version 2>/dev/null || echo 'unknown')"
 fi
 
-echo "=== Phase-4 dev-guard parity harness ==="
-echo "  Bash gate:    $BASH_HOOK"
+echo "=== dev-guard golden-fixture regression harness ==="
 echo "  TS Node gate: $TS_CJS"
 echo "  Bun status:   $BUN_STATUS"
 echo ""
@@ -76,9 +77,8 @@ echo ""
 # ---------------------------------------------------------------------------
 # Verify prerequisites
 # ---------------------------------------------------------------------------
-if [ ! -x "$BASH_HOOK" ]; then chmod +x "$BASH_HOOK"; fi
 if [ ! -f "$TS_CJS" ]; then
-    echo "FATAL: TS bundle not found at $TS_CJS — run 'cd hooks/ts && npx esbuild ...' first."
+    echo "FATAL: TS bundle not found at $TS_CJS — run 'npm --prefix hooks/ts run build' first."
     exit 1
 fi
 
@@ -117,11 +117,6 @@ make_clickup_payload() {
 # ---------------------------------------------------------------------------
 # Run helpers
 # ---------------------------------------------------------------------------
-run_bash() {
-    local payload="$1"
-    bash "$BASH_HOOK" <<< "$payload" 2>/dev/null
-}
-
 run_ts_node() {
     local payload="$1"
     echo "$payload" | node "$TS_CJS" 2>/dev/null
@@ -165,66 +160,57 @@ extract_reason() {
 }
 
 # ---------------------------------------------------------------------------
-# Core assertion: compare Bash oracle vs TS output
+# Core assertion: golden-fixture decision + cross-runtime (Node vs Bun) parity
 # ---------------------------------------------------------------------------
 
 assert_parity() {
     local name="$1"
     local payload="$2"
-    local expected_bash_decision="$3"   # "ask", "deny", or "none"
+    local expected_decision="$3"   # "ask", "deny", or "none"
 
-    local bash_out ts_node_out ts_bun_out
-    bash_out=$(run_bash "$payload")
+    local ts_node_out ts_bun_out
     ts_node_out=$(run_ts_node "$payload")
     ts_bun_out=$(run_ts_bun_cc "$payload")
 
-    local bash_dec ts_node_dec ts_bun_dec
-    bash_dec=$(extract_decision "$bash_out")
+    local ts_node_dec ts_bun_dec
     ts_node_dec=$(extract_decision "$ts_node_out")
 
-    # Verify Bash oracle matches expected.
-    local bash_ok=1
-    if [ "$bash_dec" != "$expected_bash_decision" ]; then
-        bash_ok=0
+    # Verify TS Node matches the golden fixture.
+    local node_ok=1
+    if [ "$ts_node_dec" != "$expected_decision" ]; then
+        node_ok=0
     fi
 
-    # Verify TS Node parity with Bash.
-    local node_parity_ok=1
-    if [ "$ts_node_dec" != "$bash_dec" ]; then
-        node_parity_ok=0
-    fi
-
-    # Verify reason field presence parity: if Bash emits a reason, TS must too.
+    # Reason presence: whenever a decision fires, a reason must be present.
     local node_reason_ok=1
-    if has_reason_field "$bash_out" && ! has_reason_field "$ts_node_out"; then
+    if [ "$ts_node_dec" != "none" ] && ! has_reason_field "$ts_node_out"; then
         node_reason_ok=0
     fi
 
-    # Bun parity (if present).
+    # Bun parity (cross-runtime, TS-vs-TS — if Bun is present).
     local bun_parity_ok=1
     local bun_note=""
     if [ "$ts_bun_out" = "__BUN_NOT_PRESENT__" ]; then
         bun_note=" [bun-not-present: skipped]"
     else
         ts_bun_dec=$(extract_decision "$ts_bun_out")
-        if [ "$ts_bun_dec" != "$bash_dec" ]; then
+        if [ "$ts_bun_dec" != "$expected_decision" ]; then
             bun_parity_ok=0
         fi
     fi
 
-    if [ "$bash_ok" -eq 1 ] && [ "$node_parity_ok" -eq 1 ] && [ "$node_reason_ok" -eq 1 ] && [ "$bun_parity_ok" -eq 1 ]; then
+    if [ "$node_ok" -eq 1 ] && [ "$node_reason_ok" -eq 1 ] && [ "$bun_parity_ok" -eq 1 ]; then
         PASS=$((PASS + 1))
         echo "  [PASS] $name${bun_note}"
         if [ "$VERBOSE" -eq 1 ]; then
-            echo "         bash=$bash_dec node=$ts_node_dec bun=${ts_bun_dec:-skipped}"
+            echo "         expected=$expected_decision node=$ts_node_dec bun=${ts_bun_dec:-skipped}"
         fi
     else
         FAIL=$((FAIL + 1))
         local detail=""
-        [ "$bash_ok" -eq 0 ] && detail="${detail} [oracle-mismatch: expected=$expected_bash_decision got=$bash_dec]"
-        [ "$node_parity_ok" -eq 0 ] && detail="${detail} [node-parity-fail: bash=$bash_dec node=$ts_node_dec]"
+        [ "$node_ok" -eq 0 ] && detail="${detail} [decision-mismatch: expected=$expected_decision got=$ts_node_dec]"
         [ "$node_reason_ok" -eq 0 ] && detail="${detail} [node-reason-missing]"
-        [ "$bun_parity_ok" -eq 0 ] && detail="${detail} [bun-parity-fail: bash=$bash_dec bun=$ts_bun_dec]"
+        [ "$bun_parity_ok" -eq 0 ] && detail="${detail} [bun-parity-fail: node=$ts_node_dec bun=$ts_bun_dec]"
         FAILURES+=("$name:$detail")
         echo "  [FAIL] $name |$detail"
     fi
@@ -384,9 +370,7 @@ echo "--- Section 4: Reason-no-leak (AC-15) ---"
 
 GIT_PUSH_PAYLOAD="$(make_bash_payload 'git push origin main')"
 TS_OUT=$(run_ts_node "$GIT_PUSH_PAYLOAD")
-BASH_OUT=$(run_bash "$GIT_PUSH_PAYLOAD")
 TS_REASON=$(extract_reason "$TS_OUT")
-BASH_REASON=$(extract_reason "$BASH_OUT")
 
 if has_reason_field "$TS_OUT" && [ -n "$TS_REASON" ]; then
     PASS=$((PASS + 1))
@@ -400,19 +384,10 @@ else
     echo "  [FAIL] AC-15: TS reason field missing or empty"
 fi
 
-if has_reason_field "$BASH_OUT" && [ -n "$BASH_REASON" ]; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] AC-15: Bash reason field present and non-empty"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("AC-15: Bash reason field missing or empty")
-    echo "  [FAIL] AC-15: Bash reason field missing or empty"
-fi
-
 # ---------------------------------------------------------------------------
 # Section 5 — ClickUp no-command boundary (AC-16, SEC-DR-B)
 # tool.name matches ClickUp write pattern; NO command field. Must produce ask,
-# never none/allow on EITHER runtime.
+# never none/allow.
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 5: ClickUp no-command boundary (AC-16) ---"
@@ -420,23 +395,17 @@ echo "--- Section 5: ClickUp no-command boundary (AC-16) ---"
 CLICKUP_TOOL="mcp__my_clickup_server__clickup_update_task"
 CLICKUP_PAYLOAD="$(make_clickup_payload "$CLICKUP_TOOL")"
 
-# Bash oracle for ClickUp (should be ask from dev-guard.sh line 125-127)
-BASH_CLICKUP=$(run_bash "$CLICKUP_PAYLOAD")
-BASH_CLICKUP_DEC=$(extract_decision "$BASH_CLICKUP")
 TS_CLICKUP=$(run_ts_node "$CLICKUP_PAYLOAD")
 TS_CLICKUP_DEC=$(extract_decision "$TS_CLICKUP")
 
-echo "  Bash oracle: $BASH_CLICKUP_DEC | TS Node: $TS_CLICKUP_DEC"
-if [ "$TS_CLICKUP_DEC" = "ask" ] && [ "$BASH_CLICKUP_DEC" = "ask" ]; then
+echo "  TS Node: $TS_CLICKUP_DEC"
+if [ "$TS_CLICKUP_DEC" = "ask" ]; then
     PASS=$((PASS + 1))
-    echo "  [PASS] AC-16: ClickUp no-command → ask on both Bash and TS Node"
+    echo "  [PASS] AC-16: ClickUp no-command → ask"
 else
     FAIL=$((FAIL + 1))
-    detail=""
-    [ "$BASH_CLICKUP_DEC" != "ask" ] && detail="${detail} [bash-oracle-unexpected: $BASH_CLICKUP_DEC]"
-    [ "$TS_CLICKUP_DEC" != "ask" ] && detail="${detail} [ts-node-got: $TS_CLICKUP_DEC]"
-    FAILURES+=("AC-16: ClickUp no-command boundary failed$detail")
-    echo "  [FAIL] AC-16: ClickUp no-command failed |$detail"
+    FAILURES+=("AC-16: ClickUp no-command boundary failed [ts-node-got: $TS_CLICKUP_DEC]")
+    echo "  [FAIL] AC-16: ClickUp no-command failed [ts-node-got: $TS_CLICKUP_DEC]"
 fi
 
 # Test other ClickUp write verbs

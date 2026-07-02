@@ -1,25 +1,19 @@
 #!/bin/bash
 # tests/test_session_start.sh
-# Regression tests for hooks/session-start.sh (consolidated SessionStart loader).
+# Regression tests for hooks/ts/bodies/session-start.ts (compiled to
+# hooks/ts/dist/session-start.cjs — the single source of gate logic
+# post-cutover, issue #446) — consolidated SessionStart loader.
 # Covers: dev-mode (active/absent), language (valid/unmapped/malicious),
 # workspace-mode (obsidian/local/missing/empty/malicious), combined case,
-# extensible-structure static assertions, and fail-safe cases.
+# and fail-safe cases.
 #
 # Suite 89 — workspace-mode-session-start (docs/testing.md canonical registry)
 #
-# Dual-target (HOOK_IMPL=bash|ts, default bash): the behavioral cases (Sections
-# 1-4, 6, 7's non-structural cases) run against the compiled TS artifact
-# (hooks/ts/dist/session-start.cjs) when HOOK_IMPL=ts. Section 5 and the
-# structural sub-checks of Section 7 grep the Bash SOURCE for function names
-# (load_orchestrator etc.) — a Bash-implementation-detail, not a behavioral
-# contract, so those run on the bash leg only. AC assertions on hookEventName/
-# SessionStart envelope keys run on BOTH legs (T6c): the CC entry adapter now
-# emits the wrapped hookSpecificOutput envelope, closing the bare-vs-wrapped
-# gap documented in 02-implementation-t6a.md "Divergences found".
+# AC assertions on hookEventName/SessionStart envelope keys: the CC entry
+# adapter emits the wrapped hookSpecificOutput envelope.
 #
 # Usage:
 #   bash tests/test_session_start.sh
-#   HOOK_IMPL=ts bash tests/test_session_start.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
@@ -31,23 +25,12 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK_IMPL="${HOOK_IMPL:-bash}"
-HOOK_BASH="$REPO_ROOT/hooks/session-start.sh"
-HOOK_TS="$REPO_ROOT/hooks/ts/dist/session-start.cjs"
+HOOK="$REPO_ROOT/hooks/ts/dist/session-start.cjs"
 
-if [ "$HOOK_IMPL" = "ts" ]; then
-    HOOK="$HOOK_TS"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
-        exit 1
-    fi
-else
-    HOOK="$HOOK_BASH"
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
-
-# The hook may not exist yet (Phase 2.0 — failing test mode).
-# Do NOT abort if it is missing; cases will simply produce no output and fail
-# the positive assertions, which is the expected red state.
 
 PASS=0
 FAIL=0
@@ -97,11 +80,7 @@ make_tmp_home_with_marker() {
 #   Returns stdout. Exit code is captured separately when needed.
 run_hook() {
     local fake_home="$1"
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
-    else
-        HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
-    fi
+    HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
 }
 
 # run_hook_with_exit <fake_home>
@@ -110,11 +89,7 @@ run_hook_with_exit() {
     local fake_home="$1"
     local out
     local code
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
-    else
-        out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
-    fi
+    out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
     code=$?
     printf '%s' "$out"
     printf '\nEXIT:%d' "$code"
@@ -502,74 +477,13 @@ _assert_combined "combined-additionalcontext: additionalContext key present" "$?
 rm -rf "$TMP"
 
 # ===========================================================================
-# SECTION 5: Extensible ordered structure — static source assertions (AC-13)
-# Bash-source-specific (function-name greps) — no TS equivalent contract, so
-# this section runs on the bash leg only.
+# SECTION 5 retired: the former "extensible ordered structure" static source
+# assertions grepped the Bash SOURCE for function names (load_orchestrator,
+# etc.) — a Bash-implementation-detail with no TS equivalent contract. That
+# file no longer exists (hook Bash->TS cutover, issue #446); the coverage it
+# documented (four ordered loads) is exercised behaviorally by Sections 1-4
+# and 6-7 below, which assert on hook OUTPUT, not implementation structure.
 # ===========================================================================
-if [ "$HOOK_IMPL" = "bash" ]; then
-
-echo
-echo "=== Structure: hook defines four load_<name> functions ==="
-STRUCT_OK=1
-STRUCT_REASON=""
-
-if [ ! -f "$HOOK" ]; then
-    STRUCT_OK=0
-    STRUCT_REASON="$HOOK does not exist"
-fi
-
-if [ $STRUCT_OK -eq 1 ] && ! grep -qF 'load_orchestrator' "$HOOK"; then
-    STRUCT_OK=0
-    STRUCT_REASON="load_orchestrator function not found"
-fi
-
-if [ $STRUCT_OK -eq 1 ] && ! grep -qF 'load_language' "$HOOK"; then
-    STRUCT_OK=0
-    STRUCT_REASON="load_language function not found"
-fi
-
-if [ $STRUCT_OK -eq 1 ] && ! grep -qF 'load_workspace_mode' "$HOOK"; then
-    STRUCT_OK=0
-    STRUCT_REASON="load_workspace_mode function not found"
-fi
-
-if [ $STRUCT_OK -eq 1 ] && ! grep -qF 'load_english_learning' "$HOOK"; then
-    STRUCT_OK=0
-    STRUCT_REASON="load_english_learning function not found"
-fi
-
-if [ $STRUCT_OK -eq 1 ]; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] structure: four load_<name> functions present"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("structure: four load_<name> functions — $STRUCT_REASON")
-    echo "  [FAIL] structure: four load_<name> functions — $STRUCT_REASON"
-fi
-
-echo
-echo "=== Structure: REGISTRY header comment present ==="
-if [ -f "$HOOK" ] && grep -qF 'REGISTRY' "$HOOK"; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] structure: REGISTRY header comment present"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("structure: REGISTRY header comment missing from $HOOK")
-    echo "  [FAIL] structure: REGISTRY header comment missing"
-fi
-
-echo
-echo "=== Structure: 3-step 'add a new load' procedure references test_session_start.sh ==="
-if [ -f "$HOOK" ] && grep -qF 'add a new' "$HOOK" && grep -qF 'test_session_start.sh' "$HOOK"; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] structure: 3-step add-a-new-load procedure present"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("structure: 3-step add-a-new-load procedure missing (needs 'add a new' + 'test_session_start.sh')")
-    echo "  [FAIL] structure: 3-step add-a-new-load procedure missing"
-fi
-
-fi # HOOK_IMPL = bash (SECTION 5)
 
 # ===========================================================================
 # SECTION 6: Fail-safe cases (AC-5, v2.89.0 update)
@@ -742,97 +656,12 @@ assert_output_contains "el-exemption-present: message-level exemption clause sti
 rm -rf "$TMP"
 
 # ===========================================================================
-# SECTION 7 — Structure assertions for load_english_learning (AC-3)
-# Bash-source-specific (function-name greps) — bash leg only, same rationale
-# as SECTION 5.
+# SECTION 7 structure assertions retired: grepped the Bash SOURCE for
+# load_english_learning's function name and ordering — a Bash-implementation
+# detail with no TS equivalent contract (same rationale as the retired
+# SECTION 5). The behavioral coverage (directive fires regardless of
+# language) is exercised above by the English-learning cases (AC-1, AC-2).
 # ===========================================================================
-if [ "$HOOK_IMPL" = "bash" ]; then
-
-echo
-echo "=== Structure: hook defines four load_<name> functions including load_english_learning (AC-3) ==="
-EL_STRUCT_OK=1
-EL_STRUCT_REASON=""
-
-if [ ! -f "$HOOK" ]; then
-    EL_STRUCT_OK=0
-    EL_STRUCT_REASON="$HOOK does not exist"
-fi
-
-if [ $EL_STRUCT_OK -eq 1 ] && ! grep -qF 'load_english_learning' "$HOOK"; then
-    EL_STRUCT_OK=0
-    EL_STRUCT_REASON="load_english_learning function not found in hook"
-fi
-
-if [ $EL_STRUCT_OK -eq 1 ]; then
-    # Verify load_english_learning appears AFTER load_language in the file
-    lang_line=$(grep -n 'load_language()' "$HOOK" | head -1 | cut -d: -f1)
-    el_line=$(grep -n 'load_english_learning()' "$HOOK" | head -1 | cut -d: -f1)
-    if [ -n "$lang_line" ] && [ -n "$el_line" ]; then
-        if [ "$el_line" -le "$lang_line" ]; then
-            EL_STRUCT_OK=0
-            EL_STRUCT_REASON="load_english_learning() defined before load_language() (must be after)"
-        fi
-    fi
-fi
-
-if [ $EL_STRUCT_OK -eq 1 ]; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] structure: load_english_learning function present and defined after load_language"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("structure: load_english_learning — $EL_STRUCT_REASON")
-    echo "  [FAIL] structure: load_english_learning — $EL_STRUCT_REASON"
-fi
-
-echo
-echo "=== Structure: invocation list has load_english_learning after load_language (AC-3) ==="
-EL_INVOKE_OK=1
-EL_INVOKE_REASON=""
-
-if [ ! -f "$HOOK" ]; then
-    EL_INVOKE_OK=0
-    EL_INVOKE_REASON="$HOOK does not exist"
-fi
-
-if [ $EL_INVOKE_OK -eq 1 ]; then
-    # Check that in the invocation list (bare calls, not function defs), load_english_learning
-    # appears after load_language and before load_workspace_mode.
-    lang_invoke=$(grep -n '^load_language$' "$HOOK" | head -1 | cut -d: -f1)
-    el_invoke=$(grep -n '^load_english_learning$' "$HOOK" | head -1 | cut -d: -f1)
-    ws_invoke=$(grep -n '^load_workspace_mode$' "$HOOK" | head -1 | cut -d: -f1)
-    if [ -z "$el_invoke" ]; then
-        EL_INVOKE_OK=0
-        EL_INVOKE_REASON="bare call 'load_english_learning' not found in invocation list"
-    elif [ -n "$lang_invoke" ] && [ "$el_invoke" -le "$lang_invoke" ]; then
-        EL_INVOKE_OK=0
-        EL_INVOKE_REASON="load_english_learning invoked before load_language (must be after)"
-    elif [ -n "$ws_invoke" ] && [ "$el_invoke" -ge "$ws_invoke" ]; then
-        EL_INVOKE_OK=0
-        EL_INVOKE_REASON="load_english_learning invoked after load_workspace_mode (must be before)"
-    fi
-fi
-
-if [ $EL_INVOKE_OK -eq 1 ]; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] structure: load_english_learning invoked after load_language and before load_workspace_mode"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("structure: invocation order — $EL_INVOKE_REASON")
-    echo "  [FAIL] structure: invocation order — $EL_INVOKE_REASON"
-fi
-
-echo
-echo "=== Structure: REGISTRY comment lists Load 4 (load_english_learning) ==="
-if [ -f "$HOOK" ] && grep -qF 'load_english_learning' "$HOOK" && grep -qF 'Load 4' "$HOOK"; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] structure: REGISTRY comment has Load 4 / load_english_learning"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("structure: REGISTRY comment missing Load 4 or load_english_learning reference")
-    echo "  [FAIL] structure: REGISTRY comment missing Load 4 or load_english_learning reference"
-fi
-
-fi # HOOK_IMPL = bash (SECTION 7 structure assertions)
 
 # ===========================================================================
 # Summary

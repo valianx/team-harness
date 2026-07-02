@@ -22,7 +22,7 @@ import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.
 function deny(reason: string): NormalizedDecision {
   return {
     decision: "deny",
-    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/config.json.`,
+    reason: `Blocked by team-harness policy: ${reason}. If you genuinely need this, run it manually outside Claude or scope an exception in hooks/ts/bodies/policy-block.ts.`,
     mutations: null,
   };
 }

@@ -3,7 +3,10 @@
 # Suite 85 structural checks — hook-gates-hardening (Phase 2.0, issue #304)
 #
 # SPEC-ASSERTING structural regression tests for issue #304 findings:
-#   F-008  hooks.json + config.json: ClickUp MCP PreToolUse matcher present
+#   F-008  hooks.json: ClickUp MCP PreToolUse matcher present (the marketplace
+#          plugin is the only CC wiring path since the hook Bash->TS cutover,
+#          issue #446 — hooks/config.json, the Go installer's retired CC
+#          wiring template, is not part of this check anymore)
 #   F-038  skill/orchestrator invocations: sketch-guard resolution chain (not bare repo-relative)
 #   F-009  recover predicate: decision-allowlist tokens + per-gate release fields
 #   A1     setup + update SKILL.md: guided python3 install probe block present
@@ -76,7 +79,6 @@ def _slice_section(text: str, anchor: str) -> str:
 # File reads
 # ---------------------------------------------------------------------------
 _hooks_json_text = read(PLUGIN_DIR / "hooks.json")
-_config_json_text = read(HOOKS_DIR / "config.json")
 _orchestrator_text = read(AGENTS_DIR / "orchestrator.md")
 _recover_skill_text = read(skill_path("recover"))
 _setup_skill_text = read(skill_path("setup"))
@@ -94,15 +96,8 @@ try:
 except (json.JSONDecodeError, ValueError):
     _hooks_json_parsed = {}
 
-# Parse config.json for structured access
-try:
-    _config_json_parsed = json.loads(_config_json_text)
-except (json.JSONDecodeError, ValueError):
-    _config_json_parsed = {}
-
-
 # ---------------------------------------------------------------------------
-# Helper: collect all PreToolUse matcher strings from a parsed hooks/config JSON
+# Helper: collect all PreToolUse matcher strings from a parsed hooks JSON
 # ---------------------------------------------------------------------------
 def get_pretooluse_matchers(parsed: dict) -> list[str]:
     """Extract all 'matcher' values from PreToolUse entries in a hooks JSON structure."""
@@ -116,21 +111,13 @@ def get_pretooluse_matchers(parsed: dict) -> list[str]:
     return matchers
 
 
-def get_pretooluse_matchers_config(parsed: dict, os_key: str) -> list[str]:
-    """Extract matchers from a per-OS block in config.json."""
-    os_block = parsed.get(os_key, {})
-    return get_pretooluse_matchers({"hooks": os_block.get("hooks", {})})
-
-
 # ---------------------------------------------------------------------------
 # ============================================================================
 # F-008: ClickUp MCP PreToolUse matcher
-# SPEC: Both .claude-plugin/hooks.json and hooks/config.json (all three OS blocks)
-# must contain a PreToolUse entry whose matcher covers
+# SPEC: .claude-plugin/hooks.json (the sole CC wiring path post-cutover) must
+# contain a PreToolUse entry whose matcher covers
 # mcp__<anyserver>__clickup_(update_task|create_task|...) tool calls.
 # The matcher must NOT hard-code the server segment (uses mcp__.*__clickup_…).
-# PRE-FIX STATE: only "Bash" and "Bash|Write|Edit|NotebookEdit" matchers present;
-# no ClickUp MCP matcher exists.
 # ============================================================================
 print()
 print("=== Suite 85-F008: ClickUp MCP PreToolUse matcher wiring ===")
@@ -170,29 +157,15 @@ check(
     " — hard-coding the server segment breaks on any non-standard MCP registration",
 )
 
-# Check F008-3: hooks/config.json windows block contains a ClickUp matcher
-_windows_matchers = get_pretooluse_matchers_config(_config_json_parsed, "windows")
+# F008-3/4/5 RETIRED at the hook Bash->TS cutover (issue #446): they asserted
+# per-OS ClickUp matcher wiring in hooks/config.json, the Go installer's CC
+# wiring template. That file was deleted along with the installer's CC path —
+# the marketplace plugin's .claude-plugin/hooks.json (F008-1/2 above) is now
+# the ONLY CC wiring path, so the per-OS check has no successor to preserve.
 check(
-    "F008-3: hooks/config.json windows block contains a ClickUp MCP PreToolUse matcher",
-    any("clickup" in m for m in _windows_matchers),
-    f"No ClickUp matcher in windows block; found: {_windows_matchers!r};"
-    " the Go-installer config must wire the ClickUp gate for Windows users",
-)
-
-# Check F008-4: hooks/config.json macos block contains a ClickUp matcher
-_macos_matchers = get_pretooluse_matchers_config(_config_json_parsed, "macos")
-check(
-    "F008-4: hooks/config.json macos block contains a ClickUp MCP PreToolUse matcher",
-    any("clickup" in m for m in _macos_matchers),
-    f"No ClickUp matcher in macos block; found: {_macos_matchers!r}",
-)
-
-# Check F008-5: hooks/config.json linux block contains a ClickUp matcher
-_linux_matchers = get_pretooluse_matchers_config(_config_json_parsed, "linux")
-check(
-    "F008-5: hooks/config.json linux block contains a ClickUp MCP PreToolUse matcher",
-    any("clickup" in m for m in _linux_matchers),
-    f"No ClickUp matcher in linux block; found: {_linux_matchers!r}",
+    "F008-3/4/5: hooks/config.json retired (Go installer CC path removed) — no file references it",
+    not (HOOKS_DIR / "config.json").exists(),
+    "hooks/config.json still exists — the Go installer's CC wiring template should have been deleted",
 )
 
 

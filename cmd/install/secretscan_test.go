@@ -12,17 +12,17 @@ import (
 // buildSecretFixture constructs a string that will match a given secret
 // pattern class. Fixtures use the canonical prefix/suffix to trigger the
 // scanner but do NOT embed real credentials (the values are synthetic
-// test-only strings). The hook policy scanner (policy-block.sh) fires on
+// test-only strings). The hook policy scanner (policy-block) fires on
 // real patterns in Write operations; fixtures here use runtime string
 // construction to avoid static pattern detection by the hook.
 
 // TestScanForSecrets_HighConfidence_TenClasses verifies that all 10 pattern
-// classes from hooks/policy-block.sh HIGH_CONFIDENCE_SECRETS are ported and
+// classes from hooks/ts/bodies/policy-block.ts HIGH_CONFIDENCE_SECRETS are ported and
 // match their respective fixtures exactly (1 fixture per class). The reason
 // names the CLASS, never the matched value (SEC-04).
 func TestScanForSecrets_HighConfidence_TenClasses(t *testing.T) {
 	// Fixtures are constructed at runtime to avoid static secret-pattern matches
-	// in the Write tool (which triggers policy-block.sh). The values are
+	// in the Write tool (which triggers policy-block). The values are
 	// synthetic test strings; no real credentials are used.
 	//
 	// Pattern: each entry is built from prefix + N filler chars matching the
@@ -150,11 +150,11 @@ func TestScanForSecrets_CleanInput_NoMatch(t *testing.T) {
 }
 
 // TestScanForSecrets_PatternCount verifies that exactly 10 classes are
-// registered, matching hooks/policy-block.sh HIGH_CONFIDENCE_SECRETS 1:1.
+// registered, matching hooks/ts/bodies/policy-block.ts HIGH_CONFIDENCE_SECRETS 1:1.
 func TestScanForSecrets_PatternCount(t *testing.T) {
 	const wantCount = 10
 	if len(highConfidenceSecrets) != wantCount {
-		t.Errorf("highConfidenceSecrets has %d entries, want %d (must match policy-block.sh HIGH_CONFIDENCE_SECRETS 1:1)",
+		t.Errorf("highConfidenceSecrets has %d entries, want %d (must match policy-block.ts HIGH_CONFIDENCE_SECRETS 1:1)",
 			len(highConfidenceSecrets), wantCount)
 	}
 }

@@ -1751,8 +1751,8 @@ Routing to architect to revise plan (iteration {N}/3)
 ```bash
 # Check idempotency first
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==1))" 2>/dev/null || echo 0)" = "0" ]; then
-  if test -x ~/.claude/hooks/notify-stage.sh; then
-    python3 -c "import json,sys; print(json.dumps({'stage':1,'label':'analysis','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{1-line summary ≤120 chars, no quotes}" "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  if test -f ~/.claude/hooks/ts/dist/notify-stage.cjs; then
+    python3 -c "import json,sys; print(json.dumps({'stage':1,'label':'analysis','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{1-line summary ≤120 chars, no quotes}" "{project root}" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
   else
     # append stage.notify.skipped with reason: wrapper-missing
     cat >> {docs_root}/{events_file} <<JSONL
@@ -2049,8 +2049,8 @@ Next: verify (tester + qa in parallel)
 ```bash
 # Fire only when this is the last task's Phase 2 in the last round
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==2))" 2>/dev/null || echo 0)" = "0" ]; then
-  if test -x ~/.claude/hooks/notify-stage.sh; then
-    python3 -c "import json,sys; print(json.dumps({'stage':2,'label':'implementation batch','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N} tasks implemented across {M} rounds. {K} files touched." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  if test -f ~/.claude/hooks/ts/dist/notify-stage.cjs; then
+    python3 -c "import json,sys; print(json.dumps({'stage':2,'label':'implementation batch','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N} tasks implemented across {M} rounds. {K} files touched." "{project root}" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
   else
     cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":2,"reason":"wrapper-missing"}
@@ -2519,8 +2519,8 @@ If verdict is `concerns`, list each concern as one line in the report so the use
 ```bash
 # Fire only when this is the last task's Phase 3.6 in the last round (or Phase 3.5 for hotfix+single-file)
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
-  if test -x ~/.claude/hooks/notify-stage.sh; then
-    python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean|N findings}." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  if test -f ~/.claude/hooks/ts/dist/notify-stage.cjs; then
+    python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean|N findings}." "{project root}" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
   else
     cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":3,"reason":"wrapper-missing"}
@@ -2771,8 +2771,8 @@ The orchestrator passes `04-internal-review.md` content to `delivery` for option
 
 ```bash
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==4))" 2>/dev/null || echo 0)" = "0" ]; then
-  if test -x ~/.claude/hooks/notify-stage.sh; then
-    python3 -c "import json,sys; print(json.dumps({'stage':4,'label':'delivery','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED|BLOCKED}" "{feature}" "Branch {branch}. Version {old} to {new}. Internal review: {C}C/{S}S/{N}N." "{project root}" | bash ~/.claude/hooks/notify-stage.sh
+  if test -f ~/.claude/hooks/ts/dist/notify-stage.cjs; then
+    python3 -c "import json,sys; print(json.dumps({'stage':4,'label':'delivery','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED|BLOCKED}" "{feature}" "Branch {branch}. Version {old} to {new}. Internal review: {C}C/{S}S/{N}N." "{project root}" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
   else
     cat >> {docs_root}/{events_file} <<JSONL
 {"ts":"$(date -Iseconds)","event":"stage.notify.skipped","feature":"{feature}","stage":4,"reason":"wrapper-missing"}
@@ -3820,7 +3820,7 @@ The summary is best-effort rendering; the JSONL is the durable record.
 
 ## Stage-end notification protocol
 
-The orchestrator emits one OS-native toast at the close of each of the four user-facing pipeline stages, independent of autonomy mode and pipeline outcome. This gives the developer a predictable "come back and look" signal without requiring them to poll `/th:pipelines`. The protocol is orthogonal to the Claude Code hook events in `~/.claude/settings.json` — the ultra-quiet preset stays unchanged; these toasts go through the `hooks/notify-stage.sh` wrapper invoked via the orchestrator's own `Bash` tool.
+The orchestrator emits one OS-native toast at the close of each of the four user-facing pipeline stages, independent of autonomy mode and pipeline outcome. This gives the developer a predictable "come back and look" signal without requiring them to poll `/th:pipelines`. The protocol is orthogonal to the Claude Code hook events in `~/.claude/settings.json` — the ultra-quiet preset stays unchanged; these toasts go through the compiled `hooks/ts/dist/notify-stage.cjs` bundle (native OS senders, no shell-out to a sibling script), invoked directly via the orchestrator's own `Bash` tool.
 
 Design rationale lives in `workspaces/orchestrator-stage-notifications/01-architecture.md`.
 
@@ -3842,7 +3842,7 @@ Design rationale lives in `workspaces/orchestrator-stage-notifications/01-archit
 | Stage 3 (verify) | `Pipeline {feature} · Stage 3 (verify) complete` | `Pipeline {feature} · Stage 3 (verify) FAILED` | success: `{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean\|N findings}.` failure: `Task-{i} verify failed: {tester\|qa\|security} verdict failed. {1-line summary}.` |
 | Stage 4 (delivery) | `Pipeline {feature} · Stage 4 (delivery) complete` | `Pipeline {feature} · Stage 4 (delivery) FAILED` or `Pipeline {feature} · Stage 4 (delivery) BLOCKED` | success: `Branch {branch}. Version {old} → {new}. Internal review: {C}C/{S}S/{N}N.` failure/blocked: `Delivery {error\|paused for amend}. See 00-state.md § Delivery.` |
 
-**How the toast renders on screen.** The `notify-{os}.sh` scripts derive the title from `basename($cwd)`, so the user sees:
+**How the toast renders on screen.** The notify-stage entry's native OS senders derive the title from `basename($cwd)`, so the user sees:
 ```text
 Title: Claude Code — claude-dev-team
 Body:  Pipeline my-feature · Stage 1 (analysis) complete — 2 tasks proposed across 1 service. Plan-reviewer verdict: pass.
@@ -3853,10 +3853,10 @@ Body:  Pipeline my-feature · Stage 1 (analysis) complete — 2 tasks proposed a
 The orchestrator constructs the payload using `python3 -c "json.dumps(...)"` with placeholders as positional arguments — never via string interpolation into a single-quoted `echo`. This prevents shell command injection (CWE-78) when feature names, summaries, or paths contain quotes or shell metacharacters.
 
 ```bash
-python3 -c "import json,sys; print(json.dumps({'stage':N,'label':'<label>','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "<status>" "<feature>" "<summary ≤120 chars>" "<project root>" | bash ~/.claude/hooks/notify-stage.sh
+python3 -c "import json,sys; print(json.dumps({'stage':N,'label':'<label>','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "<status>" "<feature>" "<summary ≤120 chars>" "<project root>" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
 ```
 
-The wrapper derives `last_assistant_message` from those fields (format: `Pipeline {feature} · Stage {N} ({label}) {STATUS} — {summary}`) and rebuilds a `{last_assistant_message, cwd}` payload for the OS-specific script.
+The entry derives the notification body from those fields (format: `Pipeline {feature} · Stage {N} ({label}) {STATUS} — {summary}`, capped at 300 chars) and sends it directly to the detected OS's native notifier — no intermediate payload or sibling script.
 
 ### Input sanitisation contract
 
@@ -3896,9 +3896,9 @@ The order at every insertion point is: write `phase.end` event → write `gate.p
 
 ### Failure-safety (best-effort, never blocks pipeline)
 
-1. **Wrapper missing** (`~/.claude/hooks/notify-stage.sh` not found): skip via `test -x` pre-check, append `stage.notify.skipped` with `reason: wrapper-missing`, continue.
-2. **OS unknown or wrapper exits non-zero**: the wrapper swallows errors and exits 0; from the orchestrator's perspective the call succeeded. `stage.notify` is appended regardless.
-3. **Wrapper found, call dispatched**: always append `stage.notify` after the bash call returns, accept that a wrapper-side failure is recorded as successful emission.
+1. **Artifact missing** (`~/.claude/hooks/ts/dist/notify-stage.cjs` not found, e.g. node was never available to build it): skip via `test -f` pre-check, append `stage.notify.skipped` with `reason: wrapper-missing`, continue.
+2. **OS unknown or the entry exits non-zero**: the entry swallows errors and exits 0; from the orchestrator's perspective the call succeeded. `stage.notify` is appended regardless.
+3. **Artifact found, call dispatched**: always append `stage.notify` after the node call returns, accept that an entry-side failure is recorded as successful emission.
 
 The guarantee mirrors the KG passive-capture pattern in `agents/delivery.md` § Step 11.5: the side-effect is best-effort; the pipeline MUST NOT be blocked by notification failure under any OS.
 

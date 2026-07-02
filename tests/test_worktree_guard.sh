@@ -2,7 +2,9 @@
 # tests/test_worktree_guard.sh
 # Suite 133 — worktree-guard-hook-behavior
 #
-# Functional tests for hooks/worktree-guard.sh — start-gate advisory hook.
+# Functional tests for hooks/ts/bodies/worktree-guard.ts (compiled to
+# hooks/ts/dist/worktree-guard.cjs — the single source of gate logic
+# post-cutover, issue #446) — start-gate advisory hook.
 #
 # The hook is a PreToolUse advisory gate that fires ONLY on agent-issued Bash
 # tool calls containing a branch/worktree-creation trigger token
@@ -10,17 +12,13 @@
 #   - nodecision (exit 0, empty stdout)  for non-Bash tools, non-trigger commands
 #   - permissionDecision: ask            for any trigger token (advisory, never blocks)
 #
-# Contract (hooks/worktree-guard.sh header): FAIL-OPEN — malformed/unparseable
-# payload with NO trigger token → nodecision; malformed payload where the raw
-# text DOES contain a trigger token → ask (fail-safe, never silently drops the
-# reminder). The hook must NEVER return "deny" or "allow" — advisory only.
-#
-# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
-# the compiled TS artifact (hooks/ts/dist/worktree-guard.cjs) when HOOK_IMPL=ts.
+# Contract: FAIL-OPEN — malformed/unparseable payload with NO trigger token →
+# nodecision; malformed payload where the raw text DOES contain a trigger
+# token → ask (fail-safe, never silently drops the reminder). The hook must
+# NEVER return "deny" or "allow" — advisory only.
 #
 # Usage:
 #   bash tests/test_worktree_guard.sh
-#   HOOK_IMPL=ts bash tests/test_worktree_guard.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
@@ -29,25 +27,11 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK_IMPL="${HOOK_IMPL:-bash}"
-HOOK_BASH="$REPO_ROOT/hooks/worktree-guard.sh"
-HOOK_TS="$REPO_ROOT/hooks/ts/dist/worktree-guard.cjs"
+HOOK="$REPO_ROOT/hooks/ts/dist/worktree-guard.cjs"
 
-if [ "$HOOK_IMPL" = "ts" ]; then
-    HOOK="$HOOK_TS"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
-        exit 1
-    fi
-else
-    HOOK="$HOOK_BASH"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: hooks/worktree-guard.sh not found at $HOOK"
-        exit 1
-    fi
-    if [ ! -x "$HOOK" ]; then
-        chmod +x "$HOOK"
-    fi
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
 
 PASS=0
@@ -91,11 +75,7 @@ print(json.dumps(payload))
 # Run the hook; print stdout (decision JSON or empty).
 run_hook() {
     local payload="$1"
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        node "$HOOK" <<< "$payload" 2>&1
-    else
-        bash "$HOOK" <<< "$payload" 2>&1
-    fi
+    node "$HOOK" <<< "$payload" 2>&1
 }
 
 # Assert hook emits "ask".

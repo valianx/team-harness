@@ -1,26 +1,23 @@
 #!/bin/bash
 # tests/test_language_user_prompt.sh
-# Regression tests for hooks/language-user-prompt.sh (AC-1..AC-6, SEC-DR-A)
+# Regression tests for hooks/ts/bodies/language-user-prompt.ts (compiled to
+# hooks/ts/dist/language-user-prompt.cjs — the single source of gate logic
+# post-cutover, issue #446) (AC-1..AC-5, SEC-DR-A)
 # Suite 7 — per-turn UserPromptSubmit language directive.
 #
 # Each case writes a temporary ~/.claude/.team-harness.json (or omits it),
 # invokes the hook with stdin drained, and asserts stdout + exit code.
-# AC-5 and AC-6 are registration-presence checks against repo manifest files.
+# AC-5 is a registration-presence check against the plugin's hooks.json.
 #
-# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
-# the compiled TS artifact (hooks/ts/dist/language-user-prompt.cjs) when
-# HOOK_IMPL=ts. AC-1/AC-2/AC-3/AC-4 assert on the envelope AND the
-# additionalContext VALUE on both legs (T6c): the CC entry adapter now emits
-# the wrapped hookSpecificOutput envelope, closing the bare-vs-wrapped gap
-# documented in 02-implementation-t6a.md "Divergences found".
+# AC-1/AC-2/AC-3/AC-4 assert on the envelope AND the additionalContext VALUE:
+# the CC entry adapter emits the wrapped hookSpecificOutput envelope.
 #
 # Usage:
 #   bash tests/test_language_user_prompt.sh
-#   HOOK_IMPL=ts bash tests/test_language_user_prompt.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
-# Design mirrors tests/test_language_hook.sh (Suite 6):
+# Design mirrors tests/test_session_start.sh (Suite 6):
 #   - HOME override via a temp directory so the hook reads the temp config
 #   - stdin drained via here-string (hook drains stdin at startup)
 #   - grep-based assertions on stdout (no jq requirement)
@@ -28,23 +25,12 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK_IMPL="${HOOK_IMPL:-bash}"
-HOOK_BASH="$REPO_ROOT/hooks/language-user-prompt.sh"
-HOOK_TS="$REPO_ROOT/hooks/ts/dist/language-user-prompt.cjs"
+HOOK="$REPO_ROOT/hooks/ts/dist/language-user-prompt.cjs"
 
-if [ "$HOOK_IMPL" = "ts" ]; then
-    HOOK="$HOOK_TS"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
-        exit 1
-    fi
-else
-    HOOK="$HOOK_BASH"
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
-
-# The hook may not exist yet (Phase 2.0 — failing test mode).
-# Do NOT abort if it is missing; cases will simply produce no output and fail
-# the positive assertions, which is the expected red state.
 
 PASS=0
 FAIL=0
@@ -81,11 +67,7 @@ make_tmp_home_no_config() {
 #   Returns stdout. Exit code is captured separately when needed.
 run_hook() {
     local fake_home="$1"
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
-    else
-        HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
-    fi
+    HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
 }
 
 # run_hook_with_exit <fake_home>
@@ -94,11 +76,7 @@ run_hook_with_exit() {
     local fake_home="$1"
     local out
     local code
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
-    else
-        out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
-    fi
+    out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
     code=$?
     printf '%s' "$out"
     printf '\nEXIT:%d' "$code"
@@ -375,10 +353,12 @@ assert_no_output_exit0 "AC-4 (SEC-DR-A): en+newline+injection -> rejected" "$TMP
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# AC-5 (registration, plugin mode):
+# AC-5 (registration, plugin mode — the ONLY CC wiring path post-cutover):
 #   .claude-plugin/hooks.json must contain a UserPromptSubmit entry whose
-#   command invokes language-user-prompt.sh.
-#   Per the plan: no matcher field on that entry (UserPromptSubmit ignores matchers).
+#   command invokes the fail-closed launcher with the language-user-prompt
+#   hook name. Per the plan: no matcher field on that entry (UserPromptSubmit
+#   ignores matchers). The installer's hooks/config.json wiring template was
+#   retired along with the Go installer's CC path — no successor check needed.
 # ---------------------------------------------------------------------------
 echo
 echo "=== AC-5: .claude-plugin/hooks.json registration ==="
@@ -391,45 +371,9 @@ assert_file_contains \
     '"UserPromptSubmit"'
 
 assert_file_contains \
-    "AC-5b: hooks.json UserPromptSubmit entry invokes language-user-prompt.sh" \
+    "AC-5b: hooks.json UserPromptSubmit entry invokes run-ts-hook.sh language-user-prompt" \
     "$PLUGIN_HOOKS" \
-    "language-user-prompt.sh"
-
-# ---------------------------------------------------------------------------
-# AC-6 (registration, installer mode):
-#   hooks/config.json must contain a UserPromptSubmit entry invoking
-#   language-user-prompt.sh in EACH of the windows, macos, and linux blocks.
-#   We assert the script name appears at least 3 times (once per OS block).
-# ---------------------------------------------------------------------------
-echo
-echo "=== AC-6: hooks/config.json registration (all three OS blocks) ==="
-
-INSTALLER_HOOKS="$REPO_ROOT/hooks/config.json"
-
-assert_file_contains \
-    "AC-6a: config.json contains UserPromptSubmit key" \
-    "$INSTALLER_HOOKS" \
-    '"UserPromptSubmit"'
-
-assert_file_contains \
-    "AC-6b: config.json invokes language-user-prompt.sh" \
-    "$INSTALLER_HOOKS" \
-    "language-user-prompt.sh"
-
-# Verify the script name appears in all three OS blocks by checking count >= 3.
-# Each OS block (windows/macos/linux) must have its own entry.
-# Trim trailing whitespace/newlines from grep -c output for safe integer comparison.
-count=$(grep -c "language-user-prompt.sh" "$INSTALLER_HOOKS" 2>/dev/null | tr -d '[:space:]')
-count="${count:-0}"
-ac6c_name="AC-6c: language-user-prompt.sh present in all 3 OS blocks (count>=3, got $count)"
-if [ "$count" -ge 3 ] 2>/dev/null; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] $ac6c_name"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("$ac6c_name — found $count occurrence(s) in $INSTALLER_HOOKS, expected >=3 (one per OS block)")
-    echo "  [FAIL] $ac6c_name"
-fi
+    "run-ts-hook.sh language-user-prompt"
 
 # ---------------------------------------------------------------------------
 # Summary

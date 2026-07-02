@@ -1,49 +1,29 @@
 #!/bin/bash
 # tests/test_policy_block.sh
-# Functional tests for hooks/policy-block.sh
-# Each case feeds a tool-call JSON payload to the hook and asserts the output:
+# Functional tests for hooks/ts/bodies/policy-block.ts (compiled to
+# hooks/ts/dist/policy-block.cjs — the TS body is the single source of gate
+# logic post-cutover, issue #446). Each case feeds a tool-call JSON payload
+# to the hook and asserts the output:
 #   - "deny" cases must produce a JSON with permissionDecision: "deny"
 #   - "allow" cases must produce empty stdout (no JSON, hook lets the call through)
 #
-# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
-# the compiled TS artifact (hooks/ts/dist/policy-block.cjs) when HOOK_IMPL=ts,
-# so a behavioral gap between the two implementations turns this suite red.
-#
 # Usage:
 #   ./tests/test_policy_block.sh
-#   HOOK_IMPL=ts ./tests/test_policy_block.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK_IMPL="${HOOK_IMPL:-bash}"
-HOOK_BASH="$REPO_ROOT/hooks/policy-block.sh"
-HOOK_TS="$REPO_ROOT/hooks/ts/dist/policy-block.cjs"
+HOOK="$REPO_ROOT/hooks/ts/dist/policy-block.cjs"
 
-if [ "$HOOK_IMPL" = "ts" ]; then
-    HOOK="$HOOK_TS"
-    if [ ! -f "$HOOK" ]; then
-        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
-        exit 1
-    fi
-else
-    HOOK="$HOOK_BASH"
-    if [ ! -x "$HOOK" ]; then
-        chmod +x "$HOOK"
-    fi
+if [ ! -f "$HOOK" ]; then
+    echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
+    exit 1
 fi
 
-# Dispatch to the runtime under test — bash for the .sh oracle, node for the
-# compiled .cjs artifact. Preserves stdin/env/redirection at call sites
-# (env-var prefixes on a function call apply for its duration, same as a command).
 _exec_hook() {
-    if [ "$HOOK_IMPL" = "ts" ]; then
-        node "$HOOK"
-    else
-        bash "$HOOK"
-    fi
+    node "$HOOK"
 }
 
 PASS=0
@@ -482,38 +462,6 @@ echo "=== M3c: SEC-002 — --no-verify inside -m body must NOT be denied (ALLOW)
 # Both the python3 path and the bash-degraded path must agree: no-decision (ALLOW).
 assert_allow "git commit -m body mentions --no-verify (false positive guard)" \
   '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"fixes the --no-verify bypass\""}}'
-
-echo
-echo "=== [Degraded-path] Write content with SendGrid key (DENY on bash fallback) ==="
-# SEC-A-02: verify the bash degraded path's Write/Edit content scan detects the new
-# HIGH patterns. Force the degraded path by injecting a fake python3 that exits 127
-# (the documented "absent python3 simulation" — policy-block.sh treats it as absent
-# and falls back to the native bash gate).
-# Bash-only: this exercises policy-block.sh's own python3-absent fallback, a
-# concept with no TS equivalent (Node has no python3 dependency to degrade from).
-if [ "$HOOK_IMPL" = "bash" ]; then
-_DEGRADED_FAKE_DIR="$(mktemp -d)"
-cat > "$_DEGRADED_FAKE_DIR/python3" <<'SH'
-#!/bin/bash
-exit 127
-SH
-chmod +x "$_DEGRADED_FAKE_DIR/python3"
-_SG_KEY_DEG="SG.""AAAAAAAAAAAAAAAAAAAAAA.""BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
-_degraded_out=$(
-    PATH="$_DEGRADED_FAKE_DIR:$PATH"
-    echo '{"tool_name":"Write","tool_input":{"file_path":"/app/mail.py","content":"KEY=\"'"$_SG_KEY_DEG"'\""}}' \
-        | bash "$HOOK" 2>&1
-)
-if echo "$_degraded_out" | grep -qE '"permissionDecision": *"deny"'; then
-    PASS=$((PASS + 1))
-    echo "  [PASS] DENY: Write SendGrid key — degraded-path Write/Edit detection (SEC-A-02)"
-else
-    FAIL=$((FAIL + 1))
-    FAILURES+=("DENY expected for degraded-path Write/SendGrid (SEC-A-02): ${_degraded_out:-<empty>}")
-    echo "  [FAIL] DENY: Write SendGrid key — degraded-path Write/Edit detection (SEC-A-02) (got: ${_degraded_out:-<empty>})"
-fi
-rm -rf "$_DEGRADED_FAKE_DIR"
-fi
 
 echo
 echo "=== M3: FAIL-CLOSED — unmatched edge payload (ALLOW / no-decision) ==="

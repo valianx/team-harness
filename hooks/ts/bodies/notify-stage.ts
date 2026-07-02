@@ -1,17 +1,20 @@
 // hooks/ts/bodies/notify-stage.ts
-// Canonical body — port of hooks/notify-stage.sh stage-toast router.
+// Canonical body — native TS port of the former notify-stage.sh +
+// notify-{windows,mac,linux}.sh family (hook cutover, issue #446). Sends the
+// OS-native notification directly (no shell-out to a sibling script) — the
+// per-platform branching that used to live in three separate Bash files now
+// lives in the entry's NotifyStageRunner implementation.
 //
 // CONTRACT:
 //   - NEVER emits a permissionDecision (never blocks).
 //   - ALWAYS succeeds (exit 0 on every path).
 //   - Profile gate: suppressed under TH_HOOK_PROFILE=minimal (idle-notify class).
-//   - Invoked by the orchestrator at stage boundaries (not a CC PreToolUse hook).
+//   - Invoked by the orchestrator at stage boundaries (its own Bash tool call,
+//     piping a JSON payload — not a CC hook event) AND wired as the plugin's
+//     Notification/idle_prompt hook.
 //
-// NOTIFY-STAGE IS SPECIAL: it is NOT a CC hook — it is orchestrator-invoked.
-// There is no CC entry for it in config.json. The CC entry is a no-op stub.
-// The opencode entry routes to OS notification scripts.
-//
-// The body exposes a NotifyStageRunner interface for testability.
+// The body exposes a NotifyStageRunner interface for testability — the CC
+// entry supplies the real OS-detection + native-notification implementation.
 //
 // IMPORTS hook-profile: YES. This is a notification hook — the hook-profile
 // helper is sourced ONLY by observability/notification bodies.
@@ -36,12 +39,10 @@ export interface NotifyStagePayload {
 // ---------------------------------------------------------------------------
 
 export interface NotifyStageRunner {
-  /** Run a sub-notify script. Returns null on success, error message on failure. */
-  runNotify(scriptPath: string, message: string, cwd: string): string | null;
+  /** Send a native OS notification. Returns null on success, error message on failure. */
+  sendNotification(title: string, body: string): string | null;
   /** Detect the OS. Returns "windows" | "mac" | "linux" | "unknown". */
   detectOS(): "windows" | "mac" | "linux" | "unknown";
-  /** Resolve the hooks directory path. */
-  hooksDir(): string;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,19 +60,14 @@ function buildMessage(payload: NotifyStagePayload): string {
 }
 
 // ---------------------------------------------------------------------------
-// notifyScript() — maps OS to the matching notify-{os}.sh script.
-// Returns null for unknown OS (exit-0 silently).
+// buildTitle() — mirrors the TITLE construction shared by the former
+// notify-{windows,mac,linux}.sh scripts: "Claude Code — <project>", where
+// <project> is the basename of the payload's cwd.
 // ---------------------------------------------------------------------------
 
-function notifyScript(runner: NotifyStageRunner): string | null {
-  const os = runner.detectOS();
-  const dir = runner.hooksDir();
-  switch (os) {
-    case "windows": return `${dir}/notify-windows.sh`;
-    case "mac":     return `${dir}/notify-mac.sh`;
-    case "linux":   return `${dir}/notify-linux.sh`;
-    default:        return null;
-  }
+function buildTitle(cwd: string): string {
+  const project = cwd.split(/[\\/]/).filter(Boolean).pop() ?? "";
+  return `Claude Code — ${project}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,16 +85,18 @@ export function evaluateNotifyStage(
       return null; // suppressed
     }
 
-    const script = notifyScript(runner);
-    if (script === null) {
-      return null; // unknown OS → exit 0 silently
+    const os = runner.detectOS();
+    if (os === "unknown") {
+      return null; // unrecognized OS → exit 0 silently
     }
 
     const message = buildMessage(payload);
     const cwd = String(payload.cwd ?? "");
+    const title = buildTitle(cwd);
+    const body = message.slice(0, 300) || "Waiting for input";
 
-    // Run the downstream notify script.
-    const err = runner.runNotify(script, message, cwd);
+    // Send the native notification.
+    const err = runner.sendNotification(title, body);
     if (err !== null) {
       // Non-fatal: notification failure never blocks anything.
       return null;

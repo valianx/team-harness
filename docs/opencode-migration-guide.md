@@ -1,8 +1,6 @@
 # Opencode Migration Guide
 
-> **Status: process design only.** This document describes the migration process for converting team-harness assets from Claude Code format to the target second harness format. It does NOT perform the migration. No `agents/`, `skills/`, or `hooks/` file is modified by this document. The actual migration — rewriting the 18 Bash hooks to TypeScript, materializing the `.opencode/` directory structure, building adapters — is future work tracked separately. This guide is written before the migration begins so the process is fully specified and reviewable before any conversion starts.
->
-> **Interim canonicality (declared 2026-07-01, issue batch #446-452, T6a).** The 11 hook families wired into Claude Code already have a TS port (`hooks/ts/bodies/`), but `hooks.json`/`config.json` still invoke the Bash `.sh` files. **Until the CC cutover lands (Group B), Bash is the canonical source of gate logic for Claude Code and TS is the generated/hand-ported projection** — a divergence between the two is a defect in the TS projection, not an ambiguity about which side is authoritative. The dual-target functional-suite mechanism (`HOOK_IMPL=bash|ts` in `tests/run-all.sh`) is the verification spike required by point 4 above; it runs the existing Bash-oracle test cases against the compiled TS artifacts for every wired hook family. This line is superseded, not accumulated, when Group B completes the cutover and TS becomes canonical for both runtimes.
+> **Status: hook cutover complete (declared 2026-07-02, issue batch #446-452, T6b).** **TypeScript is the single source of gate logic for both Claude Code and opencode.** The former interim declaration (Bash canonical, TS the generated projection) is superseded, not accumulated: the hook Bash->TS cutover retired all 11 Bash hook bodies (`hooks/*.sh`) along with the Go installer's Claude Code path — the marketplace plugin (`.claude-plugin/hooks.json`) wires every CC gate through `hooks/run-ts-hook.sh`, a fail-closed launcher with no gate logic of its own, execing the same compiled `hooks/ts/dist/*.cjs` artifacts opencode consumes. A divergence between CC and opencode behavior is now a defect in the shared TS body, not an interim-authority question. Only `hooks/sketch-guard.sh` (not an event hook — invoked via the Bash tool, not wired in `hooks.json`) remains Bash. This document's remaining scope is the asset-type migration process below (skills, agents, `AGENTS.md`) — the hook-specific migration section it used to describe is complete.
 
 ---
 
@@ -30,7 +28,9 @@ This transform is reversible and idempotent. The canonical body remains in `agen
 
 ### Hooks
 
-**Hard case — TypeScript rewrite required.**
+**Complete as of the hook Bash->TS cutover (issue #446, 2026-07-02).** The process below is retained as the design record of how the rewrite was carried out; every wired CC hook family now has a TS body under `hooks/ts/bodies/`, and the Claude Code plugin wires them through `hooks/run-ts-hook.sh` (a fail-closed launcher with no gate logic).
+
+**Hard case — TypeScript rewrite required (historical framing, now executed).**
 
 The target harness does not execute shell scripts as hooks. Its hook model uses TypeScript/JavaScript plugins on Bun, registered as async event callbacks in `.opencode/plugins/`. There is no execution-model bridge that converts a Bash hook body into a TS plugin without a rewrite. This is the only fundamentally incompatible surface.
 
