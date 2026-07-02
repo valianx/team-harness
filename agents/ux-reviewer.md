@@ -187,6 +187,7 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 agent: ux-reviewer
 mode: enrich | validate
 status: success | blocked | failed
+model: {effective-model-id}
 output: workspaces/{feature-name}/{01-ux-review|04-ux-validation}.md
 findings: {critical: N, high: N, medium: N, suggestion: N}
 ac_added: {count of AC added, enrich mode only}

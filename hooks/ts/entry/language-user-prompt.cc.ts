@@ -2,8 +2,10 @@
 // Claude Code (Node) entry for language-user-prompt.
 // Reads stdin → shim.inboundCC → body (with real reader) → stdout JSON.
 //
-// Output format for UserPromptSubmit hooks:
-//   { "additionalContext": "<string>" }  — if a language is configured
+// Output format for UserPromptSubmit hooks (per code.claude.com/docs/en/hooks,
+// verified via context7 — matches hooks/language-user-prompt.sh:86-89 exactly):
+//   {"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"<string>"}}
+//                                         — if a language is configured
 //   {} (empty stdout)                    — if no language configured
 //
 // NEVER blocks. Exit 0 always.
@@ -48,8 +50,15 @@ async function main(): Promise<void> {
     const output = evaluateLanguagePrompt(normalized, reader);
 
     if (output.additionalContext !== null) {
+      // Emit the CC UserPromptSubmit envelope — hookSpecificOutput wrapper,
+      // not a bare top-level additionalContext (that form is not honoured by CC).
       process.stdout.write(
-        JSON.stringify({ additionalContext: output.additionalContext }) + "\n"
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "UserPromptSubmit",
+            additionalContext: output.additionalContext,
+          },
+        }) + "\n"
       );
     }
   } catch (err) {

@@ -366,7 +366,8 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
          agent:     .[0].agent,
          phases:    [.[] | .phase],
          tokens:    [.[] | .tokens // 0] | add,
-         estimated: ([.[] | select(.tokens_estimated == true)] | length)
+         estimated: ([.[] | select(.tokens_estimated == true)] | length),
+         models:    [.[] | .model // empty] | unique
        })
      '
    ```
@@ -380,10 +381,13 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
        agent:     .[0].agent,
        phases:    [.[] | .phase],
        tokens:    [.[] | .tokens // 0] | add,
-       estimated: ([.[] | select(.tokens_estimated == true)] | length)
+       estimated: ([.[] | select(.tokens_estimated == true)] | length),
+       models:    [.[] | .model // empty] | unique
      })
    ' workspaces/{feature-name}/00-execution-events.jsonl
    ```
+
+   `models` is the deduplicated list of `event.model` values reported across that agent's phases (empty entries dropped). An empty `models` array means no event in this trace reported `model` — classification falls through to frontmatter/static-list (step 4).
 
    **If `jq` is not available, fall back to `python3`:**
 
@@ -391,7 +395,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
    # Works for both .jsonl (read direct) and .md (extract fence first with sed -n)
    python3 -c "
    import json, sys, collections
-   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'estimated': 0})
+   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'estimated': 0, 'models': set()})
    by_phase = []
    for line in sys.stdin:
        try:
@@ -404,19 +408,42 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
        phase = e.get('phase', '?')
        tokens = e.get('tokens') or 0
        est = 1 if e.get('tokens_estimated') else 0
+       model = e.get('model')
        by_agent[agent]['tokens'] += tokens
        by_agent[agent]['phases'].append(phase)
        by_agent[agent]['estimated'] += est
-       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'estimated': est})
+       if model:
+           by_agent[agent]['models'].add(model)
+       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'estimated': est, 'model': model})
    total = sum(v['tokens'] for v in by_agent.values())
    est_phases = sum(v['estimated'] for v in by_agent.values())
-   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'estimated': v['estimated']} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'est_phases': est_phases}))
+   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'estimated': v['estimated'], 'models': sorted(v['models'])} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'est_phases': est_phases}))
    "
    ```
 
-4. Compute cost if `has_pricing == true`. Model classification:
-   - `architect` agent → use `pricing.opus` rates.
-   - All other agents → use `pricing.sonnet` rates.
+4. Compute cost if `has_pricing == true`. Model classification uses the same
+   priority order as `docs/observability.md § Derivation rule` — this skill
+   MUST NOT diverge from that document:
+   - **Primary path — `event.model` / the per-agent `models` list.** When a
+     phase (by-phase table) or an agent's `models` list (by-agent table)
+     carries a non-empty `model` value, classify from it directly: `opus`
+     when the value starts with `claude-opus` or equals `opus`; `sonnet`
+     otherwise. If an agent's `models` list has more than one distinct value
+     (a session model override applied to some but not all of that agent's
+     dispatches), classify each phase row individually from its own
+     `event.model` and fall back to the next path only for phases with no
+     `model` reported.
+   - **Fallback path — frontmatter `model:` field.** When `model` is absent
+     for that phase/agent, read `agents/{agent}.md` YAML frontmatter. `opus`
+     when it starts with `claude-opus` or equals `opus`; `sonnet` otherwise.
+   - **Static opus-agent fallback** (only when both paths above are
+     unavailable): `architect`, `security`, `adversary`, `qa-plan`,
+     `ux-reviewer`, `reviewer`, `reviewer-consolidator`, `agent-builder`,
+     `mentor`, `gcp-infra`, `gcp-cost-analyzer`, `orchestrator` → `opus`.
+     This list MUST match `docs/observability.md § Derivation rule` verbatim
+     — do not edit one without the other.
+   - **No "all others → sonnet" default.** When none of the three paths
+     resolve, classify as `sonnet` and mark the row with `(?)`.
    - When `tokens_in` / `tokens_out` are available in the event, use
      `(tokens_in × input + tokens_out × output) / 1_000_000`.
    - When only `tokens` total is available, use
@@ -456,6 +483,39 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
      ```
      and fall back to printing the `## Cost` section of `00-pipeline-summary.md`
      (if it exists).
+
+---
+
+## Parallel region rendering (fan-out)
+
+**When rendered:** in default mode (no flag), after the `00-pipeline-summary.md` printout, when the feature's `00-state.md` declares `initiative: {name}` and an initiative-level `00-execution-events` file exists (`docs/observability.md § Initiative-level fan-out trace`). No new flag — this is additive output on the existing default-mode invocation.
+
+**Source:** the initiative-level file lives at the initiative root, not inside `workspaces/{feature-name}/`:
+```text
+{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/00-execution-events.jsonl   (local mode)
+{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md  (obsidian mode)
+```
+Detect the `.md` variant first (Glob), then `.jsonl`, applying the same fence-extraction as every other mode above.
+
+**Derivation.** Filter to `fanout.*` events. Group `fanout.lane.start` / `fanout.lane.end` pairs by `project` (matched on the shared `project` key). A lane with a `start` and no matching `end` is still running; a lane with both is closed, with `end.status` (`success`/`failed`/`iterating`) as its outcome. `fanout.converge` marks the region's closing boundary — its `lanes[]` array is the authoritative per-lane final status when present.
+
+**Render:**
+```text
+Parallel region — {initiative}
+=============================
+fanout.start  {ts}  eligible: {eligible_projects joined by ", "}  cap: {cap}
+
+  {project-a}   {ts_start} → {ts_end | "running"}   {status}
+  {project-b}   {ts_start} → {ts_end | "running"}   {status}
+
+fanout.converge  {ts | "(not yet — region still open)"}
+```
+
+Lanes render side-by-side in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while a region is open.
+
+**`--cost` interaction.** When a `fanout.start`/`fanout.converge` pair is present, `--cost` sums token counts across all lanes' own `{project}/00-execution-events.*` files (each lane keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`.
+
+**Fail-soft.** No `initiative` field, no initiative-level events file, no `fanout.*` events, or a read/parse error → omit this section silently. It never blocks or degrades any other mode.
 
 ---
 

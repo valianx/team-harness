@@ -145,6 +145,60 @@ This makes the breadcrumb a deterministic observability floor: any `TH_HOOK_PROF
 value can suppress notifications and richer observability, but it cannot erase
 proof that a `th:*` boundary occurred.
 
+### subagent.start — PreToolUse breadcrumb (start-side twin)
+
+Written by `hooks/ts/dist/subagent-start.cjs` (PreToolUse event, matcher
+`Task`). This is the first hook authored under Decision A (CLAUDE.md §6.3)
+with no Bash body — TypeScript is the single source, not a port. It fires
+BEFORE a Team Harness pipeline subagent (`subagent_type` starting with
+`th:`) is dispatched and appends one line to the SAME `00-subagent-trace.jsonl`
+sink as the `subagent.stop` breadcrumb above, so start/stop pairs are
+derivable from a single file.
+
+Line schema:
+```json
+{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>"}
+```
+
+`agent_id` is intentionally absent — at PreToolUse time the runtime has not
+yet assigned one (it only becomes observable on the corresponding
+`SubagentStop` payload). Readers pair a `subagent.start` line with the next
+`subagent.stop` line carrying the same `agent_type` in file order.
+
+**Complements, never replaces, `phase.end`.** Same relationship as the stop
+breadcrumb: this file proves a `th:*` boundary occurred and, paired with the
+stop line, how long it has been in flight — it carries no tokens, no
+per-phase detail, no result. The orchestrator's `phase.end` events remain the
+authoritative rich record.
+
+**Wiring asymmetry (temporary).** `.claude-plugin/hooks.json` wires this hook
+directly to `node ${CLAUDE_PLUGIN_ROOT}/hooks/ts/dist/subagent-start.cjs` —
+there is no fail-closed launcher yet (that mechanism lands with the
+Bash→TS hook cutover). `hooks/config.json` (the legacy Go-installer path)
+does NOT wire this hook: the legacy installer does not yet copy
+`hooks/ts/dist/` to `~/.claude/hooks/`, so a launcher-less direct `node`
+command would point at a path that does not exist on that install path. The
+cutover task closes this asymmetry by teaching `installHooks` to copy
+`hooks/ts/dist/*.cjs` and wiring both paths through the same launcher.
+
+**Fail-open, not fail-closed.** Absent `node`, a missing `.cjs`, or any
+internal error degrades to a lost breadcrumb — it never blocks the `Task`
+dispatch. This is deliberate: this hook pilots the `node → dist/*.cjs`
+execution mechanism on a live fleet, at a cost of a lost breadcrumb, ahead of
+the security floors adopting the same mechanism behind a fail-closed launcher.
+
+**Non-suppressible by design.** Unlike `subagent-trace.ts` (the stop-side TS
+body, which is gated by `observabilityEnabled("pipeline-observability")`),
+the start-side body does NOT import the hook-profile helper — it inherits the
+Bash oracle's original invariant that this class of breadcrumb must never be
+erasable by `TH_HOOK_PROFILE`.
+
+**Reader.** `/th:pipelines` derives in-flight lanes (agent type + elapsed
+time since start) from unpaired `subagent.start` lines and shows duration for
+complete start/stop pairs; the render is fail-soft (no file, or no pairs,
+omits the section silently). See `skills/pipelines/SKILL.md § In-flight
+lanes`.
+
 ### 00-precompact.jsonl — PreCompact breadcrumb
 
 Written by `hooks/precompact-snapshot.sh` (PreCompact event, matcher
@@ -241,6 +295,8 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 **`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps) and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure.
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when a fan-out is actually dispatched. Single-project runs (`initiative: null`) and serial multi-project runs do not produce this file. The file is mandatory for any run where `fanout.start` fires — a fan-out that emits no initiative-level trace violates the observability contract.
+
+**Implementation status.** Both renderers documented above are implemented: `skills/pipelines/SKILL.md § Initiative fan-out — parent/child lane rows` and `skills/trace/SKILL.md § Parallel region rendering (fan-out)`.
 
 ## Additional pipeline event types
 
@@ -409,18 +465,27 @@ trace, not an independent source.
 1. Read all `phase.end` events from `{docs_root}/{events_file}`.
 2. For each event, extract `agent`, `phase`, `tokens`, and `tokens_estimated`.
 3. Classify the agent's model tier using the following priority order:
-   - **Primary path — read frontmatter `model:` field.** Locate `agents/{agent}.md` and
-     read its YAML frontmatter `model:` field. Classify as `opus` when `model` starts with
-     `claude-opus` or equals `opus`; classify as `sonnet` otherwise.
-   - **Static opus-agent fallback** (used only when frontmatter is unreadable — file absent,
-     not parseable, or `model:` key missing): treat these agents as `opus` regardless of any
-     other assumption:
+   - **Primary path — `event.model` field.** When the `phase.end` event itself carries a
+     `model` field (propagated verbatim from the agent's status block — see
+     `agents/orchestrator.md` § "Populating the `model`/`effort` fields on `phase.end`"),
+     classify directly from it: `opus` when `model` starts with `claude-opus` or equals
+     `opus`; `sonnet` otherwise. This is the authoritative source once populated — it
+     reflects what the agent actually ran under, including under a session model override
+     (`agents/orchestrator.md` § "Session model override"), which frontmatter cannot express.
+   - **Fallback path — read frontmatter `model:` field.** When `event.model` is absent (the
+     event predates this field, or the agent instance had not yet adopted it), locate
+     `agents/{agent}.md` and read its YAML frontmatter `model:` field. Classify as `opus`
+     when `model` starts with `claude-opus` or equals `opus`; classify as `sonnet` otherwise.
+   - **Static opus-agent fallback** (used only when BOTH `event.model` is absent AND
+     frontmatter is unreadable — file absent, not parseable, or `model:` key missing): treat
+     these agents as `opus` regardless of any other assumption:
      `architect`, `security`, `adversary`, `qa-plan`, `ux-reviewer`, `reviewer`,
      `reviewer-consolidator`, `agent-builder`, `mentor`, `gcp-infra`, `gcp-cost-analyzer`,
-     `orchestrator`.
-   - **No "all others → sonnet" default.** When frontmatter is unreadable AND the agent
-     is not in the static opus list above, classify as `sonnet` and mark the row with `(?)` to
-     signal that the classification is uncertain.
+     `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
+     same enumeration and MUST NOT diverge from it.
+   - **No "all others → sonnet" default.** When none of the three paths above resolve a
+     classification, classify as `sonnet` and mark the row with `(?)` to signal that the
+     classification is uncertain.
 4. Compute cost per phase using the price table (see above). Sum to get total.
 5. Build the per-agent and per-phase tables.
 6. Count phases where `tokens_estimated == true` for the header annotation.
@@ -456,6 +521,14 @@ Both are written exclusively by the orchestrator. Agents return tool-usage count
 ### tokens field on phase.end
 
 Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/`Task()` metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true`. **Zero is forbidden** — a zero token count is indistinguishable from a missing field and breaks the cost rollup.
+
+### model / effort fields on phase.end
+
+Every leaf agent's status block declares its effective model on a `model:` line (mandatory) and, when known, its effective effort level on an `effort:` line (optional) — see `agents/_shared/output-template.md` § "Status block — common fields". The orchestrator propagates both verbatim onto the corresponding `phase.end` event's `model` / `effort` fields, using the same propagation mechanism already used for `tools` (see `agents/orchestrator.md` § "Populating the `model`/`effort` fields on `phase.end`"). Both fields are optional at the schema level — legacy events and events from agents that have not yet reported the fields simply omit them, and classification falls through to frontmatter/static-list inference (see § Derivation rule below).
+
+This is the field that makes a session model override (`agents/orchestrator.md` § "Session model override") observable in the trace: the frontmatter `model:` in `agents/{agent}.md` is only the agent's *default*; `event.model` on a given `phase.end` is what that specific dispatch actually ran under.
+
+**Session model override — distinct from the config-override whitelist.** The session model override (an operator utterance such as "use the bigger model for analysis this session") is recorded exclusively in `00-state.md § Current State` and applies only to analysis-tier dispatches (`architect`, the plan-review panel, consolidators) for the current session — it is never written to `~/.claude/.team-harness.json`. This is a **separate mechanism** from the session-scoped config override whitelist (CLAUDE.md §5), which governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and which continues to explicitly EXCLUDE `model`. The two must not be conflated: the config whitelist is about persisted-vs-session config keys reachable from `/th:setup`; the session model override is a dispatch-time-only instruction that never touches config and is discarded at session end. Full mechanism: `agents/orchestrator.md` § "Session model override".
 
 ### kg_write write-integrity rollup
 
@@ -494,7 +567,7 @@ The decision-ledger provides a durable audit trail of every judgement call made 
 
 - **Gate verdicts** — why a plan-review or acceptance-gate passed, raised concerns, or failed.
 - **Operator approvals** — what the operator explicitly approved or rejected at each STAGE-GATE, and any reason they gave.
-- **Finding dispositions** — how security, QA, and reviewer findings were classified (accepted, deferred to watch-list, or rejected as non-applicable).
+- **Finding dispositions** — how security, QA, and reviewer findings were classified (accepted, deferred to watch-list, or rejected as non-applicable). This includes both gate-scoped findings (Phase 1.6, 3.5, 3.6, STAGE-GATE-1) and per-comment classifications from an `apply-review` round (`phase: "4.5-review"` — see "disposition at apply-review rounds" below).
 - **Dry-run enforcement** — when a deploy or migration action was routed through a dry-run / plan-only path before any apply, recording which existing hook gated the apply.
 
 ### Schema (4 event types)
@@ -516,6 +589,8 @@ Every line is a JSON object. One JSON object per line, append-only, never rewrit
 | `guard` | conditional | For `dry-run-enforced`: which existing deterministic floor gated the apply (`gcp-guard.sh`, `dev-guard.sh`, `policy-block.sh`). Required for `dry-run-enforced` — names the enforcement layer the ledger is auditing. |
 
 **Disposition vocabulary** (`decision` field when `event == "disposition"`): `accept` (finding acknowledged and accepted as-is), `watch` (accept-with-followup; operator adds to a deferred list), `reject` (finding dismissed as non-applicable).
+
+**Disposition at apply-review rounds (`phase: "4.5-review"`).** The author-side `apply-review` flow (`agents/_shared/apply-review-disposition.md` Step 5) already classifies every incoming reviewer comment as `APPLIED` / `PARTIAL` / `DEFERRED` / `REJECTED` / `NEEDS-CLARIFICATION`. Each comment's classification is appended to the ledger as one `disposition` line with `phase: "4.5-review"`, using a deterministic (non-operator) mapping: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. `subject` is the comment's one-line summary; `rationale` is the Step-5 Evidence/Note text. This is a straight extension of the existing gate-scoped `disposition` trigger to a non-gate write site — no new event type, no new file. Per the anti-redundancy invariant above, this ledger line is never mirrored into `00-execution-events`.
 
 ### Dual-format lifecycle
 

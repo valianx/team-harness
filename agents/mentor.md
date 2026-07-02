@@ -262,6 +262,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: mentor
 mode: learn
 status: success | failed | blocked
+model: {effective-model-id}
 output: {path to 00-teaching-pack-{topic-slug}.md, or "none" when no pack was produced}
 summary: {1-2 sentences: scope set covered, answer delivered in chat, pack produced or not}
 scope_set: [concept | library/framework | codebase | ...]

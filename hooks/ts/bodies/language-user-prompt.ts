@@ -62,8 +62,10 @@ export function evaluateLanguagePrompt(
   const name = languageName(raw);
 
   // SEC-DR-B: only validated raw (lang code) and derived name interpolated.
+  // Text reconciled to hooks/language-user-prompt.sh (Bash is interim-canonical —
+  // see docs/opencode-migration-guide.md status header).
   const additionalContext =
-    `Operator language preference: \`${raw}\` (${name}). Respond in ${name} — including this turn — regardless of the language of individual messages. An explicit per-session language override from the operator still applies for this session only.`;
+    `Reply in ${name} (configured default \`${raw}\`), regardless of this message's language, unless the operator set a per-session override.`;
 
   return { additionalContext };
 }

@@ -7,8 +7,19 @@
 #
 # Suite 89 — workspace-mode-session-start (docs/testing.md canonical registry)
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the behavioral cases (Sections
+# 1-4, 6, 7's non-structural cases) run against the compiled TS artifact
+# (hooks/ts/dist/session-start.cjs) when HOOK_IMPL=ts. Section 5 and the
+# structural sub-checks of Section 7 grep the Bash SOURCE for function names
+# (load_orchestrator etc.) — a Bash-implementation-detail, not a behavioral
+# contract, so those run on the bash leg only. AC assertions on hookEventName/
+# SessionStart envelope keys run on BOTH legs (T6c): the CC entry adapter now
+# emits the wrapped hookSpecificOutput envelope, closing the bare-vs-wrapped
+# gap documented in 02-implementation-t6a.md "Divergences found".
+#
 # Usage:
 #   bash tests/test_session_start.sh
+#   HOOK_IMPL=ts bash tests/test_session_start.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
@@ -20,7 +31,19 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/session-start.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/session-start.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/session-start.cjs"
+
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+fi
 
 # The hook may not exist yet (Phase 2.0 — failing test mode).
 # Do NOT abort if it is missing; cases will simply produce no output and fail
@@ -74,7 +97,11 @@ make_tmp_home_with_marker() {
 #   Returns stdout. Exit code is captured separately when needed.
 run_hook() {
     local fake_home="$1"
-    HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
+    else
+        HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
+    fi
 }
 
 # run_hook_with_exit <fake_home>
@@ -83,7 +110,11 @@ run_hook_with_exit() {
     local fake_home="$1"
     local out
     local code
-    out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
+    else
+        out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
+    fi
     code=$?
     printf '%s' "$out"
     printf '\nEXIT:%d' "$code"
@@ -472,7 +503,10 @@ rm -rf "$TMP"
 
 # ===========================================================================
 # SECTION 5: Extensible ordered structure — static source assertions (AC-13)
+# Bash-source-specific (function-name greps) — no TS equivalent contract, so
+# this section runs on the bash leg only.
 # ===========================================================================
+if [ "$HOOK_IMPL" = "bash" ]; then
 
 echo
 echo "=== Structure: hook defines four load_<name> functions ==="
@@ -534,6 +568,8 @@ else
     FAILURES+=("structure: 3-step add-a-new-load procedure missing (needs 'add a new' + 'test_session_start.sh')")
     echo "  [FAIL] structure: 3-step add-a-new-load procedure missing"
 fi
+
+fi # HOOK_IMPL = bash (SECTION 5)
 
 # ===========================================================================
 # SECTION 6: Fail-safe cases (AC-5, v2.89.0 update)
@@ -663,35 +699,54 @@ assert_output_contains "el-c2-non-english-exemption: non-English out-of-scope cl
 rm -rf "$TMP"
 
 # ===========================================================================
-# SECTION 7 — Language-gate cases (C1 truth table: el-true + lang variant)
-# AC-1: el=true + lang=en  → directive present
-# AC-2: el=true + lang=es  → directive dormant (principal-risk case)
-# AC-3: el=true + lang absent → directive present (absent → default en)
+# SECTION 7 — Language-independence cases (#449: language gate removed)
+# The correction directive fires whenever english_learning is true, regardless
+# of the configured `language` value. Scoping to English-written messages is
+# delegated entirely to the directive's own message-level exemption sentence.
+# AC-1: el=true + lang=es  → directive fires (was dormant before #449)
+# AC-1: el=true + lang=en  → directive fires
+# AC-1: el=true + lang absent → directive fires
+# AC-1: directive text no longer mentions coupling to language: en
+# AC-2: message-level exemption remains the sole scoping mechanism
 # ===========================================================================
 
 echo
-echo "=== English-learning language-gate (AC-1): el=true + lang=en → directive present ==="
+echo "=== English-learning (AC-1): el=true + lang=es → directive fires (language gate removed) ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_contains "el-lang-es-fires: directive present when language is es" "$TMP" "english-learning mode is active"
+assert_output_contains "el-lang-es-orch-fires: orchestrator disposition fires" "$TMP" "orchestrator disposition"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (AC-1): el=true + lang=en → directive fires ==="
 TMP=$(make_tmp_home '{"english_learning":true,"language":"en"}')
 assert_output_contains "el-lang-en-fires: directive present when language is en" "$TMP" "english-learning mode is active"
-assert_output_contains "el-lang-en-orch-fires: orchestrator disposition fires" "$TMP" "orchestrator disposition"
 rm -rf "$TMP"
 
 echo
-echo "=== English-learning language-gate (AC-2): el=true + lang=es → directive dormant (principal risk) ==="
-TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
-assert_output_not_contains "el-lang-es-dormant: directive absent when language is es" "$TMP" "english-learning mode is active"
-assert_output_contains "el-lang-es-orch-fires: orchestrator disposition still fires when el-directive is dormant" "$TMP" "orchestrator disposition"
-rm -rf "$TMP"
-
-echo
-echo "=== English-learning language-gate (AC-3): el=true + no language key → directive present (absent→en) ==="
+echo "=== English-learning (AC-1): el=true + no language key → directive fires ==="
 TMP=$(make_tmp_home '{"english_learning":true}')
 assert_output_contains "el-lang-absent-fires: directive present when language key is absent" "$TMP" "english-learning mode is active"
 rm -rf "$TMP"
 
+echo
+echo "=== English-learning (AC-1): directive text no longer mentions coupling to language: en ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_not_contains "el-no-coupling-phrase: directive text does not mention coupling to language: en" "$TMP" "coupled to language: en"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (AC-2): message-level exemption remains the sole scoping mechanism with lang=es ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_contains "el-exemption-present: message-level exemption clause still present with es config" "$TMP" "do not emit a :) for a non-English message"
+rm -rf "$TMP"
+
 # ===========================================================================
 # SECTION 7 — Structure assertions for load_english_learning (AC-3)
+# Bash-source-specific (function-name greps) — bash leg only, same rationale
+# as SECTION 5.
 # ===========================================================================
+if [ "$HOOK_IMPL" = "bash" ]; then
 
 echo
 echo "=== Structure: hook defines four load_<name> functions including load_english_learning (AC-3) ==="
@@ -776,6 +831,8 @@ else
     FAILURES+=("structure: REGISTRY comment missing Load 4 or load_english_learning reference")
     echo "  [FAIL] structure: REGISTRY comment missing Load 4 or load_english_learning reference"
 fi
+
+fi # HOOK_IMPL = bash (SECTION 7 structure assertions)
 
 # ===========================================================================
 # Summary

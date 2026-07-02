@@ -985,6 +985,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | **(c) language-session-override** — "respondé en X por ahora", "switch to X", "en X esta vez", "answer in X now", "for this session use X", or any language request WITHOUT an explicit persistence marker | **language-set** (ephemeral) | write |
    | **(b′) english-learning-persistent-set** — "activá el modo de corrección de inglés por defecto", "turn on english learning por defecto", "enable english learning permanently", "enable english-learning mode", or any english-learning toggle WITH an explicit persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) | **english-learning-set** (persistent) | write |
    | **(c′) english-learning-session-toggle** — "turn on english learning for now", "enable english correction this session", "activá corrección de inglés", or any english-learning toggle WITHOUT an explicit persistence marker | **english-learning-set** (ephemeral) | write |
+   | **(d) session-model-override** — "this session use the bigger model for analysis", "esta sesión usa el modelo grande para análisis", "run the architect on opus this session", or any utterance requesting a different effective model for the analysis tier, scoped to the current session | **model-override** (ephemeral, analysis-tier only) | write |
    | crear/diseñar/mejorar un agente o skill, create/design/improve an agent or skill, "nuevo agente", "new agent", "build a skill", "build an agent" | `/th:agent-builder` skill flow | write |
    | feature, fix, bug, refactor, enhancement, hotfix, implementar, solucionar, arreglar, corregir, fixear, debuguear, regresión, error, "corrija un bug", "haga un fix", "haga un hotfix", "corregir error", "arreglar el bug", "hay un bug en X", "está rompiendo", "no funciona Y", "error en Z" | **full pipeline** | write |
    | ambiguous / mixed concerns | **unclear** | — |
@@ -1015,13 +1016,21 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      ```
      About to set english-learning correction mode to "<on|off>" (persistent write to ~/.claude/.team-harness.json).
      This affects all future sessions. The current session also switches to "<on|off>".
-     Note: enabling english-learning also sets the response language to English (language: en) at the same scope.
      Confirm? [Y/n]:
      ```
-     - On **Y** (enabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add BOTH the `english_learning` key (boolean `true`) AND the `language` key (`"en"`), write the whole document back (never a partial payload). Then record both in `00-state.md § Current State`: `english_learning: true` and `operator_language: en`.
+     - On **Y** (enabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `true`), write the whole document back (never a partial payload). Then record `english_learning: true` in `00-state.md § Current State`. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]:` — on `y`, perform a further merge-write adding the `language` key (`"en"`) and record `operator_language: en` in `00-state.md § Current State`; on `n`/Enter, leave `language` unchanged.
      - On **Y** (disabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `false`). Do NOT modify the `language` key on disable. Then record `english_learning: false` in `00-state.md § Current State`.
      - On **n**: offer to apply the change as an ephemeral session-only override instead (intent (c′) path). Do NOT write the config file.
-   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only. When enabling: record BOTH `english_learning: true` AND `operator_language: en`. When disabling: record `english_learning: false` only (do NOT modify `operator_language`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
+   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only. When enabling: record `english_learning: true` (independent of `operator_language`). When disabling: record `english_learning: false` only (do NOT modify `operator_language`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
+
+   **Session model override.** When the intent matches the `model-override` row:
+
+   - Record `model_override: {model-id}` and `model_override_scope: analysis-tier` in `00-state.md § Current State`. This is always a session-scoped, ephemeral write — there is no persistent variant, and no confirmation gate is required (unlike the language/english-learning writes, this never touches `~/.claude/.team-harness.json`).
+   - **Applies only to analysis-tier dispatches**: `architect`, the plan-review panel (`qa-plan`, `security` design-review, `plan-reviewer`), and consolidators (`research-consolidator`, `reviewer-consolidator`). Every dispatch to one of these agents while the override is active uses `model_override` as the effective model for that `Task()` call.
+   - **NEVER applies to mechanical tiers** — `implementer`, `tester`, `qa` (validate mode), `security` (pipeline mode), `delivery`, research/grep fan-out lanes, or any other dispatch not listed above. These always run on their frontmatter-declared model regardless of an active override.
+   - Each affected dispatch reports its actual effective model in its own status block (`model:` field, per `agents/_shared/output-template.md` § "Status block — common fields") and the orchestrator propagates it verbatim onto that phase's `phase.end` event (see events schema, `model` field) — this is how the override becomes observable in the trace, not a separate log line.
+   - **Distinct from the config-override whitelist** (CLAUDE.md §5, "Session-scoped config override whitelist"): that whitelist governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and explicitly EXCLUDES `model` — model changes never route through `/th:setup` or a config file. The session model override is a separate, dispatch-time-only mechanism that lives exclusively in `00-state.md` for the duration of the current session and is discarded on session end; it does not, and cannot, alter any agent's frontmatter default.
+   - On `/th:recover`, the resolved override is read back from `00-state.md § Current State` (same recovery mechanism as the language/ClickUp session overrides) — the chat is not re-parsed.
 
    **Step 6b — Route based on category:**
 
@@ -3475,6 +3484,8 @@ Every line is a JSON object with these fields:
 | `reason` | conditional | Reason a gate was skipped (e.g., `autonomous`, `legacy`). Required for `stage.gate.skipped`. |
 | `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
 | `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
+| `model` | optional | The agent's effective model ID, propagated verbatim from the `model:` line of its status block (same mechanism as `tools` — see "Populating the `model`/`effort` fields on `phase.end`" below). Present on `phase.end` when the returning agent reported it (mandatory per `agents/_shared/output-template.md`); absent on legacy events or events from agents not yet carrying the field. |
+| `effort` | optional | The agent's effective reasoning-effort level, propagated verbatim from the `effort:` line of its status block when the agent reported one. Omitted when the agent did not report an effort level — never written as `"unknown"`. |
 | `reason` | conditional | For `dispatch.blocked`: short reason (`task tool stripped`, `agent not registered`, `tool permission denied`). For `stage.gate.skipped`: `autonomous` / `legacy`. |
 | `action` | conditional | For `dispatch.blocked`: what you did about it (`top-level takeover per CLAUDE.md §14`, `aborted`). |
 | `extra` | optional | Object for event-specific extras (e.g., `{"tests_before": 42, "tests_after": 47}` for the test-ratchet gate). For `iteration.start` events: include `{"blast_radius": "localized\|structural", "patched_ids": [...]}` when the verifier declared a blast radius (omit `patched_ids` when `blast_radius` is `"structural"`). |
@@ -3485,7 +3496,7 @@ Every line is a JSON object with these fields:
 {"ts":"2026-05-01T14:00:00-03:00","event":"pipeline.start","feature":"auth-jwt","extra":{"type":"feature","complexity":"standard","ac_count":5}}
 {"ts":"2026-05-01T14:00:12-03:00","event":"dispatch.blocked","feature":"auth-jwt","phase":"0a-intake","reason":"task tool stripped","action":"top-level takeover per CLAUDE.md §14"}
 {"ts":"2026-05-01T14:00:42-03:00","event":"phase.start","feature":"auth-jwt","phase":"1-design","agent":"architect","iteration":0}
-{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens":6300,"tokens_in":3500,"tokens_out":2800,"summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
+{"ts":"2026-05-01T14:03:24-03:00","event":"phase.end","feature":"auth-jwt","phase":"1-design","agent":"architect","status":"success","duration_ms":162000,"tokens":6300,"tokens_in":3500,"tokens_out":2800,"model":"claude-opus-4-6","effort":"max","summary":"repository pattern, JWT with 15min expiry","tools":{"context7":{"hit":2,"miss":0,"skipped":0},"memory":{"search_nodes":1,"open_nodes":0}}}
 {"ts":"2026-05-01T14:03:25-03:00","event":"gate.pass","feature":"auth-jwt","phase":"1.5-ratify-plan","verdict":"pass","summary":"5/5 AC covered by Work Plan"}
 {"ts":"2026-05-01T14:18:52-03:00","event":"iteration.start","feature":"auth-jwt","phase":"3-verify","iteration":1,"summary":"AC-3 missing null check","extra":{"blast_radius":"localized","patched_ids":["AC-3"]}}
 {"ts":"2026-05-01T14:25:11-03:00","event":"gate.fail","feature":"auth-jwt","phase":"3.5-acceptance-gate","verdict":"fail","summary":"AC-2 has no passing test"}
@@ -3639,6 +3650,17 @@ Omit any sub-object the agent did not report. If the agent reported none of them
 
 This is the data that feeds the **Tool Effectiveness** section of `00-pipeline-summary.md` and the `/th:trace <feature> --tools` view.
 
+### Populating the `model`/`effort` fields on `phase.end`
+
+When an agent returns, parse its status block for the `model:` and `effort:` lines (see `agents/_shared/output-template.md` § "Status block — common fields") and propagate them verbatim onto the `phase.end` event's top-level `model` / `effort` fields — the same mechanism already used for `tools`.
+
+| Status-block line (from agent) | Maps to `phase.end` field |
+|---|---|
+| `model: {model-id}` | `"model": "{model-id}"` |
+| `effort: {effort-level}` | `"effort": "{effort-level}"` (omit the field entirely when the agent did not report a line) |
+
+This is the source-of-truth for the effective model a dispatch actually ran under, particularly when a session model override (see Phase 0a Step 6a, "Session model override") is active — the frontmatter `model:` declared in `agents/{agent}.md` is only the *default*, and the status-block field is what actually ran. Downstream cost classification (`docs/observability.md § Derivation rule`, `skills/trace/SKILL.md`) reads `event.model` first, before falling back to frontmatter inference.
+
 ---
 
 ## Decision Ledger
@@ -3663,8 +3685,20 @@ Emit a ledger line at each gate boundary you already pass through — no new dis
 |--------------|------------|--------------|
 | `gate-verdict` | After Phase 1.5 (ratify-plan), Phase 1.6 (plan-review), Phase 3.5 (acceptance-gate), Phase 3.6 (acceptance-check); when emitting each STAGE-GATE STOP block | The verdict you already compute for `gate.pass`/`gate.fail`/`stage.gate` in `00-execution-events`; add the free-text `rationale` (one sentence, ≤240 chars) |
 | `operator-approval` | When the operator replies to a STAGE-GATE STOP | The reply you already record as `stage.gate.release` `decision` in `00-execution-events`; add `rationale` from operator's text or `"no reason given"` |
-| `disposition` | When a security, QA, or reviewer finding is accepted, deferred (watch), or rejected at a gate; emitted alongside the `gate.pass`/`gate.fail` event | The operator's accept/watch/reject choice on a surfaced finding; include `subject` (finding description) and `rationale` |
+| `disposition` | When a security, QA, or reviewer finding is accepted, deferred (watch), or rejected at a gate; emitted alongside the `gate.pass`/`gate.fail` event. **Also** fires per comment during an `apply-review` round (`phase: "4.5-review"` — see below), independent of any gate | The operator's or the review-disposition's accept/watch/reject choice on a surfaced finding; include `subject` (finding description) and `rationale` |
 | `dry-run-enforced` | When a deploy/migration action is routed through a dry-run / plan-only path before any approved apply | Your dry-run-first routing decision + the guard that gates the apply; include `action`, `dry_run_ref`, and `guard` |
+
+**`disposition` at apply-review rounds (`phase: "4.5-review"`).** The `apply-review` flow (`agents/_shared/apply-review-disposition.md`) already classifies each incoming review comment as `APPLIED` / `PARTIAL` / `DEFERRED` / `REJECTED` / `NEEDS-CLARIFICATION` at its Step 5. Extend the existing gate-scoped trigger to this round: after Step 5 resolves each comment, emit one `disposition` ledger line per comment with `phase: "4.5-review"`, using this deterministic mapping (no operator prompt — the mapping is closed-form, not a judgment call):
+
+| Apply-review classification | Ledger `decision` |
+|---|---|
+| `APPLIED` | `accept` |
+| `PARTIAL` | `watch` |
+| `DEFERRED` | `watch` |
+| `REJECTED` | `reject` |
+| `NEEDS-CLARIFICATION` | `reject` |
+
+`subject` is the comment's one-line description; `rationale` is the one-sentence reason recorded at Step 5 for that comment's classification. This wiring respects the anti-redundancy invariant above: the ledger line records the disposition + rationale ONLY — it is never mirrored into `00-execution-events` (`docs/observability.md` § "Decision Ledger"), and the apply-review flow does not gain a new `phase.end`/`gate.*` event pair for this round.
 
 **Example append (local mode):**
 

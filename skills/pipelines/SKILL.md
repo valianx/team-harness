@@ -137,6 +137,53 @@ No active pipelines in workspaces/.
 
 ---
 
+## In-flight lanes
+
+**When rendered:** appended after the no-args Pipeline Status table, once per active pipeline row that has a `{resolved-path}/{feature}/00-subagent-trace.jsonl` file. This surfaces subagent dispatches that are blocked inside a concurrent `Task` call — precisely when the orchestrator itself cannot report progress.
+
+**Source:** `00-subagent-trace.jsonl`, written by two deterministic PreToolUse/SubagentStop hooks (`subagent-start.cjs` and `subagent-trace.sh`) — see `docs/observability.md § subagent.start` and `§ 00-subagent-trace.jsonl`. Read-only: parsing this file never triggers a write.
+
+**Derivation (FIFO pairing per `agent_type`).** The `subagent.start` line carries no `agent_id` (the runtime has not assigned one yet), so `agent_type` is the only correlation key available:
+1. Read the file in order. Push every `subagent.start` line onto a pending queue keyed by `agent_type`.
+2. Every `subagent.stop` line for that `agent_type` pops the OLDEST pending start for the same `agent_type` and forms a **completed pair** — duration = `stop.ts - start.ts`.
+3. Any `subagent.start` left in the pending queue after the file is fully read is an **in-flight lane** — elapsed = `now - start.ts`.
+
+**Render:**
+```
+In-flight lanes — {feature}
+  {agent_type}      running   {elapsed}   (started {HH:MM:SS})
+  {agent_type}      done      {duration}  ({HH:MM:SS} → {HH:MM:SS})
+```
+
+Sort in-flight lanes first (most recently started first), then completed pairs (most recently completed first, capped at the 5 most recent — this is a live-progress glance, not a history; the full history is `/th:trace {feature} --jsonl`).
+
+**Fail-soft.** If `00-subagent-trace.jsonl` does not exist for a feature, or exists with zero parseable start/stop lines, omit the block for that feature silently — no error, no placeholder line.
+
+---
+
+## Initiative fan-out — parent/child lane rows
+
+**When rendered:** when an active pipeline's `00-state.md` declares `initiative: {name}` AND the initiative-level `00-execution-events` file (`docs/observability.md § Initiative-level fan-out trace`) has a `fanout.start` event with no matching `fanout.converge` yet — a live fan-out.
+
+**Derivation.** Read the initiative-level `00-execution-events.jsonl` (or `.md`, JSONL-fence-extracted). Take the most recent `fanout.start` → `fanout.lane.*` → `fanout.converge` sequence:
+- `fanout.start` supplies the initiative name and `eligible_projects[]`.
+- A `fanout.lane.start` with no matching `fanout.lane.end` for the same `project` is a running child lane.
+- A `fanout.lane.start` paired with a `fanout.lane.end` is a completed child lane; status comes from the `status` field (`success`/`failed`/`iterating`).
+- A `fanout.converge` event closes the fan-out — render the converged set instead of treating it as live.
+
+For each child lane, read that project's own `{project}/00-state.md` to surface its current `Stage` / `Phase` (same fields used by the main Pipeline Status table).
+
+**Render** (replaces the normal per-project rows for that initiative in the no-args view):
+```
+parent: {initiative}
+  ├─ {project-a}   Stage {N} / {phase}   {running|done}
+  └─ {project-b}   Stage {N} / {phase}   {running|done}
+```
+
+**Fail-soft.** No initiative-level events file, no `fanout.start` event, or a read/parse error → fall back silently to the normal per-project rows in the main Pipeline Status table. No crash, no error surfaced — this rendering is additive convenience, not a required view.
+
+---
+
 ## How to detect live processes
 
 ### Step 1 — List worktrees

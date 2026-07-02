@@ -13974,6 +13974,22 @@ check(
     ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into session-start.sh",
 )
 
+# subagent.start breadcrumb — .claude-plugin/hooks.json wires the TS hook on the Task matcher
+_ph_pretool = _plugin_hooks.get("hooks", {}).get("PreToolUse", [])
+_ph_subagent_start_cmds = [
+    hk.get("command", "")
+    for entry in _ph_pretool
+    if "Task" in entry.get("matcher", "")
+    for hk in entry.get("hooks", [])
+    if "subagent-start" in hk.get("command", "")
+]
+check(
+    "subagent-start(plugin-hooks-wired): .claude-plugin/hooks.json wires subagent-start.cjs on the Task matcher",
+    len(_ph_subagent_start_cmds) == 1
+    and "hooks/ts/dist/subagent-start.cjs" in _ph_subagent_start_cmds[0],
+    ".claude-plugin/hooks.json must wire node hooks/ts/dist/subagent-start.cjs under a PreToolUse Task matcher — the deterministic subagent.start breadcrumb (issue #452); losing this wiring silently drops in-flight lane observability",
+)
+
 # ---------------------------------------------------------------------------
 # AC-8 / AC-13 — docs/dev-mode.md: gate + disposition mechanism + reconciliation
 # ---------------------------------------------------------------------------
@@ -26094,10 +26110,10 @@ check(
 # ---------------------------------------------------------------------------
 # Structural assertions for the /th:learn-english toggle skill (v2.98.0).
 # Pins: skill exists with correct frontmatter name; standalone framing; `on`
-# writes BOTH keys + the dual-activation message tokens; `off` writes
-# english_learning: false + has the language keep/change prompt + does NOT
-# auto-change language; `status`/no-arg is explicitly read-only; version-sync
-# floors; registry + hygiene guards.
+# writes english_learning only (language decoupled) and offers immersion as a
+# separate [y/N] opt-in; `off` writes english_learning: false + has the
+# language keep/change prompt + does NOT auto-change language; `status`/no-arg
+# is explicitly read-only; version-sync floors; registry + hygiene guards.
 #
 # This is a FREE STRUCTURAL SUITE — pure text reads, no agent dispatch, no
 # paid spend. It runs in CI via run-all.sh on every PR.
@@ -26144,38 +26160,35 @@ check(
     "and name ~/.claude/.team-harness.json as the write target",
 )
 
-# (3) suite109(3-on-writes-both-keys): the `on` branch section names english_learning set to true
-#     AND language set to en AND declares merge-write-whole-document
+# (3) suite109(3-on-writes-el-only): the `on` branch section names english_learning set to true,
+#     explicitly decouples `language` from that write, AND declares merge-write-whole-document
 check(
-    "suite109(3-on-writes-both-keys): `on` branch names english_learning true AND language en "
-    "AND declares merge-write-whole-document",
+    "suite109(3-on-writes-el-only): `on` branch names english_learning true, decouples language "
+    "from that write, AND declares merge-write-whole-document",
     bool(_s109_enable_slice)
     and "english_learning" in _s109_enable_slice
     and "true" in _s109_enable_slice
+    and "Do NOT touch" in _s109_enable_slice
     and "language" in _s109_enable_slice
-    and '"en"' in _s109_enable_slice
     and "merge-write" in _s109_enable_slice,
-    "`on` branch section must name english_learning set to true AND language set to en "
-    "AND declare merge-write-whole-document",
+    "`on` branch section must name english_learning set to true, explicitly state that language "
+    "is not touched in that write, AND declare merge-write-whole-document",
 )
 
-# (4) suite109(4-on-dual-activation-message): the `on` report contains the load-bearing dual-activation
-#     phrases: 'sets English as the default response language', 'activates BOTH',
-#     'language: en', 'english_learning: true'
-_s109_dual_phrase_1 = "sets English as the default response language"
-_s109_dual_phrase_2 = "activates BOTH"
-_s109_dual_token_lang = "language: en"
-_s109_dual_token_el   = "english_learning: true"
+# (4) suite109(4-on-immersion-opt-in): the `on` branch offers English-as-response-language immersion
+#     as a separate [y/N] question and writes language to "en" only on acceptance
+_s109_immersion_tok = "immersion"
+_s109_yn_tok         = "[y/N]"
+_s109_lang_en_tok    = '"en"'
 check(
-    "suite109(4-on-dual-activation-message): `on` report contains dual-activation load-bearing phrases "
-    "('sets English as the default response language', 'activates BOTH', 'language: en', 'english_learning: true')",
+    "suite109(4-on-immersion-opt-in): `on` branch offers immersion as a separate [y/N] question "
+    'and writes language to "en" only on acceptance',
     bool(_s109_enable_slice)
-    and _s109_dual_phrase_1 in _s109_enable_slice
-    and _s109_dual_phrase_2 in _s109_enable_slice
-    and _s109_dual_token_lang in _s109_enable_slice
-    and _s109_dual_token_el in _s109_enable_slice,
-    "`on` branch section must contain the dual-activation load-bearing phrases: "
-    "'sets English as the default response language', 'activates BOTH', 'language: en', 'english_learning: true'",
+    and _s109_immersion_tok in _s109_enable_slice
+    and _s109_yn_tok in _s109_enable_slice
+    and _s109_lang_en_tok in _s109_enable_slice,
+    "`on` branch section must offer the immersion question as a separate [y/N] prompt and write "
+    'language to "en" only when the operator accepts',
 )
 
 # (5) suite109(5-off-sets-false): the `off` branch section names english_learning set to false
@@ -30753,6 +30766,167 @@ check(
 )
 
 # Marker: dispatch-disambiguation
+
+# --- Leaf-agent status blocks declare `model:` (observability R1, issue #451) ---
+#
+# Every leaf agent with a Return Protocol must declare `model: {effective-model-id}`
+# in its status-block template — see `agents/_shared/output-template.md` §
+# "Status block — common fields". The universe is every `agents/*.md` file EXCEPT
+# `orchestrator.md`, `README.md`, and the `ref-*.md` reference docs (those hold
+# cross-cutting routing tables and shared flow contracts, not a single agent's own
+# Return Protocol).
+_MODEL_LINE = "model: {effective-model-id}"
+_leaf_agent_files = sorted(
+    p for p in AGENTS_DIR.glob("*.md")
+    if p.name not in {"orchestrator.md", "README.md"} and not p.name.startswith("ref-")
+)
+check(
+    "leaf-agent universe for the model: check has the expected size (26 agents)",
+    len(_leaf_agent_files) == 26,
+    f"found {len(_leaf_agent_files)} agents/*.md files eligible (excluding orchestrator/README/ref-*) "
+    "— update this count if an agent was added or removed",
+)
+for _agent_path in _leaf_agent_files:
+    _agent_src = read(_agent_path)
+    if "Return Protocol" not in _agent_src:
+        continue
+    check(
+        f"agents/{_agent_path.name}: status-block template declares `model:` line",
+        _MODEL_LINE in _agent_src,
+        "agents/_shared/output-template.md § \"Status block — common fields\" requires "
+        "every leaf agent's Return Protocol to include `model: {effective-model-id}`",
+    )
+
+# ---------------------------------------------------------------------------
+# Suite 132 — release-tag-sync (issue #450)
+#
+# Structural guard for the release-tag unification fix: an explicit
+# post-merge tag step in both operator-facing (skills/release/SKILL.md) and
+# agent-contract (agents/delivery.md) surfaces, plus (when present) the
+# deterministic tag-sync.yml workflow that dispatches release.yml — since a
+# GITHUB_TOKEN-created tag does not itself trigger release.yml's
+# `on: push: tags` listener (Actions recursion prevention).
+#
+# AC coverage:
+#   AC-1 — skills/release/SKILL.md and agents/delivery.md both document the
+#          explicit post-merge tag step (dev-guard gated).
+#   AC-2/AC-4/AC-5 — if tag-sync.yml exists: path-filtered trigger, version
+#          read, idempotent no-op guard, workflow_dispatch of release.yml
+#          with the `tag` input, minimal pinned permissions.
+#
+# Marker: release-tag-sync
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 132: release-tag-sync structural checks ===")
+
+_s132_skill = read(REPO_ROOT / "skills" / "release" / "SKILL.md")
+_s132_delivery = read(AGENTS_DIR / "delivery.md")
+
+_S132_SKILL_STOPS = ("\n## ", "\n---\n")
+_s132_skill_slice = _slice_section(
+    _s132_skill, "## Step 3 — Create and push the release tag", _S132_SKILL_STOPS
+)
+check(
+    "s132(a1): skills/release/SKILL.md documents an explicit post-merge tag step",
+    bool(_s132_skill_slice),
+    "'## Step 3 — Create and push the release tag' not found in skills/release/SKILL.md",
+)
+check(
+    "s132(a2): SKILL.md tag step includes 'git tag' and 'git push'",
+    "git tag" in _s132_skill_slice and "git push" in _s132_skill_slice,
+    "SKILL.md tag step must show the actual git tag + push commands",
+)
+check(
+    "s132(a3): SKILL.md tag step states it is dev-guard gated",
+    "dev-guard" in _s132_skill_slice,
+    "SKILL.md tag step must state the push is gated by hooks/dev-guard.sh",
+)
+
+_S132_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
+_s132_delivery_slice = _slice_section(
+    _s132_delivery, "### Step 11.4c — Release tag creation", _S132_DELIVERY_STOPS
+)
+check(
+    "s132(b1): agents/delivery.md documents the release tag step in its Return Protocol contract",
+    bool(_s132_delivery_slice),
+    "'### Step 11.4c — Release tag creation' not found in agents/delivery.md",
+)
+check(
+    "s132(b2): delivery.md tag step is gated on release-mode and PR-merged",
+    "release-mode: true" in _s132_delivery_slice and "confirmed merged" in _s132_delivery_slice,
+    "delivery.md tag step must gate on release-mode: true AND the PR being confirmed merged",
+)
+check(
+    "s132(b3): delivery.md tag step includes 'git tag' and states dev-guard gating",
+    "git tag" in _s132_delivery_slice and "dev-guard.sh" in _s132_delivery_slice,
+    "delivery.md tag step must show the git tag command and state hooks/dev-guard.sh gating",
+)
+check(
+    "s132(b4): delivery.md Return Protocol status block declares 'release_tag:'",
+    "release_tag:" in _s132_delivery,
+    "agents/delivery.md Return Protocol status block must declare a 'release_tag:' field",
+)
+
+_S132_TAG_SYNC_PATH = REPO_ROOT / ".github" / "workflows" / "tag-sync.yml"
+_s132_tag_sync_exists = _S132_TAG_SYNC_PATH.is_file()
+if _s132_tag_sync_exists:
+    _s132_tag_sync = read(_S132_TAG_SYNC_PATH)
+    check(
+        "s132(c1): tag-sync.yml triggers on push to main filtered to .claude-plugin/plugin.json",
+        "branches: [main]" in _s132_tag_sync
+        and ".claude-plugin/plugin.json" in _s132_tag_sync,
+        "tag-sync.yml must trigger on push to main, paths-filtered to .claude-plugin/plugin.json",
+    )
+    check(
+        "s132(c2): tag-sync.yml reads the version from plugin.json",
+        ".version" in _s132_tag_sync,
+        "tag-sync.yml must read the 'version' field out of .claude-plugin/plugin.json",
+    )
+    check(
+        "s132(c3): tag-sync.yml guards tag creation with an existing-tag check (idempotent no-op)",
+        "already exists" in _s132_tag_sync,
+        "tag-sync.yml must no-op cleanly when the tag already exists",
+    )
+    check(
+        "s132(c4): tag-sync.yml dispatches release.yml via workflow_dispatch with the 'tag' input",
+        "gh workflow run release.yml" in _s132_tag_sync and "tag=" in _s132_tag_sync,
+        "tag-sync.yml must dispatch release.yml via workflow_dispatch, passing the 'tag' input "
+        "(a GITHUB_TOKEN-created tag push does not itself trigger release.yml)",
+    )
+    check(
+        "s132(c5): tag-sync.yml permissions are exactly contents:write + actions:write",
+        "contents: write" in _s132_tag_sync and "actions: write" in _s132_tag_sync,
+        "tag-sync.yml must declare contents: write and actions: write permissions",
+    )
+    check(
+        "s132(c6): tag-sync.yml pins third-party actions to a version tag (no unpinned 'uses:')",
+        "actions/checkout@v" in _s132_tag_sync,
+        "tag-sync.yml must pin actions/checkout to a version tag",
+    )
+
+# Self-referential guards (hygiene contract)
+_s132_own = read(Path(__file__))
+check(
+    "suite132(self-ref): test file contains 'Suite 132' and 'release-tag-sync'",
+    "Suite 132" in _s132_own and "release-tag-sync" in _s132_own,
+    "test file must self-reference Suite 132 and the marker 'release-tag-sync'",
+)
+
+_s132_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite132(registry): docs/testing.md registers 'Suite 132' and 'release-tag-sync'",
+    "Suite 132" in _s132_testing_md and "release-tag-sync" in _s132_testing_md,
+    "docs/testing.md must register Suite 132 and the 'release-tag-sync' marker",
+)
+
+_s132_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite132(hygiene): CLAUDE.md does NOT contain 'Suite 132' (§11 hygiene contract)",
+    "Suite 132" not in _s132_claude_md,
+    "CLAUDE.md must not mention Suite 132 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: release-tag-sync
 
 # ---------------------------------------------------------------------------
 # Summary

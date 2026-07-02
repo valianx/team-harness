@@ -12,6 +12,10 @@ jobs:
   verify:
     name: run-all (policy-block + structure + frontmatter)
     runs-on: ubuntu-latest
+    env:
+      # Node/npm/bun suites must run for real in CI, not silently SKIP —
+      # see tests/run-all.sh for the skip-to-fail conversion this enables.
+      TH_REQUIRE_RUNTIMES: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,6 +27,14 @@ jobs:
 
       - name: Set up uv (for the PyYAML frontmatter test)
         uses: astral-sh/setup-uv@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Run full verification suite
         run: bash tests/run-all.sh
@@ -61,3 +73,46 @@ jobs:
             echo "building $GOOS/$GOARCH"
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o /dev/null ./cmd/install
           done
+
+  dist-freshness:
+    name: hooks/ts dist freshness (rebuild + diff + completeness)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install hooks/ts dependencies
+        working-directory: hooks/ts
+        run: npm install --no-audit --no-fund
+
+      - name: Rebuild TS hook bundles
+        working-directory: hooks/ts
+        run: npm run build
+
+      - name: Fail on stale committed dist (rebuild must match the committed .cjs)
+        run: git diff --exit-code hooks/ts/dist/
+
+      - name: Verify every CC entry has a build script
+        # Scoped to *.cc.ts (CC ships bundled dist/*.cjs). *.opencode.ts entries
+        # are distributed as raw TypeScript source and are never bundled — see
+        # cmd/install/manifest_registry.go's opencode plugin component builder.
+        run: |
+          missing=0
+          for entry in hooks/ts/entry/*.cc.ts; do
+            name="$(basename "$entry" .cc.ts)"
+            if ! grep -q "\"build:$name\"" hooks/ts/package.json; then
+              echo "::error::hooks/ts/package.json is missing a \"build:$name\" script for $entry"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "One or more CC hook entries have no build script — their dist/*.cjs can go stale unnoticed."
+            exit 1
+          fi

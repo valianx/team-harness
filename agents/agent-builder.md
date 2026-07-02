@@ -160,6 +160,7 @@ Every agent invoked by the orchestrator must end with this exact block:
 ```
 agent: {name}
 status: success | failed | blocked
+model: {effective-model-id}
 output: {file path or "none"}
 summary: {1-2 sentences of what was done}
 issues: {blockers or "none"}
@@ -393,6 +394,7 @@ The orchestrator writes observability events to `workspaces/{agent-name}/00-exec
 ```
 agent: agent-builder
 status: success | failed | blocked
+model: {effective-model-id}
 output: agents/{name}.md (or .claude/commands/{name}.md)
 summary: {what was created and why}
 issues: {lint failures or "none"}

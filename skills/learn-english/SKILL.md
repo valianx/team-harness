@@ -1,6 +1,6 @@
 ---
 name: learn-english
-description: Toggle the english-learning correction mode. on enables corrections + sets English as the default language; off disables corrections and asks whether to keep English; status reports current state. Writes ~/.claude/.team-harness.json directly.
+description: Toggle the english-learning correction mode. on enables corrections (independent of the configured response language) and offers an optional English-immersion switch; off disables corrections and asks whether to keep English; status reports current state. Writes ~/.claude/.team-harness.json directly.
 ---
 
 This is a standalone utility skill that reads and writes `~/.claude/.team-harness.json` directly to toggle the english-learning correction mode. It does NOT route through the orchestrator (mirrors `/th:setup` and `/th:update`, which read/write config directly). Writing `.team-harness.json` is this skill's purpose, exactly as it is `/th:setup`'s — so the "`/th:update` never writes `.team-harness.json`" rule does not apply here. Changes take effect at the next SessionStart, when `hooks/session-start.sh` reads the keys.
@@ -40,7 +40,7 @@ Operators run this skill routinely; the value is a clean result, not a play-by-p
 
 - **Do not narrate intermediate steps.** Execute the contract steps without emitting prose between tool calls — no "Now writing…", no per-command commentary, no restating what a command returned, no step-by-step headers. Work silently until the end.
 - **The harness's activity indicator is the progress bar.** While the tool calls run, Claude Code shows its own running-command indicator; that is the progress signal. A skill cannot render an animated progress bar of its own, and must not simulate one with repeated text, percentage prints, or spinner characters. Rely on the harness indicator during execution and the single final report after it.
-- **Emit exactly one operator-facing message: the final report**, after all steps complete. The sole exception is the `off` path, which has one interactive prompt (the language keep/change question) before its final report. A halting error is reported immediately, then the flow stops.
+- **Emit exactly one operator-facing message: the final report**, after all steps complete. The exceptions are the `on` path, which has one interactive prompt (the immersion `[y/N]` question) before its final report, and the `off` path, which has one interactive prompt (the language keep/change question) before its final report. A halting error is reported immediately, then the flow stops.
 - **The report is the product.** It must read like the output of a mature CLI tool: a titled status block with left-aligned labels and aligned values, neutral declarative voice, no emoji, no celebration, no filler. Keep it scannable in a couple of seconds.
 
 ---
@@ -81,24 +81,48 @@ If the file is simply absent: for `on`/`off`, treat as an empty document `{}` an
 
 1. Read the current config (if the file is missing, treat as an empty document `{}` and create it on write).
 2. If the file exists but is not valid JSON, apply the malformed-config error handling above and stop.
-3. Merge-write: set `english_learning` to the JSON boolean `true` AND set `language` to the string `"en"`. Both keys owned; all other keys preserved.
-4. Emit ONE report:
+3. Merge-write: set `english_learning` to the JSON boolean `true`. Do NOT touch `language` in this step. All other keys preserved.
+4. Emit the immersion prompt:
 
-```
+```text
 th learn-english — enabled
 
   english_learning    true
-  language            en
 
-This mode sets English as the default response language. It activates BOTH
-the English language (language: en) and the learn-english correction mode
-(english_learning: true) in ~/.claude/.team-harness.json.
+Corrections are active for messages you write in English, regardless of the
+configured response language.
 
-When active, each reply gives a brief English-correction signal for messages
-written in English. The change takes effect at the next SessionStart.
+Also set English as the response language for immersion? [y/N]
 ```
 
-Edge case — **already on**: if `english_learning` is already `true` and `language` is already `en`, still perform the (idempotent) merge-write and emit the same report. Do not branch into a "no change" message — the operator asked for `on`; reporting the resulting state is correct.
+5. Read the operator's response:
+
+   - `n` (or empty / Enter) → leave `language` unchanged. Emit the final report (no-immersion path).
+   - `y` → merge-write `language` to the string `"en"`. Emit the final report (immersion path).
+
+   **Final report (no-immersion path):**
+
+   ```text
+   th learn-english — enabled
+
+     english_learning    true
+
+   The change takes effect at the next SessionStart.
+   ```
+
+   **Final report (immersion path):**
+
+   ```text
+   th learn-english — enabled
+
+     english_learning    true
+     language            en
+
+   The response language is now English. The change takes effect at the next
+   SessionStart.
+   ```
+
+Edge case — **already on**: if `english_learning` is already `true`, still perform the (idempotent) merge-write and run the same interactive flow. Do not branch into a "no change" message — the operator asked for `on`; reporting the resulting state is correct.
 
 ---
 
@@ -116,8 +140,8 @@ Edge case — **already on**: if `english_learning` is already `true` and `langu
 
      english_learning    false
 
-   The response language is still configured as English (language: en) — it was
-   set to en when the mode was enabled. Keep English, or change it?
+   The response language is currently configured as English (language: en).
+   Keep English, or change it?
 
      keep            leave language: en
      change <code>   set language to an ISO 639-1 code (e.g. change es)
@@ -178,8 +202,7 @@ Edge case — **off when the mode was never on**: if `english_learning` is absen
 2. Report the current `english_learning` (treating absent as `false`/OFF) and the current `language` (treating absent as `not set`).
 
    Map:
-   - `english_learning: true` AND `language` is `en` or absent/empty → `true (active)`
-   - `english_learning: true` AND `language` is a non-`en` non-empty code → `true (inactive — language is <code>, not en)`
+   - `english_learning: true` → `true (active)`
    - `english_learning: false` or absent → `false (inactive)`
 
    ```
@@ -188,9 +211,9 @@ Edge case — **off when the mode was never on**: if `english_learning` is absen
      english_learning    <true|false>   (<active|inactive>)
      language            <code|not set>
 
-   Enable with /th:learn-english on. The correction mode is active only when
-   english_learning is true AND language is en (or unset). Changes take effect
-   at the next SessionStart.
+   Enable with /th:learn-english on. The correction mode is active whenever
+   english_learning is true, regardless of the configured language. Changes
+   take effect at the next SessionStart.
    ```
 
 3. If the file is absent: report `english_learning false (inactive)` and `language not set`, with no write.

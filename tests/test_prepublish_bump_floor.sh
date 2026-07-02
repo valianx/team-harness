@@ -17,8 +17,18 @@
 #   MINOR bump (2.108.1 on feat/prepublish-bump-floor at time of authoring).
 #   The _ver_ge() helper mirrors the _s59_ver_tuple floor pattern.
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the git-state cases run
+# against the compiled TS artifact (hooks/ts/dist/prepublish-guard.cjs) when
+# HOOK_IMPL=ts. AC-8 structural checks (grep the Bash source for
+# --name-status / MSYS_NO_PATHCONV / "ask" tokens) are bash-leg-only — no TS
+# equivalent contract. See 02-implementation-t6a.md "Divergences found" for
+# the confirmed payload-cwd gap: the TS body has no equivalent to the Bash
+# worktree-scope fix (Suite 18 / NEW-1..NEW-6), so those cases are expected
+# to diverge on the ts leg.
+#
 # Usage:
 #   bash tests/test_prepublish_bump_floor.sh
+#   HOOK_IMPL=ts bash tests/test_prepublish_bump_floor.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
@@ -27,11 +37,31 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/prepublish-guard.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/prepublish-guard.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/prepublish-guard.cjs"
 
-if [ ! -x "$HOOK" ]; then
-    chmod +x "$HOOK"
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+    if [ ! -x "$HOOK" ]; then
+        chmod +x "$HOOK"
+    fi
 fi
+
+# Dispatch to the runtime under test.
+_exec_hook() {
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        node "$HOOK"
+    else
+        bash "$HOOK"
+    fi
+}
 
 PASS=0
 FAIL=0
@@ -79,7 +109,7 @@ _run_hook() {
     local tmpout tmperr
     tmpout=$(mktemp)
     tmperr=$(mktemp)
-    (cd "$dir" && _push_payload | bash "$HOOK" >"$tmpout" 2>"$tmperr") || true
+    (cd "$dir" && _push_payload | _exec_hook >"$tmpout" 2>"$tmperr") || true
     _HOOK_STDOUT=$(cat "$tmpout")
     _HOOK_STDERR=$(cat "$tmperr")
     rm -f "$tmpout" "$tmperr"
@@ -96,7 +126,7 @@ _run_hook_from() {
     local tmpout tmperr
     tmpout=$(mktemp)
     tmperr=$(mktemp)
-    (cd "$session_dir" && _push_payload_with_cwd "$cwd_dir" | bash "$HOOK" >"$tmpout" 2>"$tmperr") || true
+    (cd "$session_dir" && _push_payload_with_cwd "$cwd_dir" | _exec_hook >"$tmpout" 2>"$tmperr") || true
     _HOOK_STDOUT=$(cat "$tmpout")
     _HOOK_STDERR=$(cat "$tmperr")
     rm -f "$tmpout" "$tmperr"
@@ -875,7 +905,7 @@ _HOOK_STDOUT=""
 _HOOK_STDERR=""
 _tmpout_a2=$(mktemp)
 _tmperr_a2=$(mktemp)
-(cd "$_clone_a2" && _push_payload | GIT_COMMIT_MSG="bump-override: minor — fix + surface in same PR" bash "$HOOK" >"$_tmpout_a2" 2>"$_tmperr_a2") || true
+(cd "$_clone_a2" && _push_payload | GIT_COMMIT_MSG="bump-override: minor — fix + surface in same PR" _exec_hook >"$_tmpout_a2" 2>"$_tmperr_a2") || true
 _HOOK_STDOUT=$(cat "$_tmpout_a2")
 _HOOK_STDERR=$(cat "$_tmperr_a2")
 rm -f "$_tmpout_a2" "$_tmperr_a2"
@@ -914,7 +944,7 @@ _tmperr_a2p=$(mktemp)
 (cd "$_clone_a2p" && _push_payload \
     | GIT_PUSH_OPTION_COUNT=1 \
       GIT_PUSH_OPTION_0="bump-override: minor — hotfix + new hook surface in same release PR" \
-      bash "$HOOK" >"$_tmpout_a2p" 2>"$_tmperr_a2p") || true
+      _exec_hook >"$_tmpout_a2p" 2>"$_tmperr_a2p") || true
 _HOOK_STDOUT=$(cat "$_tmpout_a2p")
 _HOOK_STDERR=$(cat "$_tmperr_a2p")
 rm -f "$_tmpout_a2p" "$_tmperr_a2p"
@@ -953,7 +983,7 @@ _tmpout_a2c=$(mktemp)
 _tmperr_a2c=$(mktemp)
 _ctrl_token=$(printf 'bump-override: minor \t— malicious payload')
 (cd "$_clone_a2c" && _push_payload \
-    | GIT_COMMIT_MSG="$_ctrl_token" bash "$HOOK" >"$_tmpout_a2c" 2>"$_tmperr_a2c") || true
+    | GIT_COMMIT_MSG="$_ctrl_token" _exec_hook >"$_tmpout_a2c" 2>"$_tmperr_a2c") || true
 _HOOK_STDOUT=$(cat "$_tmpout_a2c")
 _HOOK_STDERR=$(cat "$_tmperr_a2c")
 rm -f "$_tmpout_a2c" "$_tmperr_a2c"
@@ -1161,7 +1191,9 @@ _run_hook "$_clone_s17c"
 assert_nodecision "SEC-001-C: release/v2.107.1 + all three sites bumped+matching → nodecision (ALLOW)"
 
 # AC-8 structural check: --name-status in hook; no new git show without MSYS guard
+# Bash-source-specific — bash leg only (no TS equivalent contract).
 # ---------------------------------------------------------------------------
+if [ "$HOOK_IMPL" = "bash" ]; then
 echo
 echo "--- AC-8: --name-status and MSYS_NO_PATHCONV structural guard ---"
 
@@ -1190,6 +1222,7 @@ if [ -z "$_ask_in_floor" ]; then
 else
     fail "AC-6/AC-8: ask token" "floor sub-stage contains 'ask' decision: $_ask_in_floor"
 fi
+fi # HOOK_IMPL = bash (AC-8 structural checks)
 
 # ---------------------------------------------------------------------------
 # Suite 18: Worktree-scope fix — guard reads payload cwd, not process CWD
@@ -1399,7 +1432,7 @@ _tmperr_n5=$(mktemp)
 # which is the correct JSON escape for a tab.
 (cd "$_clone_n4" && printf '%s' \
     '{"tool_name":"Bash","cwd":"/tmp/clean\tdevil","tool_input":{"command":"git push origin HEAD"}}' \
-    | bash "$HOOK" >"$_tmpout_n5" 2>"$_tmperr_n5") || true
+    | _exec_hook >"$_tmpout_n5" 2>"$_tmperr_n5") || true
 _HOOK_STDOUT=$(cat "$_tmpout_n5")
 _HOOK_STDERR=$(cat "$_tmperr_n5")
 rm -f "$_tmpout_n5" "$_tmperr_n5"
@@ -1424,7 +1457,7 @@ _tmperr_n6=$(mktemp)
 
 _nonexistent_cwd="/tmp/nonexistent-worktree-guard-test-$$"
 (cd "$_clone_n4" && printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"git push origin HEAD"}}' \
-    "$_nonexistent_cwd" | bash "$HOOK" >"$_tmpout_n6" 2>"$_tmperr_n6") || true
+    "$_nonexistent_cwd" | _exec_hook >"$_tmpout_n6" 2>"$_tmperr_n6") || true
 _HOOK_STDOUT=$(cat "$_tmpout_n6")
 _HOOK_STDERR=$(cat "$_tmperr_n6")
 rm -f "$_tmpout_n6" "$_tmperr_n6"

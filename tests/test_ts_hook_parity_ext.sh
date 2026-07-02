@@ -261,23 +261,28 @@ CP_TS_CJS="$REPO_ROOT/hooks/ts/dist/checkpoint-guard.cjs"
 if [ ! -f "$CP_TS_CJS" ]; then
     echo "  [SKIP] checkpoint-guard.cjs not found"
 else
+    # The Bash oracle's allow() always emits an explicit permissionDecision:
+    # "allow" JSON (checkpoint-guard.sh:30-33) — including every fail-open
+    # branch (no workspace found, non-Task dispatch). "none" (empty stdout)
+    # was never the oracle's actual contract for these cases; the TS body is
+    # now aligned to it (T6c).
     cp_task=$(python3 -c "import json; print(json.dumps({'tool_name':'Task','tool_input':{'description':'do it'}}))")
     cp_out=$(echo "$cp_task" | node "$CP_TS_CJS" 2>/dev/null)
     cp_dec=$(ext_decision "$cp_out")
-    if [ "$cp_dec" = "none" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: checkpoint-guard no-workspace → fail-open (none)"
+    if [ "$cp_dec" = "allow" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-10: checkpoint-guard no-workspace → fail-open (explicit allow)"
     else
         FAIL=$((FAIL + 1)); FAILURES+=("AC-10: checkpoint-guard fail-open got=$cp_dec")
-        echo "  [FAIL] AC-10: fail-open expected none, got=$cp_dec"
+        echo "  [FAIL] AC-10: fail-open expected allow, got=$cp_dec"
     fi
     cp_bash_p=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'ls'}}))")
     cp_nt_out=$(echo "$cp_bash_p" | node "$CP_TS_CJS" 2>/dev/null)
     cp_nt=$(ext_decision "$cp_nt_out")
-    if [ "$cp_nt" = "none" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: checkpoint-guard non-Task → none"
+    if [ "$cp_nt" = "allow" ]; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-10: checkpoint-guard non-Task → explicit allow"
     else
         FAIL=$((FAIL + 1)); FAILURES+=("AC-10: checkpoint non-Task got=$cp_nt")
-        echo "  [FAIL] AC-10: non-Task expected none, got=$cp_nt"
+        echo "  [FAIL] AC-10: non-Task expected allow, got=$cp_nt"
     fi
 fi
 
@@ -333,17 +338,20 @@ LP_TS_CJS="$REPO_ROOT/hooks/ts/dist/language-user-prompt.cjs"
 if [ ! -f "$SS_TS_CJS" ]; then
     echo "  [SKIP] session-start.cjs not found"
 else
+    # additionalContext lives under hookSpecificOutput (T6c envelope fix) —
+    # not at the top level. code.claude.com/docs/en/hooks; matches the Bash
+    # oracle (session-start.sh:272).
     ss_in=$(python3 -c "import json; print(json.dumps({'type':'startup','session_id':'t123'}))")
     ss_out=$(echo "$ss_in" | node "$SS_TS_CJS" 2>/dev/null)
     ss_has=$(echo "$ss_out" | grep -c '"additionalContext"' 2>/dev/null || echo "0")
-    ss_nonempty=$(echo "$ss_out" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print('yes' if d.get('additionalContext') else 'no')" 2>/dev/null || echo "no")
+    ss_nonempty=$(echo "$ss_out" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print('yes' if d.get('hookSpecificOutput',{}).get('additionalContext') else 'no')" 2>/dev/null || echo "no")
     if [ "$ss_has" -ge 1 ] && [ "$ss_nonempty" = "yes" ]; then
         PASS=$((PASS + 1)); echo "  [PASS] AC-11: session-start emits non-empty additionalContext"
     else
         FAIL=$((FAIL + 1)); FAILURES+=("AC-11: session-start should emit additionalContext")
         echo "  [FAIL] AC-11: additionalContext missing or empty"
     fi
-    ss_orch=$(echo "$ss_out" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); c=d.get('additionalContext',''); print('yes' if 'orchestrator disposition is active' in c else 'no')" 2>/dev/null || echo "no")
+    ss_orch=$(echo "$ss_out" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); c=d.get('hookSpecificOutput',{}).get('additionalContext',''); print('yes' if 'orchestrator disposition is active' in c else 'no')" 2>/dev/null || echo "no")
     if [ "$ss_orch" = "yes" ]; then
         PASS=$((PASS + 1)); echo "  [PASS] AC-11: orchestrator disposition present (load 1 unconditional)"
     else

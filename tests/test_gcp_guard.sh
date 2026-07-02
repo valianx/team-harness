@@ -26,8 +26,12 @@
 #   empty/malformed stdin with gcloud token           -> fail-safe (never allow)
 #   strongest class across all gcloud invocations wins
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
+# the compiled TS artifact (hooks/ts/dist/gcp-guard.cjs) when HOOK_IMPL=ts.
+#
 # Usage:
 #   bash tests/test_gcp_guard.sh
+#   HOOK_IMPL=ts bash tests/test_gcp_guard.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
@@ -36,15 +40,25 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/gcp-guard.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/gcp-guard.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/gcp-guard.cjs"
 
-if [ ! -f "$HOOK" ]; then
-    echo "ERROR: hooks/gcp-guard.sh not found at $HOOK"
-    exit 1
-fi
-
-if [ ! -x "$HOOK" ]; then
-    chmod +x "$HOOK"
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: hooks/gcp-guard.sh not found at $HOOK"
+        exit 1
+    fi
+    if [ ! -x "$HOOK" ]; then
+        chmod +x "$HOOK"
+    fi
 fi
 
 PASS=0
@@ -88,7 +102,11 @@ print(json.dumps(payload))
 # Run the hook; print stdout (decision JSON or empty).
 run_hook() {
     local payload="$1"
-    bash "$HOOK" <<< "$payload" 2>&1
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        node "$HOOK" <<< "$payload" 2>&1
+    else
+        bash "$HOOK" <<< "$payload" 2>&1
+    fi
 }
 
 # Assert hook emits "ask".

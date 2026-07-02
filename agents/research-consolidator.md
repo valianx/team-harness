@@ -197,6 +197,7 @@ Write the consolidated findings to `output_file` using the format above.
 ```
 agent: research-consolidator
 status: success | failed
+model: {effective-model-id}
 output: {output_file path}
 summary: {1-2 sentences: N lanes consolidated (W web + C code), M findings, K conflicts}
 lanes_consolidated: {N}

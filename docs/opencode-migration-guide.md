@@ -1,6 +1,8 @@
 # Opencode Migration Guide
 
 > **Status: process design only.** This document describes the migration process for converting team-harness assets from Claude Code format to the target second harness format. It does NOT perform the migration. No `agents/`, `skills/`, or `hooks/` file is modified by this document. The actual migration — rewriting the 18 Bash hooks to TypeScript, materializing the `.opencode/` directory structure, building adapters — is future work tracked separately. This guide is written before the migration begins so the process is fully specified and reviewable before any conversion starts.
+>
+> **Interim canonicality (declared 2026-07-01, issue batch #446-452, T6a).** The 11 hook families wired into Claude Code already have a TS port (`hooks/ts/bodies/`), but `hooks.json`/`config.json` still invoke the Bash `.sh` files. **Until the CC cutover lands (Group B), Bash is the canonical source of gate logic for Claude Code and TS is the generated/hand-ported projection** — a divergence between the two is a defect in the TS projection, not an ambiguity about which side is authoritative. The dual-target functional-suite mechanism (`HOOK_IMPL=bash|ts` in `tests/run-all.sh`) is the verification spike required by point 4 above; it runs the existing Bash-oracle test cases against the compiled TS artifacts for every wired hook family. This line is superseded, not accumulated, when Group B completes the cutover and TS becomes canonical for both runtimes.
 
 ---
 

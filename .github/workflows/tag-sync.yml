@@ -1,0 +1,60 @@
+name: Tag Sync
+
+# Deterministic backstop for the manual "create and push the release tag"
+# step (see skills/release/SKILL.md and agents/delivery.md release-mode).
+# Runs whenever a release PR merges the version bump to main so the
+# opencode-side artifact pipeline (release.yml) never depends solely on a
+# human remembering to push the tag.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .claude-plugin/plugin.json
+
+# Deny by default; the sync job opts in to exactly what it needs.
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  sync-tag:
+    runs-on: ubuntu-latest
+    # Force JavaScript actions to run on Node.js 24. See release.yml for rationale.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create and push release tag, dispatch release.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(jq -r '.version' .claude-plugin/plugin.json)
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            echo "Error: could not read .version from .claude-plugin/plugin.json" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: .version '${VERSION}' is not a strict X.Y.Z SemVer — refusing to build a tag from it." >&2
+            exit 1
+          fi
+          TAG="v${VERSION}"
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "refs/tags/${TAG}"; then
+            echo "Tag ${TAG} already exists on origin — skipping tag creation, still dispatching release.yml (idempotent: a re-dispatch on an existing tag does not strand the release)."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "${TAG}"
+            git push origin "${TAG}"
+            echo "Pushed tag ${TAG}."
+          fi
+
+          # A tag created via GITHUB_TOKEN does not trigger other workflows'
+          # `on: push: tags` listeners (GitHub's Actions recursion
+          # prevention), so release.yml must be dispatched explicitly with
+          # the tag it expects (release.yml workflow_dispatch input: tag).
+          # --ref pins the dispatch to the tag itself so release.yml builds
+          # the tagged commit, not a possibly-drifted main.
+          gh workflow run release.yml --ref "${TAG}" -f tag="${TAG}"
+          echo "Dispatched release.yml for ${TAG}."

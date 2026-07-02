@@ -243,6 +243,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: acceptance-checker
 status: success | failed | blocked
+model: {effective-model-id}
 verdict: pass | concerns | fail
 output: workspaces/{feature-name}/04-validation.md § Drift Analysis
 summary: {1-2 sentences: verdict + most relevant finding, or "no drift detected"}

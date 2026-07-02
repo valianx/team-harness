@@ -7,8 +7,16 @@
 # invokes the hook with stdin drained, and asserts stdout + exit code.
 # AC-5 and AC-6 are registration-presence checks against repo manifest files.
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
+# the compiled TS artifact (hooks/ts/dist/language-user-prompt.cjs) when
+# HOOK_IMPL=ts. AC-1/AC-2/AC-3/AC-4 assert on the envelope AND the
+# additionalContext VALUE on both legs (T6c): the CC entry adapter now emits
+# the wrapped hookSpecificOutput envelope, closing the bare-vs-wrapped gap
+# documented in 02-implementation-t6a.md "Divergences found".
+#
 # Usage:
 #   bash tests/test_language_user_prompt.sh
+#   HOOK_IMPL=ts bash tests/test_language_user_prompt.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
@@ -20,7 +28,19 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/language-user-prompt.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/language-user-prompt.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/language-user-prompt.cjs"
+
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+fi
 
 # The hook may not exist yet (Phase 2.0 — failing test mode).
 # Do NOT abort if it is missing; cases will simply produce no output and fail
@@ -61,7 +81,11 @@ make_tmp_home_no_config() {
 #   Returns stdout. Exit code is captured separately when needed.
 run_hook() {
     local fake_home="$1"
-    HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
+    else
+        HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
+    fi
 }
 
 # run_hook_with_exit <fake_home>
@@ -70,7 +94,11 @@ run_hook_with_exit() {
     local fake_home="$1"
     local out
     local code
-    out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
+    else
+        out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
+    fi
     code=$?
     printf '%s' "$out"
     printf '\nEXIT:%d' "$code"

@@ -474,6 +474,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: gcp-infra
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/02-gcp-infra.md
 summary: {1-2 sentences: mode, operation class, what changed or what the gate is waiting on, blast radius}
 context7_consult: hit:N miss:N skipped:M

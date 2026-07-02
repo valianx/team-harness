@@ -35,9 +35,19 @@ const TRIGGER_RE = /git\s+(checkout\s+-b|switch\s+-c|worktree\s+add)/;
 
 // ---------------------------------------------------------------------------
 // Public evaluate() — the single entry point every runtime calls.
+//
+// `rawPayload` (optional) is the ORIGINAL, unparsed stdin text. It backs the
+// Bash oracle's Step 4 fail-safe fallback: when tool_input's shape is
+// malformed (e.g. an array instead of an object) the shim coerces it to an
+// empty object, and the structured `command` extraction above yields "" —
+// exactly like the Bash oracle's own `ti.get('command', '')` failing on a
+// non-dict `tool_input`. The Bash oracle never drops the reminder in that
+// case; it falls back to scanning the RAW, unparsed payload bytes for the
+// trigger token. Passing rawPayload is optional (opencode has no equivalent
+// contract) — when absent, only the structured `cmd` is evaluated.
 // ---------------------------------------------------------------------------
 
-export function evaluate(input: NormalizedInput): NormalizedDecision {
+export function evaluate(input: NormalizedInput, rawPayload?: string): NormalizedDecision {
   const toolName = input.tool?.name ?? "";
   if (toolName !== "Bash") return none();
 
@@ -45,8 +55,10 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
     ? (input.tool.input["command"] as string)
     : "";
 
-  // Fast-exit: no trigger token → none.
-  if (!TRIGGER_RE.test(cmd)) {
+  // Fast-exit: structured command carries the trigger → ask directly.
+  // Otherwise, fall back to a raw-text scan (fail-safe for malformed tool_input).
+  const triggered = TRIGGER_RE.test(cmd) || (rawPayload !== undefined && TRIGGER_RE.test(rawPayload));
+  if (!triggered) {
     return none();
   }
 
