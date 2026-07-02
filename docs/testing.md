@@ -618,6 +618,12 @@ These findings are the intended output of the mechanism (AC-1's "a behavioral ga
 
 **Bash leg: 24/24 pass. TS leg: 23/24 pass** — see "Dual-target functional suites" above for the one confirmed divergence (malformed `tool_input` shape fallback).
 
+### Suite 134 — subagent-start
+
+22 checks (functional, 3 sections). Functional test for `hooks/ts/dist/subagent-start.cjs`, the PreToolUse (matcher `Task`) breadcrumb writer that is the start-side twin of `hooks/subagent-trace.sh` (issue #452) — the first hook authored under Decision A (CLAUDE.md §6.3) with no Bash body. File: `tests/test_subagent_start.sh`. Wired as `# Suite 24:` in `tests/run-all.sh`. Skips cleanly (exit 0) when `node` is absent; under `TH_REQUIRE_RUNTIMES=1` (CI), a missing `node` reports FAIL via the shared `report_skip_or_fail` helper (Suite 131) instead.
+
+Checks: (Section 1, AC-1) a `th:*` `subagent_type` dispatch exits 0, emits no stdout, and appends exactly one line to the resolved workspace's `00-subagent-trace.jsonl` with `event=subagent.start`, the dispatched `agent_type`, a `ts` field, no `agent_id` key (not yet assigned at PreToolUse time), and exactly the `{ts, event, agent_type}` key set — no extra fields leaked. (Section 2, AC-1) a non-`th:*` `subagent_type` dispatch exits 0, emits no stdout, and writes nothing. (Section 3, AC-2) fail-open across six known-bad inputs — malformed JSON, empty stdin, an empty-object payload, a wrong-typed (`number`) `subagent_type`, an unreachable workspace path (no `workspaces/` directory at all), and an oversize payload exceeding the SEC-07 `MAX_PAYLOAD_BYTES` pre-parse bound — each case asserts exit 0, empty stdout, and (where applicable) no trace-file write. Note number 133 is intentionally skipped in this registry — reserved by a parallel sibling task in the same batch. Pure Bash + `node` + `python3` fixture — no network, no agent invocation, no paid spend. Written by implementer (2026-07-02). Marker: `subagent-start`.
+
 ### Suite 12 — security-self-scan
 
 5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).

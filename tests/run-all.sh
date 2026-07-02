@@ -355,6 +355,22 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 24: hooks/ts subagent-start — deterministic PreToolUse breadcrumb (registry Suite 134)"
+echo "# Requires: node. Skipped when absent."
+echo "############################################################"
+if ! command -v node >/dev/null 2>&1; then
+    report_skip_or_fail "subagent-start" "node not found — install Node.js to run this suite"
+else
+    if bash "$TESTS_DIR/test_subagent_start.sh"; then
+        echo "subagent-start: PASS"
+    else
+        echo "subagent-start: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"
