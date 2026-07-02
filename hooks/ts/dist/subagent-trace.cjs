@@ -176,6 +176,7 @@ function writeTrace(input, writer) {
     return null;
   }
   const stopReason = typeof input.tool?.input?.["stop_reason"] === "string" ? input.tool.input["stop_reason"] : "";
+  const agentId = typeof input.tool?.input?.["agent_id"] === "string" ? input.tool.input["agent_id"] : "";
   const ts = writer.now();
   const cwd = writer.cwd();
   const workspace = writer.findWorkspace(cwd);
@@ -186,6 +187,7 @@ function writeTrace(input, writer) {
     ts,
     event: "subagent.stop",
     agent_type: agentType,
+    agent_id: agentId,
     stop_reason: stopReason,
     workspace
   };

@@ -211,15 +211,15 @@ if [ ! -f "$STOP_CJS" ]; then
     echo "  [SKIP] subagent-trace.cjs not found at $STOP_CJS — run 'npm --prefix hooks/ts run build:subagent-trace' first."
 else
     make_stop_payload() {
-        local agent_type="$1"
+        local agent_type="$1" agent_id="$2"
         python3 -c "
 import json, sys
-print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.argv[1], 'stop_reason': 'complete'}}))
-" "$agent_type"
+print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.argv[1], 'agent_id': sys.argv[2], 'stop_reason': 'complete'}}))
+" "$agent_type" "$agent_id"
     }
 
     rm -f "$TRACE_FILE"
-    stop_payload="$(make_stop_payload "th:tester")"
+    stop_payload="$(make_stop_payload "th:tester" "agent-fixture-42")"
     out="$(cd "$WORKDIR" && echo "$stop_payload" | TH_HOOK_PROFILE=minimal node "$STOP_CJS" 2>/dev/null)"
     rc=$?
 
@@ -236,6 +236,9 @@ print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.
         LINE="$(cat "$TRACE_FILE")"
         if echo "$LINE" | grep -q '"event":"subagent.stop"'; then r=1; else r=0; fi
         assert_true "TH_HOOK_PROFILE=minimal: trace line has event=subagent.stop" "$r"
+
+        if echo "$LINE" | grep -q '"agent_id":"agent-fixture-42"'; then r=1; else r=0; fi
+        assert_true "TH_HOOK_PROFILE=minimal: trace line carries the agent_id correlation key (SEC-DR-007)" "$r"
     fi
 fi
 
