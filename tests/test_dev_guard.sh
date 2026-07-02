@@ -15,18 +15,33 @@
 #   - Non-covered / benign Bash -> assert_nodecision (always)
 #   - Edit/Write payloads (no command field) -> assert_nodecision (always)
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
+# the compiled TS artifact (hooks/ts/dist/dev-guard.cjs) when HOOK_IMPL=ts.
+#
 # Usage:
 #   ./tests/test_dev_guard.sh
+#   HOOK_IMPL=ts ./tests/test_dev_guard.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/dev-guard.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/dev-guard.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/dev-guard.cjs"
 
-if [ ! -x "$HOOK" ]; then
-    chmod +x "$HOOK"
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+    if [ ! -x "$HOOK" ]; then
+        chmod +x "$HOOK"
+    fi
 fi
 
 PASS=0
@@ -65,7 +80,11 @@ print(json.dumps(payload))
 run_hook() {
     local fake_home="$1"
     local payload="$2"
-    HOME="$fake_home" bash "$HOOK" <<< "$payload" 2>&1
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        HOME="$fake_home" node "$HOOK" <<< "$payload" 2>&1
+    else
+        HOME="$fake_home" bash "$HOOK" <<< "$payload" 2>&1
+    fi
 }
 
 assert_ask() {

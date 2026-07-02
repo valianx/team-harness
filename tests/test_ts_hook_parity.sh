@@ -21,6 +21,17 @@
 #   - Cold-start latency (AC-17): Node entry < 5s gate timeout.
 #   - Dual-runtime parity (AC-8): Node AND Bun (or recorded bun-not-present).
 #
+# SCOPE NOTE (issue batch #446-452, T6a): this harness remains the dedicated
+# dev-guard parity spike (Node+Bun dual-runtime, SEC-07 hardening, cold-start
+# latency) — its scope is NOT widened to the other 5 floors + session-start +
+# language-user-prompt. The BROAD Bash<->TS conformance lock across every
+# wired hook family now lives in the dual-target functional-suite mechanism
+# (`HOOK_IMPL=bash|ts`, wired per-suite in tests/run-all.sh — Suites 1, 4, 5,
+# 6, 7, 16, 87, 133), which reuses the existing Bash-oracle test cases instead
+# of hand-authored parity fixtures. See docs/opencode-migration-guide.md
+# "Interim canonicality" for the Bash-is-canonical declaration this locks
+# against.
+#
 # Usage:
 #   bash tests/test_ts_hook_parity.sh [--verbose]
 # Exit code:

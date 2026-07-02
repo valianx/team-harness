@@ -5,19 +5,46 @@
 #   - "deny" cases must produce a JSON with permissionDecision: "deny"
 #   - "allow" cases must produce empty stdout (no JSON, hook lets the call through)
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
+# the compiled TS artifact (hooks/ts/dist/policy-block.cjs) when HOOK_IMPL=ts,
+# so a behavioral gap between the two implementations turns this suite red.
+#
 # Usage:
 #   ./tests/test_policy_block.sh
+#   HOOK_IMPL=ts ./tests/test_policy_block.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/policy-block.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/policy-block.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/policy-block.cjs"
 
-if [ ! -x "$HOOK" ]; then
-    chmod +x "$HOOK"
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+    if [ ! -x "$HOOK" ]; then
+        chmod +x "$HOOK"
+    fi
 fi
+
+# Dispatch to the runtime under test — bash for the .sh oracle, node for the
+# compiled .cjs artifact. Preserves stdin/env/redirection at call sites
+# (env-var prefixes on a function call apply for its duration, same as a command).
+_exec_hook() {
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        node "$HOOK"
+    else
+        bash "$HOOK"
+    fi
+}
 
 PASS=0
 FAIL=0
@@ -27,8 +54,8 @@ assert_deny() {
     local name="$1"
     local payload="$2"
     local out
-    out=$(echo "$payload" | bash "$HOOK" 2>&1)
-    if echo "$out" | grep -q '"permissionDecision": "deny"'; then
+    out=$(echo "$payload" | _exec_hook 2>&1)
+    if echo "$out" | grep -qE '"permissionDecision":[[:space:]]*"deny"'; then
         PASS=$((PASS + 1))
         echo "  [PASS] DENY: $name"
     else
@@ -42,7 +69,7 @@ assert_allow() {
     local name="$1"
     local payload="$2"
     local out
-    out=$(echo "$payload" | bash "$HOOK" 2>&1)
+    out=$(echo "$payload" | _exec_hook 2>&1)
     if [ -z "$out" ]; then
         PASS=$((PASS + 1))
         echo "  [PASS] ALLOW: $name"
@@ -285,8 +312,8 @@ assert_ask() {
     local name="$1"
     local payload="$2"
     local out
-    out=$(echo "$payload" | bash "$HOOK" 2>&1)
-    if echo "$out" | grep -q '"permissionDecision": "ask"'; then
+    out=$(echo "$payload" | _exec_hook 2>&1)
+    if echo "$out" | grep -qE '"permissionDecision":[[:space:]]*"ask"'; then
         PASS=$((PASS + 1))
         echo "  [PASS] ASK: $name"
     else
@@ -462,6 +489,9 @@ echo "=== [Degraded-path] Write content with SendGrid key (DENY on bash fallback
 # HIGH patterns. Force the degraded path by injecting a fake python3 that exits 127
 # (the documented "absent python3 simulation" — policy-block.sh treats it as absent
 # and falls back to the native bash gate).
+# Bash-only: this exercises policy-block.sh's own python3-absent fallback, a
+# concept with no TS equivalent (Node has no python3 dependency to degrade from).
+if [ "$HOOK_IMPL" = "bash" ]; then
 _DEGRADED_FAKE_DIR="$(mktemp -d)"
 cat > "$_DEGRADED_FAKE_DIR/python3" <<'SH'
 #!/bin/bash
@@ -483,6 +513,7 @@ else
     echo "  [FAIL] DENY: Write SendGrid key — degraded-path Write/Edit detection (SEC-A-02) (got: ${_degraded_out:-<empty>})"
 fi
 rm -rf "$_DEGRADED_FAKE_DIR"
+fi
 
 echo
 echo "=== M3: FAIL-CLOSED — unmatched edge payload (ALLOW / no-decision) ==="

@@ -7,8 +7,19 @@
 #
 # Suite 89 — workspace-mode-session-start (docs/testing.md canonical registry)
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the behavioral cases (Sections
+# 1-4, 6, 7's non-structural cases) run against the compiled TS artifact
+# (hooks/ts/dist/session-start.cjs) when HOOK_IMPL=ts. Section 5 and the
+# structural sub-checks of Section 7 grep the Bash SOURCE for function names
+# (load_orchestrator etc.) — a Bash-implementation-detail, not a behavioral
+# contract, so those run on the bash leg only. AC assertions on hookEventName/
+# SessionStart envelope keys are also bash-leg-only — see
+# 02-implementation-t6a.md "Divergences found" for the known bare-vs-wrapped
+# envelope-shape gap in the CC entry adapter (out of this task's scope).
+#
 # Usage:
 #   bash tests/test_session_start.sh
+#   HOOK_IMPL=ts bash tests/test_session_start.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 #
@@ -20,7 +31,19 @@
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/session-start.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/session-start.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/session-start.cjs"
+
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+fi
 
 # The hook may not exist yet (Phase 2.0 — failing test mode).
 # Do NOT abort if it is missing; cases will simply produce no output and fail
@@ -74,7 +97,11 @@ make_tmp_home_with_marker() {
 #   Returns stdout. Exit code is captured separately when needed.
 run_hook() {
     local fake_home="$1"
-    HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
+    else
+        HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null
+    fi
 }
 
 # run_hook_with_exit <fake_home>
@@ -83,7 +110,11 @@ run_hook_with_exit() {
     local fake_home="$1"
     local out
     local code
-    out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
+    else
+        out=$(HOME="$fake_home" bash "$HOOK" <<< '{}' 2>/dev/null)
+    fi
     code=$?
     printf '%s' "$out"
     printf '\nEXIT:%d' "$code"
@@ -109,11 +140,11 @@ assert_session_start_with_language() {
         failure_reason="stdout was empty; expected a SessionStart JSON line"
     fi
 
-    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"hookEventName"'; then
+    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"hookEventName"'; then
         ok=0
         failure_reason="stdout missing hookEventName field"
     fi
-    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
+    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
         ok=0
         failure_reason="stdout missing SessionStart value"
     fi
@@ -196,7 +227,7 @@ assert_template_form() {
         failure_reason="stdout was empty; expected a SessionStart JSON line"
     fi
 
-    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
+    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
         ok=0
         failure_reason="stdout missing SessionStart value"
     fi
@@ -333,7 +364,9 @@ echo
 echo "=== Orchestrator: no marker, no config → disposition directive still fires ==="
 TMP=$(make_tmp_home_no_config)
 assert_output_contains "orch-noconfig: additionalContext present without marker" "$TMP" '"additionalContext"'
-assert_output_contains "orch-noconfig-SessionStart: SessionStart event present" "$TMP" '"SessionStart"'
+if [ "$HOOK_IMPL" = "bash" ]; then
+    assert_output_contains "orch-noconfig-SessionStart: SessionStart event present" "$TMP" '"SessionStart"'
+fi
 assert_output_contains "orch-noconfig-disposition: orchestrator disposition text present" "$TMP" "orchestrator disposition"
 assert_output_not_contains "orch-noconfig-no-systemMessage: no systemMessage banner" "$TMP" '"systemMessage"'
 assert_output_not_contains "orch-noconfig-no-DEVELOPER: no DEVELOPER MODE ACTIVE text" "$TMP" "DEVELOPER MODE ACTIVE"
@@ -362,7 +395,9 @@ echo "=== Workspace: obsidian + valid logs-path → base-path directive in addit
 TMP=$(make_tmp_home '{"logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}')
 assert_output_contains "ws-obsidian-context: additionalContext present" "$TMP" '"additionalContext"'
 assert_output_contains "ws-obsidian-path: logs-path/subfolder substring in directive" "$TMP" "/vault/work/work-logs"
-assert_output_contains "ws-obsidian-event: SessionStart event present" "$TMP" '"SessionStart"'
+if [ "$HOOK_IMPL" = "bash" ]; then
+    assert_output_contains "ws-obsidian-event: SessionStart event present" "$TMP" '"SessionStart"'
+fi
 rm -rf "$TMP"
 
 echo
@@ -472,7 +507,10 @@ rm -rf "$TMP"
 
 # ===========================================================================
 # SECTION 5: Extensible ordered structure — static source assertions (AC-13)
+# Bash-source-specific (function-name greps) — no TS equivalent contract, so
+# this section runs on the bash leg only.
 # ===========================================================================
+if [ "$HOOK_IMPL" = "bash" ]; then
 
 echo
 echo "=== Structure: hook defines four load_<name> functions ==="
@@ -534,6 +572,8 @@ else
     FAILURES+=("structure: 3-step add-a-new-load procedure missing (needs 'add a new' + 'test_session_start.sh')")
     echo "  [FAIL] structure: 3-step add-a-new-load procedure missing"
 fi
+
+fi # HOOK_IMPL = bash (SECTION 5)
 
 # ===========================================================================
 # SECTION 6: Fail-safe cases (AC-5, v2.89.0 update)
@@ -707,7 +747,10 @@ rm -rf "$TMP"
 
 # ===========================================================================
 # SECTION 7 — Structure assertions for load_english_learning (AC-3)
+# Bash-source-specific (function-name greps) — bash leg only, same rationale
+# as SECTION 5.
 # ===========================================================================
+if [ "$HOOK_IMPL" = "bash" ]; then
 
 echo
 echo "=== Structure: hook defines four load_<name> functions including load_english_learning (AC-3) ==="
@@ -792,6 +835,8 @@ else
     FAILURES+=("structure: REGISTRY comment missing Load 4 or load_english_learning reference")
     echo "  [FAIL] structure: REGISTRY comment missing Load 4 or load_english_learning reference"
 fi
+
+fi # HOOK_IMPL = bash (SECTION 7 structure assertions)
 
 # ===========================================================================
 # Summary

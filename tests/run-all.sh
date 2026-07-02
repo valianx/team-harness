@@ -23,15 +23,38 @@ report_skip_or_fail() {
     fi
 }
 
+# run_dual_target_suite <suite_label> <test_script>
+# Runs the bash leg unconditionally (existing behavior, unchanged), then the
+# same test script a second time with HOOK_IMPL=ts against the compiled TS
+# artifact when node is present. A missing node under TH_REQUIRE_RUNTIMES=1
+# reports FAIL via report_skip_or_fail — the ts leg can never silently skip
+# in CI. Used by the 8 functional suites that dual-target a hook family
+# (policy-block, checkpoint-guard, dev-guard, session-start,
+# language-user-prompt, prepublish-guard, gcp-guard, worktree-guard).
+run_dual_target_suite() {
+    local label="$1" script="$2"
+    if bash "$TESTS_DIR/$script"; then
+        echo "${label} (bash): PASS"
+    else
+        echo "${label} (bash): FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+    if command -v node >/dev/null 2>&1; then
+        if HOOK_IMPL=ts bash "$TESTS_DIR/$script"; then
+            echo "${label} (ts): PASS"
+        else
+            echo "${label} (ts): FAIL"
+            FAILED=$((FAILED + 1))
+        fi
+    else
+        report_skip_or_fail "${label} (ts)" "node not found"
+    fi
+}
+
 echo "############################################################"
-echo "# Suite 1: hooks/policy-block.sh — functional tests"
+echo "# Suite 1: hooks/policy-block.sh — functional tests (dual-target bash|ts)"
 echo "############################################################"
-if bash "$TESTS_DIR/test_policy_block.sh"; then
-    echo "policy-block: PASS"
-else
-    echo "policy-block: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_dual_target_suite "policy-block" "test_policy_block.sh"
 
 echo
 echo "############################################################"
@@ -57,47 +80,27 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 4: hooks/checkpoint-guard.sh — functional tests"
+echo "# Suite 4: hooks/checkpoint-guard.sh — functional tests (dual-target bash|ts)"
 echo "############################################################"
-if bash "$TESTS_DIR/test_checkpoint_guard.sh"; then
-    echo "checkpoint-guard: PASS"
-else
-    echo "checkpoint-guard: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_dual_target_suite "checkpoint-guard" "test_checkpoint_guard.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 5: hooks/dev-guard.sh — behavioral tests"
+echo "# Suite 5: hooks/dev-guard.sh — behavioral tests (dual-target bash|ts)"
 echo "############################################################"
-if bash "$TESTS_DIR/test_dev_guard.sh"; then
-    echo "dev-guard: PASS"
-else
-    echo "dev-guard: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_dual_target_suite "dev-guard" "test_dev_guard.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 6: hooks/session-start.sh — functional tests"
+echo "# Suite 6: hooks/session-start.sh — functional tests (dual-target bash|ts)"
 echo "############################################################"
-if bash "$TESTS_DIR/test_session_start.sh"; then
-    echo "session-start: PASS"
-else
-    echo "session-start: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_dual_target_suite "session-start" "test_session_start.sh"
 
 echo
 echo "############################################################"
-echo "# Suite 7: hooks/language-user-prompt.sh — functional tests"
+echo "# Suite 7: hooks/language-user-prompt.sh — functional tests (dual-target bash|ts)"
 echo "############################################################"
-if bash "$TESTS_DIR/test_language_user_prompt.sh"; then
-    echo "language-user-prompt: PASS"
-else
-    echo "language-user-prompt: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_dual_target_suite "language-user-prompt" "test_language_user_prompt.sh"
 
 echo
 echo "############################################################"
@@ -212,14 +215,21 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 16: hooks/prepublish-guard.sh — bump-floor advisory (registry Suite 120)"
+echo "# Suite 16: hooks/prepublish-guard.sh — bump-floor advisory (registry Suite 120, dual-target bash|ts)"
 echo "############################################################"
-if bash "$TESTS_DIR/test_prepublish_bump_floor.sh"; then
-    echo "prepublish-bump-floor: PASS"
-else
-    echo "prepublish-bump-floor: FAIL"
-    FAILED=$((FAILED + 1))
-fi
+run_dual_target_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
+
+echo
+echo "############################################################"
+echo "# Suite 87: hooks/gcp-guard.sh — gcp-guard-hook-behavior (dual-target bash|ts)"
+echo "############################################################"
+run_dual_target_suite "gcp-guard" "test_gcp_guard.sh"
+
+echo
+echo "############################################################"
+echo "# Suite 133: hooks/worktree-guard.sh — worktree-guard-hook-behavior (dual-target bash|ts)"
+echo "############################################################"
+run_dual_target_suite "worktree-guard" "test_worktree_guard.sh"
 
 echo
 echo "############################################################"
