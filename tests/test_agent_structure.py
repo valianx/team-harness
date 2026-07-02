@@ -26094,10 +26094,10 @@ check(
 # ---------------------------------------------------------------------------
 # Structural assertions for the /th:learn-english toggle skill (v2.98.0).
 # Pins: skill exists with correct frontmatter name; standalone framing; `on`
-# writes BOTH keys + the dual-activation message tokens; `off` writes
-# english_learning: false + has the language keep/change prompt + does NOT
-# auto-change language; `status`/no-arg is explicitly read-only; version-sync
-# floors; registry + hygiene guards.
+# writes english_learning only (language decoupled) and offers immersion as a
+# separate [y/N] opt-in; `off` writes english_learning: false + has the
+# language keep/change prompt + does NOT auto-change language; `status`/no-arg
+# is explicitly read-only; version-sync floors; registry + hygiene guards.
 #
 # This is a FREE STRUCTURAL SUITE — pure text reads, no agent dispatch, no
 # paid spend. It runs in CI via run-all.sh on every PR.
@@ -26144,38 +26144,35 @@ check(
     "and name ~/.claude/.team-harness.json as the write target",
 )
 
-# (3) suite109(3-on-writes-both-keys): the `on` branch section names english_learning set to true
-#     AND language set to en AND declares merge-write-whole-document
+# (3) suite109(3-on-writes-el-only): the `on` branch section names english_learning set to true,
+#     explicitly decouples `language` from that write, AND declares merge-write-whole-document
 check(
-    "suite109(3-on-writes-both-keys): `on` branch names english_learning true AND language en "
-    "AND declares merge-write-whole-document",
+    "suite109(3-on-writes-el-only): `on` branch names english_learning true, decouples language "
+    "from that write, AND declares merge-write-whole-document",
     bool(_s109_enable_slice)
     and "english_learning" in _s109_enable_slice
     and "true" in _s109_enable_slice
+    and "Do NOT touch" in _s109_enable_slice
     and "language" in _s109_enable_slice
-    and '"en"' in _s109_enable_slice
     and "merge-write" in _s109_enable_slice,
-    "`on` branch section must name english_learning set to true AND language set to en "
-    "AND declare merge-write-whole-document",
+    "`on` branch section must name english_learning set to true, explicitly state that language "
+    "is not touched in that write, AND declare merge-write-whole-document",
 )
 
-# (4) suite109(4-on-dual-activation-message): the `on` report contains the load-bearing dual-activation
-#     phrases: 'sets English as the default response language', 'activates BOTH',
-#     'language: en', 'english_learning: true'
-_s109_dual_phrase_1 = "sets English as the default response language"
-_s109_dual_phrase_2 = "activates BOTH"
-_s109_dual_token_lang = "language: en"
-_s109_dual_token_el   = "english_learning: true"
+# (4) suite109(4-on-immersion-opt-in): the `on` branch offers English-as-response-language immersion
+#     as a separate [y/N] question and writes language to "en" only on acceptance
+_s109_immersion_tok = "immersion"
+_s109_yn_tok         = "[y/N]"
+_s109_lang_en_tok    = '"en"'
 check(
-    "suite109(4-on-dual-activation-message): `on` report contains dual-activation load-bearing phrases "
-    "('sets English as the default response language', 'activates BOTH', 'language: en', 'english_learning: true')",
+    "suite109(4-on-immersion-opt-in): `on` branch offers immersion as a separate [y/N] question "
+    'and writes language to "en" only on acceptance',
     bool(_s109_enable_slice)
-    and _s109_dual_phrase_1 in _s109_enable_slice
-    and _s109_dual_phrase_2 in _s109_enable_slice
-    and _s109_dual_token_lang in _s109_enable_slice
-    and _s109_dual_token_el in _s109_enable_slice,
-    "`on` branch section must contain the dual-activation load-bearing phrases: "
-    "'sets English as the default response language', 'activates BOTH', 'language: en', 'english_learning: true'",
+    and _s109_immersion_tok in _s109_enable_slice
+    and _s109_yn_tok in _s109_enable_slice
+    and _s109_lang_en_tok in _s109_enable_slice,
+    "`on` branch section must offer the immersion question as a separate [y/N] prompt and write "
+    'language to "en" only when the operator accepts',
 )
 
 # (5) suite109(5-off-sets-false): the `off` branch section names english_learning set to false

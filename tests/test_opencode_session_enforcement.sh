@@ -240,7 +240,10 @@ pass('module-load: sessionEnforcementPlugin is exported');
 // (a-2) S-1 WIRED INJECTION — english-learning config
 // Config: { english_learning: true, language: "en" }
 // Expected: text contains english-learning anchor.
-// Also tests: { english_learning: true, language: "es" } → anchor absent.
+// Also tests: { english_learning: true, language: "es" } → anchor still
+// present (#449: the directive fires whenever english_learning is true,
+// independent of the configured language; scoping to English-written
+// messages is delegated to the directive's own message-level exemption).
 // =========================================================================
 (async function testWiredInjectionEnglishLearning() {
     // Test with en → learning mode active.
@@ -268,7 +271,7 @@ pass('module-load: sessionEnforcementPlugin is exported');
         try { fs.rmdirSync(tempDirEn); } catch {}
     }
 
-    // Test with es → learning mode dormant.
+    // Test with es → learning mode still active (language gate removed).
     const tempDirEs = makeTempConfig({ english_learning: true, language: 'es' });
     process.env['OPENCODE_CONFIG_DIR'] = tempDirEs;
     try {
@@ -279,10 +282,10 @@ pass('module-load: sessionEnforcementPlugin is exported');
             fail('(a-2) wired-injection/english-learning/es: call count', 'expected 1 (orchestrator always), got ' + client._calls.length);
         } else {
             const text = client._calls[0].body.parts[0].text;
-            if (!text.includes('english-learning mode is active')) {
-                pass('(a-2) wired-injection: english-learning anchor absent when language=es (language-gate dormant)');
+            if (text.includes('english-learning mode is active')) {
+                pass('(a-2) wired-injection: english-learning anchor present when language=es (language gate removed)');
             } else {
-                fail('(a-2) wired-injection/english-learning/es: anchor present but should be dormant', '');
+                fail('(a-2) wired-injection/english-learning/es: anchor missing but should be present', '');
             }
         }
     } finally {

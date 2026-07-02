@@ -663,30 +663,46 @@ assert_output_contains "el-c2-non-english-exemption: non-English out-of-scope cl
 rm -rf "$TMP"
 
 # ===========================================================================
-# SECTION 7 — Language-gate cases (C1 truth table: el-true + lang variant)
-# AC-1: el=true + lang=en  → directive present
-# AC-2: el=true + lang=es  → directive dormant (principal-risk case)
-# AC-3: el=true + lang absent → directive present (absent → default en)
+# SECTION 7 — Language-independence cases (#449: language gate removed)
+# The correction directive fires whenever english_learning is true, regardless
+# of the configured `language` value. Scoping to English-written messages is
+# delegated entirely to the directive's own message-level exemption sentence.
+# AC-1: el=true + lang=es  → directive fires (was dormant before #449)
+# AC-1: el=true + lang=en  → directive fires
+# AC-1: el=true + lang absent → directive fires
+# AC-1: directive text no longer mentions coupling to language: en
+# AC-2: message-level exemption remains the sole scoping mechanism
 # ===========================================================================
 
 echo
-echo "=== English-learning language-gate (AC-1): el=true + lang=en → directive present ==="
+echo "=== English-learning (AC-1): el=true + lang=es → directive fires (language gate removed) ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_contains "el-lang-es-fires: directive present when language is es" "$TMP" "english-learning mode is active"
+assert_output_contains "el-lang-es-orch-fires: orchestrator disposition fires" "$TMP" "orchestrator disposition"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (AC-1): el=true + lang=en → directive fires ==="
 TMP=$(make_tmp_home '{"english_learning":true,"language":"en"}')
 assert_output_contains "el-lang-en-fires: directive present when language is en" "$TMP" "english-learning mode is active"
-assert_output_contains "el-lang-en-orch-fires: orchestrator disposition fires" "$TMP" "orchestrator disposition"
 rm -rf "$TMP"
 
 echo
-echo "=== English-learning language-gate (AC-2): el=true + lang=es → directive dormant (principal risk) ==="
-TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
-assert_output_not_contains "el-lang-es-dormant: directive absent when language is es" "$TMP" "english-learning mode is active"
-assert_output_contains "el-lang-es-orch-fires: orchestrator disposition still fires when el-directive is dormant" "$TMP" "orchestrator disposition"
-rm -rf "$TMP"
-
-echo
-echo "=== English-learning language-gate (AC-3): el=true + no language key → directive present (absent→en) ==="
+echo "=== English-learning (AC-1): el=true + no language key → directive fires ==="
 TMP=$(make_tmp_home '{"english_learning":true}')
 assert_output_contains "el-lang-absent-fires: directive present when language key is absent" "$TMP" "english-learning mode is active"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (AC-1): directive text no longer mentions coupling to language: en ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_not_contains "el-no-coupling-phrase: directive text does not mention coupling to language: en" "$TMP" "coupled to language: en"
+rm -rf "$TMP"
+
+echo
+echo "=== English-learning (AC-2): message-level exemption remains the sole scoping mechanism with lang=es ==="
+TMP=$(make_tmp_home '{"english_learning":true,"language":"es"}')
+assert_output_contains "el-exemption-present: message-level exemption clause still present with es config" "$TMP" "do not emit a :) for a non-English message"
 rm -rf "$TMP"
 
 # ===========================================================================
