@@ -2,14 +2,20 @@
 // Claude Code (Node) entry for policy-block.
 // Reads stdin → shim.inboundCC → body → shim.outboundCC → stdout + exit 0.
 //
-// Fail direction (policy-block specific, reconciled to the Bash oracle — T6c):
+// Fail direction (policy-block specific, reconciled to the Bash oracle — T6c,
+// hardened post-flip — T6d):
 //   - ShimRejectError from unparsable JSON ("payload is not valid JSON" /
-//     "payload must be a JSON object"): fail-OPEN → none (empty stdout).
-//     hooks/policy-block.sh's python3 path wraps json.loads() in a bare
-//     `except Exception: sys.exit(0)` — ANY parse failure is a silent
-//     pass-through, documented as the oracle's contract ("fail-open on
-//     parser errors"). This branch is the single narrow parity fix; it does
-//     NOT extend to the other ShimRejectError causes below.
+//     "payload must be a JSON object") on EMPTY stdin: fail-OPEN → none
+//     (empty stdout). hooks/policy-block.sh's python3 path wraps json.loads()
+//     in a bare `except Exception: sys.exit(0)` — the realistic case this
+//     covers is a hook invoked with no stdin at all, and treating that as
+//     `ask` would spam the operator on every no-op invocation (see lessons
+//     #298/#300). This branch stays narrow to that one case.
+//   - ShimRejectError from unparsable JSON on NON-EMPTY stdin: fail-CLOSED →
+//     ask. A payload that is present but will not parse as JSON is
+//     suspicious (truncation, tampering, a caller sending the wrong shape)
+//     and gets no benefit of the doubt — the bash oracle's blanket fail-open
+//     was too broad here; only the genuinely-empty case is parity-preserved.
 //   - ShimRejectError from a schema/size/depth/pollution guard (oversized
 //     payload, excessive nesting, __proto__ key, non-string tool.name, etc.):
 //     fail-closed → ask. These are TS-only hardening with no Bash equivalent
@@ -49,9 +55,21 @@ async function main(): Promise<void> {
     outboundCC(decision);
   } catch (err) {
     if (err instanceof ShimRejectError && isParseFailure(err)) {
-      // Unparsable payload (empty stdin, invalid JSON) — fail-open, matching
-      // the Bash oracle's silent pass-through on any json.loads() exception.
-      outboundCC({ decision: "none", reason: "", mutations: null });
+      if (raw.trim().length === 0) {
+        // Empty stdin — fail-open, matching the Bash oracle's silent
+        // pass-through and avoiding ask-spam on no-op invocations.
+        outboundCC({ decision: "none", reason: "", mutations: null });
+      } else {
+        // Non-empty but unparsable — fail-closed; a present payload that
+        // won't parse gets no benefit of the doubt.
+        const fallback: NormalizedDecision = {
+          decision: "ask",
+          reason:
+            "policy-block: payload is non-empty but failed to parse as JSON — cannot evaluate safety. Manual review required before proceeding (policy-block.cc.ts SEC-07).",
+          mutations: null,
+        };
+        outboundCC(fallback);
+      }
     } else if (err instanceof ShimRejectError) {
       // SEC-07 shape/size/depth/pollution guard — TS-only hardening, stays
       // fail-closed (no Bash equivalent to reconcile against).
