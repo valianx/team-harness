@@ -9,18 +9,33 @@
 # from a temp directory that contains workspaces/x/00-state.md so the hook
 # always finds exactly one state file (or none, for the fail-safe case).
 #
+# Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
+# the compiled TS artifact (hooks/ts/dist/checkpoint-guard.cjs) when HOOK_IMPL=ts.
+#
 # Usage:
 #   ./tests/test_checkpoint_guard.sh
+#   HOOK_IMPL=ts ./tests/test_checkpoint_guard.sh
 # Exit code:
 #   0 if all cases pass, 1 otherwise.
 
 set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$REPO_ROOT/hooks/checkpoint-guard.sh"
+HOOK_IMPL="${HOOK_IMPL:-bash}"
+HOOK_BASH="$REPO_ROOT/hooks/checkpoint-guard.sh"
+HOOK_TS="$REPO_ROOT/hooks/ts/dist/checkpoint-guard.cjs"
 
-if [ ! -x "$HOOK" ]; then
-    chmod +x "$HOOK"
+if [ "$HOOK_IMPL" = "ts" ]; then
+    HOOK="$HOOK_TS"
+    if [ ! -f "$HOOK" ]; then
+        echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build' (HOOK_IMPL=ts)"
+        exit 1
+    fi
+else
+    HOOK="$HOOK_BASH"
+    if [ ! -x "$HOOK" ]; then
+        chmod +x "$HOOK"
+    fi
 fi
 
 PASS=0
@@ -50,10 +65,17 @@ make_tmp_empty() {
 }
 
 # Run hook with $payload from $cwd; print stdout.
+# HOOK_IMPL=ts: cd into $cwd rather than exporting CWD, since the TS
+# StateReader resolves the search root from process.cwd() (no CWD env-var
+# override — that override is a bash-body test convenience only).
 run_hook() {
     local cwd="$1"
     local payload="$2"
-    CWD="$cwd" bash "$HOOK" <<< "$payload" 2>&1
+    if [ "$HOOK_IMPL" = "ts" ]; then
+        (cd "$cwd" && node "$HOOK") <<< "$payload" 2>&1
+    else
+        CWD="$cwd" bash "$HOOK" <<< "$payload" 2>&1
+    fi
 }
 
 assert_deny() {
