@@ -446,12 +446,13 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
     //
     // The curl predicate covers every flag shape that can carry a body or a
     // credential: -d/--data(-raw|-binary|-urlencode), --json, -F/--form
-    // (multipart), and an Authorization: Bearer header via -H — curl -H
-    // 'Authorization: Bearer …' has no --data at all yet still exfiltrates
-    // a secret, which the original --data-only predicate missed.
+    // (multipart), and an Authorization: Bearer header via -H or --header
+    // (curl treats them as equivalent) — curl -H 'Authorization: Bearer …'
+    // has no --data at all yet still exfiltrates a secret, which the
+    // original --data-only predicate missed.
     const curlCarriesData =
       /\bcurl\b.*(?:--data(?:-[a-z]+)?\b|\s-d\b|--json\b|\s-F\b|--form\b)/i.test(cmd);
-    const curlCarriesAuthHeader = /\bcurl\b.*-H\s+['"]?Authorization:\s*Bearer\b/i.test(cmd);
+    const curlCarriesAuthHeader = /\bcurl\b.*(?:-H|--header)\s+['"]?Authorization:\s*Bearer\b/i.test(cmd);
     const shouldScanBash =
       /\bgit\s+commit\b/.test(cmd) ||
       curlCarriesData ||
