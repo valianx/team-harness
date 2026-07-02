@@ -74,14 +74,14 @@ EXPECTED_AGENTS = [
 # tests/test_policy_block.sh holds full-value concrete fixtures.
 # ---------------------------------------------------------------------------
 DETECTOR_FILE_ALLOWLIST = {
-    "hooks/policy-block.sh",
+    "hooks/ts/bodies/policy-block.ts",
     "tests/test_policy_block.sh",
     "tests/test_security_scan.py",   # this file
 }
 
 # ---------------------------------------------------------------------------
 # Check 5 — high-confidence secret patterns (class-anchored, not concrete).
-# Reused verbatim from hooks/policy-block.sh HIGH_CONFIDENCE_SECRETS.
+# Reused verbatim from hooks/ts/bodies/policy-block.ts HIGH_CONFIDENCE_SECRETS.
 # Each pattern requires a non-trivial concrete VALUE after its prefix —
 # a bare regex shell like the AKIA prefix alone does NOT match.
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ HIGH_CONFIDENCE_SECRETS = [
 
 # ---------------------------------------------------------------------------
 # Check 5 — .env.example-style placeholder allowlist.
-# Mirrors hooks/policy-block.sh EGRESS_READ_ALLOWLIST naming convention.
+# Mirrors hooks/ts/bodies/policy-block.ts EGRESS_READ_ALLOWLIST naming convention.
 # Files matching these name suffixes are placeholders, not real secrets.
 # ---------------------------------------------------------------------------
 PLACEHOLDER_SUFFIXES = (".env.example", ".env.sample", ".env.template")
@@ -592,7 +592,7 @@ def _self_test_check_4() -> None:
 def _self_test_check_5() -> None:
     """Check 5 fixture: file with a programmatically-constructed secret value.
     The value is built at runtime via string concatenation so no concrete literal
-    appears in this source file (the policy-block.sh gate would otherwise block
+    appears in this source file (the policy-block gate would otherwise block
     writing this file)."""
     # AWS key: prefix "AKIA" + 16 uppercase alphanumeric chars — constructed at runtime.
     aws_prefix = "AKIA"

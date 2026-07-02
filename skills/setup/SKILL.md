@@ -198,11 +198,11 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 
 **Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
 
-**Language propagation.** The configured `language` governs two surfaces: (a) pipeline dispatch — when dispatching the orchestrator, resolve the operator's language using the 4-level precedence chain and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` Precedence: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from the operator's first message → (4) `en`; (b) non-pipeline sessions — the `session-start.sh` unified SessionStart hook reads the same config key and injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence over the hook directive for that session. This ensures both pipeline agents and ordinary conversational turns respond in the operator's configured language.
+**Language propagation.** The configured `language` governs two surfaces: (a) pipeline dispatch — when dispatching the orchestrator, resolve the operator's language using the 4-level precedence chain and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` Precedence: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from the operator's first message → (4) `en`; (b) non-pipeline sessions — the session-start unified SessionStart hook (compiled TS, launched via `hooks/run-ts-hook.sh`) reads the same config key and injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence over the hook directive for that session. This ensures both pipeline agents and ordinary conversational turns respond in the operator's configured language.
 
 **English-learning mode propagation.** The `english_learning` boolean in `~/.claude/.team-harness.json` is set the same way as `language`: via `/th:setup` Step 3.6, or via a chat toggle with a persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) routed through the orchestrator's Y/n confirmation gate. A chat toggle WITHOUT a persistence marker applies as a session-only override recorded in `00-state.md` only — the config file is never written without an explicit persistence signal. This key is NOT in the session-override whitelist; it requires the persistence-marker + Y/n gate to become permanent. `english_learning` and `language` are independent settings — enabling english-learning arms corrections for messages the operator writes in English regardless of the configured response language; English as the response language is a separate, explicitly offered opt-in.
 
-**Outward-action gate.** Outward actions (git push, gh pr merge/review/comment, GitHub API writes, ClickUp MCP writes) require explicit operator approval via the deterministic gate `hooks/dev-guard.sh`, which fires UNCONDITIONALLY. The agent cannot auto-approve these actions. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
+**Outward-action gate.** Outward actions (git push, gh pr merge/review/comment, GitHub API writes, ClickUp MCP writes) require explicit operator approval via the deterministic dev-guard hook (compiled TS, launched via `hooks/run-ts-hook.sh dev-guard`), which fires UNCONDITIONALLY. The agent cannot auto-approve these actions. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 
 **Report team-harness problems via `/th:report-issue`.** When a bug, gap, or improvement is detected in the `th` plugin itself — its agents, skills, or any orchestrator behavior — report it with `/th:report-issue <bug|feature|docs|question> "<summary>"`, not with `gh issue create` directly and not by editing files under the plugin cache (those edits are transient and are overwritten on the next `th:update`). The skill builds the correct issue pattern (Summary, Environment with `th`/Claude Code/OS versions), de-duplicates against open issues, and requires confirmation before creating; a manual `gh issue create` skips that pattern and the dedup check.
 
@@ -306,11 +306,12 @@ Run: `command -v python3`
 Report the degraded-mode advisory:
 ```
 python3 not found on PATH.
-  The policy gate (hooks/policy-block.sh) will run in degraded mode:
-    - Bash denylist and sensitive-path checks still enforced (bash fallback active)
-    - HIGH_CONFIDENCE_SECRETS scan still enforced (bash fallback active)
-    - Medium-confidence entropy scan NOT available (requires python3)
-  For full coverage, install python3.
+  The deny-floor hooks (policy-block, dev-guard, and the other enforcement gates) are
+  unaffected — they run entirely on node via the compiled hooks/ts/dist/*.cjs bundles,
+  launched by hooks/run-ts-hook.sh, and fail closed regardless of python3 presence.
+  Some `th` skills (lint, audit-security, excalidraw-diagram) invoke python3 for
+  supporting scripts and remain in degraded/unavailable mode without it.
+  For full skill coverage, install python3.
 ```
 
 Then offer an explicit consent prompt:
@@ -318,7 +319,7 @@ Then offer an explicit consent prompt:
 ## python3
 
 ```
-Install python3 now for full secret/entropy scan coverage? [Y/n]
+Install python3 now for full skill coverage? [Y/n]
 ```
 
 **On `n` (decline or no input):** print the above degraded-mode advisory summary and continue to Step 7. No install attempted. Setup completes normally.
@@ -339,10 +340,10 @@ Install python3 now for full secret/entropy scan coverage? [Y/n]
   - If no manager is found: print manual install instructions and continue.
 
 **Post-install re-probe:** after a consented install, run `command -v python3` again.
-- If python3 is now on PATH: report `python3 installed — full secret/entropy scan now active.`
+- If python3 is now on PATH: report `python3 installed — full skill coverage now active.`
 - If python3 is still absent (re-probe fails): **Windows caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, report `python3 installed — restart the terminal for PATH refresh` (not an error). On other platforms: report the degraded-mode advisory and continue.
 
-**Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. The bash fallback floor (hooks/policy-block.sh bash path) remains the enforcement guarantee. This path changes nothing in the hook's runtime behaviour.
+**Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. The deny-floor hooks are unaffected — they run on node regardless of python3 presence; only the python3-dependent skills remain in degraded/unavailable mode.
 
 ---
 

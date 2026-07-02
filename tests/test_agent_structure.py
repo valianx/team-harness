@@ -13636,7 +13636,7 @@ check(
 check(
     "dev-mode(unconditional-gate): developer-mode.md states gate fires unconditionally (no marker)",
     "unconditionally" in _s59_style or "UNCONDITIONAL" in _s59_style or "no marker" in _s59_style,
-    "output-styles/developer-mode.md must state that hooks/dev-guard.sh fires unconditionally with no filesystem marker (SEC-DR-2 re-founding)",
+    "output-styles/developer-mode.md must state that the dev-guard hook fires unconditionally with no filesystem marker (SEC-DR-2 re-founding)",
 )
 
 # ---------------------------------------------------------------------------
@@ -13939,7 +13939,7 @@ _ph_ss_cmd = ((_ph_ss[0].get("hooks", [{}])[0]).get("command", "")) if _ph_ss el
 check(
     "dev-mode(plugin-hooks-sessionstart-single): .claude-plugin/hooks.json has exactly one SessionStart entry",
     len(_ph_ss) == 1,
-    ".claude-plugin/hooks.json SessionStart must have exactly one entry (consolidated session-start.sh) — a second entry would mean old hooks were reintroduced",
+    ".claude-plugin/hooks.json SessionStart must have exactly one entry (consolidated session-start hook) — a second entry would mean old hooks were reintroduced",
 )
 check(
     "dev-mode(plugin-hooks-sessionstart-wired): .claude-plugin/hooks.json wires session-start via run-ts-hook.sh",
@@ -13954,7 +13954,7 @@ check(
 check(
     "dev-mode(plugin-hooks-no-old-hooks): .claude-plugin/hooks.json SessionStart has no old hook filenames",
     "dev-mode-session-start.sh" not in _ph_ss_cmd and "language-session-start.sh" not in _ph_ss_cmd,
-    ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into session-start.sh",
+    ".claude-plugin/hooks.json must not reference dev-mode-session-start.sh or language-session-start.sh — both are merged into the session-start hook",
 )
 
 # subagent.start breadcrumb — .claude-plugin/hooks.json wires the TS hook on the Task matcher
@@ -14001,7 +14001,7 @@ check(
     "dev-mode(docs-devmode-outward-action-gate): docs/dev-mode.md documents the Outward-Action Gate section",
     "Outward-Action Gate" in _s59_docs_devmode
     or "outward-action gate" in _s59_docs_devmode.lower(),
-    "docs/dev-mode.md must contain an Outward-Action Gate section (dev-guard.sh contract)",
+    "docs/dev-mode.md must contain an Outward-Action Gate section (dev-guard hook contract)",
 )
 check(
     "dev-mode(docs-devmode-reconciliation-251-252): docs/dev-mode.md reconciles with #251/#252 publish-gate",
@@ -18492,7 +18492,7 @@ _s75_changelog     = read(REPO_ROOT / "CHANGELOG.md")
 _s75_testing_md    = read(REPO_ROOT / "docs" / "testing.md")
 _s75_this_file     = read(Path(__file__))
 
-# (a1) policy-block.sh references the AWS high-confidence secret pattern (AKIA)
+# (a1) policy-block.ts references the AWS high-confidence secret pattern (AKIA)
 check(
     "suite75(a1-policy-block-akia): policy-block.ts references AKIA secret pattern",
     "AKIA" in _s75_policy_block,
@@ -18500,7 +18500,7 @@ check(
     " — absent pre-fix (Facet A secret-scanner not yet implemented)",
 )
 
-# (a2) policy-block.sh contains an ask() helper for medium-confidence tier
+# (a2) policy-block.ts contains an ask() helper for medium-confidence tier
 check(
     "suite75(a2-policy-block-ask): policy-block.ts contains ask() decision",
     '"ask"' in _s75_policy_block or "permissionDecision.*ask" in _s75_policy_block
@@ -18509,7 +18509,7 @@ check(
     " — absent pre-fix (ask helper not yet added)",
 )
 
-# (b1) checkpoint-guard.sh references the B2 boundary value "research-next"
+# (b1) checkpoint-guard.ts references the B2 boundary value "research-next"
 check(
     "suite75(b1-checkpoint-guard-b2): checkpoint-guard.ts references 'research-next'",
     "research-next" in _s75_chkpt_guard,
@@ -18517,7 +18517,7 @@ check(
     " — absent pre-fix (only B1 implemented today)",
 )
 
-# (b2) checkpoint-guard.sh references the B3 boundary value "postverify-next"
+# (b2) checkpoint-guard.ts references the B3 boundary value "postverify-next"
 check(
     "suite75(b2-checkpoint-guard-b3): checkpoint-guard.ts references 'postverify-next'",
     "postverify-next" in _s75_chkpt_guard,
@@ -18735,7 +18735,7 @@ check(
     "suite82(b2-guard-python3): hooks/sketch-guard.sh uses python3 with grep fallback",
     "python3" in _s82_sketch_guard and "grep" in _s82_sketch_guard,
     "hooks/sketch-guard.sh must prefer python3 with grep as fallback (cross-platform, "
-    "same pattern as checkpoint-guard.sh)",
+    "the still-bash advisory-guard pattern; deny-floor guards moved to TS)",
 )
 
 # (b3) sketch-guard.sh NEVER emits verdict=fail (completeness gate, not security gate)
@@ -20756,9 +20756,10 @@ check(
 #   AC-7         — agents/delivery.md § Step 11.4b: post-merge teardown; Suite 53
 #                  "never from the active local branch" preserved ≥2× in orchestrator.md
 #   AC-8         — plugin.json + marketplace.json both at v2.88.0 or later (floor pin)
-#   AC-9         — hooks/worktree-guard.sh exists, fail-open, registered in all 3 OS
-#                  blocks of hooks/config.json AND in .claude-plugin/hooks.json; reason-
-#                  string states hook cannot cover own-terminal ops
+#   AC-9         — hooks/ts/bodies/worktree-guard.ts exists, fail-open, registered
+#                  in .claude-plugin/hooks.json (Go installer's per-OS hooks/config.json
+#                  CC wiring was retired); reason-string states hook cannot cover
+#                  own-terminal ops
 #
 # Self-referential guards:
 #   h1 — docs/testing.md registers 'Suite 93' + 'worktree-discipline' marker
@@ -26926,7 +26927,7 @@ check(
 #   AC-2  — docs/worktree-discipline.md: Rule 1 table contains "ahead of
 #            origin/main" AND "at/behind"; U1 + fetch-and-base blocks intact
 #            (cross-check via Suite 93 token preservation)
-#   AC-3  — hooks/worktree-guard.sh: advisory reminder contains "ahead of
+#   AC-3  — hooks/ts/bodies/worktree-guard.ts: advisory reminder contains "ahead of
 #            origin/main"
 #   AC-4  — Suite 93 cross-check: "Rule 1", "origin/main", "worktree", and
 #            "dirty" or "non-main" still present in docs/worktree-discipline.md
