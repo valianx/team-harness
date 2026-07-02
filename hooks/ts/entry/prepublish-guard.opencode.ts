@@ -87,13 +87,21 @@ function makeReader(): PrepublishReader {
       }
     },
 
-    gitDiffOriginMain(): string[] | null {
+    gitDiffNameStatus(): Array<{ status: string; path: string }> | null {
       try {
-        const out = execFileSync("git", ["diff", "--name-only", "origin/main...HEAD"], {
+        const out = execFileSync("git", ["diff", "--name-status", "origin/main...HEAD"], {
           encoding: "utf8",
           env: { ...process.env, MSYS_NO_PATHCONV: "1" },
         });
-        return out.split("\n").map((l) => l.trim()).filter(Boolean);
+        return out
+          .split("\n")
+          .filter((line) => line.trim().length > 0)
+          .map((line) => {
+            const fields = line.split("\t");
+            const status = fields[0] ?? "";
+            const filePath = fields.length > 2 ? fields[fields.length - 1] : fields[1] ?? "";
+            return { status, path: filePath };
+          });
       } catch {
         return null;
       }
@@ -108,6 +116,22 @@ function makeReader(): PrepublishReader {
       } catch {
         return null;
       }
+    },
+
+    gitCurrentBranch(): string | null {
+      try {
+        return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
+      } catch {
+        return null;
+      }
+    },
+
+    readEnv(name: string): string | undefined {
+      return process.env[name];
+    },
+
+    warn(msg: string): void {
+      process.stderr.write(msg + "\n");
     },
 
     jsonEscape(s: string): string {
