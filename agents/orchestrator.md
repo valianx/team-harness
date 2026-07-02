@@ -2151,6 +2151,10 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 Note: a frontend repo with zero browser-real types is legitimately jsdom-only when all AC are pure-logic or unit-level (no browser-API/interaction mismatch in the decision log). Do NOT emit the note in that case.
 
+**Verification packet build (mandatory before Phase 3 dispatch).** After the tester's authoring status block returns `status: success` (and after the A1-F3/A1-F4 checks above), write `{docs_root}/00-verify-packet.md` — the shared entry point every Stage-2 verifier reads first. Canonical schema, size cap, and rebuild rules: `docs/verification-packet.md`. Contents in order: header (`feature`, `Task identifier`, `Built:` timestamp, `Packet version: 1`, `Tree anchor:` from `git rev-parse HEAD` [+ dirty-diff hash], `Base ref:` the task's recorded base); scope flags from `00-state.md`; the per-task AC block copied VERBATIM from `01-plan.md § Task List`; a changed-files table + `git diff --stat`; the implementer's summary with verbatim `Deviations from Architecture` and surviving `[CONSTRAINT-DISCOVERED]` tags; the Phase 2.7 test artifact (suite result, AC→test map, `regression_test_path` for the bug-fix flow); and full-document pointers as the depth-on-demand escape hatch. Hard cap ≤120 lines. Overwrite the file in place on every rebuild — never create a `00-verify-packet-v2.md` sibling.
+
+**Packet staleness — rebuild triggers (applies for the remainder of the pipeline).** Rebuild `00-verify-packet.md` in place (increment `Packet version`, overwrite) before the next verifier dispatch whenever ANY of these fire: (1) any iteration re-dispatch (bounded patch or structural, Cases A-D) — rebuild after the producer's patch, before re-running verifiers; (2) Phase 2.5 constraint reconciliation alters AC after Phase 2.7 closed; (3) Case C criteria adjustment (AC text edited in `01-plan.md § Task List`); (4) non-empty `git diff --name-only` against the packet's tree anchor at dispatch time. A Phase 3.6 (acceptance-checker) re-run counts as a verifier dispatch for trigger 4. Full rationale: `docs/verification-packet.md § 6`.
+
 **Emit events:**
 ```json
 {"ts":"…","event":"phase.start","phase":"2.7","feature":"{feature}"}
@@ -2196,6 +2200,8 @@ Re-run the full suite (gate does NOT fire) when any of these exceptions applies:
 - (b) The tree is stale: a source file, test file, or build-config file changed since Phase 2.7 completed (the `git diff` check above produces at least one path).
 - (c) Phase 3 itself was forced by a post-Phase-2.7 constraint (e.g., a non-trivial constraint was reconciled in Phase 2.5 that added new AC after Phase 2.7 completed).
 
+**Verification packet payload (all Phase 3 / 3.4 dispatches below).** Every Task call in this block additionally carries `verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` plus a 10-line digest (AC count, changed-file count, deviations yes/no — read from the packet header). This is additive to the existing per-agent payload fields listed below; see `docs/verification-packet.md § 3` for the digest format.
+
 Launch agents simultaneously using Task tool calls in the same message:
 - **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." **Exception: when the recorded-state gate above fired**, replace the suite-execution instruction with: "Phase 2.7 recorded suite-green on an unchanged tree. Do NOT re-run the full suite. Map each AC to the existing tests authored in Phase 2.7 and confirm the mapping is complete. Record `suite_skipped_reason: phase-2.7-green-tree-unchanged` in your status block." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
 - **qa** (validate mode): feature name, summary of what was implemented (from implementer's status block summary). For `type: fix` / `type: hotfix` (Tier 2-4): also instruct: "Validate AC-1 (reproduction-no-longer-bug) by reading reproduction steps from `01-plan.md` § Review Summary and verifying observed behaviour matches expected. Validate AC-2 (regression-test-exists) by cross-checking `02-regression-test.md` against the current suite. Set `regression_test_referenced: true|false` and `reproduction_steps_validated: true|false` in your status block." For `type: fix` Tier 1: instruct: "Reduced validation. Verify the diff matches the intent stated in `01-plan.md` § Review Summary. AC list is implicit — the cited issue is fixed. Set `regression_test_referenced: null` (Phase 2.0 was skipped) and `reproduction_steps_validated: true|false` in your status block."
@@ -2212,7 +2218,7 @@ Append a `phase.start` event before launching the parallel block:
 ```
 
 Add to the parallel Task launch (same message as tester/qa/security when `frontend_scope: true`):
-- **ux-reviewer** (validate mode): feature name, workspaces path, pointer to `02-implementation.md` and `01-ux-review.md` (if it exists from Phase 1.7), source code paths relevant to UI changes. Output: `04-ux-validation.md`. Instruct: "Read `01-ux-review.md` for the UI/UX AC (from Stage 1 enrich). Read `02-implementation.md` to understand what was built. Validate each UI/UX criterion. Write `04-ux-validation.md` with per-finding verdicts including `findings.critical` count in your status block."
+- **ux-reviewer** (validate mode): feature name, workspaces path, pointer to `02-implementation.md` and `01-ux-review.md` (if it exists from Phase 1.7), source code paths relevant to UI changes, plus the verification packet payload (`verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` + 10-line digest — same as the other Phase 3 verifiers, `docs/verification-packet.md § 3`). Output: `04-ux-validation.md`. Instruct: "Read `01-ux-review.md` for the UI/UX AC (from Stage 1 enrich). Read `02-implementation.md` to understand what was built. Validate each UI/UX criterion. Write `04-ux-validation.md` with per-finding verdicts including `findings.critical` count in your status block."
 
 Append a `phase.end` event after the ux-reviewer status block is received:
 ```json
@@ -2248,6 +2254,8 @@ Next: delivery (or: iterating — implementer fixing N issues)
 **Rewrite TL;DR** (row 11 of §5.2): On all success: `Now`: "Phase 3.5 acceptance-gate running for Task-{i}." `Last`: "Task-{i} Phase 3 verify done — tester pass, qa pass, security {clean|N findings}." `Next`: "Phase 3.5 acceptance-gate." On any iteration: `Now`: "Phase 3 iterating for Task-{i} (iter N/3) — {root cause}." `Open issues`: failing AC identifiers and file:line hints.
 
 ### If any agent fails → ITERATE
+
+**Rebuild the verification packet before re-running verifiers.** Every iteration re-dispatch is a packet-staleness trigger (`docs/verification-packet.md § 6`, trigger 1): after the producer (`implementer` or `architect`) applies its patch, rebuild `00-verify-packet.md` in place (increment `Packet version`) BEFORE dispatching the next round of `tester`/`qa`/`security`/`adversary`. This applies to every Case (A/B/C/D) and every blast radius below.
 
 **Read `workspaces/{feature-name}/failure-brief.md` ONLY.** Do NOT re-read `03-testing.md`, `04-validation.md`, or `04-security.md` in full — those files can be 5-15K tokens each and are already summarized in the brief. The failing agent (tester / qa / security) is responsible for appending its accionable summary to `failure-brief.md` as part of its Return Protocol when `status: failed`.
 
@@ -3485,7 +3493,7 @@ Every line is a JSON object with these fields:
 | `round_prs` | conditional | List of task identifiers in the round (e.g., `["Task-1", "Task-2"]`). Recommended for `stage.gate stage: 2` to record which tasks ran in parallel. |
 | `reason` | conditional | Reason a gate was skipped (e.g., `autonomous`, `legacy`). Required for `stage.gate.skipped`. |
 | `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
-| `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
+| `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed", "packet": {"used":true\|false\|"absent","escapes":N,"integrity":"ok\|stale\|mismatch\|n-a"}}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. `packet` is populated on Phase 3 / Phase 3.4 verifier events (`tester` run-only, `qa`, `security`, `adversary`, `ux-reviewer` validate) — see `docs/verification-packet.md § 4`. |
 | `model` | optional | The agent's effective model ID, propagated verbatim from the `model:` line of its status block (same mechanism as `tools` — see "Populating the `model`/`effort` fields on `phase.end`" below). Present on `phase.end` when the returning agent reported it (mandatory per `agents/_shared/output-template.md`); absent on legacy events or events from agents not yet carrying the field. |
 | `effort` | optional | The agent's effective reasoning-effort level, propagated verbatim from the `effort:` line of its status block when the agent reported one. Omitted when the agent did not report an effort level — never written as `"unknown"`. |
 | `reason` | conditional | For `dispatch.blocked`: short reason (`task tool stripped`, `agent not registered`, `tool permission denied`). For `stage.gate.skipped`: `autonomous` / `legacy`. |
@@ -3643,6 +3651,7 @@ When an agent returns, you parse its status block and propagate any of the follo
 | `kg_save_candidates: [a, b]` (architect/qa/tester/security) | `"kg_save_candidates": ["a", "b"]` |
 | `kg_passive_capture: written` / `kg_passive_capture: skipped: <reason>` (delivery) | `"kg_passive_capture": "written"` / `"skipped"` / `"failed"` |
 | `kg_hit_used: [node-a, node-b]` (all leaf agents) | `"kg_hit_used": ["node-a", "node-b"]` |
+| `packet_used: true\|false\|absent` + `packet_escapes: N` + `packet_integrity: ok\|stale\|mismatch\|n-a` (Phase 3/3.4 verifiers: `tester` run-only, `qa`, `security`, `adversary`, `ux-reviewer` validate) | `"packet": {"used": true\|false\|"absent", "escapes": N, "integrity": "ok\|stale\|mismatch\|n-a"}` |
 
 **`kg_hit_used` aggregation.** Every leaf agent (`architect`, `implementer`, `tester`, `qa`, `security`, `delivery`) declares a `kg_hit_used: [node-name, ...]` field in its Return Protocol status block. An empty list `[]` is valid and means no KG node influenced the agent's output this run. The orchestrator propagates the list into the `phase.end` event's `tools.kg_hit_used` array. Aggregating these arrays across all `phase.end` events in `00-execution-events` gives a pipeline-level KG recall signal: `jq -s '[.[] | select(.event=="phase.end") | .tools.kg_hit_used // [] | .[]] | unique' {events_file}`. This is the measurability surface for issue #403.
 
@@ -3776,6 +3785,17 @@ A full rewrite per checkpoint is cheap (the file is ~30 lines) and avoids the in
 | kg_save_candidates | — | {N surfaced} | — | {entity names or —} |
 | kg_passive_capture | — | {written/skipped} | — | {entity name or skip reason} |
 
+## Verification Packet
+| Verifier | packet_used | packet_escapes | packet_integrity |
+|----------|-------------|-----------------|-------------------|
+| tester (run-only) | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| qa | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| security | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| adversary | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| ux-reviewer (validate) | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+
+**Canary window (first 10 post-merge full-pipeline runs only — see `docs/verification-packet.md § 8`):** run {N}/10. Fallback rate: {P}% of verifier dispatches escalated (`packet_integrity: stale|mismatch` or `packet_escapes > 0`). Catch rates vs June 2026 baseline: security Critical/High {N} (baseline {N}), qa AC-fail rate {P}% (baseline {P}%), acceptance-checker drift flags {N} (baseline {N}). Rollback trigger: {not-fired | FIRED — see `docs/verification-packet.md § 8`}. Omit this canary line once the 10-run window closes without a trigger.
+
 ## Cost
 **Total tokens:** {N} ({measured|estimated} — {M} phases with tokens_estimated:true)
 **Total cost:** ~${X.XX}  (or: price table not configured — showing tokens only)
@@ -3809,6 +3829,7 @@ All numbers come from `{docs_root}/{events_file}` — never re-invent them by wa
 - Iterations → count of `iteration.start` events.
 - AC pass/total → from the latest `gate.pass`/`gate.fail` at `3.5-acceptance-gate` (read its `summary` and the `pipeline.end.extra`).
 - Tool counts → aggregate of `tools` sub-objects on `phase.end` events.
+- **Verification Packet section** → aggregate `tools.packet` from each Phase 3 / 3.4 verifier's `phase.end` event; during the 10-run canary window (`docs/verification-packet.md § 8`) also compute the fallback rate (verifier dispatches with `packet_integrity: stale|mismatch` or `packet_escapes > 0`, divided by total verifier dispatches in the run) and compare catch counts against the June 2026 baseline referenced there.
 - Files / lines changed → from `git diff main...HEAD --stat` at delivery time; "—" before Phase 4.
 - **Cost and token counts** → sum `tokens` from all `phase.end` events; multiply by price from `pricing` key in `~/.claude/.team-harness.json`; degrade to tokens-only when the key is absent. Both the per-agent table and the per-phase table rewrite in full at each phase transition. Marked `(~)` when any contributing event carries `tokens_estimated: true`. See `docs/observability.md § "Cost rollup"` for the full derivation algorithm.
 

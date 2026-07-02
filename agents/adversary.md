@@ -120,7 +120,14 @@ A `broke-it` OR an INCOMPLETE `could-not-break` makes `phase3_combined = fail`, 
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
+1. **Packet-first (pipeline-adversary mode).** Read `{docs_root}/00-verify-packet.md` first — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`). It carries the per-task AC block verbatim, the changed-files table, and the implementer's Deviations — use it in place of separately reading `01-plan.md`/`02-implementation.md` for WORKSPACE-NARRATIVE context.
+   - **Hard floor — preserved read.** `04-security.md` (the GO-seeking analysis) stays a MANDATORY independent read, untouched by the packet. Your zero-overlap contract depends on reading it in full, not on a packet summary of it.
+   - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk; the packet's AC count matches `01-plan.md § Task List` for this task. On any mismatch → treat the packet as stale, escalate to the full input manifest below, report `packet_integrity: stale|mismatch`.
+   - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
+   - **Fallback (fail-open):** packet absent → proceed directly to the full input manifest below. Report `packet_used: absent`.
+   - Report `packet_used: true|false|absent`, `packet_escapes: N` (full docs opened beyond the packet), `packet_integrity: ok|stale|mismatch|n-a` in your status block.
+
+2. **Full input manifest (fallback path)** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
    - `01-plan.md` — the reviewed design: AC, Work Plan, and security assessment
    - `02-implementation.md` — implementer output: what changed and why
    - `04-security.md` — GO-seeking security report (mandatory input; attack the design, not the checklist)
@@ -128,11 +135,11 @@ A `broke-it` OR an INCOMPLETE `could-not-break` makes `phase3_combined = fail`, 
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
+3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
-3. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
+4. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
 
-4. **Write your output** to `workspaces/{feature-name}/04-adversary.md` when done.
+5. **Write your output** to `workspaces/{feature-name}/04-adversary.md` when done.
 
 ---
 
@@ -247,6 +254,9 @@ summary: {1-2 sentences: what broke or why no break was found; on could-not-brea
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, ...]
+packet_used: true | false | absent   # pipeline-adversary mode only; whether 00-verify-packet.md was read (docs/verification-packet.md)
+packet_escapes: N                    # pipeline-adversary mode only; count of full docs opened beyond the packet
+packet_integrity: ok | stale | mismatch | n-a   # pipeline-adversary mode only; n-a when packet_used: absent
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural
 issues: {break titles, or "none"}
