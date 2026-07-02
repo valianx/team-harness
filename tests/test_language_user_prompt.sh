@@ -9,10 +9,10 @@
 #
 # Dual-target (HOOK_IMPL=bash|ts, default bash): the same cases run against
 # the compiled TS artifact (hooks/ts/dist/language-user-prompt.cjs) when
-# HOOK_IMPL=ts. AC-1/AC-2/AC-3/AC-4 assert on the additionalContext VALUE
-# only (envelope-agnostic) — see 02-implementation-t6a.md "Divergences found"
-# for the known bare-vs-wrapped envelope-shape gap in the CC entry adapter,
-# which is out of this task's scope (entry files, not the body/text F4 touches).
+# HOOK_IMPL=ts. AC-1/AC-2/AC-3/AC-4 assert on the envelope AND the
+# additionalContext VALUE on both legs (T6c): the CC entry adapter now emits
+# the wrapped hookSpecificOutput envelope, closing the bare-vs-wrapped gap
+# documented in 02-implementation-t6a.md "Divergences found".
 #
 # Usage:
 #   bash tests/test_language_user_prompt.sh
@@ -130,21 +130,16 @@ assert_user_prompt_with_language() {
         failure_reason="stdout was empty; expected a UserPromptSubmit JSON line"
     fi
 
-    # Envelope-shape fields (hookEventName/UserPromptSubmit) are asserted on the
-    # bash leg only. The TS CC entry emits a bare {"additionalContext":...} —
-    # a known, out-of-scope divergence documented in 02-implementation-t6a.md.
-    if [ "$HOOK_IMPL" = "bash" ]; then
-        # Must contain hookEventName field
-        if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"hookEventName"'; then
-            ok=0
-            failure_reason="stdout missing hookEventName field"
-        fi
+    # Must contain hookEventName field
+    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"hookEventName"'; then
+        ok=0
+        failure_reason="stdout missing hookEventName field"
+    fi
 
-        # Must contain UserPromptSubmit value
-        if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"UserPromptSubmit"'; then
-            ok=0
-            failure_reason="stdout missing UserPromptSubmit value"
-        fi
+    # Must contain UserPromptSubmit value
+    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"UserPromptSubmit"'; then
+        ok=0
+        failure_reason="stdout missing UserPromptSubmit value"
     fi
 
     # Must contain additionalContext field
@@ -235,7 +230,7 @@ assert_template_form() {
         failure_reason="stdout was empty; expected a UserPromptSubmit JSON line"
     fi
 
-    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"UserPromptSubmit"'; then
+    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"UserPromptSubmit"'; then
         ok=0
         failure_reason="stdout missing UserPromptSubmit value"
     fi

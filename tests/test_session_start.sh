@@ -13,9 +13,9 @@
 # structural sub-checks of Section 7 grep the Bash SOURCE for function names
 # (load_orchestrator etc.) — a Bash-implementation-detail, not a behavioral
 # contract, so those run on the bash leg only. AC assertions on hookEventName/
-# SessionStart envelope keys are also bash-leg-only — see
-# 02-implementation-t6a.md "Divergences found" for the known bare-vs-wrapped
-# envelope-shape gap in the CC entry adapter (out of this task's scope).
+# SessionStart envelope keys run on BOTH legs (T6c): the CC entry adapter now
+# emits the wrapped hookSpecificOutput envelope, closing the bare-vs-wrapped
+# gap documented in 02-implementation-t6a.md "Divergences found".
 #
 # Usage:
 #   bash tests/test_session_start.sh
@@ -140,11 +140,11 @@ assert_session_start_with_language() {
         failure_reason="stdout was empty; expected a SessionStart JSON line"
     fi
 
-    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"hookEventName"'; then
+    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"hookEventName"'; then
         ok=0
         failure_reason="stdout missing hookEventName field"
     fi
-    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
+    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
         ok=0
         failure_reason="stdout missing SessionStart value"
     fi
@@ -227,7 +227,7 @@ assert_template_form() {
         failure_reason="stdout was empty; expected a SessionStart JSON line"
     fi
 
-    if [ "$HOOK_IMPL" = "bash" ] && [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
+    if [ $ok -eq 1 ] && ! echo "$out" | grep -qF '"SessionStart"'; then
         ok=0
         failure_reason="stdout missing SessionStart value"
     fi
@@ -364,9 +364,7 @@ echo
 echo "=== Orchestrator: no marker, no config → disposition directive still fires ==="
 TMP=$(make_tmp_home_no_config)
 assert_output_contains "orch-noconfig: additionalContext present without marker" "$TMP" '"additionalContext"'
-if [ "$HOOK_IMPL" = "bash" ]; then
-    assert_output_contains "orch-noconfig-SessionStart: SessionStart event present" "$TMP" '"SessionStart"'
-fi
+assert_output_contains "orch-noconfig-SessionStart: SessionStart event present" "$TMP" '"SessionStart"'
 assert_output_contains "orch-noconfig-disposition: orchestrator disposition text present" "$TMP" "orchestrator disposition"
 assert_output_not_contains "orch-noconfig-no-systemMessage: no systemMessage banner" "$TMP" '"systemMessage"'
 assert_output_not_contains "orch-noconfig-no-DEVELOPER: no DEVELOPER MODE ACTIVE text" "$TMP" "DEVELOPER MODE ACTIVE"
@@ -395,9 +393,7 @@ echo "=== Workspace: obsidian + valid logs-path → base-path directive in addit
 TMP=$(make_tmp_home '{"logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}')
 assert_output_contains "ws-obsidian-context: additionalContext present" "$TMP" '"additionalContext"'
 assert_output_contains "ws-obsidian-path: logs-path/subfolder substring in directive" "$TMP" "/vault/work/work-logs"
-if [ "$HOOK_IMPL" = "bash" ]; then
-    assert_output_contains "ws-obsidian-event: SessionStart event present" "$TMP" '"SessionStart"'
-fi
+assert_output_contains "ws-obsidian-event: SessionStart event present" "$TMP" '"SessionStart"'
 rm -rf "$TMP"
 
 echo

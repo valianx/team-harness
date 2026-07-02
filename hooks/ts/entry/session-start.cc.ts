@@ -2,8 +2,10 @@
 // Claude Code (Node) entry for session-start.
 // Reads stdin → shim.inboundCC → body (with real SessionStartReader) → stdout JSON.
 //
-// Output format for SessionStart hooks:
-//   { "additionalContext": "<string>" }      — if any directives loaded
+// Output format for SessionStart hooks (per code.claude.com/docs/en/hooks,
+// verified via context7 — matches hooks/session-start.sh:272 exactly):
+//   {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"<string>"}}
+//                                             — if any directives loaded
 //   {} (empty stdout)                        — if nothing to emit
 //
 // This hook NEVER blocks or emits a permissionDecision. Exit 0 always.
@@ -46,9 +48,15 @@ async function main(): Promise<void> {
     const output = evaluateSessionStart(normalized, reader);
 
     if (output.additionalContext !== null) {
-      // Emit the CC SessionStart additionalContext envelope.
+      // Emit the CC SessionStart envelope — hookSpecificOutput wrapper, not a
+      // bare top-level additionalContext (that form is not honoured by CC).
       process.stdout.write(
-        JSON.stringify({ additionalContext: output.additionalContext }) + "\n"
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: output.additionalContext,
+          },
+        }) + "\n"
       );
     }
     // Empty stdout → CC SessionStart hook emits nothing (no-op).
