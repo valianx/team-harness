@@ -188,7 +188,7 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md` (verify section), `04-validation.md`, `04-security.md` | parallel dispatch over immutable artifact |
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
 | 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
-| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — |
+| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — (dispatched concurrently with 3.75) |
 | STAGE-GATE-2 | human (skippable if autonomous) | between tasks | next / stop | default STOP |
 | 4 — Delivery | `delivery` | all workspaces | branch + commit | — |
 | **STAGE-GATE-3** | **human** | PR ready | ship / amend / abort | **MANDATORY STOP** |
@@ -2437,9 +2437,9 @@ For each candidate in `security`'s `kg_save_candidates` (may be bare string lega
 
 **Owner:** You (orchestrator) — not a subagent dispatch.
 
-**When to run:** After Phase 3.5 (acceptance gate) passes and BEFORE Phase 3.6 (acceptance check). This is an orchestrator-owned step, not an agent dispatch.
+**When to run:** After Phase 3.5 (acceptance gate) passes. Dispatched in the SAME orchestrator message as Phase 3.6 (acceptance-checker) — see § Phase 3.6 "Concurrent dispatch with Build Verification" for the scheduling contract. This remains an orchestrator-owned Bash step; the acceptance-checker `Task` call is independent and runs alongside it, not before or after.
 
-**Why this phase exists:** Build failures that reach Phase 4 (delivery) waste the cost of Phase 3.6 + Phase 4 + Phase 4.5 and can result in broken PRs. Verifying the build compiles and lint passes before the acceptance-checker runs ensures Phase 3.6 operates on code that is known to be structurally sound. This is a reinforcement at the orchestrator level — the delivery agent's Step 9b DoD checklist also verifies build/lint/test before commit, serving as a safety net for problems introduced by multi-PR merges.
+**Why this phase exists:** Build failures that reach Phase 4 (delivery) waste the cost of Phase 4 + Phase 4.5 and can result in broken PRs. Verifying the build compiles and lint passes, dispatched concurrently with the acceptance-checker's drift audit (§ Phase 3.6), catches structural breakage without adding serial wall-clock — the acceptance-checker's drift-only mandate does not depend on build success, so the two checks do not need to be ordered relative to each other. This is a reinforcement at the orchestrator level — the delivery agent's Step 9b DoD checklist also verifies build/lint/test before commit, serving as a safety net for problems introduced by multi-PR merges.
 
 **Build command detection — order of precedence:**
 
@@ -2461,6 +2461,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
    b. Re-dispatch the implementer with the failure output: "Build verification failed. Command `{cmd}` returned exit code {N}. Output: {stderr/stdout}. Fix the build/lint error and confirm the fix."
    c. After the implementer returns, re-run the build/lint commands (1 retry).
    d. If the retry also fails: set `status: blocked` in `00-state.md`, escalate to the operator with the full failure output.
+   e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Phase 3.6 "Concurrent dispatch with Build Verification") — re-run the acceptance-checker only if `01-plan.md` or `04-validation.md` changed since the drift verdict; a build/lint fix alone normally touches neither, so the existing drift verdict stands.
 
 **Iteration budget:** max 2 attempts total (1 original + 1 retry after implementer fix). This is separate from the Phase 3 iteration budget.
 
@@ -2471,7 +2472,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
 Build verification PASS
   build: {command} — exit 0
   lint: {command} — exit 0
-Next: acceptance check (Phase 3.6)
+Next: STAGE-GATE-2 / delivery, once acceptance check (Phase 3.6, dispatched concurrently) also completes
 ```
 
 Or on failure:
@@ -2482,7 +2483,7 @@ Build verification FAILED
 Routing to implementer to fix build
 ```
 
-**Rewrite TL;DR**: On pass: `Now`: "Phase 3.6 acceptance-check running." `Last`: "Phase 3.75 build verification passed." On fail: `Now`: "Build failed — implementer fixing." `Open issues`: "build/lint failure in {command}".
+**Rewrite TL;DR**: On pass: `Now`: "Awaiting Phase 3.6 acceptance-check (dispatched concurrently)." `Last`: "Phase 3.75 build verification passed." On fail: `Now`: "Build failed — implementer fixing." `Open issues`: "build/lint failure in {command}".
 
 ---
 
@@ -2492,13 +2493,23 @@ Routing to implementer to fix build
 
 **When to run:** Always. Phase 3.6 runs unconditionally after Phase 3.5 (acceptance gate) passes. The only exception is `type: hotfix` AND single-file fix — speed matters for trivially scoped urgent fixes, and Phase 3 + 3.5 are sufficient.
 
-**This is the third line of defense:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, which contains the formalized original description and AC as written by the architect at Stage 1) and the actually delivered artifacts. It catches drift that `tester` and `qa` cannot catch because they only validate the **current** AC list — not whether the AC list still matches what was approved at STAGE-GATE-1.
+**Concurrent dispatch with Build Verification.** After Phase 3.5 passes, issue the acceptance-checker `Task` call and the Phase 3.75 build/lint `Bash` calls IN THE SAME MESSAGE — independent tool calls, dispatched together rather than one after the other. Gate evaluation waits for both results before proceeding to STAGE-GATE-2 / Phase 4. This overlaps the acceptance-checker's drift audit with build verification instead of running it after 3.75 completes, shrinking the serial tail from 3.5 → 3.75 → 3.6 to 3.5 → (3.75 ∥ 3.6).
+
+**Conditional re-run after a 3.75 failure.** If Phase 3.75 fails and the implementer patches the build/lint error, re-run the acceptance-checker (3.6) ONLY if `01-plan.md` or `04-validation.md` changed since the drift verdict was produced — a build/lint fix alone normally touches neither. Check cheaply via file mtime or `git status` on those two paths; when neither changed, the existing drift verdict stands and Phase 3.6 is not re-dispatched.
+
+**This is the third line of defense — drift-only, trusting `qa`'s verdict:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, the formalized original description and AC as approved at STAGE-GATE-1) and the current `§ Task List` AC. It answers ONE question: does what was approved still match what is being delivered? The acceptance-checker does NOT re-validate AC satisfaction — `qa`'s Phase 3 verdict (`04-validation.md § AC Coverage Results`) is trusted input for that. This removes the time-shifted duplication of a fact `qa` already checked.
+
+**VERIFY — single enforcement point for Critical/High security findings.** After this narrowing, the Phase 3.5 Acceptance Gate (§ Phase 3.5 above, step 4) is the SOLE blocker for unresolved Critical/High security findings before delivery — Phase 3.6 no longer re-reads `04-security.md` for that purpose. This section neither weakens nor duplicates the Phase 3.5 gate text; it relies on it standing unchanged.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces
 - workspaces path: {resolved_workspaces_path}
-- Pointer to `01-plan.md` (§ Review Summary — original description + approved AC)
-- Pointer to `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md` (if it exists), and `04-ux-validation.md` (if `frontend_scope: true` and it exists)
+- Pointer to `01-plan.md` (§ Review Summary — original description + approved AC — AND § Task List — current AC)
+- `verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` plus the 10-line digest (`docs/verification-packet.md § 3`)
+- Pointer to `04-validation.md` (§ AC Coverage Results — `qa`'s per-AC verdict, trusted input)
+- Depth-on-demand escape-hatch pointers ONLY (opened per-delta, not by default): `02-implementation.md`, `03-testing.md`, `04-security.md` (if it exists), and `04-ux-validation.md` (if `frontend_scope: true` and it exists)
+
+Instruct: "Drift-only mandate — compare `01-plan.md § Review Summary` (approved) against `§ Task List` (current) using the packet and qa's verdict as delta evidence. Do NOT re-validate AC satisfaction — qa's verdict is trusted input. Do NOT re-check Critical/High security findings — the Phase 3.5 gate already enforces that."
 
 **Gate (status-block + verdict):** the agent returns a status block with a `verdict` field separate from `status`. Read both:
 
@@ -2510,7 +2521,7 @@ Routing to implementer to fix build
 | `failed` | (any) | Audit itself broke. Read the issue, retry once. If still failing, log warning and proceed to Phase 4 (acceptance-checker is non-binding by design — its absence does not block delivery). |
 | `blocked` | (any) | Missing input. Read issues, fix, retry. |
 
-**Iteration cost:** acceptance-checker runs once per pipeline (or once per major iteration after big changes). It does NOT run every iteration of the implementer→tester loop — that would double work. The orchestrator invokes it only after Phase 3.5 passes cleanly.
+**Iteration cost:** acceptance-checker runs once per pipeline (or once per major iteration after big changes). It does NOT run every iteration of the implementer→tester loop — that would double work. The orchestrator invokes it only after Phase 3.5 passes cleanly, concurrently with Phase 3.75.
 
 **Report to user:**
 ```
@@ -2522,12 +2533,12 @@ Next: {delivery | iterate | escalate}
 
 If verdict is `concerns`, list each concern as one line in the report so the user sees them before delivery proceeds.
 
-**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "Task-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "Task-{i} Phase 3.6 verdict={pass|concerns}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
+**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "Task-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "Task-{i} Phase 3.6 verdict={pass|concerns}, Phase 3.75 build {pass|fail}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
 
-**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 of the **last task** completes — not after every task's Phase 3. Determine "last task" as the final task in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
+**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when BOTH Phase 3.75 (build verification) AND Phase 3.6 of the **last task** have completed — not after every task's Phase 3, and not on either check alone since they are dispatched concurrently. Determine "last task" as the final task in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail, Phase 3.75 exhausts its retry budget, or the Phase 3 iteration budget is exhausted.
 
 ```bash
-# Fire only when this is the last task's Phase 3.6 in the last round (or Phase 3.5 for hotfix+single-file)
+# Fire only when both this task's Phase 3.75 and Phase 3.6 have completed, and this is the last round (or Phase 3.5 for hotfix+single-file)
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -f ~/.claude/hooks/ts/dist/notify-stage.cjs; then
     python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean|N findings}." "{project root}" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
