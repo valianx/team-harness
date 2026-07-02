@@ -76,9 +76,13 @@ function sendWindows(title: string, body: string): string | null {
     // Double single-quotes for PowerShell single-quoted string literals
     // (SEC-004 — the correct escape; a bare backslash-escape is invalid
     // PowerShell syntax). Body capped at 200 chars, same as the original.
+    // XML-escape first — the string is embedded in an XML <text> element via
+    // LoadXml(), so unescaped &, <, > produce invalid XML and the toast is
+    // silently dropped.
+    const xmlEscape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const psEscape = (s: string) => s.replace(/'/g, "''");
-    const psTitle = psEscape(title);
-    const psBody = psEscape(body.slice(0, 200));
+    const psTitle = psEscape(xmlEscape(title));
+    const psBody = psEscape(xmlEscape(body.slice(0, 200)));
     const aumid = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
     const command = `
   [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null

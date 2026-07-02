@@ -50,7 +50,20 @@ export interface NotifyStageRunner {
 // Summary is capped at 120 characters.
 // ---------------------------------------------------------------------------
 
+function hasStageFields(payload: NotifyStagePayload): boolean {
+  return [
+    payload.feature,
+    payload.stage,
+    payload.label,
+    payload.status,
+    payload.summary,
+  ].some((field) => String(field ?? "").trim() !== "");
+}
+
 function buildMessage(payload: NotifyStagePayload): string {
+  if (!hasStageFields(payload)) {
+    return "";
+  }
   const feature = String(payload.feature ?? "").slice(0, 100);
   const stage = String(payload.stage ?? "");
   const label = String(payload.label ?? "");
@@ -66,8 +79,8 @@ function buildMessage(payload: NotifyStagePayload): string {
 // ---------------------------------------------------------------------------
 
 function buildTitle(cwd: string): string {
-  const project = cwd.split(/[\\/]/).filter(Boolean).pop() ?? "";
-  return `Claude Code — ${project}`;
+  const project = cwd.split(/[\\/]/).filter(Boolean).pop();
+  return project ? `Claude Code — ${project}` : "Claude Code";
 }
 
 // ---------------------------------------------------------------------------

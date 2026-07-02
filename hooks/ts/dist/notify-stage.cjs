@@ -23,7 +23,19 @@ function observabilityEnabled(cls) {
 }
 
 // bodies/notify-stage.ts
+function hasStageFields(payload) {
+  return [
+    payload.feature,
+    payload.stage,
+    payload.label,
+    payload.status,
+    payload.summary
+  ].some((field) => String(field ?? "").trim() !== "");
+}
 function buildMessage(payload) {
+  if (!hasStageFields(payload)) {
+    return "";
+  }
   const feature = String(payload.feature ?? "").slice(0, 100);
   const stage = String(payload.stage ?? "");
   const label = String(payload.label ?? "");
@@ -32,8 +44,8 @@ function buildMessage(payload) {
   return `Pipeline ${feature} \xB7 Stage ${stage} (${label}) ${status} \u2014 ${summary}`;
 }
 function buildTitle(cwd) {
-  const project = cwd.split(/[\\/]/).filter(Boolean).pop() ?? "";
-  return `Claude Code \u2014 ${project}`;
+  const project = cwd.split(/[\\/]/).filter(Boolean).pop();
+  return project ? `Claude Code \u2014 ${project}` : "Claude Code";
 }
 function evaluateNotifyStage(payload, runner) {
   try {
@@ -94,9 +106,10 @@ function sendMac(title, body) {
 }
 function sendWindows(title, body) {
   try {
+    const xmlEscape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const psEscape = (s) => s.replace(/'/g, "''");
-    const psTitle = psEscape(title);
-    const psBody = psEscape(body.slice(0, 200));
+    const psTitle = psEscape(xmlEscape(title));
+    const psBody = psEscape(xmlEscape(body.slice(0, 200)));
     const aumid = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
     const command = `
   [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null

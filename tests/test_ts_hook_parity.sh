@@ -181,10 +181,18 @@ assert_parity() {
         node_ok=0
     fi
 
-    # Reason presence: whenever a decision fires, a reason must be present.
+    # Reason presence: whenever a decision fires, a non-empty reason must be present.
     local node_reason_ok=1
-    if [ "$ts_node_dec" != "none" ] && ! has_reason_field "$ts_node_out"; then
-        node_reason_ok=0
+    if [ "$ts_node_dec" != "none" ]; then
+        if ! has_reason_field "$ts_node_out"; then
+            node_reason_ok=0
+        else
+            local node_reason
+            node_reason=$(extract_reason "$ts_node_out")
+            if [ -z "$node_reason" ]; then
+                node_reason_ok=0
+            fi
+        fi
     fi
 
     # Bun parity (cross-runtime, TS-vs-TS — if Bun is present).

@@ -61,7 +61,7 @@ failed (non-fatal) notification.
 The marketplace plugin wires every hook automatically via `.claude-plugin/hooks.json` —
 no manual `settings.json` merge is required. Install with:
 
-```
+```sh
 /plugin marketplace add valianx/team-harness
 /plugin install th
 /th:setup
