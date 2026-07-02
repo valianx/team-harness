@@ -90,7 +90,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/ts/dist/subagent-start.cjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/ts/dist/subagent-start.cjs\"",
             "timeout": 5
           }
         ]
