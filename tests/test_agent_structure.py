@@ -48,7 +48,7 @@ def invokes_launcher(command: str, hook_name: str) -> bool:
     Matches both a parsed JSON string (a literal `"`) and the raw hooks.json
     file text (an escaped `\"`).
     """
-    pattern = r"run-ts-hook\.sh(\\)?\"?\s+" + re.escape(hook_name) + r"\b"
+    pattern = r"run-ts-hook\.sh(\\)?\"?\s+" + re.escape(hook_name) + r"(?=$|[\s\"])"
     return re.search(pattern, command) is not None
 
 
