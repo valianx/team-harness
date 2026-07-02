@@ -366,7 +366,8 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
          agent:     .[0].agent,
          phases:    [.[] | .phase],
          tokens:    [.[] | .tokens // 0] | add,
-         estimated: ([.[] | select(.tokens_estimated == true)] | length)
+         estimated: ([.[] | select(.tokens_estimated == true)] | length),
+         models:    [.[] | .model // empty] | unique
        })
      '
    ```
@@ -380,10 +381,13 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
        agent:     .[0].agent,
        phases:    [.[] | .phase],
        tokens:    [.[] | .tokens // 0] | add,
-       estimated: ([.[] | select(.tokens_estimated == true)] | length)
+       estimated: ([.[] | select(.tokens_estimated == true)] | length),
+       models:    [.[] | .model // empty] | unique
      })
    ' workspaces/{feature-name}/00-execution-events.jsonl
    ```
+
+   `models` is the deduplicated list of `event.model` values reported across that agent's phases (empty entries dropped). An empty `models` array means no event in this trace reported `model` — classification falls through to frontmatter/static-list (step 4).
 
    **If `jq` is not available, fall back to `python3`:**
 
@@ -391,7 +395,7 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
    # Works for both .jsonl (read direct) and .md (extract fence first with sed -n)
    python3 -c "
    import json, sys, collections
-   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'estimated': 0})
+   by_agent = collections.defaultdict(lambda: {'tokens': 0, 'phases': [], 'estimated': 0, 'models': set()})
    by_phase = []
    for line in sys.stdin:
        try:
@@ -404,19 +408,42 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
        phase = e.get('phase', '?')
        tokens = e.get('tokens') or 0
        est = 1 if e.get('tokens_estimated') else 0
+       model = e.get('model')
        by_agent[agent]['tokens'] += tokens
        by_agent[agent]['phases'].append(phase)
        by_agent[agent]['estimated'] += est
-       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'estimated': est})
+       if model:
+           by_agent[agent]['models'].add(model)
+       by_phase.append({'phase': phase, 'agent': agent, 'tokens': tokens, 'estimated': est, 'model': model})
    total = sum(v['tokens'] for v in by_agent.values())
    est_phases = sum(v['estimated'] for v in by_agent.values())
-   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'estimated': v['estimated']} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'est_phases': est_phases}))
+   print(json.dumps({'by_agent': [{'agent': k, 'phases': v['phases'], 'tokens': v['tokens'], 'estimated': v['estimated'], 'models': sorted(v['models'])} for k, v in sorted(by_agent.items())], 'by_phase': by_phase, 'total': total, 'est_phases': est_phases}))
    "
    ```
 
-4. Compute cost if `has_pricing == true`. Model classification:
-   - `architect` agent → use `pricing.opus` rates.
-   - All other agents → use `pricing.sonnet` rates.
+4. Compute cost if `has_pricing == true`. Model classification uses the same
+   priority order as `docs/observability.md § Derivation rule` — this skill
+   MUST NOT diverge from that document:
+   - **Primary path — `event.model` / the per-agent `models` list.** When a
+     phase (by-phase table) or an agent's `models` list (by-agent table)
+     carries a non-empty `model` value, classify from it directly: `opus`
+     when the value starts with `claude-opus` or equals `opus`; `sonnet`
+     otherwise. If an agent's `models` list has more than one distinct value
+     (a session model override applied to some but not all of that agent's
+     dispatches), classify each phase row individually from its own
+     `event.model` and fall back to the next path only for phases with no
+     `model` reported.
+   - **Fallback path — frontmatter `model:` field.** When `model` is absent
+     for that phase/agent, read `agents/{agent}.md` YAML frontmatter. `opus`
+     when it starts with `claude-opus` or equals `opus`; `sonnet` otherwise.
+   - **Static opus-agent fallback** (only when both paths above are
+     unavailable): `architect`, `security`, `adversary`, `qa-plan`,
+     `ux-reviewer`, `reviewer`, `reviewer-consolidator`, `agent-builder`,
+     `mentor`, `gcp-infra`, `gcp-cost-analyzer`, `orchestrator` → `opus`.
+     This list MUST match `docs/observability.md § Derivation rule` verbatim
+     — do not edit one without the other.
+   - **No "all others → sonnet" default.** When none of the three paths
+     resolve, classify as `sonnet` and mark the row with `(?)`.
    - When `tokens_in` / `tokens_out` are available in the event, use
      `(tokens_in × input + tokens_out × output) / 1_000_000`.
    - When only `tokens` total is available, use

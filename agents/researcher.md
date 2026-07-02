@@ -123,6 +123,7 @@ No evidence found for angle: {angle}.
 ```
 agent: researcher
 status: success | failed
+model: {effective-model-id}
 output: {findings_file path}
 summary: {1 sentence: angle + findings count}
 findings: {N}

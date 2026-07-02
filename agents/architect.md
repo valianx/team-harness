@@ -1557,6 +1557,7 @@ agent: architect
 mode: design | research | audit | planning | root-cause | consolidation
 sub_mode: light-root-cause | full-root-cause | null   # set only when mode: root-cause; null/omit otherwise
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/{01-plan|01-root-cause|00-research|00-audit|01-planning}.md
 summary: {1-2 sentence summary of what was designed/researched/planned/diagnosed}
 approach_freedom: high | low   # design mode only: high = material alternatives exist; low = one clear approach; orchestrator gates on this

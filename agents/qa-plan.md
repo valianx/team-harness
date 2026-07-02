@@ -111,6 +111,7 @@ Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the a
 ```
 agent: qa-plan
 status: success | failed | blocked
+model: {effective-model-id}
 mode: ratify-plan
 verdict: pass | fail
 output: workspaces/{feature-name}/01-plan.md (Plan Ratification section)
@@ -161,6 +162,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 ```
 agent: qa-plan
 status: success | failed | blocked
+model: {effective-model-id}
 mode: reconcile
 verdict: clean | amendments | drops
 output: workspaces/{feature-name}/04-validation.md (Reconciliation Decisions section)
@@ -366,6 +368,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: qa-plan
 mode: define-ac | ratify-plan | reconcile
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature-name}/{00-acceptance-criteria|01-plan}.md
 summary: {1-2 sentences: N/N AC covered (or: AC defined, or: constraints reconciled)}
 context7_consult: hit:N miss:N skipped:N

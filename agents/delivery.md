@@ -1480,6 +1480,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: delivery
 status: success | failed | blocked | blocked-manual-push | blocked-pr-pending
+model: {effective-model-id}
 output: workspaces/{feature-name}/00-state.md § Delivery
 summary: {1-2 sentences: branch name, version X→Y, PR #N, CLAUDE.md sections updated}
 gh_account: <login> | unknown | n/a (has_gh=false)
@@ -1499,6 +1500,7 @@ issues: {list of blockers, or "none"}
 ```
 agent: delivery
 status: blocked-manual-push
+model: {effective-model-id}
 output: workspaces/{feature-name}/00-state.md § Delivery
 manual_action_required: true
 manual_action_file: workspaces/{feature-name}/inputs/pr-body.md
@@ -1515,6 +1517,7 @@ issues: none
 ```
 agent: delivery
 status: blocked-pr-pending
+model: {effective-model-id}
 output: workspaces/{feature-name}/00-state.md § Delivery
 manual_action_required: true
 manual_action_file: workspaces/{feature-name}/inputs/pr-body.md

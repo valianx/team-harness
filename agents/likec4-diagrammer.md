@@ -282,6 +282,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: likec4-diagrammer
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature}/diagram.c4
 views: {list of view names}
 render: done | skipped   # obsidian mode only; omit in local mode

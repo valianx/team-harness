@@ -237,6 +237,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: adversary
 status: success | failed | blocked
+model: {effective-model-id}
 mode: pipeline-adversary
 output: workspaces/{feature-name}/04-adversary.md
 adversary_verdict: broke-it | could-not-break

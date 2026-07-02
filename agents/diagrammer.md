@@ -352,6 +352,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 ```
 agent: diagrammer
 status: success | failed | blocked
+model: {effective-model-id}
 output: workspaces/{feature}/diagram.excalidraw
 elements: {total element count}
 arrows: {arrow count}

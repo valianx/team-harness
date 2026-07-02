@@ -409,18 +409,27 @@ trace, not an independent source.
 1. Read all `phase.end` events from `{docs_root}/{events_file}`.
 2. For each event, extract `agent`, `phase`, `tokens`, and `tokens_estimated`.
 3. Classify the agent's model tier using the following priority order:
-   - **Primary path — read frontmatter `model:` field.** Locate `agents/{agent}.md` and
-     read its YAML frontmatter `model:` field. Classify as `opus` when `model` starts with
-     `claude-opus` or equals `opus`; classify as `sonnet` otherwise.
-   - **Static opus-agent fallback** (used only when frontmatter is unreadable — file absent,
-     not parseable, or `model:` key missing): treat these agents as `opus` regardless of any
-     other assumption:
+   - **Primary path — `event.model` field.** When the `phase.end` event itself carries a
+     `model` field (propagated verbatim from the agent's status block — see
+     `agents/orchestrator.md` § "Populating the `model`/`effort` fields on `phase.end`"),
+     classify directly from it: `opus` when `model` starts with `claude-opus` or equals
+     `opus`; `sonnet` otherwise. This is the authoritative source once populated — it
+     reflects what the agent actually ran under, including under a session model override
+     (`agents/orchestrator.md` § "Session model override"), which frontmatter cannot express.
+   - **Fallback path — read frontmatter `model:` field.** When `event.model` is absent (the
+     event predates this field, or the agent instance had not yet adopted it), locate
+     `agents/{agent}.md` and read its YAML frontmatter `model:` field. Classify as `opus`
+     when `model` starts with `claude-opus` or equals `opus`; classify as `sonnet` otherwise.
+   - **Static opus-agent fallback** (used only when BOTH `event.model` is absent AND
+     frontmatter is unreadable — file absent, not parseable, or `model:` key missing): treat
+     these agents as `opus` regardless of any other assumption:
      `architect`, `security`, `adversary`, `qa-plan`, `ux-reviewer`, `reviewer`,
      `reviewer-consolidator`, `agent-builder`, `mentor`, `gcp-infra`, `gcp-cost-analyzer`,
-     `orchestrator`.
-   - **No "all others → sonnet" default.** When frontmatter is unreadable AND the agent
-     is not in the static opus list above, classify as `sonnet` and mark the row with `(?)` to
-     signal that the classification is uncertain.
+     `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
+     same enumeration and MUST NOT diverge from it.
+   - **No "all others → sonnet" default.** When none of the three paths above resolve a
+     classification, classify as `sonnet` and mark the row with `(?)` to signal that the
+     classification is uncertain.
 4. Compute cost per phase using the price table (see above). Sum to get total.
 5. Build the per-agent and per-phase tables.
 6. Count phases where `tokens_estimated == true` for the header annotation.
@@ -456,6 +465,14 @@ Both are written exclusively by the orchestrator. Agents return tool-usage count
 ### tokens field on phase.end
 
 Every `phase.end` event MUST include a `tokens` field (integer). When `Agent()`/`Task()` metadata is absent, estimate via `duration_min × 1500` (opus) / `× 800` (sonnet) and mark `tokens_estimated: true`. **Zero is forbidden** — a zero token count is indistinguishable from a missing field and breaks the cost rollup.
+
+### model / effort fields on phase.end
+
+Every leaf agent's status block declares its effective model on a `model:` line (mandatory) and, when known, its effective effort level on an `effort:` line (optional) — see `agents/_shared/output-template.md` § "Status block — common fields". The orchestrator propagates both verbatim onto the corresponding `phase.end` event's `model` / `effort` fields, using the same propagation mechanism already used for `tools` (see `agents/orchestrator.md` § "Populating the `model`/`effort` fields on `phase.end`"). Both fields are optional at the schema level — legacy events and events from agents that have not yet reported the fields simply omit them, and classification falls through to frontmatter/static-list inference (see § Derivation rule below).
+
+This is the field that makes a session model override (`agents/orchestrator.md` § "Session model override") observable in the trace: the frontmatter `model:` in `agents/{agent}.md` is only the agent's *default*; `event.model` on a given `phase.end` is what that specific dispatch actually ran under.
+
+**Session model override — distinct from the config-override whitelist.** The session model override (an operator utterance such as "use the bigger model for analysis this session") is recorded exclusively in `00-state.md § Current State` and applies only to analysis-tier dispatches (`architect`, the plan-review panel, consolidators) for the current session — it is never written to `~/.claude/.team-harness.json`. This is a **separate mechanism** from the session-scoped config override whitelist (CLAUDE.md §5), which governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and which continues to explicitly EXCLUDE `model`. The two must not be conflated: the config whitelist is about persisted-vs-session config keys reachable from `/th:setup`; the session model override is a dispatch-time-only instruction that never touches config and is discarded at session end. Full mechanism: `agents/orchestrator.md` § "Session model override".
 
 ### kg_write write-integrity rollup
 
@@ -494,7 +511,7 @@ The decision-ledger provides a durable audit trail of every judgement call made 
 
 - **Gate verdicts** — why a plan-review or acceptance-gate passed, raised concerns, or failed.
 - **Operator approvals** — what the operator explicitly approved or rejected at each STAGE-GATE, and any reason they gave.
-- **Finding dispositions** — how security, QA, and reviewer findings were classified (accepted, deferred to watch-list, or rejected as non-applicable).
+- **Finding dispositions** — how security, QA, and reviewer findings were classified (accepted, deferred to watch-list, or rejected as non-applicable). This includes both gate-scoped findings (Phase 1.6, 3.5, 3.6, STAGE-GATE-1) and per-comment classifications from an `apply-review` round (`phase: "4.5-review"` — see "disposition at apply-review rounds" below).
 - **Dry-run enforcement** — when a deploy or migration action was routed through a dry-run / plan-only path before any apply, recording which existing hook gated the apply.
 
 ### Schema (4 event types)
@@ -516,6 +533,8 @@ Every line is a JSON object. One JSON object per line, append-only, never rewrit
 | `guard` | conditional | For `dry-run-enforced`: which existing deterministic floor gated the apply (`gcp-guard.sh`, `dev-guard.sh`, `policy-block.sh`). Required for `dry-run-enforced` — names the enforcement layer the ledger is auditing. |
 
 **Disposition vocabulary** (`decision` field when `event == "disposition"`): `accept` (finding acknowledged and accepted as-is), `watch` (accept-with-followup; operator adds to a deferred list), `reject` (finding dismissed as non-applicable).
+
+**Disposition at apply-review rounds (`phase: "4.5-review"`).** The author-side `apply-review` flow (`agents/_shared/apply-review-disposition.md` Step 5) already classifies every incoming reviewer comment as `APPLIED` / `PARTIAL` / `DEFERRED` / `REJECTED` / `NEEDS-CLARIFICATION`. Each comment's classification is appended to the ledger as one `disposition` line with `phase: "4.5-review"`, using a deterministic (non-operator) mapping: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. `subject` is the comment's one-line summary; `rationale` is the Step-5 Evidence/Note text. This is a straight extension of the existing gate-scoped `disposition` trigger to a non-gate write site — no new event type, no new file. Per the anti-redundancy invariant above, this ledger line is never mirrored into `00-execution-events`.
 
 ### Dual-format lifecycle
 
