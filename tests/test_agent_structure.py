@@ -28338,15 +28338,13 @@ for _floor_name in _S117_FLOORS:
 # ----------------------------------------------------------------
 # AC-12 — payload field data-not-instruction: JSON.stringify path + no transcript open
 #
-# [CONSTRAINT-DISCOVERED, T6b]: the retired Bash oracle's subagent-trace
-# breadcrumb schema included agent_id (documented SEC-DR-007 opaque
-# correlation key) + cwd. The TS port's record (ts, event, agent_type,
-# stop_reason, workspace) does not carry agent_id — parallel same-agent_type
-# fanout instances can no longer be disambiguated by breadcrumb alone. This
-# is a schema divergence in gate logic, out of scope for T6b (wiring-only);
-# flagged here for security review / a follow-up gate-logic task, not
-# silently fixed. The assertion below checks the TS-actual schema so the
-# suite reflects reality rather than a stale oracle contract.
+# [T6d, restores CONSTRAINT-DISCOVERED T6b]: the retired Bash oracle's
+# subagent-trace breadcrumb schema included agent_id (documented SEC-DR-007
+# opaque correlation key). The T6b TS port dropped it — parallel same-
+# agent_type fanout instances could no longer be disambiguated by breadcrumb
+# alone. T6d restores agent_id to the record (read the same way as
+# agent_type/stop_reason, copied through verbatim, never parsed). The
+# assertion below checks the TS-actual schema.
 # ----------------------------------------------------------------
 
 check(
@@ -28361,9 +28359,14 @@ check(
 )
 check(
     "suite117(ac12-schema-th-scoped): subagent-trace.ts breadcrumb record documents its actual field set "
-    "(ts, event, agent_type, stop_reason, workspace) — see [CONSTRAINT-DISCOVERED] note above re: agent_id",
+    "(ts, event, agent_type, agent_id, stop_reason, workspace)",
     "agent_type" in _s117_subagent_trace and "stop_reason" in _s117_subagent_trace,
     "subagent-trace.ts record must include agent_type and stop_reason",
+)
+check(
+    "suite117(ac12-agent-id-restored): subagent-trace.ts carries agent_id (SEC-DR-007 correlation key)",
+    "agent_id" in _s117_subagent_trace,
+    "subagent-trace.ts record must include agent_id, matching the retired Bash oracle's SEC-DR-007 contract",
 )
 
 # ----------------------------------------------------------------

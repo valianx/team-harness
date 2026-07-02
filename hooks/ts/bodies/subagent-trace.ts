@@ -13,6 +13,10 @@
 //     pair must never silently disappear because the operator lowered the hook
 //     profile for a different, unrelated class of hook.
 //   - Scope guard: agent_type field must start with "th:" — skip others silently.
+//   - agent_id (SEC-DR-007): carried through as an opaque correlation key,
+//     same as the retired Bash oracle (hooks/subagent-trace.sh Step 2/6) —
+//     read from the payload and copied into the record verbatim, never
+//     parsed, decoded, or used for control flow.
 //
 // The body exposes a SubagentTraceWriter interface for testability.
 // The CC entry injects a real filesystem writer; tests inject a mock.
@@ -75,6 +79,13 @@ export function writeTrace(input: NormalizedInput, writer: SubagentTraceWriter):
       ? (input.tool.input["stop_reason"] as string)
       : "";
 
+  // agent_id (SEC-DR-007): opaque correlation key, read the same way as
+  // agent_type/stop_reason and copied through as-is — no parsing, no decoding.
+  const agentId =
+    typeof input.tool?.input?.["agent_id"] === "string"
+      ? (input.tool.input["agent_id"] as string)
+      : "";
+
   const ts = writer.now();
   const cwd = writer.cwd();
   const workspace = writer.findWorkspace(cwd);
@@ -88,6 +99,7 @@ export function writeTrace(input: NormalizedInput, writer: SubagentTraceWriter):
     ts,
     event: "subagent.stop",
     agent_type: agentType,
+    agent_id: agentId,
     stop_reason: stopReason,
     workspace,
   };

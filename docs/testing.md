@@ -415,7 +415,7 @@ Fleet-wide structural guard for the obsidian-aware Path-override sentence (v2.82
 
 (AC-11, ~15 checks) Regression — all 5 existing PreToolUse floors (`policy-block.sh`, `dev-guard.sh`, `gcp-guard.sh`, `worktree-guard.sh`, `checkpoint-guard.sh`) remain present and unchanged in all 3 OS blocks of `config.json` and in `hooks.json`.
 
-(AC-12, 3 checks) Payload-as-data contract: both hooks use `python3 json.dumps` to encode payload fields; `agent_id` is documented as an opaque correlation key (SEC-DR-007).
+(AC-12, 4 checks) Payload-as-data contract: both hooks use `python3 json.dumps` to encode payload fields; `agent_id` is documented as an opaque correlation key (SEC-DR-007) and, since T6d, restored to the `subagent-trace.ts` breadcrumb record.
 
 (AC-13, ~20 checks) Non-waivable enforcement-floor security contract: 7 enforcement hooks (`policy-block.sh`, `dev-guard.sh`, `gcp-guard.sh`, `worktree-guard.sh`, `checkpoint-guard.sh`, `session-start.sh`, `language-user-prompt.sh`) contain NO `TH_HOOK_PROFILE` read and NO `_hook-profile.sh` source (2 × 7 = 14 checks). 6 gated observability/notification hooks (`notify-windows.sh`, `notify-mac.sh`, `notify-linux.sh`, `notify-stage.sh`, `subagent-trace.sh`, `precompact-snapshot.sh`) DO source `_hook-profile.sh` and call `th_observability_enabled` (2 × 6 = 12 checks). `_hook-profile.sh` defaults to `standard` when `TH_HOOK_PROFILE` is unset.
 
