@@ -138,13 +138,11 @@ assert_silent_exit0() {
 }
 
 # assert_no_deny_decision — the launcher must NEVER hard-deny an advisory or
-# observational hook. worktree-guard/observational keep the plain
-# `exec node "$CJS"` path (no capture/inspect logic added by SEC-PR2-001),
-# so node's raw exit status on a corrupt artifact passes straight through —
-# that pass-through is pre-existing and out of scope here. What the F5
-# contract actually guarantees for these two classes is narrower: whatever
-# node does, the launcher itself never turns it into a permissionDecision
-# block.
+# observational hook. For these two classes the launcher captures node's
+# output and always exits 0 (silent fail-open): a corrupt artifact or a node
+# crash yields exit 0 with no permissionDecision, never a block. The F5
+# contract guarantee for these classes: whatever node does, the launcher
+# itself never turns it into a permissionDecision block.
 assert_no_deny_decision() {
     local name="$1" root="$2" hook_name="$3"
     local out
