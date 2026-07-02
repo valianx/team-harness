@@ -192,9 +192,7 @@ function loadLanguage(config) {
 function loadEnglishLearning(config) {
   const el = config["english_learning"];
   if (el !== true) return null;
-  const lang = typeof config["language"] === "string" ? config["language"] : "";
-  if (lang && lang !== "en") return null;
-  return `Team Harness english-learning mode is active for this session. This mode operates with English as the response language (it is coupled to language: en). At the START of every reply, when the operator's latest message is written in English, give one brief, low-key learning signal, then continue and answer the operator's request normally in the same turn. Keep the signal unobtrusive \u2014 the operator is learning passively while working, so the signal must never dominate the reply or stall the conversation.
+  return `Team Harness english-learning mode is active for this session, independent of the configured response language. At the START of every reply, when the operator's latest message is written in English, give one brief, low-key learning signal, then continue and answer the operator's request normally in the same turn. Keep the signal unobtrusive \u2014 the operator is learning passively while working, so the signal must never dominate the reply or stall the conversation.
 
 Every message gets a signal (kept minimal). If the operator's English message is already correct, acknowledge it with the plain-ASCII emoticon :) on its own short line \u2014 nothing more (do NOT render it as an emoji glyph; it is the literal two-character sequence). If the message contains a correctable error, show the compact correction block instead. Either way, the substantive answer follows in the same turn.
 

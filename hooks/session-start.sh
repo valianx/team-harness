@@ -129,11 +129,11 @@ load_language() {
 # (contribute nothing). The directive is a fixed ASCII template with ZERO config
 # interpolation; the boolean is never echoed into output. This is strictly safer
 # than load_language, which interpolates the validated $lang token.
-# Language gate: the directive is injected ONLY when english_learning == "true"
-# AND the config `language` key is "en" or absent/empty (absent → default en).
-# A non-en code (es, pt, fr, …) keeps the directive dormant. The gate reads
-# ONLY the config key — it does NOT read 00-state.md (session-override language
-# is the orchestrator path's responsibility, not the hook's).
+# No language gate: the directive is injected whenever english_learning ==
+# "true", regardless of the configured response language. Scoping to English
+# text is handled entirely by the directive's own message-level exemption
+# below (it evaluates only messages the operator writes in English) — a
+# separate `language` check here would be redundant with that exemption.
 # Placed after load_language so the response-language directive is established
 # before the correction directive (load order matters per the plan).
 # ----------------------------------------------------------------------------
@@ -157,27 +157,10 @@ load_english_learning() {
     # false / absent / empty / malformed / multiline → contribute nothing.
     [ "$el" = "true" ] || return 0
 
-    # LANGUAGE GATE: read the `language` key — mirroring load_language's read.
-    # The directive fires only when lang == "en" OR lang is empty/absent.
-    # Any other non-empty value (es, pt, fr, …) → stay dormant.
-    # SEC: lang is used for comparison only — it is NEVER interpolated into the
-    # directive. The directive template stays a fixed ASCII string.
-    local lang=""
-    if command -v jq >/dev/null 2>&1; then
-        lang=$(jq -r '.language // empty' "$CONFIG" 2>/dev/null) || lang=""
-    else
-        lang=$(grep -o '"language"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG" 2>/dev/null \
-               | sed 's/.*"language"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
-               2>/dev/null) || lang=""
-    fi
-
-    # Gate: en or absent → fire; any other non-empty value → dormant.
-    [ "$lang" = "en" ] || [ -z "$lang" ] || return 0
-
     # SEC-DR-B: fixed ASCII template — NO config bytes are interpolated here.
-    # The boolean and language values were parsed to an on/off decision above
-    # and are never echoed into the directive.
-    directives+=( 'Team Harness english-learning mode is active for this session. This mode operates with English as the response language (it is coupled to language: en). At the START of every reply, when the operator'"'"'s latest message is written in English, give one brief, low-key learning signal, then continue and answer the operator'"'"'s request normally in the same turn. Keep the signal unobtrusive — the operator is learning passively while working, so the signal must never dominate the reply or stall the conversation.
+    # The boolean was parsed to an on/off decision above and is never echoed
+    # into the directive.
+    directives+=( 'Team Harness english-learning mode is active for this session, independent of the configured response language. At the START of every reply, when the operator'"'"'s latest message is written in English, give one brief, low-key learning signal, then continue and answer the operator'"'"'s request normally in the same turn. Keep the signal unobtrusive — the operator is learning passively while working, so the signal must never dominate the reply or stall the conversation.
 
 Every message gets a signal (kept minimal). If the operator'"'"'s English message is already correct, acknowledge it with the plain-ASCII emoticon :) on its own short line — nothing more (do NOT render it as an emoji glyph; it is the literal two-character sequence). If the message contains a correctable error, show the compact correction block instead. Either way, the substantive answer follows in the same turn.
 
