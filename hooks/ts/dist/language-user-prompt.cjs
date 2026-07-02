@@ -185,7 +185,7 @@ function evaluateLanguagePrompt(_input, reader) {
   if (!raw) return { additionalContext: null };
   if (!LANG_RE.test(raw)) return { additionalContext: null };
   const name = languageName(raw);
-  const additionalContext = `Operator language preference: \`${raw}\` (${name}). Respond in ${name} \u2014 including this turn \u2014 regardless of the language of individual messages. An explicit per-session language override from the operator still applies for this session only.`;
+  const additionalContext = `Reply in ${name} (configured default \`${raw}\`), regardless of this message's language, unless the operator set a per-session override.`;
   return { additionalContext };
 }
 
