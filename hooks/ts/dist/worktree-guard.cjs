@@ -162,11 +162,12 @@ function none() {
   return { decision: "none", reason: "", mutations: null };
 }
 var TRIGGER_RE = /git\s+(checkout\s+-b|switch\s+-c|worktree\s+add)/;
-function evaluate(input) {
+function evaluate(input, rawPayload) {
   const toolName = input.tool?.name ?? "";
   if (toolName !== "Bash") return none();
   const cmd = typeof input.tool?.input?.["command"] === "string" ? input.tool.input["command"] : "";
-  if (!TRIGGER_RE.test(cmd)) {
+  const triggered = TRIGGER_RE.test(cmd) || rawPayload !== void 0 && TRIGGER_RE.test(rawPayload);
+  if (!triggered) {
     return none();
   }
   return ask(
@@ -186,7 +187,7 @@ async function main() {
   const raw = await readStdin();
   try {
     const normalized = inboundCC(raw);
-    const decision = evaluate(normalized);
+    const decision = evaluate(normalized, raw);
     outboundCC(decision);
   } catch (err) {
     if (err instanceof ShimRejectError) {
