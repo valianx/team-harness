@@ -234,6 +234,12 @@ run_ts_hook_suite "worktree-guard" "test_worktree_guard.sh"
 
 echo
 echo "############################################################"
+echo "# Suite 136: hooks/run-ts-hook.sh — launcher-fail-closed-on-corrupt-artifact"
+echo "############################################################"
+run_ts_hook_suite "launcher-fail-closed" "test_launcher_fail_closed.sh"
+
+echo
+echo "############################################################"
 echo "# Suite 17: harness-migrate bidirectional transform (AC-1..AC-11)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
