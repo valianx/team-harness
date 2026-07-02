@@ -576,6 +576,20 @@ Checks: (a1–a4) `agents/orchestrator.md § Multi-Task Orchestration` anchor pr
 
 **Behavioral suite registration (auto-discovered, not in `run-all.sh`):** `tests/test_th_decomposition_dispatch_behavioral.sh` drives the orchestrator via `claude -p` with a controlled single-repo, two-endpoint scope and asserts the structured response shows (i) the decomposition analysis always ran, (ii) the dispatch mode is parallel, (iii) the orchestrator did not ask the operator to choose sequential vs parallel. Run on demand via `bash tests/run-behavioral.sh` (mirrors `tests/test_th_orchestrator_boot_behavioral.sh`'s scaffold: `assert` helper, `claude -p --dangerously-skip-permissions` outer/inner prompt split, structured-field assertions).
 
+### Suite 131 — `TH_REQUIRE_RUNTIMES` skip-to-fail + hooks/ts dist-freshness job
+
+Closes issue #448 — the node/bun-dependent suites (15, 17, 18, 19, 20) were SKIPPED rather than FAILED when their runtime was absent, so a green `tests/run-all.sh` run in a node-less environment did not distinguish "verified" from "not checked". `hooks/ts/dist/` was also gitignored and untracked, so no CI step could ever detect a stale committed bundle.
+
+**`TH_REQUIRE_RUNTIMES=1` flag.** `tests/run-all.sh` gains a `report_skip_or_fail` helper: with the flag set (CI only), a missing `node`/`npm` on Suites 15/17/18/19/20 reports FAIL and increments the run's failure count instead of SKIP; unset (the local-dev default), the existing graceful-SKIP behaviour is unchanged. The `go` (Suite 21) and `python3`-only suites are intentionally outside the flag's scope — `go` runs in its own dedicated CI job and the `verify` job never provisions it, and no suite in `run-all.sh` treats a missing `python3` as a skip condition. `.github/workflows/test.yml`'s `verify` job provisions `node` (`actions/setup-node@v4`, node 22) and `bun` (`oven-sh/setup-bun@v2`) and sets `TH_REQUIRE_RUNTIMES: "1"` at the job level, so Suite 15's Bun leg (`tests/test_ts_hook_parity.sh`) also stops recording `bun-not-present` in CI.
+
+**`dist-freshness` job (`.github/workflows/test.yml`).** Independent job, parallel to `verify`/`go-test`: checks out, provisions node, runs `npm install` + `npm run build` under `hooks/ts/`, then `git diff --exit-code hooks/ts/dist/` — a stale committed bundle (source edited, bundle not regenerated) fails the job with a non-empty diff. A second step asserts completeness: every `hooks/ts/entry/*.cc.ts` file must have a matching `build:<name>` script in `hooks/ts/package.json`, failing with an explicit `::error::` naming the missing entry when it does not. The check is intentionally scoped to `*.cc.ts` (the CC-distributed, bundled entries) and excludes `*.opencode.ts` — those entries ship as raw TypeScript source to the opencode runtime (`cmd/install/manifest_registry.go`'s `buildHookSubdirComponents` for `entry/*.opencode.ts`) and are never bundled, so requiring a `build:` script for them would fail by design, not by regression.
+
+**Precondition landed in the same task:** `hooks/ts/dist/` is removed from `.gitignore` and its `.cjs` artifacts are tracked — without this, `git diff --exit-code hooks/ts/dist/` would diff an untracked (always-empty-from-git's-perspective) path and the freshness check would be vacuous.
+
+**Known red at landing time:** `hooks/ts/entry/notify-stage.cc.ts` has no `build:notify-stage` script yet (the `dist/notify-stage.cjs` artifact and its build script are added by the hook-cutover preparation task in the same PR) — the completeness check fails until that task lands; this is expected, not a regression introduced here.
+
+Files: `.github/workflows/test.yml`, `tests/run-all.sh`, `.gitignore`. Marker: `TH_REQUIRE_RUNTIMES` / `dist-freshness`.
+
 ### Suite 12 — security-self-scan
 
 5 checks (one per security check). REPORT-only scanner that audits the repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) for security invariants. File: `tests/test_security_scan.py`. Wired as Suite 12 in `tests/run-all.sh`. Provides positive (red-on-regression) fixtures for all five checks (AC-9). All checks exit 0 on the v2.91.0 clean tree (AC-6).

@@ -9,6 +9,20 @@ TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 FAILED=0
 
+# Suites 15/17/18/19/20 require node/npm/bun. A green run must mean "verified",
+# never "not checked" — TH_REQUIRE_RUNTIMES=1 (set in CI) converts a missing-runtime
+# SKIP into a FAIL. Unset/0 (local dev) preserves the graceful skip. go/python3
+# skips (Suite 21 and others) are unaffected by this flag.
+report_skip_or_fail() {
+    local suite_label="$1" reason="$2"
+    if [ "${TH_REQUIRE_RUNTIMES:-0}" = "1" ]; then
+        echo "${suite_label}: FAIL (${reason} — TH_REQUIRE_RUNTIMES=1 requires it)"
+        FAILED=$((FAILED + 1))
+    else
+        echo "${suite_label}: SKIP (${reason})"
+    fi
+}
+
 echo "############################################################"
 echo "# Suite 1: hooks/policy-block.sh — functional tests"
 echo "############################################################"
@@ -168,11 +182,12 @@ echo "# Suite 15: TypeScript hook parity (Bash <-> TS decision parity)"
 echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
-    echo "ts-hook-parity: SKIP (node not found)"
+    report_skip_or_fail "ts-hook-parity" "node not found"
 elif ! command -v npm >/dev/null 2>&1; then
-    echo "ts-hook-parity: SKIP (npm not found)"
+    report_skip_or_fail "ts-hook-parity" "npm not found"
 else
-    # Build the TS bundles first (dist/ is gitignored; must be built before testing).
+    # Rebuild the TS bundles first — dist/ is committed, but the parity harness
+    # must exercise a fresh build, not a possibly-stale committed artifact.
     TS_DIR="$TESTS_DIR/../hooks/ts"
     if [ -f "$TS_DIR/package.json" ]; then
         echo "  Building TS bundles (npm --prefix hooks/ts run build)..."
@@ -212,7 +227,7 @@ echo "# Suite 17: harness-migrate bidirectional transform (AC-1..AC-11)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
-    echo "harness-migrate: SKIP (node not found — install Node.js to run this suite)"
+    report_skip_or_fail "harness-migrate" "node not found — install Node.js to run this suite"
 else
     if node "$TESTS_DIR/../tools/harness-migrate/test_harness_migrate.mjs"; then
         echo "harness-migrate: PASS"
@@ -228,7 +243,7 @@ echo "# Suite 18: harness-migrate cross-language conformance (AC-3)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
-    echo "transform-conformance: SKIP (node not found — install Node.js to run this suite)"
+    report_skip_or_fail "transform-conformance" "node not found — install Node.js to run this suite"
 else
     if node "$TESTS_DIR/../tools/harness-migrate/test_transform_conformance.mjs"; then
         echo "transform-conformance: PASS"
@@ -244,9 +259,9 @@ echo "# Suite 19: opencode config-path resolver (AC-10 / SEC-OC-R3)"
 echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
-    echo "opencode-config-resolver: SKIP (node not found — install Node.js to run this suite)"
+    report_skip_or_fail "opencode-config-resolver" "node not found — install Node.js to run this suite"
 elif ! command -v npm >/dev/null 2>&1; then
-    echo "opencode-config-resolver: SKIP (npm not found)"
+    report_skip_or_fail "opencode-config-resolver" "npm not found"
 else
     if bash "$TESTS_DIR/test_opencode_config_resolver.sh"; then
         echo "opencode-config-resolver: PASS"
@@ -262,9 +277,9 @@ echo "# Suite 20: opencode session.created enforcement (AC-1..AC-5 + S-1..S-4)"
 echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
-    echo "opencode-session-enforcement: SKIP (node not found — install Node.js to run this suite)"
+    report_skip_or_fail "opencode-session-enforcement" "node not found — install Node.js to run this suite"
 elif ! command -v npm >/dev/null 2>&1; then
-    echo "opencode-session-enforcement: SKIP (npm not found)"
+    report_skip_or_fail "opencode-session-enforcement" "npm not found"
 else
     if bash "$TESTS_DIR/test_opencode_session_enforcement.sh"; then
         echo "opencode-session-enforcement: PASS"
