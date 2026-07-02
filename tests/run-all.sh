@@ -216,6 +216,12 @@ run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
 
 echo
 echo "############################################################"
+echo "# Suite 25: hooks/ts/bodies/prepublish-guard.ts — Check 2 command-execution (registry Suite 135)"
+echo "############################################################"
+run_ts_hook_suite "prepublish-guard" "test_prepublish_guard.sh"
+
+echo
+echo "############################################################"
 echo "# Suite 87: hooks/ts/bodies/gcp-guard.ts — gcp-guard-hook-behavior"
 echo "############################################################"
 run_ts_hook_suite "gcp-guard" "test_gcp_guard.sh"
