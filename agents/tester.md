@@ -775,14 +775,18 @@ Same as standard Phase 2 but:
 
 #### Phase 3 --- Security Scan (embedded, unless `skip-security: true`)
 
-After tests pass:
+The Test Pipeline Flow dispatches no dedicated `security` agent (`agents/ref-special-flows.md § Test Pipeline Flow`) — this mini-scan is that flow's **only** security layer. It runs unless `skip-security: true` was passed in the dispatch (operator opt-out). Skip only on the exact literal `true`; absent, `false`, or any other value (`True`, `yes`, malformed content) is treated as `false` — the scan runs.
+
+When the scan runs:
 1. Review the module's source files for security issues:
    - Injection risks (SQL, command, template)
    - Auth boundary violations (missing auth checks, privilege escalation)
    - Secrets handling (hardcoded keys, tokens in logs)
    - Input validation gaps (unvalidated user input, missing sanitization)
    - Unsafe data access patterns (mass assignment, IDOR)
-2. Report findings with file:line references in the workspaces summary
+2. Report findings with file:line references in the workspaces summary.
+
+When skipped (operator flag only), `03-testing.md § Security Findings` records the skip instead of a findings table (see Session Documentation below) — an operator skip means the flow runs with **no** security layer at all.
 
 #### Session Documentation (module-test)
 
@@ -823,6 +827,7 @@ Write `workspaces/{feature-name}/03-testing.md`:
 |----------|---------|-----------|---------------|
 | {level} | {description} | {location} | {fix} |
 (or "No security issues found")
+(or, when skipped: "Skipped — `skip-security: true` was set. This flow has no dedicated security agent; the module ran with no security layer.")
 
 ## Test Results
 - Total: {X} | Passed: {Y} | Failed: {Z}

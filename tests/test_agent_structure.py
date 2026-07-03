@@ -30628,6 +30628,198 @@ check(
 # Marker: release-tag-sync
 
 # ---------------------------------------------------------------------------
+# Suite 137 — coderabbit-detection-tester-scan-dedup
+#
+# Structural guard for the fix-batch's two surviving invariants:
+# (A1) a `coderabbit_configured` field token producer (orchestrator.md
+#      Phase 0a Step 7 + 00-state.md schema) and consumer (delivery.md
+#      Step 11.4 three-signal detection rule); (A2) the module-test
+#      embedded security mini-scan documented, on the path it guards, as
+#      the Test Pipeline Flow's SOLE security layer (tester.md Phase 3 +
+#      ref-direct-modes.md § Test-Pipeline Mode), plus a dead-token guard
+#      that keeps a once-shipped-then-removed `security_agent_will_run` /
+#      `embedded_security_scan` conditional skip mechanism out of agents/
+#      unless a future design reintroduces it deliberately. Fields are set
+#      in one agent file and read in another — a drift between the two
+#      sites is invisible to any single-file review, hence the
+#      anchor-scoped guard.
+#
+# AC coverage: Task-3 AC-1, AC-2.
+#
+# Marker: coderabbit-detection-tester-scan-dedup
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 137: coderabbit-detection-tester-scan-dedup structural checks ===")
+
+_s137_delivery = read(AGENTS_DIR / "delivery.md")
+_s137_tester = read(AGENTS_DIR / "tester.md")
+_s137_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s137_ref_flows = read(AGENTS_DIR / "ref-special-flows.md")
+_s137_ref_direct = read(AGENTS_DIR / "ref-direct-modes.md")
+
+_S137_STOP_H2_H3 = ("\n### ", "\n## ", "\n---\n")
+
+# (a) delivery.md Step 11.4 — detection rule + `coderabbit:` status token
+_s137_delivery_slice = _slice_section(
+    _s137_delivery, "### Step 11.4 — Post-create mergeability + CI check", _S137_STOP_H2_H3
+)
+check(
+    "s137(a1): delivery.md Step 11.4 anchor present",
+    bool(_s137_delivery_slice),
+    "'### Step 11.4 — Post-create mergeability + CI check' not found in agents/delivery.md",
+)
+check(
+    "s137(a2): Step 11.4 states the three-signal CodeRabbit detection rule",
+    "coderabbit_configured: true" in _s137_delivery_slice
+    and ".coderabbit.yaml" in _s137_delivery_slice
+    and "statusCheckRollup" in _s137_delivery_slice,
+    "delivery.md Step 11.4 must state all three detection signals "
+    "(coderabbit_configured hint, .coderabbit.yaml/.yml file check, rollup check)",
+)
+check(
+    "s137(a3): Step 11.4 status block declares the `coderabbit:` token",
+    "coderabbit: detected | not-detected | not-verified" in _s137_delivery_slice,
+    "delivery.md Step 11.4 must declare the 'coderabbit: detected | not-detected | not-verified' "
+    "status-block line",
+)
+check(
+    "s137(a4): Step 11.4 fenced 'CI conclusion' mechanical rules are unchanged",
+    "Any check `PENDING` / `IN_PROGRESS` / `QUEUED`" in _s137_delivery_slice,
+    "the fenced 'CI conclusion (bundled from statusCheckRollup)' mechanical rules must remain "
+    "byte-identical inside Step 11.4 — this fix touches interpretive framing only",
+)
+
+# (b) tester.md module-test Phase 3 — single-condition gate + sole-security-layer statement
+_s137_tester_slice = _slice_section(
+    _s137_tester, "#### Phase 3 --- Security Scan", ("\n#### ", "\n### ", "\n## ")
+)
+check(
+    "s137(b1): tester.md module-test Phase 3 anchor present",
+    bool(_s137_tester_slice),
+    "'#### Phase 3 --- Security Scan' not found in agents/tester.md",
+)
+check(
+    "s137(b2): Phase 3 gate is single-condition with the exact-literal rule",
+    "unless `skip-security: true`" in _s137_tester_slice
+    and "Skip only on the exact literal `true`" in _s137_tester_slice
+    and "security_agent_will_run" not in _s137_tester_slice,
+    "tester.md module-test Phase 3 must gate the mini-scan on the single condition "
+    "'unless skip-security: true' with the exact-literal-only skip rule, and must not "
+    "reference the removed 'security_agent_will_run' field",
+)
+check(
+    "s137(b3): Phase 3 states the sole-security-layer invariant",
+    "**only** security layer" in _s137_tester_slice,
+    "tester.md module-test Phase 3 must state that the mini-scan is the Test Pipeline "
+    "Flow's only security layer (the flow dispatches no dedicated security agent)",
+)
+check(
+    "s137(b4): Session Documentation records the operator-flag skip with no security layer",
+    "Skipped — `skip-security: true` was set" in _s137_tester
+    and "no security layer" in _s137_tester,
+    "agents/tester.md § Security Findings skip-record line must name the operator-flag skip "
+    "and state the module ran with no security layer",
+)
+
+# (c) orchestrator.md — `coderabbit_configured` schema token + Phase 0a Step 7 setter
+_s137_orch_slice = _slice_section(_s137_orchestrator, "## Current State", ("\n## ", "\n---\n"))
+check(
+    "s137(c1): orchestrator.md 00-state.md schema anchor present",
+    bool(_s137_orch_slice),
+    "'## Current State' schema block not found in agents/orchestrator.md",
+)
+check(
+    "s137(c2): schema block declares `coderabbit_configured`",
+    "coderabbit_configured:" in _s137_orch_slice,
+    "agents/orchestrator.md 00-state.md § Current State schema must declare "
+    "'coderabbit_configured'",
+)
+_s137_classify_slice = _slice_section(
+    _s137_orchestrator, "7. **Classify:**", ("\n8. **Bootstrap check**",)
+)
+check(
+    "s137(c3): Phase 0a Step 7 declares the deterministic coderabbit_configured setter",
+    bool(_s137_classify_slice)
+    and "coderabbit_configured" in _s137_classify_slice
+    and ".coderabbit.yaml" in _s137_classify_slice
+    and ".coderabbit.yml" in _s137_classify_slice,
+    "agents/orchestrator.md Phase 0a Step 7 ('7. **Classify:**') must declare the "
+    "deterministic repo-root '.coderabbit.yaml'/'.coderabbit.yml' file-check setter bullet "
+    "for 'coderabbit_configured'",
+)
+
+# (d) ref-special-flows.md per-module payload — `Skip security:` token + dead-token guard
+_s137_ref_flows_slice = _slice_section(
+    _s137_ref_flows, "#### Per-module task payload", ("\n#### ", "\n### ", "\n## ")
+)
+check(
+    "s137(d1): ref-special-flows.md per-module payload anchor present",
+    bool(_s137_ref_flows_slice),
+    "'#### Per-module task payload' not found in agents/ref-special-flows.md",
+)
+check(
+    "s137(d2): per-module payload declares `Skip security:` with no removed field",
+    "Skip security:" in _s137_ref_flows_slice
+    and "security_agent_will_run" not in _s137_ref_flows_slice,
+    "agents/ref-special-flows.md § Per-module task payload must declare the "
+    "'Skip security:' payload line and must not carry the removed "
+    "'Security agent will run:' line",
+)
+_s137_agents_text_concat = " ".join(
+    read(f) for f in AGENTS_DIR.rglob("*.md")
+) if AGENTS_DIR.exists() else ""
+check(
+    "s137(d3): dead tokens are absent from every file under agents/",
+    "security_agent_will_run" not in _s137_agents_text_concat
+    and "embedded_security_scan" not in _s137_agents_text_concat,
+    "No file under agents/ may contain 'security_agent_will_run' or 'embedded_security_scan' — "
+    "both were removed as dead wiring (no reachable producer); reintroducing either requires "
+    "a new design, not a silent re-add",
+)
+
+# (e) ref-direct-modes.md § Test-Pipeline Mode — sole-security-layer invariant, flow-contract site
+_s137_ref_direct_slice = _slice_section(
+    _s137_ref_direct, "## Test-Pipeline Mode", ("\n## ",)
+)
+check(
+    "s137(e1): ref-direct-modes.md § Test-Pipeline Mode states the sole-security-layer invariant",
+    bool(_s137_ref_direct_slice)
+    and "### Security coverage in test-pipeline" in _s137_ref_direct_slice
+    and "**only** security layer" in _s137_ref_direct_slice
+    and "compensating security control" in _s137_ref_direct_slice,
+    "agents/ref-direct-modes.md § Test-Pipeline Mode must carry a 'Security coverage in "
+    "test-pipeline' note stating the mini-scan is the flow's only security layer and that "
+    "any future conditioning requires an on-path compensating control",
+)
+
+# Self-referential guards (hygiene contract)
+_s137_own = read(Path(__file__))
+check(
+    "suite137(self-ref): test file contains 'Suite 137' and 'coderabbit-detection-tester-scan-dedup'",
+    "Suite 137" in _s137_own and "coderabbit-detection-tester-scan-dedup" in _s137_own,
+    "test file must self-reference Suite 137 and the marker 'coderabbit-detection-tester-scan-dedup'",
+)
+
+_s137_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite137(registry): docs/testing.md registers 'Suite 137' and "
+    "'coderabbit-detection-tester-scan-dedup'",
+    "Suite 137" in _s137_testing_md
+    and "coderabbit-detection-tester-scan-dedup" in _s137_testing_md,
+    "docs/testing.md must register Suite 137 and the "
+    "'coderabbit-detection-tester-scan-dedup' marker",
+)
+
+_s137_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite137(hygiene): CLAUDE.md does NOT contain 'Suite 137' (§11 hygiene contract)",
+    "Suite 137" not in _s137_claude_md,
+    "CLAUDE.md must not mention Suite 137 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: coderabbit-detection-tester-scan-dedup
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
