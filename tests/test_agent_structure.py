@@ -30917,24 +30917,26 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 139 — canary denominator-floor guard (iteration-2 adversary re-check,
-# T2-AC-8 hardening)
+# Suite 139 — canary denominator-floor guard (iteration-3 operator ruling,
+# T2-AC-8 per-run rewrite)
 #
 # The iteration-2 adversary re-check found the T2-AC-8 canary's original
 # breadcrumb-derived denominator could degenerate to N≈0 (undercounted
-# breadcrumbs) while neither rollback clause fired, and that the Final
-# Pipeline Sanity Check step 6 assert only checked for a `## Cost` section
-# header, never the `## Verification Packet` canary line itself — so an
-# omitted or degenerate canary line silently read as "no trigger fired".
-# This amendment re-grounds the denominator on the workspace verdict docs
-# (breadcrumbs demoted to upward-only enrichment), adds an explicit
-# minimum-denominator floor clause (below-floor run => UNMEASURABLE => Clause
-# 2, never silent parity), and binds the canary line to the fail-closed
-# step-6 assert via a `canary_window` state marker. This suite pins the
-# CONTRACT TEXT of both sides (contract text only — runtime compliance of the
-# assert remains prompt-level per the honest-bounds note in A3 design point
-# 7): the orchestrator's step-6 canary-line requirement, and
-# docs/verification-packet.md's §8 minimum-denominator floor clause.
+# breadcrumbs) while neither rollback clause fired, and that the two
+# non-equivalent floor derivations it carried (one hardcoded to 4 verifiers,
+# one delegating to Agent Results) both misclassified runs. The iteration-3
+# adversary re-check found the fix itself broken — the floor still missed a
+# silently-skipped verifier and the `canary_window` marker was armed by a
+# non-computable predicate with no window-close owner — and the operator's
+# final-iteration gate ruling ("OPERATOR-EVALUATED canary — remove the
+# automatic window/rollback machinery; keep everything per-run") removed the
+# cross-run machinery entirely. This suite pins the CONTRACT TEXT of the
+# resulting per-run, operator-evaluated design (contract text only — runtime
+# compliance of the assert remains prompt-level per the honest-bounds note in
+# A3 design point 7): the single-derivation dispatch floor in
+# docs/verification-packet.md § 8, the verdict-doc-derived denominator, and
+# negative-residue guards proving the removed window/Clause machinery left no
+# dormant text in agents/orchestrator.md or docs/verification-packet.md.
 #
 # Marker: canary-denominator-floor-guard
 # ---------------------------------------------------------------------------
@@ -30944,41 +30946,50 @@ print("=== Suite 139: canary denominator-floor guard (T2-AC-8 hardening) ===")
 _s139_orch = read(AGENTS_DIR / "orchestrator.md")
 _s139_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
 
-_S139_STEP6_REQUIRED = [
-    "canary_window: active",
-    "## Verification Packet` canary line",
-    "UNMEASURABLE",
-    "canary-line` to `missing_artifacts`",
-    "blocks `pipeline.complete`",
-    "UNMEASURABLE toward Clause 2",
-]
-
-for _needle in _S139_STEP6_REQUIRED:
-    check(
-        f"suite139(step6-{_needle[:24]!r}): agents/orchestrator.md Final Pipeline "
-        f"Sanity Check step 6 contains the canary-line requirement text {_needle!r}",
-        _needle in _s139_orch,
-        f"agents/orchestrator.md step 6 must contain {_needle!r} — the canary line's "
-        f"presence/correctness must be a fail-closed assert component, not only the "
-        f"'## Cost' section header (the gap the iteration-2 adversary re-check found)",
-    )
-
 _S139_FLOOR_CLAUSE_REQUIRED = [
-    "Minimum-denominator clause.",
-    "dispatch floor",
-    "00-state.md` flags",
-    "UNMEASURABLE",
+    "Dispatch floor — exactly one derivation.",
+    "security_sensitive: true",
+    "The floor is **never** derived from",
+    "Agent Results` (the did-dispatch record)",
     "N=0 always reads UNMEASURABLE, never parity.",
 ]
 
 for _needle in _S139_FLOOR_CLAUSE_REQUIRED:
     check(
         f"suite139(floor-{_needle[:24]!r}): docs/verification-packet.md § 8 contains "
-        f"the minimum-denominator floor clause text {_needle!r}",
+        f"the single-derivation dispatch floor clause text {_needle!r}",
         _needle in _s139_packet,
-        f"docs/verification-packet.md § 8 must contain {_needle!r} — a run counting "
-        f"below its deterministic dispatch floor must be classified UNMEASURABLE "
-        f"(excluded from Clause 1, counted toward Clause 2), never silent parity",
+        f"docs/verification-packet.md § 8 must contain {_needle!r} — the floor must "
+        f"have exactly one derivation from `00-state.md` scope flags, never from "
+        f"`§ Agent Results`, and a below-floor run must render UNMEASURABLE, never "
+        f"silent parity",
+    )
+
+_S139_WINDOW_RESIDUE_FORBIDDEN = [
+    "canary_window",
+    "run N/10",
+    "Clause 1",
+    "Clause 2",
+    "canary window",
+]
+
+for _needle in _S139_WINDOW_RESIDUE_FORBIDDEN:
+    check(
+        f"suite139(no-residue-orch-{_needle[:24]!r}): agents/orchestrator.md contains "
+        f"no dormant {_needle!r} residue from the removed cross-run window machinery",
+        _needle not in _s139_orch,
+        f"agents/orchestrator.md must not contain {_needle!r} — the operator's "
+        f"iteration-3 ruling removed the 10-run window/rollback machinery entirely; "
+        f"any surviving occurrence is dormant residue",
+    )
+    check(
+        f"suite139(no-residue-packet-{_needle[:24]!r}): docs/verification-packet.md "
+        f"contains no dormant {_needle!r} residue from the removed cross-run window "
+        f"machinery",
+        _needle not in _s139_packet,
+        f"docs/verification-packet.md must not contain {_needle!r} — the operator's "
+        f"iteration-3 ruling removed the 10-run window/rollback machinery entirely; "
+        f"any surviving occurrence is dormant residue",
     )
 
 # The denominator must be re-grounded on verdict docs, not solely on breadcrumbs —

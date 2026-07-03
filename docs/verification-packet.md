@@ -235,15 +235,18 @@ code tree.
 - `packet_escapes` / `packet_integrity` telemetry make packet quality measurable — a high
   escape rate is the signal to enrich the packet schema, not to tighten the read contract
   further.
-- A 10-run post-merge canary window (§8) compares the verdict-doc-counted three-bucket
-  dispatch classification and verifier catch rates against the June 2026 baseline, with a
-  defined rollback trigger.
+- Every full-pipeline run's per-run parity line (§8) reports the verdict-doc-counted
+  three-bucket dispatch classification and verifier catch rates against the June 2026
+  baseline — the evidence base the operator evaluates whenever an ordered reversion of the
+  packet-first contract is under consideration.
 
 ---
 
-## 8. Measured-parity canary window (10-run rollback contract)
+## 8. Per-run parity reporting (operator-evaluated)
 
-**Window:** the first 10 full-pipeline runs after this contract merges.
+**Reporting unit = one run.** Every full-pipeline run's `00-pipeline-summary.md` reports one
+parity line, computable entirely from that run's own artifacts. There is no run counter, no
+multi-run window, no window-close step, and no automatic trigger of any kind.
 
 **Denominator — verdict-doc-derived, not breadcrumb- or `phase.end`-derived.** The
 verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
@@ -256,14 +259,15 @@ as telemetry-missing — breadcrumb absence can never **shrink** the count. The 
 **never** counted from `phase.end` events, whose emission is the unreliable layer this
 contract's own Task-1 fix is repairing.
 
-**Minimum-denominator clause.** Each run's counted denominator (verdict-doc entries plus any
-breadcrumb-only telemetry-missing additions) is compared against that run's deterministic
-dispatch floor — the mandatory verifier set derived from `00-state.md` flags (tester
-run-only + qa + security + adversary for every full pipeline; + ux-reviewer validate when
-`frontend_scope: true` — the same derivation the Final Pipeline Sanity Check pipeline-type
-awareness uses). A run whose counted denominator falls below its floor is **UNMEASURABLE**:
-excluded from Clause 1's aggregate, and its floor-expected dispatches are counted toward
-Clause 2 instead. N=0 always reads UNMEASURABLE, never parity.
+**Dispatch floor — exactly one derivation.** The floor is the should-have verifier set
+derived strictly from that run's `00-state.md` scope flags: `tester` run-only + `qa`
+unconditionally; + `security` and `adversary` iff `security_sensitive: true`; +
+`ux-reviewer` validate iff `frontend_scope: true`. The floor is **never** derived from
+`00-state.md § Agent Results` (the did-dispatch record) — a silently-skipped verifier must
+push the run below its floor, not shrink the floor to match the undercount. A run whose
+counted denominator (verdict-doc entries plus any breadcrumb-only telemetry-missing
+additions) falls below its floor, or whose scope flags are unreadable, renders the parity
+line as `UNMEASURABLE` — never as parity. N=0 always reads UNMEASURABLE, never parity.
 
 **Per-dispatch classification — three mutually exclusive buckets:**
 
@@ -271,8 +275,8 @@ Clause 2 instead. N=0 always reads UNMEASURABLE, never parity.
   `tools.packet` shows `packet_integrity: ok` AND `packet_escapes: 0`.
 - **fallback-with-evidence** — fresh telemetry showing `stale|mismatch`, `escapes > 0`, or
   `packet_used: absent|false`.
-- **telemetry-missing** — the dispatch's `phase.end` is backfilled or carries no
-  `tools.packet`.
+- **telemetry-missing** — the dispatch's `phase.end` is backfilled, carries no
+  `tools.packet`, or is a breadcrumb-only addition with no matching verdict entry.
 
 **Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
 event structurally cannot carry packet telemetry (the reconciliation backstop derives only
@@ -290,44 +294,24 @@ in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, 
 by pointer — not duplicated here). These artifacts exist deterministically whenever the
 verifier ran.
 
-**Render-assert binding.** At packet build (Phase 2.7, `agents/orchestrator.md § Phase 2.7
-— Test Authoring`), while the window is active the orchestrator records
-`canary_window: active (run N/10)` in `00-state.md § Current State`. Final Pipeline Sanity
-Check step 6 (`agents/orchestrator.md`) requires the `## Verification Packet` canary line in
-`00-pipeline-summary.md` whenever that marker is present — either a non-degenerate
-denominator (verdict-doc-counted N ≥ floor) or an explicit `UNMEASURABLE` marker satisfies
-the check. An absent or malformed line adds `canary-line` to `missing_artifacts`, blocks
-`pipeline.complete`, and records the run as UNMEASURABLE toward Clause 2. At window-close
-evaluation, a window run whose summary lacks the canary line is classified UNMEASURABLE at
-read time — the render surface can no longer silently read as parity-confirmed.
+**Ownership and rollback — operator-owned, no automatic trigger.** Parity data accumulates
+in every full-pipeline summary; the OPERATOR evaluates it against the June 2026 baseline
+whenever desired — there is no cross-run aggregation, window, or scheduled evaluation point
+owned by the contract itself. Rollback is a one-line contract flip shipped as a normal PR:
+the packet-first ladder default in the five verifier Session Context Protocols
+(`agents/{qa,security,adversary,tester,ux-reviewer}.md` — §4 Step 1) flips back to the full
+input-manifest read as the unconditional default (the §4 Step 3 fail-open fallback becomes
+the primary path), and the orchestrator's packet build (§1) and digest-dispatch (§3) steps
+are suspended until the schema (§2) is enriched. No clause in this contract computes this
+automatically, and no text here claims one does.
 
-**Rollback trigger.** Across the 10-run window, if EITHER clause holds:
-
-- **Clause 1 — blinding signature.** accepted-with-evidence ≥90% of verdict-doc-counted
-  dispatches across the window's measurable runs, WHILE security Critical/High findings and
-  qa AC-fails are both zero, OR any tracked catch rate falls below half its June 2026
-  baseline.
-- **Clause 2 — unmeasurable window (conservative degradation).** >50% of the window's
-  floor-expected dispatches (Σ per-run `max(floor, counted N)`) are telemetry-missing OR
-  belong to UNMEASURABLE runs — the canary cannot certify parity, and an
-  uncertifiable packet contract is reverted rather than presumed safe. This outcome also
-  means the Task-1 `phase.end` emission fix failed its first field test, which the
-  operator must see.
-
-then the packet-first read contract **reverts to full reads**:
-
-1. The packet-first ladder text in all five verifier Session Context Protocols
-   (`agents/{qa,security,adversary,tester,ux-reviewer}.md`) flips back to the full
-   input-manifest read as the unconditional default — the §4 Step 3 fail-open fallback
-   becomes the primary path, not the exception.
-2. The orchestrator's packet build (§1) and digest-dispatch (§3) steps are suspended.
-3. Suspension holds until the packet schema (§2) is enriched to close the observed gap and
-   a new 10-run canary window passes without triggering rollback.
-
-**Honest expectation.** The Task-1 atomic checklist↔`phase.end` coupling ships in the same
-PR as this contract, making fresh telemetry the expected case going forward — but the
-canary window is precisely where that expectation is unproven, so no trigger term assumes
-it.
+**Honest bound (reporting aid, not a gate).** The parity line is rendered by the
+orchestrator at prompt level and consumed by the operator — nothing gates on it. That
+reliability class is acceptable here precisely because the consumer is human: a missing or
+malformed line is itself visible evidence to the reader, and parity is only ever concluded
+by the operator reading the line — silence cannot impersonate parity. The Task-1
+fail-closed step-6 assert still requires the `## Cost` section at the 4 mandatory
+checkpoints (§ Pipeline Summary Protocol).
 
 ---
 
@@ -335,5 +319,5 @@ it.
 
 Extending this packet mechanism to the Stage-1 panel (`ratify-plan` / `plan-review`) is
 explicitly out of scope for this contract. The same build-once-read-many mechanic would cut
-the measured 56-57K/run cost there too; flagged as a follow-up once the canary window (§8)
-confirms the Stage-2 result holds.
+the measured 56-57K/run cost there too; flagged as a follow-up once the operator's
+evaluation of the accumulated §8 parity data confirms the Stage-2 result holds.
