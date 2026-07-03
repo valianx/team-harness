@@ -30713,12 +30713,18 @@ check(
     "tester.md module-test Phase 3 must state that the mini-scan is the Test Pipeline "
     "Flow's only security layer (the flow dispatches no dedicated security agent)",
 )
+_s137_session_doc_slice = _slice_section(
+    _s137_tester,
+    "#### Session Documentation (module-test)",
+    ("\n#### Gap Iteration Context",),
+)
 check(
     "s137(b4): Session Documentation records the operator-flag skip with no security layer",
-    "Skipped — `skip-security: true` was set" in _s137_tester
-    and "no security layer" in _s137_tester,
-    "agents/tester.md § Security Findings skip-record line must name the operator-flag skip "
-    "and state the module ran with no security layer",
+    bool(_s137_session_doc_slice)
+    and "Skipped — `skip-security: true` was set" in _s137_session_doc_slice
+    and "no security layer" in _s137_session_doc_slice,
+    "agents/tester.md § Session Documentation (module-test) § Security Findings skip-record "
+    "line must name the operator-flag skip and state the module ran with no security layer",
 )
 
 # (c) orchestrator.md — `coderabbit_configured` schema token + Phase 0a Step 7 setter
