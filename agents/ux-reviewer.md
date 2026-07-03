@@ -87,14 +87,14 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 Read the implementation and validate against UI/UX criteria.
 
-**Input:** `{docs_root}/00-verify-packet.md` (packet-first), `01-ux-review.md` (mandatory, preserved read), source code, `02-implementation.md` (depth-on-demand)
+**Input:** `01-plan.md § Task List` (live AC read, mandatory), `{docs_root}/00-verify-packet.md` (packet-first), `01-ux-review.md` (mandatory, preserved read), source code, `02-implementation.md` (depth-on-demand)
 **Output:** `workspaces/{feature}/04-ux-validation.md`
 
-**Packet-first read (canonical schema: `docs/verification-packet.md`).**
+**Live AC read + packet-first read (canonical schema: `docs/verification-packet.md`).**
 
-1. Read `00-verify-packet.md` first — it carries the per-task AC block verbatim, the changed-files table, and the implementer's summary/Deviations. Use it in place of separately reading `02-implementation.md` for WORKSPACE-NARRATIVE context.
+1. Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your UI/UX AC verdict baseline. Then read `00-verify-packet.md` — it carries the changed-files table and the implementer's summary/Deviations (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest). Use it in place of separately reading `02-implementation.md` for WORKSPACE-NARRATIVE context.
 2. **Hard floor — preserved read.** `01-ux-review.md` (the Stage-1 UI/UX AC baseline) stays a MANDATORY read, untouched by the packet — always read it in full when it exists.
-3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk; the packet's AC count matches `01-plan.md § Task List` for this task. On any mismatch → treat the packet as stale, escalate to a full read of `02-implementation.md`, report `packet_integrity: stale|mismatch`.
+3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to a full read of `02-implementation.md`, report `packet_integrity: stale|mismatch`.
 4. **Depth-on-demand (never forbidden):** open `02-implementation.md` in full ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
 5. **Fallback (fail-open):** packet absent → read `02-implementation.md` directly, unchanged. Report `packet_used: absent`.
 6. Read the actual source code (components, pages, styles) — unaffected by the packet.

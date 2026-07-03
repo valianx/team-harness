@@ -30645,6 +30645,80 @@ check(
 # Marker: release-tag-sync
 
 # ---------------------------------------------------------------------------
+# Suite 133 — ref-intake-flows pointer-side guard (iteration-1 mutation audit,
+# T4-AC-7)
+#
+# A7 (validation-cost-structural-redesign) extracted four conditional intake
+# sub-flows out of agents/orchestrator.md Phase 0a into the on-demand
+# agents/ref-intake-flows.md reference file, each replaced by a 1-2 line
+# trigger + pointer paragraph in the spine. The iteration-1 adversary mutation
+# audit found that deleting the Step 6d-initiative pointer paragraph left all
+# prior checks green (no structural test asserted the POINTER side of the
+# extraction, only the ref-intake-flows.md CONTENT side via Suite 68). This
+# suite closes that gap: each of the five extracted sub-flows must have a
+# live trigger + pointer paragraph in orchestrator.md naming its
+# ref-intake-flows.md section anchor.
+#
+# Marker: ref-intake-flows-pointer-guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 133: ref-intake-flows pointer-side guard (T4-AC-7) ===")
+
+_s133_orch = read(AGENTS_DIR / "orchestrator.md")
+_s133_intake = read(AGENTS_DIR / "ref-intake-flows.md")
+
+_S133_POINTERS = [
+    "Milestone Continuity",
+    "Initiative Create-or-Join",
+    "Language and English-Learning Intent Handling",
+    "Initiative Detection and Confirm",
+    "ClickUp Conversational Intents",
+]
+
+for _label in _S133_POINTERS:
+    _pointer = f"agents/ref-intake-flows.md § {_label}"
+    check(
+        f"suite133(pointer-{_label}): agents/orchestrator.md retains the trigger + "
+        f"pointer paragraph for '{_label}'",
+        _pointer in _s133_orch,
+        f"agents/orchestrator.md must contain the literal pointer '{_pointer}' — "
+        f"deleting this trigger paragraph silently drops the '{_label}' sub-flow "
+        f"from the orchestrator spine with no other test detecting it (T4-AC-7)",
+    )
+    _heading = f"## {_label}"
+    check(
+        f"suite133(content-{_label}): agents/ref-intake-flows.md contains the "
+        f"'{_heading}' section the pointer references",
+        _heading in _s133_intake,
+        f"agents/ref-intake-flows.md must contain the section heading '{_heading}' "
+        f"referenced by the orchestrator's pointer paragraph",
+    )
+
+# Self-referential guards (hygiene contract)
+_s133_own = read(Path(__file__))
+check(
+    "suite133(self-ref): test file contains 'Suite 133' and 'ref-intake-flows-pointer-guard'",
+    "Suite 133" in _s133_own and "ref-intake-flows-pointer-guard" in _s133_own,
+    "test file must self-reference Suite 133 and the marker 'ref-intake-flows-pointer-guard'",
+)
+
+_s133_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite133(registry): docs/testing.md registers 'Suite 133' and 'ref-intake-flows-pointer-guard'",
+    "Suite 133" in _s133_testing_md and "ref-intake-flows-pointer-guard" in _s133_testing_md,
+    "docs/testing.md must register Suite 133 and the 'ref-intake-flows-pointer-guard' marker",
+)
+
+_s133_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite133(hygiene): CLAUDE.md does NOT contain 'Suite 133' (§11 hygiene contract)",
+    "Suite 133" not in _s133_claude_md,
+    "CLAUDE.md must not mention Suite 133 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: ref-intake-flows-pointer-guard
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

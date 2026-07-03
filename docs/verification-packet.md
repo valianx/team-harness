@@ -31,18 +31,37 @@ header field is the versioning mechanism, not the filename.
 ## 2. Packet content contract
 
 **Hard cap: ≤120 lines / ~2-3K tokens.** A packet that cannot fit the cap is a signal the
-task scope is too large for one packet, not a license to truncate the AC block or the
-Deviations section silently.
+task scope is too large for one packet, not a license to truncate the Deviations section
+silently.
 
 | Section | Content | Source |
 |---|---|---|
 | **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (`git rev-parse HEAD`, plus a dirty-tree diff hash when uncommitted changes exist — same anchor mechanic as the recorded-state gate, `agents/orchestrator.md § Phase 3`), `Base ref:` (the task's recorded base, e.g. `origin/main`) | orchestrator |
 | **Scope** | `type`, `bug_tier`, `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
-| **Acceptance Criteria** | The per-task AC block **copied VERBATIM** — never paraphrased. Paraphrase is the lossiness vector this contract exists to avoid. | `01-plan.md § Task List` |
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
 | **Test artifact** | Phase 2.7 suite result, tests added, AC→test map; `regression_test_path` + status for the bug-fix flow | `03-testing.md` (authoring section) |
 | **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-security.md` (when later written), `01-root-cause.md` (fix flow), `sketches/*.md` | — the depth-on-demand escape hatch (§4) |
+
+### No AC section
+
+The packet carries **no acceptance-criteria copy — verbatim or digested.** AC live in
+`01-plan.md § Task List`; every verifier whose verdict baselines on AC live-reads that
+block at dispatch time (§4 Step 0). Rationale: `01-plan.md` sits outside the git tree in
+obsidian mode, so no git anchor can detect an AC edit, and any copy-freshness mechanism
+(count check, content digest) depends on prompt-compliance-dependent emission — the same
+reliability class the June 2026 data measured at ~40%. The live read needs no new
+emission and removes the AC-staleness class entirely, including same-count substance
+edits a count check would miss.
+
+### Authority scoping
+
+The packet is a **navigation-and-context digest, not an evidence source.** No verifier
+verdict may rest on a packet field as its sole evidence for a verdict-bearing fact: AC
+come from the live plan (§4 Step 0), changed files from git at scan time (§4), and any
+deviation or test claim that would influence a verdict is confirmed at its source
+document (§-scoped) before it is cited. A truncated or divergent narrative field can
+therefore misdirect navigation but can never change a verdict's evidence base.
 
 ### Skeleton
 
@@ -54,9 +73,6 @@ Deviations section silently.
 
 ## Scope
 type: {feature|fix|hotfix|refactor|enhancement} | bug_tier: {0-4|n-a} | security_sensitive: {true|false} | frontend_scope: {true|false} | complexity: {simple|standard|complex}
-
-## Acceptance Criteria
-{verbatim per-task AC block from 01-plan.md § Task List}
 
 ## Changed Files
 | Path | Type | Role |
@@ -92,7 +108,7 @@ never the full packet body embedded in the prompt:
 
 ```
 verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})
-digest: AC count {N}, changed files {N}, deviations {yes|no}
+digest: changed files {N}, deviations {yes|no}
 ```
 
 The packet survives recovery/compaction (it is a file, not prompt context) and is
@@ -105,26 +121,39 @@ per-mode instructions, regression-test instructions) are unchanged and additive 
 
 Every Stage-2 verifier's Session Context Protocol follows this ladder:
 
-1. **Read `00-verify-packet.md` first.**
+0. **Live AC read (mandatory, never replaced by the packet).** Every verifier whose
+   verdict baselines on AC live-reads the per-task AC block from `01-plan.md § Task List`
+   at dispatch time, before or alongside the packet read. AC-baselining verifiers: `qa`
+   (per-AC verdict), `tester` run-only (AC→test mapping confirmation), `ux-reviewer`
+   validate (UI/UX AC), `adversary` (when attacking AC/plan controls as written). `security`
+   does not baseline its verdict on AC (its scan target is code + scope flags) and needs no
+   AC read; `acceptance-checker` is not a packet consumer at all (see
+   `agents/acceptance-checker.md`). The AC block for one task is small (§-scoped, typically
+   ≤30 lines) — this read is what makes an AC-substance edit, same-count reword included,
+   visible with zero rebuild machinery.
+1. **Read `00-verify-packet.md` for implementation context.** Changed files, deviations,
+   test artifact, pointers — never AC (§2 states the packet carries none).
 2. **Depth-on-demand (never forbidden):** open a full workspace document ONLY when (a) an
    AC references context the packet does not explain, (b) evidence beyond the packet is
    needed (deviation detail, root-cause chain, prior findings), or (c) the integrity
-   spot-check below fails.
+   spot-check below fails. Per the authority-scoping rule (§2), any packet narrative fact
+   that would influence the verdict is confirmed at its source document (§-scoped) before
+   being cited.
 3. **Fail-open fallback:** packet absent → the verifier's current full input-manifest read,
    unchanged. Report `packet_used: absent`. This is backward-compatible with in-flight and
    legacy workspaces — never an error.
 
 ### Integrity spot-check (mandatory, cheap)
 
-Every verifier performs this check before trusting the packet as sufficient:
+Every verifier performs this 2-point check before trusting the packet as sufficient:
 
 1. The packet's `Tree anchor` matches `git rev-parse HEAD` / current working-tree state.
 2. At least one packet-listed changed file exists on disk.
-3. The packet's AC count matches the AC count in `01-plan.md § Task List` for this task.
 
 **On ANY mismatch:** treat the packet as stale. Escalate to the full-manifest read. Report
 `packet_integrity: stale` (tree anchor / file-existence failure) or `packet_integrity:
-mismatch` (AC-count or scan-target failure — see §5).
+mismatch` (scan-target failure — see §5). There is no AC-count point — the packet carries
+no AC (§2).
 
 ### Git-anchored scan-target list (security, qa)
 
@@ -175,15 +204,18 @@ explicitly per agent so the floor is auditable, not implied:
 
 The packet is a snapshot, not a live view. The orchestrator MUST rebuild it in place
 (overwrite, increment `Packet version` — never a sibling file) before the next verifier
-dispatch whenever ANY of these fire:
+dispatch whenever EITHER of these fire:
 
 1. **Any iteration re-dispatch** (bounded patch or structural, Cases A-D) — rebuild after
    the producer's patch, before re-running verifiers.
-2. **Phase 2.5 constraint reconciliation** alters AC after Phase 2.7 closed.
-3. **Case C criteria adjustment** — AC text edited in `01-plan.md § Task List`.
-4. **Non-empty `git diff --name-only`** against the packet's tree anchor at dispatch time.
+2. **Non-empty `git diff --name-only`** against the packet's tree anchor at dispatch time.
 
-A Phase 3.6 (acceptance-checker) re-run counts as a verifier dispatch for trigger 4.
+There is NO AC-edit rebuild trigger. An AC edit (Phase 2.5 late reconciliation, Case C
+reword, operator review-surface edit) does not stale the packet because the packet carries
+no AC (§2) — the edit reaches the next verifier through its live `01-plan.md § Task List`
+read (§4 Step 0) with no orchestrator action required. Both remaining triggers are
+git-grounded; neither depends on the orchestrator noticing a document edit outside the
+code tree.
 
 ---
 
@@ -192,13 +224,20 @@ A Phase 3.6 (acceptance-checker) re-run counts as a verifier dispatch for trigge
 - Opening full docs is **never forbidden** — the packet changes the default, not the
   ceiling.
 - Source-code reads are **out of the packet's scope by contract** (§5).
-- AC text is **verbatim, never summarized** (§2).
-- The integrity check **fails toward MORE reading, never less** (§4).
+- AC cannot be misstated by the packet because the packet does not carry them (§2) — every
+  AC-baselining verifier reads them live from `01-plan.md § Task List` (§4 Step 0).
+- The integrity check **fails toward MORE reading for the facts it anchors** — tree state,
+  changed-file existence, and the git-derived scan-target list (§4). The packet's narrative
+  fields (implementation summary, deviations, test artifact) are protected by the
+  authority-scoping rule (§2) instead of an anchor: no verdict rests on them as sole
+  evidence, so a truncated or divergent narrative can misdirect navigation but cannot
+  change a verdict's evidence base.
 - `packet_escapes` / `packet_integrity` telemetry make packet quality measurable — a high
   escape rate is the signal to enrich the packet schema, not to tighten the read contract
   further.
-- A 10-run post-merge canary window (§8) compares fallback rate and verifier catch rates
-  against the June 2026 baseline, with a defined rollback trigger.
+- A 10-run post-merge canary window (§8) compares the breadcrumb-counted three-bucket
+  dispatch classification and verifier catch rates against the June 2026 baseline, with a
+  defined rollback trigger.
 
 ---
 
@@ -206,25 +245,48 @@ A Phase 3.6 (acceptance-checker) re-run counts as a verifier dispatch for trigge
 
 **Window:** the first 10 full-pipeline runs after this contract merges.
 
+**Denominator — breadcrumb-derived, not `phase.end`-derived.** The verifier-dispatch count
+is read from `00-subagent-trace.jsonl` (`subagent.start`/`subagent.stop` pairs filtered by
+verifier `agent_type` within the run window) — the deterministic, non-suppressible
+emission layer. The denominator is **never** counted from `phase.end` events, whose
+emission is the unreliable layer this contract's own Task-1 fix is repairing.
+
+**Per-dispatch classification — three mutually exclusive buckets:**
+
+- **accepted-with-evidence** — a fresh, non-`backfilled: true` `phase.end` whose
+  `tools.packet` shows `packet_integrity: ok` AND `packet_escapes: 0`.
+- **fallback-with-evidence** — fresh telemetry showing `stale|mismatch`, `escapes > 0`, or
+  `packet_used: absent|false`.
+- **telemetry-missing** — the dispatch's `phase.end` is backfilled or carries no
+  `tools.packet`.
+
+**Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
+event structurally cannot carry packet telemetry (the reconciliation backstop derives only
+`duration_ms` from breadcrumbs — see `agents/orchestrator.md § Execution Events JSONL`), so
+counting it any other way would let emission loss impersonate packet acceptance.
+
 **What each run reports** (via the Task-1 `## Cost` checkpoint contract in
 `agents/orchestrator.md § Pipeline Summary Protocol` — the `## Verification Packet`
-section of `00-pipeline-summary.md`):
+section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
+rates read from the workspace verdict documents, not from `phase.end` telemetry — security
+findings by severity from `04-security.md`, qa AC-fail rate from
+`04-validation.md § AC Coverage Results`, drift flags from
+`04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
+in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, referenced
+by pointer — not duplicated here). These artifacts exist deterministically whenever the
+verifier ran.
 
-- **(a) Packet fallback rate** — the fraction of verifier dispatches in the run that
-  escalated to the full-manifest read via `packet_integrity: stale|mismatch` or
-  depth-on-demand (`packet_escapes > 0`).
-- **(b) Verifier catch rates** — security findings by severity, qa AC-fail rate,
-  acceptance-checker drift-flag count — each compared against the June 2026 baseline
-  recorded in the pipeline-validation research workspace (`02-june-empirical-analysis.md`,
-  referenced by pointer — not duplicated here).
+**Rollback trigger.** Across the 10-run window, if EITHER clause holds:
 
-**Rollback trigger.** Across the 10-run window, if EITHER of these holds:
-
-- Security Critical/High findings AND qa AC-fails are both zero, WHILE the fallback rate is
-  ≤10% of verifier dispatches (packets accepted everywhere yet catching nothing — the
-  blinding signature), OR
-- Any tracked catch rate falls below half its June baseline, under the same ≤10% fallback
-  condition,
+- **Clause 1 — blinding signature.** accepted-with-evidence ≥90% of breadcrumb-counted
+  verifier dispatches across the window, WHILE security Critical/High findings and qa
+  AC-fails are both zero, OR any tracked catch rate falls below half its June 2026
+  baseline.
+- **Clause 2 — unmeasurable window (conservative degradation).** >50% of the window's
+  verifier dispatches are telemetry-missing — the canary cannot certify parity, and an
+  uncertifiable packet contract is reverted rather than presumed safe. This outcome also
+  means the Task-1 `phase.end` emission fix failed its first field test, which the
+  operator must see.
 
 then the packet-first read contract **reverts to full reads**:
 
@@ -236,10 +298,10 @@ then the packet-first read contract **reverts to full reads**:
 3. Suspension holds until the packet schema (§2) is enriched to close the observed gap and
    a new 10-run canary window passes without triggering rollback.
 
-**Non-triggering condition:** a fallback rate above 10% is NOT a rollback trigger by
-itself — a higher escape rate means the depth-on-demand ladder is working as designed
-(§7). Only the combination of near-zero fallback AND near-zero or degraded catch signals
-the blind-spot failure mode this canary exists to detect.
+**Honest expectation.** The Task-1 atomic checklist↔`phase.end` coupling ships in the same
+PR as this contract, making fresh telemetry the expected case going forward — but the
+canary window is precisely where that expectation is unproven, so no trigger term assumes
+it.
 
 ---
 
