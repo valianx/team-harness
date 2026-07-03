@@ -933,7 +933,7 @@ Report the existing PR URL in the status block — do NOT fail.
 
 ### Step 11.4 — Post-create mergeability + CI check (mandatory, best-effort, report-only)
 
-**Gate:** Run only when `has_remote=true` AND `has_gh=true` AND a PR number is known (from Step 11.2 create or Step 11.0/11.3 existing-PR detection). If `has_remote=false`, this step is a no-op (no PR exists). If `has_gh=false` (token-only or paste tiers), the query cannot run — log `mergeable_state: not-verified: gh-unavailable` and emit a one-line operator note: "Mergeability not verified — gh CLI unavailable." Continue without failing.
+**Gate:** Run only when `has_remote=true` AND `has_gh=true` AND a PR number is known (from Step 11.2 create or Step 11.0/11.3 existing-PR detection). If `has_remote=false`, this step is a no-op (no PR exists). If `has_gh=false` (token-only or paste tiers), the query cannot run — log `mergeable_state: not-verified: gh-unavailable` and `coderabbit: not-verified: gh-unavailable` (rollup signal 3 is unreachable without `gh`), and emit a one-line operator note: "Mergeability not verified — gh CLI unavailable." Continue without failing.
 
 **Query (single call, bundles CI):**
 
@@ -970,11 +970,21 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 **Offer-to-resolve on `CONFLICTING`.** When `mergeable == CONFLICTING`, append a one-line **offer** (not an action) to the operator-facing report: "To resolve: rebase the branch on the current base (`git fetch origin && git rebase origin/main`) and resolve conflicts, then re-push." Delivery does NOT perform the rebase automatically — it is an outward/irreversible action gated by `dev-guard.sh` and owned by the operator.
 
-**Automated review (CodeRabbit) is part of the review surface.** PRs to this repo receive an automated CodeRabbit analysis alongside the CI checks; it appears as a `CodeRabbit` check and posts inline review comments. Two consequences for this step: (1) a green test rollup does NOT mean the PR is reviewed — while CodeRabbit's review is in progress its check is `pending` and `mergeStateStatus` reads `UNSTABLE`; report `ci_state: pending` and do not treat the PR as done until the CodeRabbit review completes. (2) Every CodeRabbit inline finding is a reviewer comment and MUST be routed through `agents/_shared/apply-review-disposition.md`, including Step 6 — reply to every thread, resolve only `APPLIED`, and leave a rationale reply on anything not resolved. Applying a fix without posting the thread disposition is an incomplete review cycle.
+**Automated review (CodeRabbit) detection.** Not every consumer repo has CodeRabbit configured — team-harness does, but this step runs against whatever repo the pipeline targets, so detect before framing the review surface. CodeRabbit is `detected` when ANY of:
+
+1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at orchestrator Phase 0a Step 7), OR
+2. `.coderabbit.yaml` or `.coderabbit.yml` exists at the target repo root (cheap file check), OR
+3. the already-fetched `statusCheckRollup` (from the query above) contains a check entry whose name contains `CodeRabbit`.
+
+Signal 3 is authoritative when positive — a `CodeRabbit` check in the rollup proves the App runs on this PR, and upgrades a `false`/absent hint to `detected`. Detection reuses the already-fetched rollup and the single boot-time file check; it adds zero new GitHub API calls and never polls.
+
+**When detected:** current semantics preserved verbatim — while CodeRabbit's review is in progress its check is `pending` and `mergeStateStatus` reads `UNSTABLE`; report `ci_state: pending` and do not treat the PR as done until the CodeRabbit review completes. Every CodeRabbit inline finding is a reviewer comment and MUST be routed through `agents/_shared/apply-review-disposition.md`, including Step 6 — reply to every thread, resolve only `APPLIED`, and leave a rationale reply on anything not resolved. Applying a fix without posting the thread disposition is an incomplete review cycle. If signals 1-2 are positive but signal 3 has not yet registered, add a one-line discrepancy note instead of waiting: "CodeRabbit config present but no check registered on this PR — this can mean the check has not yet posted (it will fold into `ci_state` via the mechanical rules above once it registers) OR the GitHub App is not installed on this repo (no check will ever register); this query cannot distinguish the two. Do not wait on this note alone."
+
+**When not detected:** `ci_state` is computed from the actual rollup entries only (per the mechanical rules above). This step MUST NOT wait or poll for a CodeRabbit check, and MUST NOT advise the operator to wait for an automated review that will never appear. Report `coderabbit: not-detected`. Repos with CodeRabbit enabled at the GitHub-organization level and no repo-root config file structurally expose only signal 3, which may not have registered yet at query time — `coderabbit: not-detected` is point-in-time, not proof of absence; a later-registering check still folds into `ci_state` via the mechanical rules above regardless of this report.
 
 **Reporting sites.** Step 11.4 writes:
 
-- Status block: `mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable` and `ci_state: passing | failing | pending | none | not-verified`.
+- Status block: `mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable`, `ci_state: passing | failing | pending | none | not-verified`, and `coderabbit: detected | not-detected | not-verified: gh-unavailable`.
 - `## Git Delivery` summary: a `Merge state:` line and a `CI:` line.
 - The PR-result line: append the merge state — e.g. "— created — merge: CLEAN, CI: passing".
 
@@ -1487,6 +1497,7 @@ gh_account: <login> | unknown | n/a (has_gh=false)
 dod: {pass | no gates discovered | failed: <command>}
 mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
 ci_state: passing | failing | pending | none | not-verified
+coderabbit: detected | not-detected | not-verified: gh-unavailable
 worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
 release_tag: created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged   # release-mode only (Step 11.4c); omit outside release-mode
 context7_consult: hit:N miss:N skipped:N

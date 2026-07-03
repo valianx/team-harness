@@ -41,11 +41,13 @@ govern explicit operator instructions.
   explicitly adopts it with language such as "do this", "apply this change",
   or equivalent unambiguous adoption.
 - **Automated reviewers (e.g. CodeRabbit) are third-party reviewers for this
-  purpose.** Their inline findings are governed identically — classified and
-  dispositioned like any human comment, and subject to the same Step 6
-  obligation: reply to every thread and leave a rationale reply on any comment
-  not resolved. An automated finding is never auto-applied and never silently
-  ignored.
+  purpose, WHEN configured on the target repo/PR** — presence is
+  detection-gated per `agents/delivery.md § Step 11.4`, not assumed
+  universal. When configured, their inline findings are governed identically —
+  classified and dispositioned like any human comment, and subject to the same
+  Step 6 obligation: reply to every thread and leave a rationale reply on any
+  comment not resolved. An automated finding is never auto-applied and never
+  silently ignored.
 
 ## Step 1 — Two-axis classification
 
