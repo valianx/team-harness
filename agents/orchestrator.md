@@ -2059,13 +2059,13 @@ Note: a frontend repo with zero browser-real types is legitimately jsdom-only wh
 
 1. Phase 2.7 authoring completed with `status: success` (a `phase.end` event with `phase: "2.7"` and `status: "success"` exists in `00-execution-events`).
 2. The Phase 2.7 tester status block contains `suite_still_passing: true`.
-3. No source file, test file, or build-config file changed between Phase 2.7 completion and the current Phase 3 dispatch (verify via `git diff --name-only HEAD` against the tree state when Phase 2.7 completed; if the diff is empty, the tree is unchanged).
+3. No source file, test file, or build-config file changed between Phase 2.7 completion and the current Phase 3 dispatch — verify by comparing the current tree anchor (`git rev-parse HEAD` [+ dirty-diff hash], same mechanic as `docs/verification-packet.md § 2`) against the `Tree anchor` recorded in `00-verify-packet.md`'s header (written at Phase 2.7 close, before Phase 3 opens). Anchors match → tree unchanged. A plain `git diff --name-only HEAD` is NOT sufficient here — on a tree with uncommitted work already dirty before Phase 2.7 (the common case on a feature branch), it reports the same non-empty diff regardless of whether anything changed since Phase 2.7, defeating the check.
 
 When the gate fires (all three hold): do NOT dispatch the tester for a full-suite run. Instead, instruct the tester to map each AC to the existing tests authored in Phase 2.7 only — no suite execution. Record the skip in `00-state.md` under a `phase3_suite_skip` key: `reason: "phase-2.7-green-tree-unchanged"`. Emit a `phase.skip` JSONL event: `{"ts":"…","event":"phase.skip","phase":"3-tester-full-suite","feature":"{feature}","reason":"phase-2.7-green-tree-unchanged"}`.
 
 Re-run the full suite (gate does NOT fire) when any of these exceptions applies:
 - (a) Phase 2.7 green is not recorded (any of the three fields above is absent or does not confirm success/green).
-- (b) The tree is stale: a source file, test file, or build-config file changed since Phase 2.7 completed (the `git diff` check above produces at least one path).
+- (b) The tree is stale: the current tree anchor no longer matches the packet's recorded `Tree anchor` (at least one source, test, or build-config path changed since Phase 2.7 completed).
 - (c) Phase 3 itself was forced by a post-Phase-2.7 constraint (e.g., a non-trivial constraint was reconciled in Phase 2.5 that added new AC after Phase 2.7 completed).
 
 **Verification packet payload (all Phase 3 / 3.4 dispatches below).** Every Task call in this block additionally carries `verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` plus a 10-line digest (changed-file count, deviations yes/no — read from the packet header; no AC count — the packet carries no AC). This is additive to the existing per-agent payload fields listed below; see `docs/verification-packet.md § 3` for the digest format.

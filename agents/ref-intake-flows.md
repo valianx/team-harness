@@ -27,7 +27,7 @@ Detection algorithm:
 5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
 
 **Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
-```
+```text
 ## Milestone Index
 | Milestone | Slug | Status | Commit |
 |-----------|------|--------|--------|
@@ -59,7 +59,7 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 1f, only when `initiative`
 - **CREATE**: write the full `overview.md` template (see `## overview.md Template` section in `agents/orchestrator.md`) with this project as the first row.
 
 **Write the initial project row** (project, branch-at-Design, status):
-```
+```text
 | {project-slug} | {current-branch or —} | — | — | planning |
 ```
 Branch-at-Design is the current git branch if already on a feature branch, or `—` if still on main/develop (the branch is set by the delivery agent once the PR is opened).
@@ -90,7 +90,7 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 6d-initiative, during Disc
 
 **After any signal fires**, emit a confirmation prompt naming the proposed/joined initiative slug and the resulting overview location:
 
-```
+```text
 This task appears to be part of initiative "{slug}".
    Overview location: {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{slug}/overview.md
 Keep this name (Y), enter a different name (type it), or skip the initiative (n)?
@@ -113,7 +113,7 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 6a, when the intent matche
 **Language-set intent handling.** When the intent matches a `language-set` row:
 
 - **(b) Persistent-default-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
-  ```
+  ```text
   About to set the default language to "<X>" (persistent write to ~/.claude/.team-harness.json).
   This affects all future sessions. The current session also switches to "<X>".
   Confirm? [Y/n]:
@@ -125,7 +125,7 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 6a, when the intent matche
 **English-learning-set intent handling.** When the intent matches an `english-learning-set` row:
 
 - **(b′) Persistent-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
-  ```
+  ```text
   About to set english-learning correction mode to "<on|off>" (persistent write to ~/.claude/.team-harness.json).
   This affects all future sessions. The current session also switches to "<on|off>".
   Confirm? [Y/n]:

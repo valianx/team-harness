@@ -327,18 +327,19 @@ For each business rule provided in the context:
 
 1. **Live AC read + packet-first (run-only / verify-run mode, Phase 3 — NOT authoring mode).** For AC→test mapping confirmation, live-read the per-task AC block from `01-plan.md § Task List` first — mandatory, never sourced from the packet. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`). It carries the changed-files table and the Phase 2.7 AC→test map (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest) — use it in place of separately reading `01-plan.md`/`02-implementation.md` for WORKSPACE-NARRATIVE context. **Authoring mode (Phase 2.7 itself) predates the packet and keeps the full input-manifest read below unconditionally** — the packet does not exist yet when authoring runs.
    - **Hard floor — preserved read.** Suite execution and `02-regression-test.md` (fix flow) stay UNTOUCHED by the packet — the packet replaces workspace-narrative doc reads only, never the actual test run.
+   - **Fail-closed on missing spec (run-only / verify-run mode only).** `01-plan.md` is the mandatory AC source for the AC→test mapping — there is no mapping without it. When `01-plan.md` does not exist on disk (packet-first or full-manifest path), do NOT run the suite and report a mapping anyway — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot map AC to tests` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file in run-only / verify-run mode.
    - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input manifest below, report `packet_integrity: stale|mismatch`.
    - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
    - **Fallback (fail-open):** packet absent → proceed directly to the full input manifest below. Report `packet_used: absent`.
    - Report `packet_used: true|false|absent`, `packet_escapes: N` (full docs opened beyond the packet), `packet_integrity: ok|stale|mismatch|n-a` in your status block (run-only / verify-run mode only).
 
 2. **Full input manifest (fallback path, or authoring mode)** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
-   - `01-plan.md` — AC block for this task, Work Plan, and project type
+   - `01-plan.md` — AC block for this task, Work Plan, and project type. **In run-only / verify-run mode, not covered by the general absence-skip rule below** — see the fail-closed floor in step 1 above; its absence stops a run-only / verify-run dispatch regardless of whether it reached this read via the packet-first or full-manifest path. Authoring mode keeps the general skip-if-absent behavior for it.
    - `02-implementation.md` — implementer output: files changed, deviations, known limitations
    - `01-root-cause.md` — root-cause analysis and regression test approach (bug-fix flow only)
    - `02-regression-test.md` — prior regression test authoring (Phase 3 verify-run mode only)
    - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
-   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
+   If any OTHER named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 

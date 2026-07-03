@@ -523,14 +523,22 @@ Sanity Check, step 6).
 
 ### Calibration rule — every stated cost figure carries a source tag
 
-Any token/cost figure stated in an agent or docs file (a "typical run costs ~NK
-tokens" claim, a phase's documented `**Cost:**` line, and similar) MUST carry a
-source tag: `(measured YYYY-MM, n=N)` when backed by a real measurement sample,
-or `(estimate)` when it is not. An untagged figure is indistinguishable from a
-stale guess — the ratify-plan figure drifted over 10× from its documented
-"~3-5K tokens" before the June 2026 measurement caught it (see
-`agents/orchestrator.md § Phase 1.5`). Tag every figure at the time it is
-written, and re-tag it when a new measurement supersedes the old one.
+Any narrative, human-authored cost claim or estimate in an agent or docs file
+(a "typical run costs ~NK tokens" sentence, a phase's documented `**Cost:**`
+line, and similar prose) MUST carry a source tag: `(measured YYYY-MM, n=N)`
+when backed by a real measurement sample, or `(estimate)` when it is not. An
+untagged figure is indistinguishable from a stale guess — the ratify-plan
+figure drifted over 10× from its documented "~3-5K tokens" before the June
+2026 measurement caught it (see `agents/orchestrator.md § Phase 1.5`). Tag
+every figure at the time it is written, and re-tag it when a new measurement
+supersedes the old one.
+
+**Exempt from this rule:** normative schema/config definitions (the `pricing.*`
+field table above, the `## Cost` section schema and its `{N}`/`~${X.XX}`
+template placeholders), and formula constants that are inherently estimates by
+definition (the `duration_min × 1500` / `× 800` fallback multiplier, already
+carrying `tokens_estimated: true`). These are structural literals, not claims
+about what a run costs, and tagging them would not add information.
 
 ---
 
