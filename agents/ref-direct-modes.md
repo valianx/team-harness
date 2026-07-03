@@ -697,7 +697,7 @@ When `frontend_scope` is absent or `false`, the tester is invoked without the fl
 
 When invoked with `Direct Mode Task: test-pipeline`:
 
-Full step-by-step instructions are in `ref-special-flows.md § Test Pipeline Flow`. This section documents the `frontend_scope` contract only.
+Full step-by-step instructions are in `ref-special-flows.md § Test Pipeline Flow`. This section documents the `frontend_scope` contract and the flow's security coverage.
 
 ### `frontend_scope` in test-pipeline
 
@@ -706,6 +706,12 @@ The test-pipeline skill detects frontend markers and may include `frontend_scope
 - Persist `frontend_scope: true` to `workspaces/test-pipeline/00-state.md § Current State` at Phase 0 setup (before any module-test dispatch).
 - Precedence rule: logical OR of payload flag and any pipeline-derived value — neither source can downgrade the other.
 - Thread `frontend_scope: true` into each `module-test` payload with the same one-line instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
+
+### Security coverage in test-pipeline
+
+The Test Pipeline Flow dispatches no dedicated `security` agent (`agents/ref-special-flows.md § Test Pipeline Flow`). Each `module-test` dispatch's embedded mini-scan (`tester.md § Phase 3`) is therefore this flow's **only** security layer — it runs unconditionally unless the operator passes `--skip-security`, in which case the flow runs with no security layer at all (recorded per-module in `03-testing.md § Security Findings`).
+
+Any future change that conditions or removes this scan MUST add a compensating security control inside the Test Pipeline Flow's own gates — its Coverage Gate or consolidation step, the only phases this flow traverses — never in the per-task pipeline's Phase 3.5, which this flow does not reach.
 
 ### Console-path readiness gates (consolidation/report step)
 

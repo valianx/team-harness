@@ -597,6 +597,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - regression_test_status: {failing | passing | skipped | null}  # failing before Phase 2; passing after Phase 3; skipped for Tier 1 no-behavior-change
 - security_sensitive: {true|false}             # set at Phase 0a Step 7; determines if security agent runs at Phase 3
 - frontend_scope: {true|false}                 # set at Phase 0a Step 7; determines if ux-reviewer runs at Phase 1 and 3
+- coderabbit_configured: {true|false}          # set at Phase 0a Step 7 from a repo-root file check; consumed by delivery Step 11.4 (a positive rollup signal can still yield `coderabbit: detected` even when this hint is false)
 - bug_tier: {0 | 1 | 2 | 3 | 4 | null}        # set at Phase 0a Step 7 for type: fix | hotfix; null otherwise
 - bug_tier_source: {auto | operator | architect-promote | null}  # how the tier was set; null for non-bug runs
 - logs_mode: {local|obsidian}              # resolved at boot from manifest; persisted here for recovery
@@ -1109,6 +1110,8 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
      - User explicitly requests UX review
      - GitHub issue has a `frontend`, `ui`, or `ux` label
      When `frontend_scope: true`: the `ux-reviewer` agent is dispatched in Stage 1 (enrich mode, after architect) and Stage 3 (validate mode, in parallel with tester/qa/security). The ux-reviewer adds UI/UX AC in enrich mode and validates them in validate mode. Only `critical` findings (WCAG A violations) block delivery; all other findings are recommendations.
+
+   - **`coderabbit_configured`:** `true` | `false` — deterministic repo-root file-existence check for `.coderabbit.yaml` or `.coderabbit.yml` (never keyword-based). Recorded in `00-state.md § Current State`. `false` is a boot-time hint, not proof of absence — delivery Step 11.4 can still report `coderabbit: detected` from a positive `CodeRabbit` entry in the fetched `statusCheckRollup` (App installed without a committed config file).
 
    - **Bug tier (only when `type: fix` or `type: hotfix`):** `0` | `1` | `2` | `3` | `4`. The tier determines how much of the Bug-fix Pipeline runs against a given fix — trivial bugs skip ceremony, critical bugs add prior-art research and extended security analysis. Combine three signals; high-tier signals win, default to Tier 3 when ambiguous, operator declarations override auto-classification.
 
