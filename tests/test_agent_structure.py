@@ -1027,8 +1027,10 @@ for pattern in FORBIDDEN_PATTERNS:
 # ---------------------------------------------------------------------------
 # Suite 18 — Dispatch-blocked auto-takeover contract
 # ---------------------------------------------------------------------------
-# Guards the boot probe + Dispatch-blocked exit contract across:
-#   1. agents/orchestrator.md  — the boot probe + Dispatch-blocked exit
+# Guards the Task-availability + Dispatch-blocked exit contract across:
+#   1. agents/orchestrator.md  — Task availability (folded into the first
+#      genuine dispatch, no dedicated boot probe — A7 orchestrator boot
+#      reduction) + Dispatch-blocked exit
 #   2. CLAUDE.md § 14             — the universal auto-takeover rule
 #   3. skills/README.md           — the canonical Continuity contract
 print("=== Suite 18: Dispatch-blocked auto-takeover contract ===")
@@ -1047,15 +1049,12 @@ check(
     "missing boot sequence section — auto-takeover starts here",
 )
 check(
-    "orchestrator.md boot probe uses general-purpose subagent_type",
-    "subagent_type`: `general-purpose`" in orchestrator_md
-    or "subagent_type: general-purpose" in orchestrator_md,
-    "probe must dispatch general-purpose to test Task availability",
-)
-check(
-    "orchestrator.md boot probe expects single-word OK reply",
-    "Reply with the single word OK" in orchestrator_md,
-    "probe payload contract must be present so the check is unambiguous",
+    "orchestrator.md folds Task availability into the first genuine dispatch"
+    " (no dedicated boot-probe subagent)",
+    "No dedicated dispatch-probe subagent is spawned at boot" in orchestrator_md
+    and "first genuine dispatch" in orchestrator_md.lower(),
+    "boot Step 1 must state that Task availability is verified by the first"
+    " genuine dispatch, with no dedicated probe subagent spawned at boot (A7)",
 )
 check(
     "orchestrator.md has 'Dispatch-blocked exit' section",
@@ -1079,9 +1078,10 @@ check(
     "must forbid recreating the nested condition",
 )
 check(
-    "orchestrator.md dispatch invariant #1 is conditional on probe success",
-    "After a successful boot probe" in orchestrator_md,
-    "invariant #1 must NOT unconditionally claim Task is present — that was the original bug",
+    "orchestrator.md dispatch invariant #1 is conditional on the first dispatch succeeding",
+    "After the first successful dispatch" in orchestrator_md,
+    "invariant #1 must NOT unconditionally claim Task is present — that was the original bug"
+    " (post-A7: conditional on the first dispatch, not a dedicated boot probe)",
 )
 check(
     "orchestrator.md does NOT contain the unconditional 'Task is on the list' claim",
@@ -1593,7 +1593,7 @@ print("=== Suite 19: Agent identity & cross-reference consistency ===")
 
 # Agents that legitimately have no .md file because they're reference files
 # (loaded on-demand by the orchestrator, not standalone agents)
-REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows"}
+REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows", "ref-intake-flows"}
 
 # Pipeline + standalone + reference agents that legitimately exist
 ALL_AGENT_FILES = sorted(p.stem for p in AGENTS_DIR.glob("*.md") if p.stem != "README")
@@ -15432,6 +15432,12 @@ _s68_delivery = read(AGENTS_DIR / "delivery.md")
 _s68_claude = read(REPO_ROOT / "CLAUDE.md")
 _s68_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
 _s68_observability = read(REPO_ROOT / "docs" / "observability.md")
+# v2.123.0 (A7 orchestrator boot reduction): Step 6d-initiative detection/confirm
+# and Phase 0a Step 1f (initiative create-or-join) moved verbatim out of
+# orchestrator.md into the on-demand agents/ref-intake-flows.md reference file
+# — orchestrator.md keeps only a 1-2 line trigger + pointer at each site. The
+# content-bearing slices below now read from ref-intake-flows.md instead.
+_s68_intake_flows = read(AGENTS_DIR / "ref-intake-flows.md")
 _S68_STOP = ("\n## ", "\n### ", "\n---\n")
 
 # AC-1: initiative state field defined in orchestrator.md
@@ -15487,22 +15493,28 @@ check(
     "orchestrator.md Step 2 must state local overview lives at the common parent directory of sibling repos",
 )
 
-# AC-4: generic-root misfire guard documented in orchestrator.md
-_s68_detect_slice = _slice_section(_s68_orch, "**Step 6d-initiative", _S68_STOP)
+# AC-4: generic-root misfire guard documented — content lives in
+# ref-intake-flows.md § Initiative Detection and Confirm (moved verbatim from
+# orchestrator.md by A7's Phase 0a extraction); orchestrator.md keeps only the
+# trigger label + pointer at the "**Step 6d-initiative" site (still present,
+# so the boundary marker used elsewhere — e.g. Suite 92's background-sweep
+# slice — continues to resolve).
+_s68_detect_slice = _slice_section(_s68_intake_flows, "**Step 6d-initiative", _S68_STOP)
 check(
-    "suite68(ac4a): orchestrator.md Step 6d-initiative exists (slice non-empty)",
+    "suite68(ac4a): agents/ref-intake-flows.md § Initiative Detection and Confirm exists (slice non-empty)",
     len(_s68_detect_slice) > 0,
-    "orchestrator.md must contain Step 6d-initiative sub-step for initiative detection",
+    "agents/ref-intake-flows.md must contain the Step 6d-initiative sub-step for initiative detection"
+    " (orchestrator.md must keep a pointer to it)",
 )
 check(
     "suite68(ac4b): Step 6d-initiative contains generic-root guard list",
     "projects" in _s68_detect_slice and "repos" in _s68_detect_slice and "src" in _s68_detect_slice and "code" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must list generic-root guard words (projects, repos, src, code, ...)",
+    "ref-intake-flows.md Step 6d-initiative must list generic-root guard words (projects, repos, src, code, ...)",
 )
 check(
     "suite68(ac4c): Step 6d-initiative states do NOT propose on directory layout alone",
     "do NOT propose" in _s68_detect_slice or "NOT propose" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
+    "ref-intake-flows.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
 )
 
 # AC-5: confirmation prompt + WAIT + 3-way choice + never auto-create documented in orchestrator.md and discover-phase.md
@@ -15533,27 +15545,31 @@ check(
     "docs/discover-phase.md § 11 must document the confirmation gate and WAIT",
 )
 
-# AC-6: cross-run JOIN rule documented in orchestrator.md
-_s68_join_slice = _slice_section(_s68_orch, "1f. **CONDITIONAL — Initiative create-or-join", ("\n2. **MANDATORY",))
+# AC-6: cross-run JOIN rule — content lives in ref-intake-flows.md § Initiative
+# Create-or-Join (moved verbatim from orchestrator.md Phase 0a Step 1f by A7's
+# extraction); orchestrator.md keeps only the trigger label + pointer.
+_S68_JOIN_STOP = ("\n## ", "\n---\n")
+_s68_join_slice = _slice_section(_s68_intake_flows, "1f. **CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
 check(
-    "suite68(ac6a): Phase 0a Step 1f exists (initiative create-or-join, slice non-empty)",
+    "suite68(ac6a): agents/ref-intake-flows.md § Initiative Create-or-Join exists (slice non-empty)",
     len(_s68_join_slice) > 0,
-    "orchestrator.md must contain Phase 0a Step 1f (initiative create-or-join)",
+    "agents/ref-intake-flows.md must contain Step 1f (initiative create-or-join);"
+    " orchestrator.md must keep a pointer to it",
 )
 check(
     "suite68(ac6b): Step 1f defines JOIN rule (replace-in-place if row exists)",
     "replace" in _s68_join_slice and ("in-place" in _s68_join_slice or "in place" in _s68_join_slice),
-    "orchestrator.md Step 1f must define the replace-in-place JOIN rule for existing project rows",
+    "ref-intake-flows.md Step 1f must define the replace-in-place JOIN rule for existing project rows",
 )
 check(
     "suite68(ac6c): Step 1f defines append if row absent",
     "append" in _s68_join_slice,
-    "orchestrator.md Step 1f must define append-if-absent for new project rows",
+    "ref-intake-flows.md Step 1f must define append-if-absent for new project rows",
 )
 check(
     "suite68(ac6d): Step 1f states rows are never duplicated (idempotent)",
     "never duplicate" in _s68_join_slice or "idempotent" in _s68_join_slice,
-    "orchestrator.md Step 1f must state that rows are never duplicated (idempotent)",
+    "ref-intake-flows.md Step 1f must state that rows are never duplicated (idempotent)",
 )
 
 # AC-7: concurrency/idempotency + best-effort posture documented
@@ -15726,12 +15742,13 @@ check(
 # AC-13: new assertions proving the fix (failing-first against v2.59.0 docs)
 # These assert the FIXED state and therefore FAIL on the current (unfixed) tree.
 
-# ac13a: date-agnostic JOIN match rule present in orchestrator.md Step 2 / Step 1f
-_s68_join_overview_slice = _slice_section(_s68_orch, "1f. **CONDITIONAL — Initiative create-or-join", ("\n2. **MANDATORY",))
+# ac13a: date-agnostic JOIN match rule — content lives in ref-intake-flows.md
+# § Initiative Create-or-Join (moved verbatim from orchestrator.md Step 1f).
+_s68_join_overview_slice = _slice_section(_s68_intake_flows, "1f. **CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
 check(
-    "suite68(ac13a): orchestrator.md Step 1f contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
+    "suite68(ac13a): ref-intake-flows.md Step 1f contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
     "*_{" in _s68_join_overview_slice or ("*_" in _s68_join_overview_slice and ("slug" in _s68_join_overview_slice or "initiative:" in _s68_join_overview_slice)),
-    "orchestrator.md Step 1f must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
+    "ref-intake-flows.md Step 1f must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
 )
 
 # ac13b: per-project docs_root drops {date}_{feature} leaf when initiative is set
@@ -30825,6 +30842,192 @@ check(
 
 # Marker: coderabbit-detection-tester-scan-dedup
 
+# Suite 138 — ref-intake-flows pointer-side guard (iteration-1 mutation audit,
+# T4-AC-7)
+#
+# A7 (validation-cost-structural-redesign) extracted four conditional intake
+# sub-flows out of agents/orchestrator.md Phase 0a into the on-demand
+# agents/ref-intake-flows.md reference file, each replaced by a 1-2 line
+# trigger + pointer paragraph in the spine. The iteration-1 adversary mutation
+# audit found that deleting the Step 6d-initiative pointer paragraph left all
+# prior checks green (no structural test asserted the POINTER side of the
+# extraction, only the ref-intake-flows.md CONTENT side via Suite 68). This
+# suite closes that gap: each of the five extracted sub-flows must have a
+# live trigger + pointer paragraph in orchestrator.md naming its
+# ref-intake-flows.md section anchor.
+#
+# Marker: ref-intake-flows-pointer-guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 138: ref-intake-flows pointer-side guard (T4-AC-7) ===")
+
+_s138_orch = read(AGENTS_DIR / "orchestrator.md")
+_s138_intake = read(AGENTS_DIR / "ref-intake-flows.md")
+
+_S138_POINTERS = [
+    "Milestone Continuity",
+    "Initiative Create-or-Join",
+    "Language and English-Learning Intent Handling",
+    "Initiative Detection and Confirm",
+    "ClickUp Conversational Intents",
+]
+
+for _label in _S138_POINTERS:
+    _pointer = f"agents/ref-intake-flows.md § {_label}"
+    check(
+        f"suite138(pointer-{_label}): agents/orchestrator.md retains the trigger + "
+        f"pointer paragraph for '{_label}'",
+        _pointer in _s138_orch,
+        f"agents/orchestrator.md must contain the literal pointer '{_pointer}' — "
+        f"deleting this trigger paragraph silently drops the '{_label}' sub-flow "
+        f"from the orchestrator spine with no other test detecting it (T4-AC-7)",
+    )
+    _heading = f"## {_label}"
+    check(
+        f"suite138(content-{_label}): agents/ref-intake-flows.md contains the "
+        f"'{_heading}' section the pointer references",
+        _heading in _s138_intake,
+        f"agents/ref-intake-flows.md must contain the section heading '{_heading}' "
+        f"referenced by the orchestrator's pointer paragraph",
+    )
+
+# Self-referential guards (hygiene contract)
+_s138_own = read(Path(__file__))
+check(
+    "suite138(self-ref): test file contains 'Suite 138' and 'ref-intake-flows-pointer-guard'",
+    "Suite 138" in _s138_own and "ref-intake-flows-pointer-guard" in _s138_own,
+    "test file must self-reference Suite 138 and the marker 'ref-intake-flows-pointer-guard'",
+)
+
+_s138_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite138(registry): docs/testing.md registers 'Suite 138' and 'ref-intake-flows-pointer-guard'",
+    "Suite 138" in _s138_testing_md and "ref-intake-flows-pointer-guard" in _s138_testing_md,
+    "docs/testing.md must register Suite 138 and the 'ref-intake-flows-pointer-guard' marker",
+)
+
+_s138_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite138(hygiene): CLAUDE.md does NOT contain 'Suite 138' (§11 hygiene contract)",
+    "Suite 138" not in _s138_claude_md,
+    "CLAUDE.md must not mention Suite 138 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: ref-intake-flows-pointer-guard
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 139 — canary denominator-floor guard (iteration-3 operator ruling,
+# T2-AC-8 per-run rewrite)
+#
+# The iteration-2 adversary re-check found the T2-AC-8 canary's original
+# breadcrumb-derived denominator could degenerate to N≈0 (undercounted
+# breadcrumbs) while neither rollback clause fired, and that the two
+# non-equivalent floor derivations it carried (one hardcoded to 4 verifiers,
+# one delegating to Agent Results) both misclassified runs. The iteration-3
+# adversary re-check found the fix itself broken — the floor still missed a
+# silently-skipped verifier and the `canary_window` marker was armed by a
+# non-computable predicate with no window-close owner — and the operator's
+# final-iteration gate ruling ("OPERATOR-EVALUATED canary — remove the
+# automatic window/rollback machinery; keep everything per-run") removed the
+# cross-run machinery entirely. This suite pins the CONTRACT TEXT of the
+# resulting per-run, operator-evaluated design (contract text only — runtime
+# compliance of the assert remains prompt-level per the honest-bounds note in
+# A3 design point 7): the single-derivation dispatch floor in
+# docs/verification-packet.md § 8, the verdict-doc-derived denominator, and
+# negative-residue guards proving the removed window/Clause machinery left no
+# dormant text in agents/orchestrator.md or docs/verification-packet.md.
+#
+# Marker: canary-denominator-floor-guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 139: canary denominator-floor guard (T2-AC-8 hardening) ===")
+
+_s139_orch = read(AGENTS_DIR / "orchestrator.md")
+_s139_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
+
+_S139_FLOOR_CLAUSE_REQUIRED = [
+    "Dispatch floor — exactly one derivation.",
+    "security_sensitive: true",
+    "The floor is **never** derived from",
+    "Agent Results` (the did-dispatch record)",
+    "N=0 always reads UNMEASURABLE, never parity.",
+]
+
+for _needle in _S139_FLOOR_CLAUSE_REQUIRED:
+    check(
+        f"suite139(floor-{_needle[:24]!r}): docs/verification-packet.md § 8 contains "
+        f"the single-derivation dispatch floor clause text {_needle!r}",
+        _needle in _s139_packet,
+        f"docs/verification-packet.md § 8 must contain {_needle!r} — the floor must "
+        f"have exactly one derivation from `00-state.md` scope flags, never from "
+        f"`§ Agent Results`, and a below-floor run must render UNMEASURABLE, never "
+        f"silent parity",
+    )
+
+_S139_WINDOW_RESIDUE_FORBIDDEN = [
+    "canary_window",
+    "run N/10",
+    "Clause 1",
+    "Clause 2",
+    "canary window",
+]
+
+for _needle in _S139_WINDOW_RESIDUE_FORBIDDEN:
+    check(
+        f"suite139(no-residue-orch-{_needle[:24]!r}): agents/orchestrator.md contains "
+        f"no dormant {_needle!r} residue from the removed cross-run window machinery",
+        _needle not in _s139_orch,
+        f"agents/orchestrator.md must not contain {_needle!r} — the operator's "
+        f"iteration-3 ruling removed the 10-run window/rollback machinery entirely; "
+        f"any surviving occurrence is dormant residue",
+    )
+    check(
+        f"suite139(no-residue-packet-{_needle[:24]!r}): docs/verification-packet.md "
+        f"contains no dormant {_needle!r} residue from the removed cross-run window "
+        f"machinery",
+        _needle not in _s139_packet,
+        f"docs/verification-packet.md must not contain {_needle!r} — the operator's "
+        f"iteration-3 ruling removed the 10-run window/rollback machinery entirely; "
+        f"any surviving occurrence is dormant residue",
+    )
+
+# The denominator must be re-grounded on verdict docs, not solely on breadcrumbs —
+# guards against reverting to the pre-amendment breadcrumb-derived-only wording.
+check(
+    "suite139(denominator-source): docs/verification-packet.md § 8 grounds the "
+    "denominator on verdict-doc-derived language, not breadcrumb-derived",
+    "verdict-doc-derived" in _s139_packet
+    and "upward-only enrichment" in _s139_packet,
+    "docs/verification-packet.md § 8 must state the denominator is "
+    "'verdict-doc-derived' with breadcrumbs demoted to 'upward-only enrichment' — "
+    "reverting to a purely breadcrumb-derived denominator reopens the iteration-2 "
+    "degeneracy break",
+)
+
+# Self-referential guards (hygiene contract)
+_s139_own = read(Path(__file__))
+check(
+    "suite139(self-ref): test file contains 'Suite 139' and 'canary-denominator-floor-guard'",
+    "Suite 139" in _s139_own and "canary-denominator-floor-guard" in _s139_own,
+    "test file must self-reference Suite 139 and the marker 'canary-denominator-floor-guard'",
+)
+
+_s139_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite139(registry): docs/testing.md registers 'Suite 139' and 'canary-denominator-floor-guard'",
+    "Suite 139" in _s139_testing_md and "canary-denominator-floor-guard" in _s139_testing_md,
+    "docs/testing.md must register Suite 139 and the 'canary-denominator-floor-guard' marker",
+)
+
+_s139_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite139(hygiene): CLAUDE.md does NOT contain 'Suite 139' (§11 hygiene contract)",
+    "Suite 139" not in _s139_claude_md,
+    "CLAUDE.md must not mention Suite 139 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: canary-denominator-floor-guard
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

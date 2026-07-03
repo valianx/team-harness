@@ -267,7 +267,15 @@ issues: {critical and high finding titles, or "none"}
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. Load workspace files using the **input manifest** below (named files first; glob-all only when a named file is absent).
+1. **Packet-first (pipeline mode).** Read `{docs_root}/00-verify-packet.md` first — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`). It carries the changed-files table and the implementer's Deviations (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest) — use it in place of separately reading `01-plan.md`/`02-implementation.md`/`03-testing.md` for WORKSPACE-NARRATIVE context. Your verdict does not baseline on AC (your scan target is code + scope flags), so no live AC read is required.
+   - **Hard floor — the packet replaces workspace-narrative reads only, never the scan.** Your Phase 1 discovery scan and your reads of the changed SOURCE FILES themselves are UNTOUCHED by this change — the scan target is code, not the packet.
+   - **Git-anchored scan-target list (mandatory).** Your scan-target list is derived from `git diff --name-only` against the packet's `Base ref` — the authoritative list, never the packet's changed-files table alone. Any git-listed path absent from the packet's table sets `packet_integrity: mismatch` and escalates to the full input manifest below (§ Glob-all fallback still applies to the code scan).
+   - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input manifest below, report `packet_integrity: stale|mismatch`.
+   - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
+   - **Fallback (fail-open):** packet absent → proceed directly to the full input manifest below. Report `packet_used: absent`.
+   - Report `packet_used: true|false|absent`, `packet_escapes: N` (full docs opened beyond the packet), `packet_integrity: ok|stale|mismatch|n-a` in your status block.
+
+2. **Full input manifest (fallback path)** — use Glob to look for `workspaces/{feature-name}/`. Load workspace files using the **input manifest** below (named files first; glob-all only when a named file is absent).
 
    **Security agent input manifest (read in this order):**
    | File | Why |
@@ -278,15 +286,15 @@ issues: {critical and high finding titles, or "none"}
    | `03-testing.md` | Test scope, known gaps — informs what the tester did NOT cover |
    | Git diff / changed-files list | Passed in dispatch payload for pipeline mode; derive from `02-implementation.md § Files Created/Modified` when absent |
 
-   **Glob-all fallback:** when a file named in the manifest is absent from the workspace folder, fall back to reading all remaining workspace files (`workspaces/{feature-name}/*.md`). Do not skip context — the manifest is a reading ORDER, not a reading FILTER.
+   **Glob-all fallback:** when a file named in the manifest is absent from the workspace folder, fall back to reading all remaining workspace files (`workspaces/{feature-name}/*.md`). Do not skip context — the packet is the entry point; full docs are the depth layer, and the manifest itself is a reading ORDER, not a reading FILTER.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
+3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
-3. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
+4. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
 
-4. **Write your output** to `workspaces/{feature-name}/04-security.md` when done.
+5. **Write your output** to `workspaces/{feature-name}/04-security.md` when done.
 
 ---
 
@@ -897,6 +905,9 @@ context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced security findings; [] when none
+packet_used: true | false | absent   # pipeline mode only; whether 00-verify-packet.md was read (docs/verification-packet.md)
+packet_escapes: N                    # pipeline mode only; count of full docs opened beyond the packet
+packet_integrity: ok | stale | mismatch | n-a   # pipeline mode only; n-a when packet_used: absent
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
 issues: {critical and high findings titles, or "none"}

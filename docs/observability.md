@@ -145,6 +145,29 @@ This makes the breadcrumb a deterministic observability floor: any `TH_HOOK_PROF
 value can suppress notifications and richer observability, but it cannot erase
 proof that a `th:*` boundary occurred.
 
+**Reconciliation source (kept unconditionally, repurposed).** `00-subagent-trace.jsonl`
+is retained unconditionally and read by the orchestrator's stage-gate reconciliation
+backstop (`agents/orchestrator.md § Stage-gate reconciliation backstop`) as the
+backfill source for a `phase.end` gap: the paired `subagent.start`/`subagent.stop`
+lines for the missing phase's `agent_type`, matched by the pipeline's time window,
+supply the `duration_ms` for the backfilled event. This is its primary value —
+prompt-level `phase.end` emission proved unreliable in measurement (usable in only
+31/78 sampled workspaces), while this hook-authored breadcrumb is non-suppressible
+by design and costs zero agent tokens. Consolidating it away or making it opt-in
+would remove the only deterministic proof layer the backfill depends on; neither is
+proposed here or anywhere in this document.
+
+**Second consumer — per-run parity line cross-check (upward-only enrichment, never
+denominator ground truth).** The per-run parity line
+(`docs/verification-packet.md § 8`) also reads `00-subagent-trace.jsonl`, but in a
+narrower role than the reconciliation backstop above: the parity line's dispatch
+denominator is grounded in the workspace verdict docs (`03-testing.md` run-only
+section, `04-validation.md`, `04-security.md`, `04-adversary.md`,
+`04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
+breadcrumb-evidenced dispatch that has no matching verdict entry, classified
+telemetry-missing. A dispatch's breadcrumb pair being absent never removes it from,
+or shrinks, the denominator — the two consumers never share a subtraction path.
+
 ### subagent.start — PreToolUse breadcrumb (start-side twin)
 
 Written by `hooks/ts/dist/subagent-start.cjs` (PreToolUse event, matcher
@@ -419,10 +442,15 @@ as a conservative blended estimate and mark the result with `(~)`.
 
 ### `## Cost` section schema for `00-pipeline-summary.md`
 
-The orchestrator appends a `## Cost` section to the pipeline summary whenever it
-rewrites the file (every phase transition). The section derives entirely from the
+The orchestrator appends a `## Cost` section to the pipeline summary at each of
+the 4 mandatory checkpoints (STAGE-GATE-1 emission, Stage-2 close, every
+`iteration.start`, `pipeline.complete`/`end` — see `agents/orchestrator.md`
+§ Pipeline Summary Protocol → "When to rewrite"); rewriting at every other
+phase transition is best-effort. The section derives entirely from the
 `phase.end` events in `00-execution-events.{md,jsonl}` — it is a render of the
-trace, not an independent source.
+trace, not an independent source. The Final Pipeline Sanity Check fails closed
+on a missing `## Cost` section (`agents/orchestrator.md` § Final Pipeline
+Sanity Check, step 6).
 
 **Schema:**
 
@@ -492,6 +520,25 @@ trace, not an independent source.
 6. Count phases where `tokens_estimated == true` for the header annotation.
 7. If the price table is absent or malformed, skip the cost columns and emit the
    degradation line instead.
+
+### Calibration rule — every stated cost figure carries a source tag
+
+Any narrative, human-authored cost claim or estimate in an agent or docs file
+(a "typical run costs ~NK tokens" sentence, a phase's documented `**Cost:**`
+line, and similar prose) MUST carry a source tag: `(measured YYYY-MM, n=N)`
+when backed by a real measurement sample, or `(estimate)` when it is not. An
+untagged figure is indistinguishable from a stale guess — the ratify-plan
+figure drifted over 10× from its documented "~3-5K tokens" before the June
+2026 measurement caught it (see `agents/orchestrator.md § Phase 1.5`). Tag
+every figure at the time it is written, and re-tag it when a new measurement
+supersedes the old one.
+
+**Exempt from this rule:** normative schema/config definitions (the `pricing.*`
+field table above, the `## Cost` section schema and its `{N}`/`~${X.XX}`
+template placeholders), and formula constants that are inherently estimates by
+definition (the `duration_min × 1500` / `× 800` fallback multiplier, already
+carrying `tokens_estimated: true`). These are structural literals, not claims
+about what a run costs, and tagging them would not add information.
 
 ---
 

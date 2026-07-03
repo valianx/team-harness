@@ -87,17 +87,20 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 Read the implementation and validate against UI/UX criteria.
 
-**Input:** `workspaces/{feature}/02-implementation.md`, source code, `01-ux-review.md` (if exists)
+**Input:** `01-plan.md § Task List` (live AC read, mandatory), `{docs_root}/00-verify-packet.md` (packet-first), `01-ux-review.md` (mandatory, preserved read), source code, `02-implementation.md` (depth-on-demand)
 **Output:** `workspaces/{feature}/04-ux-validation.md`
 
-**Process:**
+**Live AC read + packet-first read (canonical schema: `docs/verification-packet.md`).**
 
-1. Read `01-ux-review.md` for the UI/UX AC (if it exists from Stage 1)
-2. Read `02-implementation.md` to understand what was built
-3. Read the actual source code (components, pages, styles)
-4. Validate each UI/UX criterion
-5. Check for frontend best practices (see below)
-6. Write `04-ux-validation.md` with per-finding verdicts
+1. Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your UI/UX AC verdict baseline. Then read `00-verify-packet.md` — it carries the changed-files table and the implementer's summary/Deviations (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest). Use it in place of separately reading `02-implementation.md` for WORKSPACE-NARRATIVE context.
+2. **Hard floor — preserved read.** `01-ux-review.md` (the Stage-1 UI/UX AC baseline) stays a MANDATORY read, untouched by the packet — always read it in full when it exists.
+3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to a full read of `02-implementation.md`, report `packet_integrity: stale|mismatch`.
+4. **Depth-on-demand (never forbidden):** open `02-implementation.md` in full ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
+5. **Fallback (fail-open):** packet absent → read `02-implementation.md` directly, unchanged. Report `packet_used: absent`.
+6. Read the actual source code (components, pages, styles) — unaffected by the packet.
+7. Validate each UI/UX criterion.
+8. Check for frontend best practices (see below).
+9. Write `04-ux-validation.md` with per-finding verdicts, and report `packet_used: true|false|absent`, `packet_escapes: N`, `packet_integrity: ok|stale|mismatch|n-a` in your status block.
 
 **Frontend best practices to check:**
 
@@ -192,6 +195,9 @@ output: workspaces/{feature-name}/{01-ux-review|04-ux-validation}.md
 findings: {critical: N, high: N, medium: N, suggestion: N}
 ac_added: {count of AC added, enrich mode only}
 component_reuse_flags: {count of reuse opportunities found}
+packet_used: true | false | absent   # validate mode only; whether 00-verify-packet.md was read (docs/verification-packet.md)
+packet_escapes: N                    # validate mode only; count of full docs opened beyond the packet
+packet_integrity: ok | stale | mismatch | n-a   # validate mode only; n-a when packet_used: absent
 summary: {1-2 sentences}
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N

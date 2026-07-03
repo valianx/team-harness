@@ -313,21 +313,29 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
-   - `01-plan.md` — AC block for this task (the spec being validated)
+1. **Live AC read + packet-first (validate mode, Phase 3 of the pipeline).** Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your per-AC verdict baseline. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`) — as implementation-context digest only: the changed-files table, the implementer's Deviations, and the Phase 2.7 AC→test map. The packet carries NO acceptance-criteria copy; it is a non-authoritative navigation digest, not a substitute for `01-plan.md`/`02-implementation.md`/`03-testing.md`.
+   - **Hard floor — fail-closed on absence.** `01-plan.md` is the mandatory live AC source — there is no verdict without it. When `01-plan.md` does not exist on disk (in either the packet-first or full-manifest path), do NOT fall back to a packet summary or an implicit AC list — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot form a validation verdict` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file.
+   - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
+   - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input-manifest read below, report `packet_integrity: stale|mismatch`.
+   - **Git-anchored scan-target list (preserved read).** Your source-code AC evidence scan resolves its target list from `git diff --name-only` against the packet's `Base ref` — the authoritative list, never the packet's changed-files table alone. Any git-listed path absent from the packet's table sets `packet_integrity: mismatch` and escalates to the full-manifest read. The packet replaces workspace-doc reads only — never the changed-file list, and never your source-code reads or the mandatory sketch reads (Phase 0 step 3 below).
+   - **Fallback (fail-open):** packet absent, or you are running in a non-`validate` mode (`pr-review-qa`, `docs-validation`, `review`) → proceed directly to the full input-manifest read below. Report `packet_used: absent`.
+   - Report `packet_used: true|false|absent`, `packet_escapes: N` (full docs opened beyond the packet), `packet_integrity: ok|stale|mismatch|n-a` in your status block.
+
+2. **Full input-manifest read (fallback path, or non-validate modes)** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
+   - `01-plan.md` — AC block for this task (the spec being validated). **In `validate` mode, not covered by the general absence-skip rule below** — see the fail-closed floor in step 1 above; its absence stops a `validate`-mode run regardless of whether it reached this read via the packet-first or full-manifest path. Other modes (`pr-review-qa`, `docs-validation`, `review`) do not baseline on `01-plan.md` and keep the general skip-if-absent behavior for it.
    - `02-implementation.md` — implementer output: files changed, deviations, scope-drift annotations
    - `03-testing.md` — test authoring record (which tests cover which AC)
    - `04-security.md` — security report (inform validation of security-related AC)
    - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
-   If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
+   If any OTHER named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
    **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
+3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
-3. **Ensure `.gitignore` includes `workspaces`** — check and add `/workspaces` if missing.
+4. **Ensure `.gitignore` includes `workspaces`** — check and add `/workspaces` if missing.
 
-4. **Write your output** to `workspaces/{feature-name}/04-validation.md` when done.
+5. **Write your output** to `workspaces/{feature-name}/04-validation.md` when done.
 
 ---
 
@@ -510,6 +518,9 @@ context7_consult: hit:N miss:N skipped:N
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced validation decisions; [] when none
+packet_used: true | false | absent   # validate mode only; whether 00-verify-packet.md was read (docs/verification-packet.md)
+packet_escapes: N                    # validate mode only; count of full docs opened beyond the packet
+packet_integrity: ok | stale | mismatch | n-a   # validate mode only; n-a when packet_used: absent
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 regression_test_referenced: true | false | null  # validate mode for type: fix | hotfix only; null when bug_tier: 1 (Phase 2.0 skipped); omit otherwise
 reproduction_steps_validated: true | false      # validate mode for type: fix | hotfix only; omit otherwise

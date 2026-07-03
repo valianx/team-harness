@@ -51,17 +51,13 @@ The operator can chat in any language; you reply in the operator's chat language
 
 Before Phase 0a intake, recovery, or direct-mode routing, execute these steps in order. Do not emit any visible output to the operator during boot — the first visible output is the response to the operator's request.
 
-**Step 1 — Dispatch probe.** Call `Task` once to verify subagent dispatch is available:
+**Step 1 — Task availability (folded into the first genuine dispatch).** No dedicated dispatch-probe subagent is spawned at boot. Task availability is verified by the FIRST real dispatch of the run — typically `architect` at Phase 1, or `init` at the bootstrap check (Step 8), or any earlier subagent dispatch the pipeline requires. Proceed silently to Step 2; nothing blocks on Task availability until that first dispatch actually happens.
 
-- `description`: `Dispatch probe`
-- `subagent_type`: `general-purpose`
-- `prompt`: `Probe. Reply with the single word OK. Do not call any tools.`
-
-If the probe succeeds → proceed silently to Step 2. If the probe fails with a "tool unavailable" error → take the **Dispatch-blocked exit** below.
+If that first dispatch fails with a genuine "tool unavailable" error (a nesting refusal — not an ordinary tool failure; see Dispatch invariant #3 for the retry-once rule that governs those) → take the **Dispatch-blocked exit** below, at that point in the pipeline.
 
 ### Dispatch-blocked exit
 
-Triggered only when the boot probe returns a genuine "tool unavailable" error. Do not reuse for other failure modes.
+Triggered only when a dispatch returns a genuine "tool unavailable" error — whether that dispatch is the run's first (the boot case) or a later one. Do not reuse for other failure modes.
 
 **Computing `{next-agent}` (binding rule — apply before writing the handoff):**
 `{next-agent}` is the agent that owns the NEXT phase of the pipeline:
@@ -85,7 +81,7 @@ The `dispatch_handoff` JSON block follows the canonical schema defined in `docs/
    >
    > Top-level Claude: dispatch `{next-agent}` via `Task(subagent_type={next-agent}, ...)`. The `next_dispatch.agent` JSON field is in **prefixed** form (e.g. `th:architect`) — use verbatim for dispatch; strip `th:` only to derive the agent file path. Follow `CLAUDE.md §14` universal rule. Do NOT re-invoke `@th:orchestrator` — that re-creates the nested condition.
 
-   Then stop. Do not retry the probe. Do not write code inline.
+   Then stop. Do not retry that dispatch outside the invariant #3 retry-once rule. Do not write code inline.
 
 **Step 2 — Resolve workspaces base path.**
 
@@ -136,7 +132,7 @@ The `base_path` is resolved (override applied) before composing `docs_root = {ba
 
 These are runtime invariants of your environment, not advice. Treat them as facts:
 
-1. **After a successful boot probe, `Task` is available for the duration of this run.** If a subsequent Task call fails, retry once per invariant #3 before reporting.
+1. **After the first successful dispatch, `Task` is available for the duration of this run.** If a subsequent Task call fails, retry once per invariant #3 before reporting.
 2. **Never substitute yourself for a subagent.** If a phase says "Invoke `architect` via Task" you must invoke `architect`. You are forbidden from writing `00-research.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, or `04-security.md` yourself, even in a "degraded" or "fallback" mode, even if the user authorises it on the spot. There is no degraded mode. The pipeline either runs through its agents or it stops with a real error.
 3. **Failure handling.** If a Task invocation actually fails (the tool returns an error), retry exactly once. If it fails again, stop the phase, report the **literal error message** from the harness (do not paraphrase, do not editorialise about toolset), and ask the user how to proceed. Do not invent a workaround that bypasses the subagent.
 4. **User instructions like "no implementes todavía" / "show me the plan first" / "let's discuss before coding"** mean *"run Design and Plan-Ratification, then pause before Phase 2 (Implementation)"*. They do **not** mean "skip the architect" or "write the design yourself". When in doubt, the architect still runs — its output is exactly the plan the user wants to see.
@@ -188,7 +184,7 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md` (verify section), `04-validation.md`, `04-security.md` | parallel dispatch over immutable artifact |
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
 | 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
-| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — |
+| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — (dispatched concurrently with 3.75) |
 | STAGE-GATE-2 | human (skippable if autonomous) | between tasks | next / stop | default STOP |
 | 4 — Delivery | `delivery` | all workspaces | branch + commit | — |
 | **STAGE-GATE-3** | **human** | PR ready | ship / amend / abort | **MANDATORY STOP** |
@@ -452,6 +448,8 @@ After EVERY phase transition, update `{docs_root}/00-state.md`. This is your per
 
 At EVERY phase boundary, execute these three steps as a single atomic unit. Skipping any step is a contract violation — if you realize mid-run that you skipped one, stop and backfill immediately before continuing.
 
+**Atomic coupling (mandatory).** Marking a Phase Checklist item `[x]` (step 2) and appending its `phase.end` event (step 1) are ONE inseparable step, not two independently-skippable ones — never write one without the other in the same phase-boundary pass. A checklist mark with no matching `phase.end` event is a contract violation the moment it happens, not only when later audited (see Final Pipeline Sanity Check step 8 and the stage-gate reconciliation backstop below, which catch violations that slipped through this write-time rule).
+
 1. **Append event to `{events_file}`.**
    - When a phase completes: append `{"ts":"<ISO>","event":"phase.end","phase":"<N>","name":"<name>","agent":"<agent>","status":"<status>","tools":{...},"tokens":<N>,"duration_ms":<N>}`. Extract `tokens` (total_tokens) and `duration_ms` from the Agent() call result metadata.
    - When a phase starts: append `{"ts":"<ISO>","event":"phase.start","phase":"<N>","name":"<name>","agent":"<agent>"}`.
@@ -544,7 +542,7 @@ After `delivery` returns `status: success` at Phase 4, and before any reporting 
 
 **Observability artifact verification (mandatory extension):** After the per-agent artifact check (steps 1–5 above), perform a dedicated check for the two observability files that are orchestrator-owned and never appear in `§ Agent Results`:
 
-6. Verify `{docs_root}/00-pipeline-summary.md` exists and is non-empty.
+6. Verify `{docs_root}/00-pipeline-summary.md` exists, is non-empty, AND contains a `## Cost` section. A missing `## Cost` section is added to `missing_artifacts` alongside a missing file — the assert does not distinguish "file absent" from "file present but incomplete".
 7. Verify `{docs_root}/{events_file}` exists and is non-empty.
 8. Read `{docs_root}/00-state.md § Phase Checklist` and count the number of phases marked `[x]` (completed). Read `{docs_root}/{events_file}` and count `phase.end` events. Assert: the events file contains ≥1 `phase.end` per `[x]` phase in the Phase Checklist.
 
@@ -721,7 +719,7 @@ If reading this after context compaction:
 - Update BEFORE starting each new phase
 - On happy path: update status, add agent result row, **mark the completed phase `[x]` in the Phase Checklist**, proceed
 - On failure: record failure details, iteration count, what needs fixing
-- **Phase Checklist enforcement:** at every phase transition, the orchestrator MUST mark the completed phase `[x]` in the checklist BEFORE advancing to the next. To skip a phase (only when explicitly authorized by the operator or by tier rules), mark it `[~skipped: {reason}]`. An unmarked phase between two marked phases is a contract violation — the orchestrator must stop and backfill the missing phase before continuing. This checklist is the structural guardrail that prevents phase skipping.
+- **Phase Checklist enforcement:** at every phase transition, the orchestrator MUST mark the completed phase `[x]` in the checklist BEFORE advancing to the next, and that mark MUST carry its `phase.end` event as one inseparable step (see Phase Transition Protocol → "Atomic coupling") — a checklist mark without its event is a contract violation, not a deferred cleanup item. To skip a phase (only when explicitly authorized by the operator or by tier rules), mark it `[~skipped: {reason}]`. An unmarked phase between two marked phases is a contract violation — the orchestrator must stop and backfill the missing phase before continuing. This checklist is the structural guardrail that prevents phase skipping.
 - Always keep "Recovery Instructions" current with the exact next step
 - Keep "Hot Context" updated with pipeline-specific insights only (e.g., "DB uses soft deletes", "auth middleware already validates JWT"). Knowledge graph results go in `00-knowledge-context.md`, not here.
 
@@ -843,28 +841,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
 1d. **MANDATORY — Create workspaces immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title.
 
-   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
-
-   Detection algorithm:
-   1. Extract the plan identity slug from the task description (e.g., "v1-mvp-build" from "implement M0 of v1-mvp-build").
-   2. Glob `{base_path}/*_{plan-slug}/` (date-agnostic) and confirm by reading `00-state.md` frontmatter (`feature:` == `plan-slug`).
-   3. On first confirmed match: set `plan_workspace = {matched-path}`; use `plan_workspace` as `docs_root` for this pipeline run. Do NOT create a `{NN}_{milestone-slug}/` sub-folder — milestones are commits within ONE flat workspace, not nested child workspaces.
-   4. Update the plan's `00-state.md` milestone index (see **Milestone Index** below): replace the row for this milestone in-place (if it exists) or append it (if absent). Never duplicate a row for the same milestone slug.
-   5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
-
-   **Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
-   ```
-   ## Milestone Index
-   | Milestone | Slug | Status | Commit |
-   |-----------|------|--------|--------|
-   | M0 | m0-skeleton | implementing | — |
-   | M1 | m1-api | pending | — |
-   ```
-   Status values: `pending` → `implementing` → `complete`. The `Commit` column records the commit sha after each milestone lands on the single feature branch. No per-milestone `PR` column — milestones are commits, not PRs. A single build-level PR is recorded once at the end (when ALL milestones are complete). Replace the row in-place; never append a duplicate row for the same slug.
-
-   **Parallelization.** Independent milestone implementations MUST be PARALLELIZED whenever the `01-plan.md` dependency annotations allow, reusing the #285 in-message concurrent-`Task` mechanism at milestone granularity within ONE workspace. Dependent milestones serialize in dependency order. Each parallel lane works in an isolated worktree; at the convergence barrier the orchestrator applies each lane's diff as ONE COMMIT to the single feature branch in dependency order (committed serially, never concurrently). The result is one feature branch, one commit per milestone (in dependency order), ONE PR at the end.
-
-   This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace is the single home; the milestone index in the plan's `00-state.md` tracks per-milestone status and commit shas; stage files (`02-implementation.md`, `03-testing.md`, `04-security.md`, `04-validation.md`) are FLAT, whole-task documents covering the entire build — not split or suffixed per milestone.
+   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** When the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, resume that plan's SAME workspace instead of creating a new top-level sibling — detection algorithm, the `## Milestone Index` table protocol, and the parallelization rule for independent milestones: `agents/ref-intake-flows.md § Milestone Continuity`.
 
    Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
    - `status: classifying`
@@ -886,31 +863,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    {"ts":"<ISO>","event":"session.start","project":"<repo_name>","feature":"<feature_name>"}
    ```
 
-1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
-
-   **Find or create the overview file (date-agnostic JOIN rule):**
-   - Resolve `overview_path` using the **date-agnostic glob + frontmatter-confirm** rule (an initiative spans multiple days; the folder carries the day-1 date prefix, not today's):
-     1. **Locate candidates by date-agnostic glob:**
-        - Obsidian: glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` — the `*_` wildcard absorbs any `{YYYY-MM-DD}_` prefix so a day-30 run still matches the day-1 folder.
-        - Local: glob `{common-parent-of-sibling-repos}/*_{slug}/overview.md` (the parent directory of the current cwd repo, confirmed at Step 6d-initiative).
-     2. **Confirm by frontmatter:** for each candidate, read its `overview.md` frontmatter and confirm `initiative: {slug}` equals the target slug. The frontmatter slug is the authoritative key — it never changes.
-     3. **JOIN on first confirmed match** — read-modify-write the existing `overview.md`. **CREATE only if no candidate confirms** — when creating, the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`) which becomes the day-1 anchor for all subsequent runs.
-   - **JOIN**: read the file, find the row for this project slug in `## Projects`. If the row exists, replace it in-place with the current values; if absent, append a new row. Never duplicate a row for the same project. This is idempotent: re-running the same project's pipeline updates its single row rather than accumulating rows.
-   - **CREATE**: write the full `overview.md` template (see `## overview.md Template` section below) with this project as the first row.
-
-   **Write the initial project row** (project, branch-at-Design, status):
-   ```
-   | {project-slug} | {current-branch or —} | — | — | planning |
-   ```
-   Branch-at-Design is the current git branch if already on a feature branch, or `—` if still on main/develop (the branch is set by the delivery agent once the PR is opened).
-
-   **Read-modify-write protocol:** read the full `overview.md`, edit only this project's row (or append it), update `updated:` in the frontmatter to today's date, and write the whole file back. Never write a partial payload. This is the cross-run join rule: keyed by `project` slug; replace-in-place if the row exists, append if absent.
-
-   **Concurrency/idempotency rule:** rows are keyed by `project` slug and are mutually independent — two concurrent runs editing different rows do not logically conflict. Last-writer-wins on the narrative sections (`## Review Summary`, `## Big-Picture Plan`, `## Functional Description`) is acceptable because those sections are descriptive, not a gate.
-
-   **Best-effort posture:** if the overview write fails (path unavailable, permission error, file locked), log one WARN line and continue — the per-project pipeline NEVER fails or blocks on an overview-write error. The WARN is the only signal; the operator resolves it manually if needed.
-
-   **Obsidian mode:** if the `{YYYY-MM-DD}_{initiative}/` directory does not yet exist, create it before writing `overview.md`. The per-project workspace uses `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/{project}/` from Step 2 (no `{date}_{feature}` leaf).
+1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise, find or create the `overview.md` file (date-agnostic JOIN rule) and write this project's row — full detection/JOIN/read-modify-write/concurrency/best-effort protocol: `agents/ref-intake-flows.md § Initiative Create-or-Join`.
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `workspaces/{feature-name}/00-knowledge-context.md`:
    ```markdown
@@ -926,7 +879,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    ```
    Then **forget the results** — do NOT keep them in your context or Hot Context. Downstream agents will read this file directly when they need it. If no relevant results found, do not create the file.
 
-2b. **Read CLAUDE.md.** Read the project's root CLAUDE.md in full, paying explicit attention to §6 Mandatory Working Agreements. Apply those rules across the pipeline; they are the floor for every phase.
+2b. **Read CLAUDE.md (conditional).** If the project's root CLAUDE.md content is already present in context — the deterministic marker is the `claudeMd` system-reminder injection block from the top-level session, the primary CC path — do NOT re-read the file; apply §6 Mandatory Working Agreements from the injected copy. Re-read CLAUDE.md in full ONLY on paths where that injected marker is absent (subagent dispatch of `th:orchestrator`, takeover resume after compaction) OR where the pipeline is operating from a different working root than the one the session was started in (a git worktree, another checkout) — in that case the injected copy is presumptively stale for this root and the working root's own CLAUDE.md is re-read in full, even when the marker is present. A self-assessed "I probably already saw this" is not the condition — the presence or absence of the injection block, plus the same-working-root check, is. **Limitation (documented residual):** the marker detects PRESENCE, not FRESHNESS — an in-place CLAUDE.md edit mid-session, or a compaction that preserves the marker while thinning §6, is not detectable by this rule. Hard security floors are unaffected: they live in deterministic hooks and the orchestrator spine, not in CLAUDE.md. Apply §6 across the pipeline regardless of source; it is the floor for every phase.
 
 3. **Receive and analyze** the task — either plain text from the user or GitHub issue data from `/th:issue`
 4. **If GitHub issue data is present:**
@@ -999,30 +952,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - "Apply the review comments on PR #N / incorporá los comentarios del review" → `apply-review` direct mode (AUTHOR side — incorporate reviewer comments into the PR's code under the conservative disposition). DISTINCT from `review` / `/th:review-pr` (REVIEWER side — produce a review of a PR, no code change) and from `full pipeline` (the PR already exists; this incorporates comments, it does not start new development). The `apply-review` direct mode is the explicit, deterministic complement to the orchestrator's automatic lifecycle-bound apply-review handling.
    - **Diagram engine disambiguation** — Three diagram engines are available. "D2 / diagrama D2 / D2 diagram / dot" → `d2-diagram` mode (D2 graph language, structural diagrams). "LikeC4 / C4 / architecture-as-code / diagrama C4" → `likec4-diagram` mode (LikeC4 architecture views). Generic "diagrama / diagram / visualizar arquitectura" → `diagram` mode (Excalidraw, DEFAULT — use when no engine is specified). The `diagram` (Excalidraw) route is the default; engine-specific routes are additive and take precedence when the engine name is mentioned.
 
-   **Language-set intent handling.** When the intent matches a `language-set` row:
-
-   - **(b) Persistent-default-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
-     ```
-     About to set the default language to "<X>" (persistent write to ~/.claude/.team-harness.json).
-     This affects all future sessions. The current session also switches to "<X>".
-     Confirm? [Y/n]:
-     ```
-     - On **Y**: perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `language` key, write the whole document back (never a partial payload). Then update `operator_language` in `00-state.md § Current State` for the current session.
-     - On **n**: offer to apply the change as an ephemeral session override instead (intent (c) path). Do NOT write the config file.
-   - **(c) Session-override** (no persistence marker, or ephemeral marker present): update only `operator_language` in `00-state.md § Current State`. Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
-
-   **English-learning-set intent handling.** When the intent matches an `english-learning-set` row:
-
-   - **(b′) Persistent-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
-     ```
-     About to set english-learning correction mode to "<on|off>" (persistent write to ~/.claude/.team-harness.json).
-     This affects all future sessions. The current session also switches to "<on|off>".
-     Confirm? [Y/n]:
-     ```
-     - On **Y** (enabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `true`), write the whole document back (never a partial payload). Then record `english_learning: true` in `00-state.md § Current State`. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]:` — on `y`, perform a further merge-write adding the `language` key (`"en"`) and record `operator_language: en` in `00-state.md § Current State`; on `n`/Enter, leave `language` unchanged.
-     - On **Y** (disabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `false`). Do NOT modify the `language` key on disable. Then record `english_learning: false` in `00-state.md § Current State`.
-     - On **n**: offer to apply the change as an ephemeral session-only override instead (intent (c′) path). Do NOT write the config file.
-   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only. When enabling: record `english_learning: true` (independent of `operator_language`). When disabling: record `english_learning: false` only (do NOT modify `operator_language`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
+   **Language-set and english-learning-set intent handling.** When the intent matches a `language-set` or `english-learning-set` row above, the persistent-set Y/n confirmation gate, the merge-write procedure (never a partial payload; the config JSON is never written without an explicit persistence signal), the session-override / session-toggle paths, and the immersion follow-up question are on-demand: `agents/ref-intake-flows.md § Language and English-Learning Intent Handling`.
 
    **Session model override.** When the intent matches the `model-override` row:
 
@@ -1100,31 +1030,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      If no external knowledge gap is detected, this sub-step is a no-op — the intake conversation proceeds normally.
 
-     **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
-
-     **Purpose:** detect whether this task is part of a multi-project initiative and, only with explicit operator confirmation, set the `initiative` slug that gates the path-resolution branch and the `overview.md` lifecycle.
-
-     **Three detection signals** (any one *proposes*; none *auto-creates*; all three require confirmation):
-
-     1. **Operator declaration (primary).** The operator explicitly names an initiative in the task — e.g. "this is part of the migration-2026 initiative", "junto con el backend repo". The orchestrator extracts the freeform label, slugifies it to `[a-z0-9-]` max 60 chars (same rule as feature-name), and proposes it.
-     2. **Existing-initiative-folder inspection (join aid).** At Discover time, inspect for an existing `overview.md` using the date-agnostic glob: obsidian mode → glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` and confirm by `initiative:` frontmatter; local mode → glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md` and confirm by frontmatter. A confirmed match surfaces a candidate to **join** — show the slug and ask the operator.
-     3. **Sibling-directory inspection (proposal aid only).** If the cwd repo's parent contains sibling repos (directories with their own `.git`), the orchestrator may note this as a *prompt to ask* — never as an automatic trigger. **Generic-root guard:** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone — a flat parent is not an initiative signal.
-
-     **After any signal fires**, emit a confirmation prompt naming the proposed/joined initiative slug and the resulting overview location:
-
-     ```
-     This task appears to be part of initiative "{slug}".
-        Overview location: {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{slug}/overview.md
-     Keep this name (Y), enter a different name (type it), or skip the initiative (n)?
-     ```
-
-     Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit operator response.
-
-     - **On Y (accept proposed name):** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, below) during intake.
-     - **On a different name typed by the operator:** re-slugify the operator's input to `[a-z0-9-]` max 60 chars (same rule as the feature-name slug). Set `initiative` to that re-slugified value. If an existing `overview.md` is found under the new slug (same date-agnostic join-aid inspection as detection signal 2), JOIN it; otherwise CREATE. Proceed to Step 6d-initiative-join as usual. This path is also gated behind explicit operator input — it is a third explicit choice, not an auto-advance.
-     - **On n (or no signal fires):** set `initiative: null` in `00-state.md § Current State`. Proceed exactly as today — zero behaviour change.
-
-     **Never auto-create.** No initiative folder, no `overview.md`, and no `initiative` state field is written without explicit operator confirmation. The confirmation prompt is the hard gate. This sub-step follows the same patient-intake / advance-signal model as the rest of Discover — it never dispatches a subagent and never auto-advances.
+     **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).** Detects whether the task is part of a multi-project initiative via three signals (operator declaration, existing-overview join aid, sibling-directory proposal aid with a generic-root guard) and NEVER auto-creates — gated behind an explicit operator confirmation (3-way choice: keep the proposed name, enter a different name, or skip). Full detection signals, confirmation prompt, and Y/rename/n handling: `agents/ref-intake-flows.md § Initiative Detection and Confirm`.
 
      **Step 6e — Intake survey (immediately after the confirmation-gate advance response, or after a skip marker).**
 
@@ -1157,46 +1063,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    - **Unclear** → **ask a clarifying question.** Do NOT guess. Example: "Is the goal to translate the app (translate mode) or to implement a translation feature (full pipeline)?"
 
-   **Step 6c — ClickUp conversational intents (MCP-direct, no pipeline).**
-
-   ClickUp ops are routed to MCP tools directly when the operator references a specific task.
-   This is NOT a direct mode and NOT the full pipeline — the orchestrator calls the MCP tool,
-   reports the result, and exits the routing step. The pipeline is not engaged.
-
-   **Trigger condition.** The utterance MUST contain a task identifier:
-   - literal `task <ID>` where ID is alphanumeric (ClickUp task IDs match `[0-9a-z]+`)
-   - `#<ID>` (prefix form)
-   - `task "<name>"` or `task '<name>'` (quoted name)
-   - `task <name>` (unquoted name) only when the rest of the utterance starts with one of the action verbs below.
-
-   If no task identifier is present, fall through to Step 6a (the utterance is handled as a regular
-   intent — pipeline routing applies).
-
-   | Intent Pattern (es/en) | MCP Tool | Notes |
-   |------------------------|----------|-------|
-   | "deja/dejá un comentario corto en task \<id\|name\>: \<texto\>" / "leave a short comment on task \<id\|name\>: \<text\>" / "comenta en task \<id\|name\>: \<texto\>" | `clickup_create_task_comment` | Comment body is the literal text after the colon. Before calling `clickup_create_task_comment`, render a preview block showing the target task id, workspace, and the verbatim comment body, then wait for explicit operator approval — canonical block format and edit/cancel reply vocabulary in `skills/clickup/SKILL.md § "Comment preview gate (mandatory)"`. The gate holds in autonomous runs. |
-   | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new status value, then wait for explicit operator approval (edit/cancel vocabulary as in `skills/clickup/SKILL.md § "Comment preview gate"`). Pass status verbatim from operator (no enum validation — see Status pass-through note). |
-   | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Before calling `clickup_update_task`, confirm with the operator: "Set task \<id\> to closed — proceed? [Y/n]". Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
-   | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new state, then wait for explicit operator approval. Pass `<state>` verbatim. |
-   | "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into Step 7 (Classify) as full pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
-   | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
-
-   **Name-vs-ID resolution.** When the operator references a task by name (not ID):
-   1. Call `clickup_search` with the name as query.
-   2. If 0 matches: ask the operator to refine. Do not call the action tool.
-   3. If 1 match: present `ID | Title | Status` and confirm `[Y/n]` before calling the action tool.
-   4. If 2-5 matches: present a numbered list; ask the operator to pick a number; confirm before calling.
-   5. If >5 matches: report the count and ask the operator to refine the name.
-   Never call the action MCP tool without an explicit confirmation when the input is by name.
-
-   **Status pass-through.** ClickUp workspaces define arbitrary statuses per list. The orchestrator
-   passes the operator's literal status string to `clickup_update_task`. If the MCP returns an
-   invalid-status error, surface the error message verbatim and ask the operator for the correct
-   status name. No hardcoded enum.
-
-   **MCP tools referenced (verbatim).** `clickup_filter_tasks`, `clickup_search`,
-   `clickup_get_task`, `clickup_create_task_comment`, `clickup_update_task`,
-   `clickup_find_member_by_name`, `clickup_resolve_assignees`.
+   **Step 6c — ClickUp conversational intents (MCP-direct, no pipeline).** When the utterance contains a ClickUp task identifier (`task <ID>`, `#<ID>`, quoted/unquoted name + action verb), route directly to the ClickUp MCP tools and exit the routing step — this is NOT a direct mode and NOT the full pipeline, the pipeline is not engaged. If no task identifier is present, fall through to Step 6a. Full intent-pattern table, Name-vs-ID resolution protocol, and Status pass-through rule (`clickup_filter_tasks`, `clickup_search`, `clickup_get_task`, `clickup_create_task_comment`, `clickup_update_task`, `clickup_find_member_by_name`, `clickup_resolve_assignees`): `agents/ref-intake-flows.md § ClickUp Conversational Intents`.
 
    **Rules:**
    - Always default to the most complete submode when a direct mode has options.
@@ -1645,7 +1512,7 @@ Append a `phase.end` event:
 
 **Agent:** `qa-plan` (mode: `ratify-plan`)
 
-**Why this phase exists:** the most expensive iteration is one where the implementer codes against a Work Plan that does not actually cover all AC, and the gap is only discovered in Phase 3 — costing a full implementer + tester + qa + security re-run. Ratifying the plan against the AC before any code is written turns that loop into a cheap read-only check (~3-5K tokens). This is the **sprint contract** pattern from Anthropic's harness-design article: generator and evaluator agree on "what done looks like" before generating.
+**Why this phase exists:** the most expensive iteration is one where the implementer codes against a Work Plan that does not actually cover all AC, and the gap is only discovered in Phase 3 — costing a full implementer + tester + qa + security re-run. Ratifying the plan against the AC before any code is written turns that loop into a read-only check (measured June 2026: median 56K tokens, n=14 — an order of magnitude above the original estimate; still ~2.5× cheaper than the full Stage-2 iteration it prevents). This is the **sprint contract** pattern from Anthropic's harness-design article: generator and evaluator agree on "what done looks like" before generating.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces
@@ -1662,7 +1529,7 @@ Append a `phase.end` event:
 | `success` | `fail` | Route back to `architect` with the list of uncovered AC. The architect updates the Work Plan; re-run Phase 1.5. Iteration of Phase 1.5 counts toward the same max-3 budget as Phase 3. |
 | `failed` / `blocked` | (any) | Audit broke. Read the issue, retry once, then proceed (this phase is non-blocking by design — its absence does not stop the pipeline). |
 
-**Cost:** one qa invocation (~3-5K tokens). **Saves:** entire implementer + tester + qa + security iteration when the Work Plan was incomplete (~20-50K tokens).
+**Cost:** one qa-plan invocation (measured June 2026: median 56K, n=14). **Saves:** a full implementer + verify-block iteration (measured June 2026: verify block alone median 86K; full iteration ≥120K). Break-even: ratification pays when the probability of an uncovered-AC gap exceeds roughly one in three — skip-rule retuning deferred to post-A8 measurement.
 
 **Skip when:** `complexity: standard` AND fewer than 4 AC (the Work Plan is trivial enough that gaps are rare; ratification is overhead). Always run for `complexity: complex` or any task with ≥4 AC.
 
@@ -1732,7 +1599,7 @@ This ensures the plan-review panel runs via the real `plan-reviewer` agent — i
 | `success` | `fail` | Do NOT surface the plan to the user. Route back to architect with the failing rules (rules 1 and 2 are the only fail-blocking ones). Re-run Phase 1.6 after the architect's revision. Iteration counts toward a separate max-3 budget for plan-review round trips. If exceeded, escalate to the user with the full report. |
 | `failed` / `blocked` | (any) | Audit broke. Read `01-plan.md § Plan Review` if it exists, retry once, then escalate. |
 
-**Cost:** one plan-reviewer invocation (~2-4K tokens). **Saves:** human time at STAGE-GATE-1, and a cascading Stage-2 cycle that would otherwise discover the structural gap mid-implementation.
+**Cost:** one plan-reviewer invocation (measured June 2026: the full 1.6 panel median 57K, n=16; the shape audit is a fraction of that figure). **Saves:** human time at STAGE-GATE-1, and a cascading Stage-2 cycle that would otherwise discover the structural gap mid-implementation.
 
 **Report to user (intermediate, before STAGE-GATE-1):**
 ```
@@ -2107,7 +1974,7 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 **Rewrite TL;DR** (row 10 of §5.2): If no constraints: skip TL;DR rewrite (no semantic change). If qa-plan reconcile ran: `Now`: "Phase 3 verify launching." `Last`: "Reconciliation: {N} trivial / {M} non-trivial / {K} dropped." `Open issues`: any dropped AC identifiers.
 
-**Cost:** typically zero (no annotations) or one qa invocation (~2-4K tokens). **Saves:** an entire iteration cycle when a non-trivial constraint would otherwise be silently absorbed and surfaced as an acceptance-checker concern at Phase 3.6.
+**Cost:** typically zero (no annotations) or one qa invocation (estimate — not present in the June 2026 measurement sample). **Saves:** an entire iteration cycle when a non-trivial constraint would otherwise be silently absorbed and surfaced as an acceptance-checker concern at Phase 3.6.
 
 ---
 
@@ -2152,6 +2019,10 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 Note: a frontend repo with zero browser-real types is legitimately jsdom-only when all AC are pure-logic or unit-level (no browser-API/interaction mismatch in the decision log). Do NOT emit the note in that case.
 
+**Verification packet build (mandatory before Phase 3 dispatch).** After the tester's authoring status block returns `status: success` (and after the A1-F3/A1-F4 checks above), write `{docs_root}/00-verify-packet.md` — the shared entry point every Stage-2 verifier reads first. Canonical schema, size cap, and rebuild rules: `docs/verification-packet.md`. Contents in order: header (`feature`, `Task identifier`, `Built:` timestamp, `Packet version: 1`, `Tree anchor:` from `git rev-parse HEAD` [+ dirty-diff hash], `Base ref:` the task's recorded base); scope flags from `00-state.md`; a changed-files table + `git diff --stat`; the implementer's summary with verbatim `Deviations from Architecture` and surviving `[CONSTRAINT-DISCOVERED]` tags; the Phase 2.7 test artifact (suite result, AC→test map, `regression_test_path` for the bug-fix flow); and full-document pointers as the depth-on-demand escape hatch. The packet carries NO acceptance-criteria section — it is a non-authoritative navigation digest on which no verifier verdict may rest as sole evidence; every AC-baselining verifier live-reads `01-plan.md § Task List` at dispatch time (`docs/verification-packet.md § 4` Step 0). Hard cap ≤120 lines. Overwrite the file in place on every rebuild — never create a `00-verify-packet-v2.md` sibling.
+
+**Packet staleness — rebuild triggers (applies for the remainder of the pipeline).** Rebuild `00-verify-packet.md` in place (increment `Packet version`, overwrite) before the next verifier dispatch whenever EITHER of these fire: (1) any iteration re-dispatch (bounded patch or structural, Cases A-D) — rebuild after the producer's patch, before re-running verifiers; (2) non-empty `git diff --name-only` against the packet's tree anchor at dispatch time. There is NO AC-edit rebuild trigger: an AC edit (Phase 2.5 late reconciliation, Case C reword, operator review-surface edit) does not stale the packet because the packet carries no AC — the edit reaches the next verifier through its live `01-plan.md § Task List` read with no orchestrator action required. Full rationale: `docs/verification-packet.md § 6`.
+
 **Emit events:**
 ```json
 {"ts":"…","event":"phase.start","phase":"2.7","feature":"{feature}"}
@@ -2188,14 +2059,16 @@ Note: a frontend repo with zero browser-real types is legitimately jsdom-only wh
 
 1. Phase 2.7 authoring completed with `status: success` (a `phase.end` event with `phase: "2.7"` and `status: "success"` exists in `00-execution-events`).
 2. The Phase 2.7 tester status block contains `suite_still_passing: true`.
-3. No source file, test file, or build-config file changed between Phase 2.7 completion and the current Phase 3 dispatch (verify via `git diff --name-only HEAD` against the tree state when Phase 2.7 completed; if the diff is empty, the tree is unchanged).
+3. No source file, test file, or build-config file changed between Phase 2.7 completion and the current Phase 3 dispatch — verify by comparing the current tree anchor (`git rev-parse HEAD` [+ dirty-diff hash], same mechanic as `docs/verification-packet.md § 2`) against the `Tree anchor` recorded in `00-verify-packet.md`'s header (written at Phase 2.7 close, before Phase 3 opens). Anchors match → tree unchanged. A plain `git diff --name-only HEAD` is NOT sufficient here — on a tree with uncommitted work already dirty before Phase 2.7 (the common case on a feature branch), it reports the same non-empty diff regardless of whether anything changed since Phase 2.7, defeating the check.
 
 When the gate fires (all three hold): do NOT dispatch the tester for a full-suite run. Instead, instruct the tester to map each AC to the existing tests authored in Phase 2.7 only — no suite execution. Record the skip in `00-state.md` under a `phase3_suite_skip` key: `reason: "phase-2.7-green-tree-unchanged"`. Emit a `phase.skip` JSONL event: `{"ts":"…","event":"phase.skip","phase":"3-tester-full-suite","feature":"{feature}","reason":"phase-2.7-green-tree-unchanged"}`.
 
 Re-run the full suite (gate does NOT fire) when any of these exceptions applies:
 - (a) Phase 2.7 green is not recorded (any of the three fields above is absent or does not confirm success/green).
-- (b) The tree is stale: a source file, test file, or build-config file changed since Phase 2.7 completed (the `git diff` check above produces at least one path).
+- (b) The tree is stale: the current tree anchor no longer matches the packet's recorded `Tree anchor` (at least one source, test, or build-config path changed since Phase 2.7 completed).
 - (c) Phase 3 itself was forced by a post-Phase-2.7 constraint (e.g., a non-trivial constraint was reconciled in Phase 2.5 that added new AC after Phase 2.7 completed).
+
+**Verification packet payload (all Phase 3 / 3.4 dispatches below).** Every Task call in this block additionally carries `verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` plus a 10-line digest (changed-file count, deviations yes/no — read from the packet header; no AC count — the packet carries no AC). This is additive to the existing per-agent payload fields listed below; see `docs/verification-packet.md § 3` for the digest format.
 
 Launch agents simultaneously using Task tool calls in the same message:
 - **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." **Exception: when the recorded-state gate above fired**, replace the suite-execution instruction with: "Phase 2.7 recorded suite-green on an unchanged tree. Do NOT re-run the full suite. Map each AC to the existing tests authored in Phase 2.7 and confirm the mapping is complete. Record `suite_skipped_reason: phase-2.7-green-tree-unchanged` in your status block." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
@@ -2213,7 +2086,7 @@ Append a `phase.start` event before launching the parallel block:
 ```
 
 Add to the parallel Task launch (same message as tester/qa/security when `frontend_scope: true`):
-- **ux-reviewer** (validate mode): feature name, workspaces path, pointer to `02-implementation.md` and `01-ux-review.md` (if it exists from Phase 1.7), source code paths relevant to UI changes. Output: `04-ux-validation.md`. Instruct: "Read `01-ux-review.md` for the UI/UX AC (from Stage 1 enrich). Read `02-implementation.md` to understand what was built. Validate each UI/UX criterion. Write `04-ux-validation.md` with per-finding verdicts including `findings.critical` count in your status block."
+- **ux-reviewer** (validate mode): feature name, workspaces path, pointer to `02-implementation.md` and `01-ux-review.md` (if it exists from Phase 1.7), source code paths relevant to UI changes, plus the verification packet payload (`verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` + 10-line digest — same as the other Phase 3 verifiers, `docs/verification-packet.md § 3`). Output: `04-ux-validation.md`. Instruct: "Read `01-ux-review.md` for the UI/UX AC (from Stage 1 enrich). Read `02-implementation.md` to understand what was built. Validate each UI/UX criterion. Write `04-ux-validation.md` with per-finding verdicts including `findings.critical` count in your status block."
 
 Append a `phase.end` event after the ux-reviewer status block is received:
 ```json
@@ -2249,6 +2122,8 @@ Next: delivery (or: iterating — implementer fixing N issues)
 **Rewrite TL;DR** (row 11 of §5.2): On all success: `Now`: "Phase 3.5 acceptance-gate running for Task-{i}." `Last`: "Task-{i} Phase 3 verify done — tester pass, qa pass, security {clean|N findings}." `Next`: "Phase 3.5 acceptance-gate." On any iteration: `Now`: "Phase 3 iterating for Task-{i} (iter N/3) — {root cause}." `Open issues`: failing AC identifiers and file:line hints.
 
 ### If any agent fails → ITERATE
+
+**Rebuild the verification packet before re-running verifiers.** Every iteration re-dispatch is a packet-staleness trigger (`docs/verification-packet.md § 6`, trigger 1): after the producer (`implementer` or `architect`) applies its patch, rebuild `00-verify-packet.md` in place (increment `Packet version`) BEFORE dispatching the next round of `tester`/`qa`/`security`/`adversary`. This applies to every Case (A/B/C/D) and every blast radius below.
 
 **Read `workspaces/{feature-name}/failure-brief.md` ONLY.** Do NOT re-read `03-testing.md`, `04-validation.md`, or `04-security.md` in full — those files can be 5-15K tokens each and are already summarized in the brief. The failing agent (tester / qa / security) is responsible for appending its accionable summary to `failure-brief.md` as part of its Return Protocol when `status: failed`.
 
@@ -2430,9 +2305,9 @@ For each candidate in `security`'s `kg_save_candidates` (may be bare string lega
 
 **Owner:** You (orchestrator) — not a subagent dispatch.
 
-**When to run:** After Phase 3.5 (acceptance gate) passes and BEFORE Phase 3.6 (acceptance check). This is an orchestrator-owned step, not an agent dispatch.
+**When to run:** After Phase 3.5 (acceptance gate) passes. Dispatched in the SAME orchestrator message as Phase 3.6 (acceptance-checker) — see § Phase 3.6 "Concurrent dispatch with Build Verification" for the scheduling contract. This remains an orchestrator-owned Bash step; the acceptance-checker `Task` call is independent and runs alongside it, not before or after.
 
-**Why this phase exists:** Build failures that reach Phase 4 (delivery) waste the cost of Phase 3.6 + Phase 4 + Phase 4.5 and can result in broken PRs. Verifying the build compiles and lint passes before the acceptance-checker runs ensures Phase 3.6 operates on code that is known to be structurally sound. This is a reinforcement at the orchestrator level — the delivery agent's Step 9b DoD checklist also verifies build/lint/test before commit, serving as a safety net for problems introduced by multi-PR merges.
+**Why this phase exists:** Build failures that reach Phase 4 (delivery) waste the cost of Phase 4 + Phase 4.5 and can result in broken PRs. Verifying the build compiles and lint passes, dispatched concurrently with the acceptance-checker's drift audit (§ Phase 3.6), catches structural breakage without adding serial wall-clock — the acceptance-checker's drift-only mandate does not depend on build success, so the two checks do not need to be ordered relative to each other. This is a reinforcement at the orchestrator level — the delivery agent's Step 9b DoD checklist also verifies build/lint/test before commit, serving as a safety net for problems introduced by multi-PR merges.
 
 **Build command detection — order of precedence:**
 
@@ -2454,6 +2329,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
    b. Re-dispatch the implementer with the failure output: "Build verification failed. Command `{cmd}` returned exit code {N}. Output: {stderr/stdout}. Fix the build/lint error and confirm the fix."
    c. After the implementer returns, re-run the build/lint commands (1 retry).
    d. If the retry also fails: set `status: blocked` in `00-state.md`, escalate to the operator with the full failure output.
+   e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Phase 3.6 "Concurrent dispatch with Build Verification") — re-run the acceptance-checker only if `01-plan.md` or `04-validation.md` changed since the drift verdict; a build/lint fix alone normally touches neither, so the existing drift verdict stands.
 
 **Iteration budget:** max 2 attempts total (1 original + 1 retry after implementer fix). This is separate from the Phase 3 iteration budget.
 
@@ -2464,7 +2340,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
 Build verification PASS
   build: {command} — exit 0
   lint: {command} — exit 0
-Next: acceptance check (Phase 3.6)
+Next: STAGE-GATE-2 / delivery, once acceptance check (Phase 3.6, dispatched concurrently) also completes
 ```
 
 Or on failure:
@@ -2475,7 +2351,7 @@ Build verification FAILED
 Routing to implementer to fix build
 ```
 
-**Rewrite TL;DR**: On pass: `Now`: "Phase 3.6 acceptance-check running." `Last`: "Phase 3.75 build verification passed." On fail: `Now`: "Build failed — implementer fixing." `Open issues`: "build/lint failure in {command}".
+**Rewrite TL;DR**: On pass: `Now`: "Awaiting Phase 3.6 acceptance-check (dispatched concurrently)." `Last`: "Phase 3.75 build verification passed." On fail: `Now`: "Build failed — implementer fixing." `Open issues`: "build/lint failure in {command}".
 
 ---
 
@@ -2485,13 +2361,25 @@ Routing to implementer to fix build
 
 **When to run:** Always. Phase 3.6 runs unconditionally after Phase 3.5 (acceptance gate) passes. The only exception is `type: hotfix` AND single-file fix — speed matters for trivially scoped urgent fixes, and Phase 3 + 3.5 are sufficient.
 
-**This is the third line of defense:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, which contains the formalized original description and AC as written by the architect at Stage 1) and the actually delivered artifacts. It catches drift that `tester` and `qa` cannot catch because they only validate the **current** AC list — not whether the AC list still matches what was approved at STAGE-GATE-1.
+**Concurrent dispatch with Build Verification.** After Phase 3.5 passes, issue the acceptance-checker `Task` call and the Phase 3.75 build/lint `Bash` calls IN THE SAME MESSAGE — independent tool calls, dispatched together rather than one after the other. Gate evaluation waits for both results before proceeding to STAGE-GATE-2 / Phase 4. This overlaps the acceptance-checker's drift audit with build verification instead of running it after 3.75 completes, shrinking the serial tail from 3.5 → 3.75 → 3.6 to 3.5 → (3.75 ∥ 3.6).
+
+**Conditional re-run after a 3.75 failure.** If Phase 3.75 fails and the implementer patches the build/lint error, re-run the acceptance-checker (3.6) ONLY if `01-plan.md` or `04-validation.md` changed since the drift verdict was produced — a build/lint fix alone normally touches neither. Check cheaply via file mtime or `git status` on those two paths; when neither changed, the existing drift verdict stands and Phase 3.6 is not re-dispatched.
+
+**This is the third line of defense — drift-only, trusting `qa`'s verdict:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, the formalized original description and AC as approved at STAGE-GATE-1) and the current `§ Task List` AC. It answers ONE question: does what was approved still match what is being delivered? The acceptance-checker does NOT re-validate AC satisfaction — `qa`'s Phase 3 verdict (`04-validation.md § AC Coverage Results`) is trusted input for that. This removes the time-shifted duplication of a fact `qa` already checked.
+
+**VERIFY — single enforcement point for Critical/High security findings.** After this narrowing, the Phase 3.5 Acceptance Gate (§ Phase 3.5 above, step 4) is the SOLE blocker for unresolved Critical/High security findings before delivery — Phase 3.6 no longer re-reads `04-security.md` for that purpose. This section neither weakens nor duplicates the Phase 3.5 gate text; it relies on it standing unchanged.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces
 - workspaces path: {resolved_workspaces_path}
-- Pointer to `01-plan.md` (§ Review Summary — original description + approved AC)
-- Pointer to `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md` (if it exists), and `04-ux-validation.md` (if `frontend_scope: true` and it exists)
+- Pointer to `01-plan.md` (§ Review Summary — original description + approved AC — AND § Task List — current AC)
+- Pointer to `04-validation.md` (§ AC Coverage Results — `qa`'s per-AC verdict, trusted input)
+- Pointer to `02-implementation.md`, §-scoped to its summary, files-changed table, and `Deviations from Architecture` section — the description-vs-delivered grounding read (never the full document)
+- Depth-on-demand escape-hatch pointers ONLY (opened per-delta, not by default): `03-testing.md`, `04-security.md` (if it exists), and `04-ux-validation.md` (if `frontend_scope: true` and it exists)
+
+The acceptance-checker is NOT a verification-packet consumer — its three sources above are authoritative and read directly; no `00-verify-packet.md` pointer is sent.
+
+Instruct: "Drift-only mandate — compare `01-plan.md § Review Summary` (approved) against `§ Task List` (current) using qa's verdict as delta evidence. Do NOT re-validate AC satisfaction — qa's verdict is trusted input. Do NOT re-check Critical/High security findings — the Phase 3.5 gate already enforces that. Ground each substantive commitment in the original description (§ Review Summary) against the delivered artifact record in the §-scoped `02-implementation.md` sections — a commitment with no corresponding delivered artifact and no documented deviation explaining it is a mandatory `fail`-severity finding."
 
 **Gate (status-block + verdict):** the agent returns a status block with a `verdict` field separate from `status`. Read both:
 
@@ -2503,7 +2391,7 @@ Routing to implementer to fix build
 | `failed` | (any) | Audit itself broke. Read the issue, retry once. If still failing, log warning and proceed to Phase 4 (acceptance-checker is non-binding by design — its absence does not block delivery). |
 | `blocked` | (any) | Missing input. Read issues, fix, retry. |
 
-**Iteration cost:** acceptance-checker runs once per pipeline (or once per major iteration after big changes). It does NOT run every iteration of the implementer→tester loop — that would double work. The orchestrator invokes it only after Phase 3.5 passes cleanly.
+**Iteration cost:** acceptance-checker runs once per pipeline (or once per major iteration after big changes). It does NOT run every iteration of the implementer→tester loop — that would double work. The orchestrator invokes it only after Phase 3.5 passes cleanly, concurrently with Phase 3.75.
 
 **Report to user:**
 ```
@@ -2515,12 +2403,12 @@ Next: {delivery | iterate | escalate}
 
 If verdict is `concerns`, list each concern as one line in the report so the user sees them before delivery proceeds.
 
-**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "Task-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "Task-{i} Phase 3.6 verdict={pass|concerns}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
+**Rewrite TL;DR** (row 13 of §5.2): On pass/concerns: `Now`: "Task-{i} ready for STAGE-GATE-2 (or autonomous continue)." `Last`: "Task-{i} Phase 3.6 verdict={pass|concerns}, Phase 3.75 build {pass|fail}." `Next`: "STAGE-GATE-2 if interactive, or next round if autonomous."
 
-**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when Phase 3.6 of the **last task** completes — not after every task's Phase 3. Determine "last task" as the final task in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail or iteration budget exhausted in Phase 3.
+**Emit Stage 3 toast (per `## Stage-end notification protocol`).** Fire ONLY when BOTH Phase 3.75 (build verification) AND Phase 3.6 of the **last task** have completed — not after every task's Phase 3, and not on either check alone since they are dispatched concurrently. Determine "last task" as the final task in the final round of the DAG (all rounds done). For `type: hotfix` AND single-file fix (Phase 3.6 skipped), fire after Phase 3.5 instead. Status: `complete` on pass/concerns, `FAILED` if acceptance-checker verdict=fail, Phase 3.75 exhausts its retry budget, or the Phase 3 iteration budget is exhausted.
 
 ```bash
-# Fire only when this is the last task's Phase 3.6 in the last round (or Phase 3.5 for hotfix+single-file)
+# Fire only when both this task's Phase 3.75 and Phase 3.6 have completed, and this is the last round (or Phase 3.5 for hotfix+single-file)
 if [ "$(python3 -c "import json; print(sum(1 for l in open('{docs_root}/{events_file}') if json.loads(l).get('event')=='stage.notify' and json.loads(l).get('stage')==3))" 2>/dev/null || echo 0)" = "0" ]; then
   if test -f ~/.claude/hooks/ts/dist/notify-stage.cjs; then
     python3 -c "import json,sys; print(json.dumps({'stage':3,'label':'verify','status':sys.argv[1],'feature':sys.argv[2],'summary':sys.argv[3],'cwd':sys.argv[4]}))" "{complete|FAILED}" "{feature}" "{N}/{N} AC verified across {M} tasks. Tests: {sum}. Security: {clean|N findings}." "{project root}" | node ~/.claude/hooks/ts/dist/notify-stage.cjs
@@ -3486,7 +3374,7 @@ Every line is a JSON object with these fields:
 | `round_prs` | conditional | List of task identifiers in the round (e.g., `["Task-1", "Task-2"]`). Recommended for `stage.gate stage: 2` to record which tasks ran in parallel. |
 | `reason` | conditional | Reason a gate was skipped (e.g., `autonomous`, `legacy`). Required for `stage.gate.skipped`. |
 | `summary` | optional | One-line natural-language summary (≤120 chars), copied from the agent's status block. |
-| `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed"}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. |
+| `tools` | optional | Object propagated from the returning agent's status block. Schema: `{"context7": {"hit":N,"miss":N,"skipped":M}, "memory": {"search_nodes":N,"open_nodes":N}, "kg_save_candidates": ["entity-name",...], "kg_passive_capture": "written\|skipped\|failed", "packet": {"used":true\|false\|"absent","escapes":N,"integrity":"ok\|stale\|mismatch\|n-a"}}`. Omit sub-objects the agent did not report. Recommended for `phase.end` events. `packet` is populated on Phase 3 / Phase 3.4 verifier events (`tester` run-only, `qa`, `security`, `adversary`, `ux-reviewer` validate) — see `docs/verification-packet.md § 4`. |
 | `model` | optional | The agent's effective model ID, propagated verbatim from the `model:` line of its status block (same mechanism as `tools` — see "Populating the `model`/`effort` fields on `phase.end`" below). Present on `phase.end` when the returning agent reported it (mandatory per `agents/_shared/output-template.md`); absent on legacy events or events from agents not yet carrying the field. |
 | `effort` | optional | The agent's effective reasoning-effort level, propagated verbatim from the `effort:` line of its status block when the agent reported one. Omitted when the agent did not report an effort level — never written as `"unknown"`. |
 | `reason` | conditional | For `dispatch.blocked`: short reason (`task tool stripped`, `agent not registered`, `tool permission denied`). For `stage.gate.skipped`: `autonomous` / `legacy`. |
@@ -3520,7 +3408,7 @@ Every line is a JSON object with these fields:
 | `stage.gate.skipped` | When STAGE-GATE-2 is skipped silently (autonomous mode) or STAGE-GATE-1 is skipped (legacy pipeline). Include `stage`, `reason`, `after_pr`. |
 | `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
 | `policy.deny` | When the `policy-block` gate denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
-| `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
+| `dispatch.blocked` | When the first dispatch of the run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
 | `stage.notify` | After invoking `hooks/ts/dist/notify-stage.cjs` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
 | `stage.notify.skipped` | When toast emission is skipped — either because `stage.notify` for that stage already exists in the JSONL (`reason: already-fired`), or the wrapper is absent (`reason: wrapper-missing`). |
 | `pipeline.complete` | Immediately after the Final Pipeline Sanity Check passes (all expected artifacts present and non-empty). Emitted before Phase 5. |
@@ -3644,6 +3532,7 @@ When an agent returns, you parse its status block and propagate any of the follo
 | `kg_save_candidates: [a, b]` (architect/qa/tester/security) | `"kg_save_candidates": ["a", "b"]` |
 | `kg_passive_capture: written` / `kg_passive_capture: skipped: <reason>` (delivery) | `"kg_passive_capture": "written"` / `"skipped"` / `"failed"` |
 | `kg_hit_used: [node-a, node-b]` (all leaf agents) | `"kg_hit_used": ["node-a", "node-b"]` |
+| `packet_used: true\|false\|absent` + `packet_escapes: N` + `packet_integrity: ok\|stale\|mismatch\|n-a` (Phase 3/3.4 verifiers: `tester` run-only, `qa`, `security`, `adversary`, `ux-reviewer` validate) | `"packet": {"used": true\|false\|"absent", "escapes": N, "integrity": "ok\|stale\|mismatch\|n-a"}` |
 
 **`kg_hit_used` aggregation.** Every leaf agent (`architect`, `implementer`, `tester`, `qa`, `security`, `delivery`) declares a `kg_hit_used: [node-name, ...]` field in its Return Protocol status block. An empty list `[]` is valid and means no KG node influenced the agent's output this run. The orchestrator propagates the list into the `phase.end` event's `tools.kg_hit_used` array. Aggregating these arrays across all `phase.end` events in `00-execution-events` gives a pipeline-level KG recall signal: `jq -s '[.[] | select(.event=="phase.end") | .tools.kg_hit_used // [] | .[]] | unique' {events_file}`. This is the measurability surface for issue #403.
 
@@ -3663,6 +3552,16 @@ When an agent returns, parse its status block for the `model:` and `effort:` lin
 | `effort: {effort-level}` | `"effort": "{effort-level}"` (omit the field entirely when the agent did not report a line) |
 
 This is the source-of-truth for the effective model a dispatch actually ran under, particularly when a session model override (see Phase 0a Step 6a, "Session model override") is active — the frontmatter `model:` declared in `agents/{agent}.md` is only the *default*, and the status-block field is what actually ran. Downstream cost classification (`docs/observability.md § Derivation rule`, `skills/trace/SKILL.md`) reads `event.model` first, before falling back to frontmatter inference.
+
+### Stage-gate reconciliation backstop (self-healing emission)
+
+The atomic coupling rule (§ Phase Transition Protocol) prevents new gaps at write time; this backstop closes gaps that already exist by the time a STAGE-GATE is reached — the write-time rule is prevention, this is detection-and-repair for whatever slipped through anyway (a prior compaction, an aborted resume, a legacy workspace). At EVERY STAGE-GATE emission (1, 2, or 3) — points where the orchestrator already stops for human review — run this 3-step reconciliation before emitting the gate STOP block:
+
+1. **Count.** Read `00-state.md § Phase Checklist` and count phases marked `[x]`. Read `{events_file}` and count `phase.end` events. Any `[x]` phase with no matching `phase.end` is a gap.
+2. **Backfill each gap.** Append one `phase.end` event for the gap, carrying BOTH `tokens_estimated: true` and `backfilled: true`. Derive `duration_ms` from the paired `subagent.start`/`subagent.stop` breadcrumbs in `00-subagent-trace.jsonl` (local mode: `workspaces/00-subagent-trace.jsonl`; obsidian mode: `{logs-path}/{logs-subfolder}/00-subagent-trace.jsonl`), filtering by `agent_type` and the pipeline's time window — the trace file sits at the workspace-root level, so time-window filtering is the JOIN key against a single feature's events (a documented coarseness, not a precision guarantee).
+3. **Fall back when no breadcrumb pair exists.** Apply the existing duration heuristic (`duration_min × 1500` opus / `× 800` sonnet) for `duration_ms`, still marking `tokens_estimated: true` and `backfilled: true`.
+
+**Invariant:** a measured `phase.end` event (no `backfilled` field, or `backfilled: false`) is NEVER overwritten by this reconciliation — the backstop only appends events for gaps, it never edits or replaces an existing line. `00-subagent-trace.jsonl` is the reconciliation source this backstop reads; see `docs/observability.md § 00-subagent-trace` for its role and retention.
 
 ---
 
@@ -3729,12 +3628,16 @@ LEDGER
 
 ### When to rewrite (full rewrite, never append)
 
-- End of each phase (after the `phase.end` event for the phase's primary agent).
-- Whenever an iteration starts (so the iteration count + last failure are visible).
-- After every gate event (`gate.pass`, `gate.fail`, `stage.gate*`).
-- At `pipeline.end`.
+**4 mandatory checkpoints.** These are the ONLY rewrites that are contract-enforced (see the Final Pipeline Sanity Check assert below); every one is bound to an event the orchestrator already emits, so compliance never depends on a separate "remember to rewrite" step:
 
-A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsistency risks of partial updates.
+1. **STAGE-GATE-1 emission** — the summary and `## Cost` reflect Stage 1 (0a through 1.6).
+2. **Stage-2 close** — after the last task's Phase 3.6.
+3. **Every `iteration.start`** — so a failing pipeline stays visible (existing rationale preserved).
+4. **`pipeline.complete` / `pipeline.end`.**
+
+**Every-transition rewrite is best-effort, not enforced.** Rewriting after each additional phase (`gate.pass`/`gate.fail`, other `stage.gate*` events) is still encouraged when convenient — a fresher summary is strictly better for the operator — but only the 4 checkpoints above are gated by the Final Pipeline Sanity Check. This split exists because the prior "every transition" wording measured at 2/168 compliance: a lighter contract that is actually executed beats a heavier one that is skipped wholesale.
+
+A full rewrite per checkpoint is cheap (the file is ~30 lines) and avoids the inconsistency risks of partial updates.
 
 ### Schema (rigid — match exactly)
 
@@ -3762,6 +3665,17 @@ A full rewrite per phase is cheap (the file is ~30 lines) and avoids the inconsi
 | context7 | {N} | {N} | {N} | {short note or —} |
 | kg_save_candidates | — | {N surfaced} | — | {entity names or —} |
 | kg_passive_capture | — | {written/skipped} | — | {entity name or skip reason} |
+
+## Verification Packet
+| Verifier | packet_used | packet_escapes | packet_integrity |
+|----------|-------------|-----------------|-------------------|
+| tester (run-only) | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| qa | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| security | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| adversary | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+| ux-reviewer (validate) | {true\|false\|absent} | {N} | {ok\|stale\|mismatch\|n-a} |
+
+**Verification packet parity (per-run, operator-evaluated — see `docs/verification-packet.md § 8`):** dispatch denominator {N} verdict-doc-counted (+{N} breadcrumb-only additions, telemetry-missing) vs floor {F} from `00-state.md` scope flags → {measurable|UNMEASURABLE}; three-bucket breakdown: accepted-with-evidence {N} ({P}%), fallback-with-evidence {N} ({P}%), telemetry-missing {N} ({P}%; always counted as fallback-signal, never acceptance); per-verifier catch counts vs June 2026 baseline: security Critical/High {N} (baseline {N}), qa AC-fail rate {P}% (baseline {P}%), acceptance-checker drift flags {N} (baseline {N}). Reporting aid for the operator — no automatic trigger fires on it. Emitted on every full-pipeline run.
 
 ## Cost
 **Total tokens:** {N} ({measured|estimated} — {M} phases with tokens_estimated:true)
@@ -3796,6 +3710,7 @@ All numbers come from `{docs_root}/{events_file}` — never re-invent them by wa
 - Iterations → count of `iteration.start` events.
 - AC pass/total → from the latest `gate.pass`/`gate.fail` at `3.5-acceptance-gate` (read its `summary` and the `pipeline.end.extra`).
 - Tool counts → aggregate of `tools` sub-objects on `phase.end` events.
+- **Verification Packet section** → aggregate `tools.packet` from each Phase 3 / 3.4 verifier's `phase.end` event for the fresh-vs-stale telemetry read; the per-run dispatch denominator (`docs/verification-packet.md § 8`) comes from the workspace verdict docs (`03-testing.md` run-only section, `04-validation.md`, `04-security.md`, `04-adversary.md`, `04-ux-validation.md` — one dispatch per verifier per iteration verdict entry), never from `phase.end` events; `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/`subagent.stop` pairs filtered by verifier `agent_type`) are consumed as upward-only enrichment only — a breadcrumb-evidenced dispatch with no matching verdict entry is ADDED to the denominator as telemetry-missing, and breadcrumb absence never shrinks the count; the dispatch floor has exactly one derivation — the should-have verifier set from `00-state.md` scope flags (`tester` run-only + `qa` unconditionally; + `security` and `adversary` iff `security_sensitive: true`; + `ux-reviewer` validate iff `frontend_scope: true`), never from `§ Agent Results`; a run whose counted denominator (verdict-doc entries + breadcrumb-only additions) falls below its floor, or whose scope flags are unreadable, renders the line `UNMEASURABLE` — never parity — so N=0 never reads as parity; classify each dispatch into the three mutually exclusive buckets (accepted-with-evidence, fallback-with-evidence, telemetry-missing), with a `backfilled: true` or absent `tools.packet` counted as telemetry-missing / fallback-signal, never as acceptance; compare catch rates read from the workspace verdict docs (`04-security.md` findings by severity, `04-validation.md § AC Coverage Results` and `§ Drift Analysis`) against the June 2026 baseline referenced there.
 - Files / lines changed → from `git diff main...HEAD --stat` at delivery time; "—" before Phase 4.
 - **Cost and token counts** → sum `tokens` from all `phase.end` events; multiply by price from `pricing` key in `~/.claude/.team-harness.json`; degrade to tokens-only when the key is absent. Both the per-agent table and the per-phase table rewrite in full at each phase transition. Marked `(~)` when any contributing event carries `tokens_estimated: true`. See `docs/observability.md § "Cost rollup"` for the full derivation algorithm.
 
