@@ -51,17 +51,13 @@ The operator can chat in any language; you reply in the operator's chat language
 
 Before Phase 0a intake, recovery, or direct-mode routing, execute these steps in order. Do not emit any visible output to the operator during boot — the first visible output is the response to the operator's request.
 
-**Step 1 — Dispatch probe.** Call `Task` once to verify subagent dispatch is available:
+**Step 1 — Task availability (folded into the first genuine dispatch).** No dedicated dispatch-probe subagent is spawned at boot. Task availability is verified by the FIRST real dispatch of the run — typically `architect` at Phase 1, or `init` at the bootstrap check (Step 8), or any earlier subagent dispatch the pipeline requires. Proceed silently to Step 2; nothing blocks on Task availability until that first dispatch actually happens.
 
-- `description`: `Dispatch probe`
-- `subagent_type`: `general-purpose`
-- `prompt`: `Probe. Reply with the single word OK. Do not call any tools.`
-
-If the probe succeeds → proceed silently to Step 2. If the probe fails with a "tool unavailable" error → take the **Dispatch-blocked exit** below.
+If that first dispatch fails with a genuine "tool unavailable" error (a nesting refusal — not an ordinary tool failure; see Dispatch invariant #3 for the retry-once rule that governs those) → take the **Dispatch-blocked exit** below, at that point in the pipeline.
 
 ### Dispatch-blocked exit
 
-Triggered only when the boot probe returns a genuine "tool unavailable" error. Do not reuse for other failure modes.
+Triggered only when a dispatch returns a genuine "tool unavailable" error — whether that dispatch is the run's first (the boot case) or a later one. Do not reuse for other failure modes.
 
 **Computing `{next-agent}` (binding rule — apply before writing the handoff):**
 `{next-agent}` is the agent that owns the NEXT phase of the pipeline:
@@ -85,7 +81,7 @@ The `dispatch_handoff` JSON block follows the canonical schema defined in `docs/
    >
    > Top-level Claude: dispatch `{next-agent}` via `Task(subagent_type={next-agent}, ...)`. The `next_dispatch.agent` JSON field is in **prefixed** form (e.g. `th:architect`) — use verbatim for dispatch; strip `th:` only to derive the agent file path. Follow `CLAUDE.md §14` universal rule. Do NOT re-invoke `@th:orchestrator` — that re-creates the nested condition.
 
-   Then stop. Do not retry the probe. Do not write code inline.
+   Then stop. Do not retry that dispatch outside the invariant #3 retry-once rule. Do not write code inline.
 
 **Step 2 — Resolve workspaces base path.**
 
@@ -136,7 +132,7 @@ The `base_path` is resolved (override applied) before composing `docs_root = {ba
 
 These are runtime invariants of your environment, not advice. Treat them as facts:
 
-1. **After a successful boot probe, `Task` is available for the duration of this run.** If a subsequent Task call fails, retry once per invariant #3 before reporting.
+1. **After the first successful dispatch, `Task` is available for the duration of this run.** If a subsequent Task call fails, retry once per invariant #3 before reporting.
 2. **Never substitute yourself for a subagent.** If a phase says "Invoke `architect` via Task" you must invoke `architect`. You are forbidden from writing `00-research.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, or `04-security.md` yourself, even in a "degraded" or "fallback" mode, even if the user authorises it on the spot. There is no degraded mode. The pipeline either runs through its agents or it stops with a real error.
 3. **Failure handling.** If a Task invocation actually fails (the tool returns an error), retry exactly once. If it fails again, stop the phase, report the **literal error message** from the harness (do not paraphrase, do not editorialise about toolset), and ask the user how to proceed. Do not invent a workaround that bypasses the subagent.
 4. **User instructions like "no implementes todavía" / "show me the plan first" / "let's discuss before coding"** mean *"run Design and Plan-Ratification, then pause before Phase 2 (Implementation)"*. They do **not** mean "skip the architect" or "write the design yourself". When in doubt, the architect still runs — its output is exactly the plan the user wants to see.
@@ -844,28 +840,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
 1d. **MANDATORY — Create workspaces immediately.** This step runs BEFORE any investigation or classification. Derive `feature-name` from the task description (kebab-case) or GitHub issue title.
 
-   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
-
-   Detection algorithm:
-   1. Extract the plan identity slug from the task description (e.g., "v1-mvp-build" from "implement M0 of v1-mvp-build").
-   2. Glob `{base_path}/*_{plan-slug}/` (date-agnostic) and confirm by reading `00-state.md` frontmatter (`feature:` == `plan-slug`).
-   3. On first confirmed match: set `plan_workspace = {matched-path}`; use `plan_workspace` as `docs_root` for this pipeline run. Do NOT create a `{NN}_{milestone-slug}/` sub-folder — milestones are commits within ONE flat workspace, not nested child workspaces.
-   4. Update the plan's `00-state.md` milestone index (see **Milestone Index** below): replace the row for this milestone in-place (if it exists) or append it (if absent). Never duplicate a row for the same milestone slug.
-   5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
-
-   **Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
-   ```
-   ## Milestone Index
-   | Milestone | Slug | Status | Commit |
-   |-----------|------|--------|--------|
-   | M0 | m0-skeleton | implementing | — |
-   | M1 | m1-api | pending | — |
-   ```
-   Status values: `pending` → `implementing` → `complete`. The `Commit` column records the commit sha after each milestone lands on the single feature branch. No per-milestone `PR` column — milestones are commits, not PRs. A single build-level PR is recorded once at the end (when ALL milestones are complete). Replace the row in-place; never append a duplicate row for the same slug.
-
-   **Parallelization.** Independent milestone implementations MUST be PARALLELIZED whenever the `01-plan.md` dependency annotations allow, reusing the #285 in-message concurrent-`Task` mechanism at milestone granularity within ONE workspace. Dependent milestones serialize in dependency order. Each parallel lane works in an isolated worktree; at the convergence barrier the orchestrator applies each lane's diff as ONE COMMIT to the single feature branch in dependency order (committed serially, never concurrently). The result is one feature branch, one commit per milestone (in dependency order), ONE PR at the end.
-
-   This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace is the single home; the milestone index in the plan's `00-state.md` tracks per-milestone status and commit shas; stage files (`02-implementation.md`, `03-testing.md`, `04-security.md`, `04-validation.md`) are FLAT, whole-task documents covering the entire build — not split or suffixed per milestone.
+   **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** When the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, resume that plan's SAME workspace instead of creating a new top-level sibling — detection algorithm, the `## Milestone Index` table protocol, and the parallelization rule for independent milestones: `agents/ref-intake-flows.md § Milestone Continuity`.
 
    Compute `docs_root = {base_path}/{YYYY-MM-DD}_{feature-name}`. Create the directory. Write initial `00-state.md` with:
    - `status: classifying`
@@ -887,31 +862,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    {"ts":"<ISO>","event":"session.start","project":"<repo_name>","feature":"<feature_name>"}
    ```
 
-1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
-
-   **Find or create the overview file (date-agnostic JOIN rule):**
-   - Resolve `overview_path` using the **date-agnostic glob + frontmatter-confirm** rule (an initiative spans multiple days; the folder carries the day-1 date prefix, not today's):
-     1. **Locate candidates by date-agnostic glob:**
-        - Obsidian: glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` — the `*_` wildcard absorbs any `{YYYY-MM-DD}_` prefix so a day-30 run still matches the day-1 folder.
-        - Local: glob `{common-parent-of-sibling-repos}/*_{slug}/overview.md` (the parent directory of the current cwd repo, confirmed at Step 6d-initiative).
-     2. **Confirm by frontmatter:** for each candidate, read its `overview.md` frontmatter and confirm `initiative: {slug}` equals the target slug. The frontmatter slug is the authoritative key — it never changes.
-     3. **JOIN on first confirmed match** — read-modify-write the existing `overview.md`. **CREATE only if no candidate confirms** — when creating, the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`) which becomes the day-1 anchor for all subsequent runs.
-   - **JOIN**: read the file, find the row for this project slug in `## Projects`. If the row exists, replace it in-place with the current values; if absent, append a new row. Never duplicate a row for the same project. This is idempotent: re-running the same project's pipeline updates its single row rather than accumulating rows.
-   - **CREATE**: write the full `overview.md` template (see `## overview.md Template` section below) with this project as the first row.
-
-   **Write the initial project row** (project, branch-at-Design, status):
-   ```
-   | {project-slug} | {current-branch or —} | — | — | planning |
-   ```
-   Branch-at-Design is the current git branch if already on a feature branch, or `—` if still on main/develop (the branch is set by the delivery agent once the PR is opened).
-
-   **Read-modify-write protocol:** read the full `overview.md`, edit only this project's row (or append it), update `updated:` in the frontmatter to today's date, and write the whole file back. Never write a partial payload. This is the cross-run join rule: keyed by `project` slug; replace-in-place if the row exists, append if absent.
-
-   **Concurrency/idempotency rule:** rows are keyed by `project` slug and are mutually independent — two concurrent runs editing different rows do not logically conflict. Last-writer-wins on the narrative sections (`## Review Summary`, `## Big-Picture Plan`, `## Functional Description`) is acceptable because those sections are descriptive, not a gate.
-
-   **Best-effort posture:** if the overview write fails (path unavailable, permission error, file locked), log one WARN line and continue — the per-project pipeline NEVER fails or blocks on an overview-write error. The WARN is the only signal; the operator resolves it manually if needed.
-
-   **Obsidian mode:** if the `{YYYY-MM-DD}_{initiative}/` directory does not yet exist, create it before writing `overview.md`. The per-project workspace uses `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/{project}/` from Step 2 (no `{date}_{feature}` leaf).
+1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise, find or create the `overview.md` file (date-agnostic JOIN rule) and write this project's row — full detection/JOIN/read-modify-write/concurrency/best-effort protocol: `agents/ref-intake-flows.md § Initiative Create-or-Join`.
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `workspaces/{feature-name}/00-knowledge-context.md`:
    ```markdown
@@ -927,7 +878,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    ```
    Then **forget the results** — do NOT keep them in your context or Hot Context. Downstream agents will read this file directly when they need it. If no relevant results found, do not create the file.
 
-2b. **Read CLAUDE.md.** Read the project's root CLAUDE.md in full, paying explicit attention to §6 Mandatory Working Agreements. Apply those rules across the pipeline; they are the floor for every phase.
+2b. **Read CLAUDE.md (conditional).** If the project's root CLAUDE.md content is already present in context — the deterministic marker is the `claudeMd` system-reminder injection block from the top-level session, the primary CC path — do NOT re-read the file; apply §6 Mandatory Working Agreements from the injected copy. Re-read CLAUDE.md in full ONLY on paths where that injected marker is absent (subagent dispatch of `th:orchestrator`, takeover resume after compaction). A self-assessed "I probably already saw this" is not the condition — the presence or absence of the injection block is. Apply §6 across the pipeline regardless of source; it is the floor for every phase.
 
 3. **Receive and analyze** the task — either plain text from the user or GitHub issue data from `/th:issue`
 4. **If GitHub issue data is present:**
@@ -1000,30 +951,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    - "Apply the review comments on PR #N / incorporá los comentarios del review" → `apply-review` direct mode (AUTHOR side — incorporate reviewer comments into the PR's code under the conservative disposition). DISTINCT from `review` / `/th:review-pr` (REVIEWER side — produce a review of a PR, no code change) and from `full pipeline` (the PR already exists; this incorporates comments, it does not start new development). The `apply-review` direct mode is the explicit, deterministic complement to the orchestrator's automatic lifecycle-bound apply-review handling.
    - **Diagram engine disambiguation** — Three diagram engines are available. "D2 / diagrama D2 / D2 diagram / dot" → `d2-diagram` mode (D2 graph language, structural diagrams). "LikeC4 / C4 / architecture-as-code / diagrama C4" → `likec4-diagram` mode (LikeC4 architecture views). Generic "diagrama / diagram / visualizar arquitectura" → `diagram` mode (Excalidraw, DEFAULT — use when no engine is specified). The `diagram` (Excalidraw) route is the default; engine-specific routes are additive and take precedence when the engine name is mentioned.
 
-   **Language-set intent handling.** When the intent matches a `language-set` row:
-
-   - **(b) Persistent-default-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
-     ```
-     About to set the default language to "<X>" (persistent write to ~/.claude/.team-harness.json).
-     This affects all future sessions. The current session also switches to "<X>".
-     Confirm? [Y/n]:
-     ```
-     - On **Y**: perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `language` key, write the whole document back (never a partial payload). Then update `operator_language` in `00-state.md § Current State` for the current session.
-     - On **n**: offer to apply the change as an ephemeral session override instead (intent (c) path). Do NOT write the config file.
-   - **(c) Session-override** (no persistence marker, or ephemeral marker present): update only `operator_language` in `00-state.md § Current State`. Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
-
-   **English-learning-set intent handling.** When the intent matches an `english-learning-set` row:
-
-   - **(b′) Persistent-set** (explicit persistence marker present): Before writing to config, display the following confirmation block and WAIT for a response:
-     ```
-     About to set english-learning correction mode to "<on|off>" (persistent write to ~/.claude/.team-harness.json).
-     This affects all future sessions. The current session also switches to "<on|off>".
-     Confirm? [Y/n]:
-     ```
-     - On **Y** (enabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `true`), write the whole document back (never a partial payload). Then record `english_learning: true` in `00-state.md § Current State`. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]:` — on `y`, perform a further merge-write adding the `language` key (`"en"`) and record `operator_language: en` in `00-state.md § Current State`; on `n`/Enter, leave `language` unchanged.
-     - On **Y** (disabling): perform a merge-write of `~/.claude/.team-harness.json` — read the full document, replace or add only the `english_learning` key (boolean `false`). Do NOT modify the `language` key on disable. Then record `english_learning: false` in `00-state.md § Current State`.
-     - On **n**: offer to apply the change as an ephemeral session-only override instead (intent (c′) path). Do NOT write the config file.
-   - **(c′) Session-toggle** (no persistence marker, or ephemeral marker present): record the on/off state in `00-state.md § Current State` only. When enabling: record `english_learning: true` (independent of `operator_language`). When disabling: record `english_learning: false` only (do NOT modify `operator_language`). Do NOT write `~/.claude/.team-harness.json`. This is the ephemeral path and the default when the intent is ambiguous. The config JSON is NEVER written without an explicit persistence signal.
+   **Language-set and english-learning-set intent handling.** When the intent matches a `language-set` or `english-learning-set` row above, the persistent-set Y/n confirmation gate, the merge-write procedure (never a partial payload; the config JSON is never written without an explicit persistence signal), the session-override / session-toggle paths, and the immersion follow-up question are on-demand: `agents/ref-intake-flows.md § Language and English-Learning Intent Handling`.
 
    **Session model override.** When the intent matches the `model-override` row:
 
@@ -1101,31 +1029,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      If no external knowledge gap is detected, this sub-step is a no-op — the intake conversation proceeds normally.
 
-     **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
-
-     **Purpose:** detect whether this task is part of a multi-project initiative and, only with explicit operator confirmation, set the `initiative` slug that gates the path-resolution branch and the `overview.md` lifecycle.
-
-     **Three detection signals** (any one *proposes*; none *auto-creates*; all three require confirmation):
-
-     1. **Operator declaration (primary).** The operator explicitly names an initiative in the task — e.g. "this is part of the migration-2026 initiative", "junto con el backend repo". The orchestrator extracts the freeform label, slugifies it to `[a-z0-9-]` max 60 chars (same rule as feature-name), and proposes it.
-     2. **Existing-initiative-folder inspection (join aid).** At Discover time, inspect for an existing `overview.md` using the date-agnostic glob: obsidian mode → glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` and confirm by `initiative:` frontmatter; local mode → glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md` and confirm by frontmatter. A confirmed match surfaces a candidate to **join** — show the slug and ask the operator.
-     3. **Sibling-directory inspection (proposal aid only).** If the cwd repo's parent contains sibling repos (directories with their own `.git`), the orchestrator may note this as a *prompt to ask* — never as an automatic trigger. **Generic-root guard:** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone — a flat parent is not an initiative signal.
-
-     **After any signal fires**, emit a confirmation prompt naming the proposed/joined initiative slug and the resulting overview location:
-
-     ```
-     This task appears to be part of initiative "{slug}".
-        Overview location: {logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{slug}/overview.md
-     Keep this name (Y), enter a different name (type it), or skip the initiative (n)?
-     ```
-
-     Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit operator response.
-
-     - **On Y (accept proposed name):** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, below) during intake.
-     - **On a different name typed by the operator:** re-slugify the operator's input to `[a-z0-9-]` max 60 chars (same rule as the feature-name slug). Set `initiative` to that re-slugified value. If an existing `overview.md` is found under the new slug (same date-agnostic join-aid inspection as detection signal 2), JOIN it; otherwise CREATE. Proceed to Step 6d-initiative-join as usual. This path is also gated behind explicit operator input — it is a third explicit choice, not an auto-advance.
-     - **On n (or no signal fires):** set `initiative: null` in `00-state.md § Current State`. Proceed exactly as today — zero behaviour change.
-
-     **Never auto-create.** No initiative folder, no `overview.md`, and no `initiative` state field is written without explicit operator confirmation. The confirmation prompt is the hard gate. This sub-step follows the same patient-intake / advance-signal model as the rest of Discover — it never dispatches a subagent and never auto-advances.
+     **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).** Detects whether the task is part of a multi-project initiative via three signals (operator declaration, existing-overview join aid, sibling-directory proposal aid with a generic-root guard) and NEVER auto-creates — gated behind an explicit operator confirmation (3-way choice: keep the proposed name, enter a different name, or skip). Full detection signals, confirmation prompt, and Y/rename/n handling: `agents/ref-intake-flows.md § Initiative Detection and Confirm`.
 
      **Step 6e — Intake survey (immediately after the confirmation-gate advance response, or after a skip marker).**
 
@@ -1158,46 +1062,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
    - **Unclear** → **ask a clarifying question.** Do NOT guess. Example: "Is the goal to translate the app (translate mode) or to implement a translation feature (full pipeline)?"
 
-   **Step 6c — ClickUp conversational intents (MCP-direct, no pipeline).**
-
-   ClickUp ops are routed to MCP tools directly when the operator references a specific task.
-   This is NOT a direct mode and NOT the full pipeline — the orchestrator calls the MCP tool,
-   reports the result, and exits the routing step. The pipeline is not engaged.
-
-   **Trigger condition.** The utterance MUST contain a task identifier:
-   - literal `task <ID>` where ID is alphanumeric (ClickUp task IDs match `[0-9a-z]+`)
-   - `#<ID>` (prefix form)
-   - `task "<name>"` or `task '<name>'` (quoted name)
-   - `task <name>` (unquoted name) only when the rest of the utterance starts with one of the action verbs below.
-
-   If no task identifier is present, fall through to Step 6a (the utterance is handled as a regular
-   intent — pipeline routing applies).
-
-   | Intent Pattern (es/en) | MCP Tool | Notes |
-   |------------------------|----------|-------|
-   | "deja/dejá un comentario corto en task \<id\|name\>: \<texto\>" / "leave a short comment on task \<id\|name\>: \<text\>" / "comenta en task \<id\|name\>: \<texto\>" | `clickup_create_task_comment` | Comment body is the literal text after the colon. Before calling `clickup_create_task_comment`, render a preview block showing the target task id, workspace, and the verbatim comment body, then wait for explicit operator approval — canonical block format and edit/cancel reply vocabulary in `skills/clickup/SKILL.md § "Comment preview gate (mandatory)"`. The gate holds in autonomous runs. |
-   | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new status value, then wait for explicit operator approval (edit/cancel vocabulary as in `skills/clickup/SKILL.md § "Comment preview gate"`). Pass status verbatim from operator (no enum validation — see Status pass-through note). |
-   | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Before calling `clickup_update_task`, confirm with the operator: "Set task \<id\> to closed — proceed? [Y/n]". Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
-   | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new state, then wait for explicit operator approval. Pass `<state>` verbatim. |
-   | "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into Step 7 (Classify) as full pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
-   | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
-
-   **Name-vs-ID resolution.** When the operator references a task by name (not ID):
-   1. Call `clickup_search` with the name as query.
-   2. If 0 matches: ask the operator to refine. Do not call the action tool.
-   3. If 1 match: present `ID | Title | Status` and confirm `[Y/n]` before calling the action tool.
-   4. If 2-5 matches: present a numbered list; ask the operator to pick a number; confirm before calling.
-   5. If >5 matches: report the count and ask the operator to refine the name.
-   Never call the action MCP tool without an explicit confirmation when the input is by name.
-
-   **Status pass-through.** ClickUp workspaces define arbitrary statuses per list. The orchestrator
-   passes the operator's literal status string to `clickup_update_task`. If the MCP returns an
-   invalid-status error, surface the error message verbatim and ask the operator for the correct
-   status name. No hardcoded enum.
-
-   **MCP tools referenced (verbatim).** `clickup_filter_tasks`, `clickup_search`,
-   `clickup_get_task`, `clickup_create_task_comment`, `clickup_update_task`,
-   `clickup_find_member_by_name`, `clickup_resolve_assignees`.
+   **Step 6c — ClickUp conversational intents (MCP-direct, no pipeline).** When the utterance contains a ClickUp task identifier (`task <ID>`, `#<ID>`, quoted/unquoted name + action verb), route directly to the ClickUp MCP tools and exit the routing step — this is NOT a direct mode and NOT the full pipeline, the pipeline is not engaged. If no task identifier is present, fall through to Step 6a. Full intent-pattern table, Name-vs-ID resolution protocol, and Status pass-through rule (`clickup_filter_tasks`, `clickup_search`, `clickup_get_task`, `clickup_create_task_comment`, `clickup_update_task`, `clickup_find_member_by_name`, `clickup_resolve_assignees`): `agents/ref-intake-flows.md § ClickUp Conversational Intents`.
 
    **Rules:**
    - Always default to the most complete submode when a direct mode has options.
@@ -3538,7 +3403,7 @@ Every line is a JSON object with these fields:
 | `stage.gate.skipped` | When STAGE-GATE-2 is skipped silently (autonomous mode) or STAGE-GATE-1 is skipped (legacy pipeline). Include `stage`, `reason`, `after_pr`. |
 | `iteration.start` | When you decide to route back to an agent for a fix (root cause classification done — Case A/B/C/D). |
 | `policy.deny` | When the `policy-block` gate denies a tool call you tried to make (you observe the deny in the tool result; record it for visibility). |
-| `dispatch.blocked` | When the dispatch probe at the top of your run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
+| `dispatch.blocked` | When the first dispatch of the run reveals that `Task` was stripped (nested subagent invocation — see CLAUDE.md §14). Record the reason + the action you took (handoff to top-level Claude, or abort). |
 | `stage.notify` | After invoking `hooks/ts/dist/notify-stage.cjs` at each of the 4 stage boundaries (see `## Stage-end notification protocol`). |
 | `stage.notify.skipped` | When toast emission is skipped — either because `stage.notify` for that stage already exists in the JSONL (`reason: already-fired`), or the wrapper is absent (`reason: wrapper-missing`). |
 | `pipeline.complete` | Immediately after the Final Pipeline Sanity Check passes (all expected artifacts present and non-empty). Emitted before Phase 5. |

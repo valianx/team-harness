@@ -1027,8 +1027,10 @@ for pattern in FORBIDDEN_PATTERNS:
 # ---------------------------------------------------------------------------
 # Suite 18 — Dispatch-blocked auto-takeover contract
 # ---------------------------------------------------------------------------
-# Guards the boot probe + Dispatch-blocked exit contract across:
-#   1. agents/orchestrator.md  — the boot probe + Dispatch-blocked exit
+# Guards the Task-availability + Dispatch-blocked exit contract across:
+#   1. agents/orchestrator.md  — Task availability (folded into the first
+#      genuine dispatch, no dedicated boot probe — A7 orchestrator boot
+#      reduction) + Dispatch-blocked exit
 #   2. CLAUDE.md § 14             — the universal auto-takeover rule
 #   3. skills/README.md           — the canonical Continuity contract
 print("=== Suite 18: Dispatch-blocked auto-takeover contract ===")
@@ -1047,15 +1049,12 @@ check(
     "missing boot sequence section — auto-takeover starts here",
 )
 check(
-    "orchestrator.md boot probe uses general-purpose subagent_type",
-    "subagent_type`: `general-purpose`" in orchestrator_md
-    or "subagent_type: general-purpose" in orchestrator_md,
-    "probe must dispatch general-purpose to test Task availability",
-)
-check(
-    "orchestrator.md boot probe expects single-word OK reply",
-    "Reply with the single word OK" in orchestrator_md,
-    "probe payload contract must be present so the check is unambiguous",
+    "orchestrator.md folds Task availability into the first genuine dispatch"
+    " (no dedicated boot-probe subagent)",
+    "No dedicated dispatch-probe subagent is spawned at boot" in orchestrator_md
+    and "first genuine dispatch" in orchestrator_md.lower(),
+    "boot Step 1 must state that Task availability is verified by the first"
+    " genuine dispatch, with no dedicated probe subagent spawned at boot (A7)",
 )
 check(
     "orchestrator.md has 'Dispatch-blocked exit' section",
@@ -1079,9 +1078,10 @@ check(
     "must forbid recreating the nested condition",
 )
 check(
-    "orchestrator.md dispatch invariant #1 is conditional on probe success",
-    "After a successful boot probe" in orchestrator_md,
-    "invariant #1 must NOT unconditionally claim Task is present — that was the original bug",
+    "orchestrator.md dispatch invariant #1 is conditional on the first dispatch succeeding",
+    "After the first successful dispatch" in orchestrator_md,
+    "invariant #1 must NOT unconditionally claim Task is present — that was the original bug"
+    " (post-A7: conditional on the first dispatch, not a dedicated boot probe)",
 )
 check(
     "orchestrator.md does NOT contain the unconditional 'Task is on the list' claim",
@@ -1593,7 +1593,7 @@ print("=== Suite 19: Agent identity & cross-reference consistency ===")
 
 # Agents that legitimately have no .md file because they're reference files
 # (loaded on-demand by the orchestrator, not standalone agents)
-REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows"}
+REFERENCE_ONLY_AGENTS = {"ref-direct-modes", "ref-special-flows", "ref-intake-flows"}
 
 # Pipeline + standalone + reference agents that legitimately exist
 ALL_AGENT_FILES = sorted(p.stem for p in AGENTS_DIR.glob("*.md") if p.stem != "README")
@@ -15432,6 +15432,12 @@ _s68_delivery = read(AGENTS_DIR / "delivery.md")
 _s68_claude = read(REPO_ROOT / "CLAUDE.md")
 _s68_discover = read(REPO_ROOT / "docs" / "discover-phase.md")
 _s68_observability = read(REPO_ROOT / "docs" / "observability.md")
+# v2.123.0 (A7 orchestrator boot reduction): Step 6d-initiative detection/confirm
+# and Phase 0a Step 1f (initiative create-or-join) moved verbatim out of
+# orchestrator.md into the on-demand agents/ref-intake-flows.md reference file
+# — orchestrator.md keeps only a 1-2 line trigger + pointer at each site. The
+# content-bearing slices below now read from ref-intake-flows.md instead.
+_s68_intake_flows = read(AGENTS_DIR / "ref-intake-flows.md")
 _S68_STOP = ("\n## ", "\n### ", "\n---\n")
 
 # AC-1: initiative state field defined in orchestrator.md
@@ -15487,22 +15493,28 @@ check(
     "orchestrator.md Step 2 must state local overview lives at the common parent directory of sibling repos",
 )
 
-# AC-4: generic-root misfire guard documented in orchestrator.md
-_s68_detect_slice = _slice_section(_s68_orch, "**Step 6d-initiative", _S68_STOP)
+# AC-4: generic-root misfire guard documented — content lives in
+# ref-intake-flows.md § Initiative Detection and Confirm (moved verbatim from
+# orchestrator.md by A7's Phase 0a extraction); orchestrator.md keeps only the
+# trigger label + pointer at the "**Step 6d-initiative" site (still present,
+# so the boundary marker used elsewhere — e.g. Suite 92's background-sweep
+# slice — continues to resolve).
+_s68_detect_slice = _slice_section(_s68_intake_flows, "**Step 6d-initiative", _S68_STOP)
 check(
-    "suite68(ac4a): orchestrator.md Step 6d-initiative exists (slice non-empty)",
+    "suite68(ac4a): agents/ref-intake-flows.md § Initiative Detection and Confirm exists (slice non-empty)",
     len(_s68_detect_slice) > 0,
-    "orchestrator.md must contain Step 6d-initiative sub-step for initiative detection",
+    "agents/ref-intake-flows.md must contain the Step 6d-initiative sub-step for initiative detection"
+    " (orchestrator.md must keep a pointer to it)",
 )
 check(
     "suite68(ac4b): Step 6d-initiative contains generic-root guard list",
     "projects" in _s68_detect_slice and "repos" in _s68_detect_slice and "src" in _s68_detect_slice and "code" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must list generic-root guard words (projects, repos, src, code, ...)",
+    "ref-intake-flows.md Step 6d-initiative must list generic-root guard words (projects, repos, src, code, ...)",
 )
 check(
     "suite68(ac4c): Step 6d-initiative states do NOT propose on directory layout alone",
     "do NOT propose" in _s68_detect_slice or "NOT propose" in _s68_detect_slice,
-    "orchestrator.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
+    "ref-intake-flows.md Step 6d-initiative must state the orchestrator does NOT propose initiative on generic root",
 )
 
 # AC-5: confirmation prompt + WAIT + 3-way choice + never auto-create documented in orchestrator.md and discover-phase.md
@@ -15533,27 +15545,31 @@ check(
     "docs/discover-phase.md § 11 must document the confirmation gate and WAIT",
 )
 
-# AC-6: cross-run JOIN rule documented in orchestrator.md
-_s68_join_slice = _slice_section(_s68_orch, "1f. **CONDITIONAL — Initiative create-or-join", ("\n2. **MANDATORY",))
+# AC-6: cross-run JOIN rule — content lives in ref-intake-flows.md § Initiative
+# Create-or-Join (moved verbatim from orchestrator.md Phase 0a Step 1f by A7's
+# extraction); orchestrator.md keeps only the trigger label + pointer.
+_S68_JOIN_STOP = ("\n## ", "\n---\n")
+_s68_join_slice = _slice_section(_s68_intake_flows, "1f. **CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
 check(
-    "suite68(ac6a): Phase 0a Step 1f exists (initiative create-or-join, slice non-empty)",
+    "suite68(ac6a): agents/ref-intake-flows.md § Initiative Create-or-Join exists (slice non-empty)",
     len(_s68_join_slice) > 0,
-    "orchestrator.md must contain Phase 0a Step 1f (initiative create-or-join)",
+    "agents/ref-intake-flows.md must contain Step 1f (initiative create-or-join);"
+    " orchestrator.md must keep a pointer to it",
 )
 check(
     "suite68(ac6b): Step 1f defines JOIN rule (replace-in-place if row exists)",
     "replace" in _s68_join_slice and ("in-place" in _s68_join_slice or "in place" in _s68_join_slice),
-    "orchestrator.md Step 1f must define the replace-in-place JOIN rule for existing project rows",
+    "ref-intake-flows.md Step 1f must define the replace-in-place JOIN rule for existing project rows",
 )
 check(
     "suite68(ac6c): Step 1f defines append if row absent",
     "append" in _s68_join_slice,
-    "orchestrator.md Step 1f must define append-if-absent for new project rows",
+    "ref-intake-flows.md Step 1f must define append-if-absent for new project rows",
 )
 check(
     "suite68(ac6d): Step 1f states rows are never duplicated (idempotent)",
     "never duplicate" in _s68_join_slice or "idempotent" in _s68_join_slice,
-    "orchestrator.md Step 1f must state that rows are never duplicated (idempotent)",
+    "ref-intake-flows.md Step 1f must state that rows are never duplicated (idempotent)",
 )
 
 # AC-7: concurrency/idempotency + best-effort posture documented
@@ -15726,12 +15742,13 @@ check(
 # AC-13: new assertions proving the fix (failing-first against v2.59.0 docs)
 # These assert the FIXED state and therefore FAIL on the current (unfixed) tree.
 
-# ac13a: date-agnostic JOIN match rule present in orchestrator.md Step 2 / Step 1f
-_s68_join_overview_slice = _slice_section(_s68_orch, "1f. **CONDITIONAL — Initiative create-or-join", ("\n2. **MANDATORY",))
+# ac13a: date-agnostic JOIN match rule — content lives in ref-intake-flows.md
+# § Initiative Create-or-Join (moved verbatim from orchestrator.md Step 1f).
+_s68_join_overview_slice = _slice_section(_s68_intake_flows, "1f. **CONDITIONAL — Initiative create-or-join", _S68_JOIN_STOP)
 check(
-    "suite68(ac13a): orchestrator.md Step 1f contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
+    "suite68(ac13a): ref-intake-flows.md Step 1f contains date-agnostic JOIN match rule (*_{slug} glob or initiative: frontmatter)",
     "*_{" in _s68_join_overview_slice or ("*_" in _s68_join_overview_slice and ("slug" in _s68_join_overview_slice or "initiative:" in _s68_join_overview_slice)),
-    "orchestrator.md Step 1f must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
+    "ref-intake-flows.md Step 1f must contain the date-agnostic JOIN match rule: glob *_{slug} (absorbs any {date}_ prefix) confirmed by initiative: frontmatter",
 )
 
 # ac13b: per-project docs_root drops {date}_{feature} leaf when initiative is set
