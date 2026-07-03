@@ -157,6 +157,17 @@ by design and costs zero agent tokens. Consolidating it away or making it opt-in
 would remove the only deterministic proof layer the backfill depends on; neither is
 proposed here or anywhere in this document.
 
+**Second consumer — canary cross-check (upward-only enrichment, never denominator
+ground truth).** The Task-2 measured-parity canary window
+(`docs/verification-packet.md § 8`) also reads `00-subagent-trace.jsonl`, but in a
+narrower role than the reconciliation backstop above: the canary's dispatch
+denominator is grounded in the workspace verdict docs (`03-testing.md` run-only
+section, `04-validation.md`, `04-security.md`, `04-adversary.md`,
+`04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
+breadcrumb-evidenced dispatch that has no matching verdict entry, classified
+telemetry-missing. A dispatch's breadcrumb pair being absent never removes it from,
+or shrinks, the denominator — the two consumers never share a subtraction path.
+
 ### subagent.start — PreToolUse breadcrumb (start-side twin)
 
 Written by `hooks/ts/dist/subagent-start.cjs` (PreToolUse event, matcher

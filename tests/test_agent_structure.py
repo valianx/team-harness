@@ -30915,6 +30915,109 @@ check(
 
 # Marker: ref-intake-flows-pointer-guard
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 139 — canary denominator-floor guard (iteration-2 adversary re-check,
+# T2-AC-8 hardening)
+#
+# The iteration-2 adversary re-check found the T2-AC-8 canary's original
+# breadcrumb-derived denominator could degenerate to N≈0 (undercounted
+# breadcrumbs) while neither rollback clause fired, and that the Final
+# Pipeline Sanity Check step 6 assert only checked for a `## Cost` section
+# header, never the `## Verification Packet` canary line itself — so an
+# omitted or degenerate canary line silently read as "no trigger fired".
+# This amendment re-grounds the denominator on the workspace verdict docs
+# (breadcrumbs demoted to upward-only enrichment), adds an explicit
+# minimum-denominator floor clause (below-floor run => UNMEASURABLE => Clause
+# 2, never silent parity), and binds the canary line to the fail-closed
+# step-6 assert via a `canary_window` state marker. This suite pins the
+# CONTRACT TEXT of both sides (contract text only — runtime compliance of the
+# assert remains prompt-level per the honest-bounds note in A3 design point
+# 7): the orchestrator's step-6 canary-line requirement, and
+# docs/verification-packet.md's §8 minimum-denominator floor clause.
+#
+# Marker: canary-denominator-floor-guard
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 139: canary denominator-floor guard (T2-AC-8 hardening) ===")
+
+_s139_orch = read(AGENTS_DIR / "orchestrator.md")
+_s139_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
+
+_S139_STEP6_REQUIRED = [
+    "canary_window: active",
+    "## Verification Packet` canary line",
+    "UNMEASURABLE",
+    "canary-line` to `missing_artifacts`",
+    "blocks `pipeline.complete`",
+    "UNMEASURABLE toward Clause 2",
+]
+
+for _needle in _S139_STEP6_REQUIRED:
+    check(
+        f"suite139(step6-{_needle[:24]!r}): agents/orchestrator.md Final Pipeline "
+        f"Sanity Check step 6 contains the canary-line requirement text {_needle!r}",
+        _needle in _s139_orch,
+        f"agents/orchestrator.md step 6 must contain {_needle!r} — the canary line's "
+        f"presence/correctness must be a fail-closed assert component, not only the "
+        f"'## Cost' section header (the gap the iteration-2 adversary re-check found)",
+    )
+
+_S139_FLOOR_CLAUSE_REQUIRED = [
+    "Minimum-denominator clause.",
+    "dispatch floor",
+    "00-state.md` flags",
+    "UNMEASURABLE",
+    "N=0 always reads UNMEASURABLE, never parity.",
+]
+
+for _needle in _S139_FLOOR_CLAUSE_REQUIRED:
+    check(
+        f"suite139(floor-{_needle[:24]!r}): docs/verification-packet.md § 8 contains "
+        f"the minimum-denominator floor clause text {_needle!r}",
+        _needle in _s139_packet,
+        f"docs/verification-packet.md § 8 must contain {_needle!r} — a run counting "
+        f"below its deterministic dispatch floor must be classified UNMEASURABLE "
+        f"(excluded from Clause 1, counted toward Clause 2), never silent parity",
+    )
+
+# The denominator must be re-grounded on verdict docs, not solely on breadcrumbs —
+# guards against reverting to the pre-amendment breadcrumb-derived-only wording.
+check(
+    "suite139(denominator-source): docs/verification-packet.md § 8 grounds the "
+    "denominator on verdict-doc-derived language, not breadcrumb-derived",
+    "verdict-doc-derived" in _s139_packet
+    and "upward-only enrichment" in _s139_packet,
+    "docs/verification-packet.md § 8 must state the denominator is "
+    "'verdict-doc-derived' with breadcrumbs demoted to 'upward-only enrichment' — "
+    "reverting to a purely breadcrumb-derived denominator reopens the iteration-2 "
+    "degeneracy break",
+)
+
+# Self-referential guards (hygiene contract)
+_s139_own = read(Path(__file__))
+check(
+    "suite139(self-ref): test file contains 'Suite 139' and 'canary-denominator-floor-guard'",
+    "Suite 139" in _s139_own and "canary-denominator-floor-guard" in _s139_own,
+    "test file must self-reference Suite 139 and the marker 'canary-denominator-floor-guard'",
+)
+
+_s139_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite139(registry): docs/testing.md registers 'Suite 139' and 'canary-denominator-floor-guard'",
+    "Suite 139" in _s139_testing_md and "canary-denominator-floor-guard" in _s139_testing_md,
+    "docs/testing.md must register Suite 139 and the 'canary-denominator-floor-guard' marker",
+)
+
+_s139_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite139(hygiene): CLAUDE.md does NOT contain 'Suite 139' (§11 hygiene contract)",
+    "Suite 139" not in _s139_claude_md,
+    "CLAUDE.md must not mention Suite 139 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: canary-denominator-floor-guard
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
