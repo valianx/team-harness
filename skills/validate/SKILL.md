@@ -75,4 +75,4 @@ name: validate
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly
 - The orchestrator will route to the `qa` agent in validate mode
 - Validates implementation against acceptance criteria from `00-task-intake.md`
-- Output: `workspaces/{feature-name}/04-validation.md`
+- Output: `workspaces/{feature-name}/reviews/04-validation.md`

@@ -153,7 +153,7 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
 2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. Read the following files (input manifest):
    - `01-plan.md` — **CRITICAL: this is your blueprint AND the spec.** Read `## Review Summary` for feature-wide scope (context, not your scope). Read `## Architecture` for the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies). Read `## Task List` for your assigned task's `Files:` scope and `Acceptance Criteria:`.
    - `03-testing.md` — understand what tests expect (if tests were written first)
-   - `04-validation.md` — understand acceptance criteria to satisfy
+   - `reviews/04-validation.md` — understand acceptance criteria to satisfy
    - `failure-brief.md` — failure brief from orchestrator (present only on bounded-patch re-dispatch)
    If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
@@ -185,7 +185,7 @@ Before writing any code, you MUST complete two steps: read session context and r
 
 1. **Read CLAUDE.md** — understand project conventions, golden commands, tech stack
 2. **Read the plan** (`01-plan.md`) — read `## Architecture` to understand what to build, component boundaries, security considerations, trade-offs; read `## Task List` for your task's files and acceptance criteria
-3. **Read acceptance criteria** — read your task's AC block from `01-plan.md` § Task List (primary); `04-validation.md` for any prior validation context (if available)
+3. **Read acceptance criteria** — read your task's AC block from `01-plan.md` § Task List (primary); `reviews/04-validation.md` for any prior validation context (if available)
 3b. **Read the triggered sketch files (required reading before writing any code)** — for every `sketches/*.md` present in the workspace, read it before touching a single line of implementation. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Build the delivered surface TO these contracts: the API endpoints declared in the api-contract sketch, the tables declared in the data-model sketch, the call flow declared in the service-interaction sketch. A delivered surface that contradicts a sketch is an implementation defect. Record the list of sketch files read in the `sketches_read` field of your status block.
 
    **Workspace–repository boundary (format preservation):** Sketch conventions are workspace-only. A repository's own OpenAPI spec (`openapi/openapi.{yaml,yml,json}`) keeps its existing format, filename, and structure — the JSON api-contract sketch is a workspace decision aid, not a template for a repository's own OpenAPI file. Preserve the existing format when reading and updating any repository spec. (Canonical: `docs/plan-sketches.md §10`.)

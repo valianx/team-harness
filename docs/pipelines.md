@@ -16,7 +16,7 @@ For the day-to-day usage walkthrough, see [`docs/how-it-works.md`](./how-it-work
 | **Frontend-scope** | Auto-triggered by path patterns (`components/`, `pages/`, `*.tsx`, `*.vue`, CSS) or UI/UX keywords | Adds `ux-reviewer` in Stage 1 (enrich: UI/UX AC) and Stage 3 (validate: accessibility, responsiveness, component reuse). Only critical findings block. |
 | **Database changes** | Auto-triggered when diff touches migration files | Architect declares migration strategy; plan-reviewer validates reversibility. |
 | **Test pipeline** | `/test-pipeline` · `@th:orchestrator run the test pipeline` | Service-wide test authoring with 80 % branch-coverage gate (max 3 loops). Writes coverage config + test code in worktrees; output: `05-consolidation.md`. |
-| **Research** | `/research <topic>` · `@th:orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `00-research.md`, no code committed. |
+| **Research** | `/research <topic>` · `@th:orchestrator investigate <X>` | Time-boxed read-only investigation. Output: `research/00-research.md`, no code committed. |
 | **Spike** | `/spike <prototype>` · `@th:orchestrator spike <X>` | Throwaway prototype to validate a technical approach. No delivery. |
 | **Plan** | `/plan <task>` · `/design <feature>` · `@th:orchestrator give me the work plan` | Stage 1 only (intake → architect → plan-review → STAGE-GATE-1). Stops without implementing. |
 | **PR review** | `/review-pr #N` · `@th:orchestrator review PR #N` | 5-phase enriched review with worktree, tier-aware multi-agent dispatch (reviewer + qa + security at Tier 3+), explicit decision menu. |
@@ -57,7 +57,7 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 | Phase 0a — Classify & Intake | orchestrator | `00-state.md` initialized, Discover gate, intake survey, KG session started |
 | Phase 0b — Specify | orchestrator | AC list and scope confirmed in `00-state.md` |
 | Phase 1 — Design | architect | `01-plan.md` (merged architecture + task list) + `sketches/` |
-| Phase 1.7 — UX Enrich | ux-reviewer (when `frontend_scope: true`) | `01-ux-review.md`, UI/UX AC appended to `01-plan.md` |
+| Phase 1.7 — UX Enrich | ux-reviewer (when `frontend_scope: true`) | `reviews/01-ux-review.md`, UI/UX AC appended to `01-plan.md` |
 | Phase 1.5 — Plan Ratification | qa | AC validation against Work Plan (appended to `01-plan.md`) |
 | Phase 1.6 — Plan Review | plan-reviewer | verdict appended to `01-plan.md § Plan Review` |
 | **STAGE-GATE-1** | operator | Approve or approve-autonomous; sketch-guard validates `sketches/` |
@@ -65,10 +65,10 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 | Phase 2 — Implementation | implementer | code, `02-implementation.md` |
 | Phase 2.5 — Constraint Reconciliation | qa | keep/amend/drop decision when a hidden constraint surfaces |
 | Phase 2.7 — Test Authoring | tester (authoring mode) | `03-testing.md` (authoring section); must complete before Phase 3 |
-| Phase 3 — Verify | tester (run-only), qa, security* (parallel) | `03-testing.md` (verify section), `04-validation.md`, `04-security.md` |
+| Phase 3 — Verify | tester (run-only), qa, security* (parallel) | `03-testing.md` (verify section), `reviews/04-validation.md`, `reviews/04-security.md` |
 | Phase 3.5 — Acceptance Gate | orchestrator | re-routes to implementer if any AC is missing a passing test (max 3 loops) |
 | Phase 3.75 — Build Verification | orchestrator | build/lint commands; retry implementer once if fail |
-| Phase 3.6 — Acceptance Check | acceptance-checker | verdict appended to `04-validation.md` |
+| Phase 3.6 — Acceptance Check | acceptance-checker | verdict appended to `reviews/04-validation.md` |
 | **STAGE-GATE-2** | operator | Per-round approval (skipped when operator granted `approve-autonomous` at GATE-1) |
 | Phase 4 — Delivery | delivery | CHANGELOG entry, version bump, branch, commit |
 | Phase 4.5 — Internal Review | reviewer | advisory top-3 issues |
@@ -191,7 +191,7 @@ The test pipeline **writes coverage configuration and test code** — it is not 
 
 **When to use.** Time-boxed investigation of an unknown (technology evaluation, feasibility analysis, performance profiling, cost modeling). No code changes are committed. Triggered by `/research <topic>`, `/spike <prototype>`, `@th:orchestrator investigate <X>`, or `@th:orchestrator spike <X>`.
 
-The orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `00-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
+The orchestrator routes to read-only direct mode: no `implementer`, no `delivery`, no PR. Output is a `research/00-research.md` spike document with findings, trade-offs, and a recommendation. The operator decides whether to promote to a feature pipeline from there.
 
 ---
 
@@ -233,7 +233,7 @@ Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `0
 
 - **One workspace — one PR.** The entire build lives in a single workspace; one PR is opened at the end after STAGE-GATE-3. Per-milestone PRs are prohibited.
 - **Milestones are commits, not PRs.** Each milestone produces one commit on the feature branch. The `## Milestone Index` table in `00-state.md` tracks `Milestone | Slug | Status | Commit` — no `PR` column per milestone.
-- **Flat stage files.** `02-implementation.md`, `03-testing.md`, `04-validation.md`, and `04-security.md` are whole-task documents. No per-milestone suffixes (e.g., `02-implementation-m1.md`) and no second-cycle suffixes (e.g., `02b-implementation.md`) are ever created.
+- **Flat stage files.** `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, and `reviews/04-security.md` are whole-task documents. No per-milestone suffixes (e.g., `02-implementation-m1.md`) and no second-cycle suffixes (e.g., `02b-implementation.md`) are ever created.
 - **Independent milestones run in parallel.** The architect annotates each milestone in `01-plan.md` as `independent` or `depends-on-Mx`. Independent milestones are dispatched concurrently in isolated worktrees and converge as serial commits in dependency order.
 - **Identity-keyed, not date-keyed.** The orchestrator finds the plan workspace by identity slug (date-agnostic glob + frontmatter confirm). A day rollover never creates a new workspace.
 
@@ -243,7 +243,7 @@ Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `0
 |------|-------|-------|
 | STAGE-GATE-1 | Once | Approve the whole milestone plan (`01-plan.md`) including the dependency graph |
 | (per milestone) | per milestone | Implement → one commit on the feature branch → update Milestone Index |
-| (verify) | once, whole-task | Flat `03-testing.md` / `04-validation.md` cover the whole build |
+| (verify) | once, whole-task | Flat `03-testing.md` / `reviews/04-validation.md` cover the whole build |
 | STAGE-GATE-3 | Once | After ALL milestones complete — ONE PR opened |
 
 Full contract: [`agents/ref-special-flows.md`](../agents/ref-special-flows.md) § Milestone-Build Flow.
@@ -293,7 +293,7 @@ Full contract: [`agents/orchestrator.md`](../agents/orchestrator.md) § Parallel
 
 **When to use.** Fires automatically between Phase 3 (Verify) and STAGE-GATE-2 for every PR in every pipeline.
 
-Phase 3.5 is the orchestrator re-reading the three verify artifacts (`03-testing.md`, `04-validation.md`, `04-security.md`) and the original AC list. If any AC from `01-plan.md § Task List` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
+Phase 3.5 is the orchestrator re-reading the three verify artifacts (`03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`) and the original AC list. If any AC from `01-plan.md § Task List` is missing a passing test or has an unresolved security finding, Phase 3.5 routes back to the `implementer` for a targeted fix before the gate opens. STAGE-GATE-2 never opens on a partial-pass.
 
 ---
 
@@ -428,10 +428,10 @@ The context prune reminder (`/compact`) is printed at the end — PR review cont
 | Phase | Agent | Output |
 |-------|-------|--------|
 | 0 — Intake | orchestrator | `00-task-intake.md` (topics, vault, folder, language, subject classification) |
-| 1 — Research | architect (research mode) | `00-research.md` |
+| 1 — Research | architect (research mode) | `research/00-research.md` |
 | 2a — Write | documenter | Obsidian vault pages + `02-documentation.md` manifest |
 | 2b — Diagrams | diagrammer / canvas (conditional) | `.excalidraw.md` and `.canvas` files in vault |
-| 3 — Review | qa | `04-validation.md` |
+| 3 — Review | qa | `reviews/04-validation.md` |
 | DOC-GATE | operator | approve / revise (max 3 iterations) |
 
 ### Diagram requirements
@@ -461,9 +461,9 @@ Default: English. Override with `--lang <code>`. Prose follows the specified lan
 workspaces/{feature-name}/
   00-state.md
   00-task-intake.md
-  00-research.md
+  research/00-research.md
   02-documentation.md    # manifest (pages, diagrams, dispatch requests)
-  04-validation.md
+  reviews/04-validation.md
 ```
 
 ### QA validation checks

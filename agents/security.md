@@ -57,7 +57,7 @@ Detect the mode from the orchestrator's instructions or the user's request. Mode
 Full security audit of the entire project — backend, frontend, or fullstack.
 
 - **Trigger:** user asks for security audit, security review, or vulnerability scan; or orchestrator invokes without specific mode
-- **Output:** `workspaces/{feature-name}/04-security.md`
+- **Output:** `workspaces/{feature-name}/reviews/04-security.md`
 - **Flow:** Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 (report)
 
 ### Focused Mode
@@ -65,7 +65,7 @@ Full security audit of the entire project — backend, frontend, or fullstack.
 Targeted audit of a specific area (e.g., "audit authentication", "audit API endpoints", "audit dependencies").
 
 - **Trigger:** orchestrator or user specifies a particular area to audit
-- **Output:** `workspaces/{feature-name}/04-security.md`
+- **Output:** `workspaces/{feature-name}/reviews/04-security.md`
 - **Flow:** Phase 0 → skip to relevant Phase 2 section → Phase 4 (report)
 
 ### Pipeline Mode
@@ -73,7 +73,7 @@ Targeted audit of a specific area (e.g., "audit authentication", "audit API endp
 Invoked as part of the main pipeline after implementation, to verify no security regressions were introduced. **Scoped strictly to changed files only.**
 
 - **Trigger:** orchestrator invokes for a specific feature, passing `01-plan.md` § Review Summary context and list of changed files
-- **Output:** `workspaces/{feature-name}/04-security.md`
+- **Output:** `workspaces/{feature-name}/reviews/04-security.md`
 - **Flow:** Phase 0 → Phase 1 (only changed files) → Phase 2 (only changed files) → Phase 4 (report)
 - **Scope rule:** In pipeline mode, ONLY analyze files listed as created/modified by the implementer. Do NOT scan global config, dependencies, or other files unless they were explicitly changed. This keeps the audit fast and focused on regressions introduced by the current feature.
 
@@ -81,7 +81,7 @@ Invoked as part of the main pipeline after implementation, to verify no security
 
 Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is a fifth, distinct operating mode — it is DISTINCT from Audit Mode, Focused Mode, Pipeline Mode, and PR Review Security Mode, all of which assume source code exists.
 
-**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `04-security.md` or any `*-review.md` file in this mode.
+**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any `*-review.md` file in this mode.
 
 - **Trigger:** orchestrator invokes with `mode: design-review`, only when the task or plan is security-sensitive.
 - **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).
@@ -99,7 +99,7 @@ When the design introduces or modifies a control path, a safety enforcement mech
 **Centralization contract (MUST NOT violate):**
 - Fold findings into the body of `01-plan.md` (refine `### Security Assessment` in-place when applicable).
 - Write the sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` and a one-line summary, WITHIN `## Plan Review` — NEVER as a markdown heading with `###` prefix (a `###` heading would split the `## Plan Review` slice).
-- MUST NOT create `04-security.md`, `*-review.md`, `security-reports/`, or any parallel side-file. Zero side-files.
+- MUST NOT create `reviews/04-security.md`, `*-review.md`, `security-reports/`, or any parallel side-file. Zero side-files.
 - No parallel correction files. All output goes in-place into `01-plan.md`.
 
 **Return Protocol (status block):**
@@ -294,7 +294,7 @@ issues: {critical and high finding titles, or "none"}
 
 4. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
 
-5. **Write your output** to `workspaces/{feature-name}/04-security.md` when done.
+5. **Write your output** to `workspaces/{feature-name}/reviews/04-security.md` when done.
 
 ---
 
@@ -600,7 +600,7 @@ Note known CVEs for the detected version ranges. Flag packages more than 2 major
 | `pipeline` (Phase 3 in-pipeline dispatch, Tier 3) | **Compact findings-only** (see below) | The implementer scan is scoped to changed files; the orchestrator needs findings fast with no boilerplate |
 | `audit` (default) | **Audit-grade** (risk-score table + 10-row OWASP matrix) | Full project assessment; stakeholder-ready |
 | `focused` | **Audit-grade** | Same depth, narrower scope |
-| `design-review` | In-plan inline (no `04-security.md`) | No code exists; see Design Review Mode above |
+| `design-review` | In-plan inline (no `reviews/04-security.md`) | No code exists; see Design Review Mode above |
 | `pr-review-security` | Condensed (see PR Review Security Mode above) | Feeds consolidator; not a standalone report |
 | `/th:audit-security` | **Audit-grade** | Operator-driven standalone audit; full output required |
 
@@ -610,7 +610,7 @@ Note known CVEs for the detected version ranges. Flag packages more than 2 major
 
 ### Pipeline mode — compact findings-only report
 
-When running in `pipeline` mode, write a compact report to `workspaces/{feature-name}/04-security.md`. Omit the global risk-score weight table and the empty-row OWASP matrix. Every finding still requires `file:line` + CWE.
+When running in `pipeline` mode, write a compact report to `workspaces/{feature-name}/reviews/04-security.md`. Omit the global risk-score weight table and the empty-row OWASP matrix. Every finding still requires `file:line` + CWE.
 
 ```markdown
 ## Security Review — {feature-name}
@@ -644,7 +644,7 @@ No security findings in the scanned changed files.
 
 ### Audit / focused mode — audit-grade report
 
-Write the complete report in Spanish to `workspaces/{feature-name}/04-security.md`.
+Write the complete report in Spanish to `workspaces/{feature-name}/reviews/04-security.md`.
 
 ```markdown
 # Informe de Seguridad: {feature-name / nombre del proyecto}
@@ -861,7 +861,7 @@ Before marking the audit as complete:
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
-Write the full report to `workspaces/{feature-name}/04-security.md` (see Phase 4 above for the complete template).
+Write the full report to `workspaces/{feature-name}/reviews/04-security.md` (see Phase 4 above for the complete template).
 
 ---
 
@@ -899,7 +899,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: security
 status: success | failed | blocked
 model: {effective-model-id}
-output: workspaces/{feature-name}/04-security.md
+output: workspaces/{feature-name}/reviews/04-security.md
 summary: {1-2 sentences: N findings (X critical, Y high, Z medium), risk score, most critical issue}
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
@@ -924,7 +924,7 @@ Do NOT repeat the full workspaces content in your final message — it's already
 
 ### Failure Brief (pipeline mode only, when Critical/High findings exist)
 
-When you finish pipeline mode and `04-security.md` reports any **Critical** or **High** finding (or `status: failed`), **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route Case D iteration without re-reading the full security report. Create the file if it doesn't exist.
+When you finish pipeline mode and `reviews/04-security.md` reports any **Critical** or **High** finding (or `status: failed`), **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route Case D iteration without re-reading the full security report. Create the file if it doesn't exist.
 
 ```markdown
 ## Iteration {N} — security — {YYYY-MM-DD HH:MM}

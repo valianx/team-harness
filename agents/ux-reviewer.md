@@ -43,7 +43,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 **Input:** `workspaces/{feature}/01-plan.md`
-**Output:** `workspaces/{feature}/01-ux-review.md`
+**Output:** `workspaces/{feature}/reviews/01-ux-review.md`
 
 **Process:**
 
@@ -51,7 +51,7 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 2. Detect the frontend stack (`next.config.*` / `app/` directory → react-nextjs; `vite.config.*` + react → vite-react; etc.); when the stack supports Vitest Browser Mode (currently react-nextjs), browser-real component AC are realizable in isolation — state that in findings; when not, scope browser-real assertions to e2e (Playwright) so the tester does not hit a tooling dead-end.
 3. Identify all UI-facing changes (new components, modified views, layout changes, form additions, navigation changes)
 4. For each UI-facing change, evaluate against the checklist below
-5. Write `01-ux-review.md` with recommended AC additions and findings
+5. Write `reviews/01-ux-review.md` with recommended AC additions and findings
 
 **Checklist (evaluate each UI change against):**
 
@@ -74,33 +74,33 @@ Read the architect's `01-plan.md`. Add UI/UX acceptance criteria to the plan.
 
 ### AC sink — 01-plan.md § Task List
 
-**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-task AC block), not only into `01-ux-review.md`. The acceptance gate at Phase 3.5 and the acceptance-checker at Phase 3.6 both read AC from `01-plan.md § Task List` — AC that exist only in `01-ux-review.md` are never evaluated by any gate.
+**Primary AC sink (gate source-of-truth):** enrich-mode AC MUST be pinned into `01-plan.md § Task List` (the per-task AC block), not only into `reviews/01-ux-review.md`. The acceptance gate at Phase 3.5 and the acceptance-checker at Phase 3.6 both read AC from `01-plan.md § Task List` — AC that exist only in `reviews/01-ux-review.md` are never evaluated by any gate.
 
 **Procedure:**
-1. Write the full UX narrative (findings, checklist evaluation, existing patterns) in `01-ux-review.md`.
+1. Write the full UX narrative (findings, checklist evaluation, existing patterns) in `reviews/01-ux-review.md`.
 2. Extract the recommended AC additions (Given/When/Then format) from `## Recommended AC Additions`.
 3. Append those AC to `01-plan.md § Task List` in the per-task AC block, using contiguous numbering after the architect's last AC.
 
-**Resolution of prior contradiction:** the output field at the top of this mode (`Output: 01-ux-review.md`) describes the UX narrative file. The text "append to the existing task's AC list" at the AC format section means append to `01-plan.md § Task List` — not exclusively to `01-ux-review.md`. Both files receive the AC: `01-ux-review.md` as narrative context, `01-plan.md § Task List` as the gate-binding pin. `01-plan.md § Task List` is the primary, authoritative AC sink.
+**Resolution of prior contradiction:** the output field at the top of this mode (`Output: reviews/01-ux-review.md`) describes the UX narrative file. The text "append to the existing task's AC list" at the AC format section means append to `01-plan.md § Task List` — not exclusively to `reviews/01-ux-review.md`. Both files receive the AC: `reviews/01-ux-review.md` as narrative context, `01-plan.md § Task List` as the gate-binding pin. `01-plan.md § Task List` is the primary, authoritative AC sink.
 
 ### Mode: validate (Stage 3 — invoked in parallel with tester/qa/security)
 
 Read the implementation and validate against UI/UX criteria.
 
-**Input:** `01-plan.md § Task List` (live AC read, mandatory), `{docs_root}/00-verify-packet.md` (packet-first), `01-ux-review.md` (mandatory, preserved read), source code, `02-implementation.md` (depth-on-demand)
-**Output:** `workspaces/{feature}/04-ux-validation.md`
+**Input:** `01-plan.md § Task List` (live AC read, mandatory), `{docs_root}/00-verify-packet.md` (packet-first), `reviews/01-ux-review.md` (mandatory, preserved read), source code, `02-implementation.md` (depth-on-demand)
+**Output:** `workspaces/{feature}/reviews/04-ux-validation.md`
 
 **Live AC read + packet-first read (canonical schema: `docs/verification-packet.md`).**
 
 1. Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your UI/UX AC verdict baseline. Then read `00-verify-packet.md` — it carries the changed-files table and the implementer's summary/Deviations (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest). Use it in place of separately reading `02-implementation.md` for WORKSPACE-NARRATIVE context.
-2. **Hard floor — preserved read.** `01-ux-review.md` (the Stage-1 UI/UX AC baseline) stays a MANDATORY read, untouched by the packet — always read it in full when it exists.
+2. **Hard floor — preserved read.** `reviews/01-ux-review.md` (the Stage-1 UI/UX AC baseline) stays a MANDATORY read, untouched by the packet — always read it in full when it exists.
 3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to a full read of `02-implementation.md`, report `packet_integrity: stale|mismatch`.
 4. **Depth-on-demand (never forbidden):** open `02-implementation.md` in full ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
 5. **Fallback (fail-open):** packet absent → read `02-implementation.md` directly, unchanged. Report `packet_used: absent`.
 6. Read the actual source code (components, pages, styles) — unaffected by the packet.
 7. Validate each UI/UX criterion.
 8. Check for frontend best practices (see below).
-9. Write `04-ux-validation.md` with per-finding verdicts, and report `packet_used: true|false|absent`, `packet_escapes: N`, `packet_integrity: ok|stale|mismatch|n-a` in your status block.
+9. Write `reviews/04-ux-validation.md` with per-finding verdicts, and report `packet_used: true|false|absent`, `packet_escapes: N`, `packet_integrity: ok|stale|mismatch|n-a` in your status block.
 
 **Frontend best practices to check:**
 
@@ -131,7 +131,7 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 
 ---
 
-## Report Format (`01-ux-review.md` — enrich mode)
+## Report Format (`reviews/01-ux-review.md` — enrich mode)
 
 ```markdown
 # UX Review — {feature name}
@@ -156,7 +156,7 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 {List of existing components, design tokens, styling patterns found in the codebase that the implementation should reuse}
 ```
 
-## Report Format (`04-ux-validation.md` — validate mode)
+## Report Format (`reviews/04-ux-validation.md` — validate mode)
 
 ```markdown
 # UX Validation — {feature name}
