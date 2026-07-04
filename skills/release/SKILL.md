@@ -151,14 +151,14 @@ If `claude` is not on PATH or either command errors, record the failure for this
 - Interval: 15 seconds. Maximum attempts: 12 (180-second ceiling).
 - A 404, a version mismatch, or a network hiccup all mean "not yet published — keep polling"; none of these is treated as a failure on its own.
 - On a match, proceed to the updater below.
-- If the ceiling is reached without a match, report `opencode: publication gate timed out after 180s — run the updater manually: ./bin/update-opencode.sh (or .\bin\update-opencode.ps1 on Windows)` and continue to the final report. Do not abort or retry beyond the ceiling.
+- If the ceiling is reached without a match, report `opencode: publication gate timed out after 180s — run the updater manually: ./bin/update-opencode.sh (or .\bin\update-opencode.ps1 on Windows; without a checkout, download the updater from https://valianx.github.io/team-harness/update-opencode.sh to a file and run it)` and continue to the final report. Do not abort or retry beyond the ceiling.
 
 **Updater.** Once the gate clears, run the OS-appropriate updater, preferring the repo copy over the published fallback:
 
-- Linux/macOS: `./bin/update-opencode.sh` when the repo is present at the working directory; otherwise `curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh | bash`.
-- Windows: `.\bin\update-opencode.ps1` when the repo is present; otherwise the equivalent Pages URL for PowerShell.
+- Linux/macOS: `./bin/update-opencode.sh` when the repo is present at the working directory; otherwise download first, then execute — never pipe the remote script directly into the shell: `TMP_UPD=$(mktemp) && curl -fsSL -o "$TMP_UPD" https://valianx.github.io/team-harness/update-opencode.sh && bash "$TMP_UPD"; rm -f "$TMP_UPD"`.
+- Windows: `.\bin\update-opencode.ps1` when the repo is present; otherwise download the equivalent Pages URL to a temp file with `Invoke-WebRequest -OutFile` and run that file — never `iwr … | iex`.
 
-The updater's own cheap `VERSION` pre-check and SHA256 fail-closed verification are unchanged by this step (out of scope — see `Security Assessment`); the Go binary it invokes re-confirms the three-state delta authoritatively: update-available (applied) / already current / installed ahead. Report that delta using this exact vocabulary. Close by stating that restarting opencode is an action for the operator to take — never state that `{X.Y.Z}` is active.
+The download-then-execute form avoids running a truncated or tampered stream directly; the strong supply-chain floor is one layer down and unchanged by this step: the updater's own cheap `VERSION` pre-check and its SHA256 fail-closed verification of the release binary. The Go binary it invokes re-confirms the three-state delta authoritatively: update-available (applied) / already current / installed ahead. Report that delta using this exact vocabulary. Close by stating that restarting opencode is an action for the operator to take — never state that `{X.Y.Z}` is active.
 
 If the updater errors (missing CLI, network failure) after the gate cleared, record the failure for this leg's report row and state the manual fallback command shown above. This does not affect Leg 1's report or the already-published release.
 
@@ -174,7 +174,7 @@ release local-apply — <both applied | partial | both manual>
     installed version   <X>
     downloaded version  <Y>            (or "already current" | "manual: <reason> — run /th:update")
   opencode
-    artifact gate       published (VERSION={X.Y.Z})   (or "timed out >180s — run the updater manually")
+    artifact gate       published (VERSION={X.Y.Z})   (or "timed out after 180s — run the updater manually")
     result               <update-available applied | already current | installed ahead | manual: <reason>>
 ```
 
