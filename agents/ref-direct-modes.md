@@ -100,7 +100,7 @@ If no `Vault:` in payload → use default: `workspaces/{feature}/diagram.excalid
 Invoke `architect` in **research mode** via Task tool with:
 - The diagram request (what to visualize)
 - Feature name for workspaces
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a diagram. Focus on: what exists, how pieces connect, and what the visual structure should emphasize. Produce a structured analysis in `workspaces/{feature}/00-research.md` — do NOT produce a diagram."
+- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a diagram. Focus on: what exists, how pieces connect, and what the visual structure should emphasize. Produce a structured analysis in `workspaces/{feature}/research/00-research.md` — do NOT produce a diagram."
 
 Gate: if `status: failed` → report to user and stop.
 
@@ -108,7 +108,7 @@ Gate: if `status: failed` → report to user and stop.
 
 Invoke `diagrammer` via Task tool with:
 - Feature name
-- Path to architect's analysis: `workspaces/{feature}/00-research.md`
+- Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
 - Path to skill: `.claude/skills/excalidraw-diagram/`
 - Output path: `{resolved output path from Step 0}`
 - **Expected sections:** list the major sections from the architect's analysis
@@ -153,7 +153,7 @@ If no `Vault:` in payload → use default: `workspaces/{feature}/diagram.c4`.
 Invoke `architect` in **research mode** via Task tool with:
 - The diagram request (what to visualize)
 - Feature name for workspaces
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a LikeC4 architecture diagram. Focus on: entry points, services, databases, queues, external dependencies, and actors. Produce a structured analysis in `workspaces/{feature}/00-research.md` — do NOT produce a diagram."
+- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a LikeC4 architecture diagram. Focus on: entry points, services, databases, queues, external dependencies, and actors. Produce a structured analysis in `workspaces/{feature}/research/00-research.md` — do NOT produce a diagram."
 
 Gate: if `status: failed` → report to user and stop.
 
@@ -161,7 +161,7 @@ Gate: if `status: failed` → report to user and stop.
 
 Invoke `likec4-diagrammer` via Task tool with:
 - Feature name
-- Path to architect's analysis: `workspaces/{feature}/00-research.md`
+- Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
 - Path to skill: `.claude/skills/likec4-diagram/`
 - Output path: `{resolved output path from Step 0}`
 
@@ -196,7 +196,7 @@ If no `Vault:` in payload → use default: `workspaces/{feature}/diagram.d2`.
 Invoke `architect` in **research mode** via Task tool with:
 - The diagram request
 - Feature name for workspaces
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a D2 diagram. Produce a structured analysis in `workspaces/{feature}/00-research.md` — do NOT produce a diagram."
+- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a D2 diagram. Produce a structured analysis in `workspaces/{feature}/research/00-research.md` — do NOT produce a diagram."
 
 Gate: if `status: failed` → report to user and stop.
 
@@ -204,7 +204,7 @@ Gate: if `status: failed` → report to user and stop.
 
 Invoke `d2-diagrammer` via Task tool with:
 - Feature name
-- Path to architect's analysis: `workspaces/{feature}/00-research.md`
+- Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
 - Path to skill: `.claude/skills/d2-diagram/`
 - Output path: `{resolved output path from Step 0}`
 
@@ -312,7 +312,7 @@ Review mode MUST NOT dispatch `implementer` or any agent that has write tools ov
 `reviewer` and `reviewer-consolidator` both declare `Edit` and `Write` in their frontmatter tool grants. Those grants cannot be revoked from the dispatch side; the prohibition is therefore expressed as an imperative constraint in each agent's system prompt (see `agents/reviewer.md` § Read-Only Working-Tree Contract and `agents/reviewer-consolidator.md` § Read-Only Working-Tree Contract). The permitted writes for each agent are:
 
 - `reviewer-consolidator`: ONLY `.claude/pr-review-*` draft files (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`, etc.).
-- `reviewer`: ONLY the workspace doc `workspaces/{feature-name}/04-review.md`.
+- `reviewer`: ONLY the workspace doc `workspaces/{feature-name}/reviews/04-review.md`.
 
 NEVER write to source files, configuration files, or any other path in the working tree outside those two zones.
 

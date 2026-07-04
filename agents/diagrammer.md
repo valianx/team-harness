@@ -1,6 +1,6 @@
 ---
 name: diagrammer
-description: Generates Excalidraw diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the excalidraw-diagram skill methodology, generates the .excalidraw JSON section-by-section, runs a render-validate loop until the diagram passes quality checks, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
+description: Generates Excalidraw diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the excalidraw-diagram skill methodology, generates the .excalidraw JSON section-by-section, runs a render-validate loop until the diagram passes quality checks, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
 model: sonnet
 effort: medium
 color: orange
@@ -55,12 +55,12 @@ This is a prompt-level floor — defense in depth that complements the determini
 **Before starting ANY work:**
 
 1. **Read the orchestrator's invocation** — extract:
-   - Path to architect's analysis: `workspaces/{feature}/00-research.md`
+   - Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
    - Path to skill: `.claude/skills/excalidraw-diagram/`
    - Output path: `workspaces/{feature}/diagram.excalidraw` (or path specified by orchestrator)
    - Feature name for workspaces and execution log
 
-2. **Read the architect's analysis** — read `workspaces/{feature}/00-research.md` in full. This is your primary input. Do not start designing until you've read and understood it.
+2. **Read the architect's analysis** — read `workspaces/{feature}/research/00-research.md` in full. This is your primary input. Do not start designing until you've read and understood it.
 
 3. **Read the skill methodology** — read these files in order:
    - `.claude/skills/excalidraw-diagram/SKILL.md` — design process, quality checklist, render loop

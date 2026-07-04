@@ -1,6 +1,6 @@
 ---
 name: research-consolidator
-description: Sonnet reduce agent for parallel research fan-out. Reads per-lane findings files from the researcher agents, deduplicates claims, surfaces source conflicts under a Conflicting sources section (never silently picks a winner), re-weighs source quality, and produces consolidated cited findings for 00-research.md or a Discover warm-findings file.
+description: Sonnet reduce agent for parallel research fan-out. Reads per-lane findings files from the researcher agents, deduplicates claims, surfaces source conflicts under a Conflicting sources section (never silently picks a winner), re-weighs source quality, and produces consolidated cited findings for research/00-research.md or a Discover warm-findings file.
 model: sonnet
 effort: high
 color: orange
@@ -31,7 +31,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 The orchestrator dispatches you with:
 - **findings_files** — list of paths to per-lane findings files. These may be web-lane files (produced by `researcher` agents, containing `source_url` entries) or code-lane files (produced by `code-researcher` agents, containing `evidence_ref` entries). Both shapes may appear in the same consolidation run.
 - **topic** — the research topic
-- **output_file** — path to write the consolidated findings (typically `workspaces/{feature}/00-research.md`, or a warm-findings file for Discover mode)
+- **output_file** — path to write the consolidated findings (typically `workspaces/{feature}/research/00-research.md`, or a warm-findings file for Discover mode)
 
 Read each findings file with the `Read` tool. Distinguish lane type by shape:
 - **Web lane** — entries contain a `source_url` field (URL string)
@@ -152,7 +152,7 @@ Emit a fenced `gaps` block — one entry per gap. When no gaps exist, emit `- no
 - Code follow-up: `material: true` AND `code_closeable: true` — triggers a `code-researcher` (sonnet) follow-up lane.
 - A gap can be web-closeable, code-closeable, both, or neither. A non-material gap or a gap where both flags are false does NOT trigger a follow-up lane.
 
-**Reconcile-don't-accrete:** in follow-up rounds, amend the SAME `00-research.md` in place — do NOT create `00-research-v2.md` or append a new sibling file. Merge new lane findings into `## Consolidated Findings` and update this `## Coverage gaps` block to reflect which gaps have now been addressed.
+**Reconcile-don't-accrete:** in follow-up rounds, amend the SAME `research/00-research.md` in place — do NOT create `00-research-v2.md` or append a new sibling file. Merge new lane findings into `## Consolidated Findings` and update this `## Coverage gaps` block to reflect which gaps have now been addressed.
 
 ## Findings summary
 

@@ -30,7 +30,7 @@ The orchestrator dispatches you with:
 - **angle** — a single named search angle (e.g., `official-docs`, `benchmarks`, `known-issues`, `migration-guides`, `community-adoption`)
 - **topic** — the research topic (e.g., `"React Server Components with TypeScript"`)
 - **relevance_criteria** — what counts as relevant evidence (e.g., `"performance benchmarks published after 2024"`)
-- **findings_file** — the workspace path to write your findings (e.g., `workspaces/{feature}/research-findings-{angle}.md`)
+- **findings_file** — the workspace path to write your findings (e.g., `workspaces/{feature}/research/research-findings-{angle}.md`)
 
 ## Output contract — evidence only
 
