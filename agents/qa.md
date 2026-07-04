@@ -194,7 +194,7 @@ Used inside the Documentation Flow (Phase 3) after the documenter produces vault
 An unbacked claim (endpoint, param, env var, config key, or CLI flag) that appears in a vault page but has no verifiable counterpart in the source is the canonical example of a fidelity finding. Such a claim FAILS the gate.
 
 - **Trigger:** orchestrator invokes for docs flow Phase 3 validation (after documenter write phase)
-- **Input:** `research/00-research.md` (source of truth), vault pages written by documenter
+- **Input:** `research/00-research.md` (seed narrative), vault pages written by documenter
 - **Output:** `workspaces/{feature-name}/reviews/04-validation.md` with structural + fidelity verdicts
 
 #### Structural Checks (existing — extended, not replaced)

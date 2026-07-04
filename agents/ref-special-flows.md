@@ -967,7 +967,7 @@ Output: `research/00-research.md` in `workspaces/{feature-name}/`.
 
 Invoke `documenter` with the research findings and metadata:
 
-```
+```text
 Task context:
 - research: workspaces/{feature-name}/research/00-research.md
 - vault_path: {from Phase 0}

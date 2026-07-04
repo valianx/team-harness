@@ -31233,9 +31233,8 @@ check(
 # the reviews-family output paths for adversary/reviewer/acceptance-checker
 # not pinned by Suite 140 (AC-2), the discover-phase warm-sweep research
 # site (AC-1), and the docs/conventions.md subfolder-mechanic mention (AC-6).
-# No `docs/testing.md` self-registration check is added here — this tester
-# task's scope is restricted to tests/*.py and tests/*.sh; registering this
-# suite in docs/testing.md is out of scope for this authoring pass.
+# Registered in docs/testing.md (canonical suite registry) and guarded by
+# the same self-ref/registry/hygiene trio as Suite 140.
 #
 # Marker: workspace-subfolder-layout-gapfill
 # ---------------------------------------------------------------------------
@@ -31401,8 +31400,7 @@ check(
     + "; ".join(_s141_orphans[:10]),
 )
 
-# Self-referential guard (test-file-only; docs/testing.md registration is
-# out of scope for this authoring pass — see header note above)
+# Self-referential guards (hygiene contract — mirrors Suite 140's trio)
 _s141_own = read(Path(__file__))
 check(
     "suite141(self-ref): test file contains 'Suite 141' and "
@@ -31410,6 +31408,23 @@ check(
     "Suite 141" in _s141_own and "workspace-subfolder-layout-gapfill" in _s141_own,
     "test file must self-reference Suite 141 and the marker "
     "'workspace-subfolder-layout-gapfill'",
+)
+
+_s141_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite141(registry): docs/testing.md registers 'Suite 141' and "
+    "'workspace-subfolder-layout-gapfill'",
+    "Suite 141" in _s141_testing_md
+    and "workspace-subfolder-layout-gapfill" in _s141_testing_md,
+    "docs/testing.md must register Suite 141 and the "
+    "'workspace-subfolder-layout-gapfill' marker",
+)
+
+_s141_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite141(hygiene): CLAUDE.md does NOT contain 'Suite 141' (§11 hygiene contract)",
+    "Suite 141" not in _s141_claude_md,
+    "CLAUDE.md must not mention Suite 141 — only docs/testing.md is the canonical registry",
 )
 
 # Marker: workspace-subfolder-layout-gapfill

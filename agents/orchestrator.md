@@ -146,7 +146,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `tester` | Creates tests with factory mocks, runs them | Yes (tests) | `03-testing.md` |
 | `qa` | Validates implementations against AC; defines AC standalone | No | `reviews/04-validation.md` |
 | `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `reviews/04-security.md` |
-| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it | could-not-break`; report in Spanish | No | `reviews/04-adversary.md` |
+| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in Spanish | No | `reviews/04-adversary.md` |
 | `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `01-plan.md § Plan Review` |
 | `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `reviews/04-validation.md § Drift Analysis` |
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `00-state.md § Delivery` |
