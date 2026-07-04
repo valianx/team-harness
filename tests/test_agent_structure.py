@@ -1467,7 +1467,7 @@ for _stale_name in ("06-acceptance-check.md", "05-delivery.md", "02-task-list.md
 # PRESENCE assertions (C2) — correct schema names must appear in the doc.
 # Operating on: _subagent_orch_md (broader scope, not the absence slice).
 for _correct_name in (
-    "04-validation.md",
+    "reviews/04-validation.md",
     "00-state.md",
     "01-plan.md",
 ):
@@ -3193,7 +3193,7 @@ check(
 check(
     "ref-special-flows.md Bug-fix Flow declares full workspaces artifact set",
     "01-root-cause.md" in _ref_flows_bf and "02-regression-test.md" in _ref_flows_bf and
-    "01-plan.md" in _ref_flows_bf and "04-security.md" in _ref_flows_bf,
+    "01-plan.md" in _ref_flows_bf and "reviews/04-security.md" in _ref_flows_bf,
     "Full workspaces artifact set not declared in Bug-fix Flow",
 )
 check(
@@ -5738,7 +5738,7 @@ _c6_no_review_files = bool(_sec_dr) and (
 )
 _c6_no_security_reports = bool(_sec_dr) and (
     "security-reports" in _sec_dr
-    or "04-security.md" in _sec_dr
+    or "reviews/04-security.md" in _sec_dr
     or "zero" in _sec_dr.lower()
     or "no side" in _sec_dr.lower()
     or "no file" in _sec_dr.lower()
@@ -8713,7 +8713,7 @@ check(
 # PR D of the pipeline-flows-hardening programme.
 #
 # Dead-letter bug (theme #2): the ux-reviewer is declared in classification
-# tables but no phase body dispatches it and no gate reads 04-ux-validation.md,
+# tables but no phase body dispatches it and no gate reads reviews/04-ux-validation.md,
 # so the "WCAG A blocks delivery" contract is vacuous.
 #
 # PR D fix:
@@ -8721,16 +8721,16 @@ check(
 #       dispatches ux-reviewer enrich (sub-phase 1.7) after the architect.
 #   (2) Phase 3 parallel-dispatch block gains ux-reviewer validate (sub-phase
 #       3.4) when frontend_scope: true.
-#   (3) Phase 3.5 reads 04-ux-validation.md; a critical (WCAG A) finding fails
+#   (3) Phase 3.5 reads reviews/04-ux-validation.md; a critical (WCAG A) finding fails
 #       the gate and routes back to implementer (Case A).
-#   (4) Phase 3.6 input pointers include 04-ux-validation.md.
+#   (4) Phase 3.6 input pointers include reviews/04-ux-validation.md.
 #   (5) Sub-phase identities 1.7-ux-enrich / 3.4-ux-validate carry
 #       phase.start/phase.end observability events and Phase-Checklist lines
 #       gated by frontend_scope ([~skipped: frontend_scope:false] when off).
 #   (6) A fallback inline/nested path exists for the ux-reviewer (mirrors the
 #       plan-reviewer fallback tree); status-block gate reads findings.critical.
 #   (7) agents/ux-reviewer.md enrich-mode pins AC into 01-plan.md § Task List
-#       (not only 01-ux-review.md), resolving the AC-sink contradiction.
+#       (not only reviews/01-ux-review.md), resolving the AC-sink contradiction.
 #
 # Every check slices to a named anchor and asserts sub-tokens WITHIN the slice.
 # Anti-false-green guarantee:
@@ -8754,16 +8754,16 @@ check(
 #   (1)  / AC-1  : orchestrator.md Phase 1 enrich anchor —
 #                  "When frontend_scope: true" sub-block dispatches ux-reviewer
 #                  enrich (1.7-ux-enrich) after architect, before Phase 1.5;
-#                  input 01-plan.md + output 01-ux-review.md.
+#                  input 01-plan.md + output reviews/01-ux-review.md.
 #   (2)  / AC-2  : orchestrator.md Phase 3 validate anchor —
 #                  ux-reviewer validate (3.4-ux-validate) in the parallel block
 #                  when frontend_scope: true; input 02-implementation.md +
-#                  01-ux-review.md; output 04-ux-validation.md.
+#                  reviews/01-ux-review.md; output reviews/04-ux-validation.md.
 #   (3)  / AC-3  : orchestrator.md Phase 3.5 UX gate anchor —
-#                  reads 04-ux-validation.md; critical (WCAG A) fails gate and
+#                  reads reviews/04-ux-validation.md; critical (WCAG A) fails gate and
 #                  routes to implementer (Case A); high/medium do NOT block.
 #   (4)  / AC-4  : orchestrator.md Phase 3.6 input pointers —
-#                  04-ux-validation.md listed as a pointer (pointer line in
+#                  reviews/04-ux-validation.md listed as a pointer (pointer line in
 #                  the existing Phase 3.6 "Invoke via Task tool" block).
 #   (5)  / AC-5  : orchestrator.md Phase Checklist anchor —
 #                  sub-phase lines 1.7-ux-enrich / 3.4-ux-validate present;
@@ -8774,13 +8774,13 @@ check(
 #                  findings.critical (status-block gate).
 #   (7)  / AC-7  : agents/ux-reviewer.md AC-sink anchor —
 #                  enrich-mode pins AC into 01-plan.md § Task List;
-#                  resolves the 01-ux-review.md vs "append to PR AC list"
+#                  resolves the reviews/01-ux-review.md vs "append to PR AC list"
 #                  contradiction (lines :46/:66/:115-138).
 #   (8)  / AC-8  : this file contains "Suite 42" + "_slice_section" idiom
 #                  + "pr-d-frontend-wiring" (anti-false-green self-check).
 #   (9)  / AC-8  : CLAUDE.md §11 registers "Suite 42" + "pr-d-frontend-wiring".
 #   (10) / AC-1+2: consistency check — BOTH Phase 1 enrich slice AND Phase 3
-#                  validate slice reference "04-ux-validation.md" and
+#                  validate slice reference "reviews/04-ux-validation.md" and
 #                  "ux-reviewer" (end-to-end wiring in both directions).
 # ---------------------------------------------------------------------------
 print()
@@ -8812,14 +8812,14 @@ _s42_acsink_slice    = _slice_section(_s42_uxrev, _S42_ACSINK_ANCHOR)
 # Check (1) / AC-1 — orchestrator.md § Phase 1 enrich block:
 # When frontend_scope: true, ux-reviewer enrich dispatched after architect,
 # before Phase 1.5. Tokens: "1.7-ux-enrich" + "ux-reviewer" +
-# "01-ux-review.md" + "01-plan.md" (input) + "1.5" (ordering reference).
+# "reviews/01-ux-review.md" + "01-plan.md" (input) + "1.5" (ordering reference).
 # ---------------------------------------------------------------------------
-_S42_ENRICH_TOKENS = ("1.7-ux-enrich", "ux-reviewer", "01-ux-review.md", "01-plan.md", "1.5")
+_S42_ENRICH_TOKENS = ("1.7-ux-enrich", "ux-reviewer", "reviews/01-ux-review.md", "01-plan.md", "1.5")
 
 check(
     "frontend-wiring(1/ac-1): orchestrator.md contains Phase 1 enrich anchor"
     " and dispatches ux-reviewer enrich (1.7-ux-enrich) before Phase 1.5,"
-    " with input 01-plan.md and output 01-ux-review.md",
+    " with input 01-plan.md and output reviews/01-ux-review.md",
     bool(_s42_enrich_slice)
     and all(t in _s42_enrich_slice for t in _S42_ENRICH_TOKENS),
     f"anchor '{_S42_ENRICH_ANCHOR}' missing or required tokens absent;"
@@ -8834,17 +8834,17 @@ check(
 # Check (2) / AC-2 — orchestrator.md § Phase 3 validate block:
 # ux-reviewer validate (3.4-ux-validate) in the parallel Task block when
 # frontend_scope: true. Tokens: "3.4-ux-validate" + "ux-reviewer" +
-# "04-ux-validation.md" + "02-implementation.md" + "01-ux-review.md".
+# "reviews/04-ux-validation.md" + "02-implementation.md" + "reviews/01-ux-review.md".
 # ---------------------------------------------------------------------------
 _S42_VALIDATE_TOKENS = (
-    "3.4-ux-validate", "ux-reviewer", "04-ux-validation.md",
-    "02-implementation.md", "01-ux-review.md",
+    "3.4-ux-validate", "ux-reviewer", "reviews/04-ux-validation.md",
+    "02-implementation.md", "reviews/01-ux-review.md",
 )
 
 check(
     "frontend-wiring(2/ac-2): orchestrator.md contains Phase 3 validate anchor"
     " and adds ux-reviewer validate (3.4-ux-validate) to the parallel Task block"
-    " with input 02-implementation.md+01-ux-review.md and output 04-ux-validation.md",
+    " with input 02-implementation.md+reviews/01-ux-review.md and output reviews/04-ux-validation.md",
     bool(_s42_validate_slice)
     and all(t in _s42_validate_slice for t in _S42_VALIDATE_TOKENS),
     f"anchor '{_S42_VALIDATE_ANCHOR}' missing or required tokens absent;"
@@ -8857,20 +8857,20 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (3) / AC-3 — orchestrator.md § Phase 3.5 UX gate:
-# reads 04-ux-validation.md; critical (WCAG A) finding fails gate and routes
+# reads reviews/04-ux-validation.md; critical (WCAG A) finding fails gate and routes
 # to implementer (Case A); the gate explicitly does NOT block on high/medium.
-# Tokens required: "04-ux-validation.md" + "critical" + "Case A" +
+# Tokens required: "reviews/04-ux-validation.md" + "critical" + "Case A" +
 # one of ("implementer", "routes to implementer", "route to implementer").
 # Negative token: "high" MUST also be present (to confirm the "only critical
 # blocks" language is there, not just a bare "critical" mention).
 # ---------------------------------------------------------------------------
-_S42_GATE35_BASE_TOKENS = ("04-ux-validation.md", "critical", "Case A")
+_S42_GATE35_BASE_TOKENS = ("reviews/04-ux-validation.md", "critical", "Case A")
 _S42_GATE35_ROUTE_ALTS  = ("implementer", "route to implementer", "routes to implementer")
 _S42_GATE35_WCAG_ALTS   = ("WCAG A", "WCAG-A", "wcag-a", "wcag a")
 
 check(
     "frontend-wiring(3/ac-3): orchestrator.md § Phase 3.5 UX gate reads"
-    " 04-ux-validation.md; critical (WCAG A) finding fails gate and routes to"
+    " reviews/04-ux-validation.md; critical (WCAG A) finding fails gate and routes to"
     " implementer (Case A); 'high' token confirms only-critical-blocks language",
     bool(_s42_gate35_slice)
     and all(t in _s42_gate35_slice for t in _S42_GATE35_BASE_TOKENS)
@@ -8887,13 +8887,13 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (4) / AC-4 — orchestrator.md Phase 3.6 input pointers:
-# 04-ux-validation.md must appear in the existing "Invoke via Task tool"
+# reviews/04-ux-validation.md must appear in the existing "Invoke via Task tool"
 # pointer block of Phase 3.6 (acceptance checker inputs).
 # Strategy: search the whole orchestrator text for the 3.6 pointer block
-# and verify 04-ux-validation.md is listed alongside the existing pointers.
+# and verify reviews/04-ux-validation.md is listed alongside the existing pointers.
 # The existing line (orchestrator.md:1750) lists:
-#   "02-implementation.md, 03-testing.md, 04-validation.md, and 04-security.md"
-# After the fix it must also include "04-ux-validation.md".
+#   "02-implementation.md, 03-testing.md, reviews/04-validation.md, and reviews/04-security.md"
+# After the fix it must also include "reviews/04-ux-validation.md".
 # Anchor: "## Phase 3.6" (the acceptance-checker phase heading).
 # ---------------------------------------------------------------------------
 _S42_PHASE36_ANCHOR = "## Phase 3.6"
@@ -8901,14 +8901,14 @@ _s42_phase36_slice  = _slice_section(_s42_orch, _S42_PHASE36_ANCHOR)
 
 check(
     "frontend-wiring(4/ac-4): orchestrator.md Phase 3.6 input pointer block"
-    " includes '04-ux-validation.md' (alongside existing 02-implementation.md,"
-    " 03-testing.md, 04-validation.md pointers)",
+    " includes 'reviews/04-ux-validation.md' (alongside existing 02-implementation.md,"
+    " 03-testing.md, reviews/04-validation.md pointers)",
     bool(_s42_phase36_slice)
-    and "04-ux-validation.md" in _s42_phase36_slice,
-    f"anchor '{_S42_PHASE36_ANCHOR}' missing or '04-ux-validation.md' absent"
+    and "reviews/04-ux-validation.md" in _s42_phase36_slice,
+    f"anchor '{_S42_PHASE36_ANCHOR}' missing or 'reviews/04-ux-validation.md' absent"
     f" from Phase 3.6 input pointer block;"
     f" anchor present: {bool(_s42_phase36_slice)};"
-    f" '04-ux-validation.md' present: {'04-ux-validation.md' in _s42_phase36_slice}",
+    f" 'reviews/04-ux-validation.md' present: {'reviews/04-ux-validation.md' in _s42_phase36_slice}",
 )
 
 # ---------------------------------------------------------------------------
@@ -8972,9 +8972,9 @@ check(
 # ---------------------------------------------------------------------------
 # Check (7) / AC-7 — agents/ux-reviewer.md AC-sink:
 # Enrich-mode must pin AC into 01-plan.md § Task List (the gate source-of-truth),
-# not only 01-ux-review.md. The contradiction between :46 (output=01-ux-review.md),
+# not only reviews/01-ux-review.md. The contradiction between :46 (output=reviews/01-ux-review.md),
 # :66 ("append to existing PR's AC list"), and :115-138 (AC Additions written to
-# 01-ux-review.md) must be resolved. Tokens required:
+# reviews/01-ux-review.md) must be resolved. Tokens required:
 # "01-plan.md" + "Task List" + one of ("pin", "append to", "fix", "primary").
 # ---------------------------------------------------------------------------
 _S42_ACSINK_TOKENS = ("01-plan.md", "Task List")
@@ -9030,23 +9030,23 @@ check(
 # Check (10) / AC-1 + AC-2 consistency — end-to-end wiring:
 # BOTH the Phase 1 enrich slice AND the Phase 3 validate slice must reference
 # "ux-reviewer" and the artefact chain is coherent:
-#   enrich output (01-ux-review.md) appears as validate input.
+#   enrich output (reviews/01-ux-review.md) appears as validate input.
 # ---------------------------------------------------------------------------
 check(
     "frontend-wiring(10/ac-1+ac-2 consistency): Phase 1 enrich slice AND Phase 3"
-    " validate slice both reference 'ux-reviewer'; enrich output '01-ux-review.md'"
+    " validate slice both reference 'ux-reviewer'; enrich output 'reviews/01-ux-review.md'"
     " appears in validate slice as input (end-to-end artefact chain coherent)",
     bool(_s42_enrich_slice)
     and bool(_s42_validate_slice)
     and "ux-reviewer" in _s42_enrich_slice
     and "ux-reviewer" in _s42_validate_slice
-    and "01-ux-review.md" in _s42_validate_slice,
+    and "reviews/01-ux-review.md" in _s42_validate_slice,
     f"End-to-end artefact chain broken:"
     f" enrich slice present: {bool(_s42_enrich_slice)};"
     f" validate slice present: {bool(_s42_validate_slice)};"
     f" 'ux-reviewer' in enrich: {'ux-reviewer' in _s42_enrich_slice};"
     f" 'ux-reviewer' in validate: {'ux-reviewer' in _s42_validate_slice};"
-    f" '01-ux-review.md' in validate: {'01-ux-review.md' in _s42_validate_slice}",
+    f" 'reviews/01-ux-review.md' in validate: {'reviews/01-ux-review.md' in _s42_validate_slice}",
 )
 
 
@@ -10470,9 +10470,9 @@ check(
 #   (3)   AC-3  documenter.md § Provenance and Fail-Closed Contract: file:line provenance
 #   (4)   AC-4  documenter.md § Provenance and Fail-Closed Contract: return blocked not invent
 #   (5)   AC-5  orchestrator.md § Artifact Verification Protocol table has docs-flow rows
-#   (6)   AC-5  orchestrator.md § Artifact Verification Protocol: 00-research.md row present
+#   (6)   AC-5  orchestrator.md § Artifact Verification Protocol: research/00-research.md row present
 #   (7)   AC-5  orchestrator.md § Artifact Verification Protocol: 02-documentation.md row present
-#   (8)   AC-5  orchestrator.md § Artifact Verification Protocol: 04-validation.md row present
+#   (8)   AC-5  orchestrator.md § Artifact Verification Protocol: reviews/04-validation.md row present
 #   (9)   AC-6  ref-special-flows.md § DOC-GATE: pages-on-disk == pages_created assertion
 #   (10)  AC-6  ref-special-flows.md § DOC-GATE: mismatch → blocked (fail-closed)
 #   (11)  AC-7  Suite 47 in docs/testing.md (canonical registry)
@@ -10505,7 +10505,7 @@ _s47_rsf_docgate_slice = _slice_section(_s47_rsf, _S47_RSF_DOCGATE_ANCHOR)
 # ---------------------------------------------------------------------------
 # Check (1) / AC-1 — qa.md § Docs Validation Mode declares spot-verify of
 # concrete technical claims (endpoints, params, env vars, config keys, CLI
-# flags) against the REAL source file — not merely against 00-research.md.
+# flags) against the REAL source file — not merely against research/00-research.md.
 # Today qa.md has no docs-mode section; the slice will be empty → check fails.
 # Tokens required in slice:
 #   one of "doc-vs-code" / "source file" / "real source"
@@ -10613,19 +10613,19 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (4) / AC-4 — documenter.md § Provenance and Fail-Closed Contract
-# declares return `blocked` (NOT invent) when 00-research.md lacks backing
+# declares return `blocked` (NOT invent) when research/00-research.md lacks backing
 # — fail-closed.
 # Today no such declaration exists → slice empty → check fails.
 # Tokens required in slice:
 #   "blocked"         — the return status when backing is absent
 #   one of "invent" / "fabricat" / "not invent" / "never invent"
 #               — the prohibition on fabrication
-#   one of "00-research.md" / "research" / "backing" / "lacks"
+#   one of "research/00-research.md" / "research" / "backing" / "lacks"
 #               — the condition (backing absent)
 # ---------------------------------------------------------------------------
 check(
     "docs-fidelity(4/ac-4): documenter.md § Provenance and Fail-Closed Contract"
-    " declares return blocked (not invent) when 00-research.md lacks backing — fail-closed",
+    " declares return blocked (not invent) when research/00-research.md lacks backing — fail-closed",
     bool(_s47_doc_prov_slice)
     and "blocked" in _s47_doc_prov_slice
     and (
@@ -10633,7 +10633,7 @@ check(
         or "fabricat" in _s47_doc_prov_slice
     )
     and (
-        "00-research.md" in _s47_doc_prov_slice
+        "research/00-research.md" in _s47_doc_prov_slice
         or "research" in _s47_doc_prov_slice
         or "backing" in _s47_doc_prov_slice
         or "lacks" in _s47_doc_prov_slice
@@ -10642,7 +10642,7 @@ check(
     f" anchor present: {bool(_s47_doc_prov_slice)};"
     f" blocked: {'blocked' in _s47_doc_prov_slice};"
     f" invent/fabricat: {('invent' in _s47_doc_prov_slice or 'fabricat' in _s47_doc_prov_slice)};"
-    f" 00-research.md/research/backing/lacks: {('00-research.md' in _s47_doc_prov_slice or 'research' in _s47_doc_prov_slice or 'backing' in _s47_doc_prov_slice or 'lacks' in _s47_doc_prov_slice)}",
+    f" research/00-research.md/research/backing/lacks: {('research/00-research.md' in _s47_doc_prov_slice or 'research' in _s47_doc_prov_slice or 'backing' in _s47_doc_prov_slice or 'lacks' in _s47_doc_prov_slice)}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10653,19 +10653,19 @@ check(
 # docs-flow rows → the check on doc-flow artifact tokens fails.
 # Strategy: slice from "### Artifact Verification Protocol" and verify at
 # least one of the docs-flow artifact names is present.
-# Token: one of "00-research.md" / "02-documentation.md" / "04-validation.md"
+# Token: one of "research/00-research.md" / "02-documentation.md" / "reviews/04-validation.md"
 #         AND one of "docs" / "documentation" / "documenter" / "Phase 2a"
 #               — to distinguish docs-flow from regular validate rows
 # ---------------------------------------------------------------------------
 check(
     "docs-fidelity(5/ac-5): orchestrator.md § Artifact Verification Protocol"
-    " table contains at least one docs-flow row (00-research.md, 02-documentation.md,"
-    " or 04-validation.md) with docs-flow context",
+    " table contains at least one docs-flow row (research/00-research.md, 02-documentation.md,"
+    " or reviews/04-validation.md) with docs-flow context",
     bool(_s47_orch_av_slice)
     and (
-        "00-research.md" in _s47_orch_av_slice
+        "research/00-research.md" in _s47_orch_av_slice
         or "02-documentation.md" in _s47_orch_av_slice
-        or "04-validation.md" in _s47_orch_av_slice
+        or "reviews/04-validation.md" in _s47_orch_av_slice
     )
     and (
         "docs" in _s47_orch_av_slice
@@ -10675,23 +10675,23 @@ check(
     ),
     f"anchor '{_S47_ORCH_AV_ANCHOR}' missing in orchestrator.md or docs-flow artifact tokens absent;"
     f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" 00-research/02-documentation/04-validation: {('00-research.md' in _s47_orch_av_slice or '02-documentation.md' in _s47_orch_av_slice or '04-validation.md' in _s47_orch_av_slice)};"
+    f" 00-research/02-documentation/04-validation: {('research/00-research.md' in _s47_orch_av_slice or '02-documentation.md' in _s47_orch_av_slice or 'reviews/04-validation.md' in _s47_orch_av_slice)};"
     f" docs/documentation/documenter/Phase 2a: {('docs' in _s47_orch_av_slice or 'documentation' in _s47_orch_av_slice or 'documenter' in _s47_orch_av_slice or 'Phase 2a' in _s47_orch_av_slice)}",
 )
 
 # ---------------------------------------------------------------------------
 # Check (6) / AC-5 — orchestrator.md § Artifact Verification Protocol:
-# the architect research → 00-research.md row is present.
+# the architect research → research/00-research.md row is present.
 # Today absent → check fails.
 # ---------------------------------------------------------------------------
 check(
     "docs-fidelity(6/ac-5): orchestrator.md § Artifact Verification Protocol"
-    " has architect research → 00-research.md row",
+    " has architect research → research/00-research.md row",
     bool(_s47_orch_av_slice)
-    and "00-research.md" in _s47_orch_av_slice,
-    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or '00-research.md' absent in slice;"
+    and "research/00-research.md" in _s47_orch_av_slice,
+    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or 'research/00-research.md' absent in slice;"
     f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" 00-research.md: {'00-research.md' in _s47_orch_av_slice}",
+    f" research/00-research.md: {'research/00-research.md' in _s47_orch_av_slice}",
 )
 
 # ---------------------------------------------------------------------------
@@ -10711,18 +10711,18 @@ check(
 
 # ---------------------------------------------------------------------------
 # Check (8) / AC-5 — orchestrator.md § Artifact Verification Protocol:
-# the qa Phase 3 docs → 04-validation.md row for the docs-flow is present.
-# Note: 04-validation.md already exists in the table for standard validate mode
+# the qa Phase 3 docs → reviews/04-validation.md row for the docs-flow is present.
+# Note: reviews/04-validation.md already exists in the table for standard validate mode
 # (Phase 3).  The docs-flow row must add a docs-context qualifier so Suite 47
-# can assert its presence distinctly.  Strategy: assert BOTH "04-validation.md"
+# can assert its presence distinctly.  Strategy: assert BOTH "reviews/04-validation.md"
 # AND one of "Phase 3 docs" / "docs validation" / "documentation flow"
 # appear within the slice.  This pair is absent today → check fails.
 # ---------------------------------------------------------------------------
 check(
     "docs-fidelity(8/ac-5): orchestrator.md § Artifact Verification Protocol"
-    " has qa Phase 3 docs → 04-validation.md row with docs-flow qualifier",
+    " has qa Phase 3 docs → reviews/04-validation.md row with docs-flow qualifier",
     bool(_s47_orch_av_slice)
-    and "04-validation.md" in _s47_orch_av_slice
+    and "reviews/04-validation.md" in _s47_orch_av_slice
     and (
         "Phase 3 docs" in _s47_orch_av_slice
         or "docs validation" in _s47_orch_av_slice
@@ -10730,9 +10730,9 @@ check(
         or "docs flow" in _s47_orch_av_slice
         or "docs-flow" in _s47_orch_av_slice
     ),
-    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or '04-validation.md' + docs-flow qualifier absent;"
+    f"anchor '{_S47_ORCH_AV_ANCHOR}' missing or 'reviews/04-validation.md' + docs-flow qualifier absent;"
     f" anchor present: {bool(_s47_orch_av_slice)};"
-    f" 04-validation.md: {'04-validation.md' in _s47_orch_av_slice};"
+    f" reviews/04-validation.md: {'reviews/04-validation.md' in _s47_orch_av_slice};"
     f" docs-flow qualifier: {('Phase 3 docs' in _s47_orch_av_slice or 'docs validation' in _s47_orch_av_slice or 'documentation flow' in _s47_orch_av_slice or 'docs-flow' in _s47_orch_av_slice)}",
 )
 
@@ -11073,7 +11073,7 @@ check(
 # mode emits the gate before push/PR.
 #
 # Today: the deliver row says only "verify 02-implementation.md, 03-testing.md,
-# AND 04-validation.md exist" — no gate, no Phase 4.5.  Check fails.
+# AND reviews/04-validation.md exist" — no gate, no Phase 4.5.  Check fails.
 # Tokens required in slice (the Direct Modes table):
 #   "deliver"      — the mode row identifier (already present, anchor check)
 #   "STAGE-GATE-3" — the gate being emitted
@@ -11522,7 +11522,7 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (16) / AC-8 — documenter provenance step references 00-research.md.
+# Check (16) / AC-8 — documenter provenance step references research/00-research.md.
 #
 # Context (failing-first, 2026-05-31):
 #   agents/documenter.md § "Provenance and Fail-Closed Contract"
@@ -11531,8 +11531,8 @@ check(
 #     schema, manifest, spec). Record the file and line (file:line)."
 #   This contradicts:
 #     :12   (NEVER reads code directly)
-#     :148  (backing MUST come from 00-research.md; else blocked)
-#     :156  (if 00-research.md already provides file:line, use that)
+#     :148  (backing MUST come from research/00-research.md; else blocked)
+#     :156  (if research/00-research.md already provides file:line, use that)
 #   The documenter following :154 literally either reads source (sandbox
 #   violation) or is paralysed by the contradiction.
 #
@@ -11540,18 +11540,18 @@ check(
 #   Slice § "Provenance and Fail-Closed Contract" (anchor already used by
 #   Suite 47 on the same file — no new anchor; reuse the same string).
 #   Assert:
-#     (a) "00-research.md" appears in the slice (provenance located there)
+#     (a) "research/00-research.md" appears in the slice (provenance located there)
 #     (b) "source (code file" is ABSENT (destructive instruction removed)
 #
 # Anti-false-green: if the anchor disappears, slice returns "" →
-#   "00-research.md" in "" is False → check fails clearly.
+#   "research/00-research.md" in "" is False → check fails clearly.
 #   The absence assertion passes trivially on an empty slice — so we gate
 #   it on bool(slice): both parts require the slice to be non-empty.
 #
 # Note: Suite 47 (checks 3+4) already asserts the broader provenance/
 #   fail-closed contract (file:line + blocked).  Check 16 is orthogonal:
 #   it asserts specifically that step 1 of the requirement no longer points
-#   to the source file but to 00-research.md.  No duplication of assertions.
+#   to the source file but to research/00-research.md.  No duplication of assertions.
 # ---------------------------------------------------------------------------
 
 # -- Group F: new slice for item 3 (documenter provenance) --
@@ -11567,15 +11567,15 @@ _s48_doc = read(AGENTS_DIR / "documenter.md")
 _S48_DOC_PROV_ANCHOR = "### Provenance requirement"
 _s48_doc_prov_slice  = _slice_section(_s48_doc, _S48_DOC_PROV_ANCHOR)
 
-# Positive token: 00-research.md must appear in step 1 as provenance source
-_S48_DOC_PROV_TOKEN = "00-research.md"
+# Positive token: research/00-research.md must appear in step 1 as provenance source
+_S48_DOC_PROV_TOKEN = "research/00-research.md"
 # Destructive token: the old step-1 "source (code file" phrase must be gone
 _S48_DOC_DESTRUCTIVE = "source (code file"
 
 check(
     "recover-dedup(16/ac-8): documenter.md"
     " § Provenance requirement (sub-section of Provenance and Fail-Closed Contract)"
-    " step 1 references '00-research.md' as the source of backing evidence"
+    " step 1 references 'research/00-research.md' as the source of backing evidence"
     " and does NOT instruct reading source code directly"
     " ('source (code file' absent; consistent with :12/:148/:156)",
     bool(_s48_doc_prov_slice)
@@ -11584,9 +11584,9 @@ check(
     f"anchor '{_S48_DOC_PROV_ANCHOR}' missing from documenter.md"
     f" or provenance-fix not applied to step 1;"
     f" anchor present: {bool(_s48_doc_prov_slice)};"
-    f" '00-research.md' in slice: {_S48_DOC_PROV_TOKEN in _s48_doc_prov_slice};"
+    f" 'research/00-research.md' in slice: {_S48_DOC_PROV_TOKEN in _s48_doc_prov_slice};"
     f" 'source (code file' still present (must be False): {_S48_DOC_DESTRUCTIVE in _s48_doc_prov_slice}"
-    f" — implementer must rewrite :154 so step 1 locates backing in '00-research.md'"
+    f" — implementer must rewrite :154 so step 1 locates backing in 'research/00-research.md'"
     f" (never reading the source file directly); consistent with :12/:148/:156",
 )
 
@@ -12422,9 +12422,9 @@ check(
 # (e) reviewer.md — the read-only contract section forbids source writes WITHIN the section
 check(
     "Suite 54(e): reviewer.md § Read-Only Working-Tree Contract forbids source writes and names its sole write",
-    _s54_rev != "" and "NEVER" in _s54_rev and "source files" in _s54_rev and "04-review.md" in _s54_rev,
+    _s54_rev != "" and "NEVER" in _s54_rev and "source files" in _s54_rev and "reviews/04-review.md" in _s54_rev,
     "reviewer.md § Read-Only Working-Tree Contract must contain 'NEVER' + 'source files' AND name "
-    "'workspaces/{feature-name}/04-review.md' as its sole permitted write — all within the section "
+    "'workspaces/{feature-name}/reviews/04-review.md' as its sole permitted write — all within the section "
     "(Layer 2 prohibition lives in the agent's own system prompt, not the dispatch)",
 )
 # (f) reviewer-consolidator.md — same contract, sliced to its own section
@@ -15112,8 +15112,8 @@ check(
 )
 check(
     "qa.md Validation Outcome fold-in expands the validate-mode write scope beyond checkbox-flips",
-    "## Validation Outcome" in _s66_qa and ("04-validation.md" in _s66_qa or "deep" in _s66_qa.lower()),
-    "qa.md must state that deep per-AC detail stays in 04-validation.md while ## Validation Outcome folds into 01-plan.md",
+    "## Validation Outcome" in _s66_qa and ("reviews/04-validation.md" in _s66_qa or "deep" in _s66_qa.lower()),
+    "qa.md must state that deep per-AC detail stays in reviews/04-validation.md while ## Validation Outcome folds into 01-plan.md",
 )
 
 # (5) Self-referential guard
@@ -16317,7 +16317,7 @@ check(
 
 # c2-flat-stage-files: replaces old c2-nested-child.
 # The FINAL standard requires 02-implementation.md / 03-testing.md /
-# 04-security.md / 04-validation.md to be FLAT, whole-task documents —
+# reviews/04-security.md / reviews/04-validation.md to be FLAT, whole-task documents —
 # no per-milestone subsections.  The old text says "child workspace" with
 # milestone-specific 02/03/04 files nested inside — the opposite.
 check(
@@ -16330,7 +16330,7 @@ check(
              or "03-testing.md" in _s70_flows_milestone_slice)
     ),
     "ref-special-flows.md § Milestone-Build Flow must document 02-implementation.md / 03-testing.md / "
-    "04-security.md / 04-validation.md as FLAT, whole-task documents with no per-milestone subsections "
+    "reviews/04-security.md / reviews/04-validation.md as FLAT, whole-task documents with no per-milestone subsections "
     "(FINAL standard — Defect D fix; old text models them as child-workspace artifacts)",
 )
 
@@ -20094,7 +20094,7 @@ check(
 #   AC-1: fan-out token at all four research sites + bounded N + findings
 #          contract fields in researcher.md
 #   AC-2: research-consolidator contract (model:sonnet, dedup,
-#          ### Conflicting sources, feeds 00-research.md)
+#          ### Conflicting sources, feeds research/00-research.md)
 #   AC-3: researcher evidence-only (no conclusions) + model:haiku
 #          + researcher tools allowlist includes Write, excludes Bash/Task
 #          + init/acceptance-checker/translator frontmatter model:haiku
@@ -20219,9 +20219,9 @@ check(
 )
 check(
     "suite92(ac2-00-research): agents/research-consolidator.md states it feeds "
-    "00-research.md (or warm-findings file for Discover)",
-    "00-research.md" in _s92_consolidator,
-    "agents/research-consolidator.md must reference '00-research.md' as the output target",
+    "research/00-research.md (or warm-findings file for Discover)",
+    "research/00-research.md" in _s92_consolidator,
+    "agents/research-consolidator.md must reference 'research/00-research.md' as the output target",
 )
 
 # ---- AC-3: researcher is evidence-only + model:haiku ----
@@ -20504,8 +20504,8 @@ check(
 )
 check(
     "suite92(gl-ac1-consol-reconcile): research-consolidator.md documents "
-    "reconcile-don't-accrete instruction (amend SAME 00-research.md in place)",
-    "00-research.md" in _s92_consolidator
+    "reconcile-don't-accrete instruction (amend SAME research/00-research.md in place)",
+    "research/00-research.md" in _s92_consolidator
     and (
         "reconcile" in _s92_consolidator.lower()
         or "in place" in _s92_consolidator
@@ -20513,7 +20513,7 @@ check(
     )
     and "00-research-v2.md" in _s92_consolidator,
     "research-consolidator.md must document the reconcile-don't-accrete rule "
-    "(amend same 00-research.md, no 00-research-v2.md)",
+    "(amend same research/00-research.md, no 00-research-v2.md)",
 )
 
 # ---- AC-2 (gap-loop): architect re-emits gaps block + Residual Gaps + three reasons ----
@@ -25716,7 +25716,7 @@ check(
     and "04-internal-review-A" in _s107_orch_p45
     and "04-internal-review-B" in _s107_orch_p45,
     "Phase 4.5 sub-step must document Pass A / Pass B context-isolation and the "
-    "disjoint draft paths 04-internal-review-A.md / 04-internal-review-B.md",
+    "disjoint draft paths reviews/04-internal-review-A.md / reviews/04-internal-review-B.md",
 )
 
 # (4) suite107(4-p45-comparator): documents three-branch comparator with CONVERGED_APPROVE and CONVERGED_CHANGES
@@ -29982,13 +29982,13 @@ check(
 # -------------------------------------------------------------------
 # AC-19 (#373-5) — adversary.md boundary + README.md roster entry
 # Note: 'reads `security`'s output as input' is present in the boundary table row
-# as 'reads `04-security.md` as input'; the Core Philosophy says 'You read `security`'s
+# as 'reads `reviews/04-security.md` as input'; the Core Philosophy says 'You read `security`'s
 # output as input' (with 'You' prefix). Assert the table form as the canonical anchor.
 # -------------------------------------------------------------------
 check(
-    "s125/AC-19a: adversary.md reads security's output (boundary table: reads `04-security.md` as input)",
-    "reads `04-security.md` as input" in _s125_adv,
-    "marker 'reads `04-security.md` as input' not found in agents/adversary.md "
+    "s125/AC-19a: adversary.md reads security's output (boundary table: reads `reviews/04-security.md` as input)",
+    "reads `reviews/04-security.md` as input" in _s125_adv,
+    "marker 'reads `reviews/04-security.md` as input' not found in agents/adversary.md "
     "— AC-19 (#373-5) boundary statement about reading security output missing",
 )
 check(
@@ -31028,6 +31028,391 @@ check(
 )
 
 # Marker: canary-denominator-floor-guard
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 140 — workspace-subfolder-layout
+#
+# Pins the mechanical relocation of research-family artifacts under
+# `research/{basename}` and review-family artifacts under `reviews/{basename}`
+# at the canonical update-first sites (manifest, Artifact Verification table,
+# Agent Roster, per-agent output paths, obsidian-linking allowlist). Every
+# assertion below would FAIL if a site reverted to the bare (unprefixed)
+# basename — this is the anti-false-green requirement from AC-5: at least
+# one new regression assertion per family that fails FALSE without the
+# subfolder prefix.
+#
+# Marker: workspace-subfolder-layout
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 140: workspace-subfolder-layout ===")
+
+_s140_orch = read(AGENTS_DIR / "orchestrator.md")
+_s140_researcher = read(AGENTS_DIR / "researcher.md")
+_s140_code_researcher = read(AGENTS_DIR / "code-researcher.md")
+_s140_qa = read(AGENTS_DIR / "qa.md")
+_s140_security = read(AGENTS_DIR / "security.md")
+_s140_obsidian_linking = read(REPO_ROOT / "docs" / "obsidian-linking.md")
+_s140_verification_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
+_s140_checkpoint_guard = read(HOOKS_DIR / "ts" / "bodies" / "checkpoint-guard.ts")
+_s140_sketch_guard = read(HOOKS_DIR / "sketch-guard.sh")
+
+# --- research-family: manifest tree (§ "Workspaces: The Shared Board") ---
+check(
+    "suite140(research-manifest): agents/orchestrator.md manifest tree lists "
+    "'research/00-research.md' (subfolder-prefixed, not bare '00-research.md')",
+    "research/00-research.md" in _s140_orch,
+    "the manifest tree entry for the architect's research-mode output must carry "
+    "the 'research/' prefix — a bare '00-research.md' line is a regression",
+)
+check(
+    "suite140(research-manifest-audit): agents/orchestrator.md manifest tree lists "
+    "'research/00-audit.md'",
+    "research/00-audit.md" in _s140_orch,
+    "the manifest tree entry for the architect's audit-mode output must carry "
+    "the 'research/' prefix",
+)
+
+# --- research-family: Artifact Verification table ---
+check(
+    "suite140(research-artifact-verification): orchestrator.md § Artifact Verification "
+    "Protocol docs-flow research row points to 'research/00-research.md'",
+    "research/00-research.md" in _s140_orch,
+    "the docs-flow research-mode row of the Artifact Verification table must "
+    "resolve to 'research/00-research.md', not the bare basename",
+)
+
+# --- research-family: per-agent dispatch path examples ---
+check(
+    "suite140(researcher-findings-path): agents/researcher.md example findings_file "
+    "carries the 'research/' prefix",
+    "research/research-findings-{angle}.md" in _s140_researcher,
+    "researcher.md's example findings_file path must read "
+    "'workspaces/{feature}/research/research-findings-{angle}.md'",
+)
+check(
+    "suite140(code-researcher-findings-path): agents/code-researcher.md example "
+    "findings_file carries the 'research/' prefix",
+    "research/code-findings-{angle}.md" in _s140_code_researcher,
+    "code-researcher.md's example findings_file path must read "
+    "'workspaces/{feature}/research/code-findings-{angle}.md'",
+)
+
+# --- research-family: obsidian-linking allowlist (include-side) ---
+check(
+    "suite140(obsidian-linking-research-allowlist): docs/obsidian-linking.md "
+    "Knowledge-Only Allowlist includes 'research/00-research.md'",
+    "research/00-research.md" in _s140_obsidian_linking,
+    "the include-side allowlist row must reference the subfolder-qualified path "
+    "so the MOC scanner recurses into research/",
+)
+check(
+    "suite140(obsidian-linking-research-recurse): docs/obsidian-linking.md "
+    "documents that the scan recurses into 'research/'",
+    "recurses one level into the `research/`" in _s140_obsidian_linking,
+    "the allowlist section must state the scan recurses into research/ "
+    "(mirroring the sketches/ precedent) — otherwise research/00-research.md "
+    "is invisible to the MOC scanner",
+)
+
+# --- reviews-family: manifest tree ---
+check(
+    "suite140(reviews-manifest-validation): agents/orchestrator.md manifest tree "
+    "lists 'reviews/04-validation.md' (subfolder-prefixed)",
+    "reviews/04-validation.md" in _s140_orch,
+    "the manifest tree entry for qa's validate-mode output must carry the "
+    "'reviews/' prefix — a bare '04-validation.md' line is a regression",
+)
+check(
+    "suite140(reviews-manifest-security): agents/orchestrator.md manifest tree "
+    "lists 'reviews/04-security.md'",
+    "reviews/04-security.md" in _s140_orch,
+    "the manifest tree entry for security's output must carry the 'reviews/' prefix",
+)
+check(
+    "suite140(reviews-manifest-ux): agents/orchestrator.md manifest tree lists "
+    "'reviews/01-ux-review.md' and 'reviews/04-ux-validation.md'",
+    "reviews/01-ux-review.md" in _s140_orch and "reviews/04-ux-validation.md" in _s140_orch,
+    "the manifest tree entries for ux-reviewer's enrich/validate outputs must "
+    "carry the 'reviews/' prefix",
+)
+
+# --- reviews-family: Agent Roster "Workspace doc" column ---
+check(
+    "suite140(reviews-roster-qa): Agent Roster 'qa' row Workspace doc column "
+    "reads 'reviews/04-validation.md'",
+    "`qa` | Validates implementations against AC; defines AC standalone | No | `reviews/04-validation.md`"
+    in _s140_orch,
+    "the Agent Roster table's qa row must point to the subfolder-qualified path",
+)
+
+# --- reviews-family: per-agent output path declarations ---
+check(
+    "suite140(qa-output-path): agents/qa.md declares its validate-mode output as "
+    "'workspaces/{feature-name}/reviews/04-validation.md'",
+    "workspaces/{feature-name}/reviews/04-validation.md" in _s140_qa,
+    "qa.md's validate-mode Output field must carry the 'reviews/' prefix",
+)
+check(
+    "suite140(security-output-path): agents/security.md declares its output as "
+    "'workspaces/{feature-name}/reviews/04-security.md'",
+    "workspaces/{feature-name}/reviews/04-security.md" in _s140_security,
+    "security.md's Output field must carry the 'reviews/' prefix",
+)
+
+# --- reviews-family: verification-packet pointers ---
+check(
+    "suite140(verification-packet-reviews): docs/verification-packet.md points "
+    "to 'reviews/04-security.md' and 'reviews/04-validation.md'",
+    "reviews/04-security.md" in _s140_verification_packet
+    and "reviews/04-validation.md" in _s140_verification_packet,
+    "docs/verification-packet.md's full-document pointers and denominator "
+    "sources must carry the 'reviews/' prefix",
+)
+
+# --- fenced sites (AC-3): hooks MUST NOT reference research/ or reviews/ ---
+check(
+    "suite140(hooks-fenced-checkpoint-guard): hooks/ts/bodies/checkpoint-guard.ts "
+    "does not reference 'research/' or 'reviews/' — still hardcodes only 00-state.md",
+    "research/" not in _s140_checkpoint_guard and "reviews/" not in _s140_checkpoint_guard,
+    "checkpoint-guard.ts must remain untouched by the relocation — it hardcodes "
+    "only 00-state.md, a root-tier fenced file",
+)
+check(
+    "suite140(hooks-fenced-sketch-guard): hooks/sketch-guard.sh does not "
+    "reference 'research/' or 'reviews/' — still hardcodes only 00-state.md/01-plan.md",
+    "research/" not in _s140_sketch_guard and "reviews/" not in _s140_sketch_guard,
+    "sketch-guard.sh must remain untouched by the relocation — it hardcodes "
+    "only 00-state.md and 01-plan.md, both root-tier fenced files",
+)
+
+# --- AC-6: Frontmatter Injection documents subfolder file_role derivation ---
+check(
+    "suite140(frontmatter-file-role-subfolder): orchestrator.md § Frontmatter "
+    "Injection documents that file_role derives from the basename, ignoring "
+    "any research/ or reviews/ subfolder prefix",
+    "ignoring any subfolder prefix" in _s140_orch
+    and "research/00-research.md" in _s140_orch
+    and "reviews/04-validation.md" in _s140_orch,
+    "the Frontmatter Injection section must state file_role is derived from "
+    "the basename regardless of the research/ or reviews/ subfolder — "
+    "this is the AC-6 thinnest-link requirement",
+)
+
+# Self-referential guards (hygiene contract)
+_s140_own = read(Path(__file__))
+check(
+    "suite140(self-ref): test file contains 'Suite 140' and 'workspace-subfolder-layout'",
+    "Suite 140" in _s140_own and "workspace-subfolder-layout" in _s140_own,
+    "test file must self-reference Suite 140 and the marker 'workspace-subfolder-layout'",
+)
+
+_s140_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+check(
+    "suite140(registry): docs/testing.md registers 'Suite 140' and 'workspace-subfolder-layout'",
+    "Suite 140" in _s140_testing_md and "workspace-subfolder-layout" in _s140_testing_md,
+    "docs/testing.md must register Suite 140 and the 'workspace-subfolder-layout' marker",
+)
+
+_s140_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite140(hygiene): CLAUDE.md does NOT contain 'Suite 140' (§11 hygiene contract)",
+    "Suite 140" not in _s140_claude_md,
+    "CLAUDE.md must not mention Suite 140 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: workspace-subfolder-layout
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 141 — workspace-subfolder-layout (tester gap-fill, Phase 2.7 authoring)
+#
+# Fills genuine gaps left by Suite 140's per-site substring checks: an
+# additional fenced-site guard (AC-3), a repo-wide orphan-reference scanner
+# (AC-4) that is a distinct mechanism from Suite 140's targeted-site checks,
+# the reviews-family output paths for adversary/reviewer/acceptance-checker
+# not pinned by Suite 140 (AC-2), the discover-phase warm-sweep research
+# site (AC-1), and the docs/conventions.md subfolder-mechanic mention (AC-6).
+# No `docs/testing.md` self-registration check is added here — this tester
+# task's scope is restricted to tests/*.py and tests/*.sh; registering this
+# suite in docs/testing.md is out of scope for this authoring pass.
+#
+# Marker: workspace-subfolder-layout-gapfill
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 141: workspace-subfolder-layout (gap-fill) ===")
+
+_s141_precompact = read(HOOKS_DIR / "ts" / "bodies" / "precompact-snapshot.ts")
+_s141_discover_phase = read(REPO_ROOT / "docs" / "discover-phase.md")
+_s141_conventions = read(REPO_ROOT / "docs" / "conventions.md")
+_s141_adversary = read(AGENTS_DIR / "adversary.md")
+_s141_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s141_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+
+# --- AC-3: fenced sites — precompact-snapshot.ts (not covered by Suite 140,
+# which only checked checkpoint-guard.ts and sketch-guard.sh) ---
+check(
+    "suite141(hooks-fenced-precompact-snapshot): hooks/ts/bodies/precompact-snapshot.ts "
+    "does not reference 'research/' or 'reviews/' — still hardcodes only 00-state.md",
+    "research/" not in _s141_precompact and "reviews/" not in _s141_precompact,
+    "precompact-snapshot.ts must remain untouched by the relocation — it copies "
+    "only 00-state.md, a root-tier fenced file",
+)
+
+# --- AC-3: root-tier basenames never gain a research/ or reviews/ prefix
+# anywhere in agents/, skills/, docs/ (mirrors the fenced-site guard, but
+# checks the opposite direction: the root-tier files must not be swept in
+# by an over-eager find-and-replace) ---
+_s141_root_tier_orphans = []
+for _root_dir in (AGENTS_DIR, SKILLS_DIR, REPO_ROOT / "docs"):
+    for _f in _root_dir.rglob("*.md"):
+        _text = read(_f)
+        for _bad in (
+            "research/00-state.md",
+            "reviews/00-state.md",
+            "research/01-plan.md",
+            "reviews/01-plan.md",
+            "research/02-implementation.md",
+            "reviews/02-implementation.md",
+            "research/03-testing.md",
+            "reviews/03-testing.md",
+        ):
+            if _bad in _text:
+                _s141_root_tier_orphans.append(f"{_f}: {_bad}")
+check(
+    "suite141(ac3-root-tier-not-prefixed): no agents/skills/docs file prefixes a "
+    "root-tier basename (00-state.md, 01-plan.md, 02-implementation.md, "
+    "03-testing.md) with research/ or reviews/",
+    len(_s141_root_tier_orphans) == 0,
+    "root-tier basenames must never gain a subfolder prefix; found: "
+    + "; ".join(_s141_root_tier_orphans[:10]),
+)
+
+# --- AC-1: discover-phase.md warm-sweep site (Multi-site invariants table
+# row "warm sweep de Discover") — not read by Suite 140 at all ---
+check(
+    "suite141(discover-warm-sweep): docs/discover-phase.md § 12 references "
+    "'research/research-findings-discover.md' as the consolidated warm-sweep output",
+    "research/research-findings-discover.md" in _s141_discover_phase,
+    "docs/discover-phase.md must point the warm-sweep consolidated output at "
+    "'research/research-findings-discover.md' — a bare 'research-findings-discover.md' "
+    "site is a regression against the Multi-site invariants table",
+)
+
+# --- AC-2: reviews-family output paths not pinned by Suite 140 —
+# adversary.md, reviewer.md, acceptance-checker.md ---
+check(
+    "suite141(adversary-output-path): agents/adversary.md declares its output as "
+    "'workspaces/{feature-name}/reviews/04-adversary.md'",
+    "workspaces/{feature-name}/reviews/04-adversary.md" in _s141_adversary,
+    "adversary.md's Output field must carry the 'reviews/' prefix",
+)
+check(
+    "suite141(reviewer-output-path): agents/reviewer.md declares its internal-review "
+    "output as 'workspaces/{feature-name}/reviews/04-internal-review.md'",
+    "workspaces/{feature-name}/reviews/04-internal-review.md" in _s141_reviewer,
+    "reviewer.md's internal-review mode Output field must carry the 'reviews/' prefix",
+)
+check(
+    "suite141(acceptance-checker-drift-target): agents/acceptance-checker.md "
+    "appends its Drift Analysis section to 'reviews/04-validation.md'",
+    "reviews/04-validation.md" in _s141_acceptance_checker,
+    "acceptance-checker.md must append its Drift Analysis section to the "
+    "subfolder-qualified 'reviews/04-validation.md' path",
+)
+
+# --- AC-6: docs/conventions.md documents the research/ and reviews/
+# subfolders alongside the sketches/ precedent, with the implicit-creation
+# (no orchestrator mkdir) mechanic ---
+check(
+    "suite141(conventions-subfolder-mechanic): docs/conventions.md documents "
+    "'research/' and 'reviews/' subfolders alongside 'sketches/' with implicit "
+    "creation on first Write (no orchestrator mkdir step)",
+    "sketches/" in _s141_conventions
+    and "research/" in _s141_conventions
+    and "reviews/" in _s141_conventions
+    and "no orchestrator" in _s141_conventions
+    and "mkdir" in _s141_conventions,
+    "docs/conventions.md § Workspaces as the shared board must document that "
+    "research/ and reviews/ are created implicitly on first Write, mirroring "
+    "sketches/, with no orchestrator mkdir step — this is the AC-6 mode-parity claim",
+)
+
+# --- AC-4: repo-wide orphan-reference scanner (distinct mechanism from
+# Suite 140's targeted per-site substring checks). A path-qualified
+# reference is a moved basename immediately preceded by a directory-like
+# token containing a '/'; a bare basename mention in prose (no preceding
+# path token) is NOT an orphan per the plan's contract (§ Proposed Approach
+# mechanic 2). Scans agents/, skills/, docs/ — the exact scope the plan's
+# Orphan check (AC-4) note declares. ---
+_S141_PATH_CHARS = r"[-\w{}./]"
+_S141_RESEARCH_BASENAMES = (
+    "00-research.md",
+    "00-audit.md",
+    "research-findings-{angle}.md",
+    "research-findings-discover.md",
+    "research-findings-consolidated.md",
+    "code-findings-{angle}.md",
+)
+_S141_REVIEWS_BASENAMES = (
+    "04-validation.md",
+    "04-security.md",
+    "01-ux-review.md",
+    "04-ux-validation.md",
+    "04-adversary.md",
+    "04-review.md",
+    "04-internal-review.md",
+)
+
+
+def _s141_find_orphans(text: str, basename: str, required_prefix: str) -> list[str]:
+    pattern = re.compile(r"(" + _S141_PATH_CHARS + r"*)" + re.escape(basename))
+    orphans = []
+    for m in pattern.finditer(text):
+        prefix = m.group(1)
+        if prefix == "" or "/" not in prefix:
+            continue  # bare basename mention in prose — not path-qualified
+        if not prefix.endswith(required_prefix):
+            orphans.append(m.group(0))
+    return orphans
+
+
+_s141_orphans: list[str] = []
+_s141_scan_files = (
+    list(AGENTS_DIR.rglob("*.md"))
+    + list(SKILLS_DIR.rglob("*.md"))
+    + list((REPO_ROOT / "docs").rglob("*.md"))
+)
+for _f in _s141_scan_files:
+    _text = read(_f)
+    for _b in _S141_RESEARCH_BASENAMES:
+        for _o in _s141_find_orphans(_text, _b, "research/"):
+            _s141_orphans.append(f"{_f.relative_to(REPO_ROOT)}: {_o}")
+    for _b in _S141_REVIEWS_BASENAMES:
+        for _o in _s141_find_orphans(_text, _b, "reviews/"):
+            _s141_orphans.append(f"{_f.relative_to(REPO_ROOT)}: {_o}")
+
+check(
+    "suite141(ac4-orphan-scan): zero path-qualified references to a moved "
+    "basename resolve to the root (unprefixed) location across agents/, "
+    "skills/, docs/",
+    len(_s141_orphans) == 0,
+    f"found {len(_s141_orphans)} orphaned path-qualified reference(s): "
+    + "; ".join(_s141_orphans[:10]),
+)
+
+# Self-referential guard (test-file-only; docs/testing.md registration is
+# out of scope for this authoring pass — see header note above)
+_s141_own = read(Path(__file__))
+check(
+    "suite141(self-ref): test file contains 'Suite 141' and "
+    "'workspace-subfolder-layout-gapfill'",
+    "Suite 141" in _s141_own and "workspace-subfolder-layout-gapfill" in _s141_own,
+    "test file must self-reference Suite 141 and the marker "
+    "'workspace-subfolder-layout-gapfill'",
+)
+
+# Marker: workspace-subfolder-layout-gapfill
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
