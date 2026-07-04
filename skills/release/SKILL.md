@@ -123,6 +123,65 @@ Pushing the tag is what feeds the opencode release pipeline: `.github/workflows/
 
 ---
 
+## Step 4 — Apply the release to local runtimes (post-tag)
+
+Once the tag is pushed (Step 3), the release exists in both places it will be consumed — the marketplace catalog (already on `main`) and the GitHub Release artifacts (published by `release.yml`). This step runs quietly and reports once, in the same output discipline as `/th:update` (`skills/update/SKILL.md § Output discipline`): no intermediate narration, one final operator-facing report.
+
+Two independent legs run, each with its own failure isolation (AC-4): a failure in one leg reports its manual fallback command and does not block the other leg. Neither leg's failure reverts the tag or marks the release as failed — the release is already published and stays published regardless of what happens to the operator's local runtimes.
+
+### Leg 1 — Claude Code (immediate, no gate)
+
+The marketplace catalog for `th` is read from `main`, already merged before this step runs — this leg does not wait on `release.yml`.
+
+```bash
+claude plugin marketplace update team-harness-marketplace
+claude plugin update th@team-harness-marketplace
+```
+
+Report the version delta as installed → downloaded. This leg does **not** sync the managed `~/.claude/CLAUDE.md` blocks — that recurring sync is `/th:update`'s domain (`skills/update/SKILL.md § Division of labour`), not duplicated here. Close by stating that `/reload-plugins` (or restarting Claude Code) is an action for the operator to take — never state that `{X.Y.Z}` is active.
+
+If `claude` is not on PATH or either command errors, record the failure for this leg's report row and state the manual fallback: `Run /th:update after installing the claude CLI.` Continue to Leg 2 regardless.
+
+### Leg 2 — opencode (gated on publication)
+
+`release.yml` needs roughly a minute to cross-compile the binaries and publish the `VERSION` asset, so this leg polls for that publication before running the updater.
+
+**Publication gate.** Poll `https://github.com/valianx/team-harness/releases/latest/download/VERSION`, comparing the trimmed response against `{X.Y.Z}` exactly:
+
+- Interval: 15 seconds. Maximum attempts: 12 (180-second ceiling).
+- A 404, a version mismatch, or a network hiccup all mean "not yet published — keep polling"; none of these is treated as a failure on its own.
+- On a match, proceed to the updater below.
+- If the ceiling is reached without a match, report `opencode: publication gate timed out after 180s — run the updater manually: ./bin/update-opencode.sh (or .\bin\update-opencode.ps1 on Windows)` and continue to the final report. Do not abort or retry beyond the ceiling.
+
+**Updater.** Once the gate clears, run the OS-appropriate updater, preferring the repo copy over the published fallback:
+
+- Linux/macOS: `./bin/update-opencode.sh` when the repo is present at the working directory; otherwise `curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh | bash`.
+- Windows: `.\bin\update-opencode.ps1` when the repo is present; otherwise the equivalent Pages URL for PowerShell.
+
+The updater's own cheap `VERSION` pre-check and SHA256 fail-closed verification are unchanged by this step (out of scope — see `Security Assessment`); the Go binary it invokes re-confirms the three-state delta authoritatively: update-available (applied) / already current / installed ahead. Report that delta using this exact vocabulary. Close by stating that restarting opencode is an action for the operator to take — never state that `{X.Y.Z}` is active.
+
+If the updater errors (missing CLI, network failure) after the gate cleared, record the failure for this leg's report row and state the manual fallback command shown above. This does not affect Leg 1's report or the already-published release.
+
+### Final report (AC-5)
+
+Emit exactly one operator-facing message after both legs complete — no per-leg narration in between. Use this template, filling values from the run (no version literals in the surrounding prose — only the resolved values belong inside the block):
+
+```
+release local-apply — <both applied | partial | both manual>
+
+  claude code
+    catalog refresh     done
+    installed version   <X>
+    downloaded version  <Y>            (or "already current" | "manual: <reason> — run /th:update")
+  opencode
+    artifact gate       published (VERSION={X.Y.Z})   (or "timed out >180s — run the updater manually")
+    result               <update-available applied | already current | installed ahead | manual: <reason>>
+```
+
+Closing line (outside the fence): `Next: /reload-plugins (or restart Claude Code) to activate {X.Y.Z} in Claude Code; restart opencode to activate it there.`
+
+---
+
 ## Mode — No input provided
 
 When `$ARGUMENTS` is empty, proceed directly to Step 1 (discovery). No feature name is required — the release always aggregates ALL pending `changelog.d/` and `version.d/` work.
@@ -135,4 +194,6 @@ When `$ARGUMENTS` is empty, proceed directly to Step 1 (discovery). No feature n
 - The `release/vX.Y.Z` branch name is the release-PR discriminator used by `hooks/prepublish-guard.sh`. The guard requires all three version sites bumped and matching the branch version.
 - Do NOT skip the confirmation gate at Step 1e — the operator must confirm before any version change is made.
 - After the PR is merged to `main`, `claude plugin update` will serve the new version to all operators, and Step 3 above ships the tag that feeds the opencode artifact pipeline (`release.yml`).
-- Output: `release/vX.Y.Z` branch, CHANGELOG.md updated, all three version sites bumped, `changelog.d/` emptied, `version.d/` emptied, PR opened, `vX.Y.Z` tag created and pushed post-merge.
+- Step 4 runs the download/apply legs for both local runtimes but never performs the activation itself — `/reload-plugins` (Claude Code) and restarting opencode stay operator-driven, and Step 4 never states that the new version is active before that happens.
+- Step 4's Claude Code leg does not sync the managed `~/.claude/CLAUDE.md` blocks; that recurring sync remains `/th:update`'s standalone contract (`skills/update/SKILL.md`), not duplicated here.
+- Output: `release/vX.Y.Z` branch, CHANGELOG.md updated, all three version sites bumped, `changelog.d/` emptied, `version.d/` emptied, PR opened, `vX.Y.Z` tag created and pushed post-merge, both local runtimes' download/apply legs run with a per-runtime report.
