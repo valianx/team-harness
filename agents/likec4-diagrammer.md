@@ -1,6 +1,6 @@
 ---
 name: likec4-diagrammer
-description: Generates LikeC4 architecture diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in 00-research.md. Reads the analysis, follows the likec4-diagram skill methodology, generates the .c4 DSL incrementally, validates with CLI, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
+description: Generates LikeC4 architecture diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the likec4-diagram skill methodology, generates the .c4 DSL incrementally, validates with CLI, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
 model: sonnet
 effort: medium
 color: orange
@@ -40,12 +40,12 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 **Before starting ANY work:**
 
 1. **Read the orchestrator's invocation** — extract:
-   - Path to architect's analysis: `workspaces/{feature}/00-research.md`
+   - Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
    - Path to skill: `.claude/skills/likec4-diagram/`
    - Output path: `workspaces/{feature}/diagram.c4`
    - Feature name for workspaces and execution log
 
-2. **Read the architect's analysis** — read `workspaces/{feature}/00-research.md` in full. This is your primary input. Do not start designing until you've read and understood it.
+2. **Read the architect's analysis** — read `workspaces/{feature}/research/00-research.md` in full. This is your primary input. Do not start designing until you've read and understood it.
 
 3. **Read the skill methodology** — read these files in order:
    - `.claude/skills/likec4-diagram/SKILL.md` — design process, quality checklist

@@ -58,7 +58,7 @@ The free suites are pure bash + python3 (stdlib + PyYAML for frontmatter parsing
 
 - **Agent prompt behaviour.** The implementer's `Reviewability self-check` is a checklist embedded in a system prompt — whether Claude actually applies it is a behavioural question that requires running the pipeline.
 - **Hook integration with Claude Code.** `policy-block` is tested in isolation (stdin/stdout). Whether Claude Code actually invokes it on every Bash/Write/Edit/NotebookEdit call depends on `~/.claude/settings.json` being correctly merged. To verify the integration, restart Claude Code and try a benign command (e.g., `rm -rf /tmp/foo` should pass) and a destructive one (e.g., `rm -rf /` should be blocked with the policy reason).
-- **The orchestrator pipeline.** Phase 2.5 / 4.5 only fire inside a real pipeline run. To smoke-test, run a feature through `/issue` or a plain feature description and check that `00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode), `done.yml`, and `04-internal-review.md` appear in `workspaces/{feature}/`.
+- **The orchestrator pipeline.** Phase 2.5 / 4.5 only fire inside a real pipeline run. To smoke-test, run a feature through `/issue` or a plain feature description and check that `00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode), `done.yml`, and `reviews/04-internal-review.md` appear in `workspaces/{feature}/`.
 
 ## Adding a new test
 

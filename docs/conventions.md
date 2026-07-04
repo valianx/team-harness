@@ -8,6 +8,8 @@
 
 A workspace is the shared working directory for a single pipeline session. Each pipeline run creates its own isolated workspace at `workspaces/{feature-name}/`. Agents communicate through files — each reads prior agents' output and writes its own. The operator uses the workspace as a review surface. Values are never passed through return values. `workspaces/` is always git-ignored and never committed.
 
+Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write` (no orchestrator `mkdir` step): `sketches/` for plan-stage sketches, `research/` for research-family artifacts (`00-research.md`, `00-audit.md`, `research-findings-*.md`, `code-findings-*.md`), and `reviews/` for review-family reports (`04-validation.md`, `04-security.md`, `01-ux-review.md`, `04-ux-validation.md`, `04-adversary.md`, `04-review.md`, `04-internal-review.md`). Basenames never change across this grouping — only the directory prefix distinguishes tiers.
+
 ## Dual-mode workspaces
 
 Two output modes are available, controlled by `logs-mode` in `~/.claude/.team-harness.json`:

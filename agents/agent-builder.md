@@ -176,7 +176,7 @@ The orchestrator writes observability events to `workspaces/{feature}/00-executi
 
 Agents write outputs to `workspaces/{feature-name}/`:
 - `00-execution-events.jsonl` / `00-execution-events.md` — observability event trace (orchestrator only; `.jsonl` in local mode, `.md` in obsidian mode)
-- `00-research.md` — research output (architect, research mode)
+- `research/00-research.md` — research output (architect, research mode)
 - `01-plan.md` — architect output: spec (§ Review Summary) + architecture (§ Architecture) + task list (§ Task List)
 - `01-planning.md` — task breakdown (architect, planning mode)
 

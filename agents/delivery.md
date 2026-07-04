@@ -32,7 +32,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
 - **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: blocked`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `reviews/04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
@@ -60,8 +60,8 @@ This is a prompt-level floor — defense in depth that complements the determini
    | `01-plan.md` | AC list, architecture decisions, approved scope |
    | `02-implementation.md` | Patterns applied, deviations, reviewability exceptions, follow-ups spotted |
    | `03-testing.md` | Test results, AC coverage table, regression-test path |
-   | `04-validation.md` | QA PASS/FAIL verdict per AC |
-   | `04-security.md` | Security findings (read only when present) |
+   | `reviews/04-validation.md` | QA PASS/FAIL verdict per AC |
+   | `reviews/04-security.md` | Security findings (read only when present) |
 
    **Glob-all fallback.** When a named file above is absent, fall back to reading all `*.md` files in the workspace folder to locate the equivalent content. Log the fallback as `workspace_read: glob-fallback: {filename}` in the delivery summary.
 
@@ -96,14 +96,14 @@ Determine `{feature_name}` in this order:
 **Before doing anything else**, verify the verification stage actually passed. The orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the workspaces.
 
 1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
-2. Read `workspaces/{feature-name}/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
+2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
 3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table.
-4. If `04-security.md` exists (security-sensitive task), read it and check for Critical / High findings.
+4. If `reviews/04-security.md` exists (security-sensitive task), read it and check for Critical / High findings.
 
 **Abort criteria — return `status: failed` immediately if:**
-- Any AC is missing a `PASS` in `04-validation.md`.
+- Any AC is missing a `PASS` in `reviews/04-validation.md`.
 - Any AC has no test in `03-testing.md` AC Coverage table.
-- `04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
+- `reviews/04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
 - Any expected workspace doc is missing.
 
 When aborting, append a `## Delivery` section to `workspaces/{feature-name}/00-state.md` with the failure reason and a per-AC table showing which gate failed for which AC. Do NOT create a branch, do NOT commit.
@@ -214,7 +214,7 @@ Read workspaces and extract **only knowledge that applies beyond this feature**.
 | `01-plan.md` | Decisions with rationale, trade-offs evaluated, new patterns adopted (§ Review Summary and § Architecture) |
 | `02-implementation.md` | Patterns applied that set precedent, new dependencies added, gotchas discovered |
 | `03-testing.md` | Reusable factories, testing strategies that apply to future features |
-| `04-validation.md` | System constraints discovered, validation patterns |
+| `reviews/04-validation.md` | System constraints discovered, validation patterns |
 
 **Filter criterion:** For each piece of knowledge, ask: *"Would a future agent benefit from knowing this?"* If no → discard.
 
@@ -649,7 +649,7 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 ### Step 9c — Acceptance Matrix
 
-Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `04-validation.md` and (if it exists) `04-security.md`. Save it to `docs/specs/{feature-name}/acceptance-matrix.md` (create the folder if it does not exist):
+Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Save it to `docs/specs/{feature-name}/acceptance-matrix.md` (create the folder if it does not exist):
 
 ```markdown
 # Acceptance Matrix: {feature-name}
@@ -887,7 +887,7 @@ When deletions dominate (deletions > 2× additions, or the change is relocation-
 {paste the contents of `## Follow-ups Spotted` from `02-implementation.md`, one bullet per follow-up with file:line + description}
 
 ## Pre-PR Review (conditional — present only if Phase 4.5 ran)
-{paste the summary block from workspaces/{feature-name}/04-internal-review.md, or omit this section entirely if 04-internal-review.md does not exist}
+{paste the summary block from workspaces/{feature-name}/reviews/04-internal-review.md, or omit this section entirely if reviews/04-internal-review.md does not exist}
 
 ## Size justification (conditional — present only if Step 9d flagged the diff)
 {paste the size_justification captured in Step 9d, or omit this section entirely if the diff was within the 400 lines / 8 files caps}
@@ -1104,7 +1104,7 @@ Before invoking any other `mcp__memory__*` tool, call `mcp__memory__doctor` to v
 - `workspaces/{feature-name}/01-plan.md` § Review Summary — what was asked and approved at STAGE-GATE-1.
 - `workspaces/{feature-name}/01-plan.md` — what was designed; surprises, constraints, alternatives rejected (§ Architecture and § Review Summary).
 - `workspaces/{feature-name}/02-implementation.md` — what was actually built; deviations from the plan.
-- `workspaces/{feature-name}/03-testing.md` + `04-validation.md` — what the AC look like in practice.
+- `workspaces/{feature-name}/03-testing.md` + `reviews/04-validation.md` — what the AC look like in practice.
 - The CHANGELOG entry you wrote in Step 7.
 - The Knowledge Extracted (Step 4) + CLAUDE.md / docs/knowledge.md updates (Steps 5 / 5b).
 
@@ -1238,12 +1238,12 @@ After deriving the raw label, apply `escape_alias(s)`:
 
 #### Knowledge-only allowlist
 
-When scanning the feature folder, **include only** files whose basename matches the knowledge allowlist:
-- `00-research.md` (and any `00-research*.md`) — the research/spike knowledge-tier doc
+When scanning the feature folder, the scan recurses one level into the `research/` subfolder (mirroring the `sketches/` precedent) and **includes only** files whose basename matches the knowledge allowlist:
+- `research/00-research.md` (and any `research/00-research*.md`) — the research/spike knowledge-tier doc
 - `01-plan.md` (and any `01-plan*.md`) — the consolidated design and decision record
 - `01-root-cause.md` (and any `01-root-cause*.md`) — the bug-fix flow knowledge-tier doc (fix flows have no `00-research`; `01-root-cause` is the research-equivalent artifact)
 
-**Everything else is excluded** — both process/verification docs (`02-implementation.md`, `02-documentation.md`, `03-testing.md`, `03-regression-tests.md`, `04-validation.md`, `04-security.md`, `05-diagram.*`, `00-acceptance-criteria.md`) and plumbing (`00-state.md`, `00-execution-events.md`, `00-execution-events.jsonl`, `session.json`) and the feature-index note itself (`{feature_dir}.md`).
+**Everything else is excluded** — both process/verification docs (`02-implementation.md`, `02-documentation.md`, `03-testing.md`, `03-regression-tests.md`, `reviews/04-validation.md`, `reviews/04-security.md`, `05-diagram.*`, `00-acceptance-criteria.md`) and plumbing (`00-state.md`, `00-execution-events.md`, `00-execution-events.jsonl`, `session.json`) and the feature-index note itself (`{feature_dir}.md`).
 
 Wikilinks omit the `.md` extension for `.md` files; non-`.md` files keep their extension.
 

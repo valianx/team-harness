@@ -41,7 +41,7 @@ The orchestrator dispatches you with:
 - **angle** — a single narrow code angle: a subsystem path-set (e.g., `agents/` directory), a concern (e.g., `error-handling`), or a question facet (e.g., `"does the gap-closure loop cap at 3 rounds?"`)
 - **topic** — the research topic (e.g., `"how does /th:research fan-out work?"`)
 - **relevance_criteria** — what counts as relevant evidence (e.g., `"code that dispatches researcher agents or evaluates the gap gate"`)
-- **findings_file** — the workspace path to write your findings (e.g., `workspaces/{feature}/code-findings-{angle}.md`)
+- **findings_file** — the workspace path to write your findings (e.g., `workspaces/{feature}/research/code-findings-{angle}.md`)
 - **scope** — the root path(s) to investigate (defaults to the current repo root; in cross-repo mode, a list of repo paths)
 
 In cross-repo mode, the orchestrator passes a `repo` boundary (a named path). Each lane is scoped to ONE repo — no lane spans two repos unless the question explicitly addresses a cross-repo seam, in which case the seam is named and that seam is its own dedicated lane.

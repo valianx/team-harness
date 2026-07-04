@@ -21,11 +21,11 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
 2. **MANDATORY — Query KG** — call `search_nodes` with 1-2 semantic queries. Write `00-knowledge-context.md` if results found. If the Knowledge Graph MCP fails, log "KG: unavailable" and continue.
 3. **Fan-out web research (parallel haiku lanes)** — dispatch N `researcher` (haiku) agents in parallel (default N=3, hard cap 5). Each lane receives a distinct search angle and the structured findings contract:
    - Compose N distinct angles for the topic (e.g., `official-docs`, `benchmarks`, `known-issues`, `migration-guides`, `community-adoption`). Cap at 5.
-   - Dispatch each `researcher` with: `angle`, `topic`, `relevance_criteria`, and a per-lane `findings_file` path (`workspaces/{feature}/research-findings-{angle}.md`).
+   - Dispatch each `researcher` with: `angle`, `topic`, `relevance_criteria`, and a per-lane `findings_file` path (`workspaces/{feature}/research/research-findings-{angle}.md`).
    - Run all N lanes concurrently using the existing concurrent-`Task` pattern.
    - **Fail-open lane handling:** gate on each lane's status block. If a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event in `{events_file}` and continue with the remaining lanes. The flow never blocks on a single dead lane.
-4. **Consolidate** — dispatch `research-consolidator` (sonnet) with the list of findings files, the topic, and output path `workspaces/{feature}/00-research.md`. The consolidator deduplicates claims, surfaces `### Conflicting sources` explicitly (never silently picks a winner), and produces consolidated cited findings.
-5. **Invoke `architect` in research mode** — explicitly instruct: "This is a research task. Pre-digested consolidated findings are in `workspaces/{feature}/00-research.md` — read that file as your primary evidence base instead of running raw web searches. You may spot-fetch to fill specific gaps the consolidator flagged, but the bulk of web search has already been done. Produce your research analysis report, appending your synthesis and recommendation to `00-research.md`."
+4. **Consolidate** — dispatch `research-consolidator` (sonnet) with the list of findings files, the topic, and output path `workspaces/{feature}/research/00-research.md`. The consolidator deduplicates claims, surfaces `### Conflicting sources` explicitly (never silently picks a winner), and produces consolidated cited findings.
+5. **Invoke `architect` in research mode** — explicitly instruct: "This is a research task. Pre-digested consolidated findings are in `workspaces/{feature}/research/00-research.md` — read that file as your primary evidence base instead of running raw web searches. You may spot-fetch to fill specific gaps the consolidator flagged, but the bulk of web search has already been done. Produce your research analysis report, appending your synthesis and recommendation to `research/00-research.md`."
 6. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
 7. **Present** the research report to the user
 8. **Ask** the user how to proceed (implement, discard, or investigate further)
@@ -33,12 +33,12 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
    - **Implement:** reclassify the pipeline and re-enter the full pipeline with all gates:
      a. Determine the new type: `refactor` if the research identified structural changes to existing code; `feature` if it identified new functionality to build.
      b. Append reclassification event: `{"ts":"<ISO>","event":"pipeline.reclassify","from":"research","to":"<new_type>","reason":"operator chose implement"}`.
-     c. Update `00-state.md`: set `type:` to the new classification, reset `phase:` to `0b`, set `status: in_progress`. Add to Hot Context: `Reclassified from research to {type}. 00-research.md is input context for design.`
-     d. Re-enter the full pipeline at **Phase 0b (Specify)**. The `00-research.md` feeds the architect's design phase as prior analysis — it is NOT a substitute for `01-plan.md`.
+     c. Update `00-state.md`: set `type:` to the new classification, reset `phase:` to `0b`, set `status: in_progress`. Add to Hot Context: `Reclassified from research to {type}. research/00-research.md is input context for design.`
+     d. Re-enter the full pipeline at **Phase 0b (Specify)**. The `research/00-research.md` feeds the architect's design phase as prior analysis — it is NOT a substitute for `01-plan.md`.
      e. **All gates are mandatory:** STAGE-GATE-1, Phase 3 (verify), STAGE-GATE-3. The Phase Gate Prerequisites (§ Phase Checkpointing in `orchestrator.md`) enforce this mechanically.
      f. If the architect produced a `01-plan.md` during the research session (e.g., the operator asked for a plan before deciding to implement), that plan enters the normal ratification flow (Phase 1.5 → 1.6 → STAGE-GATE-1). It does NOT bypass design review.
    - **Discard:** clean up workspaces, mark pipeline as `complete` with `summary: research discarded by operator`.
-   - **Investigate further — bounded gap-closure loop (orchestrator-owned):** After each consolidation+synthesis round, the orchestrator reads the `## Coverage gaps` fenced block from `00-research.md` and evaluates the gate:
+   - **Investigate further — bounded gap-closure loop (orchestrator-owned):** After each consolidation+synthesis round, the orchestrator reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
 
      **Gate condition (ALL must hold):** `(≥1 gap with material:true AND web_closeable:true)` AND `research_round < 3`.
 
@@ -47,8 +47,8 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
      2. Emit `research.round.start` event: `{"ts":"<ISO>","event":"research.round.start","round":<N>,"lanes":<K>}`.
      3. Compose follow-up angles ONLY from gate-passing gaps (one lane per gap). Clamp to ≤ 5 lanes for the round (anti-runaway guard). If gate-passing gaps exceed 5, dispatch 5 lanes covering the most material gaps and emit `research.round.skipped` event: `{"ts":"<ISO>","event":"research.round.skipped","round":<N>,"skipped_gap_ids":[...]}`.
      4. Dispatch `researcher` (haiku) lanes in parallel (fail-open: `research.lane.skipped` on dead lanes).
-     5. Re-dispatch `research-consolidator` to amend the SAME `00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
-     6. Re-dispatch `architect` in research mode to re-synthesize the SAME `00-research.md` in place.
+     5. Re-dispatch `research-consolidator` to amend the SAME `research/00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
+     6. Re-dispatch `architect` in research mode to re-synthesize the SAME `research/00-research.md` in place.
      7. After architect returns, emit `research.gap.gate` event and re-evaluate the gate. Repeat from step 1 if the gate fires again AND `research_round < 3`.
 
      **On gate NO-FIRE (terminate loop):** Determine the termination reason:
@@ -59,7 +59,7 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
      Emit `research.gap.gate` event: `{"ts":"<ISO>","event":"research.gap.gate","verdict":"stop","material_closeable_count":<N>,"round":<R>}`.
      Emit `research.loop.terminated` event: `{"ts":"<ISO>","event":"research.loop.terminated","reason":"<termination-reason>","round":<R>}`.
 
-     The architect writes a mandatory `## Residual Gaps` section to `00-research.md` naming the termination reason and listing every still-open gap. The bounded stop is never silent.
+     The architect writes a mandatory `## Residual Gaps` section to `research/00-research.md` naming the termination reason and listing every still-open gap. The bounded stop is never silent.
 
      **Structural signals (mandatory):**
      - `research_round: N` in `00-state.md § Current State` (N = current round number; set to 1 at the start of the initial research flow).
@@ -68,7 +68,7 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
      - `research.round.skipped` event when gate-passing gaps exceed the per-round lane cap of 5 (the dispatch is clamped and the event makes the clamp observable).
      - `research.loop.terminated` event with the termination reason.
 
-     **Operator-initiated investigation:** if the operator asks to investigate further at any point after the loop has terminated, re-invoke architect in research mode with the operator's refined scope, amending the same `00-research.md` in place.
+     **Operator-initiated investigation:** if the operator asks to investigate further at any point after the loop has terminated, re-invoke architect in research mode with the operator's refined scope, amending the same `research/00-research.md` in place.
 
 ---
 
@@ -94,13 +94,13 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 5. **Fan-out all lanes in parallel (fail-open):**
    - Dispatch N `code-researcher` (sonnet) code lanes and up to 2 `researcher` (haiku) web lanes concurrently using the concurrent-`Task` pattern.
    - **Fail-open lane handling:** gate on each lane's status block. If a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event in `{events_file}` and continue with the remaining lanes. The flow never blocks on a single dead lane.
-6. **Consolidate** — dispatch `research-consolidator` (sonnet) with the full list of findings files (both code-lane and web-lane paths), the topic, and output path `workspaces/{feature}/00-research.md`. The consolidator merges code evidence and web evidence into one document, surfaces `## Conflicting Sources` (web-vs-web), and `## Code vs Docs Conflicts` (code-vs-docs — the primary value of the hybrid approach). Never silently picks a winner.
-7. **Invoke `architect` in research mode** — same instruction as the Research Flow: "This is a research task. Pre-digested consolidated findings are in `workspaces/{feature}/00-research.md` — read that file as your primary evidence base. Produce your research analysis report, appending your synthesis and recommendation to `00-research.md`."
+6. **Consolidate** — dispatch `research-consolidator` (sonnet) with the full list of findings files (both code-lane and web-lane paths), the topic, and output path `workspaces/{feature}/research/00-research.md`. The consolidator merges code evidence and web evidence into one document, surfaces `## Conflicting Sources` (web-vs-web), and `## Code vs Docs Conflicts` (code-vs-docs — the primary value of the hybrid approach). Never silently picks a winner.
+7. **Invoke `architect` in research mode** — same instruction as the Research Flow: "This is a research task. Pre-digested consolidated findings are in `workspaces/{feature}/research/00-research.md` — read that file as your primary evidence base. Produce your research analysis report, appending your synthesis and recommendation to `research/00-research.md`."
 8. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
 9. **Present** the research report to the user
 10. **Ask** the user how to proceed (implement, discard, or investigate further)
 11. **Act on user's choice** — same options as Research Flow (implement → full pipeline reclassification; discard → clean up; investigate further → bounded gap-closure loop below).
-12. **Bounded gap-closure loop (orchestrator-owned) — extended gate:** After each consolidation + synthesis round, the orchestrator reads the `## Coverage gaps` fenced block from `00-research.md` and evaluates the gate:
+12. **Bounded gap-closure loop (orchestrator-owned) — extended gate:** After each consolidation + synthesis round, the orchestrator reads the `## Coverage gaps` fenced block from `research/00-research.md` and evaluates the gate:
 
     **Gate condition (ANY must hold, AND round cap must not be reached):**
     `((≥1 gap with material:true AND web_closeable:true) OR (≥1 gap with material:true AND code_closeable:true)) AND research_round < 3`.
@@ -113,8 +113,8 @@ When the operator asks to investigate how the codebase works, trace a flow in re
        - For each gap with `material:true AND code_closeable:true` → dispatch one `code-researcher` (sonnet) code lane.
        - Clamp to ≤5 lanes total for the round (anti-runaway guard). If gate-passing gaps exceed 5, dispatch 5 lanes covering the most material gaps and emit `research.round.skipped` event: `{"ts":"<ISO>","event":"research.round.skipped","round":<N>,"skipped_gap_ids":[...]}`.
     4. Dispatch web and code lanes in parallel (fail-open: `research.lane.skipped` on dead lanes).
-    5. Re-dispatch `research-consolidator` to amend the SAME `00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
-    6. Re-dispatch `architect` in research mode to re-synthesize the SAME `00-research.md` in place.
+    5. Re-dispatch `research-consolidator` to amend the SAME `research/00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
+    6. Re-dispatch `architect` in research mode to re-synthesize the SAME `research/00-research.md` in place.
     7. After architect returns, emit `research.gap.gate` event and re-evaluate the gate. Repeat from step 1 if the gate fires again AND `research_round < 3`.
 
     **On gate NO-FIRE (terminate loop):** Determine the termination reason — the same three reasons as the Research Flow:
@@ -125,7 +125,7 @@ When the operator asks to investigate how the codebase works, trace a flow in re
     Emit `research.gap.gate` event: `{"ts":"<ISO>","event":"research.gap.gate","verdict":"stop","material_closeable_count":<N>,"material_code_closeable_count":<M>,"round":<R>}`.
     Emit `research.loop.terminated` event: `{"ts":"<ISO>","event":"research.loop.terminated","reason":"<termination-reason>","round":<R>}`.
 
-    The architect writes a mandatory `## Residual Gaps` section to `00-research.md` naming the termination reason and listing every still-open gap — including code-only-residual gaps (gaps where `material:true` but neither `web_closeable` nor `code_closeable`, or gaps that code lanes tried to close but could not). The bounded stop is never silent.
+    The architect writes a mandatory `## Residual Gaps` section to `research/00-research.md` naming the termination reason and listing every still-open gap — including code-only-residual gaps (gaps where `material:true` but neither `web_closeable` nor `code_closeable`, or gaps that code lanes tried to close but could not). The bounded stop is never silent.
 
     **Structural signals (mandatory):** same set as Research Flow — `research_round`, `research.round.start`, `research.gap.gate`, `research.round.skipped`, `research.loop.terminated` — all apply unchanged.
 
@@ -136,8 +136,8 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 | Dimension | `/th:research-code --multi-repo` | `/th:cross-repo` |
 |-----------|----------------------------------|-----------------|
 | **Purpose** | Evidence-gathering research: "what does this code actually do, across these repos?" | Flow/invariant auditor: "does this system obey its contracts and invariants?" |
-| **Route** | Routes through the orchestrator (this flow); produces one consolidated `00-research.md` | Standalone skill; does NOT route through the orchestrator; uses tmux fan-out |
-| **Output** | One `00-research.md` with hybrid evidence + conflict detection + gap-closure loop | Per-repo architect+security+qa+tester audits; `00-consolidated.md`; profile/contract validation |
+| **Route** | Routes through the orchestrator (this flow); produces one consolidated `research/00-research.md` | Standalone skill; does NOT route through the orchestrator; uses tmux fan-out |
+| **Output** | One `research/00-research.md` with hybrid evidence + conflict detection + gap-closure loop | Per-repo architect+security+qa+tester audits; `00-consolidated.md`; profile/contract validation |
 | **Agents** | `code-researcher` (sonnet) + optional `researcher` (haiku) + `research-consolidator` + `architect` | `architect`, `security`, `qa`, `tester` (per repo); separate workspaces per repo |
 | **When to use** | "How does the retry logic work across the gateway and the worker services?" | "Does the payment service honor the idempotency contract declared in the API profile?" |
 
@@ -217,7 +217,7 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **PROHIBITED — per-milestone artifact splitting:** Per-milestone-suffixed filenames (e.g., `02-implementation-m{N}.md`, `03-testing-m1.md`) and `{NN}_{milestone}/` child folders (e.g., `01_m0-skeleton/`, `02_m1-api/`) are explicitly PROHIBITED. Agents that create these are in defect.
 
-**Stage files are FLAT, whole-task, and there is exactly ONE set per workspace.** No suffix of ANY kind is permitted on a stage filename. This prohibits not only per-milestone suffixes (`02-implementation-m{N}.md`) and `{NN}_{milestone}/` child folders, but ALSO any "second-cycle" / "second delivery cycle" suffix such as `02b-implementation.md`, `03b-testing.md`, `04b-*.md`. There is no "second delivery cycle" convention in team-harness — inventing an undocumented file-naming convention is itself a defect. One task = one workspace = one set of stage files (`02-implementation.md`, `03-testing.md`, `04-security.md`, `04-validation.md`), each whole-task. A second PR or a second pass within the same workspace REUSES these flat files; it never mints a parallel suffixed set.
+**Stage files are FLAT, whole-task, and there is exactly ONE set per workspace.** No suffix of ANY kind is permitted on a stage filename. This prohibits not only per-milestone suffixes (`02-implementation-m{N}.md`) and `{NN}_{milestone}/` child folders, but ALSO any "second-cycle" / "second delivery cycle" suffix such as `02b-implementation.md`, `03b-testing.md`, `04b-*.md`. There is no "second delivery cycle" convention in team-harness — inventing an undocumented file-naming convention is itself a defect. One task = one workspace = one set of stage files (`02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, `reviews/04-validation.md`), each whole-task. A second PR or a second pass within the same workspace REUSES these flat files; it never mints a parallel suffixed set.
 
 **Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or orchestrator judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
@@ -238,7 +238,7 @@ Read together: a task is never SPLIT across delivery groups (anti-split), and a 
 
 **Same delivery flow alignment.** The consolidated batch ships via the same delivery flow and the same PR lifecycle as a single task — the same `delivery` agent (orchestrator Step 5d), the same review → merge → worktree-teardown lifecycle (teardown on PR merge per `docs/worktree-discipline.md` Rule 3). There is no separate batch-delivery path. The only structural difference is that delivery operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single task branch.
 
-**Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `04-security.md`, and `04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
+**Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
 
 **Milestone Index (summary).** The plan's `00-state.md` `## Milestone Index` table tracks one row per milestone with a `Commit` column (commit sha per milestone). No per-milestone `PR` column. A single build-level PR is recorded once at the end.
 
@@ -265,14 +265,14 @@ The plan artifact for a milestone build is **`01-plan.md`** — the architect wr
   01-plan.md                      ← milestone breakdown w/ per-milestone DEPENDENCY annotations (independent vs depends-on-Mx)
   02-implementation.md            ← FLAT whole-task implementer report (NO per-milestone subsections)
   03-testing.md                   ← FLAT whole-task tester report
-  04-security.md                  ← FLAT whole-task security report (tier-gated)
-  04-validation.md                ← FLAT whole-task qa report
+  reviews/04-security.md                  ← FLAT whole-task security report (tier-gated)
+  reviews/04-validation.md                ← FLAT whole-task qa report
   00-pipeline-summary.md          ← rollup
 ```
 
 One flat workspace. ONE file of each stage type, each covering the WHOLE TASK with no per-milestone subsections. NO child workspaces, NO `{NN}_{milestone-slug}/` sub-folders, NO suffixed files of any kind — e.g., `02-implementation-m1.md` and `02b-implementation.md` are both PROHIBITED. The milestone breakdown lives ONLY in `01-plan.md`.
 
-The `02-implementation.md`, `03-testing.md`, `04-security.md`, and `04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
+The `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
 
 ### Milestone execution: detect-and-continue by identity
 
@@ -318,7 +318,7 @@ Status values: `pending` → `implementing` → `complete`. One row per mileston
 |------|-------|-------|
 | STAGE-GATE-1 | ONCE | Approve the whole milestone plan (`01-plan.md`) including the dependency graph + parallelization layout. NOT per-milestone. |
 | (implement) | per milestone | Implement milestone (parallel where independent, serial where dependent) → ONE COMMIT on the single feature branch (dependency order) → update Milestone Index status + record the commit sha. NO per-milestone PR, NO per-milestone gate. |
-| (verify) | once, whole-task | The flat whole-task `03-testing.md` / `04-validation.md` (and `04-security.md` if tier-gated) cover the whole task. No gate fires per milestone. |
+| (verify) | once, whole-task | The flat whole-task `03-testing.md` / `reviews/04-validation.md` (and `reviews/04-security.md` if tier-gated) cover the whole task. No gate fires per milestone. |
 | STAGE-GATE-3 | ONCE | After ALL milestones are complete (functionality complete). ONE PR opened with all milestone commits. NOT per-milestone. |
 
 ---
@@ -438,10 +438,10 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | `02-regression-test.md` | **Conditional skip** — only when no behavior change (see Tier 1 condition above); otherwise Yes | Yes | Yes | Yes | tester's failing test (path + content + how to run) BEFORE implementer touches anything |
 | `02-implementation.md` | Yes | Yes | Yes | Yes | implementer's report |
 | `03-testing.md` | Yes — suite no-regress only | Yes | Yes | Yes | tester's post-fix verification |
-| `04-validation.md` | Yes — Tier 1 simplified template (≤15 lines, no per-AC table) | Yes — default bug-fix contract | Yes — default bug-fix contract | Yes — default bug-fix contract | qa validation |
-| `04-security.md` | **No** | **No** | **Yes (mandatory)** | **Yes (mandatory + extended analysis)** | security agent — see "Why security is tier-gated" below |
+| `reviews/04-validation.md` | Yes — Tier 1 simplified template (≤15 lines, no per-AC table) | Yes — default bug-fix contract | Yes — default bug-fix contract | Yes — default bug-fix contract | qa validation |
+| `reviews/04-security.md` | **No** | **No** | **Yes (mandatory)** | **Yes (mandatory + extended analysis)** | security agent — see "Why security is tier-gated" below |
 | `00-state.md § Delivery` | Yes | Yes | Yes | Yes | delivery agent appends this section |
-| `04-validation.md § Drift Analysis` | Conditional (per existing complexity/iteration gate) | Conditional | Conditional | Conditional | acceptance-checker appends this section |
+| `reviews/04-validation.md § Drift Analysis` | Conditional (per existing complexity/iteration gate) | Conditional | Conditional | Conditional | acceptance-checker appends this section |
 
 **Why security is tier-gated.** PR #50 set `security-sensitive: true` for every bug as a defense-in-depth override. The Tier System refines that override: security runs for every Tier 3+ bug (Tier 4 includes extended analysis cross-referencing prior art), and Tier 1 / Tier 2 fixes skip security because the impacted scope is non-functional (docs, dev-tooling, test infra). The auto-escalation rule guarantees that any fix touching a security-sensitive path (`auth/**`, `middleware/**`, `api/**`, etc.) lands at Tier 3+ at classification time — so a Tier 1 / Tier 2 run cannot accidentally bypass security on sensitive paths. Many bugs have non-obvious security implications (input-validation bugs that are actually injection, race conditions that are TOCTOU vulnerabilities, error-handling bugs that leak information); the path-pattern auto-escalation captures these without forcing security on every typo-in-docs fix.
 
@@ -460,9 +460,9 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
 | 2.5 Reconcile | orchestrator + qa-plan (reconcile) | — | Same as feature flow |
 | **2.7 Test Authoring** | tester (mode: authoring) | `03-testing.md` (authoring section) | AC-test authoring pre-verify: tester maps each AC to at least one test, runs suite once to confirm green. This is DISTINCT from Phase 2.0 (regression test for the bug). Phase 2.7 is the general AC-test authoring that gates the parallel verify block. |
-| 3 Verify | tester (run-only) + qa + security (tier-gated) | `03-testing.md`, `04-validation.md`, `04-security.md` (Tier 3+) | The tester is run-only in Phase 3: executes the frozen suite (authored in Phase 2.7), confirms no regressions, does NOT write new AC tests. Tier 1: tester (run-only, suite no-regress) + qa (simplified). Tier 2: tester (run-only) + qa. Tier 3: tester (run-only) + qa + security. Tier 4: same + extended analysis. `qa`, tester, and security parallelize over an immutable artifact — no race condition. |
+| 3 Verify | tester (run-only) + qa + security (tier-gated) | `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md` (Tier 3+) | The tester is run-only in Phase 3: executes the frozen suite (authored in Phase 2.7), confirms no regressions, does NOT write new AC tests. Tier 1: tester (run-only, suite no-regress) + qa (simplified). Tier 2: tester (run-only) + qa. Tier 3: tester (run-only) + qa + security. Tier 4: same + extended analysis. `qa`, tester, and security parallelize over an immutable artifact — no race condition. |
 | 3.5 Acceptance gate | orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1). Gate also checks assertion-content match: authored assertion patterns from `02-regression-test.md` must still be present in the actual test file at `regression_test_path` — a weakened/replaced assertion body fails the gate (see orchestrator.md Phase 3.5 Step 6). |
-| 3.6 Acceptance check | acceptance-checker | `04-validation.md § Drift Analysis` | Conditional per existing gates |
+| 3.6 Acceptance check | acceptance-checker | `reviews/04-validation.md § Drift Analysis` | Conditional per existing gates |
 | 4 Delivery | delivery | `00-state.md § Delivery` | CHANGELOG `### Fixed`, PR title `fix(area):`, Bug Report section in PR body, `Fixes #N` |
 | 4.5 Internal review | reviewer (mode: internal) | — | Conditional per diff-size gate |
 | STAGE-GATE-3 | orchestrator | STOP block | ship / amend / abort |
@@ -505,7 +505,7 @@ Documented in `agents/plan-reviewer.md`. Fire only when the orchestrator's task 
 ### qa validate-mode for `type: fix | hotfix`
 
 `agents/qa.md` validate mode adds two boolean fields to the status block:
-- `regression_test_referenced: true | false` — confirms the per-AC mapping in `04-validation.md` cross-references `02-regression-test.md`
+- `regression_test_referenced: true | false` — confirms the per-AC mapping in `reviews/04-validation.md` cross-references `02-regression-test.md`
 - `reproduction_steps_validated: true | false` — confirms the AC-1 (reproduction-no-longer-bug) was checked against `01-plan.md` § Review Summary (Reproduction steps)
 
 ### Type classification — auto-detect bug-fix vs hotfix
@@ -561,7 +561,7 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 
 ### workspaces artifact set (type: hotfix)
 
-Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `01-plan.md` is **still produced** (§ Task List minimum: 4-line task list — reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `01-plan.md § Plan Review`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, `04-security.md`, `00-state.md § Delivery`, `04-validation.md § Drift Analysis`.
+Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `01-plan.md` is **still produced** (§ Task List minimum: 4-line task list — reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `01-plan.md § Plan Review`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`, `00-state.md § Delivery`, `reviews/04-validation.md § Drift Analysis`.
 
 ### Operator-facing surface
 
@@ -575,7 +575,7 @@ v1 detects hotfix by keyword in natural language (auto-classification + operator
 2. Phase 3 launches `security` agent in parallel with tester+qa (automatic — triggered by `security-sensitive: true`)
 3. Critical/High findings block delivery → iterate with implementer (Case D)
 4. Medium/Low/Info findings are warnings in delivery report, do NOT block
-5. If any security risk unresolved after max iterations → document in `04-security.md` and proceed
+5. If any security risk unresolved after max iterations → document in `reviews/04-security.md` and proceed
 
 ---
 
@@ -940,7 +940,7 @@ When the user asks to document a service, database, API, library, infrastructure
 - Compose N distinct angles for the topic (e.g., `official-docs`, `known-issues`, `migration-guides`).
 - Dispatch each `researcher` with: `angle`, `topic`, `relevance_criteria`, and a per-lane `findings_file` path.
 - **Fail-open lane handling:** if a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event and continue.
-- After all lanes return, dispatch `research-consolidator` to merge and deduplicate findings into `workspaces/{feature}/research-findings-consolidated.md`.
+- After all lanes return, dispatch `research-consolidator` to merge and deduplicate findings into `workspaces/{feature}/research/research-findings-consolidated.md`.
 
 For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) where external web research adds little value, skip the fan-out and proceed directly to Step 1b.
 
@@ -955,21 +955,21 @@ For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) wher
 | `infrastructure` | Dockerfile, docker-compose, CI/CD workflows, deploy scripts, env vars, monitoring |
 | `product` | All of the above — full-scope investigation; pre-digested web findings if fan-out ran |
 
-Instruction to architect: "Research mode. Investigate {topic} for documentation purposes. Produce `00-research.md` covering architecture, components, data flows, configuration, and key decisions. The output will be consumed by the documenter agent — be thorough but structured."
+Instruction to architect: "Research mode. Investigate {topic} for documentation purposes. Produce `research/00-research.md` covering architecture, components, data flows, configuration, and key decisions. The output will be consumed by the documenter agent — be thorough but structured."
 
-When consolidated web findings are present (`research-findings-consolidated.md` exists): "Pre-digested consolidated web findings are in `workspaces/{feature}/research-findings-consolidated.md` — read that file as your primary external evidence base. You may spot-fetch to fill specific gaps the consolidator flagged."
+When consolidated web findings are present (`research/research-findings-consolidated.md` exists): "Pre-digested consolidated web findings are in `workspaces/{feature}/research/research-findings-consolidated.md` — read that file as your primary external evidence base. You may spot-fetch to fill specific gaps the consolidator flagged."
 
-**Multi-topic:** if 2+ topics, dispatch one architect research per topic in parallel (separate workspaces subfolders or sequential research rounds into the same `00-research.md` with clear section separation).
+**Multi-topic:** if 2+ topics, dispatch one architect research per topic in parallel (separate workspaces subfolders or sequential research rounds into the same `research/00-research.md` with clear section separation).
 
-Output: `00-research.md` in `workspaces/{feature-name}/`.
+Output: `research/00-research.md` in `workspaces/{feature-name}/`.
 
 ### Phase 2a — Write
 
 Invoke `documenter` with the research findings and metadata:
 
-```
+```text
 Task context:
-- research: workspaces/{feature-name}/00-research.md
+- research: workspaces/{feature-name}/research/00-research.md
 - vault_path: {from Phase 0}
 - folder: {from Phase 0}
 - language: {from Phase 0}
@@ -977,7 +977,7 @@ Task context:
 ```
 
 The documenter:
-1. Reads `00-research.md`
+1. Reads `research/00-research.md`
 2. Plans the page set (index + sub-pages based on subject classification)
 3. Writes all pages to the vault folder with diagram-first layout
 4. Writes `02-documentation.md` manifest listing all pages, diagram counts, and Excalidraw/Canvas dispatch requests
@@ -988,7 +988,7 @@ Output: Obsidian vault pages + `workspaces/{feature-name}/02-documentation.md`.
 
 Read `02-documentation.md`. If the manifest lists Excalidraw or Canvas dispatch requests:
 
-- **Excalidraw requests:** dispatch `diagrammer` (Excalidraw agent) per flagged page. Input: the `00-research.md` section relevant to the diagram + the target path in the vault. The diagrammer writes `.excalidraw.md` files directly to the vault folder.
+- **Excalidraw requests:** dispatch `diagrammer` (Excalidraw agent) per flagged page. Input: the `research/00-research.md` section relevant to the diagram + the target path in the vault. The diagrammer writes `.excalidraw.md` files directly to the vault folder.
 - **Canvas requests:** dispatch canvas creation using the json-canvas skill pattern. Input: the page structure from the manifest + node/edge relationships. Output: `.canvas` file in the vault folder.
 
 If no external diagram requests, skip Phase 2b.
@@ -997,11 +997,11 @@ If no external diagram requests, skip Phase 2b.
 
 ### Phase 3 — Review
 
-Invoke `qa` in validation mode. The QA agent reads `00-research.md` (the source of truth) and the vault folder (the output) and validates:
+Invoke `qa` in validation mode. The QA agent reads `research/00-research.md` (the source of truth) and the vault folder (the output) and validates:
 
 | Check | Criterion | Verdict |
 |-------|-----------|---------|
-| **Coverage** | Every major section in `00-research.md` has a corresponding doc page | PASS / FAIL |
+| **Coverage** | Every major section in `research/00-research.md` has a corresponding doc page | PASS / FAIL |
 | **Navigation** | Index page exists with wikilinks to all sub-pages | PASS / FAIL |
 | **Diagram density** | Every page has at least 1 diagram (Mermaid or Excalidraw embed) | PASS / FAIL |
 | **Diagram-first layout** | Diagrams appear before their explanatory text | PASS / FAIL |
@@ -1010,7 +1010,7 @@ Invoke `qa` in validation mode. The QA agent reads `00-research.md` (the source 
 | **Frontmatter** | Every page has valid YAML frontmatter with tags and aliases | PASS / FAIL |
 | **No orphan text** | No section longer than 5 paragraphs without a visual | PASS / FAIL |
 
-Output: `04-validation.md` with per-check verdict + overall PASS/FAIL.
+Output: `reviews/04-validation.md` with per-check verdict + overall PASS/FAIL.
 
 ### DOC-GATE — Human Checkpoint
 
@@ -1020,7 +1020,7 @@ Output: `04-validation.md` with per-check verdict + overall PASS/FAIL.
    - `count(pages on disk) == pages_created` → existence check passes.
    - `count(pages on disk) != pages_created` → **mismatch**: the manifest claims a page that was never written (or a page was written without being registered). Return `status: blocked` with `summary: pages-on-disk mismatch — manifest declares {pages_created} pages but {actual_count} found on disk; re-run documenter to reconcile`. Do NOT present the DOC-GATE to the operator until this is resolved. This is fail-closed: a manifest that claims an unwritten page is a silent documentation gap.
 
-2. **Fidelity outcome check.** Read `04-validation.md` from Phase 3. If the qa doc-vs-code fidelity check produced any fidelity finding (unbacked documented fact), the DOC-GATE is **blocked** — the fidelity finding must be resolved before human approval is solicited. Refer the qa finding back to the documenter with instructions to correct the specific claim and re-run Phase 3.
+2. **Fidelity outcome check.** Read `reviews/04-validation.md` from Phase 3. If the qa doc-vs-code fidelity check produced any fidelity finding (unbacked documented fact), the DOC-GATE is **blocked** — the fidelity finding must be resolved before human approval is solicited. Refer the qa finding back to the documenter with instructions to correct the specific claim and re-run Phase 3.
 
 Only when both pre-gate assertions pass, present to the operator:
 
@@ -1030,7 +1030,7 @@ Vault: {path}
 Folder: {folder name}
 Pages: {count} (verified on disk) | Diagrams: {inline + external count}
 QA: {PASS or FAIL with details}
-Fidelity: {PASS — N claims verified | FAIL — see fidelity findings in 04-validation.md}
+Fidelity: {PASS — N claims verified | FAIL — see fidelity findings in reviews/04-validation.md}
 
 Options:
 1. Approve — documentation is complete
@@ -1063,9 +1063,9 @@ workspaces/{feature-name}/
   00-state.md              # Pipeline state (type: docs)
   00-execution-events.md   # Observability event trace (or .jsonl in local mode) — append-only, one JSON per line
   01-plan.md               # Topics, vault, folder, language, subject classification (§ Review Summary) + task breakdown (§ Task List)
-  00-research.md           # Architect research findings
+  research/00-research.md  # Architect research findings
   02-documentation.md      # Documenter manifest (pages, diagrams, dispatch requests)
-  04-validation.md         # QA validation report
+  reviews/04-validation.md # QA validation report
 ```
 
 ### Observability events for documentation pipeline
@@ -1143,10 +1143,10 @@ Every special flow that skips phases must explicitly document which artifact ver
 
 - **Phases skipped:** 2-5 (implementation, verify, delivery, GitHub update).
 - **Artifact verification runs for:**
-  - `researcher` lanes (N parallel) → `workspaces/{feature}/research-findings-{angle}.md` per lane. The orchestrator gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
-  - `research-consolidator` → `workspaces/{feature}/00-research.md` (or `research-findings-consolidated.md` for docs-flow). The orchestrator verifies the consolidated findings file exists before dispatching the architect. Checks `material_closeable_gaps` in the consolidator status block for gate evaluation.
-  - `architect` → `00-research.md`. The orchestrator verifies `00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
-  - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `00-research.md`) → architect (re-synthesized `00-research.md`). The orchestrator also verifies the `## Coverage gaps` fenced block is present in `00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
+  - `researcher` lanes (N parallel) → `workspaces/{feature}/research/research-findings-{angle}.md` per lane. The orchestrator gates on each lane's status block. Missing or `findings: 0` lanes record a `research.lane.skipped` event (fail-open, not a failure).
+  - `research-consolidator` → `workspaces/{feature}/research/00-research.md` (or `research/research-findings-consolidated.md` for docs-flow). The orchestrator verifies the consolidated findings file exists before dispatching the architect. Checks `material_closeable_gaps` in the consolidator status block for gate evaluation.
+  - `architect` → `research/00-research.md`. The orchestrator verifies `research/00-research.md` exists and is non-empty after the architect returns. On termination, verifies `## Residual Gaps` section is present.
+  - **Per-round re-dispatch (gap-closure loop):** after each follow-up round, the same artifact verification sequence repeats — researcher lanes → consolidator (amended `research/00-research.md`) → architect (re-synthesized `research/00-research.md`). The orchestrator also verifies the `## Coverage gaps` fenced block is present in `research/00-research.md` after the consolidator and architect return, and that `research_round` in `00-state.md` matches the current loop iteration.
 - **Artifact verification skipped for:** `implementer` (not dispatched), `tester` (not dispatched), `qa` (not dispatched), `security` (not dispatched), `delivery` (not dispatched).
 - **Phase 3.6 and 4.5:** not applicable (Phases 3-4 skipped entirely).
 - **Phase 3.75 (build verification):** not applicable (no implementation to build).
@@ -1162,7 +1162,7 @@ Every special flow that skips phases must explicitly document which artifact ver
 ### Hotfix sub-flow
 
 - **Phases skipped:** Phase 1 (no architect, no `01-root-cause.md`).
-- **Artifact verification runs for:** all agents that ARE dispatched — `tester` (Phase 2.0 → `02-regression-test.md`, Phase 3 → `03-testing.md`), `implementer` (Phase 2 → `02-implementation.md`), `qa` (Phase 3 → `04-validation.md`), `security` (Phase 3 → `04-security.md`), `delivery` (Phase 4).
+- **Artifact verification runs for:** all agents that ARE dispatched — `tester` (Phase 2.0 → `02-regression-test.md`, Phase 3 → `03-testing.md`), `implementer` (Phase 2 → `02-implementation.md`), `qa` (Phase 3 → `reviews/04-validation.md`), `security` (Phase 3 → `reviews/04-security.md`), `delivery` (Phase 4).
 - **Artifact verification skipped for:** `architect` (not dispatched — Phase 1 skipped).
 - **Phase 3.6 (Acceptance Check):** SKIPPED for `type: hotfix` AND single-file fix (speed override — the only exception to mandatory Phase 3.6). For hotfixes with multi-file scope, Phase 3.6 runs normally.
 - **Phase 4.5 (Internal Review):** SKIPPED for `type: hotfix` AND single-file fix (speed override — the only exception to mandatory Phase 4.5). For hotfixes with multi-file scope, Phase 4.5 runs normally.

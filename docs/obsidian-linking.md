@@ -65,16 +65,17 @@ After deriving the raw label, apply `escape_alias(s)`:
 
 ## Knowledge-Only Allowlist
 
-When scanning a feature folder for docs to link, **include only** files whose basename matches the knowledge allowlist:
+When scanning a feature folder for docs to link, the scan recurses one level into the `research/` subfolder (mirroring the `sketches/` precedent) and **includes only** files whose basename matches the knowledge allowlist:
 
 | Included (knowledge-tier) | Reason |
 |---|---|
-| `00-research.md` (and `00-research*.md`) | Research and spike knowledge-tier doc — the pre-design study that informs the plan |
+| `research/00-research.md` (and `research/00-research*.md`) | Research and spike knowledge-tier doc — the pre-design study that informs the plan |
 | `01-plan.md` (and `01-plan*.md`) | The consolidated design and decision record — the primary knowledge artifact |
 | `01-root-cause.md` (and `01-root-cause*.md`) | Bug-fix flow knowledge-tier doc — the research-equivalent artifact for fix pipelines (fix flows have no `00-research`) |
 
 **Everything else is excluded:**
-- Process/verification docs: `02-implementation.md`, `02-documentation.md`, `03-testing.md`, `03-regression-tests.md`, `04-validation.md`, `04-security.md`, `05-diagram.*`, `00-acceptance-criteria.md`
+- Process/verification docs under `reviews/`: `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/01-ux-review.md`, `reviews/04-ux-validation.md`, `reviews/04-adversary.md`, `reviews/04-review.md`, `reviews/04-internal-review.md`
+- Process/verification docs at the feature root: `02-implementation.md`, `02-documentation.md`, `03-testing.md`, `03-regression-tests.md`, `05-diagram.*`, `00-acceptance-criteria.md`
 - Plumbing: `00-state.md`, `00-execution-events.md`, `00-execution-events.jsonl`, `session.json`
 - The feature-index note itself (`{feature_dir}.md`) — excluded to avoid self-reference
 

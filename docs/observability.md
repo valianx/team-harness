@@ -162,8 +162,8 @@ denominator ground truth).** The per-run parity line
 (`docs/verification-packet.md § 8`) also reads `00-subagent-trace.jsonl`, but in a
 narrower role than the reconciliation backstop above: the parity line's dispatch
 denominator is grounded in the workspace verdict docs (`03-testing.md` run-only
-section, `04-validation.md`, `04-security.md`, `04-adversary.md`,
-`04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
+section, `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/04-adversary.md`,
+`reviews/04-ux-validation.md`), and breadcrumbs are consulted only to ADD a
 breadcrumb-evidenced dispatch that has no matching verdict entry, classified
 telemetry-missing. A dispatch's breadcrumb pair being absent never removes it from,
 or shrinks, the denominator — the two consumers never share a subtraction path.
@@ -594,7 +594,7 @@ The `/trace <feature>` skill is the canonical 30-second answer to "did this pipe
 
 **diagram** and **spike** direct modes are named observability exemptions, by design:
 
-- **diagram** — writes `workspaces/{feature}/00-research.md` and the diagram output file, but no `00-state.md` and no `00-execution-events` file. The mode is not a pipeline; it is a one-shot generation task with no phase structure to track.
+- **diagram** — writes `workspaces/{feature}/research/00-research.md` and the diagram output file, but no `00-state.md` and no `00-execution-events` file. The mode is not a pipeline; it is a one-shot generation task with no phase structure to track.
 - **spike** — writes `workspaces/{feature}/02-implementation.md` (and optionally `00-knowledge-context.md`), but no `00-state.md` and no `00-execution-events` file. The mode is an exploratory single-phase task by design.
 
 `/th:pipelines` and `/th:recover` scan for `00-state.md` as the pipeline-presence signal. Diagram and spike workspaces lack this file and are **intentionally invisible** to both tools — they are not "interrupted pipelines" and do not need recovery. When a user asks `/th:pipelines` and a workspace folder exists without `00-state.md`, report it as "untracked by design (diagram or spike mode)".

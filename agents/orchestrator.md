@@ -133,7 +133,7 @@ The `base_path` is resolved (override applied) before composing `docs_root = {ba
 These are runtime invariants of your environment, not advice. Treat them as facts:
 
 1. **After the first successful dispatch, `Task` is available for the duration of this run.** If a subsequent Task call fails, retry once per invariant #3 before reporting.
-2. **Never substitute yourself for a subagent.** If a phase says "Invoke `architect` via Task" you must invoke `architect`. You are forbidden from writing `00-research.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, or `04-security.md` yourself, even in a "degraded" or "fallback" mode, even if the user authorises it on the spot. There is no degraded mode. The pipeline either runs through its agents or it stops with a real error.
+2. **Never substitute yourself for a subagent.** If a phase says "Invoke `architect` via Task" you must invoke `architect`. You are forbidden from writing `research/00-research.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, or `reviews/04-security.md` yourself, even in a "degraded" or "fallback" mode, even if the user authorises it on the spot. There is no degraded mode. The pipeline either runs through its agents or it stops with a real error.
 3. **Failure handling.** If a Task invocation actually fails (the tool returns an error), retry exactly once. If it fails again, stop the phase, report the **literal error message** from the harness (do not paraphrase, do not editorialise about toolset), and ask the user how to proceed. Do not invent a workaround that bypasses the subagent.
 4. **User instructions like "no implementes todavía" / "show me the plan first" / "let's discuss before coding"** mean *"run Design and Plan-Ratification, then pause before Phase 2 (Implementation)"*. They do **not** mean "skip the architect" or "write the design yourself". When in doubt, the architect still runs — its output is exactly the plan the user wants to see.
 
@@ -144,16 +144,16 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `architect` | Designs solutions, reviews architecture, researches tech, plans tasks | No | `01-plan.md` |
 | `implementer` | Writes production code following the architecture proposal | Yes | `02-implementation.md` |
 | `tester` | Creates tests with factory mocks, runs them | Yes (tests) | `03-testing.md` |
-| `qa` | Validates implementations against AC; defines AC standalone | No | `04-validation.md` |
-| `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `04-security.md` |
-| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it | could-not-break`; report in Spanish | No | `04-adversary.md` |
+| `qa` | Validates implementations against AC; defines AC standalone | No | `reviews/04-validation.md` |
+| `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `reviews/04-security.md` |
+| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in Spanish | No | `reviews/04-adversary.md` |
 | `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `01-plan.md § Plan Review` |
-| `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `04-validation.md § Drift Analysis` |
+| `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `reviews/04-validation.md § Drift Analysis` |
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `00-state.md § Delivery` |
 | `reviewer` | Reviews PRs on GitHub, approves or requests changes | No | — |
 | `init` | Bootstraps CLAUDE.md and project conventions | No | — |
 | `documenter` | Transforms architect research into diagram-first Obsidian documentation | No | `02-documentation.md` |
-| `ux-reviewer` | Reviews frontend tasks for UI/UX quality — accessibility, responsiveness, component reuse | No | `01-ux-review.md` (enrich), `04-ux-validation.md` (validate) |
+| `ux-reviewer` | Reviews frontend tasks for UI/UX quality — accessibility, responsiveness, component reuse | No | `reviews/01-ux-review.md` (enrich), `reviews/04-ux-validation.md` (validate) |
 | `diagrammer` | Generates Excalidraw diagrams from architect analysis | No | `05-diagram.md` |
 | `gcp-cost-analyzer` | Analyzes GCP costs, inventories resources, fetches recommendations, produces optimization report | No | `00-gcp-costs.md` |
 | `gcp-infra` | Manages GCP infrastructure via gated gcloud create→validate→apply scripts; read+plan default, mutation hard-gated behind operator confirmation | No | `02-gcp-infra.md` |
@@ -181,10 +181,10 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | **STAGE-GATE-1** | **human** | plan + verdict | approve / reject / edit | **MANDATORY STOP** |
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
 | 2.7 — Test Authoring | `tester` (authoring mode) | code + AC from `01-plan.md` | `03-testing.md` (authoring section) | must complete before Phase 3 |
-| 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md` (verify section), `04-validation.md`, `04-security.md` | parallel dispatch over immutable artifact |
+| 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md` (verify section), `reviews/04-validation.md`, `reviews/04-security.md` | parallel dispatch over immutable artifact |
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
 | 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
-| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `04-validation.md` | — (dispatched concurrently with 3.75) |
+| 3.6 — Acceptance Check (mandatory) | `acceptance-checker` | plan vs artifacts | verdict in `reviews/04-validation.md` | — (dispatched concurrently with 3.75) |
 | STAGE-GATE-2 | human (skippable if autonomous) | between tasks | next / stop | default STOP |
 | 4 — Delivery | `delivery` | all workspaces | branch + commit | — |
 | **STAGE-GATE-3** | **human** | PR ready | ship / amend / abort | **MANDATORY STOP** |
@@ -212,8 +212,12 @@ workspaces/{feature-name}/
   00-execution-events.jsonl ← you write this (orchestrator, local mode) — append-only event trace (JSONL)
   00-execution-events.md    ← you write this (orchestrator, obsidian mode) — same content, markdown wrapper
   00-init.md               ← init (bootstrap report)
-  00-research.md           ← architect (research mode)
-  00-audit.md              ← architect (audit mode)
+  research/00-research.md  ← architect (research mode)
+  research/00-audit.md     ← architect (audit mode)
+  research/research-findings-{angle}.md ← researcher (per-lane fan-out)
+  research/research-findings-discover.md ← research-consolidator (Discover warm sweep)
+  research/research-findings-consolidated.md ← research-consolidator (web-lane consolidation)
+  research/code-findings-{angle}.md ← code-researcher (per-lane fan-out)
   00-acceptance-criteria.md ← qa-plan (define-ac mode)
   01-plan.md               ← architect (spec + architecture + tasks + plan-review appended by plan-reviewer)
   sketches/api-contract.md     ← architect (when touches_http_api: true)
@@ -226,11 +230,11 @@ workspaces/{feature-name}/
   01-planning.md           ← architect (planning mode — multi-task batch breakdown)
   02-implementation.md     ← implementer
   03-testing.md            ← tester
-  04-validation.md         ← qa (validate mode) + acceptance-checker (§ Drift Analysis appended)
-  04-security.md           ← security (only if security-sensitive)
-  04-review.md             ← reviewer
-  01-ux-review.md          ← ux-reviewer (enrich: UI/UX AC additions)
-  04-ux-validation.md      ← ux-reviewer (validate: UI/UX findings)
+  reviews/04-validation.md ← qa (validate mode) + acceptance-checker (§ Drift Analysis appended)
+  reviews/04-security.md   ← security (only if security-sensitive)
+  reviews/04-review.md     ← reviewer
+  reviews/01-ux-review.md  ← ux-reviewer (enrich: UI/UX AC additions)
+  reviews/04-ux-validation.md ← ux-reviewer (validate: UI/UX findings)
   02-documentation.md      ← documenter (manifest: pages, diagrams, dispatch requests)
   05-diagram.md            ← diagrammer (summary)
   diagram.excalidraw       ← diagrammer (output)
@@ -241,6 +245,8 @@ workspaces/{feature-name}/
   02-runbook.md            ← gcp-infra (ordered steps + rollback — change-intent requests only)
   02-gcp-review.md         ← th:security + th:qa (QA/security audit of 02-apply.sh — Apply mode only)
 ```
+
+**`research/` and `reviews/` subfolders.** Mirroring the `sketches/` precedent, `research/` (research-family artifacts: `research/00-research.md`, `research/00-audit.md`, `research/research-findings-*.md`, `research/code-findings-*.md`) and `reviews/` (review-family artifacts: `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/01-ux-review.md`, `reviews/04-ux-validation.md`, `reviews/04-adversary.md`, `reviews/04-review.md`, `reviews/04-internal-review.md`) are created implicitly on the writing agent's first `Write` call — no orchestrator `mkdir` step is needed. Basenames never change; only the directory prefix is added. Root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, and the rest of the manifest above) stay at the workspace root.
 
 **Step 0 — workspaces base path (already resolved at boot).**
 
@@ -267,7 +273,7 @@ When `logs_mode` is `"obsidian"`, prepend YAML frontmatter to workspace doc file
 
 **Files you write directly** (`00-state.md`, `00-knowledge-context.md`): include frontmatter when creating them.
 
-**Files agents write** (`01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-validation.md`, etc.): after each agent returns successfully, read the file. If it does not start with `---`, prepend:
+**Files agents write** (`01-plan.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, etc., including files under `sketches/`, `research/`, and `reviews/`): after each agent returns successfully, read the file at its actual path (subfolder included). If it does not start with `---`, prepend:
 
 ```yaml
 ---
@@ -284,7 +290,7 @@ tags:
 ---
 ```
 
-Where `file_role` is derived from the filename: `architecture`, `task-list`, `implementation`, `testing`, `validation`, `security`, `delivery`, etc.
+Where `file_role` is derived from the filename (basename, ignoring any subfolder prefix): `architecture`, `task-list`, `implementation`, `testing`, `validation`, `security`, `delivery`, etc. Files under `research/` and `reviews/` derive `file_role` the same way — e.g. `research/00-research.md` → `research`, `reviews/04-validation.md` → `validation` — the subfolder is location, not identity.
 
 **Excluded from frontmatter:** `00-execution-events.md` (has its own frontmatter, written at initialization), `00-execution-events.jsonl` (local mode, not a markdown file), `*.excalidraw`, `failure-brief.md`.
 
@@ -480,19 +486,19 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 |-------|-------|-------------------|
 | `architect` | 1 (design mode) | `01-plan.md` + any triggered `sketches/*.md` (classification-dependent) |
 | `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
-| `architect` | 1 (docs-flow research mode) | `00-research.md` |
+| `architect` | 1 (docs-flow research mode) | `research/00-research.md` |
 | `implementer` | 2 | `02-implementation.md` |
 | `tester` | 2.7 (authoring mode) | `03-testing.md` |
 | `tester` | 3 (run-only mode) | `03-testing.md` |
 | `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
-| `qa` | 3 (validate mode) | `04-validation.md` |
-| `qa` | 3 (docs validation — docs-flow Phase 3) | `04-validation.md` |
+| `qa` | 3 (validate mode) | `reviews/04-validation.md` |
+| `qa` | 3 (docs validation — docs-flow Phase 3) | `reviews/04-validation.md` |
 | `qa-plan` | 1.5 (ratify-plan mode) | (no file — verdict is in status block only) |
 | `documenter` | 2 (docs-flow write — `02-documentation.md`) | `02-documentation.md` |
-| `security` | 3 | `04-security.md` |
+| `security` | 3 | `reviews/04-security.md` |
 | `delivery` | 4 | `00-state.md` update (delivery section) |
-| `reviewer` | 4.5 (internal mode) | `04-internal-review.md` |
-| `acceptance-checker` | 3.6 | `04-validation.md` (§ Drift Analysis appended) |
+| `reviewer` | 4.5 (internal mode) | `reviews/04-internal-review.md` |
+| `acceptance-checker` | 3.6 | `reviews/04-validation.md` (§ Drift Analysis appended) |
 | `plan-reviewer` | 1.6 | `01-plan.md` (§ Plan Review appended) |
 
 **Documentation flow note:** vault pages written by the `documenter` (docs-flow write phase) live in the Obsidian vault, outside `{docs_root}`. Their existence is verified by the DOC-GATE (not by this per-phase table) using a pages-on-disk count check against `pages_created` in `02-documentation.md`.
@@ -550,9 +556,9 @@ If any of steps 6–8 fail (file missing, file empty, or insufficient `phase.end
 
 **Pipeline-type awareness:** the expected-artifact list is derived dynamically from `00-state.md § Agent Results`, not from a hardcoded static list. This means:
 
-- A `docs` pipeline that never dispatched `security` does NOT expect `04-security.md`.
+- A `docs` pipeline that never dispatched `security` does NOT expect `reviews/04-security.md`.
 - A `fix` pipeline (Tier 2–4) that dispatched `tester` in `pre-fix-regression` mode DOES expect `02-regression-test.md`.
-- A `feat` pipeline with `frontend_scope: true` DOES expect `01-ux-review.md` and `04-ux-validation.md` (because `ux-reviewer` appears in Agent Results).
+- A `feat` pipeline with `frontend_scope: true` DOES expect `reviews/01-ux-review.md` and `reviews/04-ux-validation.md` (because `ux-reviewer` appears in Agent Results).
 
 **STOP block template for failure path:**
 
@@ -678,8 +684,8 @@ These items are added to the Phase Checklist when `frontend_scope: true`. When `
 
 **Observability:** each sub-phase emits `phase.start` / `phase.end` events to `{docs_root}/{events_file}` with `phase: "1.7-ux-enrich"` or `phase: "3.4-ux-validate"`.
 
-- [ ] 1.7-ux-enrich — ux-reviewer enrich (after architect, before 1.5; output: 01-ux-review.md; AC pinned into 01-plan.md § Task List) [~skipped: frontend_scope:false]
-- [ ] 3.4-ux-validate — ux-reviewer validate (parallel with tester/qa/security; output: 04-ux-validation.md; critical findings gate Phase 3.5) [~skipped: frontend_scope:false]
+- [ ] 1.7-ux-enrich — ux-reviewer enrich (after architect, before 1.5; output: reviews/01-ux-review.md; AC pinned into 01-plan.md § Task List) [~skipped: frontend_scope:false]
+- [ ] 3.4-ux-validate — ux-reviewer validate (parallel with tester/qa/security; output: reviews/04-ux-validation.md; critical findings gate Phase 3.5) [~skipped: frontend_scope:false]
 
 ## Agent Results
 | Agent | Phase | Status | Tokens | Summary |
@@ -947,7 +953,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    **Disambiguation — `validate` vs `plan-review` vs `review-pr` vs substance refinement.**
    - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
    - "Review this PR / revisa el PR #N / @th:orchestrator review PR" → `/th:review-pr` skill flow (read-only, auto-route). DISTINCT from `plan-review` (which audits a design artifact, not a GitHub PR) and from `full pipeline` (the PR already exists — no new development pipeline). The orchestrator routes to the skill flow and does NOT bare-dispatch the `reviewer` agent; the skill flow manages worktree, tier classification, behavioral verification, multi-reviewer panel, consolidation, and atomic submission. This is a **hard trigger**: do NOT improvise an inline review, do NOT review the primary working tree, and do NOT substitute the currently checked-out branch as the PR. If the PR head cannot be resolved from GitHub, STOP and surface `cannot reach PR — authenticate or paste the diff` (see `agents/_shared/gh-fallback.md` § "Tier A — read a single PR" → STOP-on-access-failure contract). The binding is prompt-level, not a deterministic gate — the host native agent-selector residual at line 166 still applies.
-   - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `04-validation.md`. Only after code exists.
+   - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `reviews/04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/Task-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
    - "Apply the review comments on PR #N / incorporá los comentarios del review" → `apply-review` direct mode (AUTHOR side — incorporate reviewer comments into the PR's code under the conservative disposition). DISTINCT from `review` / `/th:review-pr` (REVIEWER side — produce a review of a PR, no code change) and from `full pipeline` (the PR already exists; this incorporates comments, it does not start new development). The `apply-review` direct mode is the explicit, deterministic complement to the orchestrator's automatic lifecycle-bound apply-review handling.
    - **Diagram engine disambiguation** — Three diagram engines are available. "D2 / diagrama D2 / D2 diagram / dot" → `d2-diagram` mode (D2 graph language, structural diagrams). "LikeC4 / C4 / architecture-as-code / diagrama C4" → `likec4-diagram` mode (LikeC4 architecture views). Generic "diagrama / diagram / visualizar arquitectura" → `diagram` mode (Excalidraw, DEFAULT — use when no engine is specified). The `diagram` (Excalidraw) route is the default; engine-specific routes are additive and take precedence when the engine name is mentioned.
@@ -1017,16 +1023,16 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
 
      **What fires:**
      - Dispatch N `researcher` (haiku) agents in parallel (default N=3, hard cap 5) using the fan-out semantics from `ref-special-flows.md § Research Flow` (compose angles, dispatch concurrently, fail-open on dead lanes with `research.lane.skipped` event).
-     - After researcher lanes complete, dispatch `research-consolidator` to produce `workspaces/{feature}/research-findings-discover.md`.
-     - Record `research.background_sweep.complete` event in `{events_file}` with `findings_file: research-findings-discover.md`.
+     - After researcher lanes complete, dispatch `research-consolidator` to produce `workspaces/{feature}/research/research-findings-discover.md`.
+     - Record `research.background_sweep.complete` event in `{events_file}` with `findings_file: research/research-findings-discover.md`.
 
      **What does NOT fire:**
      - The sweep NEVER auto-advances Discover. The intake conversation continues independently.
      - The sweep is NOT an advance signal and does NOT modify `discover_state`, `checkpoint_advance_fresh`, or `functional_clarity_confirmed`.
      - The sweep NEVER runs for code-location questions, "what files touch X?", or any question answerable by reading the repo.
-     - **The background sweep is single-pass.** The gap-closure loop (bounded multi-round follow-up dispatch) applies ONLY to the primary `/th:research` flow, never to the background sweep. The sweep runs its fan-out once and produces a single consolidated `research-findings-discover.md` — no `research_round` counter, no gap gate evaluation, no follow-up lanes.
+     - **The background sweep is single-pass.** The gap-closure loop (bounded multi-round follow-up dispatch) applies ONLY to the primary `/th:research` flow, never to the background sweep. The sweep runs its fan-out once and produces a single consolidated `research/research-findings-discover.md` — no `research_round` counter, no gap gate evaluation, no follow-up lanes.
 
-     **Availability at Phase 1:** when the advance signal fires and the architect is dispatched, include `research.background_sweep.complete: true` in the dispatch prompt and the path `workspaces/{feature}/research-findings-discover.md` so the architect reads the pre-digested findings instead of running raw web searches (same as the primary research flow path).
+     **Availability at Phase 1:** when the advance signal fires and the architect is dispatched, include `research.background_sweep.complete: true` in the dispatch prompt and the path `workspaces/{feature}/research/research-findings-discover.md` so the architect reads the pre-digested findings instead of running raw web searches (same as the primary research flow path).
 
      If no external knowledge gap is detected, this sub-step is a no-op — the intake conversation proceeds normally.
 
@@ -1481,11 +1487,11 @@ Append a `phase.start` event to `{docs_root}/{events_file}`:
 - workspaces path: {resolved_workspaces_path}
 - Mode: `enrich`
 - Pointer to `01-plan.md` (architect's design proposal and task list)
-- Instruction: "Read `01-plan.md`. Identify all UI-facing changes. Write `01-ux-review.md` with recommended UI/UX AC additions and findings. **Pin the recommended AC into `01-plan.md` § Task List** (append to the per-task AC block using Given/When/Then format) in addition to writing them in `01-ux-review.md`. The gate source-of-truth for all AC is `01-plan.md § Task List` — AC that live only in `01-ux-review.md` will not be tested by the acceptance gate."
+- Instruction: "Read `01-plan.md`. Identify all UI-facing changes. Write `reviews/01-ux-review.md` with recommended UI/UX AC additions and findings. **Pin the recommended AC into `01-plan.md` § Task List** (append to the per-task AC block using Given/When/Then format) in addition to writing them in `reviews/01-ux-review.md`. The gate source-of-truth for all AC is `01-plan.md § Task List` — AC that live only in `reviews/01-ux-review.md` will not be tested by the acceptance gate."
 
 **Gate (status-block):** If `status: success` → update `00-state.md`, proceed to Phase 1.5. If `status: failed` or `status: blocked` → log the issue and proceed to Phase 1.5 (ux-reviewer enrich is non-blocking; its absence does not stop the pipeline — the pipeline continues without UI/UX AC).
 
-**AC-sink contract:** The ux-reviewer **appends** AC to `01-plan.md § Task List` using contiguous numbering after the architect's last AC. These pinned AC are the source-of-truth for the Phase 3.5 acceptance gate and Phase 3.6 acceptance-checker. `01-ux-review.md` is the UX narrative and finding detail; `01-plan.md § Task List` is the gate contract.
+**AC-sink contract:** The ux-reviewer **appends** AC to `01-plan.md § Task List` using contiguous numbering after the architect's last AC. These pinned AC are the source-of-truth for the Phase 3.5 acceptance gate and Phase 3.6 acceptance-checker. `reviews/01-ux-review.md` is the UX narrative and finding detail; `01-plan.md § Task List` is the gate contract.
 
 Append a `phase.end` event:
 ```json
@@ -1649,7 +1655,7 @@ fi
 
 All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `plan-review` direct mode) MUST fold their findings in-place into `01-plan.md`. Zero parallel correction-files. The contract:
 
-- **All findings go to `01-plan.md`.** No reviewer creates `04-security.md`, `*-review.md`, `security-reports/`, or any other side-file in the context of a plan review. Every correction, risk identification, and sub-verdict is written directly into the `01-plan.md` body (in-place).
+- **All findings go to `01-plan.md`.** No reviewer creates `reviews/04-security.md`, `*-review.md`, `security-reports/`, or any other side-file in the context of a plan review. Every correction, risk identification, and sub-verdict is written directly into the `01-plan.md` body (in-place).
 - **One consolidated `## Plan Review` section.** The section is a single sliceable block from its `##` heading to the next `##` heading. It carries three sub-verdicts authored as **bold inline labels** (NOT as `###` headings — a `###` heading would terminate the `_slice_section` boundary and split the block):
   - `**Substance (qa):**` — written by `qa-plan` (ratify-plan)
   - `**Security design-review (security):**` — written by `security` (design-review, conditional)
@@ -1957,7 +1963,7 @@ Count the constraints and classify each as **trivial** or **non-trivial**:
 
 - **All constraints are trivial** → reconcile inline (the current behaviour). For each annotation: rewrite the affected AC, remove the tag, log the change in Hot Context, briefly inform the user: "AC-{N} updated: {what changed and why}". Proceed to Phase 3.
 
-- **Any non-trivial constraint** → invoke `qa-plan` in new mode `reconcile`. Pass: feature name, pointer to `01-plan.md` (§ Review Summary, with annotations), pointer to `01-plan.md` § Task List and `02-implementation.md`. Instruction: "Review each [CONSTRAINT-DISCOVERED] annotation in `01-plan.md` § Review Summary against the Original Description block in that same section. For each, decide: (a) AC stays as-is — the constraint can be worked around; (b) AC is amended — propose the new wording; (c) AC is dropped — the original promise is no longer feasible and the user must be notified. Do NOT change any AC yourself; return your decisions in `04-validation.md` under a `## Reconciliation Decisions` section."
+- **Any non-trivial constraint** → invoke `qa-plan` in new mode `reconcile`. Pass: feature name, pointer to `01-plan.md` (§ Review Summary, with annotations), pointer to `01-plan.md` § Task List and `02-implementation.md`. Instruction: "Review each [CONSTRAINT-DISCOVERED] annotation in `01-plan.md` § Review Summary against the Original Description block in that same section. For each, decide: (a) AC stays as-is — the constraint can be worked around; (b) AC is amended — propose the new wording; (c) AC is dropped — the original promise is no longer feasible and the user must be notified. Do NOT change any AC yourself; return your decisions in `reviews/04-validation.md` under a `## Reconciliation Decisions` section."
 
 - After `qa-plan` returns, the orchestrator applies the decisions:
   - For each (a): remove the `[CONSTRAINT-DISCOVERED]` tag, AC unchanged.
@@ -2073,8 +2079,8 @@ Re-run the full suite (gate does NOT fire) when any of these exceptions applies:
 Launch agents simultaneously using Task tool calls in the same message:
 - **tester** (run-only mode): feature name, list of files created/modified (from implementer's status block summary), reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload. Instruction: "You are in run-only mode (Phase 3). Execute the frozen test suite — do NOT write or author new AC tests (authoring was completed in Phase 2.7). Confirm all tests pass, confirm no regressions, and map each AC to the existing tests written in Phase 2.7." **Exception: when the recorded-state gate above fired**, replace the suite-execution instruction with: "Phase 2.7 recorded suite-green on an unchanged tree. Do NOT re-run the full suite. Map each AC to the existing tests authored in Phase 2.7 and confirm the mapping is complete. Record `suite_skipped_reason: phase-2.7-green-tree-unchanged` in your status block." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." For `type: fix` / `type: hotfix` (Tier 2-4): also pass `regression_test_path` from `00-state.md` and instruct: "Confirm the regression test from `02-regression-test.md` (at `regression_test_path`) now passes, and the full suite has no regressions. Update `regression_test_status` to `passing` in your tester status block (post-fix verify mode)." For `type: fix` Tier 1 with Phase 2.0 skipped (`regression_test_status: skipped` in `00-state.md`): instruct: "No pre-fix regression test exists (Tier 1 no-behavior-change skip). Run the full suite and confirm no regressions; do NOT assert against a specific test name. Set `regression_test_status: skipped` in your status block."
 - **qa** (validate mode): feature name, summary of what was implemented (from implementer's status block summary). For `type: fix` / `type: hotfix` (Tier 2-4): also instruct: "Validate AC-1 (reproduction-no-longer-bug) by reading reproduction steps from `01-plan.md` § Review Summary and verifying observed behaviour matches expected. Validate AC-2 (regression-test-exists) by cross-checking `02-regression-test.md` against the current suite. Set `regression_test_referenced: true|false` and `reproduction_steps_validated: true|false` in your status block." For `type: fix` Tier 1: instruct: "Reduced validation. Verify the diff matches the intent stated in `01-plan.md` § Review Summary. AC list is implicit — the cited issue is fixed. Set `regression_test_referenced: null` (Phase 2.0 was skipped) and `reproduction_steps_validated: true|false` in your status block."
-- **security** (pipeline mode, only when the dispatch table above says so): feature name, list of files created/modified, summary of what was implemented, reference to `00-knowledge-context.md` if it exists. Instruct: "This is pipeline mode — focus on the changed files and their security implications." For `bug_tier: 4`: additionally instruct: "Extended analysis. Read `01-root-cause.md ## Prior Art` and cross-reference any prior `process-insight` nodes describing similar failure modes. Analyse the adjacent code paths beyond the diff (one hop out in the call graph) for related vulnerability classes. Surface findings on adjacent code as `## Adjacent Surface Findings` in `04-security.md` separate from the diff findings."
-- **adversary** (pipeline mode, only when `security_sensitive: true` in `00-state.md` AND the dispatch table above says so for feature flow / bug_tier 3-4): feature name, list of files created/modified, summary of what was implemented, reference to `04-security.md` (the GO-seeking analysis it is independent from). Instruct: "You are in pipeline-adversary mode. Read `01-plan.md` (the reviewed design), the diff / changed files, and `04-security.md` (the GO-seeking analysis). Attack the design's worst-case downside per your mandate. Issue `broke-it | could-not-break`. A `could-not-break` on a changed control/security-relevant path sets `incomplete_on_changed_control: true` in your status block." Dispatch in the SAME parallel Task message as tester/qa/security — adversary runs concurrently with security, wall-clock bounded by the slower of the two.
+- **security** (pipeline mode, only when the dispatch table above says so): feature name, list of files created/modified, summary of what was implemented, reference to `00-knowledge-context.md` if it exists. Instruct: "This is pipeline mode — focus on the changed files and their security implications." For `bug_tier: 4`: additionally instruct: "Extended analysis. Read `01-root-cause.md ## Prior Art` and cross-reference any prior `process-insight` nodes describing similar failure modes. Analyse the adjacent code paths beyond the diff (one hop out in the call graph) for related vulnerability classes. Surface findings on adjacent code as `## Adjacent Surface Findings` in `reviews/04-security.md` separate from the diff findings."
+- **adversary** (pipeline mode, only when `security_sensitive: true` in `00-state.md` AND the dispatch table above says so for feature flow / bug_tier 3-4): feature name, list of files created/modified, summary of what was implemented, reference to `reviews/04-security.md` (the GO-seeking analysis it is independent from). Instruct: "You are in pipeline-adversary mode. Read `01-plan.md` (the reviewed design), the diff / changed files, and `reviews/04-security.md` (the GO-seeking analysis). Attack the design's worst-case downside per your mandate. Issue `broke-it | could-not-break`. A `could-not-break` on a changed control/security-relevant path sets `incomplete_on_changed_control: true` in your status block." Dispatch in the SAME parallel Task message as tester/qa/security — adversary runs concurrently with security, wall-clock bounded by the slower of the two.
 
 ### When frontend_scope: true — ux-reviewer validate (Phase 3.4)
 
@@ -2086,7 +2092,7 @@ Append a `phase.start` event before launching the parallel block:
 ```
 
 Add to the parallel Task launch (same message as tester/qa/security when `frontend_scope: true`):
-- **ux-reviewer** (validate mode): feature name, workspaces path, pointer to `02-implementation.md` and `01-ux-review.md` (if it exists from Phase 1.7), source code paths relevant to UI changes, plus the verification packet payload (`verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` + 10-line digest — same as the other Phase 3 verifiers, `docs/verification-packet.md § 3`). Output: `04-ux-validation.md`. Instruct: "Read `01-ux-review.md` for the UI/UX AC (from Stage 1 enrich). Read `02-implementation.md` to understand what was built. Validate each UI/UX criterion. Write `04-ux-validation.md` with per-finding verdicts including `findings.critical` count in your status block."
+- **ux-reviewer** (validate mode): feature name, workspaces path, pointer to `02-implementation.md` and `reviews/01-ux-review.md` (if it exists from Phase 1.7), source code paths relevant to UI changes, plus the verification packet payload (`verification packet: {docs_root}/00-verify-packet.md (version {N}, tree anchor {sha})` + 10-line digest — same as the other Phase 3 verifiers, `docs/verification-packet.md § 3`). Output: `reviews/04-ux-validation.md`. Instruct: "Read `reviews/01-ux-review.md` for the UI/UX AC (from Stage 1 enrich). Read `02-implementation.md` to understand what was built. Validate each UI/UX criterion. Write `reviews/04-ux-validation.md` with per-finding verdicts including `findings.critical` count in your status block."
 
 Append a `phase.end` event after the ux-reviewer status block is received:
 ```json
@@ -2107,7 +2113,7 @@ adversary mapping:  could-not-break(benign) → pass,
 The orchestrator reads `incomplete_on_changed_control` from the adversary status block (not just `adversary_verdict`) when computing the roll-up. A `could-not-break` with `incomplete_on_changed_control: true` maps to `fail` (INCOMPLETE), NOT approval.
 
 - If `phase3_combined = pass` and all `status: success` → update `00-state.md`, proceed to Phase 4
-- If `phase3_combined = fail` or any `status: failed` → **ONLY THEN** read the failing agent's workspaces (`03-testing.md`, `04-validation.md`, `04-security.md`, and/or `04-adversary.md`) to understand what went wrong
+- If `phase3_combined = fail` or any `status: failed` → **ONLY THEN** read the failing agent's workspaces (`03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`, and/or `reviews/04-adversary.md`) to understand what went wrong
 
 **Do NOT read workspaces on happy path.** Trust the status blocks.
 
@@ -2125,7 +2131,7 @@ Next: delivery (or: iterating — implementer fixing N issues)
 
 **Rebuild the verification packet before re-running verifiers.** Every iteration re-dispatch is a packet-staleness trigger (`docs/verification-packet.md § 6`, trigger 1): after the producer (`implementer` or `architect`) applies its patch, rebuild `00-verify-packet.md` in place (increment `Packet version`) BEFORE dispatching the next round of `tester`/`qa`/`security`/`adversary`. This applies to every Case (A/B/C/D) and every blast radius below.
 
-**Read `workspaces/{feature-name}/failure-brief.md` ONLY.** Do NOT re-read `03-testing.md`, `04-validation.md`, or `04-security.md` in full — those files can be 5-15K tokens each and are already summarized in the brief. The failing agent (tester / qa / security) is responsible for appending its accionable summary to `failure-brief.md` as part of its Return Protocol when `status: failed`.
+**Read `workspaces/{feature-name}/failure-brief.md` ONLY.** Do NOT re-read `03-testing.md`, `reviews/04-validation.md`, or `reviews/04-security.md` in full — those files can be 5-15K tokens each and are already summarized in the brief. The failing agent (tester / qa / security) is responsible for appending its accionable summary to `failure-brief.md` as part of its Return Protocol when `status: failed`.
 
 `failure-brief.md` is the single source of truth for iteration routing. Each entry follows this format:
 
@@ -2227,19 +2233,19 @@ After Phase 3 succeeds and BEFORE invoking `delivery`, verify acceptance traceab
 **Additional gate for `type: fix` / `type: hotfix` Tier 2-4 — regression-still-passing:** Confirm `regression_test_path` (from `00-state.md`) shows PASS in `03-testing.md`, AND the named test from `02-regression-test.md` still exists in the suite without `skip`, `xfail`, or a comment removing it. If the regression test is absent or not passing → fail the gate and route back to tester (counts against the max-3 budget).
 
 1. **Read `workspaces/{feature-name}/01-plan.md`** (§ Task List, the AC block for this task) and count the total AC.
-2. **Read `workspaces/{feature-name}/04-validation.md`** (qa) and count `PASS` vs `FAIL` per AC.
+2. **Read `workspaces/{feature-name}/reviews/04-validation.md`** (qa) and count `PASS` vs `FAIL` per AC.
 3. **Read `workspaces/{feature-name}/03-testing.md`** AC Coverage table and verify every AC has at least one test marked PASS.
-4. **If `04-security.md` exists**, confirm there are no Critical/High findings unresolved.
+4. **If `reviews/04-security.md` exists**, confirm there are no Critical/High findings unresolved.
 
 ### UX gate — frontend_scope: true
 
 **When to run:** only when `frontend_scope: true` in `00-state.md`. Skip when `frontend_scope: false`.
 
-5. **If `frontend_scope: true`**, read `workspaces/{feature-name}/04-ux-validation.md`:
+5. **If `frontend_scope: true`**, read `workspaces/{feature-name}/reviews/04-ux-validation.md`:
    - Count `findings.critical` (WCAG A violations — these are the only blocking severity).
-   - If any `critical` findings are present → **fail the gate** (Case A): route back to the implementer with the list of critical findings from `04-ux-validation.md`. Increment the iteration counter (subject to the max-3 limit from Phase 3).
+   - If any `critical` findings are present → **fail the gate** (Case A): route back to the implementer with the list of critical findings from `reviews/04-ux-validation.md`. Increment the iteration counter (subject to the max-3 limit from Phase 3).
    - `high`, `medium`, and `suggestion` findings do **not** block delivery — include them in the acceptance gate summary as recommendations only.
-   - If `04-ux-validation.md` is absent (ux-reviewer failed or was skipped) → log a warning and proceed (non-blocking when the file is absent; the gate only blocks on present critical findings).
+   - If `reviews/04-ux-validation.md` is absent (ux-reviewer failed or was skipped) → log a warning and proceed (non-blocking when the file is absent; the gate only blocks on present critical findings).
 
 6. **Regression-still-passing check (type: fix / hotfix, Tier 2-4 only).** When `type` is `fix` or `hotfix` and `bug_tier` is 2, 3, or 4:
    - Read `workspaces/{feature-name}/03-testing.md` and confirm `regression_test_path` (from `00-state.md`) is listed with status PASS.
@@ -2329,7 +2335,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
    b. Re-dispatch the implementer with the failure output: "Build verification failed. Command `{cmd}` returned exit code {N}. Output: {stderr/stdout}. Fix the build/lint error and confirm the fix."
    c. After the implementer returns, re-run the build/lint commands (1 retry).
    d. If the retry also fails: set `status: blocked` in `00-state.md`, escalate to the operator with the full failure output.
-   e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Phase 3.6 "Concurrent dispatch with Build Verification") — re-run the acceptance-checker only if `01-plan.md` or `04-validation.md` changed since the drift verdict; a build/lint fix alone normally touches neither, so the existing drift verdict stands.
+   e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Phase 3.6 "Concurrent dispatch with Build Verification") — re-run the acceptance-checker only if `01-plan.md` or `reviews/04-validation.md` changed since the drift verdict; a build/lint fix alone normally touches neither, so the existing drift verdict stands.
 
 **Iteration budget:** max 2 attempts total (1 original + 1 retry after implementer fix). This is separate from the Phase 3 iteration budget.
 
@@ -2363,19 +2369,19 @@ Routing to implementer to fix build
 
 **Concurrent dispatch with Build Verification.** After Phase 3.5 passes, issue the acceptance-checker `Task` call and the Phase 3.75 build/lint `Bash` calls IN THE SAME MESSAGE — independent tool calls, dispatched together rather than one after the other. Gate evaluation waits for both results before proceeding to STAGE-GATE-2 / Phase 4. This overlaps the acceptance-checker's drift audit with build verification instead of running it after 3.75 completes, shrinking the serial tail from 3.5 → 3.75 → 3.6 to 3.5 → (3.75 ∥ 3.6).
 
-**Conditional re-run after a 3.75 failure.** If Phase 3.75 fails and the implementer patches the build/lint error, re-run the acceptance-checker (3.6) ONLY if `01-plan.md` or `04-validation.md` changed since the drift verdict was produced — a build/lint fix alone normally touches neither. Check cheaply via file mtime or `git status` on those two paths; when neither changed, the existing drift verdict stands and Phase 3.6 is not re-dispatched.
+**Conditional re-run after a 3.75 failure.** If Phase 3.75 fails and the implementer patches the build/lint error, re-run the acceptance-checker (3.6) ONLY if `01-plan.md` or `reviews/04-validation.md` changed since the drift verdict was produced — a build/lint fix alone normally touches neither. Check cheaply via file mtime or `git status` on those two paths; when neither changed, the existing drift verdict stands and Phase 3.6 is not re-dispatched.
 
-**This is the third line of defense — drift-only, trusting `qa`'s verdict:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, the formalized original description and AC as approved at STAGE-GATE-1) and the current `§ Task List` AC. It answers ONE question: does what was approved still match what is being delivered? The acceptance-checker does NOT re-validate AC satisfaction — `qa`'s Phase 3 verdict (`04-validation.md § AC Coverage Results`) is trusted input for that. This removes the time-shifted duplication of a fact `qa` already checked.
+**This is the third line of defense — drift-only, trusting `qa`'s verdict:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, the formalized original description and AC as approved at STAGE-GATE-1) and the current `§ Task List` AC. It answers ONE question: does what was approved still match what is being delivered? The acceptance-checker does NOT re-validate AC satisfaction — `qa`'s Phase 3 verdict (`reviews/04-validation.md § AC Coverage Results`) is trusted input for that. This removes the time-shifted duplication of a fact `qa` already checked.
 
-**VERIFY — single enforcement point for Critical/High security findings.** After this narrowing, the Phase 3.5 Acceptance Gate (§ Phase 3.5 above, step 4) is the SOLE blocker for unresolved Critical/High security findings before delivery — Phase 3.6 no longer re-reads `04-security.md` for that purpose. This section neither weakens nor duplicates the Phase 3.5 gate text; it relies on it standing unchanged.
+**VERIFY — single enforcement point for Critical/High security findings.** After this narrowing, the Phase 3.5 Acceptance Gate (§ Phase 3.5 above, step 4) is the SOLE blocker for unresolved Critical/High security findings before delivery — Phase 3.6 no longer re-reads `reviews/04-security.md` for that purpose. This section neither weakens nor duplicates the Phase 3.5 gate text; it relies on it standing unchanged.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces
 - workspaces path: {resolved_workspaces_path}
 - Pointer to `01-plan.md` (§ Review Summary — original description + approved AC — AND § Task List — current AC)
-- Pointer to `04-validation.md` (§ AC Coverage Results — `qa`'s per-AC verdict, trusted input)
+- Pointer to `reviews/04-validation.md` (§ AC Coverage Results — `qa`'s per-AC verdict, trusted input)
 - Pointer to `02-implementation.md`, §-scoped to its summary, files-changed table, and `Deviations from Architecture` section — the description-vs-delivered grounding read (never the full document)
-- Depth-on-demand escape-hatch pointers ONLY (opened per-delta, not by default): `03-testing.md`, `04-security.md` (if it exists), and `04-ux-validation.md` (if `frontend_scope: true` and it exists)
+- Depth-on-demand escape-hatch pointers ONLY (opened per-delta, not by default): `03-testing.md`, `reviews/04-security.md` (if it exists), and `reviews/04-ux-validation.md` (if `frontend_scope: true` and it exists)
 
 The acceptance-checker is NOT a verification-packet consumer — its three sources above are authoritative and read directly; no `00-verify-packet.md` pointer is sent.
 
@@ -2386,7 +2392,7 @@ Instruct: "Drift-only mandate — compare `01-plan.md § Review Summary` (approv
 | `status` | `verdict` | Action |
 |---|---|---|
 | `success` | `pass` | Proceed to Phase 4 (Delivery). |
-| `success` | `concerns` | Read `04-validation.md § Drift Analysis`. Report concerns to user with one line each. Default action: proceed to Phase 4 unless user says iterate. **Never block silently** — concerns must be visible. |
+| `success` | `concerns` | Read `reviews/04-validation.md § Drift Analysis`. Report concerns to user with one line each. Default action: proceed to Phase 4 unless user says iterate. **Never block silently** — concerns must be visible. |
 | `success` | `fail` | Do NOT proceed. Read the brief, classify (Case A/B/C/D), append to `failure-brief.md`, route back to implementer (or architect for B). Re-run Phase 3 + 3.5 + 3.6 after the fix. |
 | `failed` | (any) | Audit itself broke. Read the issue, retry once. If still failing, log warning and proceed to Phase 4 (acceptance-checker is non-binding by design — its absence does not block delivery). |
 | `blocked` | (any) | Missing input. Read issues, fix, retry. |
@@ -2396,7 +2402,7 @@ Instruct: "Drift-only mandate — compare `01-plan.md § Review Summary` (approv
 **Report to user:**
 ```
 Acceptance check — verdict: {pass|concerns|fail}
-  acceptance-checker | Output: 04-validation.md § Drift Analysis
+  acceptance-checker | Output: reviews/04-validation.md § Drift Analysis
   {summary from status block}
 Next: {delivery | iterate | escalate}
 ```
@@ -2630,7 +2636,7 @@ Run the A/B convergence loop exactly per `agents/ref-direct-modes.md § Dual-Rev
 
 - **Agent per pass:** `reviewer` (mode: `internal`) — the same agent that runs in the single-pass path above.
 - **Context isolation:** Pass A and Pass B each receive the same pre-fetched diff, changed-files list, and PR metadata for the current round. The two passes run concurrently and never read each other's draft — context-isolation between the two passes is mandatory. Each pass receives only the original diff/metadata from the current round; no prior-round artifacts are forwarded.
-- **Per-pass draft paths:** Pass A writes `04-internal-review-A.md` in the workspace; Pass B writes `04-internal-review-B.md`. These are disjoint from the single-pass `04-internal-review.md`.
+- **Per-pass draft paths:** Pass A writes `reviews/04-internal-review-A.md` in the workspace; Pass B writes `reviews/04-internal-review-B.md`. These are disjoint from the single-pass `reviews/04-internal-review.md`.
 - **Pre-gate positioning:** The loop runs strictly BEFORE STAGE-GATE-3. It never calls a GitHub write verb (`gh pr review`, `POST /reviews`, or any equivalent). Writing to GitHub remains the exclusive responsibility of the Publish Gate after operator approval at STAGE-GATE-3.
 - **Comparator — three branches:**
   1. Both passes emit `APPROVE` → verdict is `CONVERGED_APPROVE`. Proceed to the `**Report to user:**` block and then STAGE-GATE-3.
@@ -2645,7 +2651,7 @@ Run the A/B convergence loop exactly per `agents/ref-direct-modes.md § Dual-Rev
 
 ```
 Internal review complete — {N} criticals, {M} suggestions, {K} nitpicks
-  reviewer (mode: internal) | Output: 04-internal-review.md
+  reviewer (mode: internal) | Output: reviews/04-internal-review.md
   Summary: {one-paragraph summary from status block, verbatim}
   {if criticals_count > 0:}
   Top issues to look at:
@@ -2654,7 +2660,7 @@ Internal review complete — {N} criticals, {M} suggestions, {K} nitpicks
 Next: GitHub update
 ```
 
-The orchestrator passes `04-internal-review.md` content to `delivery` for optional inclusion in the PR description (under a "Pre-PR Review" section in the body) — `delivery` already has the PR open at this point and can update the body via `gh pr edit`.
+The orchestrator passes `reviews/04-internal-review.md` content to `delivery` for optional inclusion in the PR description (under a "Pre-PR Review" section in the body) — `delivery` already has the PR open at this point and can update the body via `gh pr edit`.
 
 **Rewrite TL;DR** (row 18 of §5.2): `Now`: "STAGE-GATE-3 about to emit." `Last`: "Phase 4.5 internal-review — {C}C / {S}S / {N}N." `Next`: "Waiting for human ship/amend/abort." `Open issues`: criticals if any.
 
@@ -2742,7 +2748,7 @@ fi
 
 **Owner:** You (orchestrator) — the GitHub steps (1–3) only run if the task originated from a GitHub issue. If not from GitHub, skip the GitHub steps. The ClickUp closing step (4) runs whenever the task originated from a ClickUp task, independent of GitHub. If the task came from neither, skip to Phase 6.
 
-1. **Comment on the issue** with: branch, commit, version, files changed, test results, **every AC individually with pass/fail status** (read `04-validation.md` for this — never summarize as "15/15 passed"), and QA notes/warnings.
+1. **Comment on the issue** with: branch, commit, version, files changed, test results, **every AC individually with pass/fail status** (read `reviews/04-validation.md` for this — never summarize as "15/15 passed"), and QA notes/warnings.
    **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — comment on an issue". When `has_gh=true`, use `gh issue comment`. When `has_gh=false`, use the curl POST fallback if a token + GitHub origin are available; else write the comment body to `workspaces/{feature}/inputs/issue-comment.md` and instruct the operator to paste it.
 
 2. **Move to "In Review"** on the project board.
@@ -3710,7 +3716,7 @@ All numbers come from `{docs_root}/{events_file}` — never re-invent them by wa
 - Iterations → count of `iteration.start` events.
 - AC pass/total → from the latest `gate.pass`/`gate.fail` at `3.5-acceptance-gate` (read its `summary` and the `pipeline.end.extra`).
 - Tool counts → aggregate of `tools` sub-objects on `phase.end` events.
-- **Verification Packet section** → aggregate `tools.packet` from each Phase 3 / 3.4 verifier's `phase.end` event for the fresh-vs-stale telemetry read; the per-run dispatch denominator (`docs/verification-packet.md § 8`) comes from the workspace verdict docs (`03-testing.md` run-only section, `04-validation.md`, `04-security.md`, `04-adversary.md`, `04-ux-validation.md` — one dispatch per verifier per iteration verdict entry), never from `phase.end` events; `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/`subagent.stop` pairs filtered by verifier `agent_type`) are consumed as upward-only enrichment only — a breadcrumb-evidenced dispatch with no matching verdict entry is ADDED to the denominator as telemetry-missing, and breadcrumb absence never shrinks the count; the dispatch floor has exactly one derivation — the should-have verifier set from `00-state.md` scope flags (`tester` run-only + `qa` unconditionally; + `security` and `adversary` iff `security_sensitive: true`; + `ux-reviewer` validate iff `frontend_scope: true`), never from `§ Agent Results`; a run whose counted denominator (verdict-doc entries + breadcrumb-only additions) falls below its floor, or whose scope flags are unreadable, renders the line `UNMEASURABLE` — never parity — so N=0 never reads as parity; classify each dispatch into the three mutually exclusive buckets (accepted-with-evidence, fallback-with-evidence, telemetry-missing), with a `backfilled: true` or absent `tools.packet` counted as telemetry-missing / fallback-signal, never as acceptance; compare catch rates read from the workspace verdict docs (`04-security.md` findings by severity, `04-validation.md § AC Coverage Results` and `§ Drift Analysis`) against the June 2026 baseline referenced there.
+- **Verification Packet section** → aggregate `tools.packet` from each Phase 3 / 3.4 verifier's `phase.end` event for the fresh-vs-stale telemetry read; the per-run dispatch denominator (`docs/verification-packet.md § 8`) comes from the workspace verdict docs (`03-testing.md` run-only section, `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/04-adversary.md`, `reviews/04-ux-validation.md` — one dispatch per verifier per iteration verdict entry), never from `phase.end` events; `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/`subagent.stop` pairs filtered by verifier `agent_type`) are consumed as upward-only enrichment only — a breadcrumb-evidenced dispatch with no matching verdict entry is ADDED to the denominator as telemetry-missing, and breadcrumb absence never shrinks the count; the dispatch floor has exactly one derivation — the should-have verifier set from `00-state.md` scope flags (`tester` run-only + `qa` unconditionally; + `security` and `adversary` iff `security_sensitive: true`; + `ux-reviewer` validate iff `frontend_scope: true`), never from `§ Agent Results`; a run whose counted denominator (verdict-doc entries + breadcrumb-only additions) falls below its floor, or whose scope flags are unreadable, renders the line `UNMEASURABLE` — never parity — so N=0 never reads as parity; classify each dispatch into the three mutually exclusive buckets (accepted-with-evidence, fallback-with-evidence, telemetry-missing), with a `backfilled: true` or absent `tools.packet` counted as telemetry-missing / fallback-signal, never as acceptance; compare catch rates read from the workspace verdict docs (`reviews/04-security.md` findings by severity, `reviews/04-validation.md § AC Coverage Results` and `§ Drift Analysis`) against the June 2026 baseline referenced there.
 - Files / lines changed → from `git diff main...HEAD --stat` at delivery time; "—" before Phase 4.
 - **Cost and token counts** → sum `tokens` from all `phase.end` events; multiply by price from `pricing` key in `~/.claude/.team-harness.json`; degrade to tokens-only when the key is absent. Both the per-agent table and the per-phase table rewrite in full at each phase transition. Marked `(~)` when any contributing event carries `tokens_estimated: true`. See `docs/observability.md § "Cost rollup"` for the full derivation algorithm.
 
@@ -4417,23 +4423,23 @@ When invoked with a `Direct Mode Task` (from a skill), execute only the specifie
 | Mode | Agent | Prerequisites | Flow |
 |------|-------|--------------|------|
 | learn | `mentor` | none | answer in chat with short inline diagrams (conversational-first; no document by default); dispatch `mentor` leaf ONLY for the optional end-of-session pack or genuinely deep background research; multi-turn drill-downs re-dispatch mentor as needed (see `ref-special-flows.md` § Learn (Teaching) Flow) |
-| research | `architect` (research mode) | none | create workspaces → set `research_round: 1` in `00-state.md § Current State` → fan-out `researcher` lanes → invoke `research-consolidator` → invoke `architect` → evaluate gap gate → run bounded gap-closure loop per `ref-special-flows.md § Research Flow` Step 9 → present `00-research.md` |
-| research-code | `code-researcher` (sonnet, read-only) + optional `researcher` (haiku) + `research-consolidator` + `architect` | none | create workspaces → set `research_round: 1` in `00-state.md § Current State` → decompose question into non-overlapping code lanes via the three-strategy ladder (subsystem / concern / question-facet) → optionally compose ≤2 web lanes → fan-out all lanes in parallel (fail-open) → invoke `research-consolidator` (merges code + web evidence, produces `## Code vs Docs Conflicts`) → invoke `architect` → evaluate extended gap gate (`material AND (web_closeable OR code_closeable)`) → run bounded gap-closure loop per `ref-special-flows.md § Research-Code Flow` → present `00-research.md` |
+| research | `architect` (research mode) | none | create workspaces → set `research_round: 1` in `00-state.md § Current State` → fan-out `researcher` lanes → invoke `research-consolidator` → invoke `architect` → evaluate gap gate → run bounded gap-closure loop per `ref-special-flows.md § Research Flow` Step 9 → present `research/00-research.md` |
+| research-code | `code-researcher` (sonnet, read-only) + optional `researcher` (haiku) + `research-consolidator` + `architect` | none | create workspaces → set `research_round: 1` in `00-state.md § Current State` → decompose question into non-overlapping code lanes via the three-strategy ladder (subsystem / concern / question-facet) → optionally compose ≤2 web lanes → fan-out all lanes in parallel (fail-open) → invoke `research-consolidator` (merges code + web evidence, produces `## Code vs Docs Conflicts`) → invoke `architect` → evaluate extended gap gate (`material AND (web_closeable OR code_closeable)`) → run bounded gap-closure loop per `ref-special-flows.md § Research-Code Flow` → present `research/00-research.md` |
 | review | `reviewer` (data-provided), or N parallel focused reviewers + `reviewer-consolidator` (when `Multi-Reviewer: true`) | PR data from skill | single: invoke reviewer → build draft → return; multi: parallel reviewer dispatches per focus → consolidator → return to skill. **Read-only guard:** capture working-tree state (`git status --untracked-files=all` + `git diff HEAD`) before invoking the reviewer and re-verify on completion; if the tree differs outside `.claude/pr-review-*`, surface detected changes as a defect. See `ref-direct-modes.md` § Read-Only Working-Tree Guard for the five-layer guard: Layers 1-3 (no-dispatch of implementer, deny-tools via system-prompt prohibition in reviewer/consolidator, tree-verify); **Layer 4** (mode-transition gate — corrective language NEVER auto-routes, requires explicit confirmation); **Layer 5** (branch-author guard — fail-closed if author-of-PR or operator identity is indeterminate). **Publish gate:** before ANY `gh pr review`/`POST reviews`, `PUT reviews/:id`, reply, or dismiss verb, present the full draft to the operator and wait for explicit approval (`ref-direct-modes.md § Publish Gate`); `--auto-publish` opt-in skips the preview. **`review_context` state:** write `review_context: { pr: {N}, status: in-progress, author: {login} }` to `00-state.md` when entering review mode; clear it on a confirmed mode-transition or session close. |
 | init | `init` | none | invoke → report generated files |
 | design | `architect` (design mode) | none | intake + specify → invoke → present `01-plan.md` |
 | test | `tester` | `02-implementation.md` + `01-plan.md` § Task List (AC) | check AC exist → pass AC to tester → invoke → report. If no AC, warn user. **Only for testing a single feature's changes against AC.** **`frontend_scope` bridge:** if the payload carries `frontend_scope: true`, (a) persist `frontend_scope: true` to `workspaces/{feature}/00-state.md § Current State` (create the state file if it does not yet exist, otherwise update the field in-place); (b) pass `frontend_scope: true` in the tester invocation payload with the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom." The tester runs in authoring-equivalent mode: TESTING.md (R4) and decision-log obligations apply. See `ref-direct-modes.md § Test Mode` for the full field contract. |
 | validate | `qa` (validate mode) | `01-plan.md` § Task List + implementation | check AC exist. If missing → tell user to run `/th:define-ac` first. Do NOT invoke without AC. |
-| deliver | `delivery` | implementation + tests + validation | verify `02-implementation.md`, `03-testing.md`, AND `04-validation.md` exist. If any missing → tell user. After `delivery` completes its internal work (branch, commits, changelog), run Phase 4.5 (internal review) and then emit STAGE-GATE-3 BEFORE any `git push` or `gh pr create`. The safe default for direct deliver is to emit the gate — it does NOT ship immediately. This mirrors the Stage 3 close of the full pipeline. |
+| deliver | `delivery` | implementation + tests + validation | verify `02-implementation.md`, `03-testing.md`, AND `reviews/04-validation.md` exist. If any missing → tell user. After `delivery` completes its internal work (branch, commits, changelog), run Phase 4.5 (internal review) and then emit STAGE-GATE-3 BEFORE any `git push` or `gh pr create`. The safe default for direct deliver is to emit the gate — it does NOT ship immediately. This mirrors the Stage 3 close of the full pipeline. |
 | define-ac | `qa-plan` (define-ac mode) | none | invoke → present `00-acceptance-criteria.md` |
-| security | `security` | none (audit) or feature context (pipeline) | create workspaces → invoke → present `04-security.md` |
+| security | `security` | none (audit) or feature context (pipeline) | create workspaces → invoke → present `reviews/04-security.md` |
 | diagram | `architect` (research) → `diagrammer` | none | see `ref-direct-modes.md` § Diagram Mode |
 | likec4-diagram | `architect` (research) → `likec4-diagrammer` | none | see `ref-direct-modes.md` § LikeC4 Diagram Mode |
 | d2-diagram | `architect` (research) → `d2-diagrammer` | none | see `ref-direct-modes.md` § D2 Diagram Mode |
 | recover | you (orchestrator) | `00-state.md` from `/th:recover` skill | read recovery context → resume pipeline from last checkpoint |
 | recover-batch | you (orchestrator) | `batch-progress.md` from `/th:recover --batch` | re-launch worktrees for RUNNING/FAILED tasks |
 | spike | `implementer` | none | see `ref-special-flows.md` § Spike Flow |
-| audit | `architect` (audit mode) | none | create workspaces → invoke → present `00-audit.md` |
+| audit | `architect` (audit mode) | none | create workspaces → invoke → present `research/00-audit.md` |
 | test-pipeline | multi-agent (`tester`) | source code | see `ref-special-flows.md` § Test Pipeline Flow |
 | translate | `translator` | none | see `ref-direct-modes.md` § Translate Mode |
 | docs | `architect` (research) → `documenter` → `diagrammer` (conditional) → `qa` | none | see `ref-special-flows.md` § Documentation Flow |

@@ -131,7 +131,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
 
 - **Trigger:** orchestrator invokes with `mode: reconcile`
 - **Flow:** Phase 0 (read plan + architecture + implementation) → Per-AC reconciliation decisions → return verdict
-- **Output:** brief append to `workspaces/{feature-name}/04-validation.md` under `## Reconciliation Decisions (Phase 2.5)` — do NOT create a new file.
+- **Output:** brief append to `workspaces/{feature-name}/reviews/04-validation.md` under `## Reconciliation Decisions (Phase 2.5)` — do NOT create a new file.
 
 **Process:**
 
@@ -143,7 +143,7 @@ Used between Phase 2 (Implementation) and Phase 3 (Verify) when the implementer 
    - **(c) drop** — the original promise is no longer feasible with the discovered constraint. The user must be informed before the pipeline continues. Provide a one-line justification grounded in the Original Description.
 4. **Do NOT** validate code (Phase 3 will do that). **Do NOT** modify `01-plan.md` or any AC. Your output is decisions, not edits.
 
-**Append to `04-validation.md`:**
+**Append to `reviews/04-validation.md`:**
 
 ```markdown
 ## Reconciliation Decisions (Phase 2.5)
@@ -165,7 +165,7 @@ status: success | failed | blocked
 model: {effective-model-id}
 mode: reconcile
 verdict: clean | amendments | drops
-output: workspaces/{feature-name}/04-validation.md (Reconciliation Decisions section)
+output: workspaces/{feature-name}/reviews/04-validation.md (Reconciliation Decisions section)
 summary: {N} kept, {N} amended, {N} dropped
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
@@ -200,7 +200,7 @@ In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **subs
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
    - `01-plan.md` — the plan being ratified: AC list, Work Plan steps, and `## Plan Review` section
    - `00-acceptance-criteria.md` — standalone AC definition (define-ac mode only)
-   - `04-validation.md` — prior reconciliation decisions (reconcile mode only)
+   - `reviews/04-validation.md` — prior reconciliation decisions (reconcile mode only)
    - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
    If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
@@ -322,7 +322,7 @@ In **define-ac mode**, write to `workspaces/{feature-name}/00-acceptance-criteri
 
 In **ratify-plan mode**, append `## Plan Ratification (Phase 1.5)` to `workspaces/{feature-name}/01-plan.md`.
 
-In **reconcile mode**, append `## Reconciliation Decisions (Phase 2.5)` to `workspaces/{feature-name}/04-validation.md`.
+In **reconcile mode**, append `## Reconciliation Decisions (Phase 2.5)` to `workspaces/{feature-name}/reviews/04-validation.md`.
 
 ---
 

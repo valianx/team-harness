@@ -87,7 +87,7 @@ This invariant covers all instruction sites: the atomic-submission note (the ski
 
 **NEVER use Edit or Write on source files in the working tree.** This agent's frontmatter grants `Edit` and `Write` tools; those grants exist for legitimate workspace writes only. The only permitted writes are:
 
-- `workspaces/{feature-name}/04-review.md` — the review summary workspace doc.
+- `workspaces/{feature-name}/reviews/04-review.md` — the review summary workspace doc.
 
 Any use of Edit or Write on any other path — source files, configuration files, build artifacts, or any working-tree file outside the `workspaces/` prefix — is a contract violation. If the review reveals that a source file must change, that finding goes into the review body as a requested change; the reviewer NEVER applies the change itself.
 
@@ -162,7 +162,7 @@ Do not force-remove a dirty worktree without operator instruction.
 
 3. **Read the triggered sketch files (required reading when a workspace exists)** — if a workspace is found in step 1, read every `sketches/*.md` file present in it before reviewing the diff. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). When reviewing the diff, confirm the changed surface matches the sketch contracts. Flag a delivered surface that silently diverges from the api-contract or service-interaction sketch as a sketch-contract-divergence finding in the review body (under the findings section of the review body, in Spanish per the ALL-Spanish review body rule).
 
-4. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your review summary (`04-review.md`). Use the PR branch name as feature name (kebab-case). Ensure `.gitignore` includes `/workspaces`.
+4. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your review summary (`reviews/04-review.md`). Use the PR branch name as feature name (kebab-case). Ensure `.gitignore` includes `/workspaces`.
 
 ---
 
@@ -260,7 +260,7 @@ Used by the orchestrator immediately after Phase 4 (Delivery) and before Phase 5
   - **Skip when diff is trivial.** If the orchestrator says the diff is `<50 lines` or `≤2 files`, the orchestrator skips this mode entirely — there's nothing meaningful to summarize.
   - **Inline diff truncation bound (upper cap: 1500 lines).** The orchestrator passes the pre-fetched diff inline. If the diff exceeds 1500 lines, the orchestrator truncates it at 1500 lines and appends a marker: `[diff truncated at 1500 lines — full diff available in the PR]`. The reviewer parses the truncated diff as-is; the full diff is accessible via the Read tool on changed files. A truncated diff does NOT reduce the line cap for the skip-when-trivial check — `<50 lines` refers to the original diff size, not the truncated payload.
 
-The orchestrator writes the output to `workspaces/{feature-name}/04-internal-review.md` and embeds the `summary` and `criticals_count` in the report to the user.
+The orchestrator writes the output to `workspaces/{feature-name}/reviews/04-internal-review.md` and embeds the `summary` and `criticals_count` in the report to the user.
 
 For the first three modes, the orchestrator writes output to draft files. The skill handles user approval and publishing via the appropriate GitHub API call. For Internal Review, the orchestrator writes the local file and surfaces a one-line digest to the user — never publishing.
 
@@ -623,7 +623,7 @@ The reviewer does NOT publish the review. It returns the `review_body` inline in
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
-Write your review summary to `workspaces/{feature-name}/04-review.md`:
+Write your review summary to `workspaces/{feature-name}/reviews/04-review.md`:
 
 ```markdown
 # Review: PR #{number}
@@ -761,7 +761,7 @@ agent: reviewer
 status: success | failed | blocked
 model: {effective-model-id}
 mode: internal
-output: workspaces/{feature-name}/04-internal-review.md
+output: workspaces/{feature-name}/reviews/04-internal-review.md
 summary: |
   {one paragraph: overall assessment, riskiest area, anything the human reviewer should look at first}
 criticals_count: {N}

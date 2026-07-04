@@ -41,7 +41,7 @@ silently.
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
 | **Test artifact** | Phase 2.7 suite result, tests added, AC→test map; `regression_test_path` + status for the bug-fix flow | `03-testing.md` (authoring section) |
-| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `04-security.md` (when later written), `01-root-cause.md` (fix flow), `sketches/*.md` | — the depth-on-demand escape hatch (§4) |
+| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-security.md` (when later written), `01-root-cause.md` (fix flow), `sketches/*.md` | — the depth-on-demand escape hatch (§4) |
 
 ### No AC section
 
@@ -94,7 +94,7 @@ regression_test_path: {path or "n/a"}
 - 01-plan.md
 - 02-implementation.md
 - 03-testing.md
-- 04-security.md (when written)
+- reviews/04-security.md (when written)
 - 01-root-cause.md (fix flow only)
 - sketches/*.md (if present)
 ```
@@ -195,8 +195,8 @@ explicitly per agent so the floor is auditable, not implied:
 | `security` | Phase 1 discovery scan AND reads of the changed SOURCE FILES themselves — the scan target is code, not the packet |
 | `qa` | Source-code reads for file:line AC evidence; the mandatory sketch reads (`qa.md` Phase 0 step 3) |
 | `tester` (run-only) | Suite execution; `02-regression-test.md` (fix flow) |
-| `adversary` | `04-security.md` — its zero-overlap, GO-seeking-vs-break-seeking contract stays a mandatory independent read |
-| `ux-reviewer` (validate) | `01-ux-review.md` — the Stage-1 UI/UX AC baseline stays a mandatory read |
+| `adversary` | `reviews/04-security.md` — its zero-overlap, GO-seeking-vs-break-seeking contract stays a mandatory independent read |
+| `ux-reviewer` (validate) | `reviews/01-ux-review.md` — the Stage-1 UI/UX AC baseline stays a mandatory read |
 
 ---
 
@@ -250,8 +250,8 @@ multi-run window, no window-close step, and no automatic trigger of any kind.
 
 **Denominator — verdict-doc-derived, not breadcrumb- or `phase.end`-derived.** The
 verifier-dispatch count is read from the workspace verdict docs — one dispatch per verifier
-per iteration verdict entry: `03-testing.md` run-only section (tester), `04-validation.md`
-(qa), `04-security.md` (security), `04-adversary.md` (adversary), `04-ux-validation.md`
+per iteration verdict entry: `03-testing.md` run-only section (tester), `reviews/04-validation.md`
+(qa), `reviews/04-security.md` (security), `reviews/04-adversary.md` (adversary), `reviews/04-ux-validation.md`
 (ux-reviewer validate). `00-subagent-trace.jsonl` breadcrumbs (`subagent.start`/
 `subagent.stop` pairs filtered by verifier `agent_type`) demote to upward-only enrichment: a
 breadcrumb-evidenced dispatch with no matching verdict entry is **ADDED** to the denominator
@@ -287,9 +287,9 @@ counting it any other way would let emission loss impersonate packet acceptance.
 `agents/orchestrator.md § Pipeline Summary Protocol` — the `## Verification Packet`
 section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
 rates read from the workspace verdict documents, not from `phase.end` telemetry — security
-findings by severity from `04-security.md`, qa AC-fail rate from
-`04-validation.md § AC Coverage Results`, drift flags from
-`04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
+findings by severity from `reviews/04-security.md`, qa AC-fail rate from
+`reviews/04-validation.md § AC Coverage Results`, drift flags from
+`reviews/04-validation.md § Drift Analysis` — each compared against the June 2026 baseline recorded
 in the pipeline-validation research workspace (`02-june-empirical-analysis.md`, referenced
 by pointer — not duplicated here). These artifacts exist deterministically whenever the
 verifier ran.

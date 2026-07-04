@@ -44,6 +44,6 @@ name: security
 
 - Always invoke the `orchestrator` agent — do NOT invoke the `security` agent directly
 - The orchestrator will route to the `security` agent
-- Output: `workspaces/{feature-name}/04-security.md`
+- Output: `workspaces/{feature-name}/reviews/04-security.md`
 - The security agent performs static analysis using Glob, Grep, and Read — no Bash required
 - Report is written in Spanish with OWASP Top 10 2025 and CWE Top 25 2025 coverage

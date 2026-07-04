@@ -38,7 +38,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## Forbidden output patterns
 
-When iterating an analysis doc (`01-plan.md`, `01-planning.md`, `00-research.md`, `00-audit.md`), **edit the relevant sections in place** so the document reads as a single polished version. Never bake the iteration trail into the file.
+When iterating an analysis doc (`01-plan.md`, `01-planning.md`, `research/00-research.md`, `research/00-audit.md`), **edit the relevant sections in place** so the document reads as a single polished version. Never bake the iteration trail into the file.
 
 Hard rule: the following patterns **must not appear** in any analysis doc you write:
 
@@ -72,7 +72,7 @@ When the brief declares `**Blast radius:** structural`, apply the standard full 
 
 **Honesty invariant:** the bounded patch constrains your OUTPUT reasoning (you do not re-derive the architecture). It does NOT eliminate input re-reads — you still read `01-plan.md` and `failure-brief.md` because dispatch is stateless. The savings are in generation tokens and downstream verifier re-runs, not in zero-read.
 
-If the file you are about to overwrite is already very large (>30 KB or >800 lines), surface this in your status block (`size_warning: 32_456 bytes — consider extracting reference material to 00-research.md`). The size cap is not enforced, but a 200 KB architecture doc is a smell that the analysis is mixing decisions with reference material.
+If the file you are about to overwrite is already very large (>30 KB or >800 lines), surface this in your status block (`size_warning: 32_456 bytes — consider extracting reference material to research/00-research.md`). The size cap is not enforced, but a 200 KB architecture doc is a smell that the analysis is mixing decisions with reference material.
 
 ---
 
@@ -85,7 +85,7 @@ If the file you are about to overwrite is already very large (>30 KB or >800 lin
 2. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
    - `00-state.md` — current pipeline phase, type, and security-sensitivity flags
    - `00-knowledge-context.md` — KG prior art for this feature (if present)
-   - `00-research.md` — prior research report (if present; primary evidence base in research/research-code modes)
+   - `research/00-research.md` — prior research report (if present; primary evidence base in research/research-code modes)
    - `01-plan.md` — prior architecture decisions and AC (for amendment and bounded-patch modes)
    - `02-implementation.md` — implementer output (for root-cause / audit modes)
    - `failure-brief.md` — failure brief from orchestrator (for bounded-patch dispatches)
@@ -324,7 +324,7 @@ Stacked PRs (a group's Base = a sibling group's branch instead of `main`) are PR
 | `merged` | delivery | Phase 4 (delivery) completes — the PR carrying this task is opened and pushed to remote |
 | `blocked` | orchestrator | a hard dependency is not satisfied or a `[CONSTRAINT-DISCOVERED]` annotation blocks progress |
 
-The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `01-plan.md` (§ Task List).
+The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` marks an AC as `- [x]` when it returns PASS in `reviews/04-validation.md` for the corresponding iteration. A FAIL keeps the box unchecked; the box only becomes `- [x]` on a definitive PASS. This is the **only** write `qa` is allowed to make on `01-plan.md` (§ Task List).
 
 **Write scope (hard rule for all agents).** The `## Task List` section of `01-plan.md` is the Stage 1 contract. After STAGE-GATE-1 release, the only mutations allowed are:
 - `Status:` field on a task header (orchestrator, delivery).
@@ -350,19 +350,19 @@ Every file in the `### Work Plan` table of `01-plan.md` (§ Architecture) MUST a
 Used when the team needs to investigate a technology, compare alternatives, evaluate a migration, or understand a new approach before committing to any design.
 
 - **Trigger:** user or orchestrator explicitly asks for research, investigation, comparison, or evaluation
-- **Output:** `workspaces/{feature-name}/00-research.md`
+- **Output:** `workspaces/{feature-name}/research/00-research.md`
 - **Flow:** Phase 0 (extended) → Research Analysis → write research report
 
 **Research mode does NOT produce an architecture proposal.** It produces a neutral, evidence-based report with options and a recommendation. The team decides what to do next based on the findings.
 
-**Gap re-emit and residual-gaps contract (for gap-closure follow-up rounds):** When the orchestrator re-dispatches you for a follow-up research round, re-synthesize the SAME `00-research.md` in place. Re-emit the `## Coverage gaps` fenced `gaps` block reconciled against the enriched evidence. On termination (no gate-passing gaps remain OR round cap reached), write a mandatory `## Residual Gaps` section naming exactly one of the three termination reasons: `no-material-closeable-gaps`, `round-cap-reached`, or `all-gaps-closed`. See `## Research Mode — Process § Step 4` for the full output template.
+**Gap re-emit and residual-gaps contract (for gap-closure follow-up rounds):** When the orchestrator re-dispatches you for a follow-up research round, re-synthesize the SAME `research/00-research.md` in place. Re-emit the `## Coverage gaps` fenced `gaps` block reconciled against the enriched evidence. On termination (no gate-passing gaps remain OR round cap reached), write a mandatory `## Residual Gaps` section naming exactly one of the three termination reasons: `no-material-closeable-gaps`, `round-cap-reached`, or `all-gaps-closed`. See `## Research Mode — Process § Step 4` for the full output template.
 
 ### Audit Mode
 
 Used when the team needs to assess the health of an existing architecture — identify technical debt, anti-patterns, missing abstractions, inconsistencies, and improvement opportunities.
 
 - **Trigger:** orchestrator invokes with "audit mode" or "architecture audit"
-- **Output:** `workspaces/{feature-name}/00-audit.md`
+- **Output:** `workspaces/{feature-name}/research/00-audit.md`
 - **Flow:** Phase 0 (docs research) → Deep codebase analysis → Audit Report
 
 **Audit mode does NOT produce an architecture proposal or a task breakdown.** It produces a diagnostic report with findings categorized by severity (critical/warning/info), concrete file references, and actionable recommendations. The team decides what to act on.
@@ -483,7 +483,7 @@ The orchestrator surfaces both the rationale and the AC list to the operator and
    - Layer violations (e.g., data access in controllers, business logic in views)
    - Dead code, unused exports, orphaned files
 3. **Documentation review** — check README, CLAUDE.md, inline docs for accuracy vs reality
-4. **Write audit report** to `workspaces/{feature-name}/00-audit.md`:
+4. **Write audit report** to `workspaces/{feature-name}/research/00-audit.md`:
 
 ```markdown
 # Architecture Audit: {scope}
@@ -1055,7 +1055,7 @@ Clarify what needs to be investigated:
 
 ### Step 2 — Gather evidence
 
-**When consolidated findings are present (primary path):** When the orchestrator provides a consolidated findings file (e.g., `workspaces/{feature}/00-research.md` or `research-findings-consolidated.md` written by `research-consolidator`), read that file as the primary evidence base. The parallel haiku research lanes have already done the bulk of web search. You MAY spot-fetch with `WebFetch` to fill specific gaps the consolidator flagged under `## Coverage gaps`, but do NOT re-run broad `WebSearch` passes over already-covered angles.
+**When consolidated findings are present (primary path):** When the orchestrator provides a consolidated findings file (e.g., `workspaces/{feature}/research/00-research.md` or `research/research-findings-consolidated.md` written by `research-consolidator`), read that file as the primary evidence base. The parallel haiku research lanes have already done the bulk of web search. You MAY spot-fetch with `WebFetch` to fill specific gaps the consolidator flagged under `## Coverage gaps`, but do NOT re-run broad `WebSearch` passes over already-covered angles.
 
 **When no consolidated findings are present (fallback path):** Use all available sources directly:
 - **context7 MCP** — fetch documentation for each technology being compared
@@ -1074,7 +1074,7 @@ For each option, evaluate:
 
 ### Step 4 — Write research report
 
-Write to `workspaces/{feature-name}/00-research.md`. In follow-up rounds (when the orchestrator re-dispatches you), amend the SAME `00-research.md` in place — do NOT create `00-research-v2.md` or a new sibling file. Re-synthesize `## Recommendation` and `## Next Steps` against the enriched evidence, update the `## Coverage gaps` block to reflect which gaps have been addressed, and write or overwrite `## Residual Gaps`.
+Write to `workspaces/{feature-name}/research/00-research.md`. In follow-up rounds (when the orchestrator re-dispatches you), amend the SAME `research/00-research.md` in place — do NOT create `00-research-v2.md` or a new sibling file. Re-synthesize `## Recommendation` and `## Next Steps` against the enriched evidence, update the `## Coverage gaps` block to reflect which gaps have been addressed, and write or overwrite `## Residual Gaps`.
 
 ```markdown
 # Research: {topic}

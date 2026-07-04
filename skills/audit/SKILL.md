@@ -51,5 +51,5 @@ name: audit
 
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly
 - The orchestrator will invoke the architect in audit mode
-- Output: `workspaces/{feature-name}/00-audit.md`
+- Output: `workspaces/{feature-name}/research/00-audit.md`
 - An audit reviews architecture health, not security (use `/th:security` for that)
