@@ -31552,6 +31552,14 @@ check(
 # suffix is ever emitted; the already-present pass-through (no gate, no
 # write) is documented at both Phase 0a sub-sites.
 #
+# 2026-07-04 security remediation (SEC-001/002/003, Phase 3 review): also
+# pins the resolved-value validation floor (reject abort on empty/root/
+# home/top-level/traversal values, at all 3 sites), the `.git/` exclusion
+# deny pairing (both provisioning sites + contract doc), and the
+# backup + atomic-write sequence for the settings-file merge-write (both
+# sites + contract doc). Plus two low-severity closures: the cross-project
+# blast-radius note and the exact-match dedup limitation note.
+#
 # Marker: permission-provisioning
 # ---------------------------------------------------------------------------
 print()
@@ -31717,6 +31725,100 @@ check(
     "permission_provisioning_decline: {obsidian | cross-repo | both | null}" in _s142_orch,
     "agents/orchestrator.md's Current State schema must declare "
     "permission_provisioning_decline with its three-value + null domain",
+)
+
+# --- SEC-001/002/003 closure checks (2026-07-04 security remediation) ---
+check(
+    "suite142(siteA-validation-floor): setup § 3a validates the resolved base "
+    "before constructing any rule, rejecting empty/root/home/top-level/"
+    "traversal values",
+    "resolved-value validation floor" in _s142_siteA.lower()
+    and ".." in _s142_siteA
+    and "top-level directory" in _s142_siteA,
+    "setup § 3a must declare the resolved-value validation floor and reject "
+    "empty/root/home/top-level/traversal values before building a rule",
+)
+check(
+    "suite142(siteB-validation-floor): Step 1g validates the resolved base/path "
+    "for both parts (a) and (b) before presenting any gate",
+    "resolved-value validation floor" in _s142_siteB.lower()
+    and ".." in _s142_siteB
+    and "top-level directory" in _s142_siteB,
+    "Step 1g must declare the resolved-value validation floor applies to both "
+    "part (a) and part (b) before any gate",
+)
+check(
+    "suite142(doc-validation-floor): docs/permission-provisioning.md declares a "
+    "dedicated Resolved-value validation floor section",
+    "## Resolved-value validation floor" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare the Resolved-value validation "
+    "floor as its own section",
+)
+check(
+    "suite142(siteA-git-deny): setup § 3a pairs every allow rule with a .git/ "
+    "deny entry",
+    "Edit(//{base}/.git/**)" in _s142_siteA and "Write(//{base}/.git/**)" in _s142_siteA,
+    "setup § 3a must add Edit(//{base}/.git/**) and Write(//{base}/.git/**) to "
+    "permissions.deny alongside the allow rules",
+)
+check(
+    "suite142(siteB-git-deny): Step 1g pairs every allow rule (both parts) with "
+    "a .git/ deny entry",
+    "Edit(//{base}/.git/**)" in _s142_siteB
+    and "Write(//{base}/.git/**)" in _s142_siteB
+    and "Edit(//{path}/.git/**)" in _s142_siteB
+    and "Write(//{path}/.git/**)" in _s142_siteB,
+    "Step 1g must add the .git/ deny pair for both the obsidian base (part a) "
+    "and the cross-repo path (part b)",
+)
+check(
+    "suite142(doc-git-deny): docs/permission-provisioning.md declares the .git/ "
+    "exclusion invariant",
+    "## `.git/` exclusion invariant" in _s142_perm_doc
+    and "never covers `.git/`" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare a dedicated .git/ exclusion "
+    "invariant section stating a provisioned scope never covers .git/",
+)
+check(
+    "suite142(siteA-backup-atomic): setup § 3a backs up settings.json before "
+    "writing and writes atomically via temp file + rename",
+    "settings.json.bak" in _s142_siteA and "rename it atomically" in _s142_siteA,
+    "setup § 3a must back up to settings.json.bak and write atomically (temp "
+    "file + rename) before landing the merged document",
+)
+check(
+    "suite142(siteB-backup-atomic): Step 1g backs up both settings files before "
+    "writing and writes atomically via temp file + rename",
+    "settings.json.bak" in _s142_siteB
+    and "settings.local.json.bak" in _s142_siteB
+    and _s142_siteB.count("rename it atomically") >= 2,
+    "Step 1g must back up settings.json.bak (part a) and settings.local.json.bak "
+    "(part b) and write atomically at both sites",
+)
+check(
+    "suite142(doc-backup-atomic): docs/permission-provisioning.md declares the "
+    "backup + atomic-write sequence in the merge-write contract",
+    "Back up before writing" in _s142_perm_doc and "Atomic write" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare the backup-before-write and "
+    "atomic-write steps in the merge-write-whole-document contract",
+)
+check(
+    "suite142(sec004-blast-radius): docs/permission-provisioning.md and setup § "
+    "3a name the cross-project/cross-session blast radius of the user-scope "
+    "destination",
+    "every Claude Code session on every project" in _s142_perm_doc
+    and "every Claude Code session on any project" in _s142_siteA,
+    "the confirmation gate must name the cross-project/cross-session cost of "
+    "the ~/.claude/settings.json destination",
+)
+check(
+    "suite142(sec005-dedup-limitation): docs/permission-provisioning.md "
+    "documents the exact-match dedup limitation and the already-present "
+    "pass-through reports the covering rule for audit visibility",
+    "Known limitation" in _s142_perm_doc and "audit visibility" in _s142_siteB,
+    "docs/permission-provisioning.md must document the exact-match dedup "
+    "limitation, and Step 1g's already-present pass-through must report the "
+    "covering rule for audit visibility",
 )
 
 # --- docs/permission-provisioning.md canonical doc ---

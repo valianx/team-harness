@@ -27,32 +27,50 @@ An `Edit`/`Write` rule alone is not sufficient for a path outside the cwd — Cl
 
 ## Merge-write-whole-document contract
 
-Both provisioning sites write to a Claude Code settings file (`~/.claude/settings.json` or `.claude/settings.local.json`) using the same discipline already established for `~/.claude/.team-harness.json` (`skills/setup/SKILL.md:166`):
+Both provisioning sites write to a Claude Code settings file (`~/.claude/settings.json` or `.claude/settings.local.json`) using the same discipline already established for `~/.claude/.team-harness.json` (`skills/setup/SKILL.md:166`), and — for the backup + atomic-write sequence — the same discipline already established for `~/.claude.json` (`skills/setup/SKILL.md:121-127`):
 
 1. Read the full JSON document (or start from `{}` if the target file does not exist yet).
-2. Append the new `Edit`/`Write` rule strings to `permissions.allow` and the new base to `permissions.additionalDirectories`.
-3. **Deduplicate** — never append a rule or directory entry that already covers the same base; a rule already present for a base is left untouched.
-4. **Preserve every other key** in the document byte-for-byte — this write touches ONLY `permissions.allow` and `permissions.additionalDirectories`, nothing else.
-5. Write the whole document back.
+2. **Back up before writing.** If the target file already exists, copy it to `{file}.bak` (`settings.json.bak` / `settings.local.json.bak` — a single rolling backup, each write overwrites the previous one) at `0o600` from the moment of creation. Skipped when the target file does not yet exist — there is nothing to preserve.
+3. Append the new `Edit`/`Write` rule strings to `permissions.allow`, the matching `.git/` deny pair to `permissions.deny` (see "`.git/` exclusion invariant" below), and the new base to `permissions.additionalDirectories`.
+4. **Deduplicate** — never append a rule or directory entry that already covers the same base; a rule already present for a base is left untouched. **Known limitation:** deduplication matches the resolved base/path as an exact string. A broader pre-existing rule (e.g. a manually-added `Edit(//mnt/**)`) is not detected or reconciled against the narrower rule this contract writes — the two may coexist. This is a documented limitation, not a silent gap: no new unprompted write is introduced by it.
+5. **Preserve every other key** in the document byte-for-byte — this write touches ONLY `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories`, nothing else.
+6. **Atomic write.** Write the merged JSON to a temporary file in the same directory, created at `0o600` from the moment of creation, verify it parses as valid JSON, then rename it over the target file. A crash before the rename leaves the original (and its `.bak`) untouched; a crash after the rename leaves the new file in place.
 
 A partial payload (writing only the new keys, dropping the rest of the document) is never acceptable — this is the exact failure mode the merge-write contract exists to prevent.
+
+## Resolved-value validation floor
+
+Before any rule is constructed from a resolved `base`/`path`, this contract validates the resolved value itself — not merely the rule template. Provisioning **aborts before any gate is shown** — no rule written, no Y/n offer — reporting a one-line operator-facing reason, when the resolved value is any of:
+
+- Empty, `.`, or unresolved (template substitution failed).
+- The filesystem root (`/`) or a Windows-normalized equivalent (`//`, `///`, ...).
+- The user's home directory — the literal `~`, `$HOME`, or its expanded absolute form.
+- A filesystem top-level directory — fewer than 2 non-empty path segments below root (depth < 2).
+- Contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`).
+
+This floor runs on the RESOLVED value, after normalization and before rule construction — it is the mechanism that guarantees "never a bare root rule" at the value level (a mis-resolved `base` of `/` or `~` would otherwise still pass the template-level guarantee in "Scoping" below, since the resulting rule string never literally matches the bare-root needle `//**`). Both provisioning sites (`skills/setup/SKILL.md` § 3a, `agents/orchestrator.md` Phase 0a Step 1g parts a and b) apply this floor identically before presenting any gate.
+
+## `.git/` exclusion invariant
+
+A provisioned scope never covers `.git/`. Alongside every `Edit`/`Write` allow rule this contract writes for a base, it also writes the matching deny pair — `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` in `permissions.deny` — in the same write. Claude Code's permission model resolves deny over allow, so this pairing holds even though the allow rule's `**` glob would otherwise match paths under `.git/`. This closes a local code-execution vector: for a cross-repo work-surface, an unprompted write to `{path}/.git/hooks/pre-commit` would execute arbitrary shell on the tree's next `git commit` — outside the `dev-guard` outward-action gate, which gates `git push`/`gh`, not `git commit`. Both provisioning sites apply this pairing identically, for every base/path they provision (obsidian workspace included).
 
 ## Confirmation gate
 
 Permission provisioning is `security_sensitive: true` (it widens local write access) and is **never silent when a rule is missing.** Every offer:
 
-- Shows the exact `Edit`/`Write` rule strings and the `additionalDirectories` entry that will be added, before asking.
+- Shows the exact `Edit`/`Write` rule strings, the `.git/` deny pair, and the `additionalDirectories` entry that will be added, before asking.
 - Requires an explicit Y/n confirmation. On decline, nothing is written.
 - Is scoped to a single, declared base per offer — no bundling of unrelated surfaces into one opaque "grant permissions?" prompt.
+- For the `~/.claude/settings.json` (user-scope) destination, names the blast radius: the rule applies to every Claude Code session on every project, not only this pipeline, and persists until removed manually from that file.
 
-**When rules are already present for a base, there is no gate at all** — provisioning is a silent pass-through in that case. The gate exists to protect the FIRST write of a new rule, not to re-confirm a rule that is already in effect.
+**When rules are already present for a base, there is no gate at all** — provisioning is a silent pass-through in that case, but still reports the already-covering rule and target file so the operator retains audit visibility into what is already granted. The gate exists to protect the FIRST write of a new rule, not to re-confirm a rule that is already in effect.
 
 ## Scoping
 
-Every rule this contract writes is scoped strictly to `{base}/**` for a single, explicitly declared base (the resolved obsidian workspace path, or a declared work-surface repo path). This contract never emits:
+Every rule this contract writes is scoped strictly to `{base}/**` for a single, explicitly declared base (the resolved obsidian workspace path, or a declared work-surface repo path), after that base has passed the "Resolved-value validation floor" above. This contract never emits:
 
 - A root-anchor rule without a path suffix (e.g. bare `//**`) — that would grant access far beyond the declared surface.
-- A rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write). Outward actions remain gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate") — this contract only ever touches local `Edit`/`Write` rules and `additionalDirectories`.
+- A rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write). Outward actions remain gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate") — this contract only ever touches local `Edit`/`Write`/deny rules and `additionalDirectories`.
 
 ## Rule report
 

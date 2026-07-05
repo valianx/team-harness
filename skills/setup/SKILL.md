@@ -162,23 +162,29 @@ If obsidian mode:
 The obsidian vault sits outside the current project's working tree, so every subagent `Edit`/`Write` into it prompts by default, and per-use approvals do not persist across dispatches. This sub-step offers to add local permission rules once, up front, so future pipeline runs write to the vault without prompting. Full contract, including the `//` double-slash anchor rationale and the documented upstream residual: `docs/permission-provisioning.md`.
 
 1. Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX (`C:\vault\Work` → `/c/vault/Work`) and anchor it with a leading `//` (a single leading slash anchors to the settings-source directory, not the filesystem root, and silently fails to match paths outside the cwd — upstream Claude Code issue #25137).
-2. Present the exact rules for confirmation. Write nothing until the operator answers:
+2. **Resolved-value validation floor (before any rule is constructed).** Reject and abort provisioning — no gate, no rule written — when the resolved `base` is empty, `/`, the user home (`~`, `$HOME`, or its expanded form), a filesystem top-level directory (fewer than 2 path segments below root), or contains `..` or a glob metacharacter (`*`, `?`, `[`, `]`). Report a one-line reason (e.g. "Obsidian workspace path resolves to the filesystem root — provisioning aborted.") and continue to Step 3.5 without offering a gate. Full contract: `docs/permission-provisioning.md § Resolved-value validation floor`.
+3. Present the exact rules for confirmation, including the `.git/` deny pair (never covers `.git/` — `docs/permission-provisioning.md § ".git/" exclusion invariant`) and the cross-project blast-radius note. Write nothing until the operator answers:
    ```
    Grant write access without prompting to the obsidian workspace?
      Edit(//{base}/**)
      Write(//{base}/**)
      additionalDirectories: //{base}
+     deny: Edit(//{base}/.git/**), Write(//{base}/.git/**)
+
+   This rule applies to every Claude Code session on any project, not just this pipeline,
+   and persists until manually removed from ~/.claude/settings.json.
 
    Add these rules to ~/.claude/settings.json? [y/N]
    ```
-3. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
-4. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — read the full JSON (start from `{}` if the file does not exist), append the two rules to `permissions.allow` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, and preserve every other key untouched. Write the whole document back.
-5. Report the rules added and the target file:
+4. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
+5. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target.
+6. Report the rules added and the target file:
    ```
    Permission rules added to ~/.claude/settings.json:
      Edit(//{base}/**)
      Write(//{base}/**)
      additionalDirectories: //{base}
+     deny: Edit(//{base}/.git/**), Write(//{base}/.git/**)
    ```
 
 This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write) — it is scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
