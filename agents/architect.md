@@ -302,6 +302,9 @@ Stacked PRs (a group's Base = a sibling group's branch instead of `main`) are PR
   - `{path}` (new|modify)
   - `{path}` (new|modify)
 - **Depends on:** {Task-N | none}
+- **Lane-decomposable:** {yes | no — default no}
+  - seams: {seam-1: [files], seam-2: [files], ...}          # omit when no
+  - frozen-contracts: [files/symbols every seam may read, none may modify]  # omit when no
 - **Notes:** {anything the implementer should know — same-commit OAS bump, flag names, etc.}
 
 #### Acceptance Criteria
@@ -344,6 +347,28 @@ The AC checkboxes (`- [ ]`) follow the same self-describing principle: `qa` mark
 #### Cross-reference rule
 
 Every file in the `### Work Plan` table of `01-plan.md` (§ Architecture) MUST appear in the `Files:` field of at least one task in `## Task List`. The plan-reviewer (Phase 1.6) cross-checks this.
+
+#### `Lane-decomposable:` field (optional, plan-time seam declaration)
+
+A task section MAY declare `Lane-decomposable: yes` plus a `seams:` map and a `frozen-contracts:` list when its scope is genuinely file-disjoint and knowable at plan time — this is the plan-time half of the Stage-2 intra-task execution-lane fan-out (the orchestrator's dispatch-time gate; see `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`).
+
+- **`seams:`** — a map of named seam → file subset. Every file in the task's `Files:` list belongs to exactly one seam or to `frozen-contracts:`; seams are disjoint by construction — no file appears in two seams.
+- **`frozen-contracts:`** — files or symbols EVERY seam may READ but NO seam may MODIFY (a shared interface, a schema, an invariant token declared in more than one file). Declaring a frozen-contract is what makes the seams safe to run concurrently: as long as no lane touches it, sibling lanes cannot conflict.
+- **Absent or `no` (the default)** — the task is tightly-coupled; Stage 2 dispatches it 1:1 to a single implementer exactly as today. This is the correct default for any task whose files share symbols, whose seams are not clean, or whose scope cannot be confidently partitioned at plan time.
+
+**When to mark `yes` (all must hold):**
+- The task's `Files:` list has independent, file-disjoint seams nameable NOW, at plan time — not a heuristic split by directory the orchestrator would have to guess.
+- No seam needs to modify a file another seam reads or depends on for correctness (if it does, that file belongs in `frozen-contracts:`, not in either seam).
+- The task is large enough that a single implementer would otherwise accumulate the full file set's context — a scope-size signal, not a hard rule. The orchestrator applies its own `LANE_DECOMPOSE_MIN_FILES` threshold at dispatch time, so declaring `yes` on a small task is harmless; it simply never crosses the threshold.
+
+**When to mark `no` / leave absent (the default for most tasks):**
+- The task is tightly-coupled — files share symbols, or one seam's change ripples into another (e.g., an endpoint + its DTO + its service in the same layer).
+- Genuinely disjoint seams cannot be named without guessing at directory boundaries.
+- The task is small — lane fan-out has coordination overhead that only pays off for genuinely oversized, file-disjoint work.
+
+**Never declare `Lane-decomposable: yes` for a tightly-coupled task "just in case."** A wrong `yes` risks the orchestrator dispatching seams that turn out to need the same frozen-contract mutated. The seam-not-disjoint fallback catches this (a lane discovers it must modify a declared frozen-contract, returns `status: blocked, reason: seam-not-disjoint`, and the orchestrator aborts the fan-out and re-dispatches the whole task monolithically) — but the fallback is a safety net, not a substitute for a correct plan-time declaration.
+
+**Dispatch-time gate is owned by the orchestrator, not this agent.** Declaring `Lane-decomposable: yes` is necessary but not sufficient for fan-out — the orchestrator's Stage 2 dispatch gate additionally requires the task's file count to meet `LANE_DECOMPOSE_MIN_FILES` and the declared seams to be genuinely disjoint. A task that declares `yes` but stays under threshold, or whose seams are not disjoint, dispatches 1:1, unchanged.
 
 ### Research Mode
 

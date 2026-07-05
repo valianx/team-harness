@@ -172,6 +172,7 @@ All commands run from the repo root.
 - **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
 - **Parallel batch implementation.** ADDITIVE items concurrently; consolidated into ONE PR. See `docs/parallel-batch-implementation.md`.
 - **`/th:research-code` hybrid codebase-research flow.** `code-researcher` (sonnet, read-only) fans out per-file/module lanes; optional web lanes; consolidator surfaces docs-vs-code conflicts; bounded gap-closure via `code_closeable` gate. → `agents/code-researcher.md`, `skills/research-code/SKILL.md`.
+- **Gated local permission provisioning.** `//` double-slash anchor + `additionalDirectories`, merge-write-whole-document, gated Y/n, two sites (`/th:setup` § 3a; orchestrator Phase 0a Step 1g). Never touches outward-action rules. See `docs/permission-provisioning.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 

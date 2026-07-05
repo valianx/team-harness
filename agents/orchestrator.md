@@ -636,11 +636,13 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - worktree: {absolute path | null}             # worktree path for this task; null when running branch-in-place. Set at Phase 0a when a worktree is created. Teardown in delivery reads this field directly — no filesystem search needed.
 - worktree_branch: {branch name | null}        # branch checked out in the worktree; null when worktree is null
 - worktree_base: {origin/main | <dep-branch> | null}  # the ref the worktree branch was cut from; null when worktree is null
+- permission_provisioning_decline: {obsidian | cross-repo | both | null}  # set at Phase 0a Step 1g when the operator declines a gated permission-provisioning offer; null = no decline this run (rules already present, granted, or not yet offered). `both` is written when part (a) and part (b) are each declined within the same run — the second decline merges into `both` rather than overwriting the first. Session-scoped — no re-offer during this run when set; the next pipeline run may offer again.
 
 **Single-task start-gate (branch-in-place vs. worktree):** before creating a branch for any single-task implementation or delivery, run `git fetch origin main` and check the tree's position. Branch-in-place is permitted ONLY when the tree is clean AND at/behind `origin/main` (`git rev-list --count origin/main..HEAD` returns `0`). Create a worktree when there are uncommitted changes OR the tree is ahead of origin/main — including when on a non-main branch. Branching from a local `main` that is ahead of `origin/main` carries unpushed commits onto the new feature branch and bundles two independent developments into one PR. The canonical decision table and detection command are in `docs/worktree-discipline.md` Rule 1.
 
 - converge: {true | false | null}              # Phase 4.5 dual-review convergence activation. Auto-on (true) when bug_tier: 4 or security_sensitive: true; operator opt-in via payload converge: true; false/null = single-pass (OFF by default).
 - convergence: {round: N, last_verdict_A: APPROVE|REQUEST_CHANGES|null, last_verdict_B: APPROVE|REQUEST_CHANGES|null, status: running|converged|escalated}  # Phase 4.5 convergence loop state; null when converge is false/null. Mirrors the review-pr skill's convergence block.
+- lane_decomposition: {task: Task-{N}, seam_map: {seam-1: [files], ...}, lanes_dispatched: N, lane_cap: 5, status: dispatching|consolidated|fallback-monolithic} | null  # Stage-2 intra-task execution-lane fan-out state (`agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`); null when no task in this run used lane fan-out.
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -870,6 +872,31 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    ```
 
 1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise, find or create the `overview.md` file (date-agnostic JOIN rule) and write this project's row — full detection/JOIN/read-modify-write/concurrency/best-effort protocol: `agents/ref-intake-flows.md § Initiative Create-or-Join`.
+
+1g. **CONDITIONAL — Gated local permission provisioning.** Provisions local Claude Code permission rules so subagent `Edit`/`Write` calls into declared out-of-cwd surfaces stop prompting on every call. Security-sensitive (it provisions permissions): always gated by an explicit Y/n, never silent when a rule is missing, and never touches outward-action rules (`git push`, `gh pr *`, any GitHub/ClickUp API write stay gated exclusively by `dev-guard`). Before either part (a) or (b) presents a gate, the resolved `base`/`path` MUST pass the resolved-value validation floor — reject and abort provisioning (no gate, no rule written, one-line operator-facing reason) when the resolved value is empty, `/`, the user home (`~`/`$HOME`/its expansion), a filesystem top-level directory (depth < 2 from root), or contains a `..` path-traversal segment or a glob metacharacter. Full contract: `docs/permission-provisioning.md § Resolved-value validation floor`.
+
+   **(a) Obsidian workspace — existing-install coverage (site B).** Runs only when `logs_mode == "obsidian"` (resolved at boot). Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX with a `//` anchor — identical normalization to `/th:setup` § 3a. The resolved-value validation floor (see above) runs first; abort silently on a rejected value. Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)`.
+      - **Already present → no gate, no write** (silent pass-through) — reports the already-covering rule and target file for audit visibility. Continue to (b).
+      - **Missing (any of the entries) → present the same gated Y/n offer as `/th:setup` § 3a**, showing the exact rules including the `.git/` deny pair and the cross-project blast-radius note. This covers an install that ran `/th:setup` before this sub-step existed, or an operator who declined the offer at setup time and later switched to obsidian mode.
+        - **Decline** → write nothing; record `permission_provisioning_decline: obsidian` in `00-state.md § Current State` as a session decision — merge to `both` if part (b) already recorded `cross-repo` earlier in this same run. No re-offer during this run; the next pipeline run may offer again.
+        - **Confirm** → merge-write-whole-document to `~/.claude/settings.json`, identical mechanism to `/th:setup` § 3a — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON, append + dedup the `Edit`/`Write` rules, the `.git/` deny pair, and `additionalDirectories`, preserve every other key untouched, then write to a temp file (`0o600`) and rename it atomically over the target; report the rules added and the target file.
+
+   **(b) Cross-repo work-surface — per-pipeline.** For each work-surface repo path this pipeline has declared outside the session's own working-tree root — a non-null `worktree` path in `00-state.md § Current State`, a non-null `Worktree (suggested):` path in `01-plan.md § Task List`, or a sibling-repo path in a multi-project initiative — the resolved-value validation floor (see above) runs first per path; reject and abort provisioning for any path that is empty, `/`, the user home, a top-level directory, or contains `..`/a glob metacharacter. For every path that passes, check `.claude/settings.local.json` at the session cwd (if present) for BOTH `Edit(//{path}/**)` and `Write(//{path}/**)` in `permissions.allow`, `//{path}` in `permissions.additionalDirectories`, AND BOTH `Edit(//{path}/.git/**)` and `Write(//{path}/.git/**)` in `permissions.deny`.
+      - **Already present for a path → no gate, no write** for that path (silent pass-through) — reports the already-covering rule and target file per path for audit visibility.
+      - **Missing for one or more paths → present one gated Y/n offer listing every path still missing coverage** with its exact scoped rules:
+        ```
+        Grant write access without prompting to these work-surface repos?
+          Edit(//{path}/**)
+          Write(//{path}/**)
+          additionalDirectories: //{path}
+          deny: Edit(//{path}/.git/**), Write(//{path}/.git/**)
+          ... (one block per path still missing coverage)
+
+        Add these rules to .claude/settings.local.json? [y/N]
+        ```
+        - **Decline** → write nothing; record `permission_provisioning_decline: cross-repo` in `00-state.md § Current State` as a session decision — merge to `both` if part (a) already recorded `obsidian` earlier in this same run. No re-offer during this run.
+        - **Confirm** → merge-write-whole-document to `.claude/settings.local.json` — back up the existing file to `settings.local.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), create the file if absent, dedup against existing entries, preserve every other key, append each `Edit`/`Write` rule plus its `.git/` deny pair and `additionalDirectories` entry, then write to a temp file (`0o600`) and rename it atomically over the target; report the rules added and the target file.
+      - A worktree path created later in the pipeline (Multi-Task Orchestration) re-runs this same check for the new path before the first implementer dispatch into it — coverage is not limited to paths already known at the top of Phase 0a.
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `workspaces/{feature-name}/00-knowledge-context.md`:
    ```markdown
@@ -1864,7 +1891,7 @@ Every state transition on a task mirrors into the `**Status:**` field of that ta
 
 The `01-plan.md` (§ Task List) mutations the orchestrator makes are scoped EXCLUSIVELY to the `**Status:**` field of one task header at a time. The orchestrator never touches `Files:`, AC text, dependencies, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:` — those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if a change there is needed, route back to `architect` for an explicit in-place refinement and re-run Phase 1.6.
 
-**The orchestrator never divides one task's plan or implementation.** It does not open a PR that is not covered by the approved `§ Task List` / `§ Delivery Grouping`, does not mint a second stage-cycle, and does not split a workspace. If a delivered scope appears to need division, it routes back to the architect (re-run Phase 1.6) and surfaces the question to the operator. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
+**The orchestrator never divides one task's DELIVERABLE — its plan, commit set, or PR.** It does not open a PR that is not covered by the approved `§ Task List` / `§ Delivery Grouping`, does not mint a second stage-cycle, and does not split a workspace. EXECUTION is a distinct axis: a task's implementation work MAY fan out into bounded parallel lanes under the Intra-task execution-lane decomposition gate (below) — that is a fan-out of WORK, never a division of the DELIVERABLE; the task still ships as one plan, one implementation record, one commit set, one PR. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes. If a delivered scope appears to need genuine division (more than one PR, more than one plan), it routes back to the architect (re-run Phase 1.6) and surfaces the question to the operator. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
 
 **Post-approval division is a hard re-gate trigger.** After STAGE-GATE-1, the approved `§ Task List` + `§ Delivery Grouping` is the complete delivery contract and the flat stage-file set is the complete document set. If, mid-workspace, an agent (a) opens or proposes a PR that is not covered by the approved contract, OR (b) creates a stage file with any suffix (`-m{N}`, `-b`, `02b-*`, second-cycle), the orchestrator MUST treat this as plan drift: route back to `architect` for an explicit in-place plan refinement, re-run Phase 1.6 (plan-reviewer), and re-surface STAGE-GATE-1 to the operator for confirmation before any delivery proceeds. The pipeline never silently absorbs an unapproved additional PR or a suffixed stage file.
 
@@ -1877,6 +1904,8 @@ The `delivery` agent owns the `merged` transition: it is the only agent that fli
 
 Tasks within the same round run **in parallel** in separate worktrees (same worktree mechanism documented under "Parallel Dispatch Flow" in `agents/ref-special-flows.md`). Each parallel implementer is invoked with its `Task identifier` and scopes work to that task's `Files:` and AC block from `01-plan.md` (§ Task List). Hooks + event-driven monitoring (`inotifywait` on Linux/macOS, equivalent on Windows) signal completion of each parallel branch back to the parent orchestrator.
 
+**Cross-repo provisioning re-check (dispatch-site trigger).** Before invoking an implementer into any worktree/work-surface path outside the session's own working-tree root, re-run Phase 0a Step 1g part (b) for that path if it is not yet covered by provisioned rules — decline proceeds with per-write prompts, recorded per the existing decline semantics.
+
 **Why this works:** tasks without `Depends on:` between them touch disjoint code paths by definition of the architect's design — if they did not, the architect would have either consolidated them or declared the dependency explicitly. Conflict on shared files is a plan error (architect's job to fix before Phase 1.6 passes), not a runtime concern.
 
 **Round boundaries:**
@@ -1887,6 +1916,53 @@ Tasks within the same round run **in parallel** in separate worktrees (same work
 **Sequential fallback:** if every task has a chained `Depends on:` (Task-2 depends on Task-1, Task-3 depends on Task-2, etc.), the DAG degenerates into a line and the rounds become 1-task rounds — identical to the legacy per-task behaviour. The scheduler is correct in that case too. No special-casing.
 
 **Implementation order vs merge order (these are distinct concerns).** The DAG governs **implementation order** — which worktrees run in parallel and which wait for their dependencies. It does NOT govern merge order to `main`. Parallel rounds (tasks in the same DAG round running in separate worktrees simultaneously) do NOT authorize parallel merge to `main`. The merge order is always serial and is governed exclusively by the contract in `agents/delivery.md`, per the declared `§ Delivery Grouping`: for a split grouping, group N+1's PR opens and merges to `main` only after group N's PR has landed. Each subsequent branch is cut from the updated `main` after the prior merge. This distinction matters for multi-group deliveries: the work can be implemented in parallel, but it ships to `main` one PR at a time, serially.
+
+### Intra-task execution-lane decomposition (dispatch-time gate)
+
+Distinct from the Stage-2 DAG scheduler above — the DAG parallelizes TASKS (whole implementer dispatches, one per task, decided at design time via `Depends on:`). This gate parallelizes EXECUTION WITHIN one task (multiple fresh-context implementer lanes for the SAME task, decided at dispatch time from file count + architect-declared seams). A task's DELIVERABLE (its commit set, its PR) is never divided by this mechanism — only its EXECUTION fans out; see "Reconciling the never-divides invariant" below.
+
+**Constants (DIAL, operator-recalibratable):**
+- `LANE_DECOMPOSE_MIN_FILES = 8` — a task's `Files:` count must meet or exceed this before lane fan-out is even considered.
+- `LANE_CAP = 5` — maximum concurrent lanes for a single task.
+- `GLOBAL_ROUND_CONCURRENCY_CAP = 6` — maximum concurrent implementer subagents in a Stage-2 round, summing inter-task DAG parallelism (above) AND intra-task lane parallelism (this section). A round already running 4 DAG tasks in parallel can fan out at most 2 more lanes before the cap is hit.
+
+**Gate (evaluated per task, immediately before "Invoke via Task tool"):** ALL of the following must hold, or the task dispatches 1:1 exactly as today —
+
+1. The task declares `Lane-decomposable: yes` in `01-plan.md` (§ Task List).
+2. The task's `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES`.
+3. The declared `seams:` are ≥2 and file-disjoint (no file appears in two seams; no file in a seam also appears in `frozen-contracts:`).
+
+The threshold alone never fires the gate, and a `yes` declaration alone never fires it either — BOTH the file-count threshold AND disjoint seams are required. A task under threshold, or one whose seams are not genuinely disjoint, dispatches 1:1 regardless of the declaration.
+
+**On gate FIRE — fan-out:**
+- Dispatch one fresh-context `implementer` subagent per seam, via concurrent `Task` calls in the parent session — the same in-message mechanism already used for the `tester+qa+security` trio at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`. Cap at `LANE_CAP` per task — a task with more seams than `LANE_CAP` runs its first `LANE_CAP` seams and queues the rest as a second wave, eager slot-fill (same wave model as § Multi-Task Orchestration Step 4, below).
+- Each lane is scoped to its seam's `Files:` subset ONLY — the lane's dispatch prompt names its files explicitly and instructs: "You may READ but must NEVER MODIFY the following frozen-contract files: {list}. If your seam's implementation genuinely requires modifying one, STOP and return `status: blocked, reason: seam-not-disjoint` instead of editing it."
+- Lanes write to the SAME worktree/branch as the task (deliverable cohesion — one commit set, one PR). Concurrent lanes touching disjoint files do not contend on the working tree.
+- **Cross-repo provisioning re-check (dispatch-site trigger).** Before dispatching the first lane, if the task's worktree/work-surface path is outside the session cwd and not yet covered by provisioned rules, re-run Phase 0a Step 1g part (b) for that path — decline proceeds with per-write prompts, recorded per the existing decline semantics; lanes share the task's already-checked worktree, so this runs once per task, not once per lane.
+- Respect `GLOBAL_ROUND_CONCURRENCY_CAP` across the whole round: before dispatching a wave of lanes, count already-running DAG-task implementers plus already-running lanes from sibling lane-decomposed tasks in the same round; never exceed 6 concurrent implementer subagents total.
+
+**On gate NO-FIRE:** dispatch 1:1 exactly as today — no state change, no trace event beyond the normal Phase 2 dispatch.
+
+**Seam-not-disjoint fallback (never a silent stop).** If any lane returns `status: blocked, reason: seam-not-disjoint`, the orchestrator:
+1. Aborts the fan-out for that task — does NOT wait for or merge partial lane results.
+2. Emits the `stage2.lane.result` trace event with `status: blocked, reason: seam-not-disjoint`, recording which lane and which frozen-contract it needed to modify.
+3. Re-dispatches the ENTIRE task monolithically to a single fresh-context implementer, exactly as the 1:1 path (`Files:` the full task file list, no seam scoping).
+4. Reports the fallback to the operator: "Lane fan-out for Task-{N} aborted — seam {seam} needed to modify frozen-contract {file}. Re-dispatching monolithically." This is always surfaced, never absorbed silently.
+
+**Consolidation (mandatory on fan-out completion).** After all lanes of a task return `status: success`, the orchestrator:
+1. Verifies contract adherence — no lane's diff touches a file outside its declared seam or a declared frozen-contract (a quick `git diff --stat` against each lane's declared file list).
+2. Writes a consolidation report appended to that task's `02-implementation.md § Review Summary` (one line per lane: seam name, files touched, one-line summary) — required, not optional, whenever fan-out ran.
+3. Records the `lane_decomposition` block in `00-state.md § Current State` (schema below) with `status: consolidated`.
+4. Proceeds to Phase 2.5 exactly as the 1:1 path — the fan-out is invisible downstream of Phase 2: one task, one `02-implementation.md`, one commit set.
+
+**Trace events** (append to `{docs_root}/{events_file}` at each transition):
+- `stage2.lane.dispatch` — `{"ts":"<ISO>","event":"stage2.lane.dispatch","task":"Task-{N}","seam":"{seam}","lane_cap":5,"files":[...]}` — one per lane, at dispatch.
+- `stage2.lane.result` — `{"ts":"<ISO>","event":"stage2.lane.result","task":"Task-{N}","seam":"{seam}","status":"success|blocked","reason":"seam-not-disjoint|null"}` — one per lane, on return.
+- `stage2.lanes.consolidated` — `{"ts":"<ISO>","event":"stage2.lanes.consolidated","task":"Task-{N}","lanes_dispatched":<N>,"status":"consolidated|fallback-monolithic"}` — once per task, at the end of the fan-out (either successful consolidation or after the monolithic fallback completes).
+
+**`00-state.md § Current State` — `lane_decomposition` block** (see schema below): `{task: Task-{N}, seam_map: {seam-1: [files], ...}, lanes_dispatched: N, lane_cap: 5, status: dispatching|consolidated|fallback-monolithic} | null` — set when the Stage-2 lane-decomposition gate fires for a task; null when no task in this run used lane fan-out.
+
+**Reconciling the never-divides invariant (DELIVERABLE vs EXECUTION).** The invariant above governs the DELIVERABLE — the task's plan, commit set, and PR are never autonomously divided by the pipeline. This mechanism governs EXECUTION — the work of implementing an already-approved, already-undivided task MAY fan out into parallel lanes when the gate above fires. A task whose lanes fan out still ships as exactly one plan, one implementation record, one commit set, one PR — the reader downstream of Phase 2 cannot tell the difference. The two axes are complementary, not in tension, mirroring the existing "decomposition vs division" reconciling clause in `agents/ref-special-flows.md § Milestone-Build Flow`. Third-mechanism documentation (distinct from this DAG and from `## Parallel Multi-Project Dispatch`): `docs/parallel-batch-implementation.md § Intra-task lane fan-out` and `agents/ref-special-flows.md § Milestone-Build Flow`.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces.
@@ -2335,7 +2411,7 @@ If no build or lint command is detected, log `{"ts":"<ISO>","event":"phase.end",
    b. Re-dispatch the implementer with the failure output: "Build verification failed. Command `{cmd}` returned exit code {N}. Output: {stderr/stdout}. Fix the build/lint error and confirm the fix."
    c. After the implementer returns, re-run the build/lint commands (1 retry).
    d. If the retry also fails: set `status: blocked` in `00-state.md`, escalate to the operator with the full failure output.
-   e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Phase 3.6 "Concurrent dispatch with Build Verification") — re-run the acceptance-checker only if `01-plan.md` or `reviews/04-validation.md` changed since the drift verdict; a build/lint fix alone normally touches neither, so the existing drift verdict stands.
+   e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Phase 3.6 "Concurrent dispatch with Build Verification") — re-run the acceptance-checker only if `01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed since the drift verdict; a build/lint fix alone normally touches none of the three, so the existing drift verdict stands.
 
 **Iteration budget:** max 2 attempts total (1 original + 1 retry after implementer fix). This is separate from the Phase 3 iteration budget.
 
@@ -2369,7 +2445,7 @@ Routing to implementer to fix build
 
 **Concurrent dispatch with Build Verification.** After Phase 3.5 passes, issue the acceptance-checker `Task` call and the Phase 3.75 build/lint `Bash` calls IN THE SAME MESSAGE — independent tool calls, dispatched together rather than one after the other. Gate evaluation waits for both results before proceeding to STAGE-GATE-2 / Phase 4. This overlaps the acceptance-checker's drift audit with build verification instead of running it after 3.75 completes, shrinking the serial tail from 3.5 → 3.75 → 3.6 to 3.5 → (3.75 ∥ 3.6).
 
-**Conditional re-run after a 3.75 failure.** If Phase 3.75 fails and the implementer patches the build/lint error, re-run the acceptance-checker (3.6) ONLY if `01-plan.md` or `reviews/04-validation.md` changed since the drift verdict was produced — a build/lint fix alone normally touches neither. Check cheaply via file mtime or `git status` on those two paths; when neither changed, the existing drift verdict stands and Phase 3.6 is not re-dispatched.
+**Conditional re-run after a 3.75 failure.** If Phase 3.75 fails and the implementer patches the build/lint error, re-run the acceptance-checker (3.6) ONLY if `01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed since the drift verdict was produced — a build/lint fix alone normally touches none of the three (the acceptance-checker's grounding read of `02-implementation.md` is watched too, since a build/lint fix that updates the implementation record can invalidate an existing drift verdict). Check cheaply via file mtime or `git status` on those three paths; when none of the three changed, the existing drift verdict stands and Phase 3.6 is not re-dispatched.
 
 **This is the third line of defense — drift-only, trusting `qa`'s verdict:** an independent comparison between the **approved plan** (`01-plan.md` § Review Summary, the formalized original description and AC as approved at STAGE-GATE-1) and the current `§ Task List` AC. It answers ONE question: does what was approved still match what is being delivered? The acceptance-checker does NOT re-validate AC satisfaction — `qa`'s Phase 3 verdict (`reviews/04-validation.md § AC Coverage Results`) is trusted input for that. This removes the time-shifted duplication of a fact `qa` already checked.
 

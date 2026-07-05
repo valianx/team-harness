@@ -31538,6 +31538,996 @@ check(
 
 # Marker: workspace-subfolder-layout-gapfill
 # ---------------------------------------------------------------------------
+# Suite 142 — permission-provisioning (issue #462)
+#
+# Asserts the gated local permission-provisioning contract structurally
+# across its three sites: (A) skills/setup/SKILL.md § 3a (obsidian
+# workspace, KEYS-once); (B-a) agents/orchestrator.md Phase 0a Step 1g
+# obsidian existing-install detection; (B-b) the same Step 1g cross-repo
+# work-surface provisioning. Pins the `//` double-slash anchor, the
+# merge-write-whole-document contract, the confirmation gate, path
+# scoping, and the rule report at every site, plus the docs/
+# permission-provisioning.md canonical doc (including the #25137 upstream
+# residual note). Negative assertions: no root anchor without a path
+# suffix is ever emitted; the already-present pass-through (no gate, no
+# write) is documented at both Phase 0a sub-sites.
+#
+# 2026-07-04 security remediation (SEC-001/002/003, Phase 3 review): also
+# pins the resolved-value validation floor (reject abort on empty/root/
+# home/top-level/traversal values, at all 3 sites), the `.git/` exclusion
+# deny pairing (both provisioning sites + contract doc), and the
+# backup + atomic-write sequence for the settings-file merge-write (both
+# sites + contract doc). Plus two low-severity closures: the cross-project
+# blast-radius note and the exact-match dedup limitation note.
+#
+# 2026-07-05 CodeRabbit disposition (PR #466, T1/T2): pins the site-A
+# already-present pass-through ahead of the confirmation gate (setup § 3a
+# now mirrors the orchestrator's site-B skip-the-prompt behavior instead of
+# always re-prompting), and re-pins the site-B additionalDirectories anchor
+# check against the exact "already contains" grant phrasing so it can no
+# longer be satisfied by the co-located Edit/Write allow-rule strings alone.
+#
+# Marker: permission-provisioning
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 142: permission-provisioning ===")
+
+_s142_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s142_orch = read(AGENTS_DIR / "orchestrator.md")
+_s142_perm_doc = read(REPO_ROOT / "docs" / "permission-provisioning.md")
+_s142_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s142_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site A: skills/setup/SKILL.md § 3a ---
+_s142_siteA = _slice_section(
+    _s142_setup,
+    "### 3a. Provision permission rules for the obsidian workspace (gated)",
+    ("\n### ",),
+)
+
+check(
+    "suite142(siteA-anchor): setup § 3a emits the '//' double-slash anchor for both "
+    "Edit and Write rules plus additionalDirectories",
+    "Edit(//{base}/**)" in _s142_siteA
+    and "Write(//{base}/**)" in _s142_siteA
+    and "additionalDirectories: //{base}" in _s142_siteA,
+    "setup § 3a must build Edit(//{base}/**), Write(//{base}/**), and "
+    "additionalDirectories: //{base} using the double-slash anchor",
+)
+check(
+    "suite142(siteA-merge-write): setup § 3a declares merge-write-whole-document "
+    "(read full JSON, append + dedup, preserve every other key)",
+    "merge-write-whole-document" in _s142_siteA
+    and "deduplicating" in _s142_siteA
+    and "preserve every other key" in _s142_siteA,
+    "setup § 3a must declare the merge-write-whole-document contract with dedup and "
+    "full-key preservation",
+)
+check(
+    "suite142(siteA-gate): setup § 3a gates the write behind an explicit Y/n and "
+    "writes nothing on decline",
+    "[y/N]" in _s142_siteA and "write nothing" in _s142_siteA,
+    "setup § 3a must present a Y/n confirmation and write nothing on decline",
+)
+check(
+    "suite142(siteA-scope-no-outward): setup § 3a never adds a rule for an outward "
+    "action (push/PR/API)",
+    "never adds a rule for an outward action" in _s142_siteA,
+    "setup § 3a must declare it never provisions outward-action rules",
+)
+check(
+    "suite142(siteA-report): setup § 3a reports the exact rules added and the "
+    "target settings file",
+    "Permission rules added to ~/.claude/settings.json:" in _s142_siteA,
+    "setup § 3a must report the rules added and the target file",
+)
+check(
+    "suite142(siteA-doc-pointer): setup § 3a points to the canonical "
+    "docs/permission-provisioning.md contract",
+    "docs/permission-provisioning.md" in _s142_siteA,
+    "setup § 3a must reference docs/permission-provisioning.md",
+)
+check(
+    "suite142(siteA-passthrough): setup § 3a checks for already-present rules "
+    "BEFORE the Y/n gate and skips the prompt entirely when covered (mirrors the "
+    "orchestrator's site-B pass-through so re-running /th:setup never re-prompts)",
+    "Already-present check (before any gate is shown)" in _s142_siteA
+    and "`permissions.additionalDirectories` already contains `//{base}`" in _s142_siteA
+    and "no gate, no write" in _s142_siteA,
+    "setup § 3a must add an already-present check ahead of the confirmation "
+    "gate, reporting the covering rule(s) and skipping the prompt on a hit",
+)
+
+# --- Site B: agents/orchestrator.md Phase 0a Step 1g (bounded anchor-to-anchor
+# slice — the step is a numbered list item, not its own markdown heading, so
+# _slice_section's heading-boundary search would over-capture; find-to-find on
+# two named textual anchors is the established alternative, see Suite 62/95/97) ---
+_s142_step1g_start = _s142_orch.find(
+    "1g. **CONDITIONAL — Gated local permission provisioning.**"
+)
+_s142_step1g_end = _s142_orch.find(
+    "2. **MANDATORY — Query knowledge graph and write to file**", _s142_step1g_start
+)
+_s142_siteB = (
+    _s142_orch[_s142_step1g_start:_s142_step1g_end]
+    if _s142_step1g_start != -1
+    and _s142_step1g_end != -1
+    and _s142_step1g_end > _s142_step1g_start
+    else ""
+)
+
+check(
+    "suite142(siteB-present): agents/orchestrator.md Phase 0a Step 1g "
+    "(permission-provisioning) exists between the initiative create-or-join step "
+    "and the KG query step",
+    _s142_siteB != "",
+    "Phase 0a Step 1g must be present in agents/orchestrator.md between Step 1f "
+    "and Step 2",
+)
+check(
+    "suite142(siteB-a-anchor): Step 1g part (a) — obsidian existing-install "
+    "detection — uses the '//' double-slash anchor and additionalDirectories",
+    "Edit(//{base}/**)" in _s142_siteB
+    and "Write(//{base}/**)" in _s142_siteB
+    and "`permissions.additionalDirectories` already contains `//{base}`" in _s142_siteB,
+    "Step 1g part (a) must check/build Edit(//{base}/**), Write(//{base}/**), and "
+    "the additionalDirectories grant for //{base} (needle pinned to the exact "
+    "'already contains' phrasing so the additionalDirectories check cannot silently "
+    "regress into a generic //{base} substring already satisfied by the allow rules)",
+)
+check(
+    "suite142(siteB-a-passthrough): Step 1g part (a) is a silent pass-through "
+    "(no gate, no write) when the obsidian rules are already present",
+    "Already present" in _s142_siteB and "no gate, no write" in _s142_siteB,
+    "Step 1g part (a) must declare the already-present silent pass-through",
+)
+check(
+    "suite142(siteB-a-merge-write): Step 1g part (a) uses the identical "
+    "merge-write mechanism as setup § 3a",
+    "identical mechanism to `/th:setup` § 3a" in _s142_siteB,
+    "Step 1g part (a) must declare it reuses the setup § 3a merge-write mechanism",
+)
+check(
+    "suite142(siteB-a-decline): Step 1g part (a) records a decline as a session "
+    "decision in 00-state.md, no re-offer this run",
+    "permission_provisioning_decline: obsidian" in _s142_siteB
+    and "No re-offer during this run" in _s142_siteB,
+    "Step 1g part (a) must record permission_provisioning_decline: obsidian on "
+    "decline and not re-offer during the same run",
+)
+check(
+    "suite142(siteB-b-anchor): Step 1g part (b) — cross-repo work-surface — uses "
+    "the '//' double-slash anchor + additionalDirectories, scoped to "
+    ".claude/settings.local.json",
+    "Edit(//{path}/**)" in _s142_siteB
+    and "Write(//{path}/**)" in _s142_siteB
+    and "additionalDirectories: //{path}" in _s142_siteB
+    and ".claude/settings.local.json" in _s142_siteB,
+    "Step 1g part (b) must build Edit(//{path}/**), Write(//{path}/**), and "
+    "additionalDirectories: //{path} into .claude/settings.local.json",
+)
+check(
+    "suite142(siteB-b-passthrough): Step 1g part (b) is a silent pass-through "
+    "per-path when the cross-repo rules are already present",
+    "Already present for a path" in _s142_siteB and "no gate, no write" in _s142_siteB,
+    "Step 1g part (b) must declare the per-path already-present silent pass-through",
+)
+check(
+    "suite142(siteB-b-gate): Step 1g part (b) presents one gated Y/n offer "
+    "listing every path still missing coverage before writing",
+    "[y/N]" in _s142_siteB and "write nothing" in _s142_siteB,
+    "Step 1g part (b) must present a Y/n confirmation and write nothing on decline",
+)
+check(
+    "suite142(siteB-b-decline): Step 1g part (b) records a decline as a session "
+    "decision distinct from part (a)",
+    "permission_provisioning_decline: cross-repo" in _s142_siteB,
+    "Step 1g part (b) must record permission_provisioning_decline: cross-repo on "
+    "decline",
+)
+check(
+    "suite142(siteB-no-outward): Step 1g declares that outward-action rules are "
+    "never provisioned by either part",
+    "never touches outward-action rules" in _s142_siteB,
+    "Step 1g must declare that outward-action rules (push/PR/API) stay gated "
+    "exclusively by dev-guard",
+)
+check(
+    "suite142(siteB-doc-pointer): Step 1g points to the canonical "
+    "docs/permission-provisioning.md contract",
+    "docs/permission-provisioning.md" in _s142_siteB,
+    "Step 1g must reference docs/permission-provisioning.md",
+)
+check(
+    "suite142(siteB-state-schema): 00-state.md § Current State schema declares "
+    "the permission_provisioning_decline field",
+    "permission_provisioning_decline: {obsidian | cross-repo | both | null}" in _s142_orch,
+    "agents/orchestrator.md's Current State schema must declare "
+    "permission_provisioning_decline with its three-value + null domain",
+)
+
+# --- SEC-001/002/003 closure checks (2026-07-04 security remediation) ---
+check(
+    "suite142(siteA-validation-floor): setup § 3a validates the resolved base "
+    "before constructing any rule, rejecting empty/root/home/top-level/"
+    "traversal values",
+    "resolved-value validation floor" in _s142_siteA.lower()
+    and "`..` path-traversal segment" in _s142_siteA
+    and "top-level directory" in _s142_siteA,
+    "setup § 3a must declare the resolved-value validation floor and reject "
+    "empty/root/home/top-level/traversal values before building a rule",
+)
+check(
+    "suite142(siteB-validation-floor): Step 1g validates the resolved base/path "
+    "for both parts (a) and (b) before presenting any gate",
+    "resolved-value validation floor" in _s142_siteB.lower()
+    and "`..` path-traversal segment" in _s142_siteB
+    and "top-level directory" in _s142_siteB,
+    "Step 1g must declare the resolved-value validation floor applies to both "
+    "part (a) and part (b) before any gate",
+)
+check(
+    "suite142(doc-validation-floor): docs/permission-provisioning.md declares a "
+    "dedicated Resolved-value validation floor section",
+    "## Resolved-value validation floor" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare the Resolved-value validation "
+    "floor as its own section",
+)
+check(
+    "suite142(siteA-git-deny): setup § 3a pairs every allow rule with a .git/ "
+    "deny entry",
+    "Edit(//{base}/.git/**)" in _s142_siteA and "Write(//{base}/.git/**)" in _s142_siteA,
+    "setup § 3a must add Edit(//{base}/.git/**) and Write(//{base}/.git/**) to "
+    "permissions.deny alongside the allow rules",
+)
+check(
+    "suite142(siteB-git-deny): Step 1g pairs every allow rule (both parts) with "
+    "a .git/ deny entry",
+    "Edit(//{base}/.git/**)" in _s142_siteB
+    and "Write(//{base}/.git/**)" in _s142_siteB
+    and "Edit(//{path}/.git/**)" in _s142_siteB
+    and "Write(//{path}/.git/**)" in _s142_siteB,
+    "Step 1g must add the .git/ deny pair for both the obsidian base (part a) "
+    "and the cross-repo path (part b)",
+)
+check(
+    "suite142(doc-git-deny): docs/permission-provisioning.md declares the .git/ "
+    "exclusion invariant",
+    "## `.git/` exclusion invariant" in _s142_perm_doc
+    and "never covers `.git/`" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare a dedicated .git/ exclusion "
+    "invariant section stating a provisioned scope never covers .git/",
+)
+check(
+    "suite142(siteA-backup-atomic): setup § 3a backs up settings.json before "
+    "writing and writes atomically via temp file + rename",
+    "settings.json.bak" in _s142_siteA and "rename it atomically" in _s142_siteA,
+    "setup § 3a must back up to settings.json.bak and write atomically (temp "
+    "file + rename) before landing the merged document",
+)
+check(
+    "suite142(siteB-backup-atomic): Step 1g backs up both settings files before "
+    "writing and writes atomically via temp file + rename",
+    "settings.json.bak" in _s142_siteB
+    and "settings.local.json.bak" in _s142_siteB
+    and _s142_siteB.count("rename it atomically") >= 2,
+    "Step 1g must back up settings.json.bak (part a) and settings.local.json.bak "
+    "(part b) and write atomically at both sites",
+)
+check(
+    "suite142(doc-backup-atomic): docs/permission-provisioning.md declares the "
+    "backup + atomic-write sequence in the merge-write contract",
+    "Back up before writing" in _s142_perm_doc and "Atomic write" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare the backup-before-write and "
+    "atomic-write steps in the merge-write-whole-document contract",
+)
+check(
+    "suite142(sec004-blast-radius): docs/permission-provisioning.md and setup § "
+    "3a name the cross-project/cross-session blast radius of the user-scope "
+    "destination",
+    "every Claude Code session on every project" in _s142_perm_doc
+    and "every Claude Code session on any project" in _s142_siteA,
+    "the confirmation gate must name the cross-project/cross-session cost of "
+    "the ~/.claude/settings.json destination",
+)
+check(
+    "suite142(sec005-dedup-limitation): docs/permission-provisioning.md "
+    "documents the exact-match dedup limitation and the already-present "
+    "pass-through reports the covering rule for audit visibility",
+    "Known limitation" in _s142_perm_doc and "audit visibility" in _s142_siteB,
+    "docs/permission-provisioning.md must document the exact-match dedup "
+    "limitation, and Step 1g's already-present pass-through must report the "
+    "covering rule for audit visibility",
+)
+
+# --- docs/permission-provisioning.md canonical doc ---
+_s142_anchor_section = _slice_section(
+    _s142_perm_doc, "## The `//` double-slash anchor", ("\n## ",)
+)
+check(
+    "suite142(doc-25137-residual): docs/permission-provisioning.md documents the "
+    "#25137 upstream residual within the anchor section",
+    "#25137" in _s142_anchor_section
+    and "documented upstream residual" in _s142_anchor_section.lower(),
+    "docs/permission-provisioning.md § anchor must document the Claude Code "
+    "issue #25137 residual (a rule may still prompt on older CC versions)",
+)
+check(
+    "suite142(doc-sites-table): docs/permission-provisioning.md enumerates both "
+    "provisioning sites (A = setup KEYS-once, B = orchestrator Phase 0a "
+    "existing-install/recurring)",
+    "A — Setup (KEYS-once)" in _s142_perm_doc
+    and "B — Orchestrator Phase 0a (existing-install / recurring)" in _s142_perm_doc,
+    "docs/permission-provisioning.md must enumerate site A (setup, KEYS-once) and "
+    "site B (orchestrator Phase 0a, existing-install/recurring)",
+)
+check(
+    "suite142(doc-merge-write-contract): docs/permission-provisioning.md declares "
+    "the merge-write-whole-document contract as the single mechanism reused by "
+    "both sites",
+    "Merge-write-whole-document contract" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare a dedicated merge-write-whole-"
+    "document contract section",
+)
+
+# --- Negative assertions ---
+_s142_root_anchor_hits = [
+    needle
+    for needle in ("Edit(//**)", "Write(//**)")
+    if needle in _s142_setup or needle in _s142_siteB or needle in _s142_perm_doc
+]
+check(
+    "suite142(negative-no-root-anchor): no site ever emits a root double-slash "
+    "anchor rule without a path suffix (Edit(//**) / Write(//**))",
+    len(_s142_root_anchor_hits) == 0,
+    f"found a root-anchor-without-suffix rule: {_s142_root_anchor_hits}",
+)
+check(
+    "suite142(negative-no-gate-when-present): both Phase 0a sub-sites (a) and (b) "
+    "declare the no-gate/no-write pass-through when rules are already present — "
+    "provisioning is never re-gated on an already-covered base",
+    _s142_siteB.count("no gate, no write") >= 2,
+    "Step 1g must declare the already-present pass-through at both part (a) and "
+    "part (b), not merely once",
+)
+
+# --- Gap-driven addition (additionalDirectories root-anchor coverage) ---
+# AC-6 / Security Assessment (issue #462: rule too broad from a malformed
+# path) scope the root-anchor negative assertion to Edit/Write rule
+# forms only; `additionalDirectories` is an equally load-bearing access grant
+# (§ docs/permission-provisioning.md `## permissions.additionalDirectories`)
+# and was not covered by the existing negative-no-root-anchor check.
+_s142_root_additionaldirs_hits = [
+    needle
+    for needle in ("additionalDirectories: //**",)
+    if needle in _s142_setup or needle in _s142_siteB or needle in _s142_perm_doc
+]
+check(
+    "suite142(negative-no-root-additionaldirs): no site ever emits a root "
+    "double-slash additionalDirectories entry without a path suffix "
+    "(additionalDirectories: //**)",
+    len(_s142_root_additionaldirs_hits) == 0,
+    f"found a root-anchor-without-suffix additionalDirectories entry: "
+    f"{_s142_root_additionaldirs_hits}",
+)
+
+# --- Dispatch-site wiring (S-1 closure): the Step 1g part (b) deferred
+# re-check must be invoked at the actual dispatch sites, not merely
+# promised inside Step 1g's own body. Pin both sites so the wiring cannot
+# silently disappear on a future edit. ---
+_s142_dag_dispatch_slice = _slice_section(
+    _s142_orch,
+    "**Stage 2 scheduler (DAG by `Depends on:`).**",
+    ("\n### Intra-task execution-lane decomposition",),
+)
+_s142_lane_fanout_slice = _slice_section(
+    _s142_orch,
+    "### Intra-task execution-lane decomposition (dispatch-time gate)",
+    ("\n**Invoke via Task tool** with context:",),
+)
+check(
+    "suite142(dispatch-site-1to1): the Stage-2 DAG task-dispatch site "
+    "(1:1 implementer path) re-invokes Step 1g part (b) for an out-of-cwd "
+    "worktree path before dispatch",
+    "Step 1g part (b)" in _s142_dag_dispatch_slice,
+    "the Stage-2 DAG scheduler prose must trigger a Step 1g part (b) "
+    "re-check before invoking an implementer into an out-of-cwd worktree "
+    "path",
+)
+check(
+    "suite142(dispatch-site-lane-fanout): the intra-task lane fan-out "
+    "dispatch site re-invokes Step 1g part (b) for an out-of-cwd worktree "
+    "path before dispatching the first lane",
+    "Step 1g part (b)" in _s142_lane_fanout_slice,
+    "the intra-task lane fan-out gate prose must trigger a Step 1g part "
+    "(b) re-check before dispatching the first lane into an out-of-cwd "
+    "worktree path",
+)
+
+# Self-referential guards (hygiene contract)
+_s142_own = read(Path(__file__))
+check(
+    "suite142(self-ref): test file contains 'Suite 142' and 'permission-provisioning'",
+    "Suite 142" in _s142_own and "permission-provisioning" in _s142_own,
+    "test file must self-reference Suite 142 and the marker 'permission-provisioning'",
+)
+check(
+    "suite142(registry): docs/testing.md registers 'Suite 142' and "
+    "'permission-provisioning'",
+    "Suite 142" in _s142_testing_md and "permission-provisioning" in _s142_testing_md,
+    "docs/testing.md must register Suite 142 and the 'permission-provisioning' marker",
+)
+check(
+    "suite142(hygiene): CLAUDE.md does NOT contain 'Suite 142' (§11 hygiene contract)",
+    "Suite 142" not in _s142_claude_md,
+    "CLAUDE.md must not mention Suite 142 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: permission-provisioning
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 143 — three-file-watched-set (issue #464)
+#
+# Asserts the Phase 3.6 conditional re-run guard watches the full three-file
+# set `{01-plan.md, 02-implementation.md, reviews/04-validation.md}` at both
+# of its sites: the Phase 3.75 caller ("After a successful retry") and the
+# Phase 3.6 definition ("Conditional re-run after a 3.75 failure"). Pins the
+# three-file wording at each site independently and asserts no site anywhere
+# in the file retains the stale two-file form.
+#
+# Marker: three-file-watched-set
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 143: three-file-watched-set ===")
+
+_s143_orch = read(AGENTS_DIR / "orchestrator.md")
+_s143_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s143_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site A: Phase 3.75 caller ("e. After a successful retry...") ---
+_s143_siteA = _slice_section(
+    _s143_orch,
+    "e. After a successful retry, apply the Phase 3.6 conditional re-run rule",
+    ("\n\n**Iteration budget:**",),
+)
+
+check(
+    "suite143(siteA-present): Phase 3.75 caller site is found between the retry "
+    "step and the iteration-budget paragraph",
+    _s143_siteA != "",
+    "agents/orchestrator.md must contain the Phase 3.75 caller line "
+    "'e. After a successful retry, apply the Phase 3.6 conditional re-run rule'",
+)
+check(
+    "suite143(siteA-three-file-set): Phase 3.75 caller site watches all three "
+    "files 01-plan.md, 02-implementation.md, reviews/04-validation.md",
+    "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed"
+    in _s143_siteA,
+    "Phase 3.75 caller site must list all three watched files "
+    "(01-plan.md, 02-implementation.md, reviews/04-validation.md)",
+)
+check(
+    "suite143(siteA-none-of-three): Phase 3.75 caller site phrases the "
+    "no-drift-recheck condition as 'none of the three'",
+    "none of the three" in _s143_siteA,
+    "Phase 3.75 caller site must phrase the condition as 'none of the three', "
+    "not the stale 'touches neither'",
+)
+
+# --- Site B: Phase 3.6 definition ("Conditional re-run after a 3.75 failure") ---
+_s143_siteB = _slice_section(
+    _s143_orch,
+    "**Conditional re-run after a 3.75 failure.**",
+    ("\n\n**This is the third line of defense",),
+)
+
+check(
+    "suite143(siteB-present): Phase 3.6 definition site is found between its "
+    "own heading and the third-line-of-defense paragraph",
+    _s143_siteB != "",
+    "agents/orchestrator.md must contain the Phase 3.6 'Conditional re-run "
+    "after a 3.75 failure' paragraph",
+)
+check(
+    "suite143(siteB-three-file-set): Phase 3.6 definition site watches all "
+    "three files 01-plan.md, 02-implementation.md, reviews/04-validation.md",
+    "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed"
+    in _s143_siteB,
+    "Phase 3.6 definition site must list all three watched files "
+    "(01-plan.md, 02-implementation.md, reviews/04-validation.md)",
+)
+check(
+    "suite143(siteB-none-of-three-changed): Phase 3.6 definition site phrases "
+    "the verdict-stands condition as 'when none of the three changed'",
+    "when none of the three changed" in _s143_siteB,
+    "Phase 3.6 definition site must phrase the verdict-stands condition as "
+    "'when none of the three changed'",
+)
+check(
+    "suite143(siteB-implementation-grounding-read): Phase 3.6 definition site "
+    "explains why 02-implementation.md is watched — it is the acceptance-"
+    "checker's grounding read, invalidated by a build-fix that updates it",
+    "acceptance-checker's grounding read of `02-implementation.md` is watched"
+    in _s143_siteB,
+    "Phase 3.6 definition site must explain that 02-implementation.md is "
+    "watched because it is the acceptance-checker's grounding read",
+)
+
+# --- Negative assertion: no site retains the stale two-file form ---
+_s143_two_file_hits = [
+    site_name
+    for site_name, needle in (
+        (
+            "Phase 3.75 caller",
+            "`01-plan.md` or `reviews/04-validation.md` changed since the drift "
+            "verdict",
+        ),
+        (
+            "Phase 3.6 definition",
+            "`01-plan.md` or `reviews/04-validation.md` changed since the drift "
+            "verdict was produced",
+        ),
+    )
+    if needle in _s143_orch
+]
+check(
+    "suite143(negative-no-two-file-form): no site in agents/orchestrator.md "
+    "retains the stale two-file wording (plan + validation without "
+    "implementation)",
+    len(_s143_two_file_hits) == 0,
+    f"found the stale two-file guard wording at: {_s143_two_file_hits}",
+)
+
+# Self-referential guards (hygiene contract)
+_s143_own = read(Path(__file__))
+check(
+    "suite143(self-ref): test file contains 'Suite 143' and "
+    "'three-file-watched-set'",
+    "Suite 143" in _s143_own and "three-file-watched-set" in _s143_own,
+    "test file must self-reference Suite 143 and the marker "
+    "'three-file-watched-set'",
+)
+check(
+    "suite143(registry): docs/testing.md registers 'Suite 143' and "
+    "'three-file-watched-set'",
+    "Suite 143" in _s143_testing_md and "three-file-watched-set" in _s143_testing_md,
+    "docs/testing.md must register Suite 143 and the 'three-file-watched-set' "
+    "marker",
+)
+check(
+    "suite143(hygiene): CLAUDE.md does NOT contain 'Suite 143' (§11 hygiene "
+    "contract)",
+    "Suite 143" not in _s143_claude_md,
+    "CLAUDE.md must not mention Suite 143 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: three-file-watched-set
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 144 — lane-decomposition-bounds (issue #454)
+#
+# Asserts the dispatch-time intra-task execution-lane decomposition gate
+# (bounded fan-out of a single task's EXECUTION into architect-declared,
+# file-disjoint seams). Pins the three structural caps at their declaration
+# site in agents/orchestrator.md, the `Lane-decomposable:` schema field at
+# its declaration site in agents/architect.md, the seam-not-disjoint
+# fallback, the `lane_decomposition` state block, the trace-event names,
+# and the reconciled deliverable-vs-execution "never divides" token at both
+# doc-sites (docs/parallel-batch-implementation.md and
+# agents/ref-special-flows.md) via independent anchor-scoped slices.
+#
+# Marker: lane-decomposition-bounds
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 144: lane-decomposition-bounds ===")
+
+_s144_orch = read(AGENTS_DIR / "orchestrator.md")
+_s144_arch = read(AGENTS_DIR / "architect.md")
+_s144_pbi = read(REPO_ROOT / "docs" / "parallel-batch-implementation.md")
+_s144_ref = read(AGENTS_DIR / "ref-special-flows.md")
+_s144_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s144_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Declaration site: the dispatch-time gate section in orchestrator.md ---
+_S144_GATE_ANCHOR = "### Intra-task execution-lane decomposition (dispatch-time gate)"
+_S144_GATE_STOP = ("\n**Invoke via Task tool**", "\n### Phase 2.5", "\n## ")
+_s144_gate_slice = _slice_section(_s144_orch, _S144_GATE_ANCHOR, _S144_GATE_STOP)
+
+check(
+    "suite144(gate-present): agents/orchestrator.md contains the intra-task "
+    "execution-lane decomposition dispatch-time gate section",
+    _s144_gate_slice != "",
+    "agents/orchestrator.md must contain the "
+    "'### Intra-task execution-lane decomposition (dispatch-time gate)' section",
+)
+check(
+    "suite144(min-files-cap): the gate section pins LANE_DECOMPOSE_MIN_FILES = 8",
+    "`LANE_DECOMPOSE_MIN_FILES = 8`" in _s144_gate_slice,
+    "the dispatch-time gate section must declare `LANE_DECOMPOSE_MIN_FILES = 8`",
+)
+check(
+    "suite144(lane-cap): the gate section pins LANE_CAP = 5",
+    "`LANE_CAP = 5`" in _s144_gate_slice,
+    "the dispatch-time gate section must declare `LANE_CAP = 5`",
+)
+check(
+    "suite144(global-round-cap): the gate section pins GLOBAL_ROUND_CONCURRENCY_CAP = 6",
+    "`GLOBAL_ROUND_CONCURRENCY_CAP = 6`" in _s144_gate_slice,
+    "the dispatch-time gate section must declare `GLOBAL_ROUND_CONCURRENCY_CAP = 6`",
+)
+
+# --- Negative assertions (AC-7): lanes never exceed LANE_CAP; gate requires
+#     BOTH the file-count threshold AND disjoint seams, never one alone ---
+check(
+    "suite144(negative-lanes-never-exceed-cap): the gate section enforces "
+    "LANE_CAP as a hard ceiling — excess seams queue as a second wave, "
+    "never dispatch beyond the cap",
+    "runs its first `LANE_CAP` seams and queues the rest as a second wave"
+    in _s144_gate_slice,
+    "the gate section must state that a task with more seams than LANE_CAP "
+    "queues the excess rather than exceeding the cap",
+)
+check(
+    "suite144(negative-gate-requires-both): the gate fires only when BOTH "
+    "the file-count threshold AND disjoint seams hold — never threshold "
+    "alone, never the yes-declaration alone",
+    "BOTH the file-count threshold AND disjoint seams are required"
+    in _s144_gate_slice,
+    "the gate section must state that the file-count threshold and disjoint "
+    "seams are both required — neither alone fires the gate",
+)
+
+# --- Seam-not-disjoint fallback (never a silent stop) ---
+_S144_FALLBACK_ANCHOR = "**Seam-not-disjoint fallback (never a silent stop).**"
+_s144_fallback_slice = _slice_section(
+    _s144_orch, _S144_FALLBACK_ANCHOR, ("\n\n**Consolidation",)
+)
+check(
+    "suite144(seam-not-disjoint-fallback): a lane that must modify a "
+    "frozen-contract returns status:blocked reason:seam-not-disjoint and "
+    "the orchestrator re-dispatches the task monolithically",
+    "status: blocked, reason: seam-not-disjoint" in _s144_fallback_slice
+    and "Re-dispatches the ENTIRE task monolithically" in _s144_fallback_slice,
+    "agents/orchestrator.md must declare the seam-not-disjoint fallback: "
+    "status:blocked/reason:seam-not-disjoint triggers a monolithic re-dispatch, "
+    "never a silent stop",
+)
+
+# --- lane_decomposition state block + trace-event enum ---
+check(
+    "suite144(state-schema): 00-state.md Current State schema declares the "
+    "lane_decomposition field",
+    "- lane_decomposition:" in _s144_orch,
+    "agents/orchestrator.md '## Current State' schema must declare the "
+    "`lane_decomposition` field",
+)
+check(
+    "suite144(trace-events): the gate section names all three lane "
+    "trace events (dispatch / result / consolidated)",
+    "`stage2.lane.dispatch`" in _s144_gate_slice
+    and "`stage2.lane.result`" in _s144_gate_slice
+    and "`stage2.lanes.consolidated`" in _s144_gate_slice,
+    "the gate section must name the stage2.lane.dispatch, stage2.lane.result, "
+    "and stage2.lanes.consolidated trace events",
+)
+
+# --- Declaration site: Lane-decomposable schema field in architect.md ---
+_S144_ARCH_SCHEMA_ANCHOR = "- **Depends on:** {Task-N | none}"
+_s144_arch_schema_slice = _slice_section(
+    _s144_arch, _S144_ARCH_SCHEMA_ANCHOR, ("\n#### Acceptance Criteria",)
+)
+check(
+    "suite144(arch-schema-field): the Task List template declares the "
+    "Lane-decomposable field with seams and frozen-contracts",
+    "**Lane-decomposable:**" in _s144_arch_schema_slice
+    and "seams:" in _s144_arch_schema_slice
+    and "frozen-contracts:" in _s144_arch_schema_slice,
+    "agents/architect.md Task-1 template must declare `- **Lane-decomposable:**` "
+    "with `seams:` and `frozen-contracts:` sub-fields",
+)
+
+_S144_ARCH_GUIDE_ANCHOR = (
+    "#### `Lane-decomposable:` field (optional, plan-time seam declaration)"
+)
+_s144_arch_guide_slice = _slice_section(
+    _s144_arch, _S144_ARCH_GUIDE_ANCHOR, ("\n### Research Mode",)
+)
+check(
+    "suite144(arch-guidance): architect.md documents when to mark yes vs no "
+    "for Lane-decomposable, including the never-declare-just-in-case guard",
+    "When to mark `yes`" in _s144_arch_guide_slice
+    and "Never declare `Lane-decomposable: yes` for a tightly-coupled task"
+    in _s144_arch_guide_slice,
+    "agents/architect.md must document Lane-decomposable guidance (when to "
+    "mark yes/no) including the never-declare-just-in-case guard",
+)
+
+# --- AC-8: reconciled deliverable-vs-execution token at BOTH doc-sites ---
+_S144_TOKEN = (
+    "The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION "
+    "may fan out into bounded lanes"
+)
+
+_S144_PBI_ANCHOR = (
+    "## Intra-task lane fan-out — a third, distinct parallelism mechanism"
+)
+_s144_pbi_slice = _slice_section(_s144_pbi, _S144_PBI_ANCHOR, ("\n## Worktree isolation",))
+check(
+    "suite144(doc-siteA-parallel-batch): docs/parallel-batch-implementation.md "
+    "documents intra-task lane fan-out as the third parallelism mechanism and "
+    "carries the reconciled deliverable-vs-execution token",
+    _s144_pbi_slice != "" and _S144_TOKEN in _s144_pbi_slice,
+    "docs/parallel-batch-implementation.md must contain the "
+    "'## Intra-task lane fan-out' section with the reconciled "
+    "deliverable-vs-execution 'never divides' token",
+)
+
+_S144_REF_ANCHOR = "**Third parallelism axis — intra-task execution-lane fan-out"
+_s144_ref_slice = _slice_section(
+    _s144_ref, _S144_REF_ANCHOR, ("\n### Batch consolidation vs the anti-split invariant",)
+)
+check(
+    "suite144(doc-siteB-ref-special-flows): agents/ref-special-flows.md "
+    "documents intra-task lane fan-out as the third parallelism axis and "
+    "carries the reconciled deliverable-vs-execution token",
+    _s144_ref_slice != "" and _S144_TOKEN in _s144_ref_slice,
+    "agents/ref-special-flows.md must contain the 'Third parallelism axis' "
+    "paragraph with the reconciled deliverable-vs-execution 'never divides' "
+    "token",
+)
+
+# --- Gap-driven additions (multi-site invariant parity) ---
+# The Multi-site invariants table (01-plan.md) lists THREE sites for the
+# "#454 deliverable-vs-execution reconcile" invariant: the two external
+# doc-sites pinned above (doc-siteA/doc-siteB) AND agents/orchestrator.md's
+# own reconciled invariant paragraph (`:1893`). Only the two doc-sites had an
+# independent check — pin the third site for multi-site parity.
+_S144_INVARIANT_ANCHOR = "**The orchestrator never divides one task's DELIVERABLE"
+_s144_invariant_slice = _slice_section(
+    _s144_orch, _S144_INVARIANT_ANCHOR, ("\n\n**Post-approval division",)
+)
+check(
+    "suite144(invariant-site-orchestrator): agents/orchestrator.md's own "
+    "reconciled invariant paragraph (the third site, distinct from the two "
+    "doc-sites above) carries the DELIVERABLE-vs-EXECUTION token",
+    _s144_invariant_slice != "" and _S144_TOKEN in _s144_invariant_slice,
+    "agents/orchestrator.md must carry the reconciled deliverable-vs-execution "
+    "'never divides' token at its own invariant paragraph (:1893), not only "
+    "at the two external doc-sites",
+)
+check(
+    "suite144(negative-no-stale-plan-or-implementation): no stale "
+    "pre-reconciliation wording ('one task's plan or implementation' without "
+    "the DELIVERABLE/EXECUTION distinction) remains in agents/orchestrator.md",
+    "one task's plan or implementation" not in _s144_orch,
+    "agents/orchestrator.md must not retain the stale invariant wording "
+    "'one task's plan or implementation' — it must be reconciled to "
+    "DELIVERABLE vs EXECUTION",
+)
+check(
+    "suite144(gate-no-fire): the gate section states that a NO-FIRE task "
+    "(AC-2 tightly-coupled path) dispatches 1:1 exactly as today, with no "
+    "state change and no trace event",
+    "dispatch 1:1 exactly as today — no state change, no trace event"
+    in _s144_gate_slice,
+    "the gate section must state that gate NO-FIRE dispatches 1:1 exactly as "
+    "today, with no state change and no trace event",
+)
+check(
+    "suite144(consolidation-report-mandatory): the Consolidation section "
+    "declares the per-lane consolidation report is required, not optional, "
+    "whenever fan-out ran (AC-4)",
+    "required, not optional, whenever fan-out ran" in _s144_gate_slice,
+    "the Consolidation section must declare the consolidation report is "
+    "required, not optional, whenever fan-out ran",
+)
+
+# Self-referential guards (hygiene contract)
+_s144_own = read(Path(__file__))
+check(
+    "suite144(self-ref): test file contains 'Suite 144' and "
+    "'lane-decomposition-bounds'",
+    "Suite 144" in _s144_own and "lane-decomposition-bounds" in _s144_own,
+    "test file must self-reference Suite 144 and the marker "
+    "'lane-decomposition-bounds'",
+)
+check(
+    "suite144(registry): docs/testing.md registers 'Suite 144' and "
+    "'lane-decomposition-bounds'",
+    "Suite 144" in _s144_testing_md
+    and "lane-decomposition-bounds" in _s144_testing_md,
+    "docs/testing.md must register Suite 144 and the "
+    "'lane-decomposition-bounds' marker",
+)
+check(
+    "suite144(hygiene): CLAUDE.md does NOT contain 'Suite 144' (§11 hygiene "
+    "contract)",
+    "Suite 144" not in _s144_claude_md,
+    "CLAUDE.md must not mention Suite 144 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: lane-decomposition-bounds
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 145 — reviewer-writes-internal-review (issue #465)
+#
+# Asserts the ratified Opción B write-contract (the reviewer IS the writer of
+# its own internal-review outputs) agrees across all five sites: the
+# Read-Only Working-Tree Contract whitelist, the reviewer's internal-mode
+# prose, the reviewer's status-block example, the orchestrator's Artifact
+# Verification table, and the orchestrator's dual-review A/B per-pass draft
+# paths. One independent anchor-scoped check per site (multi-site
+# discipline), plus a negative assertion that no site anywhere states the
+# orchestrator writes the internal-review file.
+#
+# Marker: reviewer-writes-internal-review
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 145: reviewer-writes-internal-review ===")
+
+_s145_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s145_orch = read(AGENTS_DIR / "orchestrator.md")
+_s145_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s145_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site 1: Read-Only Working-Tree Contract whitelist (reviewer.md) ---
+_S145_WHITELIST_ANCHOR = "## Read-Only Working-Tree Contract"
+_S145_WHITELIST_STOP = ("\n## Worktree Lifecycle for PR Reviews",)
+_s145_whitelist_slice = _slice_section(
+    _s145_reviewer, _S145_WHITELIST_ANCHOR, _S145_WHITELIST_STOP
+)
+check(
+    "suite145(site1-present): agents/reviewer.md contains the Read-Only "
+    "Working-Tree Contract section",
+    _s145_whitelist_slice != "",
+    "agents/reviewer.md must contain the '## Read-Only Working-Tree "
+    "Contract' section",
+)
+check(
+    "suite145(site1-whitelist-enumeration): the whitelist enumerates all "
+    "four permitted writes (04-review.md plus the three internal-review "
+    "paths), each under the workspaces/ prefix",
+    all(
+        f"`workspaces/{{feature-name}}/reviews/{name}`" in _s145_whitelist_slice
+        for name in (
+            "04-review.md",
+            "04-internal-review.md",
+            "04-internal-review-A.md",
+            "04-internal-review-B.md",
+        )
+    ),
+    "agents/reviewer.md Read-Only Working-Tree Contract whitelist must "
+    "enumerate 04-review.md and all three 04-internal-review*.md paths, "
+    "each under workspaces/{feature-name}/reviews/",
+)
+check(
+    "suite145(site1-outside-workspaces-violation): the whitelist site "
+    "declares any write outside the `workspaces/` prefix a contract "
+    "violation (AC-1's 'nothing outside the workspaces/ prefix')",
+    "outside the `workspaces/` prefix" in _s145_whitelist_slice,
+    "agents/reviewer.md Read-Only Working-Tree Contract must declare that "
+    "any write outside the workspaces/ prefix is a contract violation",
+)
+
+# --- Site 2: reviewer internal-mode writer-identity prose (reviewer.md) ---
+_S145_MODE_ANCHOR = "### Internal Review (Phase 4.5 — advisory, no GitHub publish)"
+_S145_MODE_STOP = ("\n## Phase 0 — Parse Inline Data",)
+_s145_mode_slice = _slice_section(_s145_reviewer, _S145_MODE_ANCHOR, _S145_MODE_STOP)
+check(
+    "suite145(site2-reviewer-writes): the internal-mode prose states the "
+    "reviewer writes reviews/04-internal-review.md and the orchestrator "
+    "only surfaces the digest, never publishing it",
+    "The reviewer writes the output to "
+    "`workspaces/{feature-name}/reviews/04-internal-review.md`" in _s145_mode_slice
+    and "the orchestrator surfaces" in _s145_mode_slice,
+    "agents/reviewer.md Internal Review mode prose must state that the "
+    "reviewer writes 04-internal-review.md and the orchestrator only "
+    "surfaces the digest",
+)
+check(
+    "suite145(site2-without-publishing): the internal-mode prose states the "
+    "orchestrator surfaces the digest without publishing it anywhere "
+    "(AC-2's 'without publishing')",
+    "without publishing it anywhere" in _s145_mode_slice,
+    "agents/reviewer.md Internal Review mode prose must state the "
+    "orchestrator surfaces the digest without publishing it anywhere",
+)
+
+# --- Site 3: reviewer status-block example (reviewer.md Return Protocol) ---
+_S145_STATUS_ANCHOR = "### Internal Review (Phase 4.5 — advisory)"
+_S145_STATUS_STOP = ("\n### Rules for the status block",)
+_s145_status_slice = _slice_section(_s145_reviewer, _S145_STATUS_ANCHOR, _S145_STATUS_STOP)
+check(
+    "suite145(site3-status-block): the reviewer's Internal Review status-"
+    "block example declares its own workspace output path",
+    "output: workspaces/{feature-name}/reviews/04-internal-review.md"
+    in _s145_status_slice,
+    "agents/reviewer.md Return Protocol Internal Review example must "
+    "declare `output: workspaces/{feature-name}/reviews/04-internal-review.md`",
+)
+
+# --- Site 4: orchestrator Artifact Verification table ---
+_S145_TABLE_ANCHOR = "**Agent → Expected artifact mapping:**"
+_S145_TABLE_STOP = ("\n**Documentation flow note:**",)
+_s145_table_slice = _slice_section(_s145_orch, _S145_TABLE_ANCHOR, _S145_TABLE_STOP)
+check(
+    "suite145(site4-artifacts-table): the orchestrator's Artifact "
+    "Verification table maps the reviewer's Phase 4.5 internal mode to "
+    "reviews/04-internal-review.md",
+    "| `reviewer` | 4.5 (internal mode) | `reviews/04-internal-review.md` |"
+    in _s145_table_slice,
+    "agents/orchestrator.md Artifact → Expected artifact mapping table "
+    "must map reviewer/4.5 (internal mode) to reviews/04-internal-review.md",
+)
+
+# --- Site 5: orchestrator dual-review A/B per-pass draft paths ---
+_S145_AB_ANCHOR = "- **Per-pass draft paths:**"
+_S145_AB_STOP = ("\n- **Pre-gate positioning:**",)
+_s145_ab_slice = _slice_section(_s145_orch, _S145_AB_ANCHOR, _S145_AB_STOP)
+check(
+    "suite145(site5-dual-review-ab): the dual-review A/B section states "
+    "Pass A and Pass B each write their own draft file",
+    "Pass A writes `reviews/04-internal-review-A.md`" in _s145_ab_slice
+    and "Pass B writes `reviews/04-internal-review-B.md`" in _s145_ab_slice,
+    "agents/orchestrator.md dual-review 'Per-pass draft paths' bullet must "
+    "state Pass A writes 04-internal-review-A.md and Pass B writes "
+    "04-internal-review-B.md",
+)
+
+# --- Negative assertion: no site anywhere claims the orchestrator writes
+#     the internal-review file ---
+_S145_STALE_PHRASES = (
+    "The orchestrator writes the output to `workspaces/{feature-name}/"
+    "reviews/04-internal-review.md`",
+    "the orchestrator writes the local file and surfaces a one-line digest",
+)
+_s145_stale_hits = [
+    phrase
+    for phrase in _S145_STALE_PHRASES
+    if phrase in _s145_reviewer or phrase in _s145_orch
+]
+check(
+    "suite145(negative-no-orchestrator-writes): neither agents/reviewer.md "
+    "nor agents/orchestrator.md retains stale wording claiming the "
+    "orchestrator writes the internal-review file",
+    len(_s145_stale_hits) == 0,
+    f"found stale orchestrator-writes-internal-review wording: {_s145_stale_hits}",
+)
+
+# Self-referential guards (hygiene contract)
+_s145_own = read(Path(__file__))
+check(
+    "suite145(self-ref): test file contains 'Suite 145' and "
+    "'reviewer-writes-internal-review'",
+    "Suite 145" in _s145_own and "reviewer-writes-internal-review" in _s145_own,
+    "test file must self-reference Suite 145 and the marker "
+    "'reviewer-writes-internal-review'",
+)
+check(
+    "suite145(registry): docs/testing.md registers 'Suite 145' and "
+    "'reviewer-writes-internal-review'",
+    "Suite 145" in _s145_testing_md
+    and "reviewer-writes-internal-review" in _s145_testing_md,
+    "docs/testing.md must register Suite 145 and the "
+    "'reviewer-writes-internal-review' marker",
+)
+check(
+    "suite145(hygiene): CLAUDE.md does NOT contain 'Suite 145' (§11 hygiene "
+    "contract)",
+    "Suite 145" not in _s145_claude_md,
+    "CLAUDE.md must not mention Suite 145 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: reviewer-writes-internal-review
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
