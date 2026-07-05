@@ -6,3 +6,4 @@
 ### Fixed
 
 - Phase 3.6 conditional re-run guard now watches `02-implementation.md` in addition to `01-plan.md` and `reviews/04-validation.md` (#464): a post-3.75 build/lint fix that updates the implementation record — the acceptance-checker's grounding read — now re-triggers the acceptance-checker instead of leaving a stale drift verdict in place.
+- Reviewer's Read-Only Working-Tree Contract whitelist now includes its own internal-review outputs (#465): `reviews/04-internal-review.md` plus the dual-review `-A.md`/`-B.md` variants are permitted writes under `workspaces/`, and every site (whitelist, internal-mode prose, status-block example, orchestrator artifacts table, dual-review A/B paths) agrees the reviewer is the writer — the orchestrator only surfaces the digest.

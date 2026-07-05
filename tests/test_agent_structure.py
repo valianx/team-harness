@@ -32132,6 +32132,166 @@ check(
 
 # Marker: lane-decomposition-bounds
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 145 — reviewer-writes-internal-review (issue #465)
+#
+# Asserts the ratified Opción B write-contract (the reviewer IS the writer of
+# its own internal-review outputs) agrees across all five sites: the
+# Read-Only Working-Tree Contract whitelist, the reviewer's internal-mode
+# prose, the reviewer's status-block example, the orchestrator's Artifact
+# Verification table, and the orchestrator's dual-review A/B per-pass draft
+# paths. One independent anchor-scoped check per site (multi-site
+# discipline), plus a negative assertion that no site anywhere states the
+# orchestrator writes the internal-review file.
+#
+# Marker: reviewer-writes-internal-review
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 145: reviewer-writes-internal-review ===")
+
+_s145_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s145_orch = read(AGENTS_DIR / "orchestrator.md")
+_s145_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s145_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site 1: Read-Only Working-Tree Contract whitelist (reviewer.md) ---
+_S145_WHITELIST_ANCHOR = "## Read-Only Working-Tree Contract"
+_S145_WHITELIST_STOP = ("\n## Worktree Lifecycle for PR Reviews",)
+_s145_whitelist_slice = _slice_section(
+    _s145_reviewer, _S145_WHITELIST_ANCHOR, _S145_WHITELIST_STOP
+)
+check(
+    "suite145(site1-present): agents/reviewer.md contains the Read-Only "
+    "Working-Tree Contract section",
+    _s145_whitelist_slice != "",
+    "agents/reviewer.md must contain the '## Read-Only Working-Tree "
+    "Contract' section",
+)
+check(
+    "suite145(site1-whitelist-enumeration): the whitelist enumerates all "
+    "four permitted writes (04-review.md plus the three internal-review "
+    "paths), each under the workspaces/ prefix",
+    all(
+        f"`workspaces/{{feature-name}}/reviews/{name}`" in _s145_whitelist_slice
+        for name in (
+            "04-review.md",
+            "04-internal-review.md",
+            "04-internal-review-A.md",
+            "04-internal-review-B.md",
+        )
+    ),
+    "agents/reviewer.md Read-Only Working-Tree Contract whitelist must "
+    "enumerate 04-review.md and all three 04-internal-review*.md paths, "
+    "each under workspaces/{feature-name}/reviews/",
+)
+
+# --- Site 2: reviewer internal-mode writer-identity prose (reviewer.md) ---
+_S145_MODE_ANCHOR = "### Internal Review (Phase 4.5 — advisory, no GitHub publish)"
+_S145_MODE_STOP = ("\n## Phase 0 — Parse Inline Data",)
+_s145_mode_slice = _slice_section(_s145_reviewer, _S145_MODE_ANCHOR, _S145_MODE_STOP)
+check(
+    "suite145(site2-reviewer-writes): the internal-mode prose states the "
+    "reviewer writes reviews/04-internal-review.md and the orchestrator "
+    "only surfaces the digest, never publishing it",
+    "The reviewer writes the output to "
+    "`workspaces/{feature-name}/reviews/04-internal-review.md`" in _s145_mode_slice
+    and "the orchestrator surfaces" in _s145_mode_slice,
+    "agents/reviewer.md Internal Review mode prose must state that the "
+    "reviewer writes 04-internal-review.md and the orchestrator only "
+    "surfaces the digest",
+)
+
+# --- Site 3: reviewer status-block example (reviewer.md Return Protocol) ---
+_S145_STATUS_ANCHOR = "### Internal Review (Phase 4.5 — advisory)"
+_S145_STATUS_STOP = ("\n### Rules for the status block",)
+_s145_status_slice = _slice_section(_s145_reviewer, _S145_STATUS_ANCHOR, _S145_STATUS_STOP)
+check(
+    "suite145(site3-status-block): the reviewer's Internal Review status-"
+    "block example declares its own workspace output path",
+    "output: workspaces/{feature-name}/reviews/04-internal-review.md"
+    in _s145_status_slice,
+    "agents/reviewer.md Return Protocol Internal Review example must "
+    "declare `output: workspaces/{feature-name}/reviews/04-internal-review.md`",
+)
+
+# --- Site 4: orchestrator Artifact Verification table ---
+_S145_TABLE_ANCHOR = "**Agent → Expected artifact mapping:**"
+_S145_TABLE_STOP = ("\n**Documentation flow note:**",)
+_s145_table_slice = _slice_section(_s145_orch, _S145_TABLE_ANCHOR, _S145_TABLE_STOP)
+check(
+    "suite145(site4-artifacts-table): the orchestrator's Artifact "
+    "Verification table maps the reviewer's Phase 4.5 internal mode to "
+    "reviews/04-internal-review.md",
+    "| `reviewer` | 4.5 (internal mode) | `reviews/04-internal-review.md` |"
+    in _s145_table_slice,
+    "agents/orchestrator.md Artifact → Expected artifact mapping table "
+    "must map reviewer/4.5 (internal mode) to reviews/04-internal-review.md",
+)
+
+# --- Site 5: orchestrator dual-review A/B per-pass draft paths ---
+_S145_AB_ANCHOR = "- **Per-pass draft paths:**"
+_S145_AB_STOP = ("\n- **Pre-gate positioning:**",)
+_s145_ab_slice = _slice_section(_s145_orch, _S145_AB_ANCHOR, _S145_AB_STOP)
+check(
+    "suite145(site5-dual-review-ab): the dual-review A/B section states "
+    "Pass A and Pass B each write their own draft file",
+    "Pass A writes `reviews/04-internal-review-A.md`" in _s145_ab_slice
+    and "Pass B writes `reviews/04-internal-review-B.md`" in _s145_ab_slice,
+    "agents/orchestrator.md dual-review 'Per-pass draft paths' bullet must "
+    "state Pass A writes 04-internal-review-A.md and Pass B writes "
+    "04-internal-review-B.md",
+)
+
+# --- Negative assertion: no site anywhere claims the orchestrator writes
+#     the internal-review file ---
+_S145_STALE_PHRASES = (
+    "The orchestrator writes the output to `workspaces/{feature-name}/"
+    "reviews/04-internal-review.md`",
+    "the orchestrator writes the local file and surfaces a one-line digest",
+)
+_s145_stale_hits = [
+    phrase
+    for phrase in _S145_STALE_PHRASES
+    if phrase in _s145_reviewer or phrase in _s145_orch
+]
+check(
+    "suite145(negative-no-orchestrator-writes): neither agents/reviewer.md "
+    "nor agents/orchestrator.md retains stale wording claiming the "
+    "orchestrator writes the internal-review file",
+    len(_s145_stale_hits) == 0,
+    f"found stale orchestrator-writes-internal-review wording: {_s145_stale_hits}",
+)
+
+# Self-referential guards (hygiene contract)
+_s145_own = read(Path(__file__))
+check(
+    "suite145(self-ref): test file contains 'Suite 145' and "
+    "'reviewer-writes-internal-review'",
+    "Suite 145" in _s145_own and "reviewer-writes-internal-review" in _s145_own,
+    "test file must self-reference Suite 145 and the marker "
+    "'reviewer-writes-internal-review'",
+)
+check(
+    "suite145(registry): docs/testing.md registers 'Suite 145' and "
+    "'reviewer-writes-internal-review'",
+    "Suite 145" in _s145_testing_md
+    and "reviewer-writes-internal-review" in _s145_testing_md,
+    "docs/testing.md must register Suite 145 and the "
+    "'reviewer-writes-internal-review' marker",
+)
+check(
+    "suite145(hygiene): CLAUDE.md does NOT contain 'Suite 145' (§11 hygiene "
+    "contract)",
+    "Suite 145" not in _s145_claude_md,
+    "CLAUDE.md must not mention Suite 145 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: reviewer-writes-internal-review
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

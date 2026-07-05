@@ -88,6 +88,9 @@ This invariant covers all instruction sites: the atomic-submission note (the ski
 **NEVER use Edit or Write on source files in the working tree.** This agent's frontmatter grants `Edit` and `Write` tools; those grants exist for legitimate workspace writes only. The only permitted writes are:
 
 - `workspaces/{feature-name}/reviews/04-review.md` — the review summary workspace doc.
+- `workspaces/{feature-name}/reviews/04-internal-review.md` — the internal-review digest (Phase 4.5, single-pass).
+- `workspaces/{feature-name}/reviews/04-internal-review-A.md` — the internal-review digest, Pass A (Phase 4.5, dual-review).
+- `workspaces/{feature-name}/reviews/04-internal-review-B.md` — the internal-review digest, Pass B (Phase 4.5, dual-review).
 
 Any use of Edit or Write on any other path — source files, configuration files, build artifacts, or any working-tree file outside the `workspaces/` prefix — is a contract violation. If the review reveals that a source file must change, that finding goes into the review body as a requested change; the reviewer NEVER applies the change itself.
 
@@ -260,9 +263,9 @@ Used by the orchestrator immediately after Phase 4 (Delivery) and before Phase 5
   - **Skip when diff is trivial.** If the orchestrator says the diff is `<50 lines` or `≤2 files`, the orchestrator skips this mode entirely — there's nothing meaningful to summarize.
   - **Inline diff truncation bound (upper cap: 1500 lines).** The orchestrator passes the pre-fetched diff inline. If the diff exceeds 1500 lines, the orchestrator truncates it at 1500 lines and appends a marker: `[diff truncated at 1500 lines — full diff available in the PR]`. The reviewer parses the truncated diff as-is; the full diff is accessible via the Read tool on changed files. A truncated diff does NOT reduce the line cap for the skip-when-trivial check — `<50 lines` refers to the original diff size, not the truncated payload.
 
-The orchestrator writes the output to `workspaces/{feature-name}/reviews/04-internal-review.md` and embeds the `summary` and `criticals_count` in the report to the user.
+The reviewer writes the output to `workspaces/{feature-name}/reviews/04-internal-review.md`; the orchestrator surfaces the `summary` and `criticals_count` digest in the report to the user without publishing it anywhere.
 
-For the first three modes, the orchestrator writes output to draft files. The skill handles user approval and publishing via the appropriate GitHub API call. For Internal Review, the orchestrator writes the local file and surfaces a one-line digest to the user — never publishing.
+For the first three modes, the orchestrator writes output to draft files. The skill handles user approval and publishing via the appropriate GitHub API call. For Internal Review, the reviewer writes the local file directly and the orchestrator surfaces a one-line digest to the user — never publishing.
 
 ---
 
