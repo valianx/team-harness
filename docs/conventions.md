@@ -16,7 +16,7 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 
 | Doc | Tier | Format contract | Writer |
 |-----|------|-----------------|--------|
-| `01-plan.md` | operator-facing | Intrinsic plan schema (`## Review Summary` first, `## Architecture`, `## Task List`); consolidated, ordered, final state before implementation | architect (content); see write-scope table in `agents/_shared/plan-consolidation.md` |
+| `01-plan.md` | operator-facing | Intrinsic plan schema (`## Review Summary` first, `## Architecture`, `## Task List`); consolidated, ordered, final state before implementation (`## Review Summary` is the plan's own operator summary — not reviewer output) | architect (content); see write-scope table in `agents/_shared/plan-consolidation.md` |
 | `sketches/*.md` | operator-facing | `docs/plan-sketches.md` manifest (unchanged) | architect |
 | `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
 | `overview.md` (initiative) | operator-facing | `orchestrator.md § overview.md Template` (unchanged) | orchestrator / delivery |

@@ -81,7 +81,7 @@ Invoked as part of the main pipeline after implementation, to verify no security
 
 Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is a fifth, distinct operating mode — it is DISTINCT from Audit Mode, Focused Mode, Pipeline Mode, and PR Review Security Mode, all of which assume source code exists.
 
-**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any `*-review.md` file in this mode — your output goes to the single canonical `reviews/01-plan-review.md` (the plan-review panel's consolidated file), not to a security-specific side-file.
+**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any other `*-review.md` side-file in this mode — your output goes to the single canonical `reviews/01-plan-review.md` (the plan-review panel's consolidated file), not to a security-specific side-file.
 
 - **Trigger:** orchestrator invokes with `mode: design-review`, only when the task or plan is security-sensitive.
 - **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).

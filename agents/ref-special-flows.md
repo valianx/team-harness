@@ -436,7 +436,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | `00-execution-events.jsonl` / `.md` | Yes | Yes | Yes | Yes | Standard event trace (`.jsonl` local mode, `.md` obsidian mode) |
 | `00-pipeline-summary.md` | Yes | Yes | Yes | Yes | Standard rollup |
 | `01-root-cause.md` | **No (Phase 1 skipped)** | Yes — `mode: light-root-cause`, ≤30 lines | Yes — `mode: full-root-cause`, 1 pg max | Yes — `mode: full-root-cause` + mandatory `## Prior Art`, 1 pg max + ≤15 lines | file:line + mechanism + scope |
-| `reviews/01-plan-review.md § Plan Review` | Yes | Yes | Yes | Yes | plan-reviewer writes this section; includes Rules 7 + 8 (gated on `type: fix | hotfix`) |
+| `reviews/01-plan-review.md § Plan Review` | Yes | Yes | Yes | Yes | plan-reviewer writes this section; includes Rules 7 + 8 (gated on `type: fix \| hotfix`) |
 | `02-regression-test.md` | **Conditional skip** — only when no behavior change (see Tier 1 condition above); otherwise Yes | Yes | Yes | Yes | tester's failing test (path + content + how to run) BEFORE implementer touches anything |
 | `02-implementation.md` | Yes | Yes | Yes | Yes | implementer's report |
 | `03-testing.md` | Yes — suite no-regress only | Yes | Yes | Yes | tester's post-fix verification |
@@ -456,7 +456,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | 0.5 Bootstrap | orchestrator | — | Same as feature flow |
 | 1 Root-cause | architect (mode: root-cause + sub-mode) | `01-root-cause.md` (Tier 2-4 only) | **Tier 1: skipped.** Tier 2: `mode: light-root-cause`, ≤30 lines. Tier 3: `mode: full-root-cause`, 1 pg max. Tier 4: `mode: full-root-cause` + mandatory `## Prior Art`. |
 | 1.5 Plan ratification | qa-plan (mode: ratify-plan) | append to `01-root-cause.md` | Usually skipped for `type: fix` (≤3 AC) |
-| 1.6 Plan review | plan-reviewer | `reviews/01-plan-review.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix | hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
+| 1.6 Plan review | plan-reviewer | `reviews/01-plan-review.md § Plan Review` | Rules 1-6 plus Rules 7 + 8 (gated on `type: fix \| hotfix`). For Tier 1: Rule 7 is no-op (no `01-root-cause.md`); Rule 8 conditional on Phase 2.0 run |
 | STAGE-GATE-1 | orchestrator | STOP block | Plan-reviewer verdict + TL;DR from `01-root-cause.md` + Task Summary from `01-plan.md` (§ Task List). Tier 1: one-sentence prose plan replaces TL;DR copy |
 | **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback. Distinct from the AC-test authoring of Phase 2.7 — this test captures the bug before the implementer runs. |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
@@ -563,7 +563,7 @@ The Hotfix sub-flow is a tighter variant of the Bug-fix Flow for trivially scope
 
 ### workspaces artifact set (type: hotfix)
 
-Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `01-plan.md` is **still produced** (§ Task List minimum: 4-line task list — reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `reviews/01-plan-review.md § Plan Review`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`, `00-state.md § Delivery`, `reviews/04-validation.md § Drift Analysis`.
+Every artifact required by `type: fix` is also required by `type: hotfix`, **with one exception**: `01-root-cause.md` is omitted (Phase 1 skipped). `01-plan.md` is **still produced** (§ Task List minimum: 4-line task list — reproduce, regression test, fix, verify). All other artifacts in the table above for `type: fix` are produced for `type: hotfix` too — `reviews/01-plan-review.md § Plan Review`, `02-regression-test.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md`, `00-state.md § Delivery`, `reviews/04-validation.md § Drift Analysis` when Phase 3.6 runs (skipped for single-file hotfixes).
 
 ### Operator-facing surface
 
