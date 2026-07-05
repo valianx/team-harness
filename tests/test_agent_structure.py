@@ -31791,6 +31791,146 @@ check(
 
 # Marker: permission-provisioning
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 143 — three-file-watched-set (issue #464)
+#
+# Asserts the Phase 3.6 conditional re-run guard watches the full three-file
+# set `{01-plan.md, 02-implementation.md, reviews/04-validation.md}` at both
+# of its sites: the Phase 3.75 caller ("After a successful retry") and the
+# Phase 3.6 definition ("Conditional re-run after a 3.75 failure"). Pins the
+# three-file wording at each site independently and asserts no site anywhere
+# in the file retains the stale two-file form.
+#
+# Marker: three-file-watched-set
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 143: three-file-watched-set ===")
+
+_s143_orch = read(AGENTS_DIR / "orchestrator.md")
+_s143_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s143_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site A: Phase 3.75 caller ("e. After a successful retry...") ---
+_s143_siteA = _slice_section(
+    _s143_orch,
+    "e. After a successful retry, apply the Phase 3.6 conditional re-run rule",
+    ("\n\n**Iteration budget:**",),
+)
+
+check(
+    "suite143(siteA-present): Phase 3.75 caller site is found between the retry "
+    "step and the iteration-budget paragraph",
+    _s143_siteA != "",
+    "agents/orchestrator.md must contain the Phase 3.75 caller line "
+    "'e. After a successful retry, apply the Phase 3.6 conditional re-run rule'",
+)
+check(
+    "suite143(siteA-three-file-set): Phase 3.75 caller site watches all three "
+    "files 01-plan.md, 02-implementation.md, reviews/04-validation.md",
+    "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed"
+    in _s143_siteA,
+    "Phase 3.75 caller site must list all three watched files "
+    "(01-plan.md, 02-implementation.md, reviews/04-validation.md)",
+)
+check(
+    "suite143(siteA-none-of-three): Phase 3.75 caller site phrases the "
+    "no-drift-recheck condition as 'none of the three'",
+    "none of the three" in _s143_siteA,
+    "Phase 3.75 caller site must phrase the condition as 'none of the three', "
+    "not the stale 'touches neither'",
+)
+
+# --- Site B: Phase 3.6 definition ("Conditional re-run after a 3.75 failure") ---
+_s143_siteB = _slice_section(
+    _s143_orch,
+    "**Conditional re-run after a 3.75 failure.**",
+    ("\n\n**This is the third line of defense",),
+)
+
+check(
+    "suite143(siteB-present): Phase 3.6 definition site is found between its "
+    "own heading and the third-line-of-defense paragraph",
+    _s143_siteB != "",
+    "agents/orchestrator.md must contain the Phase 3.6 'Conditional re-run "
+    "after a 3.75 failure' paragraph",
+)
+check(
+    "suite143(siteB-three-file-set): Phase 3.6 definition site watches all "
+    "three files 01-plan.md, 02-implementation.md, reviews/04-validation.md",
+    "`01-plan.md`, `02-implementation.md`, or `reviews/04-validation.md` changed"
+    in _s143_siteB,
+    "Phase 3.6 definition site must list all three watched files "
+    "(01-plan.md, 02-implementation.md, reviews/04-validation.md)",
+)
+check(
+    "suite143(siteB-none-of-three-changed): Phase 3.6 definition site phrases "
+    "the verdict-stands condition as 'when none of the three changed'",
+    "when none of the three changed" in _s143_siteB,
+    "Phase 3.6 definition site must phrase the verdict-stands condition as "
+    "'when none of the three changed'",
+)
+check(
+    "suite143(siteB-implementation-grounding-read): Phase 3.6 definition site "
+    "explains why 02-implementation.md is watched — it is the acceptance-"
+    "checker's grounding read, invalidated by a build-fix that updates it",
+    "acceptance-checker's grounding read of `02-implementation.md` is watched"
+    in _s143_siteB,
+    "Phase 3.6 definition site must explain that 02-implementation.md is "
+    "watched because it is the acceptance-checker's grounding read",
+)
+
+# --- Negative assertion: no site retains the stale two-file form ---
+_s143_two_file_hits = [
+    site_name
+    for site_name, needle in (
+        (
+            "Phase 3.75 caller",
+            "`01-plan.md` or `reviews/04-validation.md` changed since the drift "
+            "verdict",
+        ),
+        (
+            "Phase 3.6 definition",
+            "`01-plan.md` or `reviews/04-validation.md` changed since the drift "
+            "verdict was produced",
+        ),
+    )
+    if needle in _s143_orch
+]
+check(
+    "suite143(negative-no-two-file-form): no site in agents/orchestrator.md "
+    "retains the stale two-file wording (plan + validation without "
+    "implementation)",
+    len(_s143_two_file_hits) == 0,
+    f"found the stale two-file guard wording at: {_s143_two_file_hits}",
+)
+
+# Self-referential guards (hygiene contract)
+_s143_own = read(Path(__file__))
+check(
+    "suite143(self-ref): test file contains 'Suite 143' and "
+    "'three-file-watched-set'",
+    "Suite 143" in _s143_own and "three-file-watched-set" in _s143_own,
+    "test file must self-reference Suite 143 and the marker "
+    "'three-file-watched-set'",
+)
+check(
+    "suite143(registry): docs/testing.md registers 'Suite 143' and "
+    "'three-file-watched-set'",
+    "Suite 143" in _s143_testing_md and "three-file-watched-set" in _s143_testing_md,
+    "docs/testing.md must register Suite 143 and the 'three-file-watched-set' "
+    "marker",
+)
+check(
+    "suite143(hygiene): CLAUDE.md does NOT contain 'Suite 143' (§11 hygiene "
+    "contract)",
+    "Suite 143" not in _s143_claude_md,
+    "CLAUDE.md must not mention Suite 143 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: three-file-watched-set
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
