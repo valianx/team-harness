@@ -31733,7 +31733,7 @@ check(
     "before constructing any rule, rejecting empty/root/home/top-level/"
     "traversal values",
     "resolved-value validation floor" in _s142_siteA.lower()
-    and ".." in _s142_siteA
+    and "`..` path-traversal segment" in _s142_siteA
     and "top-level directory" in _s142_siteA,
     "setup § 3a must declare the resolved-value validation floor and reject "
     "empty/root/home/top-level/traversal values before building a rule",
@@ -31742,7 +31742,7 @@ check(
     "suite142(siteB-validation-floor): Step 1g validates the resolved base/path "
     "for both parts (a) and (b) before presenting any gate",
     "resolved-value validation floor" in _s142_siteB.lower()
-    and ".." in _s142_siteB
+    and "`..` path-traversal segment" in _s142_siteB
     and "top-level directory" in _s142_siteB,
     "Step 1g must declare the resolved-value validation floor applies to both "
     "part (a) and part (b) before any gate",
@@ -31872,9 +31872,9 @@ check(
     "part (b), not merely once",
 )
 
-# --- Gap-driven addition (tester Phase 2.7 audit) ---
-# AC-6 / Security Assessment ("#462 regla demasiado amplia por path mal
-# construido") scope the root-anchor negative assertion to Edit/Write rule
+# --- Gap-driven addition (additionalDirectories root-anchor coverage) ---
+# AC-6 / Security Assessment (issue #462: rule too broad from a malformed
+# path) scope the root-anchor negative assertion to Edit/Write rule
 # forms only; `additionalDirectories` is an equally load-bearing access grant
 # (§ docs/permission-provisioning.md `## permissions.additionalDirectories`)
 # and was not covered by the existing negative-no-root-anchor check.
@@ -31890,6 +31890,39 @@ check(
     len(_s142_root_additionaldirs_hits) == 0,
     f"found a root-anchor-without-suffix additionalDirectories entry: "
     f"{_s142_root_additionaldirs_hits}",
+)
+
+# --- Dispatch-site wiring (S-1 closure): the Step 1g part (b) deferred
+# re-check must be invoked at the actual dispatch sites, not merely
+# promised inside Step 1g's own body. Pin both sites so the wiring cannot
+# silently disappear on a future edit. ---
+_s142_dag_dispatch_slice = _slice_section(
+    _s142_orch,
+    "**Stage 2 scheduler (DAG by `Depends on:`).**",
+    ("\n### Intra-task execution-lane decomposition",),
+)
+_s142_lane_fanout_slice = _slice_section(
+    _s142_orch,
+    "### Intra-task execution-lane decomposition (dispatch-time gate)",
+    ("\n**Invoke via Task tool** with context:",),
+)
+check(
+    "suite142(dispatch-site-1to1): the Stage-2 DAG task-dispatch site "
+    "(1:1 implementer path) re-invokes Step 1g part (b) for an out-of-cwd "
+    "worktree path before dispatch",
+    "Step 1g part (b)" in _s142_dag_dispatch_slice,
+    "the Stage-2 DAG scheduler prose must trigger a Step 1g part (b) "
+    "re-check before invoking an implementer into an out-of-cwd worktree "
+    "path",
+)
+check(
+    "suite142(dispatch-site-lane-fanout): the intra-task lane fan-out "
+    "dispatch site re-invokes Step 1g part (b) for an out-of-cwd worktree "
+    "path before dispatching the first lane",
+    "Step 1g part (b)" in _s142_lane_fanout_slice,
+    "the intra-task lane fan-out gate prose must trigger a Step 1g part "
+    "(b) re-check before dispatching the first lane into an out-of-cwd "
+    "worktree path",
 )
 
 # Self-referential guards (hygiene contract)
@@ -32227,7 +32260,7 @@ check(
     "token",
 )
 
-# --- Gap-driven additions (tester Phase 2.7 audit) ---
+# --- Gap-driven additions (multi-site invariant parity) ---
 # The Multi-site invariants table (01-plan.md) lists THREE sites for the
 # "#454 deliverable-vs-execution reconcile" invariant: the two external
 # doc-sites pinned above (doc-siteA/doc-siteB) AND agents/orchestrator.md's
@@ -32356,7 +32389,7 @@ check(
 check(
     "suite145(site1-outside-workspaces-violation): the whitelist site "
     "declares any write outside the `workspaces/` prefix a contract "
-    "violation (AC-1's 'nada fuera del prefijo workspaces/')",
+    "violation (AC-1's 'nothing outside the workspaces/ prefix')",
     "outside the `workspaces/` prefix" in _s145_whitelist_slice,
     "agents/reviewer.md Read-Only Working-Tree Contract must declare that "
     "any write outside the workspaces/ prefix is a contract violation",
@@ -32380,7 +32413,7 @@ check(
 check(
     "suite145(site2-without-publishing): the internal-mode prose states the "
     "orchestrator surfaces the digest without publishing it anywhere "
-    "(AC-2's 'sin publicar')",
+    "(AC-2's 'without publishing')",
     "without publishing it anywhere" in _s145_mode_slice,
     "agents/reviewer.md Internal Review mode prose must state the "
     "orchestrator surfaces the digest without publishing it anywhere",
