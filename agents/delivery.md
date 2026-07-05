@@ -869,6 +869,7 @@ When deletions dominate (deletions > 2× additions, or the change is relocation-
 - **Risk level:** low | medium | high — {one-line justification}
 - **Blast radius:** {what could break if this is wrong, e.g. "auth on /api/* — every authenticated endpoint would 401"}
 - **Rollback plan:** {one line — usually "revert the merge commit"}
+- **Docs placement (report-only):** {if the diff added files under `/docs`, list them — the documentation-placement policy was followed; if the diff added a source-comment block larger than ~15 lines, note `file:line` so the reviewer can confirm it is a legitimate WHY-comment and not prose that belongs under `/docs`. Omit this line entirely when neither condition applies.}
 
 ## Before / after (conditional — include when behaviour visibly changes)
 - **Before:** {observable behaviour before this PR}
