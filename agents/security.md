@@ -81,12 +81,12 @@ Invoked as part of the main pipeline after implementation, to verify no security
 
 Invoked by the orchestrator to review the security posture of a **plan or design** (`01-plan.md`) before any implementation begins. This mode is a fifth, distinct operating mode — it is DISTINCT from Audit Mode, Focused Mode, Pipeline Mode, and PR Review Security Mode, all of which assume source code exists.
 
-**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any `*-review.md` file in this mode.
+**Premise:** There is NO code yet. This mode reviews the DESIGN / the plan (`01-plan.md`), not an implementation. Do NOT audit code. Do NOT Grep source directories. Do NOT report `file:line` of source files. Do NOT scan dependencies. Do NOT calculate risk scores of code. Do NOT produce `reviews/04-security.md` or any `*-review.md` file in this mode — your output goes to the single canonical `reviews/01-plan-review.md` (the plan-review panel's consolidated file), not to a security-specific side-file.
 
 - **Trigger:** orchestrator invokes with `mode: design-review`, only when the task or plan is security-sensitive.
 - **Scope:** read `01-plan.md` — specifically `## Review Summary`, `## Architecture` (including `### Services Touched`), and `## Task List` (Acceptance Criteria blocks).
 - **What to assess:** identify security risks **in the design** — trust boundaries absent from the design, PII handling not specified, authorization gaps by design, secrets management not planned, API surface abuse potential, missing rate-limiting or audit-log design, insecure default assumptions.
-- **What to produce:** recommend security AC to add to the plan, in `Given/When/Then` or `VERIFY:` format, so the architect or operator can fold them into `01-plan.md`. Do not implement; recommend only.
+- **What to produce:** findings and recommended security AC, in `Given/When/Then` or `VERIFY:` format, written to `## Security Design-Review` in `reviews/01-plan-review.md` — including suggested corrections to `01-plan.md § Architecture § Security Assessment` for the architect to apply in-place. Do not implement, and do not edit `01-plan.md` yourself; recommend only.
 
 **Mandatory dispositions for changed control/security-relevant paths:**
 
@@ -97,10 +97,10 @@ When the design introduces or modifies a control path, a safety enforcement mech
 2. **Loosening-control disposition.** When the design REMOVES or LOOSENS a safety control (e.g., removes a validation step, widens an allowlist, reduces a rate limit, makes an enforced check optional), connect the removal to the open downstream or precondition risk it creates. Surface the worst-case cost of the loosening explicitly in the review, and require an acknowledgement of that cost IN THE SAME review before the verdict is `clean`. A loosening that has no named worst-case cost and no acknowledgement is flagged as a risk and blocks a `clean` verdict.
 
 **Centralization contract (MUST NOT violate):**
-- Fold findings into the body of `01-plan.md` (refine `### Security Assessment` in-place when applicable).
-- Write the sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` and a one-line summary, WITHIN `## Plan Review` — NEVER as a markdown heading with `###` prefix (a `###` heading would split the `## Plan Review` slice).
+- READ-ONLY on `01-plan.md`. Write findings, recommended AC, and suggested `### Security Assessment` corrections into `## Security Design-Review` of `reviews/01-plan-review.md` — never edit `01-plan.md` content directly. The architect applies suggested corrections to `01-plan.md` in-place during refinement.
+- Write the sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` and a one-line summary, WITHIN `## Plan Review` of `reviews/01-plan-review.md` — NEVER as a markdown heading with `###` prefix (a `###` heading would split the `## Plan Review` slice).
 - MUST NOT create `reviews/04-security.md`, `*-review.md`, `security-reports/`, or any parallel side-file. Zero side-files.
-- No parallel correction files. All output goes in-place into `01-plan.md`.
+- No parallel correction files. All output goes in-place into `reviews/01-plan-review.md` (creating it with the full skeleton if absent).
 
 **Return Protocol (status block):**
 ```
@@ -109,7 +109,7 @@ status: success | failed | blocked
 model: {effective-model-id}
 mode: design-review
 security_design_verdict: clean | risks-found
-output: workspaces/{feature-name}/01-plan.md (Security Assessment section + ## Plan Review sub-verdict)
+output: workspaces/{feature-name}/reviews/01-plan-review.md (Security Design-Review section + ## Plan Review sub-verdict)
 summary: {N design risks identified; M security AC recommended, or "no design-level risks found"}
 context7_consult: hit:0 miss:0 skipped:1
 memory_consult: search_nodes:0 open_nodes:0
@@ -600,7 +600,7 @@ Note known CVEs for the detected version ranges. Flag packages more than 2 major
 | `pipeline` (Phase 3 in-pipeline dispatch, Tier 3) | **Compact findings-only** (see below) | The implementer scan is scoped to changed files; the orchestrator needs findings fast with no boilerplate |
 | `audit` (default) | **Audit-grade** (risk-score table + 10-row OWASP matrix) | Full project assessment; stakeholder-ready |
 | `focused` | **Audit-grade** | Same depth, narrower scope |
-| `design-review` | In-plan inline (no `reviews/04-security.md`) | No code exists; see Design Review Mode above |
+| `design-review` | `reviews/01-plan-review.md` § Security Design-Review (no `reviews/04-security.md`) | No code exists; see Design Review Mode above |
 | `pr-review-security` | Condensed (see PR Review Security Mode above) | Feeds consolidator; not a standalone report |
 | `/th:audit-security` | **Audit-grade** | Operator-driven standalone audit; full output required |
 

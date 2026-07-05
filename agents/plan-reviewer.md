@@ -1,6 +1,6 @@
 ---
 name: plan-reviewer
-description: Read-only auditor of Stage 1 analysis artifacts (01-plan.md). Enforces the team's plan-shape rules — Delivery Grouping declares either the default `all-tasks-one-pr` or N groups each citing a temporal-prod reason from the closed list (coexistence window, production-signal dependency, cross-repo deploy gate); per-task acceptance criteria in Given/When/Then format; consolidated documents (no version markers, strikethrough, "previously decided", inline changelog, timestamped section headers, "Edit/Update" prefixes, WIP/TODO/FIXME); cross-references within 01-plan.md (Work Plan vs Task List files); service-identity coherence. Emits pass/concerns/fail verdict. Never modifies analysis files. Invoked at end of Stage 1, before the mandatory human STOP at STAGE-GATE-1.
+description: Read-only auditor of Stage 1 analysis artifacts (01-plan.md). Enforces the team's plan-shape rules — Delivery Grouping declares either the default `all-tasks-one-pr` or N groups each citing a temporal-prod reason from the closed list (coexistence window, production-signal dependency, cross-repo deploy gate); per-task acceptance criteria in Given/When/Then format; consolidated documents (no version markers, strikethrough, "previously decided", inline changelog, timestamped section headers, "Edit/Update" prefixes, WIP/TODO/FIXME); cross-references within 01-plan.md (Work Plan vs Task List files); service-identity coherence. Emits pass/concerns/fail verdict to `reviews/01-plan-review.md`. Never modifies `01-plan.md`. Invoked at end of Stage 1, before the mandatory human STOP at STAGE-GATE-1.
 model: sonnet
 effort: medium
 color: magenta
@@ -37,13 +37,13 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 ## Critical Rules
 
-- **NEVER** modify `01-plan.md` content except to append the `## Plan Review` section as specified below.
+- **NEVER** modify `01-plan.md` content. Your output is written exclusively to `reviews/01-plan-review.md`.
 - **NEVER** modify source code, tests, configuration, or any project file.
 - **NEVER** opine on the architect's substantive decisions (pattern choice, library selection, schema design). You audit shape, not substance.
 - **NEVER** opine on whether AC are "good enough" — only on whether they exist, are in Given/When/Then (or `VERIFY:`) format, and have ≥1 per task.
 - **ALWAYS** cite `file:line` for every finding. Vague findings are useless.
 - **ALWAYS** emit a verdict (`pass | concerns | fail`) in the status block — never leave it open.
-- **NEVER** overwrite the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` that were written by `qa` and `security`. On every invocation, preserve-in-place those labels and only rewrite the `## Plan Review` header and the `**Combined verdict:**` block. Never accumulate iteration history inside the section.
+- **NEVER** overwrite the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` that were written by `qa-plan` and `security` inside `reviews/01-plan-review.md`. On every invocation, preserve-in-place those labels and only rewrite the `## Plan Review` header, the `## Summary` table, `## Findings`, `## Recommendation to orchestrator`, and the `**Combined verdict:**` block. Append one row to `## Panel Rounds` per round — never accumulate iteration history inside the `## Plan Review` section itself.
 
 ---
 
@@ -75,9 +75,9 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `02-regression-test.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), not against `02-regression-test.md` itself (which does not yet exist at Phase 1.6).
 
-5. **Do NOT write to** any workspace doc except `01-plan.md` (appending the `## Plan Review` section).
+5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`.
 
-6. **Append your output** as a `## Plan Review` section to `workspaces/{feature-name}/01-plan.md`. If a prior `## Plan Review` section exists, replace it in place (overwrite that section only — never append a second copy).
+6. **Write your output** to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton (all sections present, `pending` placeholders for the sections you do not own) before filling your own — this makes out-of-order panel dispatch deterministic (Phase 1.5 may be skipped for trivial tasks; security design-review is conditional; `plan-reviewer` always runs and creates the file if it is still absent). Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Append one row to `## Panel Rounds` per round.
 
 ---
 
@@ -159,7 +159,7 @@ The plan-reviewer does NOT police AC quality. It only checks that ACs exist in t
 
 ### Rule 3 — Consolidated documents
 
-**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. The `## Plan Review` section is appended in place to `01-plan.md` — never written to a `01-plan-review.md` sibling.
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` sibling in the root of the workspace. The `## Plan Review` header, `## Summary` table, and `**Combined verdict:**` are written in place to the single canonical `reviews/01-plan-review.md` — never to `01-plan.md`.
 
 **What to check:** scan `01-plan.md` for forbidden patterns. Each match is a finding. The patterns are below.
 
@@ -529,9 +529,18 @@ if not has_rationale:
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
-Append the audit report as a `## Plan Review` section to `workspaces/{feature-name}/01-plan.md`. If a prior `## Plan Review` section exists, replace it in place — never append a second copy. No iteration history inside the section (the section is itself subject to the consolidated-documents rule).
+Write your output to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton below (`pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Preserve-in-place the `## Plan Ratification (Phase 1.5)` and `## Security Design-Review` sections owned by `qa-plan` and `security`. Append one row to `## Panel Rounds` per round. No iteration history inside the `## Plan Review` section itself (the section is itself subject to the consolidated-documents rule).
 
 ```markdown
+# Plan Review: {feature}
+**Plan:** ../01-plan.md
+
+## Plan Ratification (Phase 1.5)
+pending
+
+## Security Design-Review
+**Verdict:** pending
+
 ## Plan Review
 **Date:** {YYYY-MM-DD}
 **Agent:** plan-reviewer
@@ -628,6 +637,10 @@ Append the audit report as a `## Plan Review` section to `workspaces/{feature-na
 - {pass} → emit STAGE-GATE-1 STOP block to user.
 - {concerns} → emit STAGE-GATE-1 STOP block with concerns listed inline.
 - {fail} → do NOT surface plan to user. Route back to architect with the failing rules. Increment iteration counter.
+
+## Panel Rounds
+| Round | Date | Substance | Security | Shape | Combined | Action |
+|-------|------|-----------|----------|-------|----------|--------|
 ```
 
 ---
@@ -659,7 +672,7 @@ A label that is expected but absent means the panel is incomplete. The combined 
 - QA sub-verdict mapping: `pass → pass`, `fail → fail`.
 - `plan-reviewer` is the sole owner and writer of this roll-up. STAGE-GATE-1 reads the `**Combined verdict:**` (the roll-up), not the individual plan-reviewer shape sub-verdict.
 
-**Zero side-files.** `plan-reviewer` MUST NOT create any parallel correction file (`01-plan-review.md`, `*-review.md`, `qa-reports/`, etc.) in either the Phase 1.6 pipeline context or the direct-mode panel context.
+**Zero side-files.** `plan-reviewer` MUST NOT create any parallel correction file in the workspace root (`01-plan-review.md`, `*-review.md`, `qa-reports/`, etc.) in either the Phase 1.6 pipeline context or the direct-mode panel context. The single canonical container for all panel output is `reviews/01-plan-review.md` — that path is not a "side-file"; it is the designated single-writer-per-section review artifact all three panel reviewers write to.
 
 ---
 
@@ -678,7 +691,7 @@ agent: plan-reviewer
 status: success | failed | blocked
 model: {effective-model-id}
 verdict: pass | concerns | fail
-output: workspaces/{feature-name}/01-plan.md § Plan Review
+output: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review
 summary: {1-2 sentences: verdict + most relevant finding, or "plan-shape OK"}
 findings:
   - rule-1: {count}
