@@ -636,6 +636,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - worktree: {absolute path | null}             # worktree path for this task; null when running branch-in-place. Set at Phase 0a when a worktree is created. Teardown in delivery reads this field directly — no filesystem search needed.
 - worktree_branch: {branch name | null}        # branch checked out in the worktree; null when worktree is null
 - worktree_base: {origin/main | <dep-branch> | null}  # the ref the worktree branch was cut from; null when worktree is null
+- permission_provisioning_decline: {obsidian | cross-repo | both | null}  # set at Phase 0a Step 1g when the operator declines a gated permission-provisioning offer; null = no decline this run (rules already present, granted, or not yet offered). Session-scoped — no re-offer during this run when set; the next pipeline run may offer again.
 
 **Single-task start-gate (branch-in-place vs. worktree):** before creating a branch for any single-task implementation or delivery, run `git fetch origin main` and check the tree's position. Branch-in-place is permitted ONLY when the tree is clean AND at/behind `origin/main` (`git rev-list --count origin/main..HEAD` returns `0`). Create a worktree when there are uncommitted changes OR the tree is ahead of origin/main — including when on a non-main branch. Branching from a local `main` that is ahead of `origin/main` carries unpushed commits onto the new feature branch and bundles two independent developments into one PR. The canonical decision table and detection command are in `docs/worktree-discipline.md` Rule 1.
 
@@ -870,6 +871,30 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    ```
 
 1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise, find or create the `overview.md` file (date-agnostic JOIN rule) and write this project's row — full detection/JOIN/read-modify-write/concurrency/best-effort protocol: `agents/ref-intake-flows.md § Initiative Create-or-Join`.
+
+1g. **CONDITIONAL — Gated local permission provisioning.** Provisions local Claude Code permission rules so subagent `Edit`/`Write` calls into declared out-of-cwd surfaces stop prompting on every call. Security-sensitive (it provisions permissions): always gated by an explicit Y/n, never silent when a rule is missing, and never touches outward-action rules (`git push`, `gh pr *`, any GitHub/ClickUp API write stay gated exclusively by `dev-guard`). Full contract: `docs/permission-provisioning.md`.
+
+   **(a) Obsidian workspace — existing-install coverage (site B).** Runs only when `logs_mode == "obsidian"` (resolved at boot). Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX with a `//` anchor — identical normalization to `/th:setup` § 3a. Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)` AND `permissions.additionalDirectories` already contains `//{base}`.
+      - **Already present → no gate, no write** (silent pass-through). Continue to (b).
+      - **Missing (any of the three) → present the same gated Y/n offer as `/th:setup` § 3a**, showing the exact rules. This covers an install that ran `/th:setup` before this sub-step existed, or an operator who declined the offer at setup time and later switched to obsidian mode.
+        - **Decline** → write nothing; record `permission_provisioning_decline: obsidian` in `00-state.md § Current State` as a session decision. No re-offer during this run; the next pipeline run may offer again.
+        - **Confirm** → merge-write-whole-document to `~/.claude/settings.json`, identical mechanism to `/th:setup` § 3a (read the full JSON, append + dedup, preserve every other key, write the whole document back); report the rules added and the target file.
+
+   **(b) Cross-repo work-surface — per-pipeline.** For each work-surface repo path this pipeline has declared outside the session's own working-tree root — a non-null `worktree` path in `00-state.md § Current State`, a non-null `Worktree (suggested):` path in `01-plan.md § Task List`, or a sibling-repo path in a multi-project initiative — check `.claude/settings.local.json` at the session cwd (if present) for BOTH `Edit(//{path}/**)` and `Write(//{path}/**)` in `permissions.allow` AND `//{path}` in `permissions.additionalDirectories`.
+      - **Already present for a path → no gate, no write** for that path (silent pass-through).
+      - **Missing for one or more paths → present one gated Y/n offer listing every path still missing coverage** with its exact scoped rules:
+        ```
+        Grant write access without prompting to these work-surface repos?
+          Edit(//{path}/**)
+          Write(//{path}/**)
+          additionalDirectories: //{path}
+          ... (one block per path still missing coverage)
+
+        Add these rules to .claude/settings.local.json? [y/N]
+        ```
+        - **Decline** → write nothing; record `permission_provisioning_decline: cross-repo` in `00-state.md § Current State` as a session decision. No re-offer during this run.
+        - **Confirm** → merge-write-whole-document to `.claude/settings.local.json` (create the file if absent; dedup against existing entries; preserve every other key), appending each `Edit`/`Write` rule plus its `additionalDirectories` entry; report the rules added and the target file.
+      - A worktree path created later in the pipeline (Multi-Task Orchestration) re-runs this same check for the new path before the first implementer dispatch into it — coverage is not limited to paths already known at the top of Phase 0a.
 
 2. **MANDATORY — Query knowledge graph and write to file** — this is the FIRST analysis action (immediately after session_start). Search for related knowledge from past pipelines using the Knowledge Graph MCP `search_nodes` with 2-3 semantic queries related to the project name, technologies, or components mentioned in the task (e.g., "Next.js authentication patterns", "Prisma serverless gotchas"). You MUST call `search_nodes` — do not skip this step. If the Knowledge Graph MCP tools fail or are unavailable, log "KG: unavailable, skipping" and continue. If results are found, write them to `workspaces/{feature-name}/00-knowledge-context.md`:
    ```markdown

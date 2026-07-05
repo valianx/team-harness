@@ -31538,6 +31538,259 @@ check(
 
 # Marker: workspace-subfolder-layout-gapfill
 # ---------------------------------------------------------------------------
+# Suite 142 — permission-provisioning (issue #462)
+#
+# Asserts the gated local permission-provisioning contract structurally
+# across its three sites: (A) skills/setup/SKILL.md § 3a (obsidian
+# workspace, KEYS-once); (B-a) agents/orchestrator.md Phase 0a Step 1g
+# obsidian existing-install detection; (B-b) the same Step 1g cross-repo
+# work-surface provisioning. Pins the `//` double-slash anchor, the
+# merge-write-whole-document contract, the confirmation gate, path
+# scoping, and the rule report at every site, plus the docs/
+# permission-provisioning.md canonical doc (including the #25137 upstream
+# residual note). Negative assertions: no root anchor without a path
+# suffix is ever emitted; the already-present pass-through (no gate, no
+# write) is documented at both Phase 0a sub-sites.
+#
+# Marker: permission-provisioning
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 142: permission-provisioning ===")
+
+_s142_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s142_orch = read(AGENTS_DIR / "orchestrator.md")
+_s142_perm_doc = read(REPO_ROOT / "docs" / "permission-provisioning.md")
+_s142_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s142_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site A: skills/setup/SKILL.md § 3a ---
+_s142_siteA = _slice_section(
+    _s142_setup,
+    "### 3a. Provision permission rules for the obsidian workspace (gated)",
+    ("\n### ",),
+)
+
+check(
+    "suite142(siteA-anchor): setup § 3a emits the '//' double-slash anchor for both "
+    "Edit and Write rules plus additionalDirectories",
+    "Edit(//{base}/**)" in _s142_siteA
+    and "Write(//{base}/**)" in _s142_siteA
+    and "additionalDirectories: //{base}" in _s142_siteA,
+    "setup § 3a must build Edit(//{base}/**), Write(//{base}/**), and "
+    "additionalDirectories: //{base} using the double-slash anchor",
+)
+check(
+    "suite142(siteA-merge-write): setup § 3a declares merge-write-whole-document "
+    "(read full JSON, append + dedup, preserve every other key)",
+    "merge-write-whole-document" in _s142_siteA
+    and "deduplicating" in _s142_siteA
+    and "preserve every other key" in _s142_siteA,
+    "setup § 3a must declare the merge-write-whole-document contract with dedup and "
+    "full-key preservation",
+)
+check(
+    "suite142(siteA-gate): setup § 3a gates the write behind an explicit Y/n and "
+    "writes nothing on decline",
+    "[y/N]" in _s142_siteA and "write nothing" in _s142_siteA,
+    "setup § 3a must present a Y/n confirmation and write nothing on decline",
+)
+check(
+    "suite142(siteA-scope-no-outward): setup § 3a never adds a rule for an outward "
+    "action (push/PR/API)",
+    "never adds a rule for an outward action" in _s142_siteA,
+    "setup § 3a must declare it never provisions outward-action rules",
+)
+check(
+    "suite142(siteA-report): setup § 3a reports the exact rules added and the "
+    "target settings file",
+    "Permission rules added to ~/.claude/settings.json:" in _s142_siteA,
+    "setup § 3a must report the rules added and the target file",
+)
+check(
+    "suite142(siteA-doc-pointer): setup § 3a points to the canonical "
+    "docs/permission-provisioning.md contract",
+    "docs/permission-provisioning.md" in _s142_siteA,
+    "setup § 3a must reference docs/permission-provisioning.md",
+)
+
+# --- Site B: agents/orchestrator.md Phase 0a Step 1g (bounded anchor-to-anchor
+# slice — the step is a numbered list item, not its own markdown heading, so
+# _slice_section's heading-boundary search would over-capture; find-to-find on
+# two named textual anchors is the established alternative, see Suite 62/95/97) ---
+_s142_step1g_start = _s142_orch.find(
+    "1g. **CONDITIONAL — Gated local permission provisioning.**"
+)
+_s142_step1g_end = _s142_orch.find(
+    "2. **MANDATORY — Query knowledge graph and write to file**", _s142_step1g_start
+)
+_s142_siteB = (
+    _s142_orch[_s142_step1g_start:_s142_step1g_end]
+    if _s142_step1g_start != -1
+    and _s142_step1g_end != -1
+    and _s142_step1g_end > _s142_step1g_start
+    else ""
+)
+
+check(
+    "suite142(siteB-present): agents/orchestrator.md Phase 0a Step 1g "
+    "(permission-provisioning) exists between the initiative create-or-join step "
+    "and the KG query step",
+    _s142_siteB != "",
+    "Phase 0a Step 1g must be present in agents/orchestrator.md between Step 1f "
+    "and Step 2",
+)
+check(
+    "suite142(siteB-a-anchor): Step 1g part (a) — obsidian existing-install "
+    "detection — uses the '//' double-slash anchor and additionalDirectories",
+    "Edit(//{base}/**)" in _s142_siteB
+    and "Write(//{base}/**)" in _s142_siteB
+    and "//{base}" in _s142_siteB,
+    "Step 1g part (a) must check/build Edit(//{base}/**), Write(//{base}/**), and "
+    "the //{base} additionalDirectories entry",
+)
+check(
+    "suite142(siteB-a-passthrough): Step 1g part (a) is a silent pass-through "
+    "(no gate, no write) when the obsidian rules are already present",
+    "Already present" in _s142_siteB and "no gate, no write" in _s142_siteB,
+    "Step 1g part (a) must declare the already-present silent pass-through",
+)
+check(
+    "suite142(siteB-a-merge-write): Step 1g part (a) uses the identical "
+    "merge-write mechanism as setup § 3a",
+    "identical mechanism to `/th:setup` § 3a" in _s142_siteB,
+    "Step 1g part (a) must declare it reuses the setup § 3a merge-write mechanism",
+)
+check(
+    "suite142(siteB-a-decline): Step 1g part (a) records a decline as a session "
+    "decision in 00-state.md, no re-offer this run",
+    "permission_provisioning_decline: obsidian" in _s142_siteB
+    and "No re-offer during this run" in _s142_siteB,
+    "Step 1g part (a) must record permission_provisioning_decline: obsidian on "
+    "decline and not re-offer during the same run",
+)
+check(
+    "suite142(siteB-b-anchor): Step 1g part (b) — cross-repo work-surface — uses "
+    "the '//' double-slash anchor + additionalDirectories, scoped to "
+    ".claude/settings.local.json",
+    "Edit(//{path}/**)" in _s142_siteB
+    and "Write(//{path}/**)" in _s142_siteB
+    and "additionalDirectories: //{path}" in _s142_siteB
+    and ".claude/settings.local.json" in _s142_siteB,
+    "Step 1g part (b) must build Edit(//{path}/**), Write(//{path}/**), and "
+    "additionalDirectories: //{path} into .claude/settings.local.json",
+)
+check(
+    "suite142(siteB-b-passthrough): Step 1g part (b) is a silent pass-through "
+    "per-path when the cross-repo rules are already present",
+    "Already present for a path" in _s142_siteB and "no gate, no write" in _s142_siteB,
+    "Step 1g part (b) must declare the per-path already-present silent pass-through",
+)
+check(
+    "suite142(siteB-b-gate): Step 1g part (b) presents one gated Y/n offer "
+    "listing every path still missing coverage before writing",
+    "[y/N]" in _s142_siteB and "write nothing" in _s142_siteB,
+    "Step 1g part (b) must present a Y/n confirmation and write nothing on decline",
+)
+check(
+    "suite142(siteB-b-decline): Step 1g part (b) records a decline as a session "
+    "decision distinct from part (a)",
+    "permission_provisioning_decline: cross-repo" in _s142_siteB,
+    "Step 1g part (b) must record permission_provisioning_decline: cross-repo on "
+    "decline",
+)
+check(
+    "suite142(siteB-no-outward): Step 1g declares that outward-action rules are "
+    "never provisioned by either part",
+    "never touches outward-action rules" in _s142_siteB,
+    "Step 1g must declare that outward-action rules (push/PR/API) stay gated "
+    "exclusively by dev-guard",
+)
+check(
+    "suite142(siteB-doc-pointer): Step 1g points to the canonical "
+    "docs/permission-provisioning.md contract",
+    "docs/permission-provisioning.md" in _s142_siteB,
+    "Step 1g must reference docs/permission-provisioning.md",
+)
+check(
+    "suite142(siteB-state-schema): 00-state.md § Current State schema declares "
+    "the permission_provisioning_decline field",
+    "permission_provisioning_decline: {obsidian | cross-repo | both | null}" in _s142_orch,
+    "agents/orchestrator.md's Current State schema must declare "
+    "permission_provisioning_decline with its three-value + null domain",
+)
+
+# --- docs/permission-provisioning.md canonical doc ---
+_s142_anchor_section = _slice_section(
+    _s142_perm_doc, "## The `//` double-slash anchor", ("\n## ",)
+)
+check(
+    "suite142(doc-25137-residual): docs/permission-provisioning.md documents the "
+    "#25137 upstream residual within the anchor section",
+    "#25137" in _s142_anchor_section
+    and "documented upstream residual" in _s142_anchor_section.lower(),
+    "docs/permission-provisioning.md § anchor must document the Claude Code "
+    "issue #25137 residual (a rule may still prompt on older CC versions)",
+)
+check(
+    "suite142(doc-sites-table): docs/permission-provisioning.md enumerates both "
+    "provisioning sites (A = setup KEYS-once, B = orchestrator Phase 0a "
+    "existing-install/recurring)",
+    "A — Setup (KEYS-once)" in _s142_perm_doc
+    and "B — Orchestrator Phase 0a (existing-install / recurring)" in _s142_perm_doc,
+    "docs/permission-provisioning.md must enumerate site A (setup, KEYS-once) and "
+    "site B (orchestrator Phase 0a, existing-install/recurring)",
+)
+check(
+    "suite142(doc-merge-write-contract): docs/permission-provisioning.md declares "
+    "the merge-write-whole-document contract as the single mechanism reused by "
+    "both sites",
+    "Merge-write-whole-document contract" in _s142_perm_doc,
+    "docs/permission-provisioning.md must declare a dedicated merge-write-whole-"
+    "document contract section",
+)
+
+# --- Negative assertions ---
+_s142_root_anchor_hits = [
+    needle
+    for needle in ("Edit(//**)", "Write(//**)")
+    if needle in _s142_setup or needle in _s142_siteB or needle in _s142_perm_doc
+]
+check(
+    "suite142(negative-no-root-anchor): no site ever emits a root double-slash "
+    "anchor rule without a path suffix (Edit(//**) / Write(//**))",
+    len(_s142_root_anchor_hits) == 0,
+    f"found a root-anchor-without-suffix rule: {_s142_root_anchor_hits}",
+)
+check(
+    "suite142(negative-no-gate-when-present): both Phase 0a sub-sites (a) and (b) "
+    "declare the no-gate/no-write pass-through when rules are already present — "
+    "provisioning is never re-gated on an already-covered base",
+    _s142_siteB.count("no gate, no write") >= 2,
+    "Step 1g must declare the already-present pass-through at both part (a) and "
+    "part (b), not merely once",
+)
+
+# Self-referential guards (hygiene contract)
+_s142_own = read(Path(__file__))
+check(
+    "suite142(self-ref): test file contains 'Suite 142' and 'permission-provisioning'",
+    "Suite 142" in _s142_own and "permission-provisioning" in _s142_own,
+    "test file must self-reference Suite 142 and the marker 'permission-provisioning'",
+)
+check(
+    "suite142(registry): docs/testing.md registers 'Suite 142' and "
+    "'permission-provisioning'",
+    "Suite 142" in _s142_testing_md and "permission-provisioning" in _s142_testing_md,
+    "docs/testing.md must register Suite 142 and the 'permission-provisioning' marker",
+)
+check(
+    "suite142(hygiene): CLAUDE.md does NOT contain 'Suite 142' (§11 hygiene contract)",
+    "Suite 142" not in _s142_claude_md,
+    "CLAUDE.md must not mention Suite 142 — only docs/testing.md is the canonical registry",
+)
+
+# Marker: permission-provisioning
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

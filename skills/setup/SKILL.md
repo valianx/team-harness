@@ -155,6 +155,36 @@ If obsidian mode:
 2. Ask for the subfolder within the vault (default: `work-logs`).
 3. Verify the vault path exists. If not, warn and ask to confirm or re-enter.
 
+### 3a. Provision permission rules for the obsidian workspace (gated)
+
+**Runs only when Step 3 configured `obsidian` mode with a resolved `logs-path` and `logs-subfolder`.** Skipped entirely in `local` mode — no gate, no output.
+
+The obsidian vault sits outside the current project's working tree, so every subagent `Edit`/`Write` into it prompts by default, and per-use approvals do not persist across dispatches. This sub-step offers to add local permission rules once, up front, so future pipeline runs write to the vault without prompting. Full contract, including the `//` double-slash anchor rationale and the documented upstream residual: `docs/permission-provisioning.md`.
+
+1. Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX (`C:\vault\Work` → `/c/vault/Work`) and anchor it with a leading `//` (a single leading slash anchors to the settings-source directory, not the filesystem root, and silently fails to match paths outside the cwd — upstream Claude Code issue #25137).
+2. Present the exact rules for confirmation. Write nothing until the operator answers:
+   ```
+   Grant write access without prompting to the obsidian workspace?
+     Edit(//{base}/**)
+     Write(//{base}/**)
+     additionalDirectories: //{base}
+
+   Add these rules to ~/.claude/settings.json? [y/N]
+   ```
+3. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
+4. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — read the full JSON (start from `{}` if the file does not exist), append the two rules to `permissions.allow` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, and preserve every other key untouched. Write the whole document back.
+5. Report the rules added and the target file:
+   ```
+   Permission rules added to ~/.claude/settings.json:
+     Edit(//{base}/**)
+     Write(//{base}/**)
+     additionalDirectories: //{base}
+   ```
+
+This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write) — it is scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
+
+**Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's Phase 0a intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
+
 ### 3.5. Configure default language
 
 Ask the operator for the default language for agent responses and workspace prose. This setting persists across all future sessions.
