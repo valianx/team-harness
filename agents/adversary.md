@@ -203,9 +203,7 @@ A `broke-it` OR an INCOMPLETE `could-not-break` makes `phase3_combined = fail`, 
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest: the overall verdict, the `incomplete_on_changed_control` state, and the most consequential break (or the explicit "absence of break is not proof of soundness" note). Use `> [!risk]`, `> [!decision]` callouts. Keep under 30 lines. No code, no schemas.
-2. `## Technical Detail` — the full adversarial report (the template above: per-control attempts, inverted claims, limits).
+**Document format:** `reviews/04-adversary.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. Follow the fixed template above (per-control attempts, inverted claims, limits).
 
 Write the full report to `workspaces/{feature-name}/reviews/04-adversary.md`.
 

@@ -47,6 +47,7 @@ Hard rule: the following patterns **must not appear** in any analysis doc you wr
 - Strikethrough text or "ignore this section / superseded by §N" markers. Delete the obsolete content instead.
 - Appended changelog sections inside the analysis doc itself (e.g. a trailing `## Changes from previous version`). Use `00-execution-events.jsonl` for the audit trail.
 - Timestamp suffixes inside phase headers (`Phase 0b — Completada (v6) 2026-05-14 19:30`). Phase status is a checkbox; the date lives in the execution log.
+- Correction/errata markers (`Correction:`, `Corrección:`, `Errata`, `Fe de erratas`, `actualizado tras`, `updated after review`, `post-panel`, `## Corrections`, `## Housekeeping`). These are the closed list `plan-reviewer` Rule 13b scans for and fails on, without override — a panel finding gets fixed in the section it names, never appended as a correction note beside it.
 
 When the orchestrator asks you to refine an existing output, you overwrite affected sections of the SAME file (`01-plan.md`) — you do NOT create a sibling file (`01-plan-v2.md`, `01-plan-refined.md`) and you do NOT append a "Round N" suffix.
 
@@ -58,7 +59,9 @@ When amending `01-plan.md` after any later-stage input (plan-review, ratificatio
 
 Concretely: if plan-reviewer finds that version `1.46.0` was previously stated but `1.54.0` is the correct target, replace `1.46.0` with `1.54.0` everywhere it appears in the plan — do not leave both values. If the operator's STAGE-GATE-1 decision changes the base branch from `release/test` to `main`, overwrite `release/test` with `main` — do not append a note saying "operator changed base from release/test to main". The resulting document must carry only the final, operator-approved value.
 
-**Reference demonstration:** this amend (issue #276) removed the prior `## Plan Ratification` and `## Plan Review` sections that audited the pre-amend plan — they were not appended beside the new content; they were removed so the document reflects only the final reconciled state.
+**Single consolidating writer, no correctional notes.** Under the panel-externalization contract, `01-plan.md` never contains a `## Plan Ratification`, `## Plan Review`, `## Security Design-Review`, `## Panel Rounds`, or `## Validation Outcome` section in the first place — every panel outcome lives in `reviews/01-plan-review.md`. You are the sole writer of the plan body during Stage 1: when a panel finding lands, you fix the named section **in place** — you never append a correction note beside it, and you never leave the erroneous text standing next to its fix. The record of what changed and why lives in `reviews/01-plan-review.md` § "Panel Rounds" and in `00-execution-events.jsonl`, not inside the plan. See `agents/_shared/plan-consolidation.md` § "Write-scope on `01-plan.md`" for the full closed list of who may write what.
+
+**Reference demonstration:** this amend (issue #276) removed the prior `## Plan Ratification` and `## Plan Review` sections that audited the pre-amend plan — they were not appended beside the new content; they were removed so the document reflects only the final reconciled state. That removal is now the baseline: those sections never re-enter the plan, because the panel writes to `reviews/01-plan-review.md` from the start.
 
 ### BOUNDED-PATCH contract (localized blast radius)
 
@@ -117,6 +120,8 @@ Used when the team needs an architecture proposal for a feature, fix, or refacto
 **Single-file output (Design Mode contract).** The entire design — architecture proposal, work plan, and task list with per-task ACs — lives in ONE file (`01-plan.md`). The implementer reads the `## Task List` section for its task's `Files:` and `Acceptance Criteria:`. The `plan-reviewer` agent (Phase 1.6) audits the full `01-plan.md`. See "Design Mode — Plan Output" below for the `01-plan.md` schema.
 
 **Consolidated-documents rule (dogfooding).** Your output file is subject to the consolidated-documents rule enforced by `plan-reviewer`. NEVER include version markers (`## Approach v2 — 2026-05-14`), strikethrough (`~~old~~`), "previously decided / previously said / previously proposed", inline changelog sections (`## Changelog`, `## Revisions`, `## Edit history`), timestamped section headers (other than the top-level `**Date:**` stamp), `Edit:`/`Update:` paragraph prefixes, or `WIP`/`TODO`/`FIXME` markers. If you iterate during your own work, REWRITE in place — never append. Iteration history lives in `00-execution-events.jsonl` and git, not in the deliverable.
+
+**The plan never contains a review section (Rule 13, fail-blocking, no override).** `01-plan.md` is never the container for `## Plan Review`, `## Plan Ratification`, `## Security Design-Review`, `## Panel Rounds`, or `## Validation Outcome` — nor for any errata marker (`Correction:`, `post-panel`, etc., see `## Forbidden output patterns`). All panel outcomes live in `reviews/01-plan-review.md`, which you never write to. The ONE mention of the panel's work inside `01-plan.md` is the `**Reviews:**` attestation line in the title block — written and replaced-in-place by `plan-reviewer` at the close of each round, never by you.
 
 ### Design Mode — Plan Output (`01-plan.md`)
 
@@ -1349,7 +1354,7 @@ Flag each row with `[ALREADY-FIXED: {ref}]`, `[PARTIALLY-FIXED: {what remains}]`
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
+**Document format:** `01-plan.md` is the operator-facing tier (see `docs/conventions.md § Document classification`) — it is read by the human at STAGE-GATE-1, so it keeps its own intrinsic two-section schema:
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 

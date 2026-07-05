@@ -147,7 +147,7 @@ These are runtime invariants of your environment, not advice. Treat them as fact
 | `qa` | Validates implementations against AC; defines AC standalone | No | `reviews/04-validation.md` |
 | `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `reviews/04-security.md` |
 | `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in Spanish | No | `reviews/04-adversary.md` |
-| `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `01-plan.md § Plan Review` |
+| `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `reviews/01-plan-review.md` |
 | `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `reviews/04-validation.md § Drift Analysis` |
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `00-state.md § Delivery` |
 | `reviewer` | Reviews PRs on GitHub, approves or requests changes | No | — |
@@ -176,8 +176,8 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 0a — Intake | orchestrator | user task / issue data | `00-state.md` (initial) | — |
 | 0b — Specify | orchestrator | `00-state.md` + codebase | AC list in spec | — |
 | 1 — Design | `architect` | AC + codebase context | `01-plan.md` | — |
-| 1.5 — Plan Ratification | `qa` | `01-plan.md` | ratified AC (appended) | — |
-| 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | verdict appended to `01-plan.md` | — |
+| 1.5 — Plan Ratification | `qa` | `01-plan.md` | ratified AC (`reviews/01-plan-review.md § Plan Ratification`) | — |
+| 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | Combined verdict (`reviews/01-plan-review.md`) | — |
 | **STAGE-GATE-1** | **human** | plan + verdict | approve / reject / edit | **MANDATORY STOP** |
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
 | 2.7 — Test Authoring | `tester` (authoring mode) | code + AC from `01-plan.md` | `03-testing.md` (authoring section) | must complete before Phase 3 |
@@ -219,7 +219,7 @@ workspaces/{feature-name}/
   research/research-findings-consolidated.md ← research-consolidator (web-lane consolidation)
   research/code-findings-{angle}.md ← code-researcher (per-lane fan-out)
   00-acceptance-criteria.md ← qa-plan (define-ac mode)
-  01-plan.md               ← architect (spec + architecture + tasks + plan-review appended by plan-reviewer)
+  01-plan.md               ← architect (spec + architecture + tasks — final state; carries only the **Reviews:** attestation line)
   sketches/api-contract.md     ← architect (when touches_http_api: true)
   sketches/ui-wireframe.md     ← architect (when touches_ui: true)
   sketches/data-model.md       ← architect (when touches_data_model: true)
@@ -230,6 +230,7 @@ workspaces/{feature-name}/
   01-planning.md           ← architect (planning mode — multi-task batch breakdown)
   02-implementation.md     ← implementer
   03-testing.md            ← tester
+  reviews/01-plan-review.md ← qa-plan (§ Plan Ratification) + security (§ Security Design-Review, conditional) + plan-reviewer (§ Plan Review + Combined verdict + § Panel Rounds)
   reviews/04-validation.md ← qa (validate mode) + acceptance-checker (§ Drift Analysis appended)
   reviews/04-security.md   ← security (only if security-sensitive)
   reviews/04-review.md     ← reviewer
@@ -246,7 +247,7 @@ workspaces/{feature-name}/
   02-gcp-review.md         ← th:security + th:qa (QA/security audit of 02-apply.sh — Apply mode only)
 ```
 
-**`research/` and `reviews/` subfolders.** Mirroring the `sketches/` precedent, `research/` (research-family artifacts: `research/00-research.md`, `research/00-audit.md`, `research/research-findings-*.md`, `research/code-findings-*.md`) and `reviews/` (review-family artifacts: `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/01-ux-review.md`, `reviews/04-ux-validation.md`, `reviews/04-adversary.md`, `reviews/04-review.md`, `reviews/04-internal-review.md`) are created implicitly on the writing agent's first `Write` call — no orchestrator `mkdir` step is needed. Basenames never change; only the directory prefix is added. Root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, and the rest of the manifest above) stay at the workspace root.
+**`research/` and `reviews/` subfolders.** Mirroring the `sketches/` precedent, `research/` (research-family artifacts: `research/00-research.md`, `research/00-audit.md`, `research/research-findings-*.md`, `research/code-findings-*.md`) and `reviews/` (review-family artifacts: `reviews/01-plan-review.md`, `reviews/04-validation.md`, `reviews/04-security.md`, `reviews/01-ux-review.md`, `reviews/04-ux-validation.md`, `reviews/04-adversary.md`, `reviews/04-review.md`, `reviews/04-internal-review.md`) are created implicitly on the writing agent's first `Write` call — no orchestrator `mkdir` step is needed. Basenames never change; only the directory prefix is added. Root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, and the rest of the manifest above) stay at the workspace root.
 
 **Step 0 — workspaces base path (already resolved at boot).**
 
@@ -493,13 +494,13 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 | `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
 | `qa` | 3 (validate mode) | `reviews/04-validation.md` |
 | `qa` | 3 (docs validation — docs-flow Phase 3) | `reviews/04-validation.md` |
-| `qa-plan` | 1.5 (ratify-plan mode) | (no file — verdict is in status block only) |
+| `qa-plan` | 1.5 (ratify-plan mode) | `reviews/01-plan-review.md` (§ Plan Ratification) |
 | `documenter` | 2 (docs-flow write — `02-documentation.md`) | `02-documentation.md` |
 | `security` | 3 | `reviews/04-security.md` |
 | `delivery` | 4 | `00-state.md` update (delivery section) |
 | `reviewer` | 4.5 (internal mode) | `reviews/04-internal-review.md` |
 | `acceptance-checker` | 3.6 | `reviews/04-validation.md` (§ Drift Analysis appended) |
-| `plan-reviewer` | 1.6 | `01-plan.md` (§ Plan Review appended) |
+| `plan-reviewer` | 1.6 | `reviews/01-plan-review.md` (§ Plan Review + Combined verdict) |
 
 **Documentation flow note:** vault pages written by the `documenter` (docs-flow write phase) live in the Obsidian vault, outside `{docs_root}`. Their existence is verified by the DOC-GATE (not by this per-phase table) using a pages-on-disk count check against `pages_created` in `02-documentation.md`.
 
@@ -978,7 +979,7 @@ Every task runs the COMPLETE pipeline: Specify → Design → Plan Ratification 
    | ambiguous / mixed concerns | **unclear** | — |
 
    **Disambiguation — `validate` vs `plan-review` vs `review-pr` vs substance refinement.**
-   - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last) folding all findings in-place into `01-plan.md`. Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
+   - "Revisa el plan / review the plan / audit my plan" → `plan-review` direct mode → runs the three-reviewer panel (qa-plan ratify-plan → security design-review conditional → plan-reviewer shape, last); the panel writes findings to `reviews/01-plan-review.md`, and `01-plan.md` stays clean (attestation line only). Produces one consolidated `## Plan Review` section. Plan-shape + substance coverage + design-security (conditional). DISTINCT from `validate` (which checks code after implementation) and from substance-refinement (which routes to architect).
    - "Review this PR / revisa el PR #N / @th:orchestrator review PR" → `/th:review-pr` skill flow (read-only, auto-route). DISTINCT from `plan-review` (which audits a design artifact, not a GitHub PR) and from `full pipeline` (the PR already exists — no new development pipeline). The orchestrator routes to the skill flow and does NOT bare-dispatch the `reviewer` agent; the skill flow manages worktree, tier classification, behavioral verification, multi-reviewer panel, consolidation, and atomic submission. This is a **hard trigger**: do NOT improvise an inline review, do NOT review the primary working tree, and do NOT substitute the currently checked-out branch as the PR. If the PR head cannot be resolved from GitHub, STOP and surface `cannot reach PR — authenticate or paste the diff` (see `agents/_shared/gh-fallback.md` § "Tier A — read a single PR" → STOP-on-access-failure contract). The binding is prompt-level, not a deterministic gate — the host native agent-selector residual at line 166 still applies.
    - "Validate implementation / verifica la implementación" → `validate` → invokes `qa` (validate mode) → writes `reviews/04-validation.md`. Only after code exists.
    - "Refine the architecture / completa el plan / actualiza el inventario" → route back to `architect` (design mode) for **in-place** refinement of `01-plan.md`. **Never delegate substance refinement of a plan to `qa`** — `qa` has no contract for writing parallel review files, and improvising filenames like `01-coverage-review.md`, `02-flow-coverage.md`, or `qa-reports/Task-N.md` is a documented failure mode. If the qa agent is invoked for plan substance, it must return `status: blocked` with `summary: route to architect`.
@@ -1552,7 +1553,7 @@ Append a `phase.end` event:
 - workspaces path: {resolved_workspaces_path}
 - Pointer to `01-plan.md` (§ Review Summary for AC list, § Architecture → `### Work Plan`)
 - Mode: `ratify-plan`
-- Instruction: "Read the Work Plan from `01-plan.md` (§ Architecture → `### Work Plan`) and the AC from `01-plan.md` (§ Review Summary). Confirm that every AC is covered by at least one Work Plan step. Do NOT validate any code (there is none yet). Return verdict: `pass` if all AC are covered, or `fail` with the list of AC not covered by any plan step."
+- Instruction: "Read the Work Plan from `01-plan.md` (§ Architecture → `### Work Plan`) and the AC from `01-plan.md` (§ Review Summary). Confirm that every AC is covered by at least one Work Plan step. Do NOT validate any code (there is none yet). Write your ratification table to `reviews/01-plan-review.md § Plan Ratification (Phase 1.5)` — create the file with the full skeleton if it does not yet exist; never write ratification content to `01-plan.md`. Return verdict: `pass` if all AC are covered, or `fail` with the list of AC not covered by any plan step."
 
 **Gate (status-block + verdict):**
 
@@ -1599,11 +1600,11 @@ Routing to architect to revise Work Plan
 - `type` field from `00-state.md` (so the plan-reviewer can gate Rules 7 + 8 on `type: fix | hotfix`).
 - `security_sensitive: {true|false}` from `00-state.md` (so the vacuous-success guard can decide whether the `**Security design-review (security):**` label is expected — absence of that label is expected when `security_sensitive: false` and must not trigger the guard).
 - Mode: default (the plan-reviewer has one mode).
-- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other workspaces. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report into `## Plan Review` in `01-plan.md` using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, and the `**Combined verdict:**` block. Never append a second `## Plan Review` section. For the vacuous-success guard (rule 2): the `**Security design-review (security):**` label is required only when `security_sensitive: true` was passed in context — when `security_sensitive: false`, absence of that label is expected and must NOT trigger the guard. Return verdict pass/concerns/fail in the status block."
+- Instruction: "Audit the Stage 1 artifact (`01-plan.md`) against the plan-shape rules. Read `01-plan.md` (and `01-root-cause.md` when `type: fix`); do NOT read code, do NOT read other workspaces. Apply Rules 1-6 always. Apply Rules 7 + 8 only when `type: fix` or `type: hotfix`. Write your report into `## Plan Review` in `reviews/01-plan-review.md` — create the file with the full skeleton if it does not yet exist — using preserve-in-place semantics (per `§ "Plan-review panel centralization contract"`): preserve the upstream sub-verdicts `**Substance (qa):**` and `**Security design-review (security):**` written by earlier panel reviewers; rewrite only your own header, the `## Summary` rules table, `## Findings`, `## Recommendation to orchestrator`, and the `**Combined verdict:**` block. Append one row to `## Panel Rounds` for this round. Never append a second `## Plan Review` section. For the vacuous-success guard (rule 2): the `**Security design-review (security):**` label is required only when `security_sensitive: true` was passed in context — when `security_sensitive: false`, absence of that label is expected and must NOT trigger the guard. Return verdict pass/concerns/fail in the status block."
 
 ### Phase 1.6 is inviolable
 
-**Never skip, never punt to the user.** `01-plan.md` MUST contain a `## Plan Review` section with a `**Verdict:**` line before STAGE-GATE-1 is emitted. If the section is absent at gate-emission time, the orchestrator does NOT show the plan to the user — it returns to executing Phase 1.6 first. The 3-stage pipeline contract guarantees agent-then-human review; surfacing the plan to the user without a system-side audit silently degrades the system to human-only review and breaks the contract.
+**Never skip, never punt to the user.** `reviews/01-plan-review.md` MUST exist and contain a `## Plan Review` section with a `**Combined verdict:**` line before STAGE-GATE-1 is emitted. If the file or the combined verdict is absent at gate-emission time, the orchestrator does NOT show the plan to the user — it returns to executing Phase 1.6 first. The 3-stage pipeline contract guarantees agent-then-human review; surfacing the plan to the user without a system-side audit silently degrades the system to human-only review and breaks the contract.
 
 **Security design-review dispatch in-pipeline (SEC-002, wired here):** When the task is security-sensitive (`security_sensitive: true` in `00-state.md`, or determined by path/keyword/flag at Phase 0a), Phase 1.6 MUST also invoke the `security` agent in `design-review` mode BEFORE dispatching `plan-reviewer`. This is the in-pipeline equivalent of the panel that `/th:plan-review` runs in direct mode (centralization contract, `ref-direct-modes.md § "Plan Review Mode"`). The dispatch is conditional on security-sensitivity — it runs in addition to the `plan-reviewer`, never as a substitute. This wiring closes the latent gap where `--fast` or any other in-pipeline path could skip the security design-review for security-sensitive work. The carve-out in the `--fast` skip-set (see `§ "Fast mode"` in Phase 0a above) is the enforcement point; this wiring is the execution point. Both are required for the fail-closed guarantee.
 
@@ -1629,15 +1630,15 @@ This ensures the plan-review panel runs via the real `plan-reviewer` agent — i
 |---|---|---|
 | `success` | `pass` | Proceed to STAGE-GATE-1 with the plan-reviewer summary inline. |
 | `success` | `concerns` | Proceed to STAGE-GATE-1 with the concerns listed inline. The human can still `reject` or `edit`. |
-| `success` | `fail` | Do NOT surface the plan to the user. Route back to architect with the failing rules (rules 1 and 2 are the only fail-blocking ones). Re-run Phase 1.6 after the architect's revision. Iteration counts toward a separate max-3 budget for plan-review round trips. If exceeded, escalate to the user with the full report. |
-| `failed` / `blocked` | (any) | Audit broke. Read `01-plan.md § Plan Review` if it exists, retry once, then escalate. |
+| `success` | `fail` | Do NOT surface the plan to the user. Route back to architect with the failing rules (see `agents/plan-reviewer.md § Verdict Calibration` for the full fail-blocking set — rules 1, 2, 6-missing, 9, 10-escalation, 13, plus 7/8 for Bug-fix Flow). Re-run Phase 1.6 after the architect's revision. Iteration counts toward a separate max-3 budget for plan-review round trips. If exceeded, escalate to the user with the full report. |
+| `failed` / `blocked` | (any) | Audit broke. Read `reviews/01-plan-review.md` if it exists, retry once, then escalate. |
 
 **Cost:** one plan-reviewer invocation (measured June 2026: the full 1.6 panel median 57K, n=16; the shape audit is a fraction of that figure). **Saves:** human time at STAGE-GATE-1, and a cascading Stage-2 cycle that would otherwise discover the structural gap mid-implementation.
 
 **Report to user (intermediate, before STAGE-GATE-1):**
 ```
 Plan review — verdict: {pass|concerns|fail}
-  plan-reviewer | Output: 01-plan.md § Plan Review
+  plan-reviewer | Output: reviews/01-plan-review.md § Plan Review
   Findings: rule-1: {N}, rule-2: {N}, rule-3: {N}, rule-4: {N}, rule-5: {N}
 Next: STAGE-GATE-1 (human approval required)
 ```
@@ -1678,20 +1679,32 @@ fi
 
 ### Plan-review panel centralization contract
 
-**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. Every plan-stage outcome folds into a named section of the single `01-plan.md` in place.
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` sibling in the workspace root. Every panel-stage outcome (ratification, plan review, security design-review) is written to the single canonical `reviews/01-plan-review.md`.
 
-All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `plan-review` direct mode) MUST fold their findings in-place into `01-plan.md`. Zero parallel correction-files. The contract:
+All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `plan-review` direct mode) MUST write their findings in-place into `reviews/01-plan-review.md`. Zero OTHER parallel correction-files. The contract:
 
-- **All findings go to `01-plan.md`.** No reviewer creates `reviews/04-security.md`, `*-review.md`, `security-reports/`, or any other side-file in the context of a plan review. Every correction, risk identification, and sub-verdict is written directly into the `01-plan.md` body (in-place).
+- **All findings go to `reviews/01-plan-review.md`.** No reviewer creates `reviews/04-security.md`, `*-review.md`, `security-reports/`, or any side-file additional to the single canonical container in the context of a plan review. `01-plan.md` stays clean — every correction, risk identification, and sub-verdict is written directly into `reviews/01-plan-review.md`'s body (in-place), never into the plan.
 - **One consolidated `## Plan Review` section.** The section is a single sliceable block from its `##` heading to the next `##` heading. It carries three sub-verdicts authored as **bold inline labels** (NOT as `###` headings — a `###` heading would terminate the `_slice_section` boundary and split the block):
   - `**Substance (qa):**` — written by `qa-plan` (ratify-plan)
   - `**Security design-review (security):**` — written by `security` (design-review, conditional)
   - `**Combined verdict:**` — written by `plan-reviewer` (sole writer of the combined verdict)
-- **`plan-reviewer` is the sole writer of the `## Plan Review` header and the `**Combined verdict:**` block.** It runs last (after qa and security) and reads their sub-verdicts to produce the combined verdict. `qa` and `security` each append only their own labelled sub-verdict and MUST NOT touch the combined verdict.
-- **Preserve-in-place.** `plan-reviewer` preserves the upstream sub-verdicts (`**Substance (qa):**` and `**Security design-review (security):**`) written by the earlier panel reviewers. It MUST NOT overwrite or remove them. On repeated invocations, `plan-reviewer` rewrites only the header, the `## Summary` rules table, and the `**Combined verdict:**` block; `qa` and `security` replace their own labelled sub-verdict lines within the section.
+- **`plan-reviewer` is the sole writer of the `## Plan Review` header and the `**Combined verdict:**` block.** It runs last (after qa and security) and reads their sub-verdicts to produce the combined verdict. `qa` and `security` each write only their own labelled sub-verdict and MUST NOT touch the combined verdict.
+- **Preserve-in-place.** `plan-reviewer` preserves the upstream sub-verdicts (`**Substance (qa):**` and `**Security design-review (security):**`) written by the earlier panel reviewers. It MUST NOT overwrite or remove them. On repeated invocations, `plan-reviewer` rewrites only the header, the `## Summary` rules table, `## Findings`, `## Recommendation to orchestrator`, and the `**Combined verdict:**` block — and appends one row to `## Panel Rounds` per round; `qa` and `security` replace their own labelled sub-verdict lines within the section.
 - **Deterministic worst-of roll-up.** The `**Combined verdict:**` is the worst-of the three sub-verdicts with severity order `fail > concerns > pass`. Security sub-verdict mapping: `clean → pass`, `risks-found → fail`. A missing-but-expected sub-verdict label means the panel is incomplete — the combined verdict MUST NOT be `pass` in that case.
-- **Canonical-field reconciliation requirement.** When Phase 1.6 (plan-reviewer) detects a Rule 3h contradiction (mutually contradictory values for a canonical field such as base branch or version bump across the plan), the orchestrator routes back to the architect for in-place reconciliation of `01-plan.md § ...` (whichever sections contain the contradiction) before re-running Phase 1.6. The architect overwrites the superseded value so only the final value remains. No forked `01-plan-*.md` — the reconciliation target is always the single `01-plan.md`.
-- **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa-plan reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of this same centralization principle: every correction folds to `01-plan.md`, nothing accretes in side-files. The plan-review panel applies the same rule at Stage 1.
+- **Canonical-field reconciliation requirement.** When Phase 1.6 (plan-reviewer) detects a Rule 3h contradiction (mutually contradictory values for a canonical field such as base branch or version bump across the plan), the orchestrator routes back to the architect for in-place reconciliation of `01-plan.md § ...` (whichever sections contain the contradiction) before re-running Phase 1.6. The architect overwrites the superseded value so only the final value remains. No forked `01-plan-*.md` — the reconciliation target for the plan's own content is always the single `01-plan.md`; panel findings themselves stay in `reviews/01-plan-review.md`.
+- **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa-plan reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of the centralization principle applied to the plan body itself; the plan-review panel applies the equivalent rule to its own review artifact, `reviews/01-plan-review.md`.
+
+**Final-state invariant — single consolidating writer, no errata.** `01-plan.md` must reach STAGE-GATE-1 reading as if it had been written correctly on the first pass. This binds every plan-review round trip, in-pipeline or direct mode:
+
+- **The architect is the sole consolidating writer of the plan body post-panel.** When Phase 1.6 returns `verdict: fail` (or `concerns` the operator wants addressed), the orchestrator routes back to the architect with the pointer to `reviews/01-plan-review.md`. The architect fixes each named section **in place** — no writer, including the architect on a later round, ever appends a correction note ("Correction:", "post-panel", etc.) beside the section it corrects. `agents/plan-reviewer.md` Rule 13 fail-blocks the gate (no override) on exactly these patterns; `agents/architect.md § Forbidden output patterns` is the producer-side mirror of the same closed list.
+- **No errata, ever, inside the plan.** The refinement history — what changed, which round, why — is NOT recorded inside `01-plan.md`. It lives in `reviews/01-plan-review.md` § "Panel Rounds" (one row per round) and in `00-execution-events.jsonl`. A plan that shows its refinement work is a Rule 13 violation, not a transparency feature.
+- **Attestation-line contract.** The only mention of the panel's work inside `01-plan.md` is the one-line `**Reviews:**` attestation in the title block, written and replaced-in-place by `plan-reviewer` once per round:
+
+  ```
+  **Reviews:** substance {pass|fail} · security {clean|risks-found|skipped} · shape {pass|concerns|fail} → combined **{pass|concerns|fail}** — detail: reviews/01-plan-review.md
+  ```
+
+  This line is a carve-out, not a Rule 13 violation — the closed errata-token list in Rule 13b is disjoint from `Reviews`, `Status`, and the AC-checkbox pattern by design, so the panel's own attestation write can never trip the gate it exists to protect. See `agents/_shared/plan-consolidation.md § "Write-scope on 01-plan.md"` for the full closed list of who may write what on the plan.
 
 ---
 
@@ -1769,7 +1782,8 @@ Parse the JSON output. `verdict: pass` → no sketch concerns. `verdict: concern
    - {sketch-guard concerns if any, e.g.: "touches_http_api=true but sketches/api-contract.md is missing"}
 
  Artifacts written:
-   - workspaces/{feature-name}/01-plan.md             (architecture + task list + plan-review appended)
+   - workspaces/{feature-name}/01-plan.md             (architecture + task list — final state)
+   - workspaces/{feature-name}/reviews/01-plan-review.md (panel verdicts + findings)
    - workspaces/{feature-name}/sketches/*.md           (triggered sketches, if any)
 
  Reply with:

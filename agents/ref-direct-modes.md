@@ -23,13 +23,13 @@ This file is read on-demand by the orchestrator when executing a direct mode. It
 
 ### Review Panel (three reviewers, one plan)
 
-The `plan-review` direct mode runs a panel of up to three reviewers that fold their findings into a single `01-plan.md`. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
+The `plan-review` direct mode runs a panel of up to three reviewers that write their findings into a single `reviews/01-plan-review.md` — the same canonical file and the same rules as the in-pipeline Phase 1.5/1.6 panel. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
 
-1. **`qa-plan` (mode: `ratify-plan`)** — substance reviewer. Validates AC coverage vs Work Plan. Writes `## Plan Ratification` (existing contract) AND writes its sub-verdict as the bold inline label `**Substance (qa):**` followed by a one-line verdict inside `## Plan Review`. Does NOT use a `###` heading for this label.
-2. **`security` (mode: `design-review`)** — design-security reviewer. **Conditional:** runs only when the task is security-sensitive. When run, writes its sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` inside `## Plan Review`. Does NOT use a `###` heading.
-3. **`plan-reviewer` (shape audit, runs last)** — sole writer of the `## Plan Review` header and the `**Combined verdict:**` block. Reads the sub-verdicts written by (1) and (2) to produce the combined verdict. Runs LAST so it can read the other sub-verdicts.
+1. **`qa-plan` (mode: `ratify-plan`)** — substance reviewer. Validates AC coverage vs Work Plan. Writes `## Plan Ratification` to `reviews/01-plan-review.md` (existing contract, relocated container) AND writes its sub-verdict as the bold inline label `**Substance (qa):**` followed by a one-line verdict inside `## Plan Review` of that same file. Does NOT use a `###` heading for this label.
+2. **`security` (mode: `design-review`)** — design-security reviewer. **Conditional:** runs only when the task is security-sensitive. When run, writes its sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` inside `## Plan Review` of `reviews/01-plan-review.md`. Does NOT use a `###` heading.
+3. **`plan-reviewer` (shape audit, runs last)** — sole writer of the `## Plan Review` header and the `**Combined verdict:**` block, in `reviews/01-plan-review.md`. Reads the sub-verdicts written by (1) and (2) to produce the combined verdict. Runs LAST so it can read the other sub-verdicts. Creates the file with the full skeleton if it is still absent, and appends one row to `## Panel Rounds`.
 
-**Centralization contract:** the panel MUST NOT create any parallel side-file. Zero parallel correction-files. All findings fold in-place into `01-plan.md`. The consolidated `## Plan Review` section carries the three sub-verdicts as bold inline labels (`**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) — never as `###` headings — so `## Plan Review` stays a single sliceable block from start to finish.
+**Centralization contract:** the panel MUST NOT create any side-file additional to the single canonical `reviews/01-plan-review.md`. Zero OTHER parallel correction-files. All findings are written in-place into `reviews/01-plan-review.md`; `01-plan.md` stays clean (attestation line only). The consolidated `## Plan Review` section carries the three sub-verdicts as bold inline labels (`**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) — never as `###` headings — so `## Plan Review` stays a single sliceable block from start to finish.
 
 **Gating of security reviewer (step 2):** determine security-sensitivity in this order:
 1. Read `00-state.md` (if it exists) and check for `security-sensitive: true` or `security_sensitive: true`.
@@ -56,10 +56,10 @@ If a required label is absent, the panel is incomplete — do NOT surface a pass
 **Scope note:** this guard applies to the `plan-review` direct mode and to the design/research panels. Diagram modes (`/d2-diagram`, `/likec4-diagram`, `/excalidraw`) do NOT dispatch a qa/plan-review panel — the guard does not apply there.
 
 **Behaviour:**
-- Zero side-files. All panel output folds in-place into `01-plan.md`. No agent creates a parallel review file.
-- The consolidated `## Plan Review` section in `01-plan.md` is idempotent (preserve-in-place on subsequent invocations — upstream sub-verdicts are never overwritten by `plan-reviewer`).
+- Zero side-files additional to `reviews/01-plan-review.md`. All panel output is written in-place into that single canonical file. No agent creates a parallel review file, and no agent writes panel content into `01-plan.md`.
+- The consolidated `## Plan Review` section in `reviews/01-plan-review.md` is idempotent (preserve-in-place on subsequent invocations — upstream sub-verdicts are never overwritten by `plan-reviewer`).
 - Does not append `stage.gate` events to JSONL — there is no pipeline.
-- Inline fallback (nested-dispatch): if the Task tool is unavailable (nested context), run the panel reviewers sequentially inline using each agent's system-prompt file as the procedure spec — same order, same centralization contract.
+- Inline fallback (nested-dispatch): if the Task tool is unavailable (nested context), run the panel reviewers sequentially inline using each agent's system-prompt file as the procedure spec — same order, same target file, same centralization contract.
 
 **Output:**
 ```
@@ -74,7 +74,7 @@ Top issues:
   - {file:line — rule — short description}
   ...
 
-Full report: workspaces/{feature-name}/01-plan.md § Plan Review
+Full report: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review
 ```
 
 ---

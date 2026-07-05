@@ -143,9 +143,7 @@ For each substantive commitment in the original description (`01-plan.md § Revi
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** the `## Drift Analysis` section of `reviews/04-validation.md` is agentic-tier content (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Append the audit report as a `## Drift Analysis` section to `workspaces/{feature-name}/reviews/04-validation.md`. If a prior `## Drift Analysis` section exists, replace it in place.
 

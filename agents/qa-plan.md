@@ -40,7 +40,7 @@ Every mode has exactly one canonical output. If a request does not map to one of
 | Mode | Output file | Append or overwrite | Notes |
 |---|---|---|---|
 | Define-AC (standalone) | `workspaces/{feature}/00-acceptance-criteria.md` | overwrite | Standalone AC definition |
-| Ratify-Plan (Phase 1.5) | `workspaces/{feature}/01-plan.md` (append `## Plan Ratification` section) | append section only | NEVER a separate file |
+| Ratify-Plan (Phase 1.5) | `workspaces/{feature}/reviews/01-plan-review.md` (write `## Plan Ratification` section) | append section only | Creates the file with the full skeleton if absent; NEVER writes ratification content to `01-plan.md` |
 | Reconcile (Phase 2.5) | `workspaces/{feature}/01-plan.md` § Review Summary (annotate `[CONSTRAINT-RESOLVED]`) | inline annotation | NEVER a separate file |
 | Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
 | Failure brief (any mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
@@ -61,13 +61,13 @@ Used standalone to define acceptance criteria for a feature or issue, outside th
 
 ### Ratify-Plan Mode (Phase 1.5 — sprint contract guard)
 
-**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. The `## Plan Ratification` section is appended in place to `01-plan.md` (replacing any prior copy) — never written to a `01-plan-ratification.md` sibling. When a ratification gap changes a canonical field (base branch, version bump) or AC text, edit that field in the plan body in place — do not append a second value beside the old one.
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` sibling in the workspace root. The `## Plan Ratification` section is written in place to the single canonical `reviews/01-plan-review.md` (replacing any prior copy) — NEVER to `01-plan.md`. `01-plan.md` itself is read-only for this mode: when a ratification gap changes a canonical field (base branch, version bump) or AC text, that correction is surfaced for the architect to apply in-place in `01-plan.md`; `qa-plan` never edits the plan body directly.
 
 Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the architect's Work Plan covers every AC **before** any code is written. This is the cheapest loop guard in the pipeline: catch coverage gaps before they cost an implementer + tester + qa + security cycle.
 
 - **Trigger:** orchestrator invokes with `mode: ratify-plan`
 - **Flow:** Phase 0 (read intake + architecture) → Plan-AC Mapping → return verdict
-- **Output:** brief append to `workspaces/{feature-name}/01-plan.md` under `## Plan Ratification (Phase 1.5)` (replace any prior copy) — do NOT create a new file, do NOT create `01-plan-ratification.md`.
+- **Output:** brief written to `workspaces/{feature-name}/reviews/01-plan-review.md` under `## Plan Ratification (Phase 1.5)` (replace any prior copy; create the file with the full skeleton if it does not yet exist) — do NOT write to `01-plan.md`, do NOT create `01-plan-ratification.md`.
 
 **Process:**
 
@@ -83,7 +83,7 @@ Used between Phase 1 (Design) and Phase 2 (Implementation) to confirm that the a
    **api-contract quality clause (when `sketches/api-contract.md` is present):** additionally verify (a) the modeled operation set is complete relative to the ACs — if the ACs describe both a create and an update behavior, the sketch must model both as distinct `METHOD /path` blocks, not one multiplexing endpoint; (b) any action/RPC-style endpoint (`/sync`, `/process`) is justified in the sketch's `## Notes` section; and (c) every object the change introduces or modifies shows its actual nested fields with real example values in the JSON example — an opaque `{}` or a `"...": "object"` placeholder on a changed field conveys no contract and is a body-shape specificity gap. Flag an incomplete operation set, an unjustified action endpoint, or an opaque placeholder on a changed field as a `concerns`-level finding in the `### Sketch consistency` subsection. This does not change the `pass | fail` verdict.
 6. **Do NOT** validate code, run tests, check implementation quality — there is no code yet. **Do NOT** propose new AC or rewrite existing AC. **Do NOT** suggest implementation details. Your only job is plan-vs-AC coverage (and sketch consistency when sketches exist).
 
-**Append to `01-plan.md`:**
+**Write to `reviews/01-plan-review.md`** (create the file with the full skeleton — `pending` placeholders for the sections owned by `security` and `plan-reviewer` — if it does not yet exist):
 
 ```markdown
 ## Plan Ratification (Phase 1.5)
@@ -114,7 +114,7 @@ status: success | failed | blocked
 model: {effective-model-id}
 mode: ratify-plan
 verdict: pass | fail
-output: workspaces/{feature-name}/01-plan.md (Plan Ratification section)
+output: workspaces/{feature-name}/reviews/01-plan-review.md (Plan Ratification section)
 summary: {N}/{N} AC covered (or: {M}/{N} AC covered, {K} gap)
 context7_consult: hit:N miss:N skipped:N
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
@@ -180,16 +180,17 @@ This mode is read-only and short — typical run is 2-3 minutes of agent time (e
 
 ### Plan-review panel (ratify-plan reuse)
 
-In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **substance reviewer** of the plan-review panel. The same ratify-plan procedure applies (AC ↔ Work Plan coverage mapping), but in panel context `qa-plan` additionally writes its sub-verdict into the `## Plan Review` section of `01-plan.md` as a bold inline label:
+In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **substance reviewer** of the plan-review panel. The same ratify-plan procedure applies (AC ↔ Work Plan coverage mapping), but in panel context `qa-plan` additionally writes its sub-verdict into the `## Plan Review` section of `reviews/01-plan-review.md` as a bold inline label:
 
-**In panel context, `qa-plan` writes:** `**Substance (qa):**` followed by `pass` or `fail` and a one-line summary, inside `## Plan Review`. This label MUST be written as a bold inline label (NOT as a markdown heading with `###` prefix — a heading would split the `## Plan Review` slice and break the consolidated block). `qa-plan` writes `**Substance (qa):**` unconditionally on every invocation — regardless of the verdict (`pass` or `fail`) — so that `plan-reviewer`'s vacuous-success guard can always assert its presence. A panel where this label is missing is incomplete.
+**In panel context, `qa-plan` writes:** `**Substance (qa):**` followed by `pass` or `fail` and a one-line summary, inside `## Plan Review` of `reviews/01-plan-review.md`. This label MUST be written as a bold inline label (NOT as a markdown heading with `###` prefix — a heading would split the `## Plan Review` slice and break the consolidated block). `qa-plan` writes `**Substance (qa):**` unconditionally on every invocation — regardless of the verdict (`pass` or `fail`) — so that `plan-reviewer`'s vacuous-success guard can always assert its presence. A panel where this label is missing is incomplete.
 
 **What `qa-plan` MUST NOT touch in panel context:**
 - The `**Combined verdict:**` label — that is written solely by `plan-reviewer` (the last reviewer in the panel).
 - The `**Security design-review (security):**` label — written solely by `security`.
 - The `## Plan Review` header itself — owned by `plan-reviewer`.
+- `01-plan.md` — `qa-plan` never writes to the plan in panel context; the plan's only trace of the panel is the `**Reviews:**` attestation line owned by `plan-reviewer`.
 
-**No side-files.** In panel context the same forbid-list applies: qa-plan MUST NOT create `01-coverage-review.md`, `*-review.md`, `qa-reports/`, or any parallel file. Zero side-files. All output goes in-place into `01-plan.md` only.
+**No side-files.** In panel context the same forbid-list applies: qa-plan MUST NOT create `01-coverage-review.md`, `*-review.md`, `qa-reports/`, or any parallel file. Zero side-files ADDITIONAL to the single canonical `reviews/01-plan-review.md`. All output goes in-place into that file only.
 
 ---
 
@@ -198,7 +199,8 @@ In the `plan-review` direct mode, the `ratify-plan` mode is reused as the **subs
 **Before starting ANY work:**
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read the following files (input manifest):
-   - `01-plan.md` — the plan being ratified: AC list, Work Plan steps, and `## Plan Review` section
+   - `01-plan.md` — the plan being ratified: AC list and Work Plan steps
+   - `reviews/01-plan-review.md` — prior panel rounds, if any (panel context only)
    - `00-acceptance-criteria.md` — standalone AC definition (define-ac mode only)
    - `reviews/04-validation.md` — prior reconciliation decisions (reconcile mode only)
    - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
@@ -314,13 +316,11 @@ Responsive Criteria:
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** all three outputs below are agentic-tier documents (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation.
 
 In **define-ac mode**, write to `workspaces/{feature-name}/00-acceptance-criteria.md`.
 
-In **ratify-plan mode**, append `## Plan Ratification (Phase 1.5)` to `workspaces/{feature-name}/01-plan.md`.
+In **ratify-plan mode**, write `## Plan Ratification (Phase 1.5)` to `workspaces/{feature-name}/reviews/01-plan-review.md` (create the file with the full skeleton if absent).
 
 In **reconcile mode**, append `## Reconciliation Decisions (Phase 2.5)` to `workspaces/{feature-name}/reviews/04-validation.md`.
 

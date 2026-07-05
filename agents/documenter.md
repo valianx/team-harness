@@ -242,9 +242,7 @@ Write all documentation in the language specified by the orchestrator in the tas
 
 ---
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** `02-documentation.md` (this session's manifest) is an agentic-tier document (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. The vault pages produced above are operator-deliverable content with their own docs-flow contract, outside the two-tier mandate.
 
 ## Return Protocol
 

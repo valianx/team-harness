@@ -180,9 +180,7 @@ Only `critical` findings block delivery. Everything else is a recommendation —
 
 ---
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** `reviews/01-ux-review.md` and `reviews/04-ux-validation.md` are agentic-tier documents (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. Follow the fixed templates above.
 
 ## Return Protocol
 

@@ -58,8 +58,8 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 | Phase 0b — Specify | orchestrator | AC list and scope confirmed in `00-state.md` |
 | Phase 1 — Design | architect | `01-plan.md` (merged architecture + task list) + `sketches/` |
 | Phase 1.7 — UX Enrich | ux-reviewer (when `frontend_scope: true`) | `reviews/01-ux-review.md`, UI/UX AC appended to `01-plan.md` |
-| Phase 1.5 — Plan Ratification | qa | AC validation against Work Plan (appended to `01-plan.md`) |
-| Phase 1.6 — Plan Review | plan-reviewer | verdict appended to `01-plan.md § Plan Review` |
+| Phase 1.5 — Plan Ratification | qa-plan | AC validation against Work Plan (written to `reviews/01-plan-review.md § Plan Ratification`) |
+| Phase 1.6 — Plan Review | plan-reviewer | verdict written to `reviews/01-plan-review.md` (`**Combined verdict:**`) |
 | **STAGE-GATE-1** | operator | Approve or approve-autonomous; sketch-guard validates `sketches/` |
 | Phase 2.0 — (bug-fix only) | — | — (see Bug-fix pipeline) |
 | Phase 2 — Implementation | implementer | code, `02-implementation.md` |
@@ -84,7 +84,8 @@ Full contract: [`docs/discover-phase.md`](./discover-phase.md).
 
 ### Notable artifacts
 
-- `workspaces/{feature}/01-plan.md` — merged design proposal + task list (§ Architecture + § Task List); plan-reviewer verdict appended as `§ Plan Review`
+- `workspaces/{feature}/01-plan.md` — merged design proposal + task list (§ Architecture + § Task List); stays clean at STAGE-GATE-1 — a one-line `**Reviews:**` attestation in the title block is the only review trace
+- `workspaces/{feature}/reviews/01-plan-review.md` — plan-review panel output (§ Plan Ratification, § Security Design-Review, § Plan Review + `**Combined verdict:**`, § Panel Rounds); must exist with a Combined verdict before STAGE-GATE-1
 - `workspaces/{feature}/sketches/` — api-contract, data-model, ui-wireframe, etc. (presence gated by sketch-guard at STAGE-GATE-1)
 - `workspaces/{feature}/00-spec-seed.md` — optional pre-architect spec anchor (Discover phase)
 - `workspaces/{feature}/00-state.md` — live pipeline state (TL;DR + phase + agent results)
@@ -221,7 +222,7 @@ Runs Stage 1 (Phase 0–1.6 + STAGE-GATE-1) and stops. The architect produces `0
 
 | File | Consumer | Purpose |
 |------|---------|---------|
-| `01-plan.md` | implementer + qa + plan-reviewer | Merged architecture + task list (§ Architecture + § Task List); plan-review verdict appended as § Plan Review |
+| `01-plan.md` | implementer + qa + plan-reviewer | Merged architecture + task list (§ Architecture + § Task List); stays clean — plan-review verdict lives in `reviews/01-plan-review.md` |
 
 ---
 
