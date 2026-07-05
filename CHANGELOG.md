@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.124.0] - 2026-07-05
+
+### Added
+
+- Gated local permission provisioning for the obsidian workspace and cross-repo work surfaces (#462): `/th:setup` § 3a offers to write `Edit`/`Write` rules (double-slash `//` anchor) plus an `additionalDirectories` entry for the obsidian vault to `~/.claude/settings.json`; the orchestrator's Phase 0a Step 1g re-offers the same obsidian rules on existing installs and offers scoped rules for declared cross-repo work-surface paths to `.claude/settings.local.json`. Every write is gated by an explicit Y/n, merge-write-whole-document, and reported; already-provisioned rules are a silent pass-through; outward-action rules (push/PR/API) are never touched. See `docs/permission-provisioning.md`.
+- Dispatch-time intra-task execution-lane decomposition (#454): the architect may declare `Lane-decomposable: yes` with file-disjoint `seams:` and read-only `frozen-contracts:` for an oversized task; the orchestrator's Stage-2 dispatch gate fans out that task's EXECUTION into up to `LANE_CAP` (5) fresh-context implementer lanes when the task's file count meets `LANE_DECOMPOSE_MIN_FILES` (8), capped at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round. A lane that must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`, triggering a monolithic re-dispatch of the whole task — never a silent stop. The task's DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out. See `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` and `docs/parallel-batch-implementation.md § Intra-task lane fan-out`.
+
+### Changed
+
+- `/th:release` now continues past the release tag with a `Step 4 — Apply the release to local runtimes (post-tag)`: an immediate Claude Code leg (catalog refresh + `claude plugin update`) and a publication-gated opencode leg (bounded poll of the published `VERSION` asset, then the OS-appropriate `update-opencode.{sh,ps1}`), each with per-leg failure isolation and a single final per-runtime report. Both activations (`/reload-plugins`, opencode restart) remain operator-driven; the skill never states the new version is active.
+
+### Fixed
+
+- Phase 3.6 conditional re-run guard now watches `02-implementation.md` in addition to `01-plan.md` and `reviews/04-validation.md` (#464): a post-3.75 build/lint fix that updates the implementation record — the acceptance-checker's grounding read — now re-triggers the acceptance-checker instead of leaving a stale drift verdict in place.
+- Reviewer's Read-Only Working-Tree Contract whitelist now includes its own internal-review outputs (#465): `reviews/04-internal-review.md` plus the dual-review `-A.md`/`-B.md` variants are permitted writes under `workspaces/`, and every site (whitelist, internal-mode prose, status-block example, orchestrator artifacts table, dual-review A/B paths) agrees the reviewer is the writer — the orchestrator only surfaces the digest.
+
 ## [2.123.1] - 2026-07-04
 
 ### Changed
