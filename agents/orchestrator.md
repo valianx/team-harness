@@ -642,6 +642,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 
 - converge: {true | false | null}              # Phase 4.5 dual-review convergence activation. Auto-on (true) when bug_tier: 4 or security_sensitive: true; operator opt-in via payload converge: true; false/null = single-pass (OFF by default).
 - convergence: {round: N, last_verdict_A: APPROVE|REQUEST_CHANGES|null, last_verdict_B: APPROVE|REQUEST_CHANGES|null, status: running|converged|escalated}  # Phase 4.5 convergence loop state; null when converge is false/null. Mirrors the review-pr skill's convergence block.
+- lane_decomposition: {task: Task-{N}, seam_map: {seam-1: [files], ...}, lanes_dispatched: N, lane_cap: 5, status: dispatching|consolidated|fallback-monolithic} | null  # Stage-2 intra-task execution-lane fan-out state (`agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`); null when no task in this run used lane fan-out.
 
 ## Phase Checklist
 <!-- Mandatory sequential execution. Mark each phase with [x] ONLY after completion.
@@ -1889,7 +1890,7 @@ Every state transition on a task mirrors into the `**Status:**` field of that ta
 
 The `01-plan.md` (§ Task List) mutations the orchestrator makes are scoped EXCLUSIVELY to the `**Status:**` field of one task header at a time. The orchestrator never touches `Files:`, AC text, dependencies, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:` — those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if a change there is needed, route back to `architect` for an explicit in-place refinement and re-run Phase 1.6.
 
-**The orchestrator never divides one task's plan or implementation.** It does not open a PR that is not covered by the approved `§ Task List` / `§ Delivery Grouping`, does not mint a second stage-cycle, and does not split a workspace. If a delivered scope appears to need division, it routes back to the architect (re-run Phase 1.6) and surfaces the question to the operator. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
+**The orchestrator never divides one task's DELIVERABLE — its plan, commit set, or PR.** It does not open a PR that is not covered by the approved `§ Task List` / `§ Delivery Grouping`, does not mint a second stage-cycle, and does not split a workspace. EXECUTION is a distinct axis: a task's implementation work MAY fan out into bounded parallel lanes under the Intra-task execution-lane decomposition gate (below) — that is a fan-out of WORK, never a division of the DELIVERABLE; the task still ships as one plan, one implementation record, one commit set, one PR. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes. If a delivered scope appears to need genuine division (more than one PR, more than one plan), it routes back to the architect (re-run Phase 1.6) and surfaces the question to the operator. (Canonical: `agents/ref-special-flows.md § Milestone-Build Flow → Operator-authority invariant`.)
 
 **Post-approval division is a hard re-gate trigger.** After STAGE-GATE-1, the approved `§ Task List` + `§ Delivery Grouping` is the complete delivery contract and the flat stage-file set is the complete document set. If, mid-workspace, an agent (a) opens or proposes a PR that is not covered by the approved contract, OR (b) creates a stage file with any suffix (`-m{N}`, `-b`, `02b-*`, second-cycle), the orchestrator MUST treat this as plan drift: route back to `architect` for an explicit in-place plan refinement, re-run Phase 1.6 (plan-reviewer), and re-surface STAGE-GATE-1 to the operator for confirmation before any delivery proceeds. The pipeline never silently absorbs an unapproved additional PR or a suffixed stage file.
 
@@ -1912,6 +1913,52 @@ Tasks within the same round run **in parallel** in separate worktrees (same work
 **Sequential fallback:** if every task has a chained `Depends on:` (Task-2 depends on Task-1, Task-3 depends on Task-2, etc.), the DAG degenerates into a line and the rounds become 1-task rounds — identical to the legacy per-task behaviour. The scheduler is correct in that case too. No special-casing.
 
 **Implementation order vs merge order (these are distinct concerns).** The DAG governs **implementation order** — which worktrees run in parallel and which wait for their dependencies. It does NOT govern merge order to `main`. Parallel rounds (tasks in the same DAG round running in separate worktrees simultaneously) do NOT authorize parallel merge to `main`. The merge order is always serial and is governed exclusively by the contract in `agents/delivery.md`, per the declared `§ Delivery Grouping`: for a split grouping, group N+1's PR opens and merges to `main` only after group N's PR has landed. Each subsequent branch is cut from the updated `main` after the prior merge. This distinction matters for multi-group deliveries: the work can be implemented in parallel, but it ships to `main` one PR at a time, serially.
+
+### Intra-task execution-lane decomposition (dispatch-time gate)
+
+Distinct from the Stage-2 DAG scheduler above — the DAG parallelizes TASKS (whole implementer dispatches, one per task, decided at design time via `Depends on:`). This gate parallelizes EXECUTION WITHIN one task (multiple fresh-context implementer lanes for the SAME task, decided at dispatch time from file count + architect-declared seams). A task's DELIVERABLE (its commit set, its PR) is never divided by this mechanism — only its EXECUTION fans out; see "Reconciling the never-divides invariant" below.
+
+**Constants (DIAL, operator-recalibratable):**
+- `LANE_DECOMPOSE_MIN_FILES = 8` — a task's `Files:` count must meet or exceed this before lane fan-out is even considered.
+- `LANE_CAP = 5` — maximum concurrent lanes for a single task.
+- `GLOBAL_ROUND_CONCURRENCY_CAP = 6` — maximum concurrent implementer subagents in a Stage-2 round, summing inter-task DAG parallelism (above) AND intra-task lane parallelism (this section). A round already running 4 DAG tasks in parallel can fan out at most 2 more lanes before the cap is hit.
+
+**Gate (evaluated per task, immediately before "Invoke via Task tool"):** ALL of the following must hold, or the task dispatches 1:1 exactly as today —
+
+1. The task declares `Lane-decomposable: yes` in `01-plan.md` (§ Task List).
+2. The task's `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES`.
+3. The declared `seams:` are ≥2 and file-disjoint (no file appears in two seams; no file in a seam also appears in `frozen-contracts:`).
+
+The threshold alone never fires the gate, and a `yes` declaration alone never fires it either — BOTH the file-count threshold AND disjoint seams are required. A task under threshold, or one whose seams are not genuinely disjoint, dispatches 1:1 regardless of the declaration.
+
+**On gate FIRE — fan-out:**
+- Dispatch one fresh-context `implementer` subagent per seam, via concurrent `Task` calls in the parent session — the same in-message mechanism already used for the `tester+qa+security` trio at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`. Cap at `LANE_CAP` per task — a task with more seams than `LANE_CAP` runs its first `LANE_CAP` seams and queues the rest as a second wave, eager slot-fill (same wave model as § Multi-Task Orchestration Step 4, below).
+- Each lane is scoped to its seam's `Files:` subset ONLY — the lane's dispatch prompt names its files explicitly and instructs: "You may READ but must NEVER MODIFY the following frozen-contract files: {list}. If your seam's implementation genuinely requires modifying one, STOP and return `status: blocked, reason: seam-not-disjoint` instead of editing it."
+- Lanes write to the SAME worktree/branch as the task (deliverable cohesion — one commit set, one PR). Concurrent lanes touching disjoint files do not contend on the working tree.
+- Respect `GLOBAL_ROUND_CONCURRENCY_CAP` across the whole round: before dispatching a wave of lanes, count already-running DAG-task implementers plus already-running lanes from sibling lane-decomposed tasks in the same round; never exceed 6 concurrent implementer subagents total.
+
+**On gate NO-FIRE:** dispatch 1:1 exactly as today — no state change, no trace event beyond the normal Phase 2 dispatch.
+
+**Seam-not-disjoint fallback (never a silent stop).** If any lane returns `status: blocked, reason: seam-not-disjoint`, the orchestrator:
+1. Aborts the fan-out for that task — does NOT wait for or merge partial lane results.
+2. Emits the `stage2.lane.result` trace event with `status: blocked, reason: seam-not-disjoint`, recording which lane and which frozen-contract it needed to modify.
+3. Re-dispatches the ENTIRE task monolithically to a single fresh-context implementer, exactly as the 1:1 path (`Files:` the full task file list, no seam scoping).
+4. Reports the fallback to the operator: "Lane fan-out for Task-{N} aborted — seam {seam} needed to modify frozen-contract {file}. Re-dispatching monolithically." This is always surfaced, never absorbed silently.
+
+**Consolidation (mandatory on fan-out completion).** After all lanes of a task return `status: success`, the orchestrator:
+1. Verifies contract adherence — no lane's diff touches a file outside its declared seam or a declared frozen-contract (a quick `git diff --stat` against each lane's declared file list).
+2. Writes a consolidation report appended to that task's `02-implementation.md § Review Summary` (one line per lane: seam name, files touched, one-line summary) — required, not optional, whenever fan-out ran.
+3. Records the `lane_decomposition` block in `00-state.md § Current State` (schema below) with `status: consolidated`.
+4. Proceeds to Phase 2.5 exactly as the 1:1 path — the fan-out is invisible downstream of Phase 2: one task, one `02-implementation.md`, one commit set.
+
+**Trace events** (append to `{docs_root}/{events_file}` at each transition):
+- `stage2.lane.dispatch` — `{"ts":"<ISO>","event":"stage2.lane.dispatch","task":"Task-{N}","seam":"{seam}","lane_cap":5,"files":[...]}` — one per lane, at dispatch.
+- `stage2.lane.result` — `{"ts":"<ISO>","event":"stage2.lane.result","task":"Task-{N}","seam":"{seam}","status":"success|blocked","reason":"seam-not-disjoint|null"}` — one per lane, on return.
+- `stage2.lanes.consolidated` — `{"ts":"<ISO>","event":"stage2.lanes.consolidated","task":"Task-{N}","lanes_dispatched":<N>,"status":"consolidated|fallback-monolithic"}` — once per task, at the end of the fan-out (either successful consolidation or after the monolithic fallback completes).
+
+**`00-state.md § Current State` — `lane_decomposition` block** (see schema below): `{task: Task-{N}, seam_map: {seam-1: [files], ...}, lanes_dispatched: N, lane_cap: 5, status: dispatching|consolidated|fallback-monolithic} | null` — set when the Stage-2 lane-decomposition gate fires for a task; null when no task in this run used lane fan-out.
+
+**Reconciling the never-divides invariant (DELIVERABLE vs EXECUTION).** The invariant above governs the DELIVERABLE — the task's plan, commit set, and PR are never autonomously divided by the pipeline. This mechanism governs EXECUTION — the work of implementing an already-approved, already-undivided task MAY fan out into parallel lanes when the gate above fires. A task whose lanes fan out still ships as exactly one plan, one implementation record, one commit set, one PR — the reader downstream of Phase 2 cannot tell the difference. The two axes are complementary, not in tension, mirroring the existing "decomposition vs division" reconciling clause in `agents/ref-special-flows.md § Milestone-Build Flow`. Third-mechanism documentation (distinct from this DAG and from `## Parallel Multi-Project Dispatch`): `docs/parallel-batch-implementation.md § Intra-task lane fan-out` and `agents/ref-special-flows.md § Milestone-Build Flow`.
 
 **Invoke via Task tool** with context:
 - Feature name for workspaces.

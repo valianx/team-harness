@@ -31931,6 +31931,207 @@ check(
 
 # Marker: three-file-watched-set
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 144 — lane-decomposition-bounds (issue #454)
+#
+# Asserts the dispatch-time intra-task execution-lane decomposition gate
+# (bounded fan-out of a single task's EXECUTION into architect-declared,
+# file-disjoint seams). Pins the three structural caps at their declaration
+# site in agents/orchestrator.md, the `Lane-decomposable:` schema field at
+# its declaration site in agents/architect.md, the seam-not-disjoint
+# fallback, the `lane_decomposition` state block, the trace-event names,
+# and the reconciled deliverable-vs-execution "never divides" token at both
+# doc-sites (docs/parallel-batch-implementation.md and
+# agents/ref-special-flows.md) via independent anchor-scoped slices.
+#
+# Marker: lane-decomposition-bounds
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 144: lane-decomposition-bounds ===")
+
+_s144_orch = read(AGENTS_DIR / "orchestrator.md")
+_s144_arch = read(AGENTS_DIR / "architect.md")
+_s144_pbi = read(REPO_ROOT / "docs" / "parallel-batch-implementation.md")
+_s144_ref = read(AGENTS_DIR / "ref-special-flows.md")
+_s144_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s144_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Declaration site: the dispatch-time gate section in orchestrator.md ---
+_S144_GATE_ANCHOR = "### Intra-task execution-lane decomposition (dispatch-time gate)"
+_S144_GATE_STOP = ("\n**Invoke via Task tool**", "\n### Phase 2.5", "\n## ")
+_s144_gate_slice = _slice_section(_s144_orch, _S144_GATE_ANCHOR, _S144_GATE_STOP)
+
+check(
+    "suite144(gate-present): agents/orchestrator.md contains the intra-task "
+    "execution-lane decomposition dispatch-time gate section",
+    _s144_gate_slice != "",
+    "agents/orchestrator.md must contain the "
+    "'### Intra-task execution-lane decomposition (dispatch-time gate)' section",
+)
+check(
+    "suite144(min-files-cap): the gate section pins LANE_DECOMPOSE_MIN_FILES = 8",
+    "`LANE_DECOMPOSE_MIN_FILES = 8`" in _s144_gate_slice,
+    "the dispatch-time gate section must declare `LANE_DECOMPOSE_MIN_FILES = 8`",
+)
+check(
+    "suite144(lane-cap): the gate section pins LANE_CAP = 5",
+    "`LANE_CAP = 5`" in _s144_gate_slice,
+    "the dispatch-time gate section must declare `LANE_CAP = 5`",
+)
+check(
+    "suite144(global-round-cap): the gate section pins GLOBAL_ROUND_CONCURRENCY_CAP = 6",
+    "`GLOBAL_ROUND_CONCURRENCY_CAP = 6`" in _s144_gate_slice,
+    "the dispatch-time gate section must declare `GLOBAL_ROUND_CONCURRENCY_CAP = 6`",
+)
+
+# --- Negative assertions (AC-7): lanes never exceed LANE_CAP; gate requires
+#     BOTH the file-count threshold AND disjoint seams, never one alone ---
+check(
+    "suite144(negative-lanes-never-exceed-cap): the gate section enforces "
+    "LANE_CAP as a hard ceiling — excess seams queue as a second wave, "
+    "never dispatch beyond the cap",
+    "runs its first `LANE_CAP` seams and queues the rest as a second wave"
+    in _s144_gate_slice,
+    "the gate section must state that a task with more seams than LANE_CAP "
+    "queues the excess rather than exceeding the cap",
+)
+check(
+    "suite144(negative-gate-requires-both): the gate fires only when BOTH "
+    "the file-count threshold AND disjoint seams hold — never threshold "
+    "alone, never the yes-declaration alone",
+    "BOTH the file-count threshold AND disjoint seams are required"
+    in _s144_gate_slice,
+    "the gate section must state that the file-count threshold and disjoint "
+    "seams are both required — neither alone fires the gate",
+)
+
+# --- Seam-not-disjoint fallback (never a silent stop) ---
+_S144_FALLBACK_ANCHOR = "**Seam-not-disjoint fallback (never a silent stop).**"
+_s144_fallback_slice = _slice_section(
+    _s144_orch, _S144_FALLBACK_ANCHOR, ("\n\n**Consolidation",)
+)
+check(
+    "suite144(seam-not-disjoint-fallback): a lane that must modify a "
+    "frozen-contract returns status:blocked reason:seam-not-disjoint and "
+    "the orchestrator re-dispatches the task monolithically",
+    "status: blocked, reason: seam-not-disjoint" in _s144_fallback_slice
+    and "Re-dispatches the ENTIRE task monolithically" in _s144_fallback_slice,
+    "agents/orchestrator.md must declare the seam-not-disjoint fallback: "
+    "status:blocked/reason:seam-not-disjoint triggers a monolithic re-dispatch, "
+    "never a silent stop",
+)
+
+# --- lane_decomposition state block + trace-event enum ---
+check(
+    "suite144(state-schema): 00-state.md Current State schema declares the "
+    "lane_decomposition field",
+    "- lane_decomposition:" in _s144_orch,
+    "agents/orchestrator.md '## Current State' schema must declare the "
+    "`lane_decomposition` field",
+)
+check(
+    "suite144(trace-events): the gate section names all three lane "
+    "trace events (dispatch / result / consolidated)",
+    "`stage2.lane.dispatch`" in _s144_gate_slice
+    and "`stage2.lane.result`" in _s144_gate_slice
+    and "`stage2.lanes.consolidated`" in _s144_gate_slice,
+    "the gate section must name the stage2.lane.dispatch, stage2.lane.result, "
+    "and stage2.lanes.consolidated trace events",
+)
+
+# --- Declaration site: Lane-decomposable schema field in architect.md ---
+_S144_ARCH_SCHEMA_ANCHOR = "- **Depends on:** {Task-N | none}"
+_s144_arch_schema_slice = _slice_section(
+    _s144_arch, _S144_ARCH_SCHEMA_ANCHOR, ("\n#### Acceptance Criteria",)
+)
+check(
+    "suite144(arch-schema-field): the Task List template declares the "
+    "Lane-decomposable field with seams and frozen-contracts",
+    "**Lane-decomposable:**" in _s144_arch_schema_slice
+    and "seams:" in _s144_arch_schema_slice
+    and "frozen-contracts:" in _s144_arch_schema_slice,
+    "agents/architect.md Task-1 template must declare `- **Lane-decomposable:**` "
+    "with `seams:` and `frozen-contracts:` sub-fields",
+)
+
+_S144_ARCH_GUIDE_ANCHOR = (
+    "#### `Lane-decomposable:` field (optional, plan-time seam declaration)"
+)
+_s144_arch_guide_slice = _slice_section(
+    _s144_arch, _S144_ARCH_GUIDE_ANCHOR, ("\n### Research Mode",)
+)
+check(
+    "suite144(arch-guidance): architect.md documents when to mark yes vs no "
+    "for Lane-decomposable, including the never-declare-just-in-case guard",
+    "When to mark `yes`" in _s144_arch_guide_slice
+    and "Never declare `Lane-decomposable: yes` for a tightly-coupled task"
+    in _s144_arch_guide_slice,
+    "agents/architect.md must document Lane-decomposable guidance (when to "
+    "mark yes/no) including the never-declare-just-in-case guard",
+)
+
+# --- AC-8: reconciled deliverable-vs-execution token at BOTH doc-sites ---
+_S144_TOKEN = (
+    "The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION "
+    "may fan out into bounded lanes"
+)
+
+_S144_PBI_ANCHOR = (
+    "## Intra-task lane fan-out — a third, distinct parallelism mechanism"
+)
+_s144_pbi_slice = _slice_section(_s144_pbi, _S144_PBI_ANCHOR, ("\n## Worktree isolation",))
+check(
+    "suite144(doc-siteA-parallel-batch): docs/parallel-batch-implementation.md "
+    "documents intra-task lane fan-out as the third parallelism mechanism and "
+    "carries the reconciled deliverable-vs-execution token",
+    _s144_pbi_slice != "" and _S144_TOKEN in _s144_pbi_slice,
+    "docs/parallel-batch-implementation.md must contain the "
+    "'## Intra-task lane fan-out' section with the reconciled "
+    "deliverable-vs-execution 'never divides' token",
+)
+
+_S144_REF_ANCHOR = "**Third parallelism axis — intra-task execution-lane fan-out"
+_s144_ref_slice = _slice_section(
+    _s144_ref, _S144_REF_ANCHOR, ("\n### Batch consolidation vs the anti-split invariant",)
+)
+check(
+    "suite144(doc-siteB-ref-special-flows): agents/ref-special-flows.md "
+    "documents intra-task lane fan-out as the third parallelism axis and "
+    "carries the reconciled deliverable-vs-execution token",
+    _s144_ref_slice != "" and _S144_TOKEN in _s144_ref_slice,
+    "agents/ref-special-flows.md must contain the 'Third parallelism axis' "
+    "paragraph with the reconciled deliverable-vs-execution 'never divides' "
+    "token",
+)
+
+# Self-referential guards (hygiene contract)
+_s144_own = read(Path(__file__))
+check(
+    "suite144(self-ref): test file contains 'Suite 144' and "
+    "'lane-decomposition-bounds'",
+    "Suite 144" in _s144_own and "lane-decomposition-bounds" in _s144_own,
+    "test file must self-reference Suite 144 and the marker "
+    "'lane-decomposition-bounds'",
+)
+check(
+    "suite144(registry): docs/testing.md registers 'Suite 144' and "
+    "'lane-decomposition-bounds'",
+    "Suite 144" in _s144_testing_md
+    and "lane-decomposition-bounds" in _s144_testing_md,
+    "docs/testing.md must register Suite 144 and the "
+    "'lane-decomposition-bounds' marker",
+)
+check(
+    "suite144(hygiene): CLAUDE.md does NOT contain 'Suite 144' (§11 hygiene "
+    "contract)",
+    "Suite 144" not in _s144_claude_md,
+    "CLAUDE.md must not mention Suite 144 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: lane-decomposition-bounds
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()

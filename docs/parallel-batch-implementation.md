@@ -20,6 +20,23 @@ If any condition is not met, fall back to the default serial implementation (tod
 
 ---
 
+## Intra-task lane fan-out — a third, distinct parallelism mechanism
+
+This document covers ONE parallelism mechanism: an operator-authorized batch of independent ITEMS across isolated worktrees, consolidated into one PR. Team-harness has two other, structurally distinct parallelism mechanisms — naming all three prevents "parallel" from being read as one undifferentiated concept:
+
+| Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
+|---|---|---|---|---|
+| Inter-task DAG scheduler | tasks within one plan | one implementer per task | none — parallel-by-default, `Depends on:` rounds | `agents/orchestrator.md § Phase 2 — Implementation → Stage 2 scheduler (DAG by Depends on:)` |
+| Parallel Multi-Project Dispatch | projects within one initiative | one implement+verify lane per project | operator confirm gate (`parallel` / `serial`) | `agents/orchestrator.md § Parallel Multi-Project Dispatch` |
+| Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
+| **Intra-task execution-lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
+
+**Intra-task execution-lane decomposition, in brief.** A task's architect-declared `seams:` (disjoint file subsets) and `frozen-contracts:` (shared files/symbols no seam may modify) let the orchestrator fan out ONE task's implementation into up to `LANE_CAP` (5) fresh-context implementer lanes at dispatch time, capped globally at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round (summing inter-task DAG parallelism and intra-task lanes). A lane that discovers it must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`; the orchestrator aborts the fan-out and re-dispatches the whole task monolithically — never a silent stop. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes — the reader downstream of Phase 2 sees one task, one `02-implementation.md`, one commit set, exactly as the 1:1 path. Full gate mechanics, trace events, and the `00-state.md` schema live at `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`.
+
+**Why this is not the same as this document's batch mechanism.** This document's batch mechanism fans out independent ITEMS — each with its own worktree, its own branch, its own full Stage-1-through-verify pipeline run, consolidated at the END via sequential `git merge`. Intra-task lane decomposition fans out FILES within a SINGLE task that already cleared Stage 1 — lanes share the SAME worktree and branch (deliverable cohesion, not execution cohesion), write disjoint files, and consolidate via a compact status-block report, never a merge. Do not apply this document's worktree-isolation or edit-class-split machinery to lane decomposition; it operates at a different, finer grain.
+
+---
+
 ## Worktree isolation
 
 Each item runs in its own `git worktree`. Follow `docs/worktree-discipline.md` rules:
