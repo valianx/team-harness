@@ -857,9 +857,7 @@ Before marking the audit as complete:
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** `reviews/04-security.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. The Spanish-language contract for the report body is unchanged — language is orthogonal to format.
 
 Write the full report to `workspaces/{feature-name}/reviews/04-security.md` (see Phase 4 above for the complete template).
 

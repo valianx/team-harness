@@ -440,9 +440,7 @@ Write the report to `workspaces/{feature-name}/reviews/04-validation.md`:
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** `reviews/04-validation.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Write the validation report to `workspaces/{feature-name}/reviews/04-validation.md` (see Phase 3 above for the full template).
 

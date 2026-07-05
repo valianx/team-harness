@@ -596,9 +596,7 @@ for line in 01-plan.md.lines:
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** `reviews/01-plan-review.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — a fixed skeleton of anchored sections, tables and labels, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Write your output to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton below (`pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Preserve-in-place the `## Plan Ratification (Phase 1.5)` and `## Security Design-Review` sections owned by `qa-plan` and `security`. Append one row to `## Panel Rounds` per round. No iteration history inside the `## Plan Review` section itself (the section is itself subject to the consolidated-documents rule). Additionally, replace the `**Reviews:**` attestation line in `01-plan.md`'s title block in place — this is the only write you make to `01-plan.md`.
 

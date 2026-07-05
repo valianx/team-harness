@@ -345,6 +345,8 @@ Before marking the task complete:
 
 ## Session Documentation
 
+**Document format:** `02-gcp-infra.md` and `02-runbook.md` are agentic-tier documents (see `docs/conventions.md § Document classification`) — fixed structure, no two-tier split obligation beyond the template's own sections below.
+
 ### 02-gcp-infra.md
 
 Write the plan report to `workspaces/{feature-name}/02-gcp-infra.md`:

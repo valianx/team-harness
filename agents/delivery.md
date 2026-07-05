@@ -1413,9 +1413,7 @@ initiative_overview: updated | skipped: no-initiative | skipped: overview-not-fo
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
-1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
-2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
+**Document format:** the `## Delivery` section of `00-state.md` is agentic-tier content (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}/00-state.md`. If a prior `## Delivery` section exists, replace it in place.
 

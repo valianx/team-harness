@@ -1354,7 +1354,7 @@ Flag each row with `[ALREADY-FIXED: {ref}]`, `[PARTIALLY-FIXED: {what remains}]`
 
 ## Session Documentation
 
-**Document format:** Structure your output file with two top-level sections:
+**Document format:** `01-plan.md` is the operator-facing tier (see `docs/conventions.md § Document classification`) — it is read by the human at STAGE-GATE-1, so it keeps its own intrinsic two-section schema:
 1. `## Review Summary` — human-readable digest of decisions, risks, and outcomes. Use `> [!decision]`, `> [!risk]`, `> [!change]` callouts. Keep under 30 lines. No code, no file paths, no schemas.
 2. `## Technical Detail` — full content for downstream agents. Current format and structure preserved here.
 
