@@ -31560,6 +31560,13 @@ check(
 # sites + contract doc). Plus two low-severity closures: the cross-project
 # blast-radius note and the exact-match dedup limitation note.
 #
+# 2026-07-05 CodeRabbit disposition (PR #466, T1/T2): pins the site-A
+# already-present pass-through ahead of the confirmation gate (setup § 3a
+# now mirrors the orchestrator's site-B skip-the-prompt behavior instead of
+# always re-prompting), and re-pins the site-B additionalDirectories anchor
+# check against the exact "already contains" grant phrasing so it can no
+# longer be satisfied by the co-located Edit/Write allow-rule strings alone.
+#
 # Marker: permission-provisioning
 # ---------------------------------------------------------------------------
 print()
@@ -31620,6 +31627,16 @@ check(
     "docs/permission-provisioning.md" in _s142_siteA,
     "setup § 3a must reference docs/permission-provisioning.md",
 )
+check(
+    "suite142(siteA-passthrough): setup § 3a checks for already-present rules "
+    "BEFORE the Y/n gate and skips the prompt entirely when covered (mirrors the "
+    "orchestrator's site-B pass-through so re-running /th:setup never re-prompts)",
+    "Already-present check (before any gate is shown)" in _s142_siteA
+    and "`permissions.additionalDirectories` already contains `//{base}`" in _s142_siteA
+    and "no gate, no write" in _s142_siteA,
+    "setup § 3a must add an already-present check ahead of the confirmation "
+    "gate, reporting the covering rule(s) and skipping the prompt on a hit",
+)
 
 # --- Site B: agents/orchestrator.md Phase 0a Step 1g (bounded anchor-to-anchor
 # slice — the step is a numbered list item, not its own markdown heading, so
@@ -31652,9 +31669,11 @@ check(
     "detection — uses the '//' double-slash anchor and additionalDirectories",
     "Edit(//{base}/**)" in _s142_siteB
     and "Write(//{base}/**)" in _s142_siteB
-    and "//{base}" in _s142_siteB,
+    and "`permissions.additionalDirectories` already contains `//{base}`" in _s142_siteB,
     "Step 1g part (a) must check/build Edit(//{base}/**), Write(//{base}/**), and "
-    "the //{base} additionalDirectories entry",
+    "the additionalDirectories grant for //{base} (needle pinned to the exact "
+    "'already contains' phrasing so the additionalDirectories check cannot silently "
+    "regress into a generic //{base} substring already satisfied by the allow rules)",
 )
 check(
     "suite142(siteB-a-passthrough): Step 1g part (a) is a silent pass-through "

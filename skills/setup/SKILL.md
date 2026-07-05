@@ -163,8 +163,18 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 1. Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX (`C:\vault\Work` → `/c/vault/Work`) and anchor it with a leading `//` (a single leading slash anchors to the settings-source directory, not the filesystem root, and silently fails to match paths outside the cwd — upstream Claude Code issue #25137).
 2. **Resolved-value validation floor (before any rule is constructed).** Reject and abort provisioning — no gate, no rule written — when the resolved `base` is empty, `/`, the user home (`~`, `$HOME`, or its expanded form), a filesystem top-level directory (fewer than 2 path segments below root), or contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`). Report a one-line reason (e.g. "Obsidian workspace path resolves to the filesystem root — provisioning aborted.") and continue to Step 3.5 without offering a gate. Full contract: `docs/permission-provisioning.md § Resolved-value validation floor`.
-3. Present the exact rules for confirmation, including the `.git/` deny pair (never covers `.git/` — `docs/permission-provisioning.md § ".git/" exclusion invariant`) and the cross-project blast-radius note. Write nothing until the operator answers:
-   ```
+3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to the orchestrator's Phase 0a Step 1g part (a), so the two sites stay reconciled.
+   - **Already present → no gate, no write** (silent pass-through) — report the covering rule(s) and target file for audit visibility, then continue to Step 3.5:
+     ```text
+     Permission rules for the obsidian workspace are already present in ~/.claude/settings.json:
+       Edit(//{base}/**)
+       Write(//{base}/**)
+       additionalDirectories: //{base}
+       deny: Edit(//{base}/.git/**), Write(//{base}/.git/**)
+     ```
+   - **Missing (any of the entries) → present the gated Y/n offer below.**
+4. Present the exact rules for confirmation, including the `.git/` deny pair (never covers `.git/` — `docs/permission-provisioning.md § ".git/" exclusion invariant`) and the cross-project blast-radius note. Write nothing until the operator answers:
+   ```text
    Grant write access without prompting to the obsidian workspace?
      Edit(//{base}/**)
      Write(//{base}/**)
@@ -176,10 +186,10 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
    Add these rules to ~/.claude/settings.json? [y/N]
    ```
-4. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
-5. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target.
-6. Report the rules added and the target file:
-   ```
+5. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
+6. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target.
+7. Report the rules added and the target file:
+   ```text
    Permission rules added to ~/.claude/settings.json:
      Edit(//{base}/**)
      Write(//{base}/**)
