@@ -1630,7 +1630,7 @@ This ensures the plan-review panel runs via the real `plan-reviewer` agent — i
 |---|---|---|
 | `success` | `pass` | Proceed to STAGE-GATE-1 with the plan-reviewer summary inline. |
 | `success` | `concerns` | Proceed to STAGE-GATE-1 with the concerns listed inline. The human can still `reject` or `edit`. |
-| `success` | `fail` | Do NOT surface the plan to the user. Route back to architect with the failing rules (rules 1 and 2 are the only fail-blocking ones). Re-run Phase 1.6 after the architect's revision. Iteration counts toward a separate max-3 budget for plan-review round trips. If exceeded, escalate to the user with the full report. |
+| `success` | `fail` | Do NOT surface the plan to the user. Route back to architect with the failing rules (see `agents/plan-reviewer.md § Verdict Calibration` for the full fail-blocking set — rules 1, 2, 6-missing, 9, 10-escalation, 13, plus 7/8 for Bug-fix Flow). Re-run Phase 1.6 after the architect's revision. Iteration counts toward a separate max-3 budget for plan-review round trips. If exceeded, escalate to the user with the full report. |
 | `failed` / `blocked` | (any) | Audit broke. Read `reviews/01-plan-review.md` if it exists, retry once, then escalate. |
 
 **Cost:** one plan-reviewer invocation (measured June 2026: the full 1.6 panel median 57K, n=16; the shape audit is a fraction of that figure). **Saves:** human time at STAGE-GATE-1, and a cascading Stage-2 cycle that would otherwise discover the structural gap mid-implementation.
@@ -1693,6 +1693,18 @@ All reviewers of a plan (whether invoked via Phase 1.6 in-pipeline or via the `p
 - **Deterministic worst-of roll-up.** The `**Combined verdict:**` is the worst-of the three sub-verdicts with severity order `fail > concerns > pass`. Security sub-verdict mapping: `clean → pass`, `risks-found → fail`. A missing-but-expected sub-verdict label means the panel is incomplete — the combined verdict MUST NOT be `pass` in that case.
 - **Canonical-field reconciliation requirement.** When Phase 1.6 (plan-reviewer) detects a Rule 3h contradiction (mutually contradictory values for a canonical field such as base branch or version bump across the plan), the orchestrator routes back to the architect for in-place reconciliation of `01-plan.md § ...` (whichever sections contain the contradiction) before re-running Phase 1.6. The architect overwrites the superseded value so only the final value remains. No forked `01-plan-*.md` — the reconciliation target for the plan's own content is always the single `01-plan.md`; panel findings themselves stay in `reviews/01-plan-review.md`.
 - **Cross-link — same principle as `[CONSTRAINT-DISCOVERED]` fold-back (Phase 2.5).** The `[CONSTRAINT-DISCOVERED]` mechanism (implementer annotates `01-plan.md`; Phase 2.5 triggers qa-plan reconcile; orchestrator applies in `01-plan.md`) is the execution→plan instance of the centralization principle applied to the plan body itself; the plan-review panel applies the equivalent rule to its own review artifact, `reviews/01-plan-review.md`.
+
+**Final-state invariant — single consolidating writer, no errata.** `01-plan.md` must reach STAGE-GATE-1 reading as if it had been written correctly on the first pass. This binds every plan-review round trip, in-pipeline or direct mode:
+
+- **The architect is the sole consolidating writer of the plan body post-panel.** When Phase 1.6 returns `verdict: fail` (or `concerns` the operator wants addressed), the orchestrator routes back to the architect with the pointer to `reviews/01-plan-review.md`. The architect fixes each named section **in place** — no writer, including the architect on a later round, ever appends a correction note ("Correction:", "post-panel", etc.) beside the section it corrects. `agents/plan-reviewer.md` Rule 13 fail-blocks the gate (no override) on exactly these patterns; `agents/architect.md § Forbidden output patterns` is the producer-side mirror of the same closed list.
+- **No errata, ever, inside the plan.** The refinement history — what changed, which round, why — is NOT recorded inside `01-plan.md`. It lives in `reviews/01-plan-review.md` § "Panel Rounds" (one row per round) and in `00-execution-events.jsonl`. A plan that shows its refinement work is a Rule 13 violation, not a transparency feature.
+- **Attestation-line contract.** The only mention of the panel's work inside `01-plan.md` is the one-line `**Reviews:**` attestation in the title block, written and replaced-in-place by `plan-reviewer` once per round:
+
+  ```
+  **Reviews:** substance {pass|fail} · security {clean|risks-found|skipped} · shape {pass|concerns|fail} → combined **{pass|concerns|fail}** — detail: reviews/01-plan-review.md
+  ```
+
+  This line is a carve-out, not a Rule 13 violation — the closed errata-token list in Rule 13b is disjoint from `Reviews`, `Status`, and the AC-checkbox pattern by design, so the panel's own attestation write can never trip the gate it exists to protect. See `agents/_shared/plan-consolidation.md § "Write-scope on 01-plan.md"` for the full closed list of who may write what on the plan.
 
 ---
 

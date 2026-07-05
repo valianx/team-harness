@@ -49,13 +49,12 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 Every mode has exactly one canonical output. If a request does not map to one of these, **stop and return `status: blocked`** with `summary: mode not supported, route caller to <agent>`. Do not improvise filenames.
 
-**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` files. Validate mode writes to `01-plan.md` in two ways (checkbox flips and `## Validation Outcome`), as defined below.
+**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant", § "Section-ownership map", and § "Write-scope on `01-plan.md`". No forked `01-plan-*.md` files. Validate mode's ONLY write to `01-plan.md` is the AC checkbox mirror, as defined below.
 
 | Mode | Output file | Append or overwrite | Notes |
 |---|---|---|---|
 | Validate (default, Phase 3) | `workspaces/{feature}/reviews/04-validation.md` | overwrite per iteration | Per-task validation report (deep per-AC detail) |
 | Validate (default, Phase 3) — AC checkbox mirror | `workspaces/{feature}/01-plan.md` (§ Task List, checkbox flips only) | targeted edit, see below | Mirror each PASS AC to its checkbox; NEVER touch other fields |
-| Validate (default, Phase 3) — Validation Outcome fold-in | `workspaces/{feature}/01-plan.md` (§ `## Validation Outcome`, append in place) | append in place; replace any prior copy | Final verdict + reference to reviews/04-validation.md; deep detail stays in reviews/04-validation.md |
 | Review (cross-repo) | passed to the caller via status block (no workspace doc file written) | n/a | Used by `/th:cross-repo` only |
 | Failure brief (any mode, when failing) | `workspaces/{feature}/failure-brief.md` | append iteration block | Shared with implementer/tester/security |
 
@@ -67,21 +66,7 @@ For each AC the validate-mode run produces a verdict in `reviews/04-validation.m
 - AC verdict **FAIL** or any non-PASS → leave the checkbox as `- [ ]`. Do not partially mark.
 - A re-flip from `- [x]` back to `- [ ]` is allowed only on a follow-up iteration where the AC regresses to FAIL (rare). Log the regression in the failure brief.
 
-### Validate Mode — Validation Outcome fold-in to `01-plan.md`
-
-After producing `reviews/04-validation.md` (deep per-AC detail), fold a final summary into `01-plan.md` as a `## Validation Outcome` section:
-
-```markdown
-## Validation Outcome
-**Date:** {YYYY-MM-DD}
-**Verdict:** PASS | FAIL
-**AC passed:** {N}/{N}
-**Detail:** see `reviews/04-validation.md` for per-AC evidence.
-```
-
-Append this section in place to `01-plan.md` (replace any prior copy). This makes the plan a complete snapshot — a reader does not need to open `reviews/04-validation.md` to know the validation verdict. The deep per-AC evidence stays in `reviews/04-validation.md`.
-
-This is the **only** edit you are allowed to make on `01-plan.md` beyond the checkbox flips: the `## Validation Outcome` section. Together, the two allowed writes are: AC checkbox flips (§ Task List) and the `## Validation Outcome` section. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: 01-plan.md scope drift requested — route to architect`.
+**No `## Validation Outcome` fold-in.** The checkbox mirror above is the **only** edit you are allowed to make on `01-plan.md` — the plan stays in its final state pre-implementation; there is no post-implementation section to fold in. The validation verdict lives exclusively in `reviews/04-validation.md`; progress is read off the AC checkboxes and the task's `Status:` field, never a summary embedded in the plan. You do NOT touch `Status:`, `Files:`, AC text, dependencies, `Split reason`, `Cleanup PR:`, `Base PR:`, `Title:`, `Branch:`, or `Notes:`. Those are frozen post-STAGE-GATE-1. Touching anything else — including re-introducing a `## Validation Outcome` section — is a contract violation; if you find yourself wanting to, return `status: blocked` with `summary: 01-plan.md scope drift requested — route to architect`.
 
 ## Files I MUST NOT write
 
@@ -89,7 +74,7 @@ Hard rule: when asked to "review", "audit", or "validate" a plan / inventory / t
 
 - `01-coverage-review.md`, `02-flow-coverage.md`, `01-substance-review.md`, or any other `*-review.md` sibling to `01-plan.md`.
 - A `qa-reports/` directory, or any per-task audit file (`qa-reports/Task-N.md`, `Task-N-review.md`) **before implementation exists**. Pre-implementation per-task concerns belong inside the AC block of that task in `01-plan.md` (§ Task List).
-- Any file mimicking the `## Plan Review` section that `plan-reviewer` appends to `01-plan.md`. The canonical plan-shape audit is `plan-reviewer`'s appended section; if substance review is needed, **edit `01-plan.md` in place** (see Routing below) instead of producing a parallel synthesis.
+- Any file mimicking `reviews/01-plan-review.md`, or any embedded `## Plan Review` / `## Plan Ratification` / `## Validation Outcome` / `## Security Design-Review` / `## Panel Rounds` section written directly into `01-plan.md`. The canonical container for all panel outcomes is `reviews/01-plan-review.md` (plan-reviewer Rule 13a blocks the gate on any of these headings found in the plan); if substance review is needed, **edit `01-plan.md` in place** (see Routing below) instead of producing a parallel synthesis.
 
 ### Routing when asked to "review the plan"
 
