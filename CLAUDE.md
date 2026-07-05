@@ -147,7 +147,7 @@ All commands run from the repo root.
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. See `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. See `docs/conventions.md`.
 - **Initiative layer (opt-in).** Groups per-project pipelines under an `overview.md` parent index. detect + confirm gate; parallel multi-project dispatch (v2.61.0) fans out Stage-2 lanes when ≥2 projects clear STAGE-GATE-1 (`--serial` always wins). Full contracts: `agents/orchestrator.md § Parallel Multi-Project Dispatch`; `docs/discover-phase.md § 11`.
-- **Two-tier document classification.** Operator-facing (`01-plan.md`, `sketches/`, `01-root-cause.md`, `overview.md`): human-readable, final state. Everything else agentic. See `docs/conventions.md § Document classification`.
+- **Two-tier document classification.** Operator-facing (final-state docs) vs agentic (everything else). See `docs/conventions.md § Document classification`.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on it without re-reading full workspaces.
 - **Installer always overwrites embedded files.** Direct edits to `~/.claude/agents/*.md` are replaced on every install. Hash-match files are skipped. See `docs/conventions.md` for the full overwrite + preservation contract.
 - **Session-scoped config override whitelist** — overridable (chat → `00-state.md` only): `logs-mode`, `logs-path`, `logs-subfolder`, `clickup.workspace_id`. Excluded → /th:setup: MCP URL, context7, model, effort. **Session model override** (a distinct, dispatch-time-only mechanism, chat → `00-state.md` only, applied solely to analysis-tier dispatches) does NOT add `model` to this whitelist — `model` remains excluded from config-file writes. See `agents/orchestrator.md` § "Session model override".
@@ -161,7 +161,7 @@ All commands run from the repo root.
 - **Documentation freshness via context7.** Verify third-party APIs against context7 before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** For `type: fix`/`hotfix`. Full flow: `agents/ref-special-flows.md § Bug-fix Flow`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
-- **Plan-review panel centralization** — worst-of combined verdict; vacuous-success guard; panel writes `reviews/01-plan-review.md`, plan stays clean (Rule 13). See `agents/ref-direct-modes.md`.
+- **Plan-review panel centralization** — worst-of verdict; panel writes `reviews/01-plan-review.md`. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Orchestrator disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the orchestrator; no marker required; outward actions gated by `dev-guard`. See `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.

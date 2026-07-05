@@ -32566,37 +32566,46 @@ check(
     "agents/plan-reviewer.md must name reviews/01-plan-review.md as its output container",
 )
 
-# Checks (2-4): Rule 13a — individual forbidden-in-plan headings named within the
-# '### Rule 13' slice. Anti-false-green: anchor absent -> empty slice -> all 3 fail.
+# Checks (2-6): Rule 13a — individual forbidden-in-plan headings named within the
+# '### Rule 13' slice. Anti-false-green: anchor absent -> empty slice -> all 5 fail.
+# Covers all five FORBIDDEN_HEADINGS entries individually (full closed-list parity).
 _S146_RULE13_STOP = ("\n## Verdict Calibration",)
 _s146_rule13 = _slice_section(_s146_pr, "### Rule 13", _S146_RULE13_STOP)
-for _heading in ("## Plan Review", "## Plan Ratification", "## Validation Outcome"):
+for _heading in (
+    "## Plan Review", "## Plan Ratification", "## Validation Outcome",
+    "## Security Design-Review", "## Panel Rounds",
+):
     check(
-        f"suite146(2-4/{_heading}): plan-reviewer.md Rule 13 slice names '{_heading}' as forbidden-in-plan",
+        f"suite146(2-6/{_heading}): plan-reviewer.md Rule 13 slice names '{_heading}' as forbidden-in-plan",
         bool(_s146_rule13) and _heading in _s146_rule13,
         f"Rule 13 slice must list '{_heading}' among the forbidden headings",
     )
 
-# Checks (5-9): Rule 13b — individual errata tokens named in the closed list.
-for _token in ("Correction:", "Errata", "actualizado tras", "post-panel", "## Corrections"):
+# Checks (7-15): Rule 13b — individual errata tokens named in the closed list.
+# Covers all nine ERRATA_TOKENS entries individually (full closed-list parity,
+# including the Spanish-language tokens 'Corrección:' and 'Fe de erratas').
+for _token in (
+    "Correction:", "Corrección:", "Errata", "Fe de erratas", "actualizado tras",
+    "updated after review", "post-panel", "## Corrections", "## Housekeeping",
+):
     check(
-        f"suite146(5-9/{_token}): plan-reviewer.md Rule 13 slice lists errata token '{_token}'",
+        f"suite146(7-15/{_token}): plan-reviewer.md Rule 13 slice lists errata token '{_token}'",
         bool(_s146_rule13) and _token in _s146_rule13,
         f"Rule 13 slice must list errata token '{_token}' in the closed ERRATA_TOKENS list",
     )
 
-# Check (10): Rule 13 severity fail + no override declared.
+# Check (16): Rule 13 severity fail + no override declared.
 check(
-    "suite146(10): plan-reviewer.md Rule 13 slice declares severity 'fail' with no override available",
+    "suite146(16): plan-reviewer.md Rule 13 slice declares severity 'fail' with no override available",
     bool(_s146_rule13)
     and "fail" in _s146_rule13.lower()
     and "No override available" in _s146_rule13,
     "Rule 13 slice must declare severity fail with 'No override available'",
 )
 
-# Check (11): carve-out positive — the rule's own text enumerates the exempt tokens.
+# Check (17): carve-out positive — the rule's own text enumerates the exempt tokens.
 check(
-    "suite146(11): plan-reviewer.md Rule 13 slice enumerates the carve-out"
+    "suite146(17): plan-reviewer.md Rule 13 slice enumerates the carve-out"
     " (**Reviews:**, - [x], Status:) as declared non-violations",
     bool(_s146_rule13)
     and "**Reviews:**" in _s146_rule13
@@ -32606,26 +32615,26 @@ check(
     "Rule 13 slice must enumerate **Reviews:**, - [x], and Status: as a declared carve-out",
 )
 
-# Check (12): carve-out negative — the errata-token list is disjoint from the carve-out.
+# Check (18): carve-out negative — the errata-token list is disjoint from the carve-out.
 check(
-    "suite146(12): plan-reviewer.md Rule 13 slice asserts the errata-token list is"
+    "suite146(18): plan-reviewer.md Rule 13 slice asserts the errata-token list is"
     " disjoint from Reviews/Status/checkbox",
     bool(_s146_rule13) and "disjoint" in _s146_rule13.lower() and "none of" in _s146_rule13.lower(),
     "Rule 13 slice must assert the closed errata-token list is disjoint from the carve-out tokens",
 )
 
-# Check (13): Rule 13b block-quote tolerance, parity with Rule 3 (declared behaviour).
+# Check (19): Rule 13b block-quote tolerance, parity with Rule 3 (declared behaviour).
 check(
-    "suite146(13): plan-reviewer.md Rule 13b declares block-quote tolerance with parity to Rule 3",
+    "suite146(19): plan-reviewer.md Rule 13b declares block-quote tolerance with parity to Rule 3",
     bool(_s146_rule13) and "block-quote" in _s146_rule13.lower() and "Rule 3" in _s146_rule13,
     "Rule 13 slice must declare block-quote tolerance with parity to Rule 3",
 )
 
-# Check (14): plan-reviewer's sole write on 01-plan.md is the **Reviews:** attestation line.
+# Check (20): plan-reviewer's sole write on 01-plan.md is the **Reviews:** attestation line.
 _S146_CRITICAL_STOP = ("\n## Core Philosophy",)
 _s146_pr_critical = _slice_section(_s146_pr, "## Critical Rules", _S146_CRITICAL_STOP)
 check(
-    "suite146(14): plan-reviewer.md Critical Rules declares the **Reviews:** line"
+    "suite146(20): plan-reviewer.md Critical Rules declares the **Reviews:** line"
     " as its only write on 01-plan.md",
     bool(_s146_pr_critical)
     and "NEVER" in _s146_pr_critical
@@ -32636,11 +32645,11 @@ check(
     " to the never-modify-01-plan.md rule",
 )
 
-# Check (15): qa-plan.md ratify-plan writes to reviews/01-plan-review.md; plan-append absent.
+# Check (21): qa-plan.md ratify-plan writes to reviews/01-plan-review.md; plan-append absent.
 _S146_QAP_FILES_STOP = ("\n## Operating Modes",)
 _s146_qap_files = _slice_section(_s146_qap, "## Files I write (exhaustive)", _S146_QAP_FILES_STOP)
 check(
-    "suite146(15): qa-plan.md Files-I-write table routes Ratify-Plan to"
+    "suite146(21): qa-plan.md Files-I-write table routes Ratify-Plan to"
     " reviews/01-plan-review.md and forbids ratification content in 01-plan.md",
     bool(_s146_qap_files)
     and "reviews/01-plan-review.md" in _s146_qap_files
@@ -32649,11 +32658,11 @@ check(
     " and declare the NEVER-writes-to-01-plan.md prohibition",
 )
 
-# Check (16): security.md design-review writes to reviews file + read-only over the plan.
+# Check (22): security.md design-review writes to reviews file + read-only over the plan.
 _S146_SEC_STOP = ("\n### Structural Security Invariants",)
 _s146_sec_dr = _slice_section(_s146_sec, "### Design Review Mode", _S146_SEC_STOP)
 check(
-    "suite146(16): security.md Design Review Mode writes to reviews/01-plan-review.md"
+    "suite146(22): security.md Design Review Mode writes to reviews/01-plan-review.md"
     " and declares READ-ONLY on 01-plan.md",
     bool(_s146_sec_dr)
     and "reviews/01-plan-review.md" in _s146_sec_dr
@@ -32662,24 +32671,24 @@ check(
     " READ-ONLY on 01-plan.md",
 )
 
-# Check (17): orchestrator.md gate-inviolable slice requires the reviews file + Combined verdict.
+# Check (23): orchestrator.md gate-inviolable slice requires the reviews file + Combined verdict.
 _S146_GATE_STOP = ("\n### Phase 1.6 — Plan Review — nested-context handoff",)
 _s146_gate = _slice_section(_s146_orch, "### Phase 1.6 is inviolable", _S146_GATE_STOP)
 check(
-    "suite146(17): orchestrator.md gate-inviolable slice requires reviews/01-plan-review.md"
+    "suite146(23): orchestrator.md gate-inviolable slice requires reviews/01-plan-review.md"
     " + Combined verdict before STAGE-GATE-1",
     bool(_s146_gate) and "reviews/01-plan-review.md" in _s146_gate and "Combined verdict" in _s146_gate,
     "orchestrator.md '### Phase 1.6 is inviolable' slice must require reviews/01-plan-review.md"
     " and a Combined verdict line before STAGE-GATE-1",
 )
 
-# Check (18): orchestrator.md centralization contract — findings to reviews file, plan stays clean.
+# Check (24): orchestrator.md centralization contract — findings to reviews file, plan stays clean.
 _S146_ORCH_PR_STOP = ("\n---\n",)
 _s146_orch_pr = _slice_section(
     _s146_orch, "### Plan-review panel centralization contract", _S146_ORCH_PR_STOP
 )
 check(
-    "suite146(18): orchestrator.md centralization contract states findings go to"
+    "suite146(24): orchestrator.md centralization contract states findings go to"
     " reviews/01-plan-review.md, 01-plan.md stays clean, zero other side-files",
     bool(_s146_orch_pr)
     and "reviews/01-plan-review.md" in _s146_orch_pr
@@ -32689,13 +32698,13 @@ check(
     " 01-plan.md stays clean, and zero other side-files are created",
 )
 
-# Check (19): ref-direct-modes.md § Plan Review Mode names the reviews container;
+# Check (25): ref-direct-modes.md § Plan Review Mode names the reviews container;
 # the old "fold ... into 01-plan.md" phrasing is absent (regex-scoped, not a bare
 # "fold" substring search, since "folder" would otherwise false-positive).
 _S146_RDM_STOP = ("\n## Diagram Mode",)
 _s146_rdm = _slice_section(_s146_ref, "## Plan Review Mode", _S146_RDM_STOP)
 check(
-    "suite146(19): ref-direct-modes.md § Plan Review Mode names reviews/01-plan-review.md;"
+    "suite146(25): ref-direct-modes.md § Plan Review Mode names reviews/01-plan-review.md;"
     " stale 'fold ... into 01-plan.md' phrasing is absent",
     bool(_s146_rdm)
     and "reviews/01-plan-review.md" in _s146_rdm
@@ -32704,7 +32713,7 @@ check(
     " retain 'fold ... into 01-plan.md' stale phrasing",
 )
 
-# Check (20): plan-consolidation.md ownership map routes the panel to the reviews file
+# Check (26): plan-consolidation.md ownership map routes the panel to the reviews file
 # AND the no-forked-sibling prohibition is preserved (coexistence).
 _s146_pc_ownership = _slice_section(
     _s146_pc, "## Section-ownership map", ("\n## Write-scope on",)
@@ -32713,7 +32722,7 @@ _s146_pc_noforked = _slice_section(
     _s146_pc, "## No-forked-file prohibition", ("\n## Section-ownership map",)
 )
 check(
-    "suite146(20): plan-consolidation.md ownership map routes the panel to"
+    "suite146(26): plan-consolidation.md ownership map routes the panel to"
     " reviews/01-plan-review.md and preserves the no-forked-sibling prohibition",
     bool(_s146_pc_ownership)
     and "reviews/01-plan-review.md" in _s146_pc_ownership
@@ -32723,30 +32732,46 @@ check(
     " ownership map and keep the no-forked-file prohibition",
 )
 
-# Check (21): plan-reviewer.md declares '## Panel Rounds' as append-only (one row per round).
+# Check (27): plan-consolidation.md closed write-scope list names ux-reviewer's
+# Phase 1.7 AC-pin write on 01-plan.md § Task List (S1 fix — the closed list must
+# not omit the one Stage-1 writer other than the architect).
+_s146_pc_writescope = _slice_section(
+    _s146_pc, "## Write-scope on", ("\n## How to reference this file",)
+)
 check(
-    "suite146(21): plan-reviewer.md declares '## Panel Rounds' as an append-only,"
+    "suite146(27): plan-consolidation.md closed write-scope list names ux-reviewer's"
+    " Phase 1.7 AC-pin on 01-plan.md",
+    bool(_s146_pc_writescope)
+    and "ux-reviewer" in _s146_pc_writescope
+    and "Phase 1.7" in _s146_pc_writescope,
+    "plan-consolidation.md '## Write-scope on 01-plan.md (closed list)' table must enumerate"
+    " ux-reviewer's Phase 1.7 AC-pin write — the closed list must not omit this Stage-1 writer",
+)
+
+# Check (28): plan-reviewer.md declares '## Panel Rounds' as append-only (one row per round).
+check(
+    "suite146(28): plan-reviewer.md declares '## Panel Rounds' as an append-only,"
     " one-row-per-round table",
     "Append one row to `## Panel Rounds` per round" in _s146_pr,
     "plan-reviewer.md must declare '## Panel Rounds' as append-only (one row per round)",
 )
 
-# Check (22): plan-consolidation.md declares the architect as sole consolidating writer.
+# Check (29): plan-consolidation.md declares the architect as sole consolidating writer.
 check(
-    "suite146(22): plan-consolidation.md declares the architect as the single"
+    "suite146(29): plan-consolidation.md declares the architect as the single"
     " consolidating writer of the plan body",
     "Single consolidating writer of the plan body" in _s146_pc and "architect" in _s146_pc.lower(),
     "plan-consolidation.md must declare the architect as the single consolidating writer"
     " of the plan body",
 )
 
-# Check (23): CLAUDE.md §5 bullet omits the old "Every workspace doc" mandate and
+# Check (30): CLAUDE.md §5 bullet omits the old "Every workspace doc" mandate and
 # names operator-facing docs. Bullet-scoped (single line) to avoid matching unrelated
 # occurrences of "operator-facing" elsewhere in the file.
 _s146_bullet_match = re.search(r"- \*\*Two-tier document classification\.\*\*.*", _s146_claude)
 _s146_bullet = _s146_bullet_match.group(0) if _s146_bullet_match else ""
 check(
-    "suite146(23): CLAUDE.md §5 'Two-tier document classification' bullet omits the old"
+    "suite146(30): CLAUDE.md §5 'Two-tier document classification' bullet omits the old"
     " 'Every workspace doc' mandate and names operator-facing docs",
     bool(_s146_bullet)
     and "Every workspace doc" not in _s146_bullet
@@ -32755,12 +32780,12 @@ check(
     " operator-facing docs",
 )
 
-# Check (24): docs/conventions.md § Document classification declares both tiers.
+# Check (31): docs/conventions.md § Document classification declares both tiers.
 _s146_conv_slice = _slice_section(
     _s146_conventions, "## Document classification", ("\n## Dual-mode workspaces",)
 )
 check(
-    "suite146(24): docs/conventions.md § Document classification declares"
+    "suite146(31): docs/conventions.md § Document classification declares"
     " operator-facing and agentic tiers",
     bool(_s146_conv_slice)
     and "operator-facing" in _s146_conv_slice.lower()
@@ -32769,12 +32794,12 @@ check(
     " and agentic tiers",
 )
 
-# Check (25): architect.md § Session Documentation declares 01-plan.md operator-facing.
+# Check (32): architect.md § Session Documentation declares 01-plan.md operator-facing.
 _s146_arch_sessiondoc = _slice_section(
     _s146_architect, "## Session Documentation", ("\n## Execution Log Protocol",)
 )
 check(
-    "suite146(25): architect.md § Session Documentation declares 01-plan.md as the"
+    "suite146(32): architect.md § Session Documentation declares 01-plan.md as the"
     " operator-facing tier",
     bool(_s146_arch_sessiondoc)
     and "operator-facing" in _s146_arch_sessiondoc.lower()
@@ -32782,7 +32807,7 @@ check(
     "architect.md § Session Documentation must declare 01-plan.md as operator-facing",
 )
 
-# Checks (26-38): the old two-tier boilerplate is gone from each of the 13
+# Checks (33-45): the old two-tier boilerplate is gone from each of the 13
 # agentic-tier agents (architect + qa/qa-plan/plan-reviewer/security counted above
 # separately; these are the remaining files carrying the generic boilerplate).
 _S146_AGENTIC_AGENTS = (
@@ -32794,17 +32819,17 @@ _S146_STALE_BOILERPLATE = "Structure your output file with two top-level section
 for _agent_name in _S146_AGENTIC_AGENTS:
     _agent_text = read(AGENTS_DIR / f"{_agent_name}.md")
     check(
-        f"suite146(26-38/{_agent_name}): agents/{_agent_name}.md no longer carries the"
+        f"suite146(33-45/{_agent_name}): agents/{_agent_name}.md no longer carries the"
         " old two-tier boilerplate",
         _S146_STALE_BOILERPLATE not in _agent_text,
         f"agents/{_agent_name}.md must not contain the stale two-tier boilerplate"
         f" '{_S146_STALE_BOILERPLATE}'",
     )
 
-# Checks (39-40): self-referential guard + hygiene contract.
+# Checks (46-47): self-referential guard + hygiene contract.
 _s146_own = read(Path(__file__))
 check(
-    "suite146(39): test file self-references 'Suite 146' + marker, and docs/testing.md"
+    "suite146(46): test file self-references 'Suite 146' + marker, and docs/testing.md"
     " registers the same",
     "Suite 146" in _s146_own
     and "plan-review-externalization" in _s146_own
@@ -32814,7 +32839,7 @@ check(
     " docs/testing.md must register the same",
 )
 check(
-    "suite146(40): CLAUDE.md does NOT contain 'Suite 146' (§11 hygiene contract)",
+    "suite146(47): CLAUDE.md does NOT contain 'Suite 146' (§11 hygiene contract)",
     "Suite 146" not in _s146_claude,
     "CLAUDE.md must not mention Suite 146 — only docs/testing.md is the canonical registry",
 )

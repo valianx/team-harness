@@ -35,6 +35,7 @@ No plan-stage agent may create a `01-plan-*.md` sibling file in the root of the 
 | `## Plan Review` header + `## Summary` rules table + `**Combined verdict:**` | `reviews/01-plan-review.md` | plan-reviewer | append in place; replace any prior copy |
 | `## Plan Review` sub-verdict `**Substance (qa):**` | `reviews/01-plan-review.md` | qa-plan (panel) | replace own labelled line in place |
 | `## Plan Review` sub-verdict `**Security design-review (security):**` | `reviews/01-plan-review.md` | security (panel) | replace own labelled line in place |
+| `## Security Design-Review` (top-level skeleton section, condition-gated) | `reviews/01-plan-review.md` | security (panel) | fill the skeleton's own `**Verdict:**` line in place; the worst-of combine reads the `## Plan Review` sub-verdict above, not this section |
 | `**Reviews:**` attestation line (plan title block) | `01-plan.md` | plan-reviewer | replace own labelled line in place, once per panel round |
 | AC checkboxes in `## Task List` | `01-plan.md` | qa (validate) | checkbox flip only — no `## Validation Outcome` fold-in; the plan stays in final state pre-implementation, the verdict lives in `reviews/04-validation.md`, progress is read off the checkboxes and `Status:` |
 | `Status:` field on task headers | `01-plan.md` | orchestrator / delivery | field edit in place |
@@ -51,6 +52,7 @@ Every writer's permitted edit to `01-plan.md` is enumerated below. A writer not 
 | orchestrator | reconciliation of canonical fields decided by the operator at STAGE-GATE-1 (overwrite-in-place); `Status:` transitions | gate / post-gate |
 | qa (validate) | ONLY AC checkbox flips | Phase 3 |
 | delivery | `Status: merged` | Phase 4 |
+| ux-reviewer | AC additions appended to `## Task List` (per-task AC block, contiguous numbering after the architect's last AC) — narrative stays in `reviews/01-ux-review.md` | Phase 1.7 (enrich, Stage 1, before ratification) |
 | qa-plan, security, tester, implementer, and everyone else | NONE | — |
 
 (The Stage-2 mechanisms — `[CONSTRAINT-DISCOVERED]` annotations by the implementer/architect and orchestrator-applied amendments after Phase 2.5 — are out of scope for this table; they are unchanged.)

@@ -562,8 +562,9 @@ for line in 01-plan.md.lines:
     for token in ERRATA_TOKENS:
         if token in line:
             findings.append((f"Rule 13b: errata marker '{token}' found outside block-quote at 01-plan.md:{line_number}", FAIL))
-# The **Reviews:** line, `- [x]` checkboxes, and `Status:` fields are never scanned against ERRATA_TOKENS —
-# the list above is disjoint from those three carve-outs by construction.
+# The **Reviews:** line, `- [x]` checkboxes, and `Status:` fields ARE scanned by the loop above —
+# no line is skipped for them. They never MATCH, because ERRATA_TOKENS is disjoint from
+# `Reviews`, `Status`, and the checkbox pattern by construction, so the scan is a safe no-op there.
 ```
 
 **Severity:** `fail`. No override available — the operator override on Rule 13 is firm; a dirty plan must never reach the gate.
@@ -599,6 +600,8 @@ for line in 01-plan.md.lines:
 **Document format:** `reviews/01-plan-review.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — a fixed skeleton of anchored sections, tables and labels, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Write your output to `workspaces/{feature-name}/reviews/01-plan-review.md`. If the file does not exist, create it with the full skeleton below (`pending` placeholders for the sections you do not own) before filling your own. Rewrite the `## Plan Review` header, `## Summary`, `## Findings`, `## Recommendation to orchestrator`, and `**Combined verdict:**` in place — never append a second copy. Preserve-in-place the `## Plan Ratification (Phase 1.5)` and `## Security Design-Review` sections owned by `qa-plan` and `security`. Append one row to `## Panel Rounds` per round. No iteration history inside the `## Plan Review` section itself (the section is itself subject to the consolidated-documents rule). Additionally, replace the `**Reviews:**` attestation line in `01-plan.md`'s title block in place — this is the only write you make to `01-plan.md`.
+
+**Single canonical verdict location (security).** The top-level `## Security Design-Review` section's own `**Verdict:**` line is security's local placeholder — it is never read by the worst-of combine. The one canonical input to `**Combined verdict:**` for security is the `**Security design-review (security):**` sub-verdict line inside `## Plan Review` (see § "Consolidated Plan Review section" below). Do not treat the two lines as interchangeable.
 
 ```markdown
 # Plan Review: {feature}
