@@ -30530,6 +30530,19 @@ for _agent_path in _leaf_agent_files:
 #          read, idempotent no-op guard, workflow_dispatch of release.yml
 #          with the `tag` input, minimal pinned permissions.
 #
+# Group d extends the same suite for the release-apply-local-updates feature:
+# the post-tag "## Step 4 — Apply the release to local runtimes" step in
+# skills/release/SKILL.md, which applies the just-published release to both
+# local runtimes (Claude Code plugin cache, opencode installation) with
+# per-leg failure isolation and operator-driven activation. d1-d4 fix the
+# anchor and the two legs' commands/gate/honesty tokens (authored by the
+# implementer). d5-d11 close tester-authored gaps: anchor-boundary negative
+# guards on both untouched surfaces (Step 3 slice, delivery.md), the gate's
+# poll cadence + timeout-reporting language (AC-1), the no-revert/no-fail
+# language of per-leg isolation (AC-4), the never-claim-active wording on
+# both legs (AC-2/AC-3), the {X.Y.Z}-only placeholder hygiene (AC-8), and
+# the division-of-labour cross-reference in skills/update/SKILL.md (AC-7).
+#
 # Marker: release-tag-sync
 # ---------------------------------------------------------------------------
 print()
@@ -30619,6 +30632,102 @@ if _s132_tag_sync_exists:
         "actions/checkout@v" in _s132_tag_sync,
         "tag-sync.yml must pin actions/checkout to a version tag",
     )
+
+_S132_STEP4_STOPS = ("\n## ", "\n---\n")
+_s132_step4_slice = _slice_section(
+    _s132_skill,
+    "## Step 4 — Apply the release to local runtimes",
+    _S132_STEP4_STOPS,
+)
+check(
+    "s132(d1): skills/release/SKILL.md documents the post-tag local-runtime apply step",
+    bool(_s132_step4_slice),
+    "'## Step 4 — Apply the release to local runtimes' not found in skills/release/SKILL.md",
+)
+check(
+    "s132(d2): Step 4 covers both the Claude Code leg and the opencode leg",
+    "claude plugin update" in _s132_step4_slice and "update-opencode" in _s132_step4_slice,
+    "Step 4 must reference both 'claude plugin update' (Claude Code leg) and 'update-opencode' (opencode leg)",
+)
+check(
+    "s132(d3): Step 4 gates the opencode leg on the published VERSION asset with a bounded poll",
+    "releases/latest/download/VERSION" in _s132_step4_slice
+    and "180" in _s132_step4_slice,
+    "Step 4 must poll 'releases/latest/download/VERSION' and state the bounded timeout (180s ceiling)",
+)
+check(
+    "s132(d4): Step 4 states restart-to-activate honesty and per-leg failure isolation",
+    "/reload-plugins" in _s132_step4_slice
+    and "operator" in _s132_step4_slice
+    and "does not block the other leg" in _s132_step4_slice,
+    "Step 4 must state '/reload-plugins' is operator-driven and that a per-leg failure does not "
+    "block the other leg or revert the release",
+)
+check(
+    "s132(d5): Step 3 slice does not bleed into the Step 4 header (anchor boundary intact)",
+    "Apply the release to local runtimes" not in _s132_skill_slice,
+    "The '## Step 3' slice (grp a) must stop before '## Step 4' — a boundary regression here "
+    "would silently widen the a1-a3 checks to cover Step 4 content too",
+)
+check(
+    "s132(d6): agents/delivery.md stays untouched by the local-apply feature",
+    "Apply the release to local runtimes" not in _s132_delivery
+    and "update-opencode" not in _s132_delivery,
+    "agents/delivery.md must not mention the Step 4 local-apply content — the feature is "
+    "skill-side only and delivery.md's Step 11.4c tag-creation contract is unrelated/unchanged",
+)
+check(
+    "s132(d7): opencode gate timeout path pins the poll cadence and reports the manual command "
+    "without aborting",
+    "15" in _s132_step4_slice
+    and "12" in _s132_step4_slice
+    and "timed out" in _s132_step4_slice
+    and "run the updater manually" in _s132_step4_slice
+    and "Do not abort" in _s132_step4_slice,
+    "Step 4 must pin the opencode publication gate's poll interval (15s) and max attempts (12), "
+    "and state that a timed-out gate reports the manual updater command and does not abort or "
+    "retry beyond the 180s ceiling — AC-1",
+)
+check(
+    "s132(d8): per-leg failure isolation states the release is never reverted or marked failed",
+    "reverts the tag" in _s132_step4_slice and "marks the release as failed" in _s132_step4_slice,
+    "Step 4 must state that neither leg's failure reverts the tag or marks the release as "
+    "failed — AC-4",
+)
+check(
+    "s132(d9): both legs individually state they never claim the new version is active",
+    _s132_step4_slice.count("never state that") >= 2
+    and "restarting opencode" in _s132_step4_slice,
+    "Step 4 must state, once per leg, that it never claims '{X.Y.Z} is active', and the opencode "
+    "leg's activation must be phrased as 'restarting opencode' being operator-driven — AC-2/AC-3",
+)
+check(
+    "s132(d10): Step 4 prose uses only the {X.Y.Z} placeholder — no hardcoded version literals",
+    re.search(r"\bv?\d+\.\d+\.\d+\b", _s132_step4_slice) is None,
+    "Step 4 conceptual prose must not contain a hardcoded 'X.Y.Z'-shaped version literal — "
+    "only the '{X.Y.Z}' placeholder is allowed — AC-8",
+)
+
+_s132_update_skill = read(REPO_ROOT / "skills" / "update" / "SKILL.md")
+check(
+    "s132(d11): skills/update/SKILL.md cross-references /th:release Step 4's division of labour",
+    "/th:release" in _s132_update_skill
+    and "Step 4" in _s132_update_skill
+    and "does NOT sync the managed" in _s132_update_skill,
+    "skills/update/SKILL.md must state that /th:release's Step 4 runs the same download/apply "
+    "legs at release-cut time but does NOT sync the managed CLAUDE.md blocks, which stays "
+    "/th:update's own contract — AC-7",
+)
+check(
+    "s132(d12): Step 4 emits a single per-runtime final report, neutral voice, no emoji",
+    "release local-apply" in _s132_step4_slice
+    and "claude code" in _s132_step4_slice
+    and "opencode" in _s132_step4_slice
+    and "exactly one operator-facing message" in _s132_step4_slice
+    and re.search(r"[\U0001F300-\U0001FAFF☀-➿]", _s132_step4_slice) is None,
+    "Step 4 must emit exactly one operator-facing final report (the 'release local-apply' "
+    "template) with a row for each runtime ('claude code', 'opencode') and no emoji — AC-5",
+)
 
 # Self-referential guards (hygiene contract)
 _s132_own = read(Path(__file__))
