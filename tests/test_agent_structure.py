@@ -31770,6 +31770,26 @@ check(
     "part (b), not merely once",
 )
 
+# --- Gap-driven addition (tester Phase 2.7 audit) ---
+# AC-6 / Security Assessment ("#462 regla demasiado amplia por path mal
+# construido") scope the root-anchor negative assertion to Edit/Write rule
+# forms only; `additionalDirectories` is an equally load-bearing access grant
+# (§ docs/permission-provisioning.md `## permissions.additionalDirectories`)
+# and was not covered by the existing negative-no-root-anchor check.
+_s142_root_additionaldirs_hits = [
+    needle
+    for needle in ("additionalDirectories: //**",)
+    if needle in _s142_setup or needle in _s142_siteB or needle in _s142_perm_doc
+]
+check(
+    "suite142(negative-no-root-additionaldirs): no site ever emits a root "
+    "double-slash additionalDirectories entry without a path suffix "
+    "(additionalDirectories: //**)",
+    len(_s142_root_additionaldirs_hits) == 0,
+    f"found a root-anchor-without-suffix additionalDirectories entry: "
+    f"{_s142_root_additionaldirs_hits}",
+)
+
 # Self-referential guards (hygiene contract)
 _s142_own = read(Path(__file__))
 check(
@@ -32105,6 +32125,52 @@ check(
     "token",
 )
 
+# --- Gap-driven additions (tester Phase 2.7 audit) ---
+# The Multi-site invariants table (01-plan.md) lists THREE sites for the
+# "#454 deliverable-vs-execution reconcile" invariant: the two external
+# doc-sites pinned above (doc-siteA/doc-siteB) AND agents/orchestrator.md's
+# own reconciled invariant paragraph (`:1893`). Only the two doc-sites had an
+# independent check — pin the third site for multi-site parity.
+_S144_INVARIANT_ANCHOR = "**The orchestrator never divides one task's DELIVERABLE"
+_s144_invariant_slice = _slice_section(
+    _s144_orch, _S144_INVARIANT_ANCHOR, ("\n\n**Post-approval division",)
+)
+check(
+    "suite144(invariant-site-orchestrator): agents/orchestrator.md's own "
+    "reconciled invariant paragraph (the third site, distinct from the two "
+    "doc-sites above) carries the DELIVERABLE-vs-EXECUTION token",
+    _s144_invariant_slice != "" and _S144_TOKEN in _s144_invariant_slice,
+    "agents/orchestrator.md must carry the reconciled deliverable-vs-execution "
+    "'never divides' token at its own invariant paragraph (:1893), not only "
+    "at the two external doc-sites",
+)
+check(
+    "suite144(negative-no-stale-plan-or-implementation): no stale "
+    "pre-reconciliation wording ('one task's plan or implementation' without "
+    "the DELIVERABLE/EXECUTION distinction) remains in agents/orchestrator.md",
+    "one task's plan or implementation" not in _s144_orch,
+    "agents/orchestrator.md must not retain the stale invariant wording "
+    "'one task's plan or implementation' — it must be reconciled to "
+    "DELIVERABLE vs EXECUTION",
+)
+check(
+    "suite144(gate-no-fire): the gate section states that a NO-FIRE task "
+    "(AC-2 tightly-coupled path) dispatches 1:1 exactly as today, with no "
+    "state change and no trace event",
+    "dispatch 1:1 exactly as today — no state change, no trace event"
+    in _s144_gate_slice,
+    "the gate section must state that gate NO-FIRE dispatches 1:1 exactly as "
+    "today, with no state change and no trace event",
+)
+check(
+    "suite144(consolidation-report-mandatory): the Consolidation section "
+    "declares the per-lane consolidation report is required, not optional, "
+    "whenever fan-out ran (AC-4)",
+    "required, not optional, whenever fan-out ran" in _s144_gate_slice,
+    "the Consolidation section must declare the consolidation report is "
+    "required, not optional, whenever fan-out ran",
+)
+
 # Self-referential guards (hygiene contract)
 _s144_own = read(Path(__file__))
 check(
@@ -32185,6 +32251,14 @@ check(
     "enumerate 04-review.md and all three 04-internal-review*.md paths, "
     "each under workspaces/{feature-name}/reviews/",
 )
+check(
+    "suite145(site1-outside-workspaces-violation): the whitelist site "
+    "declares any write outside the `workspaces/` prefix a contract "
+    "violation (AC-1's 'nada fuera del prefijo workspaces/')",
+    "outside the `workspaces/` prefix" in _s145_whitelist_slice,
+    "agents/reviewer.md Read-Only Working-Tree Contract must declare that "
+    "any write outside the workspaces/ prefix is a contract violation",
+)
 
 # --- Site 2: reviewer internal-mode writer-identity prose (reviewer.md) ---
 _S145_MODE_ANCHOR = "### Internal Review (Phase 4.5 — advisory, no GitHub publish)"
@@ -32200,6 +32274,14 @@ check(
     "agents/reviewer.md Internal Review mode prose must state that the "
     "reviewer writes 04-internal-review.md and the orchestrator only "
     "surfaces the digest",
+)
+check(
+    "suite145(site2-without-publishing): the internal-mode prose states the "
+    "orchestrator surfaces the digest without publishing it anywhere "
+    "(AC-2's 'sin publicar')",
+    "without publishing it anywhere" in _s145_mode_slice,
+    "agents/reviewer.md Internal Review mode prose must state the "
+    "orchestrator surfaces the digest without publishing it anywhere",
 )
 
 # --- Site 3: reviewer status-block example (reviewer.md Return Protocol) ---
