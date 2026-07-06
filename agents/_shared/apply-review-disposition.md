@@ -213,6 +213,21 @@ resolve threads, see `agents/_shared/gh-fallback.md` §§ "Tier B — list revie
 threads (map comment → thread id)", "Tier B — reply to a review thread", and
 "Tier B — resolve a review thread".
 
+**Batching (default when `gh` is available).** When a single comment-
+incorporation pass produces the reply + resolve actions for more than one
+thread, do not issue one `gh api graphql` call per thread. Compose the whole
+pass's replies and resolves into one aliased request per
+`agents/_shared/gh-fallback.md` § "Tier B — batched review disposition
+(aliased mutation)": build the ledger from the per-comment Decisions above
+(Step 5) and this table's thread-action mapping, preview the full composed
+payload to the operator in chat, then issue the single gated call. This
+collapses what would otherwise be one `ask` per thread into exactly one `ask`
+for the whole pass, without changing which threads get resolved (the
+Decision→thread-action mapping above is unchanged — batching only changes
+how many `gh api graphql` calls carry it out). The single-thread sections
+remain the fallback whenever `gh` is unavailable, no token is set, or the
+batched call itself fails to reach the API.
+
 **Issue-level comments** (general PR discussion, not line-anchored review
 threads) receive a reply but are NOT resolvable — they have no `isResolved`
 field. The resolve action in the mapping table applies only to line-anchored
