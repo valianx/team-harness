@@ -415,10 +415,10 @@ for task in tasks:
 **What to check:**
 
 1. Locate `### Classification block` in `01-plan.md § Review Summary`. If absent or if all eight booleans are omitted: finding `"Rule 11: Classification block missing from 01-plan.md § Review Summary"` with severity `concerns`. **Note:** if the plan's `Files:` list contains contract-surface paths (routes, controllers, handlers, endpoints, openapi, schema, migration, model, component) and the block is absent, name the skipped surface explicitly: `"Rule 11: Classification block missing — plan Files: contain contract-surface paths (e.g., {path}) — classification may have been skipped"`.
-2. For each boolean that is `true`, verify the corresponding `sketches/{type}.md` file exists in the workspace (under the `sketches/` subfolder in the same directory as `01-plan.md`, or under the consolidated `{overview_root}/sketches/` path in a multi-project workspace). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but sketches/{name}.md is absent"` with severity `concerns`.
+2. For each boolean that is `true`, verify the corresponding `sketches/{type}` file exists in the workspace (under the `sketches/` subfolder in the same directory as `01-plan.md`, or under the consolidated `{overview_root}/sketches/` path in a multi-project workspace). Missing required sketch → finding `"Rule 11: touches_{boolean} is true but sketches/{name} is absent"` with severity `concerns`.
 3. For `touches_data_model: true` AND `destructive: true`, also require `sketches/data-migration.md`. Missing → finding `"Rule 11: touches_data_model AND destructive are both true but sketches/data-migration.md is absent"` with severity `concerns`.
 4. For `spans_multiple_services: true`, require `sketches/service-interaction.md`. Missing → finding `"Rule 11: spans_multiple_services is true but sketches/service-interaction.md is absent"` with severity `concerns`.
-5. For each present `sketches/*.md`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: sketches/{name}.md appears empty (header-only)"` with severity `concerns`.
+5. For each present `sketches/*`, check it contains more than a header line (non-trivial content). Trivially empty sketch → finding `"Rule 11: sketches/{name} appears empty (header-only)"` with severity `concerns`.
 6. **api-contract completeness and body-shape sub-check (when `sketches/api-contract.md` is present):** two shape-adjacent checks, both `concerns`-severity and fail-OPEN:
    - **Operation completeness:** if the sketch models a single action-style path (e.g., `/sync`, `/process`) — detectable by scanning the `METHOD /path` header lines — AND the plan's ACs reference more than one distinct CRUD operation (e.g., create and update), emit finding `"Rule 11: api-contract sketch models a single action-style endpoint but the ACs describe multiple distinct operations — confirm completeness/convention or justify the action endpoint in the sketch's ## Notes"`.
    - **Body-shape specificity:** if the sketch shows any object the change introduces or modifies as an opaque `{}` or a `"...": "object"` placeholder (with no actual nested fields shown), emit finding `"Rule 11: api-contract sketch contains an opaque {} or placeholder on a changed field — show the field's actual nested fields with real example values; a contract that leaves a changed field opaque conveys no contract"`. Changed objects left opaque are the target; unchanged nested DTOs abbreviated or referenced by name are not a finding.
@@ -439,7 +439,7 @@ if classification is None:
 
 SKETCH_MAP = {
     "touches_http_api": "sketches/api-contract.md",
-    "touches_ui": "sketches/ui-wireframe.md",
+    "touches_ui": "sketches/ui-wireframe.html",
     "touches_data_model": "sketches/data-model.md",
     "touches_cli": "sketches/cli-surface.md",
     "touches_public_lib_api": "sketches/public-api.md",

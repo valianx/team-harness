@@ -30,7 +30,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 ### Dropped duties (owner)
 
 - **Per-AC satisfaction re-validation** → owned by `qa` (Phase 3); this agent trusts `qa`'s verdict instead of re-deriving it.
-- **Sketch surface-diff** → owned by `qa`'s mandatory sketch cross-check (`qa.md` Phase 0 step 3 — "a delivered surface that contradicts the sketch is a validation finding"). This agent no longer diffs `sketches/*.md` against the delivered surface, including the service-interaction sequenceDiagram check for `spans_multiple_services: true` tasks — `qa` owns that surface diff now.
+- **Sketch surface-diff** → owned by `qa`'s mandatory sketch cross-check (`qa.md` Phase 0 step 3 — "a delivered surface that contradicts the sketch is a validation finding"). This agent no longer diffs `sketches/*` against the delivered surface, including the service-interaction sequenceDiagram check for `spans_multiple_services: true` tasks — `qa` owns that surface diff now.
 - **Critical/High security re-read** → already enforced by the Phase 3.5 gate (unresolved Critical/High blocks delivery) and the worst-of roll-up; this agent does not re-read `reviews/04-security.md` for that purpose.
 
 ---

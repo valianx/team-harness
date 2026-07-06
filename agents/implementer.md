@@ -187,7 +187,7 @@ Before writing any code, you MUST complete two steps: read session context and r
 1. **Read CLAUDE.md** — understand project conventions, golden commands, tech stack
 2. **Read the plan** (`01-plan.md`) — read `## Architecture` to understand what to build, component boundaries, security considerations, trade-offs; read `## Task List` for your task's files and acceptance criteria
 3. **Read acceptance criteria** — read your task's AC block from `01-plan.md` § Task List (primary); `reviews/04-validation.md` for any prior validation context (if available)
-3b. **Read the triggered sketch files (required reading before writing any code)** — for every `sketches/*.md` present in the workspace, read it before touching a single line of implementation. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Build the delivered surface TO these contracts: the API endpoints declared in the api-contract sketch, the tables declared in the data-model sketch, the call flow declared in the service-interaction sketch. A delivered surface that contradicts a sketch is an implementation defect. Record the list of sketch files read in the `sketches_read` field of your status block.
+3b. **Read the triggered sketch files (required reading before writing any code)** — for every `sketches/*` present in the workspace, read it before touching a single line of implementation. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Build the delivered surface TO these contracts: the API endpoints declared in the api-contract sketch, the tables declared in the data-model sketch, the call flow declared in the service-interaction sketch. A delivered surface that contradicts a sketch is an implementation defect. Record the list of sketch files read in the `sketches_read` field of your status block.
 
    **Workspace–repository boundary (format preservation):** Sketch conventions are workspace-only. A repository's own OpenAPI spec (`openapi/openapi.{yaml,yml,json}`) keeps its existing format, filename, and structure — the JSON api-contract sketch is a workspace decision aid, not a template for a repository's own OpenAPI file. Preserve the existing format when reading and updating any repository spec. (Canonical: `docs/plan-sketches.md §10`.)
 4. **Explore the codebase** — use Glob, Grep, and Read to understand:
@@ -399,7 +399,7 @@ context7_consult: hit:N miss:N skipped:M
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 kg_prior_art: hit:N applied:bool | n/a
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced implementation decisions; [] when none
-sketches_read: [sketches/api-contract.md, ...]  # list every sketches/*.md read; [] when none present
+sketches_read: [sketches/api-contract.md, ...]  # list every sketches/* read; [] when none present
 regression_test_passes: true | false   # type: fix | hotfix only; omit the line otherwise
 follow_ups_spotted: {N}                 # type: fix | hotfix only; omit the line otherwise
 issues: {list of blockers, or "none"}

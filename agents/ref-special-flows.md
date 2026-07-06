@@ -1189,9 +1189,9 @@ Every special flow that skips phases must explicitly document which artifact ver
 
 ## Plan Sketches — Per-Type Applicability
 
-This section defines which task types and tiers produce a classification block and `sketches/*.md` files. The canonical reference is `docs/plan-sketches.md § 7`.
+This section defines which task types and tiers produce a classification block and `sketches/*` files. The canonical reference is `docs/plan-sketches.md § 7`.
 
-| Type / Tier | Classification block? | Always-sketches (collapsed surfaces) | Conditional sketches (`sketches/*.md`) | sketch-guard.sh invoked? |
+| Type / Tier | Classification block? | Always-sketches (collapsed surfaces) | Conditional sketches (`sketches/*`) | sketch-guard.sh invoked? |
 |-------------|----------------------|-------------------------------------|----------------------------------------|--------------------------|
 | `feature` / `refactor` / `enhancement` | Yes — architect records in `00-state.md` and mirrors in `01-plan.md § Review Summary → ### Classification block` | Yes — functional-acceptance AC in `§ Task List`; non-functional notes in `§ Architecture` | Per booleans: the architect produces every triggered file | Yes, at STAGE-GATE-1 |
 | `fix` Tier 2-4 | Yes — architect root-cause mode records in `00-state.md`; defaults false unless fix touches a contract surface | Yes (minimum AC in `§ Task List`) | Rare — only if the fix modifies a contract surface (e.g., the fix adds an endpoint); booleans default false | Yes — no-op pass when all-false |
@@ -1202,7 +1202,7 @@ This section defines which task types and tiers produce a classification block a
 
 **Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md`, it MUST add the `### Classification block` subsection to `## Review Summary` with all seven booleans set to `false`. This satisfies the plan-reviewer Rule 11 classification-block check and ensures `sketch-guard.sh` receives a valid state file at STAGE-GATE-1.
 
-**Fast Mode:** the architect is not dispatched — the orchestrator writes a one-sentence prose plan. Classification block: all-false (same as self-authored path above). Sketch-guard: invoked as a no-op pass. `sketches/*.md`: none produced.
+**Fast Mode:** the architect is not dispatched — the orchestrator writes a one-sentence prose plan. Classification block: all-false (same as self-authored path above). Sketch-guard: invoked as a no-op pass. `sketches/*`: none produced.
 
 ---
 

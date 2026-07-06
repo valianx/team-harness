@@ -41,7 +41,7 @@ silently.
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
 | **Test artifact** | Phase 2.7 suite result, tests added, AC→test map; `regression_test_path` + status for the bug-fix flow | `03-testing.md` (authoring section) |
-| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-security.md` (when later written), `01-root-cause.md` (fix flow), `sketches/*.md` | — the depth-on-demand escape hatch (§4) |
+| **Full-document pointers** | Explicit paths to `01-plan.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-security.md` (when later written), `01-root-cause.md` (fix flow), `sketches/*` | — the depth-on-demand escape hatch (§4) |
 
 ### No AC section
 
@@ -96,7 +96,7 @@ regression_test_path: {path or "n/a"}
 - 03-testing.md
 - reviews/04-security.md (when written)
 - 01-root-cause.md (fix flow only)
-- sketches/*.md (if present)
+- sketches/* (if present)
 ```
 
 ---

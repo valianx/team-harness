@@ -372,7 +372,7 @@ Before writing any test:
    - Naming conventions (`.test.ts`, `.spec.ts`, `_test.go`, `_test.py`)
    - Mocking approach (factories, inline mocks, fixtures)
    - Helper/utility patterns already in use
-3a. **Read the triggered sketch files (required reading before writing any tests)** — for every `sketches/*.md` present in the workspace, read it before writing a test plan. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Derive test cases from each declared contract surface: each endpoint in the api-contract sketch is a test target, each table in the data-model sketch is a test target, each call hop in the service-interaction sketch is a test target — in addition to the per-task AC. Record the list of sketch files read in the `sketches_read` field of your status block.
+3a. **Read the triggered sketch files (required reading before writing any tests)** — for every `sketches/*` present in the workspace, read it before writing a test plan. In a multi-project initiative, resolve sketches from `{overview_root}/sketches/{project}-{name}` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). Derive test cases from each declared contract surface: each endpoint in the api-contract sketch is a test target, each table in the data-model sketch is a test target, each call hop in the service-interaction sketch is a test target — in addition to the per-task AC. Record the list of sketch files read in the `sketches_read` field of your status block.
 3b. **Derive warranted test types** from the AC list and changed files. This is AC- and change-driven — NOT "every frontend task writes UI tests":
    - Changed `*.stories.tsx` or interactive component + AC about rendering/interaction → `ui-component`
    - AC mentioning accessibility / axe / keyboard / screen-reader → `a11y`
@@ -894,7 +894,7 @@ pre_fix_test_status: authored | skipped | null   # pre-fix-regression mode only;
 regression_test_path: {test-file-path}    # pre-fix-regression mode AND Phase 3 post-fix verify (type: fix | hotfix); omit in other modes; null when pre_fix_test_status: skipped
 regression_test_status: failing | passing | skipped  # pre-fix-regression: 'failing' or 'skipped'; Phase 3 verify (post-fix): 'passing' or 'skipped'; omit in other modes
 blast_radius: localized {IDs} | structural            # when status: failed only; omit on success
-sketches_read: [sketches/api-contract.md, ...]        # list every sketches/*.md read; [] when none present
+sketches_read: [sketches/api-contract.md, ...]        # list every sketches/* read; [] when none present
 context7_consult: hit:N miss:N skipped:M
 memory_consult: search_nodes:N open_nodes:N
 kg_save_candidates: [entity-name-1, entity-name-2]
