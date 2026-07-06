@@ -33118,6 +33118,521 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 148 — read-only-allowlist-three-site-identity (issue th-friction-redesign)
+#
+# Extends Suite 142's permission-provisioning coverage: asserts the read-only
+# allowlist class (inert Bash commands + prefix-safe gh read verbs + gh auth
+# switch + mcp__memory__*) documented in docs/permission-provisioning.md §
+# "Read-only allowlist — disjointness invariant" is reproduced IDENTICALLY at
+# both provisioning sites (multi-site invariant (c), Task-3 AC-5) — a literal
+# substring cross-check, mirroring how Suite 142 pins the Edit/Write/
+# additionalDirectories triad at the same two sites. Also pins the AC-3/AC-7
+# exclusions (no effective git verb, no form of `gh api`) and the mechanical
+# enforcement pointer to tests/test_permission_disjointness.py.
+#
+# Marker: read-only-allowlist-three-site-identity
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 148: read-only-allowlist-three-site-identity ===")
+
+_s148_setup = read(SKILLS_DIR / "setup" / "SKILL.md")
+_s148_orch = read(AGENTS_DIR / "orchestrator.md")
+_s148_perm_doc = read(REPO_ROOT / "docs" / "permission-provisioning.md")
+_s148_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s148_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# --- Site A: skills/setup/SKILL.md § 3a (same bounded slice as Suite 142) ---
+_s148_siteA = _slice_section(
+    _s148_setup,
+    "### 3a. Provision permission rules for the obsidian workspace (gated)",
+    ("\n### ",),
+)
+
+# --- Site B: agents/orchestrator.md Phase 0a Step 1g (same find-to-find
+# bounded slice as Suite 142 — the step is a numbered list item, not its own
+# markdown heading) ---
+_s148_step1g_start = _s148_orch.find(
+    "1g. **CONDITIONAL — Gated local permission provisioning.**"
+)
+_s148_step1g_end = _s148_orch.find(
+    "2. **MANDATORY — Query knowledge graph and write to file**", _s148_step1g_start
+)
+_s148_siteB = (
+    _s148_orch[_s148_step1g_start:_s148_step1g_end]
+    if _s148_step1g_start != -1
+    and _s148_step1g_end != -1
+    and _s148_step1g_end > _s148_step1g_start
+    else ""
+)
+
+# --- Canonical doc: the "Offered set" subsection ---
+_s148_offered = _slice_section(_s148_perm_doc, "### Offered set", ("\n### ",))
+
+_S148_OFFERED_RULE_STRINGS = (
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git show:*)",
+    "Bash(git rev-parse:*)",
+    "Bash(git branch --list:*)",
+    "Bash(git worktree list:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(rg:*)",
+    "Bash(grep:*)",
+    "Bash(gh pr view:*)",
+    "Bash(gh pr list:*)",
+    "Bash(gh issue view:*)",
+    "Bash(gh issue list:*)",
+    "Bash(gh auth switch:*)",
+    "mcp__memory__*",
+)
+
+check(
+    "suite148(doc-offered-set): docs/permission-provisioning.md § 'Offered set' "
+    "enumerates every rule in the read-only allowlist class",
+    all(rule in _s148_offered for rule in _S148_OFFERED_RULE_STRINGS),
+    f"missing from the canonical doc's Offered set: "
+    f"{[r for r in _S148_OFFERED_RULE_STRINGS if r not in _s148_offered]}",
+)
+check(
+    "suite148(siteA-offered-set): setup § 3a reproduces the same read-only "
+    "allowlist rule strings as the canonical doc",
+    all(rule in _s148_siteA for rule in _S148_OFFERED_RULE_STRINGS),
+    f"missing from setup § 3a: "
+    f"{[r for r in _S148_OFFERED_RULE_STRINGS if r not in _s148_siteA]}",
+)
+check(
+    "suite148(siteB-offered-set): orchestrator Phase 0a Step 1g reproduces the "
+    "same read-only allowlist rule strings as the canonical doc",
+    all(rule in _s148_siteB for rule in _S148_OFFERED_RULE_STRINGS),
+    f"missing from Step 1g: "
+    f"{[r for r in _S148_OFFERED_RULE_STRINGS if r not in _s148_siteB]}",
+)
+check(
+    "suite148(three-site-identity): the three sites (doc, setup § 3a, "
+    "orchestrator Step 1g) declare the identical rule-string set — no site "
+    "carries a superset or subset of another",
+    {rule for rule in _S148_OFFERED_RULE_STRINGS if rule in _s148_offered}
+    == {rule for rule in _S148_OFFERED_RULE_STRINGS if rule in _s148_siteA}
+    == {rule for rule in _S148_OFFERED_RULE_STRINGS if rule in _s148_siteB},
+    "the three provisioning sites do not agree on the exact set of offered "
+    "read-only allowlist rules",
+)
+
+# --- AC-7 / SEC-DR-03 closure: no form of 'gh api' at any of the three sites ---
+_S148_GH_API_FORMS = ("Bash(gh api:*)", "Bash(gh api graphql:*)", "Bash(gh api /repos")
+_s148_gh_api_hits = {
+    "doc": [f for f in _S148_GH_API_FORMS if f in _s148_offered],
+    "siteA": [f for f in _S148_GH_API_FORMS if f in _s148_siteA],
+    "siteB": [f for f in _S148_GH_API_FORMS if f in _s148_siteB],
+}
+check(
+    "suite148(no-gh-api-anywhere): no form of 'gh api' is offered at the "
+    "canonical doc, setup § 3a, or orchestrator Step 1g",
+    all(len(hits) == 0 for hits in _s148_gh_api_hits.values()),
+    f"found gh api form(s): {_s148_gh_api_hits}",
+)
+
+# --- AC-3 closure: the canonical doc's exclusion section names every
+# effective git verb and the remote-mutating commands ---
+_s148_excluded_git = _slice_section(
+    _s148_perm_doc,
+    "### Excluded — effective git verbs and remote-mutating commands",
+    ("\n### ", "\n## "),
+)
+_S148_EXCLUDED_GIT_VERBS = (
+    "git checkout", "git fetch", "git pull", "git clean", "git reset",
+    "git rebase", "git merge", "git push",
+)
+_S148_EXCLUDED_REMOTE_CMDS = (
+    "git remote set-url", "git remote add", "git remote rename",
+)
+check(
+    "suite148(excluded-git-verbs): the canonical doc names every effective "
+    "git verb as excluded from the allowlist",
+    all(v in _s148_excluded_git for v in _S148_EXCLUDED_GIT_VERBS),
+    f"missing: {[v for v in _S148_EXCLUDED_GIT_VERBS if v not in _s148_excluded_git]}",
+)
+check(
+    "suite148(excluded-remote-mutating): the canonical doc names the "
+    "remote-mutating commands as excluded from the allowlist",
+    all(c in _s148_excluded_git for c in _S148_EXCLUDED_REMOTE_CMDS),
+    f"missing: {[c for c in _S148_EXCLUDED_REMOTE_CMDS if c not in _s148_excluded_git]}",
+)
+
+# --- Disjointness invariant is named as the governing constraint, at both
+# provisioning sites and the canonical doc, with a pointer to the mechanical
+# enforcement test ---
+check(
+    "suite148(doc-disjointness-pointer): the canonical doc names "
+    "tests/test_permission_disjointness.py as the mechanical enforcement",
+    "tests/test_permission_disjointness.py" in _s148_perm_doc,
+    "docs/permission-provisioning.md must reference "
+    "tests/test_permission_disjointness.py as the disjointness enforcement",
+)
+check(
+    "suite148(siteA-disjointness-pointer): setup § 3a points to the "
+    "disjointness invariant section and its test enforcement",
+    "disjointness invariant" in _s148_siteA
+    and "tests/test_permission_disjointness.py" in _s148_siteA,
+    "setup § 3a must reference the disjointness invariant section and "
+    "tests/test_permission_disjointness.py",
+)
+check(
+    "suite148(siteB-disjointness-pointer): Step 1g points to the disjointness "
+    "invariant section and its test enforcement",
+    "disjointness invariant" in _s148_siteB
+    and "tests/test_permission_disjointness.py" in _s148_siteB,
+    "Step 1g must reference the disjointness invariant section and "
+    "tests/test_permission_disjointness.py",
+)
+
+# --- .git/ exclusion, resolved-value floor, and merge-write mechanics remain
+# unchanged for additionalDirectories writes (AC-6) — re-pin the same three
+# needles Suite 142 already asserts, at both sites, so a regression on this
+# specific extension is caught independently of Suite 142's own drift ---
+check(
+    "suite148(ac6-git-exclusion-unchanged): the .git/ exclusion invariant "
+    "still governs both sites after the read-only allowlist extension",
+    "Edit(//{base}/.git/**)" in _s148_siteA
+    and "Edit(//{base}/.git/**)" in _s148_siteB,
+    "the .git/ exclusion deny pair must remain present at both sites",
+)
+check(
+    "suite148(ac6-resolved-value-floor-unchanged): the resolved-value "
+    "validation floor still governs both sites after the extension",
+    "resolved-value validation floor" in _s148_siteA.lower()
+    and "resolved-value validation floor" in _s148_siteB.lower(),
+    "the resolved-value validation floor must remain present at both sites",
+)
+check(
+    "suite148(ac6-merge-write-unchanged): the merge-write-whole-document "
+    "mechanic still governs the write at site A",
+    "merge-write-whole-document" in _s148_siteA,
+    "setup § 3a must still declare merge-write-whole-document after the "
+    "read-only allowlist extension",
+)
+
+# Self-referential guards (hygiene contract)
+_s148_own = read(Path(__file__))
+check(
+    "suite148(self-ref): test file contains 'Suite 148' and "
+    "'read-only-allowlist-three-site-identity'",
+    "Suite 148" in _s148_own and "read-only-allowlist-three-site-identity" in _s148_own,
+    "test file must self-reference Suite 148 and the marker "
+    "'read-only-allowlist-three-site-identity'",
+)
+check(
+    "suite148(registry): docs/testing.md registers 'Suite 148' and "
+    "'read-only-allowlist-three-site-identity'",
+    "Suite 148" in _s148_testing_md
+    and "read-only-allowlist-three-site-identity" in _s148_testing_md,
+    "docs/testing.md must register Suite 148 and the "
+    "'read-only-allowlist-three-site-identity' marker",
+)
+check(
+    "suite148(hygiene): CLAUDE.md does NOT contain 'Suite 148' (§11 hygiene "
+    "contract)",
+    "Suite 148" not in _s148_claude_md,
+    "CLAUDE.md must not mention Suite 148 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: read-only-allowlist-three-site-identity
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 149 — dev-guard-contract-reconciliation (Task-5, th-friction-redesign)
+#
+# WI-1 (Task-1) changed the dev-guard DECISION for `git push`: a single
+# recognized refspec targeting a non-default branch on `origin` now resolves
+# to `allow` instead of a blanket `ask`. This suite pins, at every site of
+# the Multi-site (a) table in `01-plan.md`, that (1) the refined
+# destination-aware statement is present, (2) the OLD blanket-ask phrasing
+# that site used to carry is gone, and (3) the "fires unconditionally"
+# invariant (the hook still evaluates every covered action, every time — only
+# the DECISION for one push form changed) is still present. Whitespace is
+# normalized before substring checks so a YAML `>` block-scalar line-wrap
+# cannot produce a false negative on a token that legitimately spans a line
+# break in the raw file.
+#
+# Marker: dev-guard-contract-reconciliation
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 149: dev-guard-contract-reconciliation ===")
+
+
+def _s149_norm(text: str) -> str:
+    return re.sub(r"\s+", " ", text)
+
+
+_S149_REFINED_TOKEN = "gates by destination"
+_S149_UNCONDITIONAL_TOKEN = "fires unconditionally"
+
+# (label, path, old-phrasing substring that must now be ABSENT — None when
+# the site is a historical/append-only record where the old text legitimately
+# stays, annotated in-place instead of removed)
+_S149_SITES = [
+    (
+        "dev-mode.md",
+        REPO_ROOT / "docs" / "dev-mode.md",
+        "the hook issues `ask` for every covered outward action, unconditionally",
+    ),
+    (
+        "developer-mode.md",
+        REPO_ROOT / "output-styles" / "developer-mode.md",
+        'It emits `permissionDecision: "ask"` — the **operator** must approve '
+        "that specific call interactively. The agent CANNOT auto-approve.\n\n"
+        "Covered actions",
+    ),
+    (
+        "how-it-works.md",
+        REPO_ROOT / "docs" / "how-it-works.md",
+        "require explicit operator approval via `hooks/dev-guard.sh`",
+    ),
+    (
+        "setup/SKILL.md (managed-block copy)",
+        SKILLS_DIR / "setup" / "SKILL.md",
+        "require explicit operator approval via the deterministic dev-guard hook",
+    ),
+    (
+        "managed-blocks/orchestrator-dispatch-rule.md",
+        SKILLS_DIR / "setup" / "managed-blocks" / "orchestrator-dispatch-rule.md",
+        "require explicit operator approval via the deterministic dev-guard hook",
+    ),
+    (
+        "CLAUDE.md",
+        REPO_ROOT / "CLAUDE.md",
+        "outward actions gated by `dev-guard`. See `docs/dev-mode.md`",
+    ),
+    (
+        "docs/knowledge.md",
+        REPO_ROOT / "docs" / "knowledge.md",
+        None,
+    ),
+    (
+        "dev-guard.claude-code.yaml",
+        HOOKS_DIR / "adapters" / "dev-guard.claude-code.yaml",
+        "dev-guard is the unconditional outward-action gate",
+    ),
+    (
+        "dev-guard.opencode.yaml",
+        HOOKS_DIR / "adapters" / "dev-guard.opencode.yaml",
+        None,
+    ),
+]
+
+for _s149_label, _s149_path, _s149_old in _S149_SITES:
+    _s149_text = _s149_norm(read(_s149_path))
+    check(
+        f"suite149(refined-present:{_s149_label}): refined destination-aware "
+        f"statement present",
+        _S149_REFINED_TOKEN in _s149_text,
+        f"{_s149_path} must contain '{_S149_REFINED_TOKEN}'",
+    )
+    check(
+        f"suite149(unconditional-preserved:{_s149_label}): 'fires "
+        f"unconditionally' invariant preserved (AC-3 — hook still evaluates "
+        f"every covered action, every time)",
+        _S149_UNCONDITIONAL_TOKEN in _s149_text.lower(),
+        f"{_s149_path} must still contain a 'fires unconditionally' statement",
+    )
+    if _s149_old is not None:
+        check(
+            f"suite149(old-absent:{_s149_label}): old blanket-ask phrasing "
+            f"removed",
+            _s149_old not in _s149_text,
+            f"{_s149_path} must not still carry the old blanket-ask phrasing",
+        )
+
+# --- SKILL.md carries the refined statement at TWO sites in the same file:
+# the embedded managed-block copy (checked above) and the Step 4e operator
+# report line — pin the second occurrence independently. ---
+_s149_setup_full = _s149_norm(read(SKILLS_DIR / "setup" / "SKILL.md"))
+check(
+    "suite149(step4e-report-refined): Step 4e's operator-facing report line "
+    "carries the refined destination-aware statement, not the old "
+    "'(unconditional)' blanket-ask summary",
+    "gates by destination" in _s149_setup_full
+    and "require explicit approval (unconditional)" not in _s149_setup_full,
+    "skills/setup/SKILL.md Step 4e report block must state the "
+    "destination-aware gate outcome, not the old blanket-ask summary",
+)
+
+# --- No site claims the gate itself was removed or made conditional-by-marker
+# (AC-3's second half) ---
+for _s149_label, _s149_path, _ in _S149_SITES:
+    _s149_text = _s149_norm(read(_s149_path))
+    check(
+        f"suite149(no-removed-claim:{_s149_label}): no claim that the gate "
+        f"was removed or made conditional-by-marker",
+        "gate was removed" not in _s149_text.lower()
+        and "conditional-by-marker" not in _s149_text.lower(),
+        f"{_s149_path} must not claim the dev-guard gate was removed or made "
+        "conditional-by-marker",
+    )
+
+# Self-referential guards (hygiene contract)
+_s149_own = read(Path(__file__))
+_s149_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s149_claude_md = read(REPO_ROOT / "CLAUDE.md")
+check(
+    "suite149(self-ref): test file contains 'Suite 149' and "
+    "'dev-guard-contract-reconciliation'",
+    "Suite 149" in _s149_own and "dev-guard-contract-reconciliation" in _s149_own,
+    "test file must self-reference Suite 149 and the marker "
+    "'dev-guard-contract-reconciliation'",
+)
+check(
+    "suite149(registry): docs/testing.md registers 'Suite 149' and "
+    "'dev-guard-contract-reconciliation'",
+    "Suite 149" in _s149_testing_md
+    and "dev-guard-contract-reconciliation" in _s149_testing_md,
+    "docs/testing.md must register Suite 149 and the "
+    "'dev-guard-contract-reconciliation' marker",
+)
+check(
+    "suite149(hygiene): CLAUDE.md does NOT contain 'Suite 149' (§11 hygiene "
+    "contract)",
+    "Suite 149" not in _s149_claude_md,
+    "CLAUDE.md must not mention Suite 149 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: dev-guard-contract-reconciliation
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 150 — batched-graphql-review-disposition (Task-2, th-friction-redesign)
+#
+# Structural coverage for the "Tier B — batched review disposition (aliased
+# mutation)" section added to agents/_shared/gh-fallback.md (T2-G1 closure —
+# the adversary/tester both confirmed Task-2's 7 AC had zero test coverage).
+# Pins the section's five load-bearing properties: fixed-template integer-
+# indexed aliases, variables-only data binding (CWE-78, -F reserved for
+# numeric/boolean only), the payload-preview mandate before the gated call,
+# per-alias partial-failure handling (not all-or-nothing), and that the
+# single-thread sections remain the documented additive fallback.
+#
+# Marker: batched-graphql-review-disposition
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 150: batched-graphql-review-disposition ===")
+
+_s150_gh_fallback = read(AGENTS_DIR / "_shared" / "gh-fallback.md")
+_s150_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s150_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+_s150_section = _slice_section(
+    _s150_gh_fallback,
+    "## Tier B — batched review disposition (aliased mutation)",
+    ("\n## ",),
+)
+
+check(
+    "suite150(section-present): agents/_shared/gh-fallback.md declares the "
+    "'Tier B — batched review disposition (aliased mutation)' section",
+    len(_s150_section) > 0,
+    "gh-fallback.md must contain the batched review-disposition section",
+)
+check(
+    "suite150(fixed-template): the section documents a FIXED query template "
+    "with integer-indexed reply{i}/resolve{i} aliases",
+    "fixed template" in _s150_section.lower()
+    and "reply{i}" in _s150_section
+    and "resolve{i}" in _s150_section,
+    "the section must document a fixed template with integer-indexed "
+    "reply{i}/resolve{i} aliases",
+)
+check(
+    "suite150(reply-before-resolve-ordering): the section states reply "
+    "aliases precede resolve aliases (serial left-to-right GraphQL "
+    "execution guarantee)",
+    "aliases always precede resolve aliases" in " ".join(_s150_section.split()),
+    "the section must state the reply-before-resolve alias ordering "
+    "guarantee",
+)
+check(
+    "suite150(variables-only): every data value (reply body, thread node "
+    "ID) is bound via GraphQL variables (-f/--input), never concatenated "
+    "into the query text",
+    "-f`/`--input`" in _s150_section
+    and "never concatenated or\ninterpolated into the query string" in _s150_section,
+    "the section must state that reply bodies and thread IDs are bound via "
+    "-f/--input variables, never concatenated into the query",
+)
+check(
+    "suite150(-F-reserved-numeric-boolean): -F is documented as reserved to "
+    "numeric/boolean values and never used for reply bodies or thread IDs "
+    "(CWE-78 completeness)",
+    "`-F` is reserved for genuinely numeric or boolean values" in _s150_section
+    and "@/etc/passwd" in _s150_section,
+    "the section must document -F as reserved to numeric/boolean values, "
+    "with the @/etc/passwd file-read risk named for reply bodies/thread IDs",
+)
+check(
+    "suite150(payload-preview-mandate): the section mandates rendering the "
+    "full composed batch to the operator BEFORE the gated call",
+    "Payload preview mandate" in _s150_section
+    and "Do not issue the `gh api graphql --input" in _s150_section,
+    "the section must mandate a payload preview before the gated call",
+)
+check(
+    "suite150(per-alias-partial-failure): the section documents per-alias "
+    "partial failure (data + errors[].path[0]), not all-or-nothing",
+    "Partial failure" in _s150_section
+    and "not all-or-nothing" in _s150_section
+    and "errors[].path[0]" in _s150_section,
+    "the section must document per-alias partial-failure handling via "
+    "data + errors[].path[0], explicitly not all-or-nothing",
+)
+check(
+    "suite150(additive-fallback): the section states the batched path is "
+    "additive and the single-thread sections remain the documented fallback",
+    "additive" in _s150_section.lower()
+    and "single-thread" in _s150_section.lower()
+    and "fallback" in _s150_section.lower(),
+    "the section must state the batched path is additive and the "
+    "single-thread sections remain the fallback",
+)
+check(
+    "suite150(one-ask-not-weakened): the section states the dev-guard gate "
+    "still fires exactly once per batch — the gate is not weakened, only "
+    "the prompt count drops",
+    "not weakened" in _s150_section,
+    "the section must state the gate is not weakened by batching",
+)
+
+# Self-referential guards (hygiene contract)
+_s150_own = read(Path(__file__))
+check(
+    "suite150(self-ref): test file contains 'Suite 150' and "
+    "'batched-graphql-review-disposition'",
+    "Suite 150" in _s150_own and "batched-graphql-review-disposition" in _s150_own,
+    "test file must self-reference Suite 150 and the marker "
+    "'batched-graphql-review-disposition'",
+)
+check(
+    "suite150(registry): docs/testing.md registers 'Suite 150' and "
+    "'batched-graphql-review-disposition'",
+    "Suite 150" in _s150_testing_md
+    and "batched-graphql-review-disposition" in _s150_testing_md,
+    "docs/testing.md must register Suite 150 and the "
+    "'batched-graphql-review-disposition' marker",
+)
+check(
+    "suite150(hygiene): CLAUDE.md does NOT contain 'Suite 150' (§11 hygiene "
+    "contract)",
+    "Suite 150" not in _s150_claude_md,
+    "CLAUDE.md must not mention Suite 150 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: batched-graphql-review-disposition
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
