@@ -378,6 +378,22 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 147: permission-disjointness-invariant (#18312 floor)"
+echo "# Requires: python3. Skipped when absent."
+echo "############################################################"
+if ! command -v python3 >/dev/null 2>&1; then
+    report_skip_or_fail "permission-disjointness" "python3 not found — install Python 3 to run this suite"
+else
+    if python3 "$TESTS_DIR/test_permission_disjointness.py"; then
+        echo "permission-disjointness: PASS"
+    else
+        echo "permission-disjointness: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

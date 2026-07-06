@@ -251,7 +251,7 @@ assert_ts_node() {
 echo "--- Section 1: Parity against test_dev_guard.sh fixtures ---"
 
 assert_parity "gh pr merge (ASK)" "$(make_bash_payload 'gh pr merge 123 --squash')" "ask"
-assert_parity "git push bare (ASK)" "$(make_bash_payload 'git push origin feat/my-branch')" "ask"
+assert_parity "git push to non-default branch on origin (ALLOW, th-friction-redesign branch-aware recognizer)" "$(make_bash_payload 'git push origin feat/my-branch')" "allow"
 assert_parity "gh pr review (ASK)" "$(make_bash_payload 'gh pr review 42 --approve')" "ask"
 assert_parity "gh pr comment (ASK)" "$(make_bash_payload 'gh pr comment 42 --body "LGTM"')" "ask"
 assert_parity "gh api -X PUT /pulls/merge (ASK)" "$(make_bash_payload 'gh api -X PUT /repos/owner/repo/pulls/42/merge')" "ask"
