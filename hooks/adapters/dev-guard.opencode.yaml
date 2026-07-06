@@ -20,6 +20,10 @@ capabilities:
 #           on tool.name; no command field (tool.input.command → null); body gates
 #           on tool.name alone, never degrades to none/allow.
 notes: >
+  dev-guard fires unconditionally for every covered outward action and gates by destination: a git
+  push whose single recognized refspec targets a non-default branch on origin resolves to allow
+  (no prompt, no throw); every other covered form still resolves to ask, which this runtime maps
+  to throw below.
   ask→throw mapping (fail-closed): opencode's tool.execute.before has no
   interactive operator-confirm path; canonical "ask" maps to throw for
   outward/gcp gates. The cost is that opencode operators see a hard block
