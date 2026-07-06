@@ -19359,18 +19359,23 @@ check(
     " size threshold, which works unchanged for the HTML sketch",
 )
 
-# (uwh13) AC-9 — changelog.d/ fragment exists for this migration
-_S82UWH_CHANGELOG_FRAGMENT = REPO_ROOT / "changelog.d" / "feat-sketch-ui-wireframe-html.md"
-_s82uwh_changelog_fragment_text = (
-    read(_S82UWH_CHANGELOG_FRAGMENT) if _S82UWH_CHANGELOG_FRAGMENT.exists() else ""
-)
+# (uwh13) AC-9 — the sketch contract migration is documented in the released
+# CHANGELOG. The original check guarded the changelog.d/ fragment file itself,
+# but that fragment is consumed (assembled into CHANGELOG.md and deleted) at
+# release cut — a fragment-existence guard must not outlive the fragment's
+# consumption, or every subsequent release trips a permanently-stale check.
+# Assert against the durable artifact (the released CHANGELOG section) instead.
+_s82uwh_changelog_text = read(REPO_ROOT / "CHANGELOG.md")
 check(
-    "suite82(uwh13-changelog-fragment): changelog.d/feat-sketch-ui-wireframe-html.md"
-    " exists with a ### Changed entry",
-    _S82UWH_CHANGELOG_FRAGMENT.exists() and "### Changed" in _s82uwh_changelog_fragment_text,
-    "changelog.d/feat-sketch-ui-wireframe-html.md must exist and contain a"
-    " ### Changed entry describing the sketch contract migration (version bump"
-    " itself is deferred to /th:release — this check only guards the fragment)",
+    "suite82(uwh13-changelog-released): CHANGELOG.md [2.125.1] section documents"
+    " the sketch contract migration",
+    "## [2.125.1]" in _s82uwh_changelog_text
+    and "ui-wireframe" in _s82uwh_changelog_text
+    and "sketches/ui-wireframe.html" in _s82uwh_changelog_text,
+    "CHANGELOG.md must retain the released [2.125.1] section documenting the"
+    " ui-wireframe sketch contract migration to sketches/ui-wireframe.html"
+    " (the changelog.d/ fragment that seeded this entry was consumed at"
+    " release cut and no longer exists on disk, by design)",
 )
 
 # (uwh14) AC-9 — docs/knowledge.md carries a [decision] bullet for this migration
