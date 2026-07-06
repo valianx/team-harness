@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.125.1] - 2026-07-06
+
+### Changed
+
+- The `ui-wireframe` plan-stage sketch is now delivered as a standalone, self-contained HTML file (`sketches/ui-wireframe.html`) instead of ASCII markdown (`sketches/ui-wireframe.md`). The file embeds a fixed grayscale wireframe stylesheet inline — no `<script>`, no external resources — preserving the existing fidelity ceiling (layout + components + states, no product styling). This is a narrowly-scoped exception to the sketch representation ceiling; the other 8 sketch types are unaffected. All sketch required-reading instructions across the pipeline (implementer, tester, qa, reviewer, qa-plan, acceptance-checker, `/th:review-pr`, `/th:validate`) generalize their reading glob from `sketches/*.md` to the extension-agnostic `sketches/*` so the `.html` file enters mandatory reading.
+
 ## [2.125.0] - 2026-07-05
 
 ### Added
