@@ -44,7 +44,7 @@ If `verdict: concerns`, show a one-line banner before proceeding:
 Note: sketch-guard found concerns for this workspace — {concerns[0]}. Proceeding with validation.
 ```
 
-**Required sketch reading (mid-pipeline entry):** after the guard probe, read every `sketches/*.md` file present in the workspace before routing to the qa agent. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-{name}.md` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). These sketch files are required reading — the qa agent will cross-check the delivered surface against them as part of AC validation.
+**Required sketch reading (mid-pipeline entry):** after the guard probe, read every `sketches/*` file present in the workspace before routing to the qa agent. In a multi-project initiative, resolve sketch paths from `{overview_root}/sketches/{project}-{name}` (and `{overview_root}/sketches/service-interaction.md` for the shared service-interaction sketch). These sketch files are required reading — the qa agent will cross-check the delivered surface against them as part of AC validation.
 
 **Fail-open:** if the script exits non-zero or the workspace cannot be located, continue. The probe is informational only — it never blocks validation.
 

@@ -47,7 +47,7 @@ set -euo pipefail
 # Values are bare type filenames; resolve_sketch_path composes the sketches/ prefix.
 SKETCH_MAP=(
     "touches_http_api:api-contract.md"
-    "touches_ui:ui-wireframe.md"
+    "touches_ui:ui-wireframe.html"
     "touches_data_model:data-model.md"
     "touches_cli:cli-surface.md"
     "touches_public_lib_api:public-api.md"
@@ -272,7 +272,7 @@ eval_map() {
 }
 
 eval_map "$touches_http_api"        "api-contract.md"
-eval_map "$touches_ui"              "ui-wireframe.md"
+eval_map "$touches_ui"              "ui-wireframe.html"
 eval_map "$touches_data_model"      "data-model.md"
 eval_map "$touches_cli"             "cli-surface.md"
 eval_map "$touches_public_lib_api"  "public-api.md"
@@ -340,7 +340,7 @@ for sketch_file in "${required_files[@]}"; do
             concerns+=("Missing required sketch: ${sketch_file} (triggered by classification block)")
         fi
     else
-        # Fidelity heuristic: file must be non-empty and have a heading
+        # Fidelity heuristic: file must be non-empty
         local_size=$(wc -c < "$full_path" 2>/dev/null || echo 0)
         if [ "$local_size" -lt 4 ]; then
             concerns+=("Sketch ${sketch_file} exists but appears empty (size: ${local_size} bytes)")

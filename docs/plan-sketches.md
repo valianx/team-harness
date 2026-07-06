@@ -18,7 +18,7 @@ system. Three representations reference this document:
 ## 1. Purpose
 
 The plan stage declares a **result-defining sketch set** — lightweight, plan-resident
-documents (`sketches/{type}.md`) that show WHAT will be delivered (functional + non-functional)
+documents (`sketches/{type}`) that show WHAT will be delivered (functional + non-functional)
 so the final result is determinable before a line is implemented. The goal is **contract
 determinism, not content determinism**: the same input type produces a predictable,
 verifiable SET of artifacts in a fixed shape. LLM prose varies; the envelope (what exists,
@@ -35,6 +35,16 @@ headers only — not the full machine schema). **Mermaid is the ONLY render libr
 (data-model ER only; native Obsidian + GitHub render, no CLI); JSON examples are fenced
 text, not a render library. **Excalidraw / D2 / LikeC4 are NOT in the sketch set** — they
 stay in the durable `/th:docs` lane (post-completion, never gated into development).
+
+**Narrowly-scoped exception — UI wireframe.** The UI wireframe sketch alone is delivered as
+a standalone, self-contained HTML file (`sketches/ui-wireframe.html`) instead of the zero-
+dependency text formats above. It embeds a fixed grayscale wireframe stylesheet inline
+(no `<script>`, no external resources — CDN, remote images, remote stylesheets are all
+prohibited) and renders via any browser or an Obsidian HTML-render community plugin. The
+fidelity ceiling is unchanged (layout + components + states, no product styling) and is
+preserved by construction: the embedded stylesheet is fixed, so the architect cannot escape
+into product-level styling even when writing HTML. This exception is scoped strictly to
+ui-wireframe — the zero-dependency, text-only rule stands for the other 8 sketches.
 
 ---
 
@@ -88,14 +98,14 @@ STAGE-GATE-1 and `plan-reviewer` Rule 11 can audit consistency.
 
 The two always-sketches collapse into existing surfaces and are NOT separate files.
 Every plan has a `§ Task List` AC block and a `§ Architecture` Security/Performance section,
-so no standalone `sketches/*.md` files are needed for the always-pair.
+so no standalone `sketches/*` files are needed for the always-pair.
 
 ### Conditional (on classification booleans)
 
 | Sketch | Trigger boolean | Format | Tool | Fidelity ceiling | Representation ceiling | File |
 |--------|----------------|--------|------|-----------------|----------------------|------|
 | API contract | `touches_http_api` | `METHOD /path` header + JSON request/response body examples + optional field-notes table | none | changed endpoints only; body + headers only | fenced ` ```json ` examples — no machine schema | `sketches/api-contract.md` |
-| UI wireframe | `touches_ui` | ASCII layout + component legend + states | none | layout+components+states; NO styling | monospace fence in `.md` | `sketches/ui-wireframe.md` |
+| UI wireframe | `touches_ui` | semantic HTML + fixed wireframe stylesheet embedded | none | layout+components+states; NO styling | standalone HTML, embedded stylesheet | `sketches/ui-wireframe.html` |
 | Data model sketch | `touches_data_model` | `erDiagram`, touched tables only | **Mermaid** (native Obsidian render) | touched tables only; no full schema | inline ` ```mermaid ` fence | `sketches/data-model.md` |
 | CLI surface | `touches_cli` | command/flag table + example invocations | none | changed commands only | markdown table | `sketches/cli-surface.md` |
 | Public API surface | `touches_public_lib_api` | signatures + one usage example | none | changed signatures only | fenced code block | `sketches/public-api.md` |
@@ -114,6 +124,12 @@ Fidelity and representation ceilings cap *effort and format*; the quality bar ca
 
 **Cross-cutting (all contract sketches):** model the COMPLETE changed surface and follow the domain's conventions. The same logic applies to the event-contract sketch (model every distinct event the change introduces; follow the messaging platform's naming) and the public-api sketch (model every distinct changed signature; follow the language's API conventions). State a deliberate departure from convention explicitly; never let it be the silent default.
 
+**ui-wireframe sketch — HTML quality requirements:**
+1. **Semantic structure.** Use semantic HTML elements (`<h1>`/`<h2>`, `<table>`, meaningful class names) instead of `<div>` soup — the sketch must be legible as a document, not only as a rendered page.
+2. **Fixed stylesheet, no product styling.** The embedded `<style>` block is the fixed grayscale wireframe stylesheet — neutral rgba grays, dashed/solid borders, `color-scheme: light dark`. The architect never introduces brand colors, custom fonts, or product-level polish.
+3. **Script-free and network-free.** No `<script>` tag and no reference to an external resource (CDN, remote image, remote stylesheet). The file is fully self-contained so it is safe to render inside the operator's vault.
+4. **States + legend are mandatory.** Every ui-wireframe sketch includes a component legend table and a states table (loading/empty/error and any domain-specific state) — matching the always-required Layout section.
+
 ---
 
 ## 4. Layout
@@ -125,7 +141,7 @@ workspace/{feature}/
   01-plan.md                             ← work plan (HOW), milestones
   sketches/                              ← only triggered sketches created (WHAT)
     api-contract.md
-    ui-wireframe.md
+    ui-wireframe.html
     data-model.md
     cli-surface.md
     public-api.md
@@ -140,7 +156,7 @@ workspace/{feature}/
 - **Optional `sketches/index.md`** uses Obsidian embeds (`![[sketches/api-contract]]`) to
   transclude all triggered sketches into one scrollable note (operator-optional).
 - **Only triggered sketches are created** — if no boolean is true, no conditional
-  `sketches/*.md` files are produced. This is a valid, normal outcome (e.g., a docs-only
+  `sketches/*` files are produced. This is a valid, normal outcome (e.g., a docs-only
   task or a task that triggers only the always-pair).
 
 ### Multi-project consolidated layout
@@ -155,7 +171,7 @@ When a multi-project initiative is active (`initiative != null`, parent `overvie
     payment-gateway-data-model.md
     transactions-api-contract.md
     transactions-data-model.md
-    backoffice-ui-wireframe.md
+    backoffice-ui-wireframe.html
     service-interaction.md                    ← shared cross-project sketch, NOT prefixed
   payment-gateway/   00-state.md  01-plan.md ...
   transactions/      00-state.md  01-plan.md ...
@@ -198,15 +214,15 @@ also see the classification block and the diff signal. The check is `concerns`-s
 
 | Phase | Who | Action |
 |-------|-----|--------|
-| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `sketches/*.md` files |
+| Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `sketches/*` files |
 | Phase 1.5 (Plan Ratification) | qa-plan | Checks sketch↔AC consistency (functional-acceptance sketch matches `§ Task List` AC) |
 | Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness per-project (shape-only, fail-OPEN parity); each project's block audited independently in multi-project dispatch |
 | STAGE-GATE-1 | orchestrator | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
-| Stage 2 Implementation | implementer | **Required reading:** reads every triggered `sketches/*.md` file (or consolidated `{overview_root}/sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
-| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*.md` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-task AC; emits `sketches_read` in status block |
-| Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*.md` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
-| Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `sketches/*.md` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
-| Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `sketches/*.md` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `{overview_root}/sketches/` paths in multi-project workspaces |
+| Stage 2 Implementation | implementer | **Required reading:** reads every triggered `sketches/*` file (or consolidated `{overview_root}/sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
+| Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-task AC; emits `sketches_read` in status block |
+| Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
+| Phase 3 Code Review | reviewer | **Required reading:** reads the triggered `sketches/*` files; confirms the diff matches the sketch contracts; flags a delivered surface that silently diverges from the api-contract or service-interaction sketch |
+| Phase 3.6 (Acceptance Check) | acceptance-checker | **Required reading:** reads every triggered `sketches/*` file (required, not optional); diffs the delivered surface against each sketch; includes service-interaction diff row when `spans_multiple_services: true`; resolves consolidated `{overview_root}/sketches/` paths in multi-project workspaces |
 | Direct-entry skills | `/th:review-pr`, `/th:validate` | Run `sketch-guard.sh` as a prerequisite probe; **required reading:** reads the triggered sketch files when entering mid-pipeline before the consuming pass begins |
 
 ---
@@ -228,7 +244,7 @@ also see the classification block and the diff signal. The check is `concerns`-s
 | Artifact | Carries | Lifecycle | Handoff rule |
 |----------|---------|-----------|-------------|
 | `00-spec-seed.md` | Functional INTENT from E2 co-authoring (developer's settled intent, dissent record) | Produced pre-Design; a strong prior | The functional-acceptance sketch (per-task AC) DERIVES from the spec-seed's functional surface when a seed exists |
-| `sketches/*.md` | Result CONTRACTS (checkable: what API, what tables, what payload) | Produced by architect in Design, alongside `01-plan.md` | Conditional sketches (API/UI/data/...) have NO spec-seed counterpart; they stand alone. No duplication: the seed states intent in prose, the sketch states the contract in a fixed shape. |
+| `sketches/*` | Result CONTRACTS (checkable: what API, what tables, what payload) | Produced by architect in Design, alongside `01-plan.md` | Conditional sketches (API/UI/data/...) have NO spec-seed counterpart; they stand alone. No duplication: the seed states intent in prose, the sketch states the contract in a fixed shape. |
 
 **When a spec-seed exists**, the architect adds a one-line provenance note to the
 functional-acceptance AC block: `Provenance: derived from 00-spec-seed.md § <section>`.
@@ -258,7 +274,7 @@ bash tests/run-all.sh
 
 ## 10. Workspace–Repository Boundary
 
-**Sketch conventions govern only the workspace.** Sketches (`sketches/*.md`) are throwaway
+**Sketch conventions govern only the workspace.** Sketches (`sketches/*`) are throwaway
 decision aids produced for a single pipeline run. Their format, layout, and naming
 conventions are workspace-internal and do not carry forward into the repository.
 

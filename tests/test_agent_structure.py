@@ -18676,7 +18676,7 @@ _s82_this_file          = read(Path(__file__))
 # docs/plan-sketches.md and agents/architect.md use the sketches/-prefixed form.
 _S82_EXPECTED_PAIRS = [
     ("touches_http_api",         "sketches/api-contract.md"),
-    ("touches_ui",               "sketches/ui-wireframe.md"),
+    ("touches_ui",               "sketches/ui-wireframe.html"),
     ("touches_data_model",       "sketches/data-model.md"),
     ("touches_cli",              "sketches/cli-surface.md"),
     ("touches_public_lib_api",   "sketches/public-api.md"),
@@ -18686,13 +18686,18 @@ _S82_EXPECTED_PAIRS = [
 # hooks/sketch-guard.sh SKETCH_MAP uses bare type filenames (sketches/ prefix composed by resolver).
 _S82_GUARD_PAIRS = [
     ("touches_http_api",         "api-contract.md"),
-    ("touches_ui",               "ui-wireframe.md"),
+    ("touches_ui",               "ui-wireframe.html"),
     ("touches_data_model",       "data-model.md"),
     ("touches_cli",              "cli-surface.md"),
     ("touches_public_lib_api",   "public-api.md"),
     ("touches_async_messaging",  "event-contract.md"),
     ("spans_multiple_services",  "service-interaction.md"),
 ]
+# AC-6 grep-safety: the legacy token is assembled by concatenation so this test
+# file's own source never contains the contiguous literal ui-wireframe+.md —
+# the closing acceptance grep (`grep -rn 'ui-wireframe\.md' ... tests/`) would
+# otherwise false-positive on this very false-green guard.
+_S82_UI_WIREFRAME_LEGACY_TOKEN = "ui-wireframe" + ".md"
 # Migration sketch: docs/architect use sketches/-prefixed; guard uses bare name.
 _S82_MIGRATION_PAIR       = ("touches_data_model", "touches_destructive", "sketches/data-migration.md")
 _S82_MIGRATION_PAIR_GUARD = ("touches_data_model", "touches_destructive", "data-migration.md")
@@ -18760,6 +18765,49 @@ check(
     "sketches/data-migration.md" in _s82_architect and "destructive" in _s82_architect,
     "agents/architect.md must document the data-migration sketch as sketches/data-migration.md"
     " (touches_data_model AND destructive → sketches/data-migration.md)",
+)
+
+# ---------------------------------------------------------------------------
+# Group (a-negative) — false-green guard: the retired ui-wireframe markdown
+# form (bare type filename + .md) must be absent from every representation
+# that used to carry it (AC-4).
+# ---------------------------------------------------------------------------
+
+# (a7) docs/plan-sketches.md — no residual legacy ui-wireframe markdown filename
+check(
+    "suite82(a7-docs-no-legacy-md): docs/plan-sketches.md does not reference the retired"
+    " ui-wireframe markdown filename",
+    _S82_UI_WIREFRAME_LEGACY_TOKEN not in _s82_docs_sketches,
+    "docs/plan-sketches.md must have fully migrated to sketches/ui-wireframe.html —"
+    " a residual legacy-extension reference is a false-green (the old contract still matches)",
+)
+
+# (a8) agents/architect.md — no residual legacy ui-wireframe markdown filename
+check(
+    "suite82(a8-architect-no-legacy-md): agents/architect.md does not reference the retired"
+    " ui-wireframe markdown filename",
+    _S82_UI_WIREFRAME_LEGACY_TOKEN not in _s82_architect,
+    "agents/architect.md must have fully migrated to sketches/ui-wireframe.html —"
+    " a residual legacy-extension reference is a false-green (the old contract still matches)",
+)
+
+# (a9) hooks/sketch-guard.sh — no residual legacy ui-wireframe markdown filename
+check(
+    "suite82(a9-guard-no-legacy-md): hooks/sketch-guard.sh does not reference the retired"
+    " ui-wireframe markdown filename",
+    _S82_UI_WIREFRAME_LEGACY_TOKEN not in _s82_sketch_guard,
+    "hooks/sketch-guard.sh SKETCH_MAP must have fully migrated to ui-wireframe.html —"
+    " a residual legacy-extension reference is a false-green (the old contract still matches)",
+)
+
+# (a10) agents/plan-reviewer.md — no residual legacy ui-wireframe markdown filename in the Rule 11 dict
+check(
+    "suite82(a10-plan-reviewer-no-legacy-md): agents/plan-reviewer.md does not reference the"
+    " retired ui-wireframe markdown filename",
+    _S82_UI_WIREFRAME_LEGACY_TOKEN not in _s82_plan_reviewer,
+    "agents/plan-reviewer.md Rule 11 SKETCH_MAP must have fully migrated to"
+    " sketches/ui-wireframe.html — a residual legacy-extension reference is a false-green"
+    " (the old contract still matches)",
 )
 
 # ---------------------------------------------------------------------------
@@ -19113,6 +19161,228 @@ check(
     "suite82(h3-hygiene): CLAUDE.md does NOT contain 'Suite 82'",
     "Suite 82" not in _s82_claude,
     "CLAUDE.md must not mention Suite 82 — only docs/testing.md is the canonical registry",
+)
+
+# ---------------------------------------------------------------------------
+# Group (j) — sketch-ui-wireframe-html hardening (2026-07-06)
+# Groups (a)/(a-negative)/(i7-i11)/(d1) already assert "sketches/" as a loose
+# substring, which is ALSO true of the RETIRED "sketches/*.md" glob and of the
+# bare "sketches/ui-wireframe.html" filename — so those checks alone would
+# false-green a residual un-migrated glob or a missing HTML-specific clause.
+# This group locks the remaining AC-1/AC-2/AC-3/AC-6/AC-7/AC-8/AC-9 gaps that
+# the base Suite 82 checks leave open for this migration.
+# ---------------------------------------------------------------------------
+
+# (uwh1) AC-6 — automated equivalent of the closing acceptance grep
+# (`grep -rn 'ui-wireframe\.md' agents/ skills/ hooks/ docs/ tests/`), made a
+# durable regression check instead of a one-time manual verification step.
+_S82UWH_SCAN_DIRS = ("agents", "skills", "hooks", "docs", "tests")
+_s82uwh_legacy_hits: list[str] = []
+for _s82uwh_dirname in _S82UWH_SCAN_DIRS:
+    for _s82uwh_path in (REPO_ROOT / _s82uwh_dirname).rglob("*"):
+        if not _s82uwh_path.is_file():
+            continue
+        try:
+            _s82uwh_text = _s82uwh_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if _S82_UI_WIREFRAME_LEGACY_TOKEN in _s82uwh_text:
+            _s82uwh_legacy_hits.append(str(_s82uwh_path.relative_to(REPO_ROOT)))
+check(
+    "suite82(uwh1-ac6-closing-grep): no file under agents/skills/hooks/docs/tests"
+    " references the retired ui-wireframe markdown filename",
+    len(_s82uwh_legacy_hits) == 0,
+    "the AC-6 closing grep must return 0 hits — residual legacy-extension references found in: "
+    + ", ".join(_s82uwh_legacy_hits[:10]),
+)
+
+# (uwh2) AC-6 (R2) — required-reading glob generalization: the retired
+# extension-locked glob ("sketches/" + "*.md") must not survive in any
+# consumer/doc file that declares the mandatory sketch-reading instruction.
+_S82UWH_OLD_GLOB = "sketches/*" + ".md"
+_S82UWH_GLOB_FILES = {
+    "agents/implementer.md": _s82_implementer,
+    "agents/tester.md": _s82_tester,
+    "agents/qa.md": _s82_qa,
+    "agents/reviewer.md": _s82_reviewer,
+    "agents/qa-plan.md": _s82_qa_plan,
+    "agents/acceptance-checker.md": _s82_acceptance_checker,
+    "agents/ref-special-flows.md": _s82_ref_special_flows,
+    "agents/orchestrator.md": _s82_orchestrator,
+    "agents/plan-reviewer.md": _s82_plan_reviewer,
+    "skills/review-pr/SKILL.md": _s82_skill_review_pr,
+    "skills/validate/SKILL.md": _s82_skill_validate,
+}
+_s82uwh_glob_residue = [
+    name for name, text in _S82UWH_GLOB_FILES.items() if _S82UWH_OLD_GLOB in text
+]
+check(
+    "suite82(uwh2-ac6-glob-generalization): no required-reading consumer file"
+    " still uses the retired extension-locked sketches glob",
+    len(_s82uwh_glob_residue) == 0,
+    "these files still contain the retired 'sketches/*.md' glob instead of the"
+    " extension-agnostic 'sketches/*' (the .html sketch would not enter mandatory"
+    " reading): " + ", ".join(_s82uwh_glob_residue),
+)
+
+# (uwh15) AC-1 (§6) — docs/plan-sketches.md lifecycle rows must also carry the
+# generalized "sketches/*" glob, not the retired extension-locked form. This is
+# distinct from (a7), which only guards the ui-wireframe-specific literal
+# ("ui-wireframe" + ".md") — a residual generic glob in §6 would slip past a7.
+check(
+    "suite82(uwh15-docs-glob-generalization): docs/plan-sketches.md does not"
+    " reference the retired extension-locked sketches glob",
+    _S82UWH_OLD_GLOB not in _s82_docs_sketches,
+    "docs/plan-sketches.md must use the extension-agnostic 'sketches/*' glob"
+    " throughout §6 lifecycle rows (and elsewhere) — a residual 'sketches/*.md'"
+    " reference is a false-green (the .html sketch would not enter reading)",
+)
+
+# (uwh3) AC-7 — orchestrator.md Frontmatter Injection exclusion list covers *.html
+check(
+    "suite82(uwh3-orchestrator-frontmatter-exclusion): agents/orchestrator.md excludes"
+    " *.html from frontmatter injection with rationale",
+    "*.html" in _s82_orchestrator and "breaks the render" in _s82_orchestrator,
+    "agents/orchestrator.md 'Excluded from frontmatter' list must include *.html"
+    " (not only the specific ui-wireframe.html filename) with the rationale that"
+    " YAML frontmatter prepended to HTML breaks the render",
+)
+
+# (uwh4) AC-7 — orchestrator.md workspace artifact inventory names the HTML file literally
+check(
+    "suite82(uwh4-orchestrator-artifact-list-html): agents/orchestrator.md workspace"
+    " artifact inventory lists sketches/ui-wireframe.html literally",
+    "sketches/ui-wireframe.html" in _s82_orchestrator,
+    "agents/orchestrator.md workspace document inventory must literally list"
+    " sketches/ui-wireframe.html (not only the loose 'sketches/' substring)",
+)
+
+# (uwh5)/(j6)/(j8) AC-2/AC-8 — architect.md ui-wireframe skeleton's actual HTML
+# fenced code block (NOT the surrounding prose quality-note, which legitimately
+# mentions "<script>" as documentation text describing the prohibition).
+_S82UWH_SKELETON_START = "```html\n<!DOCTYPE html>"
+_S82UWH_SKELETON_STOP = ("\n```\n",)
+_s82uwh_skeleton = _slice_section(_s82_architect, _S82UWH_SKELETON_START, _S82UWH_SKELETON_STOP)
+check(
+    "suite82(uwh5-architect-skeleton-anchor): agents/architect.md ui-wireframe"
+    " HTML fenced code block resolves (anchor found)",
+    bool(_s82uwh_skeleton),
+    "agents/architect.md must contain a ```html fenced code block starting with"
+    " <!DOCTYPE html> for the ui-wireframe skeleton — anchor not found",
+)
+check(
+    "suite82(uwh6-architect-skeleton-script-free): the ui-wireframe skeleton block"
+    " contains no <script> tag",
+    bool(_s82uwh_skeleton) and "<script" not in _s82uwh_skeleton.lower(),
+    "the ui-wireframe HTML skeleton in agents/architect.md must be script-free"
+    " (no <script> tag) — it renders inside the operator's vault",
+)
+check(
+    "suite82(uwh7-architect-skeleton-network-free): the ui-wireframe skeleton block"
+    " references no external resource",
+    bool(_s82uwh_skeleton)
+    and "http://" not in _s82uwh_skeleton
+    and "https://" not in _s82uwh_skeleton
+    and "cdn." not in _s82uwh_skeleton.lower(),
+    "the ui-wireframe HTML skeleton in agents/architect.md must be network-free"
+    " (no CDN, remote image, or remote stylesheet reference) — self-contained only",
+)
+check(
+    "suite82(uwh8-architect-skeleton-sections): the ui-wireframe skeleton block"
+    " is a self-contained <!DOCTYPE html> with Layout/Component legend/States sections",
+    bool(_s82uwh_skeleton)
+    and "<!DOCTYPE html>" in _s82uwh_skeleton
+    and "<style>" in _s82uwh_skeleton
+    and "Layout" in _s82uwh_skeleton
+    and "Component legend" in _s82uwh_skeleton
+    and "States" in _s82uwh_skeleton,
+    "the ui-wireframe skeleton must be a self-contained <!DOCTYPE html> (embedded"
+    " <style>, no mid-dispatch repo read) with Layout, Component legend, and"
+    " States sections",
+)
+
+# (uwh9) AC-1 — docs/plan-sketches.md §1 narrowly-scoped exception clause
+_S82UWH_EXCEPTION_START = "Narrowly-scoped exception"
+_S82UWH_EXCEPTION_STOP = ("\n---\n", "\n## 2.")
+_s82uwh_exception = _slice_section(_s82_docs_sketches, _S82UWH_EXCEPTION_START, _S82UWH_EXCEPTION_STOP)
+check(
+    "suite82(uwh9-docs-narrowly-scoped-exception): docs/plan-sketches.md §1 documents"
+    " the ui-wireframe representation-ceiling exception",
+    bool(_s82uwh_exception)
+    and "ui-wireframe.html" in _s82uwh_exception
+    and "other 8" in _s82uwh_exception,
+    "docs/plan-sketches.md §1 must contain a 'Narrowly-scoped exception' clause"
+    " naming sketches/ui-wireframe.html and confirming the zero-dependency"
+    " text-only rule still stands for the other 8 sketches",
+)
+
+# (uwh10) AC-1 — docs/plan-sketches.md §4 layout listings (single + multi-project)
+check(
+    "suite82(uwh10-docs-layout-listings): docs/plan-sketches.md §4 lists the HTML"
+    " sketch in both single-project and multi-project consolidated layouts",
+    "ui-wireframe.html" in _s82_docs_sketches
+    and "backoffice-ui-wireframe.html" in _s82_docs_sketches,
+    "docs/plan-sketches.md §4 must list ui-wireframe.html in the single-project"
+    " layout and backoffice-ui-wireframe.html in the multi-project consolidated"
+    " layout example",
+)
+
+# (uwh11) AC-1/AC-8 — docs/plan-sketches.md § Sketch quality bar carries the
+# ui-wireframe HTML requirements sub-section (mirrors the existing api-contract
+# quality-bar pattern below, M2.3), including the script-free/network-free clause.
+_S82UWH_QBAR_START = "ui-wireframe sketch — HTML quality requirements:"
+_S82UWH_QBAR_STOP = ("\n---\n", "\n## 4.")
+_s82uwh_qbar = _slice_section(_s82_docs_sketches, _S82UWH_QBAR_START, _S82UWH_QBAR_STOP)
+check(
+    "suite82(uwh11-docs-quality-bar-html): docs/plan-sketches.md § Sketch quality bar"
+    " documents the four ui-wireframe HTML requirements",
+    bool(_s82uwh_qbar)
+    and "Semantic structure" in _s82uwh_qbar
+    and "Fixed stylesheet" in _s82uwh_qbar
+    and "Script-free and network-free" in _s82uwh_qbar
+    and "States + legend" in _s82uwh_qbar,
+    "docs/plan-sketches.md § Sketch quality bar must contain a"
+    " 'ui-wireframe sketch — HTML quality requirements:' sub-section covering"
+    " semantic structure, fixed stylesheet, script-free/network-free, and"
+    " mandatory states+legend — anchor not found or a requirement is missing",
+)
+
+# (uwh12) AC-3 — hooks/sketch-guard.sh Step 6 comment no longer implies a
+# markdown-specific heading check (the real heuristic is size >= 4 bytes)
+check(
+    "suite82(uwh12-guard-comment-no-heading-claim): hooks/sketch-guard.sh Step 6"
+    " comment does not claim a heading-specific check",
+    "must be non-empty" in _s82_sketch_guard
+    and "have a heading" not in _s82_sketch_guard,
+    "hooks/sketch-guard.sh Step 6 comment must say 'must be non-empty' and must"
+    " NOT claim a markdown-heading-specific check — the real heuristic is a byte"
+    " size threshold, which works unchanged for the HTML sketch",
+)
+
+# (uwh13) AC-9 — changelog.d/ fragment exists for this migration
+_S82UWH_CHANGELOG_FRAGMENT = REPO_ROOT / "changelog.d" / "feat-sketch-ui-wireframe-html.md"
+_s82uwh_changelog_fragment_text = (
+    read(_S82UWH_CHANGELOG_FRAGMENT) if _S82UWH_CHANGELOG_FRAGMENT.exists() else ""
+)
+check(
+    "suite82(uwh13-changelog-fragment): changelog.d/feat-sketch-ui-wireframe-html.md"
+    " exists with a ### Changed entry",
+    _S82UWH_CHANGELOG_FRAGMENT.exists() and "### Changed" in _s82uwh_changelog_fragment_text,
+    "changelog.d/feat-sketch-ui-wireframe-html.md must exist and contain a"
+    " ### Changed entry describing the sketch contract migration (version bump"
+    " itself is deferred to /th:release — this check only guards the fragment)",
+)
+
+# (uwh14) AC-9 — docs/knowledge.md carries a [decision] bullet for this migration
+# using the new filename (the repo-wide AC-6 scan in j1 already guards docs/
+# against the retired literal; this check confirms the positive form is present)
+_s82uwh_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
+check(
+    "suite82(uwh14-knowledge-decision-bullet): docs/knowledge.md [decision] bullet"
+    " names sketches/ui-wireframe.html",
+    "[decision]" in _s82uwh_knowledge and "sketches/ui-wireframe.html" in _s82uwh_knowledge,
+    "docs/knowledge.md must contain a [decision] bullet documenting the"
+    " sketches/ui-wireframe.html contract migration",
 )
 
 # ---------------------------------------------------------------------------

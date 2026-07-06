@@ -838,14 +838,14 @@ Mirror the same eight values so the human sees them at STAGE-GATE-1 and the plan
 
 ### Step 2 — Produce the required sketch files
 
-Use the trigger table below to determine which `sketches/{type}.md` files to create in `workspaces/{feature-name}/sketches/`. Create ONLY the triggered files; if no boolean is true, no conditional sketch files are produced (valid outcome).
+Use the trigger table below to determine which `sketches/{type}` files to create in `workspaces/{feature-name}/sketches/`. Create ONLY the triggered files; if no boolean is true, no conditional sketch files are produced (valid outcome).
 
 **Trigger table (agent-readable):**
 
 | Boolean | Required sketch file | Format |
 |---------|---------------------|--------|
 | `touches_http_api: true` | `sketches/api-contract.md` | `METHOD /path` header + JSON request/response body examples + optional field-notes table |
-| `touches_ui: true` | `sketches/ui-wireframe.md` | ASCII layout + component legend + states, monospace fenced block |
+| `touches_ui: true` | `sketches/ui-wireframe.html` | semantic HTML + fixed wireframe stylesheet embedded |
 | `touches_data_model: true` | `sketches/data-model.md` | Mermaid `erDiagram` (touched tables only), inline fenced block |
 | `touches_cli: true` | `sketches/cli-surface.md` | command/flag table + example invocations, markdown table |
 | `touches_public_lib_api: true` | `sketches/public-api.md` | changed signatures + one usage example, fenced code block |
@@ -909,27 +909,83 @@ Use these as starting points; fill in the actual content from the design:
 - {justify any action/RPC-style endpoint here if used}
 ```
 
-**`sketches/ui-wireframe.md`**
-```markdown
-# UI Wireframe Sketch — {feature-name}
+**`sketches/ui-wireframe.html`**
 
-## Layout
+**Quality bar (ui-wireframe):** the sketch is a standalone, self-contained HTML file — NOT a template for the fixed stylesheet, which must be embedded verbatim (no `<script>`, no reference to any external resource: CDN, remote image, remote stylesheet). Semantic HTML only (`<h1>`/`<h2>`, `<table>`, meaningful class names, not `<div>` soup). A component legend table and a states table (loading/empty/error, plus any domain-specific state) are mandatory in every ui-wireframe sketch. (Canonical: `docs/plan-sketches.md §3 → Sketch quality bar`.)
 
-```
-+----------------------------------+
-| {Component}                      |
-|  [ field label ]  [_________]    |
-|  [ button ]                      |
-+----------------------------------+
-```
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Wireframe — {feature-name}</title>
+<style>
+  /* Fixed wireframe stylesheet — do not restyle; layout only, no product polish */
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; margin: 24px auto; max-width: 860px; padding: 0 16px; }
+  h1 { font-size: 18px; } h2 { font-size: 15px; margin-top: 32px; }
+  .frame { border: 1px solid #888; border-radius: 6px; overflow: hidden; font-size: 13px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+         padding: 10px 14px; border-bottom: 1px solid #888; flex-wrap: wrap; }
+  .bar.header { background: rgba(128,128,128,.18); }
+  .chip { border: 1px dashed #888; padding: 2px 8px; }
+  .control { border: 1px solid #888; padding: 3px 10px; border-radius: 4px; }
+  .control.primary { background: rgba(128,128,128,.25); }
+  .control.grow { flex: 1; min-width: 140px; color: #888; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 10px; }
+  th { background: rgba(128,128,128,.12); border-bottom: 1px solid #888; }
+  .num { text-align: right; } .ctr { text-align: center; }
+  .footer { text-align: center; padding: 8px; border-top: 1px solid #888; }
+  .modal { border: 2px solid #888; border-radius: 8px; max-width: 420px; margin: 8px auto;
+           font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .modal .body { padding: 10px 14px; line-height: 1.8; }
+  .modal .actions { text-align: right; padding: 8px 14px; border-top: 1px solid #888; }
+  .legend th, .legend td { border: 1px solid #888; }
+  .note { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
 
-## Component Legend
-| Component | Description | States |
-|-----------|-------------|--------|
-| {name}    | {what}      | default, loading, error |
+<h1>UI Wireframe — {feature-name}</h1>
 
-## Interaction Notes
-- {keyboard nav, focus order, empty state behavior}
+<h2>Layout</h2>
+<div class="frame">
+  <div class="bar header">
+    <span><span class="chip">Logo</span> <strong>{Component}</strong></span>
+    <span class="chip">User menu ▾</span>
+  </div>
+  <div class="bar">
+    <span class="control">{filter} ▾</span>
+    <span class="control grow">Search…</span>
+    <span class="control primary">Apply</span>
+  </div>
+  <table>
+    <tr><th>{col-1}</th><th>{col-2}</th><th class="num">{col-3}</th><th class="ctr">Actions</th></tr>
+    <tr><td>{value}</td><td>{value}</td><td class="num">{value}</td><td class="ctr"><span class="control">View</span></td></tr>
+  </table>
+  <div class="footer">
+    <span class="control">&lt; Prev</span> &nbsp; Page 1 of N &nbsp; <span class="control">Next &gt;</span>
+  </div>
+</div>
+
+<h2>Component legend</h2>
+<table class="legend">
+  <tr><th>Component</th><th>Description</th></tr>
+  <tr><td>{name}</td><td>{what it does}</td></tr>
+</table>
+
+<h2>States</h2>
+<table class="legend">
+  <tr><th>State</th><th>Behavior</th></tr>
+  <tr><td>Loading</td><td>{skeleton/disabled behavior}</td></tr>
+  <tr><td>Empty</td><td>{empty-state copy + CTA}</td></tr>
+  <tr><td>Error</td><td>{inline error + retry}</td></tr>
+</table>
+
+</body>
+</html>
 ```
 
 **`sketches/data-model.md`**
@@ -1063,11 +1119,11 @@ sequenceDiagram
 ```
 
 **Multi-project layout note:** In a multi-project initiative the sketch files for each project are written into a shared `{overview_root}/sketches/` folder with a project prefix:
-- Per-project conditional sketches: `{overview_root}/sketches/{project}-{name}.md`
+- Per-project conditional sketches: `{overview_root}/sketches/{project}-{name}`
   (example: `sketches/payment-gateway-api-contract.md`)
 - Shared service-interaction sketch: `{overview_root}/sketches/service-interaction.md` (un-prefixed — it belongs to no single project)
 
-In a single-project workspace, all sketches live under `sketches/{type}.md` in the workspace root (e.g., `workspaces/{feature}/sketches/api-contract.md`).
+In a single-project workspace, all sketches live under `sketches/{type}` in the workspace root (e.g., `workspaces/{feature}/sketches/api-contract.md`).
 
 ---
 

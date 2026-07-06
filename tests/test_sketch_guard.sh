@@ -186,7 +186,7 @@ make_state "$TMP8" "## Current State
 - destructive: false"
 OUT8=$(run_guard "$TMP8")
 assert_verdict "ui=true, sketch missing: concerns" "$OUT8" "concerns"
-assert_contains "ui wireframe missing in concerns" "$OUT8" "ui-wireframe.md"
+assert_contains "ui wireframe missing in concerns" "$OUT8" "ui-wireframe.html"
 rm -rf "$TMP8"
 
 # --- Case 9: touches_data_model=true + destructive=true, BOTH sketches needed ---
@@ -272,7 +272,7 @@ make_state "$TMP13" "## Current State
 - destructive: true"
 mkdir -p "$TMP13/sketches"
 echo "# API" > "$TMP13/sketches/api-contract.md"
-echo "# UI" > "$TMP13/sketches/ui-wireframe.md"
+echo "<h1>UI</h1>" > "$TMP13/sketches/ui-wireframe.html"
 echo "# Data Model" > "$TMP13/sketches/data-model.md"
 echo "# CLI" > "$TMP13/sketches/cli-surface.md"
 echo "# Public API" > "$TMP13/sketches/public-api.md"
