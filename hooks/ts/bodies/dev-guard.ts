@@ -86,7 +86,7 @@ export interface DevGuardReader {
    *  integrity of what "origin" points to is a model assumption; remote-
    *  mutating commands (git remote set-url|add|rename|set-head) are not in
    *  this gate's covered set and remain prompted through the normal
-   *  permission flow. The `set-head` case (NB-8): a stale or spoofed
+   *  permission flow. The `set-head` case: a stale or spoofed
    *  `origin/HEAD` can also mislead Step 6's default-branch resolution — see
    *  docs/permission-provisioning.md § Documented residuals for the accepted
    *  residual and its scope (non-standard-default repos only; the
@@ -222,12 +222,12 @@ const PLAIN_BRANCH_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
 const REF_NAMESPACE_WORDS = new Set(["refs", "heads", "tags", "remotes"]);
 
 // Step 6 — the ask-FLOOR: checked case-insensitively, and NEVER a permissive
-// fallback. Contrast with round 1's `DEFAULT_BRANCH_NAMES`, which doubled as
-// a fallback allowlist when the dynamic default failed to resolve — that
-// fallback is exactly what let a non-standard default (`develop`) leak an
-// `allow` when `origin/HEAD` was absent locally (NB-3). Under this design, an
-// unresolvable dynamic default is unconditionally `ask` (see
-// evaluateDestinationBranch) — this floor only ever narrows toward `ask`.
+// fallback. An earlier design used this set as a fallback allowlist when the
+// dynamic default failed to resolve — that fallback is exactly what let a
+// non-standard default (`develop`) leak an `allow` when `origin/HEAD` was
+// absent locally. Under this design, an unresolvable dynamic default is
+// unconditionally `ask` (see evaluateDestinationBranch) — this floor only
+// ever narrows toward `ask`.
 const DEFAULT_BRANCH_FLOOR = new Set(["main", "master"]);
 
 const GATE_DOC_POINTER = "see docs/dev-mode.md § Outward-Action Gate";
@@ -273,7 +273,7 @@ function isPlainBranchDestination(dst: string): boolean {
 // Step 6 — default-branch resolution, fail-closed. The static floor is
 // checked first (case-insensitive, never bypassable); an `allow` requires
 // the reader to POSITIVELY resolve the real default AND the destination to
-// differ from it — that comparison is ALSO case-insensitive (NB-7), so a
+// differ from it — that comparison is ALSO case-insensitive, so a
 // case-insensitive remote/filesystem can never collapse a differently-cased
 // spelling of the resolved default into an `allow`. An unresolvable default
 // is never treated as license to allow a name simply because it isn't

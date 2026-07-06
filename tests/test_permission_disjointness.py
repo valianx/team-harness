@@ -11,7 +11,7 @@ a tool call is granted WITHOUT invoking any hook for that call, so an offered
 allow-rule that happens to be a prefix of an outward-action command silently
 defeats `dev-guard`'s `ask`/`deny` for that command.
 
-Catalogue-driven, not example-driven (Task-3 AC-8 / T3-AC-NEW-b):
+Catalogue-driven, not example-driven:
 
   (a) the outward-action catalogue is DERIVED from the live regex constants in
       `hooks/ts/bodies/dev-guard.ts` (every `*_RE` declaration), not a
@@ -122,7 +122,7 @@ check(
 
 # One or more real-world command/token samples per regex constant found in
 # dev-guard.ts. Every name discovered above MUST have an entry here — this is
-# the coupling floor (T3-AC-NEW-b point 4): a new dev-guard.ts pattern with no
+# the coupling floor: a new dev-guard.ts pattern with no
 # registered sample fails check "suite147(coupling)" below rather than being
 # silently invisible to the disjointness assertion.
 OUTWARD_SAMPLES: dict[str, list[str]] = {
@@ -301,7 +301,7 @@ check(
 
 # ---------------------------------------------------------------------------
 # (e) `gh api` (every form) must never appear in the offered set — the
-# governing exclusion this whole invariant exists to enforce (Task-3 AC-7).
+# governing exclusion this whole invariant exists to enforce.
 # ---------------------------------------------------------------------------
 gh_api_hits = [p for p in offered_prefixes if p == "gh api" or p.startswith("gh api ")]
 check(

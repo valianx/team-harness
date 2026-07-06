@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Conditional-noop gate (WI-5, R2 mitigation) — NOT a `paths-ignore`
+      # Conditional-noop gate — NOT a `paths-ignore`
       # trigger filter. A `paths-ignore` on the job/workflow trigger would
       # leave this required check permanently "pending" for a diff that
       # matches it, blocking merge. Instead the job always runs (satisfying

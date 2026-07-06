@@ -1508,7 +1508,7 @@ assert_nodecision "NEW-6: non-existent cwd → skipped, no deny (fail-open)"
 assert_stderr_contains "NEW-6: non-existent-dir warning in stderr" "does not exist"
 
 # ---------------------------------------------------------------------------
-# Suite 19: release-cut marker/trailer recognition (WI-5, Task-4)
+# Suite 19: release-cut marker/trailer recognition
 #
 # A feature branch (non-release/vX.Y.Z) carrying a version.d/.release-cut
 # marker (or a release-cut: commit trailer) is routed to the SAME
@@ -1517,14 +1517,14 @@ assert_stderr_contains "NEW-6: non-existent-dir warning in stderr" "does not exi
 # ---------------------------------------------------------------------------
 
 echo
-echo "=== Suite 19: release-cut marker/trailer recognition (WI-5) ==="
+echo "=== Suite 19: release-cut marker/trailer recognition ==="
 
 # ---------------------------------------------------------------------------
-# T4-AC-1: feature branch + marker (v2.107.1) + all-three sites bumped+matching
+# feature branch + marker (v2.107.1) + all-three sites bumped+matching
 # → nodecision (release-path applied, not denied)
 # ---------------------------------------------------------------------------
 echo
-echo "--- T4-AC-1: feature branch + marker + all-three bumped+matching → nodecision ---"
+echo "--- feature branch + marker + all-three bumped+matching → nodecision ---"
 
 _bare_m1=$(_new_tmp)
 _clone_m1=$(_new_tmp)
@@ -1558,13 +1558,13 @@ git clone "$_bare_m1" "$_clone_m1" -q 2>/dev/null
 )
 
 _run_hook "$_clone_m1"
-assert_nodecision "T4-AC-1: feature branch + marker + all-three bumped+matching → nodecision (release-path applied)"
+assert_nodecision "feature branch + marker + all-three bumped+matching → nodecision (release-path applied)"
 
 # ---------------------------------------------------------------------------
-# T4-AC-2: feature branch + marker + a version site left stale → DENY
+# feature branch + marker + a version site left stale → DENY
 # ---------------------------------------------------------------------------
 echo
-echo "--- T4-AC-2: feature branch + marker + marketplace.json/CLAUDE.md stale → DENY ---"
+echo "--- feature branch + marker + marketplace.json/CLAUDE.md stale → DENY ---"
 
 _bare_m2=$(_new_tmp)
 _clone_m2=$(_new_tmp)
@@ -1596,15 +1596,15 @@ git clone "$_bare_m2" "$_clone_m2" -q 2>/dev/null
 )
 
 _run_hook "$_clone_m2"
-assert_deny "T4-AC-2: feature branch + marker + missing site (marketplace.json/CLAUDE.md stale) → deny"
+assert_deny "feature branch + marker + missing site (marketplace.json/CLAUDE.md stale) → deny"
 
 # ---------------------------------------------------------------------------
-# T4-AC-3: feature branch + NO marker + stray all-three-site bump → DENY
+# feature branch + NO marker + stray all-three-site bump → DENY
 # (confirms the marker-recognition branch is not accidentally reached without
 # the marker; behavior is unchanged from the pre-existing feature path)
 # ---------------------------------------------------------------------------
 echo
-echo "--- T4-AC-3: feature branch + NO marker + stray bump → DENY (feature-path unchanged) ---"
+echo "--- feature branch + NO marker + stray bump → DENY (feature-path unchanged) ---"
 
 _bare_m3=$(_new_tmp)
 _clone_m3=$(_new_tmp)
@@ -1636,16 +1636,16 @@ git clone "$_bare_m3" "$_clone_m3" -q 2>/dev/null
 )
 
 _run_hook "$_clone_m3"
-assert_deny "T4-AC-3: feature branch + no marker + stray bump → deny (single-bump invariant, feature-path unchanged)"
+assert_deny "feature branch + no marker + stray bump → deny (single-bump invariant, feature-path unchanged)"
 
 # ---------------------------------------------------------------------------
-# T4-AC-9: feature branch + marker present but NOT strict SemVer → DENY
+# feature branch + marker present but NOT strict SemVer → DENY
 # (never falls to feature-path, never skips the version-match checks — even
 # though all three sites are bumped and matching, a well-formed release-path
 # push from this same diff would otherwise be nodecision)
 # ---------------------------------------------------------------------------
 echo
-echo "--- T4-AC-9: feature branch + non-semver marker content → DENY ---"
+echo "--- feature branch + non-semver marker content → DENY ---"
 
 _bare_m4=$(_new_tmp)
 _clone_m4=$(_new_tmp)
@@ -1679,15 +1679,15 @@ git clone "$_bare_m4" "$_clone_m4" -q 2>/dev/null
 )
 
 _run_hook "$_clone_m4"
-assert_deny "T4-AC-9: feature branch + non-semver marker → deny (malformed signal never authorizes allow)"
-assert_deny_reason_contains "T4-AC-9: deny reason names the strict-SemVer requirement" "does not parse as strict SemVer"
+assert_deny "feature branch + non-semver marker → deny (malformed signal never authorizes allow)"
+assert_deny_reason_contains "deny reason names the strict-SemVer requirement" "does not parse as strict SemVer"
 
 # ---------------------------------------------------------------------------
-# T4-AC-1 (trailer variant): feature branch + release-cut: trailer (SECONDARY
+# (trailer variant): feature branch + release-cut: trailer (SECONDARY
 # signal, no marker file) + all-three bumped+matching → nodecision
 # ---------------------------------------------------------------------------
 echo
-echo "--- T4-AC-1 (trailer variant): feature branch + release-cut: trailer, no marker file → nodecision ---"
+echo "--- (trailer variant): feature branch + release-cut: trailer, no marker file → nodecision ---"
 
 _bare_m5=$(_new_tmp)
 _clone_m5=$(_new_tmp)
@@ -1727,7 +1727,7 @@ _tmperr_m5=$(mktemp)
 _HOOK_STDOUT=$(cat "$_tmpout_m5")
 _HOOK_STDERR=$(cat "$_tmperr_m5")
 rm -f "$_tmpout_m5" "$_tmperr_m5"
-assert_nodecision "T4-AC-1 trailer variant: feature branch + release-cut: trailer (no marker file) → nodecision"
+assert_nodecision "trailer variant: feature branch + release-cut: trailer (no marker file) → nodecision"
 
 # ---------------------------------------------------------------------------
 # Summary

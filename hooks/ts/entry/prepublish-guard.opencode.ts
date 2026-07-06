@@ -12,7 +12,7 @@
 // — it does NOT depend on the config path. Only the prepublish_check key read
 // is moved to the opencode config root.
 //
-// Release-cut marker/trailer recognition (WI-5) lives entirely in the body —
+// Release-cut marker/trailer recognition lives entirely in the body —
 // it reads the marker via the existing readFile/gitDiffNameStatus methods and
 // the trailer via the existing readEnv method, so this entry needs no new
 // PrepublishReader capability.

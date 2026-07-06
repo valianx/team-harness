@@ -1,6 +1,6 @@
 # Acceptance Matrix: th-friction-redesign
 
-45/45 AC PASS across 5 tasks. Full per-AC evidence (file:line) in `reviews/04-validation.md`; security/adversary detail in `reviews/05-security-verify.md` and `reviews/06-adversary.md`; acceptance-audit (drift check) in `reviews/07-acceptance-check.md`.
+45/45 AC PASS across 5 tasks. Per-AC evidence (file:line) is in the Test / QA evidence columns below.
 
 ## Task-1 — dev-guard branch-aware push gating + PR-create autogate opt-in (16 AC)
 
@@ -60,7 +60,7 @@
 | AC-6 | Conditional-noop gate, not `paths-ignore` | structural PASS | `test.yml:25-87` PASS | clean |
 | AC-7 | cost-and-caching.md + CLAUDE.md §6.3 reflect opt-in path | structural PASS | PASS | clean |
 | AC-8 | Bootstrap case documented (this build uses deferred cut) | structural PASS | PASS | clean |
-| AC-9 | Non-semver marker → deny | `test_prepublish_bump_floor.sh` (T4-AC-9) PASS | PASS | clean |
+| AC-9 | Non-semver marker → deny | `test_prepublish_bump_floor.sh` PASS | PASS | clean |
 | AC-10 | Fail-open on CLAUDE.md §3 documented, unchanged | structural PASS | `prepublish-guard.ts:407-408` PASS | clean |
 
 ## Task-5 — multi-site dev-guard contract reconciliation (4 AC)
@@ -74,5 +74,5 @@
 
 ## Residuals (accepted, not blocking)
 
-- **NB-8** — `origin/HEAD` staleness/spoofing for non-standard default branches: operator-accepted (Option A); recovery documented as `git remote set-head origin -a`; `main`/`master` unaffected (static floor).
+- `origin/HEAD` staleness/spoofing for non-standard default branches: operator-accepted; recovery documented as `git remote set-head origin -a`; `main`/`master` unaffected (static floor).
 - **suite82(uwh13)** — pre-existing stale check for a consumed `changelog.d/` fragment; resolved in this delivery run (see delivery summary) by re-anchoring the check to the released `CHANGELOG.md [2.125.1]` section instead of the (by-design, already-deleted) fragment file.

@@ -201,7 +201,7 @@ assert_nodecision "F015-6: C:\\src\\app.py (non-sensitive backslash) -> nodecisi
 # compound command certifies only the clause the recognizer happens to
 # inspect while an `allow` decision authorizes the WHOLE Bash tool call, so
 # ANY shell chaining/control operator anywhere in the command forces `ask`
-# regardless of how safe the push clause itself looks (SEC-V-01 closure).
+# regardless of how safe the push clause itself looks.
 # ============================================================================
 echo
 echo "############################################################"

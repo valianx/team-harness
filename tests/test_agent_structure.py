@@ -33129,7 +33129,7 @@ check(
 # allowlist class (inert Bash commands + prefix-safe gh read verbs + gh auth
 # switch + mcp__memory__*) documented in docs/permission-provisioning.md §
 # "Read-only allowlist — disjointness invariant" is reproduced IDENTICALLY at
-# both provisioning sites (multi-site invariant (c), Task-3 AC-5) — a literal
+# both provisioning sites (multi-site invariant (c)) — a literal
 # substring cross-check, mirroring how Suite 142 pins the Edit/Write/
 # additionalDirectories triad at the same two sites. Also pins the AC-3/AC-7
 # exclusions (no effective git verb, no form of `gh api`) and the mechanical
@@ -33225,7 +33225,7 @@ check(
     "read-only allowlist rules",
 )
 
-# --- AC-7 / SEC-DR-03 closure: no form of 'gh api' at any of the three sites ---
+# --- no form of 'gh api' at any of the three sites ---
 _S148_GH_API_FORMS = ("Bash(gh api:*)", "Bash(gh api graphql:*)", "Bash(gh api /repos")
 _s148_gh_api_hits = {
     "doc": [f for f in _S148_GH_API_FORMS if f in _s148_offered],
@@ -33348,12 +33348,12 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 149 — dev-guard-contract-reconciliation (Task-5, th-friction-redesign)
+# Suite 149 — dev-guard-contract-reconciliation
 #
-# WI-1 (Task-1) changed the dev-guard DECISION for `git push`: a single
+# The dev-guard DECISION for `git push` changed: a single
 # recognized refspec targeting a non-default branch on `origin` now resolves
 # to `allow` instead of a blanket `ask`. This suite pins, at every site of
-# the Multi-site (a) table in `01-plan.md`, that (1) the refined
+# the Multi-site (a) table in `docs/specs/th-friction-redesign.md`, that (1) the refined
 # destination-aware statement is present, (2) the OLD blanket-ask phrasing
 # that site used to carry is gone, and (3) the "fires unconditionally"
 # invariant (the hook still evaluates every covered action, every time — only
@@ -33509,11 +33509,10 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Suite 150 — batched-graphql-review-disposition (Task-2, th-friction-redesign)
+# Suite 150 — batched-graphql-review-disposition
 #
 # Structural coverage for the "Tier B — batched review disposition (aliased
-# mutation)" section added to agents/_shared/gh-fallback.md (T2-G1 closure —
-# the adversary/tester both confirmed Task-2's 7 AC had zero test coverage).
+# mutation)" section added to agents/_shared/gh-fallback.md.
 # Pins the section's five load-bearing properties: fixed-template integer-
 # indexed aliases, variables-only data binding (CWE-78, -F reserved for
 # numeric/boolean only), the payload-preview mandate before the gated call,

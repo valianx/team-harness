@@ -69,7 +69,7 @@ const FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
 const MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
 const CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
 
-// Release-cut marker (WI-5, single-PR release path) — decouples the release
+// Release-cut marker (single-PR release path) — decouples the release
 // path from the `release/vX.Y.Z` branch-name convention. PRIMARY signal: an
 // in-tree file at this fixed path, its presence in THIS push's diff (not mere
 // existence at HEAD) is what triggers recognition — this keeps the marker
@@ -215,7 +215,7 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
 }
 
 // ---------------------------------------------------------------------------
-// Release-cut recognition (WI-5) — a feature branch carrying a well-formed
+// Release-cut recognition — a feature branch carrying a well-formed
 // marker or trailer is routed to the release-path check below. This is a
 // recognition-only helper: the governing rule that a recognized-but-malformed
 // signal must DENY (never fall through to the feature path, never skip the
@@ -223,7 +223,7 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
 // the marker routes into the SAME runReleasePath as a release/vX.Y.Z branch,
 // the three-site invariant it enforces is preserved as-is — including its
 // pre-existing fail-open on CLAUDE.md §3 parse (see the "Third site" comment
-// in runReleasePath below), unchanged from today (SEC-DR-06 / T4-AC-10).
+// in runReleasePath below), unchanged from today.
 // ---------------------------------------------------------------------------
 
 interface ReleaseCutSignal {
@@ -514,12 +514,12 @@ function runVersionBumpCheck(reader: PrepublishReader): NormalizedDecision | nul
     return runReleasePath(reader, changed, branch.version, sites);
   }
 
-  // WI-5: a feature branch carrying a release-cut marker/trailer is routed to
+  // A feature branch carrying a release-cut marker/trailer is routed to
   // the release-path check instead of the feature-path check. Governing
   // principle: the marker authorizes RUNNING the release-path check — it
   // never bypasses it. A recognized-but-malformed signal DENIES outright and
   // never falls through to the feature path or skips the version-match
-  // checks (SEC-DR-06 / T4-AC-9).
+  // checks.
   const releaseCut = resolveReleaseCut(reader, changed);
   if (releaseCut) {
     if (releaseCut.malformed) {

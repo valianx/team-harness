@@ -1064,7 +1064,7 @@ worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-presen
 
 When either condition is false, this step is a no-op — log `release_tag: skipped: not-release-mode` or `release_tag: skipped: pr-not-merged` and continue.
 
-**Verify-only (tag-sync.yml is the single idempotent tag authority — WI-5).** `.github/workflows/tag-sync.yml` fires on every push to `main` that changes `.claude-plugin/plugin.json`; it checks `git ls-remote --tags` first (idempotent — a pre-existing tag is a no-op) and creates + pushes the `v{X.Y.Z}` tag itself, then dispatches `release.yml`. This step therefore VERIFIES the tag landed rather than creating it:
+**Verify-only (tag-sync.yml is the single idempotent tag authority).** `.github/workflows/tag-sync.yml` fires on every push to `main` that changes `.claude-plugin/plugin.json`; it checks `git ls-remote --tags` first (idempotent — a pre-existing tag is a no-op) and creates + pushes the `v{X.Y.Z}` tag itself, then dispatches `release.yml`. This step therefore VERIFIES the tag landed rather than creating it:
 
 ```bash
 git ls-remote --tags origin "refs/tags/v{X.Y.Z}"
