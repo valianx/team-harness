@@ -11,6 +11,11 @@
 // IMPORTANT: Check 1 (version-bump floor) is config-independent and fail-closed
 // — it does NOT depend on the config path. Only the prepublish_check key read
 // is moved to the opencode config root.
+//
+// Release-cut marker/trailer recognition (WI-5) lives entirely in the body —
+// it reads the marker via the existing readFile/gitDiffNameStatus methods and
+// the trailer via the existing readEnv method, so this entry needs no new
+// PrepublishReader capability.
 
 import * as fs from "node:fs";
 import * as path from "node:path";

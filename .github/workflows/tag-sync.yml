@@ -1,10 +1,12 @@
 name: Tag Sync
 
-# Deterministic backstop for the manual "create and push the release tag"
-# step (see skills/release/SKILL.md and agents/delivery.md release-mode).
-# Runs whenever a release PR merges the version bump to main so the
-# opencode-side artifact pipeline (release.yml) never depends solely on a
-# human remembering to push the tag.
+# The single, deterministic, idempotent tag authority (see
+# skills/release/SKILL.md Step 3 and agents/delivery.md Step 11.4c, both of
+# which VERIFY the tag this workflow creates rather than pushing it
+# themselves). Runs whenever a version bump merges to main — from either the
+# batch release/vX.Y.Z path or the single-PR inline-release path (WI-5) — so
+# the opencode-side artifact pipeline (release.yml) never depends on a human
+# remembering to push the tag. Trigger/logic unchanged by WI-5.
 on:
   push:
     branches: [main]

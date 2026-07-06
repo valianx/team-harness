@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut a plugin release — aggregate pending changelog.d/ fragments and version.d/ markers, derive the bump level, bump all three version sites once, and push a release/vX.Y.Z branch.
+description: Cut a plugin release — aggregate pending changelog.d/ fragments and version.d/ markers, derive the bump level, bump all three version sites once, and push a release/vX.Y.Z branch. `--with <feature-branch>` folds the same cut into that feature branch's own PR instead (single-PR release path).
 ---
 
 Analyze the input: $ARGUMENTS
@@ -18,6 +18,8 @@ Analyze the input: $ARGUMENTS
 3. **Release cut** — routes through the orchestrator into delivery `release-mode`, which bumps all three synchronized version sites once, assembles `changelog.d/` fragments into the versioned CHANGELOG section, empties `version.d/`, tags, and pushes a `release/vX.Y.Z` branch.
 
 **Urgent single-PR override:** to release immediately after an urgent/security merge without waiting to batch other pending work, run `/th:release` right after the merge. The release step aggregates all pending fragments including the just-merged one.
+
+**Inline-release mode (`--with <feature-branch>`):** folds the same three-site bump + `changelog.d/` assembly into a feature branch's OWN pull request instead of opening a second `release/vX.Y.Z` PR — one PR, one CI run, one review/merge cycle. See § "Mode — Inline release" below. The no-flag batch mode above is unchanged and remains the right choice when several PRs have accumulated pending work between releases.
 
 ---
 
@@ -106,9 +108,15 @@ The orchestrator routes to the `delivery` agent in `release-mode`, which:
 
 ---
 
-## Step 3 — Create and push the release tag (post-merge)
+## Step 3 — Verify the release tag (post-merge)
 
-Once the operator merges the `release/v{X.Y.Z}` PR into `main`, create and push the release tag:
+**Degraded to verify-only.** `.github/workflows/tag-sync.yml` is the single, deterministic, idempotent tag authority: it fires on every `push: main` that changes `.claude-plugin/plugin.json`, checks `git ls-remote --tags` first, and creates + pushes `v{X.Y.Z}` itself (a no-op if the tag already exists). A manual push here was redundant with that workflow and could race it. This step therefore verifies the tag landed rather than creating it:
+
+```bash
+git ls-remote --tags origin "refs/tags/v{X.Y.Z}"
+```
+
+If the tag is present, the release cut is complete — no further action. If it is absent after a short wait (`tag-sync.yml` typically completes within a minute of the merge), fall back to the manual create-and-push as a safety net — this remains an outward action gated by `hooks/dev-guard.sh` like any other push and requires operator approval:
 
 ```bash
 git checkout main
@@ -117,9 +125,7 @@ git tag v{X.Y.Z}
 git push origin v{X.Y.Z}
 ```
 
-The `git push` above is an outward action — it is gated by `hooks/dev-guard.sh` like any other push and requires operator approval. `.github/workflows/tag-sync.yml` also watches `main` for changes to `.claude-plugin/plugin.json` and pushes the same tag on its own if this step is skipped, so a forgotten manual tag no longer silently strands the opencode artifact pipeline — but do not rely on the workflow as a substitute for this step; push the tag as part of closing out the release.
-
-Pushing the tag is what feeds the opencode release pipeline: `.github/workflows/release.yml` triggers on `push: tags: ["v*"]` and cross-compiles the install binaries, writes the `VERSION` asset, and publishes the GitHub Release that `bin/update-opencode.sh` checks against.
+Pushing the tag (whether by `tag-sync.yml` or the manual fallback) is what feeds the opencode release pipeline: `.github/workflows/release.yml` triggers on `push: tags: ["v*"]` and cross-compiles the install binaries, writes the `VERSION` asset, and publishes the GitHub Release that `bin/update-opencode.sh` checks against.
 
 ---
 
@@ -188,12 +194,59 @@ When `$ARGUMENTS` is empty, proceed directly to Step 1 (discovery). No feature n
 
 ---
 
+## Mode — Inline release (`--with <feature-branch>`)
+
+Folds the release cut into an already-open feature branch's own pull request instead of opening a second `release/vX.Y.Z` PR. Use this when a single feature PR should ship as its own release (no other pending work needs batching) — one PR, one CI run, one review/merge cycle. This decouples the release path from the `release/vX.Y.Z` branch-name convention via an in-tree marker; see `hooks/ts/bodies/prepublish-guard.ts` § release-cut recognition.
+
+Parse `$ARGUMENTS` for `--with <feature-branch>`. If the named branch does not exist locally or on `origin`, abort and report the branch was not found — do not guess a substitute branch.
+
+**Step 1 (inline) — Read-only discovery.** Identical to Step 1a–1d above (list `changelog.d/` fragments and `version.d/` markers, derive the bump level and target version). The discovery summary additionally states the target branch and that no new branch will be created:
+
+```
+Release discovery (inline — feature branch {feature-branch}):
+  Current version:  {current}
+  ...(same fields as Step 1e)...
+
+The release will:
+  - Bump .claude-plugin/plugin.json, .claude-plugin/marketplace.json, and CLAUDE.md §3
+    from {current} → {X.Y.Z} ON {feature-branch} (no new branch)
+  - Assemble changelog.d/ fragments into CHANGELOG.md under ## [{X.Y.Z}] - {date}
+  - Write version.d/.release-cut = v{X.Y.Z} so prepublish-guard recognizes the release-path
+    on this feature branch
+  - Delete all changelog.d/ fragments and version.d/*.bump markers (the .release-cut marker
+    itself is not deleted — see agents/delivery.md Step 9-R-5)
+  - Fold all of the above into {feature-branch}'s existing (or about-to-open) PR — no second PR
+
+Confirm inline release? [Y/n]
+```
+
+Wait for operator reply; abort with no changes on `n`/`no`.
+
+**Step 2 (inline) — Route to orchestrator in inline-release mode.** Pass to the `orchestrator` agent:
+
+```
+Direct Mode Task:
+- Mode: deliver
+- Feature: {feature-branch's own feature name}
+- inline-release: true
+- target-version: {X.Y.Z}
+- Branch: {feature-branch}
+- Summary: Inline release v{X.Y.Z} on {feature-branch} — aggregate {N} changelog.d/ fragments and {M} version.d/ markers; bump level {major|minor|patch}
+```
+
+The orchestrator routes to `delivery` in `inline-release` mode (see `agents/delivery.md` Step 9's mode table), which bumps all three sites, assembles `changelog.d/`, writes the `version.d/.release-cut` marker, and continues the SAME feature PR through its normal STAGE-GATE-3 — no separate release branch, no second PR.
+
+**Step 3 (inline) — Verify the tag, same as batch mode.** Once the feature PR merges to `main`, the tag verification in Step 3 above applies unchanged (`tag-sync.yml` is the single tag authority regardless of which mode cut the release).
+
+---
+
 ## Important
 
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly.
-- The `release/vX.Y.Z` branch name is the release-PR discriminator used by `hooks/prepublish-guard.sh`. The guard requires all three version sites bumped and matching the branch version.
-- Do NOT skip the confirmation gate at Step 1e — the operator must confirm before any version change is made.
-- After the PR is merged to `main`, `claude plugin update` will serve the new version to all operators, and Step 3 above ships the tag that feeds the opencode artifact pipeline (`release.yml`).
+- Batch mode: the `release/vX.Y.Z` branch name is the release-PR discriminator used by `hooks/ts/bodies/prepublish-guard.ts`. Inline mode: the `version.d/.release-cut` marker (or a `release-cut: vX.Y.Z` commit trailer) is the discriminator instead — the branch name stays the feature branch's own name. Either path enforces the same three-site-bumped-and-matching invariant; the marker authorizes RUNNING that check on a feature branch, never bypassing it.
+- Do NOT skip the confirmation gate at Step 1e (batch mode) or its inline-mode equivalent — the operator must confirm before any version change is made.
+- After the PR is merged to `main`, `claude plugin update` will serve the new version to all operators, and Step 3 above verifies the tag that feeds the opencode artifact pipeline (`release.yml`).
 - Step 4 runs the download/apply legs for both local runtimes but never performs the activation itself — `/reload-plugins` (Claude Code) and restarting opencode stay operator-driven, and Step 4 never states that the new version is active before that happens.
 - Step 4's Claude Code leg does not sync the managed `~/.claude/CLAUDE.md` blocks; that recurring sync remains `/th:update`'s standalone contract (`skills/update/SKILL.md`), not duplicated here.
-- Output: `release/vX.Y.Z` branch, CHANGELOG.md updated, all three version sites bumped, `changelog.d/` emptied, `version.d/` emptied, PR opened, `vX.Y.Z` tag created and pushed post-merge, both local runtimes' download/apply legs run with a per-runtime report.
+- Output (batch mode): `release/vX.Y.Z` branch, CHANGELOG.md updated, all three version sites bumped, `changelog.d/` emptied, `version.d/*.bump` emptied, PR opened, `vX.Y.Z` tag verified (or created as fallback) post-merge, both local runtimes' download/apply legs run with a per-runtime report.
+- Output (inline mode): the named feature branch gains the same version-site bumps + CHANGELOG assembly + `version.d/.release-cut` marker, folded into its existing PR — no new branch, no second PR; tag verification is identical to batch mode.

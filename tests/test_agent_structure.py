@@ -30838,12 +30838,12 @@ _s132_delivery = read(AGENTS_DIR / "delivery.md")
 
 _S132_SKILL_STOPS = ("\n## ", "\n---\n")
 _s132_skill_slice = _slice_section(
-    _s132_skill, "## Step 3 — Create and push the release tag", _S132_SKILL_STOPS
+    _s132_skill, "## Step 3 — Verify the release tag (post-merge)", _S132_SKILL_STOPS
 )
 check(
     "s132(a1): skills/release/SKILL.md documents an explicit post-merge tag step",
     bool(_s132_skill_slice),
-    "'## Step 3 — Create and push the release tag' not found in skills/release/SKILL.md",
+    "'## Step 3 — Verify the release tag (post-merge)' not found in skills/release/SKILL.md",
 )
 check(
     "s132(a2): SKILL.md tag step includes 'git tag' and 'git push'",
@@ -30858,12 +30858,12 @@ check(
 
 _S132_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
 _s132_delivery_slice = _slice_section(
-    _s132_delivery, "### Step 11.4c — Release tag creation", _S132_DELIVERY_STOPS
+    _s132_delivery, "### Step 11.4c — Release tag verification", _S132_DELIVERY_STOPS
 )
 check(
     "s132(b1): agents/delivery.md documents the release tag step in its Return Protocol contract",
     bool(_s132_delivery_slice),
-    "'### Step 11.4c — Release tag creation' not found in agents/delivery.md",
+    "'### Step 11.4c — Release tag verification' not found in agents/delivery.md",
 )
 check(
     "s132(b2): delivery.md tag step is gated on release-mode and PR-merged",
