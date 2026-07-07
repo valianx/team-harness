@@ -16,7 +16,7 @@
 
 **External dependencies (required).**
 - **context7 API key** — for library docs retrieval. Get one at https://context7.com/ (the installer prompts for it or reads `CONTEXT7_API_KEY` from the environment).
-- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker, or a local container). The installer prompts for it (interactive TTY) or reads `MEMORY_MCP_URL` from the environment (non-interactive / CI). **No default URL** — empty input is rejected and missing env var exits the installer with an explicit error. The previous silent fallback was removed because it produced misleading "connection refused" diagnostics for operators whose actual MCP lived on a different host. Every install requires the operator to provide their URL explicitly. Example format only: `https://your-mcp.example.com/mcp` — substitute the actual host of your own deployment.
+- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker, or a local container). The installer prompts for it (interactive TTY) or reads `MEMORY_MCP_URL` from the environment (non-interactive / CI). **No default URL** — empty input is rejected and a missing env var exits the installer with an explicit error (rationale: `docs/knowledge.md`). Example format only: `https://your-mcp.example.com/mcp`.
 
 **External dependencies (recommended).**
 - `gh` — GitHub CLI. Enables full GitHub integration for `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/ — When absent or unauthenticated, skills use `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or fall back to operator-paste paths with `blocked-manual-push` status. See `agents/_shared/gh-fallback.md` for the degradation contract.
@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.125.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.126.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE` env var, `modes.go::lowCostMatrix`) transformed agent frontmatter for the retired Claude Code install path (see the Installer row above). Neither mode is wired into the opencode manifest engine (`install apply --runtime opencode`); the functions remain as unreferenced Go code, not a live capability. This — not matrix staleness — is why `cmd/install/` stays frozen for fleet model-allocation changes. See [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the historical tally.
 

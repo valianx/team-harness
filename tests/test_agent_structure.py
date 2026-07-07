@@ -20534,8 +20534,8 @@ check(
     f"researcher.md tools must include 'Write' and must NOT include 'Bash', 'Task', or 'Edit'; "
     f"got tools='{_s92_researcher_tools}'",
 )
-# Haiku model-pin assertions for the three newly-flipped agents.
-# These checks FAIL on v2.84.0 (all three read model:sonnet) and pass on v2.85.0.
+# Model-pin assertions: init stays on haiku; acceptance-checker and translator
+# were re-tiered to sonnet in PR #475 (commit 9453fb9).
 _s92_init_fm            = parse_frontmatter(read(AGENTS_DIR / "init.md"))
 _s92_acc_checker_fm     = parse_frontmatter(read(AGENTS_DIR / "acceptance-checker.md"))
 _s92_translator_fm      = parse_frontmatter(read(AGENTS_DIR / "translator.md"))
@@ -20545,16 +20545,17 @@ check(
     f"expected model=haiku for init, got '{_s92_init_fm.get('model', '')}'",
 )
 check(
-    "suite92(ac3-acceptance-checker-model-haiku): agents/acceptance-checker.md "
-    "frontmatter model is 'haiku'",
-    _s92_acc_checker_fm.get("model", "") == "haiku",
-    f"expected model=haiku for acceptance-checker, "
+    "suite92(ac3-acceptance-checker-model-sonnet): agents/acceptance-checker.md "
+    "frontmatter model is 'sonnet'",
+    _s92_acc_checker_fm.get("model", "") == "sonnet",
+    f"expected model=sonnet for acceptance-checker (PR #475 re-tier), "
     f"got '{_s92_acc_checker_fm.get('model', '')}'",
 )
 check(
-    "suite92(ac3-translator-model-haiku): agents/translator.md frontmatter model is 'haiku'",
-    _s92_translator_fm.get("model", "") == "haiku",
-    f"expected model=haiku for translator, got '{_s92_translator_fm.get('model', '')}'",
+    "suite92(ac3-translator-model-sonnet): agents/translator.md frontmatter model is 'sonnet'",
+    _s92_translator_fm.get("model", "") == "sonnet",
+    f"expected model=sonnet for translator (PR #475 re-tier), "
+    f"got '{_s92_translator_fm.get('model', '')}'",
 )
 
 # Effort regression pins for the three re-tuned agents (v2.85.0 effort re-tune, AC-7/AC-8).
@@ -30161,9 +30162,9 @@ check(
     f"frontmatter name is '{_s125_adv_fm.get('name', '')}', expected 'adversary'",
 )
 check(
-    "s125/AC-15b: adversary.md frontmatter model: opus",
-    _s125_adv_fm.get("model", "") == "opus",
-    f"frontmatter model is '{_s125_adv_fm.get('model', '')}', expected 'opus'",
+    "s125/AC-15b: adversary.md frontmatter model: sonnet",
+    _s125_adv_fm.get("model", "") == "sonnet",
+    f"frontmatter model is '{_s125_adv_fm.get('model', '')}', expected 'sonnet' (PR #475 re-tier)",
 )
 check(
     "s125/AC-15c: adversary.md frontmatter color: red",
