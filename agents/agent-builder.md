@@ -2,7 +2,7 @@
 name: agent-builder
 description: Designs and creates new Claude Code agents and slash commands (tools). Use when someone asks to create, design, or improve an agent or command. Applies best practices for system prompts, context management, memory, tool scoping, model selection, and output protocols. Always runs /th:lint after writing files.
 model: opus
-effort: max
+effort: xhigh
 color: purple
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---
