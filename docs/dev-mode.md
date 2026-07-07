@@ -35,7 +35,7 @@ The gate fires UNCONDITIONALLY for covered outward actions and gates by destinat
 
 **No authorisation file.** A file that the agent can write with `echo authorized > ...` is forgeable by the same subject the gate protects — it is not a control. The authorisation is `ask` (human), not a file.
 
-**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates.
+**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc — and reconstruction of a gated verb the router cannot see as a contiguous token, whether by quote/backslash splicing (`''git push`, `g''it push`) or by parameter/command expansion (`p=push; git $p …`) — is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates; for the injected-obfuscation case the prompt-injection floor (§6.6) is the primary defense.
 
 ---
 

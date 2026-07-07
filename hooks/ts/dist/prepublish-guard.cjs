@@ -189,8 +189,8 @@ function deny(reason) {
 function none() {
   return { decision: "none", reason: "", mutations: null };
 }
-var GIT_PUSH_RE = /(^|[\s|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)/;
-var GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
+var GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
+var GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 var SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
 var RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
 var FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
@@ -283,7 +283,9 @@ function readVersionSites(reader) {
   };
 }
 function resolveReleaseCutMarker(reader, changed) {
-  const touchedThisPush = changed.some((c) => c.path === RELEASE_CUT_MARKER_PATH);
+  const touchedThisPush = changed.some(
+    (c) => c.path === RELEASE_CUT_MARKER_PATH && c.status.charAt(0) !== "D"
+  );
   if (!touchedThisPush) return null;
   const raw = reader.readFile(RELEASE_CUT_MARKER_PATH);
   const content = (raw ?? "").trim();

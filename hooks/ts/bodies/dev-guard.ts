@@ -129,45 +129,62 @@ const CLICKUP_WRITE_RE =
 // safe". Any git invocation ending in a push subcommand, however dressed up
 // (glued/spaced -C, --git-dir/--work-tree, env-assignment connectors),
 // counts as covered so it reaches the recognizer instead of silently
-// defaulting to none().
+// defaulting to none(). Case-insensitive: on a case-insensitive filesystem
+// (Windows/Git Bash) `GIT PUSH ...` still runs, so the router must still
+// route it in — the recognizer below (which stays case-sensitive) is what
+// keeps a mixed-case form from ever resolving to allow. BOTH boundaries
+// around the verb admit a glued shell metacharacter — leading
+// ([\s|;&<>()`]) and trailing ([;&|<>()`"'$]) — so a metacharacter fused to
+// the verb with no space on EITHER side (`(git push origin main)`,
+// `true&&git push`, `git push>/dev/null`, `git push$(evil)`, `( git push)`)
+// still routes into the recognizer, where rejectUnparsableOrRedirected or the
+// exact-form check ask on it. Without both, a narrower boundary would miss the
+// glued form, evaluate() would return none(), and bash would still run the
+// `<verb> <args>` (and any $()-substituted command) ungated. The classes cover
+// the bash word-separators that leave the verb a complete token (\n is already
+// covered by \s), so every glued form the router now admits is one the
+// recognizer rejects to ask.
 const GIT_PUSH_RE =
-  /(^|[\s|;`])git(\s+-C\s+\S+|\s+--git-dir(?:=\S+|\s+\S+)|\s+--work-tree(?:=\S+|\s+\S+)|\s+-\S*|\s+\S+=\S+)*\s+push(\s|$)/;
+  /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+--git-dir(?:=\S+|\s+\S+)|\s+--work-tree(?:=\S+|\s+\S+)|\s+-\S*|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
 
 // 2b. gh pr create (mutating verb only — read-only gh pr view/list/status stay ungated)
-const GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
+// Case-insensitive router — see GIT_PUSH_RE comment above.
+const GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 
-// 2c. gh pr merge
-const GH_PR_MERGE_RE = /(^|[\s|;`])gh\s+pr\s+merge(\s|$)/;
+// 2c. gh pr merge (case-insensitive router)
+const GH_PR_MERGE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+merge(\s|$|[;&|<>()`"'$])/i;
 
-// 2c. gh pr review (including --dismiss)
-const GH_PR_REVIEW_RE = /(^|[\s|;`])gh\s+pr\s+review(\s|$)/;
+// 2c. gh pr review (including --dismiss) (case-insensitive router)
+const GH_PR_REVIEW_RE = /(^|[\s|;&<>()`])gh\s+pr\s+review(\s|$|[;&|<>()`"'$])/i;
 
-// 2d. gh pr comment
-const GH_PR_COMMENT_RE = /(^|[\s|;`])gh\s+pr\s+comment(\s|$)/;
+// 2d. gh pr comment (case-insensitive router)
+const GH_PR_COMMENT_RE = /(^|[\s|;&<>()`])gh\s+pr\s+comment(\s|$|[;&|<>()`"'$])/i;
 
 // 2e. gh api -X PUT|POST|PATCH|DELETE ... /pulls
 const GH_API_REST_PR_RE =
-  /(^|[\s|;`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls/i;
+  /(^|[\s|;&<>()`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls/i;
 
 // 2e-bis. gh api graphql with a PR-write mutation name
 // Read-only reviewThreads listing queries carry no mutation name → nodecision.
-const GH_GRAPHQL_RE = /(^|[\s|;`])gh\s+api\s+graphql/i;
+const GH_GRAPHQL_RE = /(^|[\s|;&<>()`])gh\s+api\s+graphql/i;
 const GRAPHQL_PR_MUTATIONS_RE =
   /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
 
 // 2e-ter. gh issue mutating writes (create, edit, comment).
 // Read-only gh issue list / gh issue view stay ungated (no outward side-effect).
-const GH_ISSUE_WRITE_RE = /(^|[\s|;`])gh\s+issue\s+(create|edit|comment)(\s|$)/;
+// Case-insensitive router — see GIT_PUSH_RE comment above.
+const GH_ISSUE_WRITE_RE = /(^|[\s|;&<>()`])gh\s+issue\s+(create|edit|comment)(\s|$|[;&|<>()`"'$])/i;
 
 // 2f. curl/wget mutating method to api.github.com (both forms from dev-guard.sh)
 const CURL_WGET_MUTATING_RE =
-  /(^|[\s|;`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com/i;
-const API_GITHUB_URL_RE = /api\.github\.com/;
+  /(^|[\s|;&<>()`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com/i;
+const API_GITHUB_URL_RE = /api\.github\.com/i;
 const MUTATING_METHOD_RE = /(-X|--request)\s*(PUT|POST|PATCH|DELETE)/i;
 
 // Defence-in-depth (F-016): raw payload scan when cmd is empty (mirrors dev-guard.sh lines 185-189)
+// Case-insensitive router — see GIT_PUSH_RE comment above.
 const RAW_OUTWARD_SCAN_RE =
-  /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/;
+  /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
 
 // ---------------------------------------------------------------------------
 // git-push recognizer — closed POSITIVE grammar (Steps 0-7, see module header)
@@ -199,6 +216,14 @@ const TREE_OR_ENV_REDIRECT_RE = /((^|\s)-C(?=[\s/=]|$)|--git-dir\b|--work-tree\b
 // exactly this: nothing precedes `git`, nothing but `push` follows it.
 const GIT_PUSH_EXACT_RE = /^git\s+push(\s|$)/;
 
+// The case-insensitive GH_PR_CREATE_RE router only ROUTES a payload into the
+// autogate branch; the autogate `allow` itself requires this exact, case-
+// sensitive, single-invocation form (mirrors GIT_PUSH_EXACT_RE). A mixed-case
+// (`GH pr create`) or shell-composed (`gh pr create && …`) form matches the
+// router but not this recognizer, so it falls through to ask instead of
+// auto-allowing the whole Bash call.
+const GH_PR_CREATE_EXACT_RE = /^gh\s+pr\s+create(\s|$)/;
+
 // Step 3 — the ONLY flags that do not disqualify the safe form. Deliberately
 // minimal: `-u`/`--set-upstream` is the primary first-push-of-a-feature-
 // branch flag (the auto-allow recognizer's core use case); `-v`/`--verbose`/
@@ -208,8 +233,10 @@ const GIT_PUSH_EXACT_RE = /^git\s+push(\s|$)/;
 const BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
 
 // Step 5 — tag-literal destination heuristic: `git push origin v1.2.3` is a
-// tag push even without `refs/tags/` or `--tags`.
-const TAG_LIKE_RE = /^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
+// tag push even without `refs/tags/` or `--tags`. The optional prefix accepts
+// both cases (`v`/`V`) — a tag-like destination must ask regardless of the
+// case of its leading letter.
+const TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
 
 // Step 5 — a destination must fully match this shape to be considered a
 // plain branch name at all (before the ref-namespace-word check below).
@@ -519,9 +546,15 @@ export function evaluate(input: NormalizedInput, reader: DevGuardReader): Normal
     return evaluateGitPush(cmdStr, reader);
   }
 
-  // 2b. gh pr create — autogate opt-in, default ask.
+  // 2b. gh pr create — autogate opt-in, default ask. The autogate `allow`
+  // requires a clean, exactly-cased, single `gh pr create` invocation: the
+  // case-insensitive router only routes here, and a mixed-case or shell-
+  // composed form falls through to ask (mirrors the git push recognizer).
   if (GH_PR_CREATE_RE.test(cmdStr)) {
-    if (isPrCreateAutogateEnabled(reader)) {
+    const cleanAutogateForm =
+      !SHELL_COMPOSITION_RE.test(cmdStr) &&
+      GH_PR_CREATE_EXACT_RE.test(cmdStr.trim());
+    if (cleanAutogateForm && isPrCreateAutogateEnabled(reader)) {
       return allow(
         `outward action 'gh pr create' auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
       );

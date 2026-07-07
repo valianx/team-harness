@@ -61,8 +61,18 @@ export interface PrepublishReader {
 // Regex — mirrors prepublish-guard.sh route detection and constants
 // ---------------------------------------------------------------------------
 
-const GIT_PUSH_RE = /(^|[\s|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)/;
-const GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
+// Routers are case-insensitive so this tests-before-PR floor stays in sync
+// with dev-guard's case-insensitive routers — a mixed-case `GH pr create`
+// (Windows/Git Bash) is enforced here too, never silently skipped. The
+// boundaries around the verb also admit a glued shell metacharacter — leading
+// ([\s|;&<>()`]) and trailing ([;&|<>()`"'$]) — to stay in sync with
+// dev-guard: without them a metacharacter fused to the verb on either side
+// (`(git push origin main)`, `true&&git push`, `git push>/dev/null`,
+// `git push$(evil)`, `( git push)`) would skip this floor while dev-guard's
+// own widened routers still ask — desyncing the two-hook "deny > allow"
+// contract.
+const GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
+const GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 const SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
 const RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
 const FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
@@ -233,7 +243,14 @@ interface ReleaseCutSignal {
 }
 
 function resolveReleaseCutMarker(reader: PrepublishReader, changed: ChangedFile[]): ReleaseCutSignal | null {
-  const touchedThisPush = changed.some((c) => c.path === RELEASE_CUT_MARKER_PATH);
+  // A deletion (status "D") removes the marker rather than declaring a
+  // release cut — per the delivery contract ("added or modified vs
+  // origin/main"), a delete falls through to the ordinary feature path
+  // instead of being read (and misread as malformed, since the file's
+  // content is gone) as a release-cut signal.
+  const touchedThisPush = changed.some(
+    (c) => c.path === RELEASE_CUT_MARKER_PATH && c.status.charAt(0) !== "D"
+  );
   if (!touchedThisPush) return null; // marker not part of this diff — not present
 
   const raw = reader.readFile(RELEASE_CUT_MARKER_PATH);

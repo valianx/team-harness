@@ -193,25 +193,26 @@ function none() {
   return { decision: "none", reason: "", mutations: null };
 }
 var CLICKUP_WRITE_RE = /^mcp__.+__clickup_(update_task|create_task|create_task_comment|attach_task_file|delete_task)$/;
-var GIT_PUSH_RE = /(^|[\s|;`])git(\s+-C\s+\S+|\s+--git-dir(?:=\S+|\s+\S+)|\s+--work-tree(?:=\S+|\s+\S+)|\s+-\S*|\s+\S+=\S+)*\s+push(\s|$)/;
-var GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
-var GH_PR_MERGE_RE = /(^|[\s|;`])gh\s+pr\s+merge(\s|$)/;
-var GH_PR_REVIEW_RE = /(^|[\s|;`])gh\s+pr\s+review(\s|$)/;
-var GH_PR_COMMENT_RE = /(^|[\s|;`])gh\s+pr\s+comment(\s|$)/;
-var GH_API_REST_PR_RE = /(^|[\s|;`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls/i;
-var GH_GRAPHQL_RE = /(^|[\s|;`])gh\s+api\s+graphql/i;
+var GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+--git-dir(?:=\S+|\s+\S+)|\s+--work-tree(?:=\S+|\s+\S+)|\s+-\S*|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
+var GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
+var GH_PR_MERGE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+merge(\s|$|[;&|<>()`"'$])/i;
+var GH_PR_REVIEW_RE = /(^|[\s|;&<>()`])gh\s+pr\s+review(\s|$|[;&|<>()`"'$])/i;
+var GH_PR_COMMENT_RE = /(^|[\s|;&<>()`])gh\s+pr\s+comment(\s|$|[;&|<>()`"'$])/i;
+var GH_API_REST_PR_RE = /(^|[\s|;&<>()`])gh\s+api\s+.*(-X|--method)\s*(PUT|POST|PATCH|DELETE).*pulls/i;
+var GH_GRAPHQL_RE = /(^|[\s|;&<>()`])gh\s+api\s+graphql/i;
 var GRAPHQL_PR_MUTATIONS_RE = /(resolveReviewThread|unresolveReviewThread|addPullRequestReviewThreadReply|addPullRequestReviewComment|addPullRequestReview|submitPullRequestReview|mergePullRequest)/;
-var GH_ISSUE_WRITE_RE = /(^|[\s|;`])gh\s+issue\s+(create|edit|comment)(\s|$)/;
-var CURL_WGET_MUTATING_RE = /(^|[\s|;`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com/i;
-var API_GITHUB_URL_RE = /api\.github\.com/;
+var GH_ISSUE_WRITE_RE = /(^|[\s|;&<>()`])gh\s+issue\s+(create|edit|comment)(\s|$|[;&|<>()`"'$])/i;
+var CURL_WGET_MUTATING_RE = /(^|[\s|;&<>()`])(curl|wget)\s.*(-X|--request)\s*(PUT|POST|PATCH|DELETE).*api\.github\.com/i;
+var API_GITHUB_URL_RE = /api\.github\.com/i;
 var MUTATING_METHOD_RE = /(-X|--request)\s*(PUT|POST|PATCH|DELETE)/i;
-var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/;
+var RAW_OUTWARD_SCAN_RE = /(git\s+push|gh\s+pr\s+(create|merge|review|comment)|gh\s+issue\s+(create|edit|comment)|gh\s+api.*pulls|api\.github\.com)/i;
 var SHELL_QUOTING_OR_EXPANSION_RE = /["'\\$]/;
 var SHELL_COMPOSITION_RE = /[;&|`\n<>]|\$\(/;
 var TREE_OR_ENV_REDIRECT_RE = /((^|\s)-C(?=[\s/=]|$)|--git-dir\b|--work-tree\b|\bGIT_[A-Z_]+=)/;
 var GIT_PUSH_EXACT_RE = /^git\s+push(\s|$)/;
+var GH_PR_CREATE_EXACT_RE = /^gh\s+pr\s+create(\s|$)/;
 var BENIGN_PUSH_FLAG_RE = /^(-u|--set-upstream|-v|--verbose|--progress)$/;
-var TAG_LIKE_RE = /^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
+var TAG_LIKE_RE = /^[vV]?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/;
 var PLAIN_BRANCH_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
 var REF_NAMESPACE_WORDS = /* @__PURE__ */ new Set(["refs", "heads", "tags", "remotes"]);
 var DEFAULT_BRANCH_FLOOR = /* @__PURE__ */ new Set(["main", "master"]);
@@ -404,7 +405,8 @@ function evaluate(input, reader) {
     return evaluateGitPush(cmdStr, reader);
   }
   if (GH_PR_CREATE_RE.test(cmdStr)) {
-    if (isPrCreateAutogateEnabled(reader)) {
+    const cleanAutogateForm = !SHELL_COMPOSITION_RE.test(cmdStr) && GH_PR_CREATE_EXACT_RE.test(cmdStr.trim());
+    if (cleanAutogateForm && isPrCreateAutogateEnabled(reader)) {
       return allow(
         `outward action 'gh pr create' auto-allowed by opt-in config autogate.pr_create=true (dev-guard.ts); the prepublish-guard tests-before-PR floor still applies independently (deny > allow); ${GATE_DOC_POINTER}`
       );
