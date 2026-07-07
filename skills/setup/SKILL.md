@@ -163,7 +163,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 1. Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX (`C:\vault\Work` → `/c/vault/Work`) and anchor it with a leading `//` (a single leading slash anchors to the settings-source directory, not the filesystem root, and silently fails to match paths outside the cwd — upstream Claude Code issue #25137).
 2. **Resolved-value validation floor (before any rule is constructed).** Reject and abort provisioning — no gate, no rule written — when the resolved `base` is empty, `/`, the user home (`~`, `$HOME`, or its expanded form), a filesystem top-level directory (fewer than 2 path segments below root), or contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`). Report a one-line reason (e.g. "Obsidian workspace path resolves to the filesystem root — provisioning aborted.") and continue to Step 3.5 without offering a gate. Full contract: `docs/permission-provisioning.md § Resolved-value validation floor`.
-3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to the orchestrator's Phase 0a Step 1g part (a), so the two sites stay reconciled.
+3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, the read-only allowlist set below, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to the orchestrator's Phase 0a Step 1g part (a), so the two sites stay reconciled.
    - **Already present → no gate, no write** (silent pass-through) — report the covering rule(s) and target file for audit visibility, then continue to Step 3.5:
      ```text
      Permission rules for the obsidian workspace are already present in ~/.claude/settings.json:
@@ -171,15 +171,26 @@ The obsidian vault sits outside the current project's working tree, so every sub
        Write(//{base}/**)
        additionalDirectories: //{base}
        deny: Edit(//{base}/.git/**), Write(//{base}/.git/**)
+       Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*),
+       Bash(git rev-parse:*), Bash(git branch --list:*), Bash(git worktree list:*),
+       Bash(ls:*), Bash(cat:*), Bash(rg:*), Bash(grep:*),
+       Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh issue view:*), Bash(gh issue list:*),
+       Bash(gh auth switch:*), mcp__memory__*
      ```
    - **Missing (any of the entries) → present the gated Y/n offer below.**
-4. Present the exact rules for confirmation, including the `.git/` deny pair (never covers `.git/` — `docs/permission-provisioning.md § ".git/" exclusion invariant`) and the cross-project blast-radius note. Write nothing until the operator answers:
+4. Present the exact rules for confirmation, including the `.git/` deny pair (never covers `.git/` — `docs/permission-provisioning.md § ".git/" exclusion invariant`), the read-only allowlist set (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"` — canonical definition; excludes every form of `gh api` and every effective git verb), and the cross-project blast-radius note. Write nothing until the operator answers:
    ```text
-   Grant write access without prompting to the obsidian workspace?
+   Grant write access without prompting to the obsidian workspace, and add a
+   read-only allowlist (inert Bash commands, gh read verbs, gh auth switch, KG tools)?
      Edit(//{base}/**)
      Write(//{base}/**)
      additionalDirectories: //{base}
      deny: Edit(//{base}/.git/**), Write(//{base}/.git/**)
+     Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*),
+     Bash(git rev-parse:*), Bash(git branch --list:*), Bash(git worktree list:*),
+     Bash(ls:*), Bash(cat:*), Bash(rg:*), Bash(grep:*),
+     Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh issue view:*), Bash(gh issue list:*),
+     Bash(gh auth switch:*), mcp__memory__*
 
    This rule applies to every Claude Code session on any project, not just this pipeline,
    and persists until manually removed from ~/.claude/settings.json.
@@ -187,7 +198,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
    Add these rules to ~/.claude/settings.json? [y/N]
    ```
 5. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
-6. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target.
+6. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair and the read-only allowlist set to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target.
 7. Report the rules added and the target file:
    ```text
    Permission rules added to ~/.claude/settings.json:
@@ -195,9 +206,14 @@ The obsidian vault sits outside the current project's working tree, so every sub
      Write(//{base}/**)
      additionalDirectories: //{base}
      deny: Edit(//{base}/.git/**), Write(//{base}/.git/**)
+     Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*),
+     Bash(git rev-parse:*), Bash(git branch --list:*), Bash(git worktree list:*),
+     Bash(ls:*), Bash(cat:*), Bash(rg:*), Bash(grep:*),
+     Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh issue view:*), Bash(gh issue list:*),
+     Bash(gh auth switch:*), mcp__memory__*
    ```
 
-This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write) — it is scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
+This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
 
 **Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's Phase 0a intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
 
@@ -248,7 +264,7 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 
 **English-learning mode propagation.** The `english_learning` boolean in `~/.claude/.team-harness.json` is set the same way as `language`: via `/th:setup` Step 3.6, or via a chat toggle with a persistence marker (`por defecto`, `siempre`, `default`, `permanente`, `de aquí en adelante`) routed through the orchestrator's Y/n confirmation gate. A chat toggle WITHOUT a persistence marker applies as a session-only override recorded in `00-state.md` only — the config file is never written without an explicit persistence signal. This key is NOT in the session-override whitelist; it requires the persistence-marker + Y/n gate to become permanent. `english_learning` and `language` are independent settings — enabling english-learning arms corrections for messages the operator writes in English regardless of the configured response language; English as the response language is a separate, explicitly offered opt-in.
 
-**Outward-action gate.** Outward actions (git push, gh pr merge/review/comment, GitHub API writes, ClickUp MCP writes) require explicit operator approval via the deterministic dev-guard hook (compiled TS, launched via `hooks/run-ts-hook.sh dev-guard`), which fires UNCONDITIONALLY. The agent cannot auto-approve these actions. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
+**Outward-action gate.** Outward actions (git push, gh pr merge/review/comment, GitHub API writes, ClickUp MCP writes) are evaluated by the deterministic dev-guard hook (compiled TS, launched via `hooks/run-ts-hook.sh dev-guard`), which fires UNCONDITIONALLY and gates by destination: a push to a non-default branch on `origin` resolves to `allow` without a prompt; a push to the default branch, a tag push, a force push, `gh pr merge/review/comment`, GitHub API writes, and ClickUp MCP writes still require explicit operator approval (`ask`). The agent cannot auto-approve an `ask`. Security floors are non-waivable. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 
 **Report team-harness problems via `/th:report-issue`.** When a bug, gap, or improvement is detected in the `th` plugin itself — its agents, skills, or any orchestrator behavior — report it with `/th:report-issue <bug|feature|docs|question> "<summary>"`, not with `gh issue create` directly and not by editing files under the plugin cache (those edits are transient and are overwritten on the next `th:update`). The skill builds the correct issue pattern (Summary, Environment with `th`/Claude Code/OS versions), de-duplicates against open issues, and requires confirmation before creating; a manual `gh issue create` skips that pattern and the dedup check.
 
@@ -265,7 +281,7 @@ After the copy, tell the operator:
 
 ```
 Orchestrator disposition configured.
-  Gate:    outward actions (git push, gh pr merge/review/comment) require explicit approval (unconditional)
+  Gate:    fires unconditionally, gates by destination — non-default branch push to origin: allow; default/tag/force push, gh pr merge/review/comment, API/ClickUp writes: ask
   Style:   /config -> Output style -> developer-mode  (optional — replaces coding instructions with orchestrator contract)
 ```
 

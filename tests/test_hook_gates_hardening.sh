@@ -197,6 +197,11 @@ assert_nodecision "F015-6: C:\\src\\app.py (non-sensitive backslash) -> nodecisi
 # SPEC: the compound command
 #   git commit -m "msg" && git push origin feat/x
 # must be correctly extracted so 'git push' is seen and the hook returns ASK.
+# `allow` is reserved for a SINGLE, un-chained `git push` invocation — a
+# compound command certifies only the clause the recognizer happens to
+# inspect while an `allow` decision authorizes the WHOLE Bash tool call, so
+# ANY shell chaining/control operator anywhere in the command forces `ask`
+# regardless of how safe the push clause itself looks.
 # ============================================================================
 echo
 echo "############################################################"
@@ -205,12 +210,13 @@ echo "############################################################"
 
 COMPOUND_PAYLOAD='{"tool_name":"Bash","tool_input":{"command":"git commit -m \"msg\" && git push origin feat/x"}}'
 
-# Case F016-3: compound command with embedded quote → ASK (unconditional, regression guard)
+# Case F016-3: compound command with embedded quote → ASK (unconditional for
+# any chained form, regardless of how safe the push clause itself would be).
 echo
 echo "=== F-016-3: compound cmd with embedded quote -> EXACT ASK ==="
 TMP_F016C=$(make_tmp_with_marker)
 OUT_F016_3=$(HOME="$TMP_F016C" node "$DEV_GUARD_HOOK" <<< "$COMPOUND_PAYLOAD" 2>/dev/null || true)
-assert_exact_ask "F016-3: compound cmd with embedded quote -> ask (git push seen, unconditional)" "$OUT_F016_3"
+assert_exact_ask "F016-3: compound cmd with embedded quote -> ask (git push seen, but chained — allow is single-invocation-only)" "$OUT_F016_3"
 
 
 # ---------------------------------------------------------------------------

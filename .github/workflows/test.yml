@@ -19,25 +19,86 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      # Conditional-noop gate — NOT a `paths-ignore`
+      # trigger filter. A `paths-ignore` on the job/workflow trigger would
+      # leave this required check permanently "pending" for a diff that
+      # matches it, blocking merge. Instead the job always runs (satisfying
+      # the required-check contract) and each heavy step below is skipped
+      # via `if:` when the diff is release-only (version sites + CHANGELOG +
+      # changelog.d/ + version.d/ only — e.g. an inline-release cut). Any
+      # diff outside that narrow allowlist, or any failure to compute the
+      # diff, defaults to running the full suite (fail-closed toward more
+      # verification, never less).
+      - name: Detect release-only diff
+        id: release-only
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          is_release_only=false
+          if [ -n "$BASE_SHA" ] && [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || true)"
+            if [ -n "$changed" ]; then
+              is_release_only=true
+              while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                case "$f" in
+                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|CLAUDE.md|CHANGELOG.md|changelog.d/*.md|version.d/*)
+                    ;;
+                  *)
+                    is_release_only=false
+                    ;;
+                esac
+              done <<< "$changed"
+            fi
+          fi
+          echo "is_release_only=$is_release_only" >> "$GITHUB_OUTPUT"
+          echo "Release-only diff: $is_release_only"
+
+      # Python (structural suite) and Node (policy-block functional suite) are
+      # set up UNCONDITIONALLY: those two suites validate CLAUDE.md and
+      # .claude-plugin/plugin.json, both of which are IN the release-only
+      # allowlist above — so a release-only diff must still exercise them.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Set up uv (for the PyYAML frontmatter test)
-        uses: astral-sh/setup-uv@v5
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "24"
 
+      # uv (PyYAML frontmatter suite) and Bun (opencode/behavioral suites) back
+      # only the heavier suites that stay gated on a release-only diff.
+      - name: Set up uv (for the PyYAML frontmatter test)
+        if: steps.release-only.outputs.is_release_only != 'true'
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Bun
+        if: steps.release-only.outputs.is_release_only != 'true'
         uses: oven-sh/setup-bun@v2
 
+      # The structural and policy-block suites validate CLAUDE.md and
+      # plugin.json — files that ARE in the release-only allowlist — so they run
+      # on every diff, release-only included. The full suite below re-runs them
+      # (plus every other suite) only for non-release diffs.
+      - name: Run structural suite (always — validates CLAUDE.md + plugin.json)
+        run: python3 tests/test_agent_structure.py
+
+      - name: Run policy-block functional suite (always)
+        run: bash tests/test_policy_block.sh
+
       - name: Run full verification suite
+        if: steps.release-only.outputs.is_release_only != 'true'
         run: bash tests/run-all.sh
+
+      - name: Release-only diff — heavier suites skipped (structural + policy-block still ran)
+        if: steps.release-only.outputs.is_release_only == 'true'
+        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ + version.d/ (a release cut) — the structural and policy-block suites ran above; skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
 
   go-test:
     name: go test (installer)

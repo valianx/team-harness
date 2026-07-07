@@ -425,9 +425,10 @@ This step is gateway-aware: if the project does not have an external gateway (or
 |------|--------|----------|
 | **Per-PR bump (shipped default)** | no `skip-version` flag, or `skip-version: false` | Proceed with Step 9. Bump the project version once at assembly (min one, max one) and update the CHANGELOG directly (or via a `changelog.d/` fragment where that convention exists — see Step 9e). |
 | **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (e.g., team-harness's own `CLAUDE.md §6.3`) | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). If this change is a consumer-facing bump that produces no `changelog.d/` fragment (internal refactor), write a `version.d/{slug}.bump` marker (one line: `patch`, `minor`, or `major`) so the deferred release step can include it. |
-| **Deferred release cut (opt-in, NOT a shipped default)** | `release-mode: true` (passed by a repo-local release tool — e.g. team-harness's own `/th:release` — via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. |
+| **Deferred release cut (opt-in, NOT a shipped default)** | `release-mode: true` (passed by a repo-local release tool — e.g. team-harness's own `/th:release` — via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. Cuts a separate `release/vX.Y.Z` branch/PR. |
+| **Inline release cut (opt-in, NOT a shipped default)** | `inline-release: true` (passed by `/th:release --with <feature-branch>` via the orchestrator) | Proceed with Step 9 ON THE FEATURE BRANCH ITSELF — no separate `release/vX.Y.Z` branch. Discover bump level via sub-step 9-R (same aggregation as `release-mode`), bump all three version sites, assemble `changelog.d/` (Step 9e), and write the `version.d/.release-cut` marker (sub-step 9-R-5 below) so `prepublish-guard.ts` recognizes this feature-branch push as a release-path push. One PR, one CI run — see `skills/release/SKILL.md § Mode — Inline release`. |
 
-**Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true` and `release-mode: true` exist for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally.
+**Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true`, `release-mode: true`, and `inline-release: true` exist for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally.
 
 **`version.d/` marker discipline (repo-local-deferral mode only).** Write `version.d/{slug}.bump` ONLY when ALL of the following are true:
 1. The change reaches the consumer (it is not repo-internal docs/tests/CI only).
@@ -437,9 +438,9 @@ The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contai
 
 **If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
 
-**If the orchestrator passed `release-mode: true` → continue below through Step 9-R and then Steps 9.0–9e.**
+**If the orchestrator passed `release-mode: true` OR `inline-release: true` → continue below through Step 9-R and then Steps 9.0–9e.** (Sub-step 9-R-5 below runs ONLY under `inline-release: true`.)
 
-### Step 9-R — Deferred release-cut bump-level discovery (runs ONLY when `release-mode: true`, a repo-local deferral convention)
+### Step 9-R — Deferred release-cut bump-level discovery (runs when `release-mode: true` OR `inline-release: true`, a repo-local deferral convention)
 
 Before choosing the SemVer level in Step 9.2, aggregate pending fragments and markers:
 
@@ -460,6 +461,9 @@ Take the MAX across all fragment-derived levels and all marker levels. If no fra
 
 **Sub-step 9-R-4 — Empty `version.d/`.**
 After deriving the level, delete all `*.bump` files from `version.d/` (the directory itself may remain). Stage the deletions in Step 10.0 alongside the version files.
+
+**Sub-step 9-R-5 — Write the release-cut marker (runs ONLY under `inline-release: true`).**
+Write `version.d/.release-cut` containing exactly `v{X.Y.Z}\n` — the target version derived in Step 9.2. This is the PRIMARY signal `hooks/ts/bodies/prepublish-guard.ts` recognizes to authorize running the release-path check (all three version sites bumped and matching) on a feature branch that is not named `release/vX.Y.Z`. The marker authorizes RUNNING that check — it never bypasses it; a malformed marker denies the push outright. Stage this file in Step 10.0 alongside the version files. Unlike `version.d/*.bump` markers, the `.release-cut` marker is NOT deleted after this delivery — the prepublish-guard only reacts to the marker when it is part of the CURRENT push's diff (added or modified vs `origin/main`), so a marker left over from a prior release on `main` does not retrigger the release-path check on later, unrelated feature branches.
 
 Proceed to Step 9.0 with the derived level as the input to Step 9.2 (skip the git-diff analysis in Step 9.2 — the level is already derived).
 
@@ -711,7 +715,8 @@ git add README.md             # only if modified in Step 6
 git add openapi/openapi.yaml  # only if updated in Step 8
 git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written (feature-mode or release-mode before assembly)
 git add version.d/{slug}.bump     # ONLY when a version.d/ marker was written in Step 9 feature-mode
-# In release-mode after Step 9-R-4: stage version.d/ deletions: git add version.d/
+# In release-mode/inline-release after Step 9-R-4: stage version.d/ deletions: git add version.d/
+git add version.d/.release-cut    # ONLY in inline-release mode, after Step 9-R-5
 ```
 
 **If version was bumped:** verify BOTH `.claude-plugin/plugin.json` AND `.claude-plugin/marketplace.json` are staged: `git diff --cached .claude-plugin/`. If either is not staged, stop and fix.
@@ -979,7 +984,7 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 Signal 3 is authoritative when positive — a `CodeRabbit` check in the rollup proves the App runs on this PR, and upgrades a `false`/absent hint to `detected`. Detection reuses the already-fetched rollup and the single boot-time file check; it adds zero new GitHub API calls and never polls.
 
-**When detected:** current semantics preserved verbatim — while CodeRabbit's review is in progress its check is `pending` and `mergeStateStatus` reads `UNSTABLE`; report `ci_state: pending` and do not treat the PR as done until the CodeRabbit review completes. Every CodeRabbit inline finding is a reviewer comment and MUST be routed through `agents/_shared/apply-review-disposition.md`, including Step 6 — reply to every thread, resolve only `APPLIED`, and leave a rationale reply on anything not resolved. Applying a fix without posting the thread disposition is an incomplete review cycle. If signals 1-2 are positive but signal 3 has not yet registered, add a one-line discrepancy note instead of waiting: "CodeRabbit config present but no check registered on this PR — this can mean the check has not yet posted (it will fold into `ci_state` via the mechanical rules above once it registers) OR the GitHub App is not installed on this repo (no check will ever register); this query cannot distinguish the two. Do not wait on this note alone."
+**When detected:** current semantics preserved verbatim — while CodeRabbit's review is in progress its check is `pending` and `mergeStateStatus` reads `UNSTABLE`; report `ci_state: pending` and do not treat the PR as done until the CodeRabbit review completes. Every CodeRabbit inline finding is a reviewer comment and MUST be routed through `agents/_shared/apply-review-disposition.md`, including Step 6 — reply to every thread, resolve only `APPLIED`, and leave a rationale reply on anything not resolved. Applying a fix without posting the thread disposition is an incomplete review cycle. **Comment incorporation across multiple threads batches its replies and resolves into one aliased request** per `agents/_shared/gh-fallback.md` § "Tier B — batched review disposition (aliased mutation)" — one composed-payload preview and one gated `ask` for the whole review pass, rather than one per thread; the per-thread sections remain the fallback when `gh` is unavailable or the batched call fails. If signals 1-2 are positive but signal 3 has not yet registered, add a one-line discrepancy note instead of waiting: "CodeRabbit config present but no check registered on this PR — this can mean the check has not yet posted (it will fold into `ci_state` via the mechanical rules above once it registers) OR the GitHub App is not installed on this repo (no check will ever register); this query cannot distinguish the two. Do not wait on this note alone."
 
 **When not detected:** `ci_state` is computed from the actual rollup entries only (per the mechanical rules above). This step MUST NOT wait or poll for a CodeRabbit check, and MUST NOT advise the operator to wait for an automated review that will never appear. Report `coderabbit: not-detected`. Repos with CodeRabbit enabled at the GitHub-organization level and no repo-root config file structurally expose only signal 3, which may not have registered yet at query time — `coderabbit: not-detected` is point-in-time, not proof of absence; a later-registering check still folds into `ci_state` via the mechanical rules above regardless of this report.
 
@@ -1051,15 +1056,23 @@ worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-presen
 
 ---
 
-### Step 11.4c — Release tag creation (post-merge, release-mode; conditional)
+### Step 11.4c — Release tag verification (post-merge, release-mode/inline-release; conditional)
 
 **Gate:** run only when BOTH of the following are true:
-1. `release-mode: true` was passed in the task context (this is `/th:release`'s deferred-cut convention, not the shipped default — see Step 9's release-mode row).
+1. `release-mode: true` OR `inline-release: true` was passed in the task context (release-mode = `/th:release`'s deferred-cut convention onto its own `release/vX.Y.Z` branch; inline-release = the single-PR release path folded into a feature branch — see Step 9's mode table).
 2. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
 
 When either condition is false, this step is a no-op — log `release_tag: skipped: not-release-mode` or `release_tag: skipped: pr-not-merged` and continue.
 
-**Create and push the tag:**
+**Verify-only (tag-sync.yml is the single idempotent tag authority).** `.github/workflows/tag-sync.yml` fires on every push to `main` that changes `.claude-plugin/plugin.json`; it checks `git ls-remote --tags` first (idempotent — a pre-existing tag is a no-op) and creates + pushes the `v{X.Y.Z}` tag itself, then dispatches `release.yml`. This step therefore VERIFIES the tag landed rather than creating it:
+
+```bash
+git ls-remote --tags origin "refs/tags/v{X.Y.Z}"
+```
+
+Poll up to 3 times at 15-second intervals. If the tag is present, log success and continue — no further action.
+
+**Fallback (safety net, unchanged workflow logic).** If the tag is still absent after the polling ceiling, fall back to a manual create-and-push:
 
 ```bash
 git checkout main
@@ -1070,11 +1083,11 @@ git push origin v{X.Y.Z}
 
 `{X.Y.Z}` is the version bumped in Step 9 for this release. The `git push` is an outward action — it is gated by `hooks/dev-guard.sh` like any other push and requires operator approval; it is never auto-approved.
 
-**Why this step exists.** `.github/workflows/release.yml` (the opencode artifact pipeline — cross-compiled install binaries, `VERSION` asset, GitHub Release) triggers only on `push: tags: ["v*"]`. Without an explicit tag push, that pipeline never runs and opencode operators silently fall behind CC operators, who receive the new version through `claude plugin update` as soon as the PR merges. `.github/workflows/tag-sync.yml` is a deterministic backstop that watches `main` for changes to `.claude-plugin/plugin.json` and pushes the same tag if this step is skipped — it does not replace this step; both exist so a forgotten tag is not the only line of defense.
+**Why this step exists.** `.github/workflows/release.yml` (the opencode artifact pipeline — cross-compiled install binaries, `VERSION` asset, GitHub Release) triggers only on `push: tags: ["v*"]`. Without a tag landing on `origin`, that pipeline never runs and opencode operators silently fall behind CC operators, who receive the new version through `claude plugin update` as soon as the PR merges. `tag-sync.yml` is the primary mechanism now (not a backstop to a manual push); the manual create-and-push above is the safety net if the workflow itself fails to fire.
 
 **Log the outcome** — add one line to the delivery status block:
 ```
-release_tag: created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged
+release_tag: verified: v{X.Y.Z} (tag-sync.yml) | created: v{X.Y.Z} (manual fallback) | skipped: not-release-mode | skipped: pr-not-merged
 ```
 
 ---
@@ -1498,7 +1511,7 @@ mergeable_state: clean | conflicting | undetermined | blocked | behind | unstabl
 ci_state: passing | failing | pending | none | not-verified
 coderabbit: detected | not-detected | not-verified: gh-unavailable
 worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
-release_tag: created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged   # release-mode only (Step 11.4c); omit outside release-mode
+release_tag: verified: v{X.Y.Z} | created: v{X.Y.Z} | skipped: not-release-mode | skipped: pr-not-merged   # release-mode/inline-release only (Step 11.4c); omit otherwise
 context7_consult: hit:N miss:N skipped:N
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a delivery decision; [] when none
 tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N

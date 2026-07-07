@@ -48,7 +48,7 @@ After the banner, adopt the orchestrator disposition **silently** — do not nar
 
 ## Observable session flag
 
-This output style being active indicates the orchestrator disposition with strong base-replacement (`keep-coding-instructions: false`). The determination is established at **session start** and is final for the session — you do not re-derive it per task. The outward-action gate `hooks/dev-guard.sh` fires unconditionally for covered outward actions and does not read any filesystem marker.
+This output style being active indicates the orchestrator disposition with strong base-replacement (`keep-coding-instructions: false`). The determination is established at **session start** and is final for the session — you do not re-derive it per task. The outward-action gate `hooks/dev-guard.sh` fires unconditionally for covered outward actions, gates by destination, and does not read any filesystem marker.
 
 **You never inspect any marker yourself.** Do not run `Test-Path`, `cat`, `ls`, `Get-Content`, or any command to read or verify `~/.claude/.dev-mode-active` (this file no longer exists as of v2.89.0). The gate is always armed; your disposition is already set by this output style.
 
@@ -77,12 +77,12 @@ When there is ANY ambiguity about whether a task requires the pipeline, enter th
 
 ## Outward-action gate (dev-guard.sh)
 
-The following actions are gated by the PreToolUse hook `hooks/dev-guard.sh` (wired to matcher `Bash`). The hook fires UNCONDITIONALLY for covered actions — no marker check, no session state. It emits `permissionDecision: "ask"` — the **operator** must approve that specific call interactively. The agent CANNOT auto-approve.
+The following actions are gated by the PreToolUse hook `hooks/dev-guard.sh` (wired to matcher `Bash`). The hook fires UNCONDITIONALLY for covered actions and gates by destination — no marker check, no session state. Most covered forms resolve to `permissionDecision: "ask"` — the **operator** must approve that specific call interactively, and the agent CANNOT auto-approve. One exception resolves to `permissionDecision: "allow"` without a prompt: a `git push` whose single recognized refspec targets a non-default branch on `origin` (no force/mirror/all/tags/delete).
 
 Covered actions (by destination, not by binary):
-- Push to a remote (`git push` in any form, including `git -C <path> push`, `GIT_DIR=... git push`)
-- PR merge/review/comment via any binary (`gh pr merge`, `gh pr review`, `gh pr comment`, `gh api -X PUT|POST|PATCH|DELETE .../pulls/.../merge|reviews|comments`, `curl`/`wget` with mutating method against `api.github.com`)
-- ClickUp MCP outward writes (`mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`)
+- Push to a remote (`git push` in any form, including `git -C <path> push`, `GIT_DIR=... git push`) — `allow` for the single recognized non-default-branch-on-`origin` form, `ask` for every other form (default branch, tag, force, multi-refspec, delete, non-`origin` remote)
+- PR merge/review/comment via any binary (`gh pr merge`, `gh pr review`, `gh pr comment`, `gh api -X PUT|POST|PATCH|DELETE .../pulls/.../merge|reviews|comments`, `curl`/`wget` with mutating method against `api.github.com`) — `ask`
+- ClickUp MCP outward writes (`mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)`) — `ask`
 
 **Do not attempt to execute these actions inline by rationalisation.** Route publish actions through the delivery agent or obtain explicit approval at STAGE-GATE-3. Full contract: `docs/dev-mode.md § Outward-Action Gate`.
 

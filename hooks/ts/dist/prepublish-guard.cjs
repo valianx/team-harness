@@ -189,13 +189,17 @@ function deny(reason) {
 function none() {
   return { decision: "none", reason: "", mutations: null };
 }
-var GIT_PUSH_RE = /(^|[\s|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)/;
-var GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
+var GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
+var GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 var SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
 var RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
 var FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
 var MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
 var CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
+var RELEASE_CUT_MARKER_PATH = "version.d/.release-cut";
+var RELEASE_CUT_SEMVER_RE = /^v([0-9]+\.[0-9]+\.[0-9]+)$/;
+var RELEASE_CUT_TRAILER_RE = /^release-cut: v([0-9]+\.[0-9]+\.[0-9]+)$/m;
+var RELEASE_CUT_TRAILER_PREFIX_RE = /^release-cut:/m;
 var OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
 var CONTROL_CHAR_RE = /[\x00-\x09\x0b-\x1f\x7f]/;
 function touchesShippedPath(c) {
@@ -277,6 +281,42 @@ function readVersionSites(reader) {
     claudeOrigin,
     claudeBumped: isBumped(claudeHead, claudeOrigin)
   };
+}
+function resolveReleaseCutMarker(reader, changed) {
+  const touchedThisPush = changed.some(
+    (c) => c.path === RELEASE_CUT_MARKER_PATH && c.status.charAt(0) !== "D"
+  );
+  if (!touchedThisPush) return null;
+  const raw = reader.readFile(RELEASE_CUT_MARKER_PATH);
+  const content = (raw ?? "").trim();
+  const m = RELEASE_CUT_SEMVER_RE.exec(content);
+  return m ? { malformed: false, version: m[1] } : { malformed: true, version: "" };
+}
+function resolveReleaseCutTrailer(reader) {
+  let src = "";
+  const commitMsg = reader.readEnv("GIT_COMMIT_MSG");
+  if (commitMsg) src += commitMsg;
+  const count = parseInt(reader.readEnv("GIT_PUSH_OPTION_COUNT") ?? "0", 10);
+  if (Number.isFinite(count) && count > 0) {
+    for (let i = 0; i < count; i++) {
+      const opt = reader.readEnv(`GIT_PUSH_OPTION_${i}`);
+      if (opt) src += `
+${opt}`;
+    }
+  }
+  if (!src) return null;
+  if (CONTROL_CHAR_RE.test(src)) {
+    reader.warn(
+      "prepublish-guard: release-cut trailer source contains control characters; treating as absent (SEC-DR-A)."
+    );
+    return null;
+  }
+  const m = RELEASE_CUT_TRAILER_RE.exec(src);
+  if (m) return { malformed: false, version: m[1] };
+  return RELEASE_CUT_TRAILER_PREFIX_RE.test(src) ? { malformed: true, version: "" } : null;
+}
+function resolveReleaseCut(reader, changed) {
+  return resolveReleaseCutMarker(reader, changed) ?? resolveReleaseCutTrailer(reader);
 }
 function resolveBranch(reader) {
   const raw = reader.gitCurrentBranch();
@@ -429,10 +469,19 @@ function runVersionBumpCheck(reader) {
   const branch = resolveBranch(reader);
   if (branch === null) return null;
   const sites = readVersionSites(reader);
-  if (!branch.isRelease) {
-    return runFeaturePath(reader, changed, sites);
+  if (branch.isRelease) {
+    return runReleasePath(reader, changed, branch.version, sites);
   }
-  return runReleasePath(reader, changed, branch.version, sites);
+  const releaseCut = resolveReleaseCut(reader, changed);
+  if (releaseCut) {
+    if (releaseCut.malformed) {
+      return deny(
+        `prepublish-guard: a release-cut signal (${RELEASE_CUT_MARKER_PATH} or a release-cut: commit trailer) is present but its content does not parse as strict SemVer (vX.Y.Z). The signal authorizes running the release-path check, never bypassing it. Fix the content (e.g. v2.109.0) or remove it to use the ordinary feature path. Push blocked.`
+      );
+    }
+    return runReleasePath(reader, changed, releaseCut.version, sites);
+  }
+  return runFeaturePath(reader, changed, sites);
 }
 function runPrepublishCheck(reader) {
   const config = reader.readConfig();

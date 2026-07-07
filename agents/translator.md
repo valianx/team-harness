@@ -1,7 +1,7 @@
 ---
 name: translator
 description: Discovers user-facing strings in any frontend codebase, builds a product-aware glossary, sets up i18n infrastructure, extracts strings into locale files (source language preserved), translates to target language (default), and replaces hardcoded strings with i18n keys. Produces a glossary and translation report. Works with any frontend framework.
-model: haiku
+model: sonnet
 effort: medium
 color: green
 tools: Read, Edit, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs

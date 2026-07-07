@@ -22,8 +22,8 @@ color: blue
 **Frontmatter keys.**
 - `name` — agent identifier (matches the filename).
 - `description` — one-line summary used by the invoker to decide when to route to this agent.
-- `model` — `opus` for agents whose work is **analysis or coordination** (cannot fail); `sonnet` for agents whose work is **execution following a plan** (write code, tests, diagrams, commits, docs).
-- `effort` — reasoning level when the agent is active. Allowed: `medium` | `high` | `xhigh` | `max`. **`low` is forbidden by project policy** (the floor is `medium`). Tune per agent based on how much judgement the role demands; the matrix in the Roster below is canonical.
+- `model` — `opus` for the highest-stakes, non-recoverable analysis and coordination (`architect`, `security`, `agent-builder`, orchestrator); `sonnet` for everything else — execution against a plan AND secondary analysis/review a human or gate still ratifies (`adversary`, `reviewer`, `qa`, `acceptance-checker`, `translator`, …), since Sonnet 5 at `xhigh` sits near Opus for these at a fraction of the cost; `haiku` only for `researcher`/`init` (mechanical, downstream-gated).
+- `effort` — reasoning level when the agent is active. Allowed: `medium` | `high` | `xhigh` (the ceiling). **`max` is retired** (marginal gain over `xhigh` at a large cost premium) and **`low` is forbidden** (the floor is `medium`). On Claude Code `effort` is session-global, so this per-agent value is opencode-honored and advisory on CC; the model is the load-bearing per-agent lever there. The matrix in the Roster below is canonical.
 - `color` — arbitrary colour label for display.
 - `tools` — comma-separated allowlist of tools the agent can invoke (capability scoping). The runtime restricts the agent to this set; tools not listed are unavailable. Read-only agents (`security`, `acceptance-checker`, `qa`) MUST NOT include `Bash`, `Edit`, or `Write` beyond their own workspace doc. Agents that need external research include `WebFetch`, `WebSearch`. Agents that build (implementer, tester, delivery, diagrammers) include `Bash`. The canonical allowlist per agent lives in each agent's frontmatter and is the source of truth.
 
@@ -35,10 +35,10 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 |---|---|---|---|---|
 | `orchestrator` | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, all 8 `mcp__memory__*` (KG read + write) | Central hub. Coordinates the pipeline and routes to all other agents. |
 | `architect` | opus | `xhigh` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Architecture design, research, planning, audits. **No Bash** (read-only on system). KG read-only (Phase 6 writes stay in orchestrator). |
-| `agent-builder` | opus | `max` | Read, Edit, Write, Glob, Grep, Bash | Create / improve agents and skills. |
-| `security` | opus | `max` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). KG read-only for prior-vuln lookup. |
-| `adversary` | opus | `max` | Read, Glob, Grep, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | Independent adversarial reviewer with a break-the-design mandate. Runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in Spanish. **No Bash, no Edit** (write-only to own workspace doc `reviews/04-adversary.md`). KG read-only. |
-| `reviewer` | opus | `max` | Read, Glob, Grep, Edit, Write, Bash | GitHub PR review. Bash limited to `git`/`gh` for diff retrieval. |
+| `agent-builder` | opus | `xhigh` | Read, Edit, Write, Glob, Grep, Bash | Create / improve agents and skills. |
+| `security` | opus | `xhigh` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | OWASP / CWE / ASVS audits. **No Bash** (strict read-only on system). KG read-only for prior-vuln lookup. |
+| `adversary` | sonnet | `xhigh` | Read, Glob, Grep, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | Independent adversarial reviewer with a break-the-design mandate. Runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in Spanish. **No Bash, no Edit** (write-only to own workspace doc `reviews/04-adversary.md`). KG read-only. |
+| `reviewer` | sonnet | `xhigh` | Read, Glob, Grep, Edit, Write, Bash | GitHub PR review. Bash limited to `git`/`gh` for diff retrieval. |
 | `qa-plan` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Pre-code AC work: ratify-plan (Phase 1.5), define-ac (standalone), reconcile (Phase 2.5), plan-review panel substance-reviewer. **No Bash** (read-only on system). KG read-only. |
 | `qa` | sonnet | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Post-code validation: validate (Phase 3), pr-review-qa, docs-validation, cross-repo review. **No Bash** (read-only on system). KG read-only for AC-pattern lookup. |
 | `plan-reviewer` | sonnet | `medium` | Read, Glob, Grep, Write | Read-only audit of Stage 1 artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict at Phase 1.6 before STAGE-GATE-1. **No Bash, no Edit** (write-only on its own workspace doc). |
@@ -47,11 +47,11 @@ The combination of `model` + `effort` + `tools` below is the canonical matrix fo
 | `init` | haiku | `medium` | Read, Edit, Write, Glob, Grep, Bash | Bootstrap `CLAUDE.md` in any repo. |
 | `implementer` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, NotebookEdit | Production code following the architect's Work Plan. |
 | `tester` | sonnet | `high` | Read, Edit, Write, Bash, Glob, Grep, `mcp__memory__search_nodes`, `mcp__memory__open_nodes` | Test suites with factory mocks. KG read-only for test-pattern lookup. |
-| `acceptance-checker` | haiku | `high` | Read, Glob, Grep, Write | External audit comparing original spec vs delivered artifacts (Phase 3.6, non-binding verdict). **No Bash, no Edit** (write-only on its own workspace doc). |
+| `acceptance-checker` | sonnet | `high` | Read, Glob, Grep, Write | External audit comparing original spec vs delivered artifacts (Phase 3.6, non-binding verdict). **No Bash, no Edit** (write-only on its own workspace doc). |
 | `diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash, WebFetch | Excalidraw diagrams (render-validate loop). |
 | `likec4-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | LikeC4 diagrams (architecture-as-code). |
 | `d2-diagrammer` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | D2 diagrams. |
-| `translator` | haiku | `medium` | Read, Edit, Write, Glob, Grep, Bash | i18n discovery, glossary, translation. |
+| `translator` | sonnet | `medium` | Read, Edit, Write, Glob, Grep, Bash | i18n discovery, glossary, translation. |
 | `documenter` | sonnet | `high` | Read, Edit, Write, Glob, Grep, Bash | Diagram-first Obsidian documentation from architect research. |
 | `ux-reviewer` | opus | `high` | Read, Glob, Grep, Edit, Write, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | UI/UX review for frontend tasks — accessibility, responsiveness, component reuse. Dispatched when `frontend_scope: true`. |
 | `delivery` | sonnet | `medium` | Read, Edit, Write, Bash, Glob, Grep | Docs, changelog, version, branch, commit, PR. |
@@ -71,8 +71,8 @@ Plus two cross-cutting snippets in `_shared/` (not invocable agents), installed 
 
 Three principles drive the matrix above:
 
-1. **Model by nature of the work.** Agents that do **analysis or coordination** (architect, security, reviewer, qa-plan, gcp-cost-analyzer, agent-builder, orchestrator) run on `opus` — a wrong call here cascades through the whole pipeline. Agents that do **execution against a finished plan** (implementer, tester, delivery, diagrammers) or **high-volume post-code auditing** (qa, documenter) run on `sonnet` — the heavy thinking has already been done upstream. Agents that do **mechanical work with structured output and a named downstream safety net** (`researcher`, `init`, `acceptance-checker`, `translator`) run on `haiku` — each has light judgment that is absorbed by a human or gate downstream (see the eligibility criteria and per-agent justifications below).
-2. **Effort by depth of judgement required.** `max` for irreversible analysis (security audits, PR reviews, agent design). `xhigh` for exhaustive analysis whose blast radius a downstream gate still de-risks — below `max` because a gate catches a bad output before it causes harm, but the analysis mandate is genuinely exhaustive, not merely solid (`architect`: largest decision surface, seeds the whole pipeline, gated by STAGE-GATE-1; `gcp-infra`: production-mutation planning, gated by `gcp-guard.sh` + Phase 3.5 audit + STOP). `high` for solid analytical work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan, tester authoring regression tests). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`.
+1. **Model by nature of the work.** The highest-stakes, non-recoverable analysis and coordination (architect, security, agent-builder, qa-plan, orchestrator, and the GCP/UX specialists) runs on `opus` — a wrong call here cascades through the whole pipeline. Everything else runs on `sonnet`: execution against a finished plan (implementer, tester, delivery, diagrammers), high-volume post-code auditing (qa, documenter), AND secondary analysis/review whose output a human or gate still ratifies (`adversary`, `reviewer`, `acceptance-checker`, `translator`) — Sonnet 5 at `xhigh` sits near Opus for these at a fraction of the cost, so the split is stakes-and-recoverability, not analysis-vs-execution. Only `researcher` and `init` stay on `haiku` (mechanical, structured, downstream-gated — see the eligibility criteria below).
+2. **Effort by depth of judgement required.** `xhigh` is the ceiling — for exhaustive or irreversible analysis (`architect`, `security`, `adversary`, `agent-builder`, `gcp-infra`); `max` is retired (marginal gain over `xhigh` at a large cost premium). `high` for solid analytical work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan, tester authoring regression tests, `acceptance-checker`). `medium` for everything else, **including the most mechanical tasks** — the floor is `medium`, never `low`. On Claude Code effort is session-global (this per-agent value is opencode-honored, advisory on CC); the model is the load-bearing per-agent lever there.
 3. **Tools by capability boundary.** The `tools` field is the **agency boundary** — what the agent literally cannot do regardless of what its prompt instructs. Read-only auditors (`architect`, `security`, `qa`, `qa-plan`, `acceptance-checker`) lose `Bash` so they cannot mutate the host even by accident. Builders (`implementer`, `tester`, `delivery`, diagrammers, `translator`, `init`, `agent-builder`) keep `Bash` but the harness gates destructive commands at `PreToolUse` (see `hooks/config.json`). Permission surface = agency boundary; tighten one and the prompt becomes a softer guardrail backed by a hard one.
 
 ### Haiku eligibility criteria
@@ -87,7 +87,7 @@ When any condition does not hold, `sonnet` is the minimum floor. Use `opus` when
 
 ### Per-agent haiku justification
 
-The three agents below joined `researcher` on `haiku` in v2.85.0. Each has light judgment (criterion 2 is partial); a named downstream safety net absorbs the risk in each case — mirroring the low-cost matrix Justification pattern.
+`researcher` and `init` are the only `haiku` roles. Each is mechanical with structured output and a named downstream safety net that absorbs its light judgment.
 
 **`init`**
 - C1 mechanical/structured: clean — bootstrap is templated `CLAUDE.md` generation against a discovered stack; the output structure is deterministic.
@@ -95,17 +95,7 @@ The three agents below joined `researcher` on `haiku` in v2.85.0. Each has light
 - C3 cheap/detectable failure: clean — one-shot output reviewed before the first commit.
 - **Named safety net:** the operator edits the generated `CLAUDE.md` before the first commit. A wrong naming or structure call is caught at human review; no cascade.
 
-**`acceptance-checker`**
-- C1 mechanical/structured: clean — structural diff of the approved spec versus delivered artifacts; the comparison procedure is deterministic.
-- C2 no judgment: partial — light "materially covered" judgment when assessing spec coverage.
-- C3 cheap/detectable failure: clean — verdict is non-binding (Phase 3.6).
-- **Named safety net:** the verdict is non-binding; the orchestrator decides whether to proceed. A wrong "materially covered" call does not gate delivery on its own; the orchestrator's acceptance check is the authority.
-
-**`translator`**
-- C1 mechanical/structured: clean — glossary-anchored extraction and structured locale-file output; the glossary constrains synthesis to a lookup.
-- C2 no judgment: partial — product-aware glossary judgment when selecting the correct term per context.
-- C3 cheap/detectable failure: clean — failures are visible on the locale-file diff.
-- **Named safety net:** the glossary is the contextual anchor and the human reviews the i18n diff at PR time. A wrong term is detectable on the diff; the glossary constrains synthesis.
+`acceptance-checker` and `translator` were promoted `haiku → sonnet`: acceptance-checker is a drift-detecting gate whose miss weakens delivery review, and translator is a rare-but-must-not-fail role (neutral-register translation) — both earn a stronger model even though their downstream safety nets (non-binding verdict; human i18n-diff review) remain.
 
 ## Low-cost mode
 
@@ -115,7 +105,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 
 **Engineering-honest trade-off.** On low-cost mode: architecture proposals are 1-2 iterations rougher (less novel synthesis, weaker risk enumeration); security audits are coarser (obvious OWASP-Top-10 issues caught, subtle injection vectors more likely missed); reviewer verdicts are more lenient; test suites miss ~5-15% more negative-path cases; code-generation correctness is preserved at `sonnet` (the implementer's standard tier). Single pipeline run is roughly **15-30% cheaper** and **15-30% slower** (more Phase 3 iteration loops). Suitable for personal projects, prototypes, and side-org workloads where the human reviewer at each STAGE-GATE is the trusted backstop — not for production-grade work where the standard mode's quality contract is load-bearing.
 
-**Low-cost matrix** (vestigial — Go installer infra decommissioned 2026-06-02; `cmd/install/modes.go::lowCostMatrix` is no longer the source of truth. Table kept for historical reference only.):
+**Low-cost matrix** (vestigial — Go installer infra decommissioned 2026-06-02; `cmd/install/modes.go::lowCostMatrix` is no longer the source of truth. Table kept for historical reference only. Its **Standard** columns predate the `adversary`/`reviewer` → `sonnet` and `acceptance-checker`/`translator` → `sonnet` re-tiering and the `max` → `xhigh` ceiling — the Roster table above is canonical.):
 
 | Agent | Standard model | Standard effort | Low-cost model | Low-cost effort | Notes |
 |---|---|---|---|---|---|
@@ -145,7 +135,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `researcher` | haiku | medium | sonnet | medium | Post-decommission agent — not in Go installer lowCostMatrix. In low-cost mode, runs on sonnet (haiku→sonnet upgrade; mechanical role is still suitable). |
 | `research-consolidator` | sonnet | high | sonnet | medium | Post-decommission agent — not in Go installer lowCostMatrix. Effort drops to medium in low-cost; consolidation quality is reduced but the fail-open fail-safe applies. |
 
-**Tally (standard mode):** 8 agents on `opus` (orchestrator, architect, agent-builder, security, adversary, reviewer-consolidator, qa-plan, mentor), 4 agents on `haiku` (`researcher`, `init`, `acceptance-checker`, `translator`), remainder on `sonnet`. In low-cost mode, all on `sonnet`. No `max`, no `low`.
+**Tally (standard mode):** core `opus` agents — orchestrator, architect, agent-builder, security, reviewer-consolidator, qa-plan, mentor (plus the GCP/UX specialists); `haiku` — `researcher`, `init`; everything else on `sonnet`, now including `adversary`, `reviewer`, `acceptance-checker`, `translator`. In low-cost mode, all on `sonnet`. No `max`, no `low`.
 
 **Low-cost mode and the haiku tier:** the low-cost matrix (legacy Go installer, `cmd/install/modes.go::lowCostMatrix`) is frozen pre-haiku and does NOT track the `researcher` or `research-consolidator` agents. The Go installer is roadmapped as the **opencode agents installer** — fleet model-allocation changes no longer propagate to it. Plugin install (`/plugin install th`) is the canonical path and receives the correct `model: haiku` assignment. See `CLAUDE.md §3` for the full exclusion rationale.
 

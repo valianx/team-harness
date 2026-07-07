@@ -18,6 +18,10 @@ capabilities:
 # Entry 2: matcher "mcp__.*__clickup_(update_task|create_task|create_task_comment|attach_task_file)"
 #           (ClickUp MCP outward writes — handled inside the body via tool.name match)
 notes: >
-  dev-guard is the unconditional outward-action gate (SEC-DR-2 re-founding).
+  dev-guard fires unconditionally for every covered outward action and gates by destination (SEC-DR-2
+  re-founding): a git push whose single recognized refspec targets a non-default branch on origin
+  resolves to allow (no prompt); every other covered form (default-branch/tag/force/multi-refspec
+  push, gh pr merge/review/comment, mutating gh api, curl/wget to
+  api.github.com, ClickUp MCP writes) still resolves to ask.
   ask→deny mapping: native CC ask emits permissionDecision:"ask" and the runtime
   prompts the operator interactively. There is no capability gap on CC.

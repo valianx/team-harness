@@ -1,7 +1,7 @@
 ---
 name: acceptance-checker
 description: Drift-only auditor that compares the approved plan (01-plan.md § Review Summary, frozen at STAGE-GATE-1) against the current AC (§ Task List), spot-checks deltas against qa's verdict (reviews/04-validation.md § AC Coverage Results) and the §-scoped implementation record (02-implementation.md), and grounds each substantive original-description commitment against delivered artifacts — trusting qa's AC-satisfaction result rather than re-validating it. Detects drift between "what was approved" and "what is being delivered". Produces a non-binding verdict (pass / concerns / fail) the orchestrator uses to decide whether to proceed to Delivery. Read-only. Not a verification-packet consumer — reads its authoritative sources directly.
-model: haiku
+model: sonnet
 effort: high
 color: pink
 tools: Read, Glob, Grep, Write

@@ -582,6 +582,167 @@ mutation returns `isResolved: true`. Safe to re-run.
 orphaned by rebase, force-push, or squash) even when the UI shows no resolution
 affordance. The mutation proceeds normally.
 
+## Tier B — batched review disposition (aliased mutation)
+
+Composes every reply and every resolve produced by one comment-incorporation
+pass (`apply-review-disposition.md` Steps 5-6) into a **single** `gh api
+graphql` call, instead of one call per thread. This is additive — the
+single-thread sections above ("Tier B — reply to a review thread", "Tier B —
+resolve a review thread") remain the documented fallback and are used
+unchanged whenever `has_gh=false`, whenever no token is available, or whenever
+the batched call itself fails outright (auth error, network error). The
+batched path is the default when `has_gh=true`; the single-thread path is not
+removed.
+
+**Why batch:** each reply and each resolve is individually a covered outward
+mutation — `GH_GRAPHQL_RE && GRAPHQL_PR_MUTATIONS_RE` in the dev-guard matches
+`gh api graphql` carrying `addPullRequestReviewThreadReply` or
+`resolveReviewThread` and gates it with `ask`. N threads processed one call at
+a time cost N operator prompts. Composing all N+M mutations (N replies, M
+resolves, M ≤ N since only `APPLIED` — or fully-resolved `PARTIAL` — decisions
+resolve) into one aliased request means the dev-guard's regex matches the
+call exactly once. The gate is not weakened: the same call still requires the
+same `ask`; only the number of prompts for one review pass drops from N+M to 1.
+
+### Fixed query template — integer-indexed aliases
+
+The query is a **fixed template**: one `reply{i}` block per comment
+(`i = 0..N-1`, in ledger order) followed by one `resolve{i}` block per comment
+whose Decision resolves its thread (a subset of the same index range). Reply
+aliases always precede resolve aliases in the query text — GraphQL executes
+top-level mutation fields serially, left to right, so this ordering is a
+hard guarantee, not a convention. A `resolve{i}` alias reuses the same
+`$thread{i}` variable as its matching `reply{i}` — one thread-id variable per
+comment, never duplicated:
+
+```graphql
+mutation(
+  $thread0: ID!, $body0: String!,
+  $thread1: ID!, $body1: String!,
+  $thread2: ID!, $body2: String!
+) {
+  reply0: addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $thread0, body: $body0 }) {
+    comment { id }
+  }
+  reply1: addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $thread1, body: $body1 }) {
+    comment { id }
+  }
+  reply2: addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $thread2, body: $body2 }) {
+    comment { id }
+  }
+  resolve0: resolveReviewThread(input: { threadId: $thread0 }) {
+    thread { id isResolved }
+  }
+  resolve2: resolveReviewThread(input: { threadId: $thread2 }) {
+    thread { id isResolved }
+  }
+}
+```
+
+The example above shows N=3 replies with M=2 resolves (comment 1 was
+`DEFERRED` or `REJECTED` — replied to, not resolved). The alias set scales
+mechanically with N and M; the shape per index never changes.
+
+**CWE-78 completeness — every data value is a variable, never query text.**
+Every reply body and every thread node ID is bound through the GraphQL
+`variables` map (`-f`/`--input`, raw string) — never concatenated or
+interpolated into the query string. This mirrors the existing correct
+pattern at § "Tier B — reply to a review thread" (`-f body='...'`) and
+extends it to the thread IDs as well:
+
+- Only the alias names (`reply0`, `reply1`, …) and the variable declarations
+  (`$thread0: ID!`, …) are query text, and both are built purely from the
+  loop index `i` — never from thread or comment content.
+- `-F` is reserved for genuinely numeric or boolean values. It is never used
+  for reply bodies or thread IDs: `gh api graphql -F` applies typed coercion
+  (a value that is all digits becomes a number, `true`/`false` becomes a
+  boolean) and treats a leading `@` as "read this value from a file" — a
+  reply body of `123`, `true`, or `@/etc/passwd` would be silently
+  mismanaged or read a local file under `-F`. Thread IDs (`PRRT_…`) and reply
+  bodies are always free-form strings, so both go through `-f`/`--input`.
+  This section has no numeric/boolean inputs, so `-F` is not used at all.
+
+**Composition procedure (no shell interpolation of data values):**
+
+1. Build the ledger in memory from `apply-review-disposition.md` Steps 5-6:
+   for each comment, `{index: i, thread_id, reply_body, resolves: bool}`.
+2. Write the ledger to a JSON manifest file (via the Write tool — never via a
+   shell `echo`/heredoc containing the composed reply text) at, e.g.,
+   `workspaces/{feature}/inputs/review-disposition-batch.json`.
+3. Run a small script (`python3` or `node`, argv = the manifest file path
+   only) that reads the manifest, builds the fixed-template query string
+   from the entry count (aliases + variable declarations from `i`, never
+   from `thread_id`/`reply_body`), builds the `variables` object
+   (`{"thread0": "...", "body0": "...", ...}`) from the manifest's data
+   fields, and writes the combined `{"query": "...", "variables": {...}}`
+   GraphQL request body to a temp file.
+4. Issue **one** call:
+   ```bash
+   gh api graphql --input "$batch_payload_file"
+   ```
+   (curl fallback, when `has_gh=false` but a token is set: `curl -sf -X POST
+   -H "Authorization: Bearer $token" -H "Content-Type: application/json"
+   https://api.github.com/graphql --data @"$batch_payload_file"` — same
+   file, same discipline. When neither `gh` nor a token is available, do not
+   attempt the batch; fall through to the single-thread operator-paste
+   sections above.)
+
+### Payload preview mandate (before the gated call)
+
+Before issuing the single gated call, render the full composed batch to the
+operator in chat — every reply body and which thread it resolves — so the
+one `ask` the operator approves covers a payload they have actually seen,
+mirroring the existing preview-and-confirm contract for outward actions
+(`docs/dev-mode.md` § Outward-Action Gate). Example rendering:
+
+```text
+Batch review-disposition payload — 3 replies, 2 resolves, PR #{number}:
+
+  [0] thread {short-thread-id-0} — resolve: yes
+      reply: "{reply body 0}"
+  [1] thread {short-thread-id-1} — resolve: no (DEFERRED — follow-up #123)
+      reply: "{reply body 1}"
+  [2] thread {short-thread-id-2} — resolve: yes
+      reply: "{reply body 2}"
+```
+
+Do not issue the `gh api graphql --input …` call until this preview has been
+shown. The gated `ask` that follows covers the whole previewed batch, not a
+per-thread prompt.
+
+### Partial failure — per-alias, not all-or-nothing
+
+GraphQL executes the top-level mutation fields serially; a failure on one
+alias does not abort the others — nullable fields simply resolve to `null`
+for the failed alias, and the response carries both `data` (per-alias
+results, possibly with `null` entries) and `errors` (each entry's `path[0]`
+names the failed alias, e.g. `["reply1"]`).
+
+After the call:
+1. Read `data.{alias}` for every alias declared in the query. An alias with a
+   non-null result succeeded.
+2. Read `errors[].path[0]` for every alias that failed; map it back to its
+   ledger entry by index (`reply1` → ledger entry `1`) and report the thread
+   and the error message by name.
+3. Do not retry succeeded aliases. Report failed aliases individually in the
+   delivery summary (thread, alias, error) so the operator can see exactly
+   which reply/resolve did not land, without re-issuing the whole batch.
+4. A `resolve{i}` alias failing on a 403 (missing "Contents: read+write";
+   see § "Tier B — resolve a review thread" § "Permission and degradation on
+   403") degrades the same way as the single-thread path: the matching
+   `reply{i}` still counts as posted if it succeeded, the resolve for that
+   index alone is reported as skipped with the missing-permission name, and
+   the batch is not considered a hard failure over one skipped resolve.
+
+### Fallback — additive, not a replacement
+
+The batched path requires `has_gh=true`. Every other condition — `gh`
+missing, no token, non-GitHub remote, or the batched call itself failing to
+reach the API — falls through unchanged to the single-thread sections above
+(§ "Tier B — reply to a review thread", § "Tier B — resolve a review
+thread"): one `gh api graphql` (or operator-paste) call per thread, exactly
+as before this section was added.
+
 ## Tier D — project board ops (graceful skip)
 
 `gh project` calls wrap GitHub's Projects V2 GraphQL API. There is no REST

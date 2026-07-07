@@ -1,6 +1,6 @@
 # Orchestrator Disposition — Contract
 
-The top-level Claude Code agent IS the orchestrator. This is the CC native architecture, not a mode that activates or deactivates. The security property that protects outward actions is enforced by the `dev-guard` gate (`.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh dev-guard` → `hooks/ts/dist/dev-guard.cjs`), which fires UNCONDITIONALLY for covered outward actions — no filesystem marker required or consulted.
+The top-level Claude Code agent IS the orchestrator. This is the CC native architecture, not a mode that activates or deactivates. The security property that protects outward actions is enforced by the `dev-guard` gate (`.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh dev-guard` → `hooks/ts/dist/dev-guard.cjs`), which fires UNCONDITIONALLY for every covered outward action and gates by destination — no filesystem marker required or consulted.
 
 **SEC-DR-2 re-founding (v2.89.0).** The former "dev mode" was a conditional disposition controlled by `~/.claude/.dev-mode-active`. That model was retired when empirical testing (M1 probe, 2026-06-14) confirmed that nested foreground subagents retain the `Task` tool — the foundational premise behind the handoff machinery was obsolete on the CC path. The disposition is now unconditional: the general agent is always the orchestrator, and the gate is always armed.
 
@@ -10,13 +10,14 @@ The top-level Claude Code agent IS the orchestrator. This is the CC native archi
 
 The deterministic security layer is the PreToolUse hook `dev-guard`, wired in its own dedicated `Bash`-only PreToolUse entry in `.claude-plugin/hooks.json` — the marketplace plugin's runtime, the only Claude Code install path (the Go installer's CC path is retired; `hooks/config.json`, its per-OS wiring template, no longer exists). The entry runs `hooks/run-ts-hook.sh dev-guard`, a fail-closed launcher with no gate logic of its own that execs `node` against `hooks/ts/dist/dev-guard.cjs` — TypeScript is the single source of gate logic, shared with the opencode runtime. `policy-block` is in a separate entry with matcher `Bash|Write|Edit|NotebookEdit` so it continues to secret-scan write/edit content — dev-guard never fires on Edit/Write/NotebookEdit. This is the GUARANTEE — not the disposition.
 
-The gate fires UNCONDITIONALLY for covered outward actions. No filesystem marker is read; no session state is checked.
+The gate fires UNCONDITIONALLY for covered outward actions and gates by destination — evaluating every one of them, never skipping the check, while the DECISION varies with what the command actually targets. No filesystem marker is read; no session state is checked.
 
 **What it gates (by DESTINATION, not by binary):**
 
 | Covered action | Decision | Rationale |
 |---|---|---|
-| Push to a remote: `git push` (bare, `git -C <path> push`, `GIT_DIR=... git push`) | `ask` | Any push to a remote is an irreversible outward action |
+| Push to a remote: single recognized refspec targeting a non-default branch on `origin` (no force/mirror/all/tags/delete) | `allow` | The closed-form recognizer confirms the destination is a non-default branch on `origin` — a routine feature-branch push proceeds without a prompt |
+| Push to a remote: default branch, tag, force (flag or `+refspec`/`--mirror`), multi-refspec, delete refspec, or a remote other than `origin` | `ask` | Any push outside the single recognized safe form is an irreversible outward action |
 | `gh pr merge` | `ask` | Merges to main cannot be undone |
 | `gh pr review` (including `--dismiss`) | `ask` | Publishes a review on behalf of the operator |
 | `gh pr comment` | `ask` | Publishes a comment on behalf of the operator |
@@ -28,13 +29,13 @@ The gate fires UNCONDITIONALLY for covered outward actions. No filesystem marker
 
 **What `ask` means:** `permissionDecision: "ask"` causes the Claude Code runtime to prompt the OPERATOR interactively for that specific call. The agent CANNOT auto-approve an `ask`. There is NO authorisation marker file — the authorisation is human out-of-band. A legitimate delivery push at STAGE-GATE-3 proceeds through this same operator approval, mirroring the preview-and-confirm contract of review-mode (#251/#252).
 
-**Fail-CLOSED for covered actions:** the hook issues `ask` for every covered outward action, unconditionally. This is the intentional fail-mode: the consequences of an unauthorised merge to main are irreversible; the consequences of an over-zealous `ask` are a minor friction.
+**Fail-CLOSED for covered actions:** the hook evaluates every covered outward action unconditionally and returns a destination-aware decision — `allow` only for the single recognized safe push form, `ask` for every other form (default-branch/tag/force/multi-refspec/non-`origin` pushes, merges, PR/issue creation, API/ClickUp writes). This is the intentional fail-mode: the consequences of an unauthorised merge to main are irreversible; the consequences of an over-zealous `ask` are a minor friction.
 
 **Default → no-decision for non-covered calls:** when the command is not a covered outward action, the hook emits **no permissionDecision** — exit 0, empty stdout — and defers to the operator's normal permission flow. A permission gate must never widen permissions on its fail-safe path.
 
 **No authorisation file.** A file that the agent can write with `echo authorized > ...` is forgeable by the same subject the gate protects — it is not a control. The authorisation is `ask` (human), not a file.
 
-**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates.
+**Residual limit (documented honesty):** obfuscation via `eval`/`base64`/alias/heredoc — and reconstruction of a gated verb the router cannot see as a contiguous token, whether by quote/backslash splicing (`''git push`, `g''it push`) or by parameter/command expansion (`p=push; git $p …`) — is a known limit of any string-matching gate (parity with `policy-block`). The threat model is disposition that rationalises the readable path — not an adversary who actively obfuscates; for the injected-obfuscation case the prompt-injection floor (§6.6) is the primary defense.
 
 ---
 

@@ -144,6 +144,22 @@ assert_deny() {
     fi
 }
 
+# assert_deny_reason_contains NAME NEEDLE
+assert_deny_reason_contains() {
+    local name="$1" needle="$2"
+    if printf '%s' "$_HOOK_STDOUT" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+o = d.get('hookSpecificOutput', d)
+reason = o.get('permissionDecisionReason', '')
+sys.exit(0 if '$needle' in reason else 1)
+" 2>/dev/null; then
+        pass "$name (deny reason contains: $needle)"
+    else
+        fail "$name" "expected deny reason to contain '$needle' but stdout was: ${_HOOK_STDOUT:-<empty>}"
+    fi
+}
+
 # assert_stderr_contains NAME NEEDLE
 assert_stderr_contains() {
     local name="$1" needle="$2"
@@ -1490,6 +1506,273 @@ rm -f "$_tmpout_n6" "$_tmperr_n6"
 
 assert_nodecision "NEW-6: non-existent cwd → skipped, no deny (fail-open)"
 assert_stderr_contains "NEW-6: non-existent-dir warning in stderr" "does not exist"
+
+# ---------------------------------------------------------------------------
+# Suite 19: release-cut marker/trailer recognition
+#
+# A feature branch (non-release/vX.Y.Z) carrying a version.d/.release-cut
+# marker (or a release-cut: commit trailer) is routed to the SAME
+# runReleasePath check a release/vX.Y.Z branch uses — the marker authorizes
+# RUNNING that check, never bypassing it.
+# ---------------------------------------------------------------------------
+
+echo
+echo "=== Suite 19: release-cut marker/trailer recognition ==="
+
+# ---------------------------------------------------------------------------
+# feature branch + marker (v2.107.1) + all-three sites bumped+matching
+# → nodecision (release-path applied, not denied)
+# ---------------------------------------------------------------------------
+echo
+echo "--- feature branch + marker + all-three bumped+matching → nodecision ---"
+
+_bare_m1=$(_new_tmp)
+_clone_m1=$(_new_tmp)
+
+git init --bare "$_bare_m1" -q 2>/dev/null
+git clone "$_bare_m1" "$_clone_m1" -q 2>/dev/null
+
+(
+    cd "$_clone_m1"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent" > agents/marker-a.md
+    git add .
+    git commit -m "initial: version 2.107.0" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch (NOT release/vX.Y.Z): modify shipped asset, bump all
+    # three sites, and write the release-cut marker.
+    git checkout -b feat/marker-positive -q 2>/dev/null
+    echo "# marker agent — updated" > agents/marker-a.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
+    mkdir -p version.d
+    printf 'v2.107.1\n' > version.d/.release-cut
+    git add .
+    git commit -m "feat: marker-positive — release-cut marker with all three sites bumped" -q 2>/dev/null
+)
+
+_run_hook "$_clone_m1"
+assert_nodecision "feature branch + marker + all-three bumped+matching → nodecision (release-path applied)"
+
+# ---------------------------------------------------------------------------
+# feature branch + marker + a version site left stale → DENY
+# ---------------------------------------------------------------------------
+echo
+echo "--- feature branch + marker + marketplace.json/CLAUDE.md stale → DENY ---"
+
+_bare_m2=$(_new_tmp)
+_clone_m2=$(_new_tmp)
+
+git init --bare "$_bare_m2" -q 2>/dev/null
+git clone "$_bare_m2" "$_clone_m2" -q 2>/dev/null
+
+(
+    cd "$_clone_m2"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent b" > agents/marker-b.md
+    git add .
+    git commit -m "initial: version 2.107.0" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: only plugin.json bumped — marketplace.json and CLAUDE.md
+    # stay stale at 2.107.0 (the marker must not paper over a missing site).
+    git checkout -b feat/marker-missing-site -q 2>/dev/null
+    echo "# marker agent b — updated" > agents/marker-b.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    mkdir -p version.d
+    printf 'v2.107.1\n' > version.d/.release-cut
+    git add agents/marker-b.md .claude-plugin/plugin.json version.d/.release-cut
+    git commit -m "feat: marker-missing-site — marker present but only plugin.json bumped" -q 2>/dev/null
+)
+
+_run_hook "$_clone_m2"
+assert_deny "feature branch + marker + missing site (marketplace.json/CLAUDE.md stale) → deny"
+
+# ---------------------------------------------------------------------------
+# feature branch + NO marker + stray all-three-site bump → DENY
+# (confirms the marker-recognition branch is not accidentally reached without
+# the marker; behavior is unchanged from the pre-existing feature path)
+# ---------------------------------------------------------------------------
+echo
+echo "--- feature branch + NO marker + stray bump → DENY (feature-path unchanged) ---"
+
+_bare_m3=$(_new_tmp)
+_clone_m3=$(_new_tmp)
+
+git init --bare "$_bare_m3" -q 2>/dev/null
+git clone "$_bare_m3" "$_clone_m3" -q 2>/dev/null
+
+(
+    cd "$_clone_m3"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent c" > agents/marker-c.md
+    git add .
+    git commit -m "initial: version 2.107.0" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: modify shipped asset + bump all three sites (matching),
+    # but write NO release-cut marker and NO trailer.
+    git checkout -b feat/marker-absent-stray-bump -q 2>/dev/null
+    echo "# marker agent c — updated" > agents/marker-c.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
+    git add .
+    git commit -m "feat: marker-absent-stray-bump — no marker, no trailer" -q 2>/dev/null
+)
+
+_run_hook "$_clone_m3"
+assert_deny "feature branch + no marker + stray bump → deny (single-bump invariant, feature-path unchanged)"
+
+# ---------------------------------------------------------------------------
+# feature branch + marker present but NOT strict SemVer → DENY
+# (never falls to feature-path, never skips the version-match checks — even
+# though all three sites are bumped and matching, a well-formed release-path
+# push from this same diff would otherwise be nodecision)
+# ---------------------------------------------------------------------------
+echo
+echo "--- feature branch + non-semver marker content → DENY ---"
+
+_bare_m4=$(_new_tmp)
+_clone_m4=$(_new_tmp)
+
+git init --bare "$_bare_m4" -q 2>/dev/null
+git clone "$_bare_m4" "$_clone_m4" -q 2>/dev/null
+
+(
+    cd "$_clone_m4"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent d" > agents/marker-d.md
+    git add .
+    git commit -m "initial: version 2.107.0" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: all three sites bumped+matching (would be nodecision
+    # under a well-formed marker), but the marker content is not semver.
+    git checkout -b feat/marker-malformed -q 2>/dev/null
+    echo "# marker agent d — updated" > agents/marker-d.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
+    mkdir -p version.d
+    printf 'not-a-version\n' > version.d/.release-cut
+    git add .
+    git commit -m "feat: marker-malformed — release-cut marker is not strict semver" -q 2>/dev/null
+)
+
+_run_hook "$_clone_m4"
+assert_deny "feature branch + non-semver marker → deny (malformed signal never authorizes allow)"
+assert_deny_reason_contains "deny reason names the strict-SemVer requirement" "does not parse as strict SemVer"
+
+# ---------------------------------------------------------------------------
+# (trailer variant): feature branch + release-cut: trailer (SECONDARY
+# signal, no marker file) + all-three bumped+matching → nodecision
+# ---------------------------------------------------------------------------
+echo
+echo "--- (trailer variant): feature branch + release-cut: trailer, no marker file → nodecision ---"
+
+_bare_m5=$(_new_tmp)
+_clone_m5=$(_new_tmp)
+
+git init --bare "$_bare_m5" -q 2>/dev/null
+git clone "$_bare_m5" "$_clone_m5" -q 2>/dev/null
+
+(
+    cd "$_clone_m5"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent e" > agents/marker-e.md
+    git add .
+    git commit -m "initial: version 2.107.0" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: modify shipped asset, bump all three sites, no marker
+    # file — the release-cut signal arrives only via the commit-trailer.
+    git checkout -b feat/marker-trailer -q 2>/dev/null
+    echo "# marker agent e — updated" > agents/marker-e.md
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.1`\n' > CLAUDE.md
+    git add .
+    git commit -m "feat: marker-trailer — release-cut signalled via commit trailer only" -q 2>/dev/null
+)
+
+_HOOK_STDOUT=""
+_HOOK_STDERR=""
+_tmpout_m5=$(mktemp)
+_tmperr_m5=$(mktemp)
+(cd "$_clone_m5" && _push_payload \
+    | GIT_COMMIT_MSG="release-cut: v2.107.1" _exec_hook >"$_tmpout_m5" 2>"$_tmperr_m5") || true
+_HOOK_STDOUT=$(cat "$_tmpout_m5")
+_HOOK_STDERR=$(cat "$_tmperr_m5")
+rm -f "$_tmpout_m5" "$_tmperr_m5"
+assert_nodecision "trailer variant: feature branch + release-cut: trailer (no marker file) → nodecision"
+
+# ---------------------------------------------------------------------------
+# feature branch + DELETED release-cut marker (status D) → nodecision
+#
+# A deletion of version.d/.release-cut is not a release-cut declaration — the
+# file going away carries no version content to read. Per the delivery
+# contract ("added or modified vs origin/main"), a delete must fall through
+# to the ordinary feature path instead of being read (and, since the deleted
+# file's content is gone, misread as malformed).
+# ---------------------------------------------------------------------------
+echo
+echo "--- feature branch + DELETED release-cut marker + changelog fragment, no bump → nodecision ---"
+
+_bare_m6=$(_new_tmp)
+_clone_m6=$(_new_tmp)
+
+git init --bare "$_bare_m6" -q 2>/dev/null
+git clone "$_bare_m6" "$_clone_m6" -q 2>/dev/null
+
+(
+    cd "$_clone_m6"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents version.d
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent f" > agents/marker-f.md
+    printf 'v2.106.0\n' > version.d/.release-cut
+    git add .
+    git commit -m "initial: version 2.107.0 with stale release-cut marker" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: modify a shipped asset, delete the stale marker, and
+    # supply a changelog.d/ fragment instead — no version bump anywhere.
+    git checkout -b feat/marker-deleted -q 2>/dev/null
+    echo "# marker agent f — updated" > agents/marker-f.md
+    git rm -q version.d/.release-cut
+    mkdir -p changelog.d
+    printf '### Changed\n- Updated marker agent f behavior\n' > changelog.d/feat-marker-agent-f.md
+    git add agents/marker-f.md changelog.d/feat-marker-agent-f.md
+    git commit -m "feat: marker-deleted — release-cut marker removed, not a release signal" -q 2>/dev/null
+)
+
+_run_hook "$_clone_m6"
+assert_nodecision "feature branch + DELETED release-cut marker + changelog fragment, no bump → nodecision (deletion never a release-cut signal, never a malformed deny)"
 
 # ---------------------------------------------------------------------------
 # Summary

@@ -133,7 +133,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 Since v2.56 / SEC-DR-2, **the top-level Claude Code agent IS the orchestrator**. No filesystem marker, no mode flag, and no special invocation is required — when Claude Code runs at the top level, it operates with the full orchestrator role and dispatches specialist subagents via the `Task` tool.
 
-**Outward-action gate.** All outward actions (`git push`, `gh pr create`, `gh pr merge`, GitHub API writes, ClickUp MCP writes) require explicit operator approval via `hooks/dev-guard.sh`. The hook fires unconditionally — the agent cannot auto-approve these actions regardless of autonomy grants.
+**Outward-action gate.** All outward actions (`git push`, `gh pr create`, `gh pr merge`, GitHub API writes, ClickUp MCP writes) are evaluated via `hooks/dev-guard.sh`. The hook fires unconditionally and gates by destination — the agent cannot auto-approve regardless of autonomy grants. A `git push` whose single recognized refspec targets a non-default branch on `origin` resolves to `allow` (no prompt); a push to the default branch, a tag push, a force push, `gh pr create`/`merge`, GitHub API writes, and ClickUp MCP writes still resolve to `ask`, requiring explicit operator approval.
 
 **No "inline fallback" for subagent dispatch.** All specialist subagents (architect, implementer, tester, qa, etc.) are dispatched via `Task`. There is no degraded inline-substitution mode — if `Task` is unavailable (e.g., in an opencode nested context), the orchestrator emits a `dispatch_handoff` directive and the top-level Claude takes over dispatch. See `docs/subagent-orchestration.md` for the full handoff protocol.
 

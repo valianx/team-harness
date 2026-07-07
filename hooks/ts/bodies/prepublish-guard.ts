@@ -61,13 +61,36 @@ export interface PrepublishReader {
 // Regex — mirrors prepublish-guard.sh route detection and constants
 // ---------------------------------------------------------------------------
 
-const GIT_PUSH_RE = /(^|[\s|;`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$)/;
-const GH_PR_CREATE_RE = /(^|[\s|;`])gh\s+pr\s+create(\s|$)/;
+// Routers are case-insensitive so this tests-before-PR floor stays in sync
+// with dev-guard's case-insensitive routers — a mixed-case `GH pr create`
+// (Windows/Git Bash) is enforced here too, never silently skipped. The
+// boundaries around the verb also admit a glued shell metacharacter — leading
+// ([\s|;&<>()`]) and trailing ([;&|<>()`"'$]) — to stay in sync with
+// dev-guard: without them a metacharacter fused to the verb on either side
+// (`(git push origin main)`, `true&&git push`, `git push>/dev/null`,
+// `git push$(evil)`, `( git push)`) would skip this floor while dev-guard's
+// own widened routers still ask — desyncing the two-hook "deny > allow"
+// contract.
+const GIT_PUSH_RE = /(^|[\s|;&<>()`])git(\s+-C\s+\S+|\s+\S+=\S+)*\s+push(\s|$|[;&|<>()`"'$])/i;
+const GH_PR_CREATE_RE = /(^|[\s|;&<>()`])gh\s+pr\s+create(\s|$|[;&|<>()`"'$])/i;
 const SHIPPED_PATH_RE = /^(agents|skills|hooks)\//;
 const RELEASE_BRANCH_RE = /^release\/v([0-9]+\.[0-9]+\.[0-9]+)$/;
 const FRAGMENT_RE = /^changelog\.d\/[a-z0-9-]+\.md$/;
 const MARKER_RE = /^version\.d\/[a-z0-9-]+\.bump$/;
 const CLAUDE_VERSION_RE = /\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`/;
+
+// Release-cut marker (single-PR release path) — decouples the release
+// path from the `release/vX.Y.Z` branch-name convention. PRIMARY signal: an
+// in-tree file at this fixed path, its presence in THIS push's diff (not mere
+// existence at HEAD) is what triggers recognition — this keeps the marker
+// from re-triggering on every later, unrelated feature branch cut from a
+// `main` that still carries the file from a prior release. SECONDARY signal:
+// a `release-cut: vX.Y.Z` commit trailer / push option, read the same way as
+// the existing bump-override token.
+const RELEASE_CUT_MARKER_PATH = "version.d/.release-cut";
+const RELEASE_CUT_SEMVER_RE = /^v([0-9]+\.[0-9]+\.[0-9]+)$/;
+const RELEASE_CUT_TRAILER_RE = /^release-cut: v([0-9]+\.[0-9]+\.[0-9]+)$/m;
+const RELEASE_CUT_TRAILER_PREFIX_RE = /^release-cut:/m;
 // Token format: bump-override: minor — <reason> (em dash, matches the Bash oracle literally).
 const OVERRIDE_TOKEN_RE = /^bump-override: (minor|major) — .+$/m;
 
@@ -199,6 +222,77 @@ function readVersionSites(reader: PrepublishReader): VersionSites {
     claudeOrigin,
     claudeBumped: isBumped(claudeHead, claudeOrigin),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Release-cut recognition — a feature branch carrying a well-formed
+// marker or trailer is routed to the release-path check below. This is a
+// recognition-only helper: the governing rule that a recognized-but-malformed
+// signal must DENY (never fall through to the feature path, never skip the
+// version-match checks) lives in the caller (runVersionBumpCheck). Because
+// the marker routes into the SAME runReleasePath as a release/vX.Y.Z branch,
+// the three-site invariant it enforces is preserved as-is — including its
+// pre-existing fail-open on CLAUDE.md §3 parse (see the "Third site" comment
+// in runReleasePath below), unchanged from today.
+// ---------------------------------------------------------------------------
+
+interface ReleaseCutSignal {
+  malformed: boolean;
+  /** Bare X.Y.Z (no leading "v"); only meaningful when !malformed. */
+  version: string;
+}
+
+function resolveReleaseCutMarker(reader: PrepublishReader, changed: ChangedFile[]): ReleaseCutSignal | null {
+  // A deletion (status "D") removes the marker rather than declaring a
+  // release cut — per the delivery contract ("added or modified vs
+  // origin/main"), a delete falls through to the ordinary feature path
+  // instead of being read (and misread as malformed, since the file's
+  // content is gone) as a release-cut signal.
+  const touchedThisPush = changed.some(
+    (c) => c.path === RELEASE_CUT_MARKER_PATH && c.status.charAt(0) !== "D"
+  );
+  if (!touchedThisPush) return null; // marker not part of this diff — not present
+
+  const raw = reader.readFile(RELEASE_CUT_MARKER_PATH);
+  const content = (raw ?? "").trim();
+  const m = RELEASE_CUT_SEMVER_RE.exec(content);
+  return m ? { malformed: false, version: m[1] } : { malformed: true, version: "" };
+}
+
+function resolveReleaseCutTrailer(reader: PrepublishReader): ReleaseCutSignal | null {
+  let src = "";
+  const commitMsg = reader.readEnv("GIT_COMMIT_MSG");
+  if (commitMsg) src += commitMsg;
+
+  const count = parseInt(reader.readEnv("GIT_PUSH_OPTION_COUNT") ?? "0", 10);
+  if (Number.isFinite(count) && count > 0) {
+    for (let i = 0; i < count; i++) {
+      const opt = reader.readEnv(`GIT_PUSH_OPTION_${i}`);
+      if (opt) src += `\n${opt}`;
+    }
+  }
+
+  if (!src) return null;
+
+  if (CONTROL_CHAR_RE.test(src)) {
+    reader.warn(
+      "prepublish-guard: release-cut trailer source contains control characters; treating as absent (SEC-DR-A)."
+    );
+    return null;
+  }
+
+  const m = RELEASE_CUT_TRAILER_RE.exec(src);
+  if (m) return { malformed: false, version: m[1] };
+
+  // The "release-cut:" prefix is present but the value after it did not parse
+  // as strict vX.Y.Z — treat this as a recognized-but-malformed signal.
+  return RELEASE_CUT_TRAILER_PREFIX_RE.test(src) ? { malformed: true, version: "" } : null;
+}
+
+// PRIMARY (in-tree marker) wins over SECONDARY (commit trailer) when both are
+// present, per the plan's file-primary/trailer-secondary decision.
+function resolveReleaseCut(reader: PrepublishReader, changed: ChangedFile[]): ReleaseCutSignal | null {
+  return resolveReleaseCutMarker(reader, changed) ?? resolveReleaseCutTrailer(reader);
 }
 
 // ---------------------------------------------------------------------------
@@ -433,11 +527,27 @@ function runVersionBumpCheck(reader: PrepublishReader): NormalizedDecision | nul
 
   const sites = readVersionSites(reader);
 
-  if (!branch.isRelease) {
-    return runFeaturePath(reader, changed, sites);
+  if (branch.isRelease) {
+    return runReleasePath(reader, changed, branch.version, sites);
   }
 
-  return runReleasePath(reader, changed, branch.version, sites);
+  // A feature branch carrying a release-cut marker/trailer is routed to
+  // the release-path check instead of the feature-path check. Governing
+  // principle: the marker authorizes RUNNING the release-path check — it
+  // never bypasses it. A recognized-but-malformed signal DENIES outright and
+  // never falls through to the feature path or skips the version-match
+  // checks.
+  const releaseCut = resolveReleaseCut(reader, changed);
+  if (releaseCut) {
+    if (releaseCut.malformed) {
+      return deny(
+        `prepublish-guard: a release-cut signal (${RELEASE_CUT_MARKER_PATH} or a release-cut: commit trailer) is present but its content does not parse as strict SemVer (vX.Y.Z). The signal authorizes running the release-path check, never bypassing it. Fix the content (e.g. v2.109.0) or remove it to use the ordinary feature path. Push blocked.`
+      );
+    }
+    return runReleasePath(reader, changed, releaseCut.version, sites);
+  }
+
+  return runFeaturePath(reader, changed, sites);
 }
 
 // ---------------------------------------------------------------------------
