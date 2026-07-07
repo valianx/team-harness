@@ -132,6 +132,24 @@ run_ts_bun_cc() {
     echo "$payload" | "$BUN_BIN" run "$TS_CJS" 2>/dev/null
 }
 
+# Directory-scoped variants — for cases whose decision depends on positive
+# git default-branch resolution (refs/remotes/origin/HEAD), which the
+# ambient checkout running this suite cannot guarantee (a CI checkout has no
+# origin/HEAD; see the hermetic fixture built ahead of Section 1).
+run_ts_node_in_dir() {
+    local dir="$1" payload="$2"
+    (cd "$dir" && echo "$payload" | node "$TS_CJS" 2>/dev/null)
+}
+
+run_ts_bun_cc_in_dir() {
+    local dir="$1" payload="$2"
+    if [ -z "$BUN_BIN" ]; then
+        echo "__BUN_NOT_PRESENT__"
+        return
+    fi
+    (cd "$dir" && echo "$payload" | "$BUN_BIN" run "$TS_CJS" 2>/dev/null)
+}
+
 # ---------------------------------------------------------------------------
 # Comparison helpers
 # ---------------------------------------------------------------------------
@@ -224,6 +242,68 @@ assert_parity() {
     fi
 }
 
+# Same as assert_parity, but runs the gate inside a given directory instead
+# of the ambient cwd — for fixtures whose decision depends on positive
+# git default-branch resolution.
+assert_parity_in_dir() {
+    local name="$1"
+    local dir="$2"
+    local payload="$3"
+    local expected_decision="$4"
+
+    local ts_node_out ts_bun_out
+    ts_node_out=$(run_ts_node_in_dir "$dir" "$payload")
+    ts_bun_out=$(run_ts_bun_cc_in_dir "$dir" "$payload")
+
+    local ts_node_dec ts_bun_dec
+    ts_node_dec=$(extract_decision "$ts_node_out")
+
+    local node_ok=1
+    if [ "$ts_node_dec" != "$expected_decision" ]; then
+        node_ok=0
+    fi
+
+    local node_reason_ok=1
+    if [ "$ts_node_dec" != "none" ]; then
+        if ! has_reason_field "$ts_node_out"; then
+            node_reason_ok=0
+        else
+            local node_reason
+            node_reason=$(extract_reason "$ts_node_out")
+            if [ -z "$node_reason" ]; then
+                node_reason_ok=0
+            fi
+        fi
+    fi
+
+    local bun_parity_ok=1
+    local bun_note=""
+    if [ "$ts_bun_out" = "__BUN_NOT_PRESENT__" ]; then
+        bun_note=" [bun-not-present: skipped]"
+    else
+        ts_bun_dec=$(extract_decision "$ts_bun_out")
+        if [ "$ts_bun_dec" != "$expected_decision" ]; then
+            bun_parity_ok=0
+        fi
+    fi
+
+    if [ "$node_ok" -eq 1 ] && [ "$node_reason_ok" -eq 1 ] && [ "$bun_parity_ok" -eq 1 ]; then
+        PASS=$((PASS + 1))
+        echo "  [PASS] $name${bun_note}"
+        if [ "$VERBOSE" -eq 1 ]; then
+            echo "         expected=$expected_decision node=$ts_node_dec bun=${ts_bun_dec:-skipped}"
+        fi
+    else
+        FAIL=$((FAIL + 1))
+        local detail=""
+        [ "$node_ok" -eq 0 ] && detail="${detail} [decision-mismatch: expected=$expected_decision got=$ts_node_dec]"
+        [ "$node_reason_ok" -eq 0 ] && detail="${detail} [node-reason-missing]"
+        [ "$bun_parity_ok" -eq 0 ] && detail="${detail} [bun-parity-fail: node=$ts_node_dec bun=$ts_bun_dec]"
+        FAILURES+=("$name:$detail")
+        echo "  [FAIL] $name |$detail"
+    fi
+}
+
 # Assertion for expected decision from TS only (SEC-07 / security tests — no Bash oracle)
 assert_ts_node() {
     local name="$1"
@@ -250,8 +330,40 @@ assert_ts_node() {
 # ---------------------------------------------------------------------------
 echo "--- Section 1: Parity against test_dev_guard.sh fixtures ---"
 
+# Hermetic fixture for the one ALLOW case below: the decision requires
+# positive default-branch resolution (refs/remotes/origin/HEAD), which a CI
+# checkout of this repo does not have (actions/checkout does not set it) and
+# which the ambient worktree running this suite cannot be relied on to have
+# either. Built the same way as test_dev_guard.sh's shared fixture: a
+# throwaway clone establishes `main` with a commit on the bare remote first,
+# then the real fixture clones it — origin/HEAD is only auto-set by `git
+# clone` when the remote already has a default branch at clone time.
+_parity_bare=$(mktemp -d)
+_parity_throwaway=$(mktemp -d)
+PARITY_NORMAL_REPO=$(mktemp -d)
+git init --bare -q -b main "$_parity_bare" 2>/dev/null
+git clone -q "$_parity_bare" "$_parity_throwaway" 2>/dev/null
+(
+    cd "$_parity_throwaway" || exit 1
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    git checkout -q -B main 2>/dev/null
+    echo init > README.md
+    git add README.md
+    git commit -q -m initial 2>/dev/null
+    git push -q origin HEAD:main 2>/dev/null
+)
+git clone -q "$_parity_bare" "$PARITY_NORMAL_REPO" 2>/dev/null
+rm -rf "$_parity_throwaway"
+(
+    cd "$PARITY_NORMAL_REPO" || exit 1
+    git config user.email "test@test.com"
+    git config user.name "Test"
+)
+
 assert_parity "gh pr merge (ASK)" "$(make_bash_payload 'gh pr merge 123 --squash')" "ask"
-assert_parity "git push to non-default branch on origin (ALLOW, th-friction-redesign branch-aware recognizer)" "$(make_bash_payload 'git push origin feat/my-branch')" "allow"
+assert_parity_in_dir "git push to non-default branch on origin (ALLOW, th-friction-redesign branch-aware recognizer)" "$PARITY_NORMAL_REPO" \
+    "$(make_bash_payload 'git push origin feat/my-branch')" "allow"
 assert_parity "gh pr review (ASK)" "$(make_bash_payload 'gh pr review 42 --approve')" "ask"
 assert_parity "gh pr comment (ASK)" "$(make_bash_payload 'gh pr comment 42 --body "LGTM"')" "ask"
 assert_parity "gh api -X PUT /pulls/merge (ASK)" "$(make_bash_payload 'gh api -X PUT /repos/owner/repo/pulls/42/merge')" "ask"
@@ -659,6 +771,8 @@ if [ -f "$EXT_FILE" ]; then
 else
     echo "  [NOTE] Extension file not found: $EXT_FILE — skipping rewrite gate checks"
 fi
+
+rm -rf "$_parity_bare" "$PARITY_NORMAL_REPO"
 
 # ---------------------------------------------------------------------------
 # Summary

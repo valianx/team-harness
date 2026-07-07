@@ -33252,6 +33252,7 @@ _S148_EXCLUDED_GIT_VERBS = (
 )
 _S148_EXCLUDED_REMOTE_CMDS = (
     "git remote set-url", "git remote add", "git remote rename",
+    "git remote set-head",
 )
 check(
     "suite148(excluded-git-verbs): the canonical doc names every effective "
@@ -33313,10 +33314,11 @@ check(
 )
 check(
     "suite148(ac6-merge-write-unchanged): the merge-write-whole-document "
-    "mechanic still governs the write at site A",
-    "merge-write-whole-document" in _s148_siteA,
-    "setup § 3a must still declare merge-write-whole-document after the "
-    "read-only allowlist extension",
+    "mechanic still governs the write at both provisioning sites",
+    "merge-write-whole-document" in _s148_siteA
+    and "merge-write-whole-document" in _s148_siteB,
+    "both setup § 3a and orchestrator Phase 0a Step 1g must still declare "
+    "merge-write-whole-document after the read-only allowlist extension",
 )
 
 # Self-referential guards (hygiene contract)

@@ -179,6 +179,7 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
         "git push origin $BR",
     ],
     "GIT_PUSH_EXACT_RE": ["git push origin feat/x"],
+    "GH_PR_CREATE_EXACT_RE": ["gh pr create --title x"],
     "BENIGN_PUSH_FLAG_RE": ["-u", "--set-upstream"],
 }
 

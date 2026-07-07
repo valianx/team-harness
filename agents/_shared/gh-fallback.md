@@ -695,7 +695,7 @@ one `ask` the operator approves covers a payload they have actually seen,
 mirroring the existing preview-and-confirm contract for outward actions
 (`docs/dev-mode.md` § Outward-Action Gate). Example rendering:
 
-```
+```text
 Batch review-disposition payload — 3 replies, 2 resolves, PR #{number}:
 
   [0] thread {short-thread-id-0} — resolve: yes

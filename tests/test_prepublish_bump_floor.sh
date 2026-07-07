@@ -1730,6 +1730,51 @@ rm -f "$_tmpout_m5" "$_tmperr_m5"
 assert_nodecision "trailer variant: feature branch + release-cut: trailer (no marker file) → nodecision"
 
 # ---------------------------------------------------------------------------
+# feature branch + DELETED release-cut marker (status D) → nodecision
+#
+# A deletion of version.d/.release-cut is not a release-cut declaration — the
+# file going away carries no version content to read. Per the delivery
+# contract ("added or modified vs origin/main"), a delete must fall through
+# to the ordinary feature path instead of being read (and, since the deleted
+# file's content is gone, misread as malformed).
+# ---------------------------------------------------------------------------
+echo
+echo "--- feature branch + DELETED release-cut marker + changelog fragment, no bump → nodecision ---"
+
+_bare_m6=$(_new_tmp)
+_clone_m6=$(_new_tmp)
+
+git init --bare "$_bare_m6" -q 2>/dev/null
+git clone "$_bare_m6" "$_clone_m6" -q 2>/dev/null
+
+(
+    cd "$_clone_m6"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p .claude-plugin agents version.d
+    _write_plugin_json "2.107.0" .claude-plugin/plugin.json
+    _write_market_json "2.107.0" .claude-plugin/marketplace.json
+    printf '**Current version:** `2.107.0`\n' > CLAUDE.md
+    echo "# marker agent f" > agents/marker-f.md
+    printf 'v2.106.0\n' > version.d/.release-cut
+    git add .
+    git commit -m "initial: version 2.107.0 with stale release-cut marker" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: modify a shipped asset, delete the stale marker, and
+    # supply a changelog.d/ fragment instead — no version bump anywhere.
+    git checkout -b feat/marker-deleted -q 2>/dev/null
+    echo "# marker agent f — updated" > agents/marker-f.md
+    git rm -q version.d/.release-cut
+    mkdir -p changelog.d
+    printf '### Changed\n- Updated marker agent f behavior\n' > changelog.d/feat-marker-agent-f.md
+    git add agents/marker-f.md changelog.d/feat-marker-agent-f.md
+    git commit -m "feat: marker-deleted — release-cut marker removed, not a release signal" -q 2>/dev/null
+)
+
+_run_hook "$_clone_m6"
+assert_nodecision "feature branch + DELETED release-cut marker + changelog fragment, no bump → nodecision (deletion never a release-cut signal, never a malformed deny)"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 
