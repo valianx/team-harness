@@ -1673,9 +1673,12 @@ for ref in sorted(plausible_agent_refs):
 # 5. Phase numbers mentioned in orchestrator.md are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.3", "2.5", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
+    # 2.3 is the Blind Test Authoring phase (feature-flow only): tester (author-from-ac
+    # mode) derives an AC-test suite blind of the implementation, concurrent with Phase 2
+    # (parallel-blind) or before it (serial-blind); skipped for impl-aware.
     # 2.7 is the Test Authoring sub-phase (Stage 2, pre-verify): tester writes AC tests
     # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
@@ -33637,6 +33640,383 @@ check(
 )
 
 # Marker: batched-graphql-review-disposition
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 151 — blind-test-authoring
+#
+# Structural coverage for the parallel blind test-authoring lane (Phase 2.3)
+# and the Phase 2.7 gap-check conversion, anchor-scoped with _slice_section
+# (Suite 144 idiom) and both positive and negative assertions per site of the
+# multi-site contract (01-plan.md § Multi-site invariants). A missing anchor
+# always returns an empty slice, so every content check fails closed instead
+# of false-greening.
+#
+# Marker: blind-test-authoring
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 151: blind-test-authoring ===")
+
+_s151_orch = read(AGENTS_DIR / "orchestrator.md")
+_s151_tester = read(AGENTS_DIR / "tester.md")
+_s151_implementer = read(AGENTS_DIR / "implementer.md")
+_s151_qa = read(AGENTS_DIR / "qa.md")
+_s151_ref = read(AGENTS_DIR / "ref-special-flows.md")
+_s151_packet = read(REPO_ROOT / "docs" / "verification-packet.md")
+_s151_observability = read(REPO_ROOT / "docs" / "observability.md")
+_s151_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s151_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+
+# Forbidden-literal fragments assembled via concatenation so the negative
+# assertions below never embed the contiguous forbidden string in this file
+# (a residue scan over the repo must not mistake this check's own source for
+# an occurrence of the artifact it excludes).
+_s151_impl_doc_literal = "02-" + "implementation.md"
+_s151_blind_suite_literal = "blind_" + "suite"
+_s151_blind_phase_literal = "Blind Test " + "Authoring"
+_s151_author_mode_literal = "author" + "-from-ac"
+
+# --- Site 1: orchestrator.md § Phase 2.3 — Blind Test Authoring ------------
+# Anchored with a leading "\n" — the bare heading text also appears earlier
+# in the file inside backtick cross-references (e.g. a footnote pointing at
+# this section), and a first-occurrence find() would resolve to those
+# instead of the real "## " heading line without the newline prefix.
+_s151_orch_23 = _slice_section(
+    _s151_orch, "\n## Phase 2.3 — Blind Test Authoring", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-2.3-exists): agents/orchestrator.md declares "
+    "'## Phase 2.3 — Blind Test Authoring' documenting the blind dispatch "
+    "payload and its exclusions",
+    "Dispatch payload" in _s151_orch_23
+    and "Explicit exclusion clause" in _s151_orch_23,
+    "orchestrator.md must contain a '## Phase 2.3 — Blind Test Authoring' "
+    "section with a dispatch-payload block and an explicit exclusion clause",
+)
+
+_s151_orch_23_allowed = _slice_section(
+    _s151_orch_23, "carries ONLY:", ("**Explicit exclusion clause",)
+)
+check(
+    "suite151(orchestrator-2.3-exclusion-negative): the Phase 2.3 "
+    "dispatch-payload allowed-inputs list does NOT permit "
+    "02-implementation.md or the implementation diff among its inputs",
+    len(_s151_orch_23_allowed) > 0
+    and _s151_impl_doc_literal not in _s151_orch_23_allowed
+    and re.search(r"\bdiff\b", _s151_orch_23_allowed) is None,
+    "the 'carries ONLY:' allowed-inputs bullet list must not list "
+    "02-implementation.md or the implementation diff",
+)
+check(
+    "suite151(orchestrator-2.3-exclusion-positive): the exclusion clause "
+    "itself names 02-implementation.md and the implementation diff as "
+    "forbidden reads",
+    _s151_impl_doc_literal in _s151_orch_23
+    and "implementation diff" in _s151_orch_23
+    and "00-verify-packet.md" in _s151_orch_23,
+    "the exclusion clause must name 02-implementation.md, the "
+    "implementation diff, and 00-verify-packet.md as forbidden reads",
+)
+check(
+    "suite151(orchestrator-predicate-neverskip): '## Phase 2.3' documents "
+    "the 3-way predicate values, the never-a-silent-skip mandate, and the "
+    "phase.start/phase.end events carrying the resolved mode",
+    "parallel-blind" in _s151_orch_23
+    and "serial-blind" in _s151_orch_23
+    and "impl-aware" in _s151_orch_23
+    and "Never a silent skip" in _s151_orch_23
+    and "phase.start" in _s151_orch_23
+    and "phase.end" in _s151_orch_23,
+    "Phase 2.3 must document all 3 predicate values, the 'Never a silent "
+    "skip' mandate, and phase.start/phase.end events with the resolved mode",
+)
+check(
+    "suite151(orchestrator-concurrency-bound): '## Phase 2.3' § Concurrency "
+    "bound documents the round-size bound, deterministic non-fan-out "
+    "shape, and the KG cost-bound reference",
+    "### Concurrency bound" in _s151_orch_23
+    and "never a fan-out" in _s151_orch_23
+    and "bounded by round size" in _s151_orch_23
+    and "bounded-self-looping-fanout-cost-bound" in _s151_orch_23,
+    "Phase 2.3 § Concurrency bound must document the round-size bound, "
+    "'never a fan-out', and the bounded-self-looping-fanout-cost-bound KG "
+    "reference",
+)
+
+# --- Site 1b: orchestrator.md tables — Phase Dispatch Reference / Artifact -
+# --- Verification Protocol / Phase Checklist rows for Phase 2.3 ------------
+_s151_orch_dispatchref = _slice_section(
+    _s151_orch, "## Phase Dispatch Reference", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-dispatch-ref-row): '## Phase Dispatch Reference' "
+    "table has a '2.3 — Blind Test Authoring' row producing "
+    "03-blind-testing.md",
+    "2.3 — Blind Test Authoring" in _s151_orch_dispatchref
+    and "03-blind-testing.md" in _s151_orch_dispatchref,
+    "the Phase Dispatch Reference table must have a '2.3 — Blind Test "
+    "Authoring' row whose output is 03-blind-testing.md",
+)
+
+_s151_orch_avp = _slice_section(
+    _s151_orch, "### Artifact Verification Protocol", ("\n### ",)
+)
+check(
+    "suite151(orchestrator-avp-row): '### Artifact Verification Protocol' "
+    "table has a tester / 2.3 (author-from-ac mode) row mapping to "
+    "03-blind-testing.md",
+    "2.3 (author-from-ac mode)" in _s151_orch_avp
+    and "03-blind-testing.md" in _s151_orch_avp,
+    "the Artifact Verification Protocol table must have a tester / "
+    "'2.3 (author-from-ac mode)' row mapping to 03-blind-testing.md",
+)
+
+_s151_orch_checklist = _slice_section(
+    _s151_orch, "## Phase Checklist", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-checklist-row): '## Phase Checklist' template "
+    "has a '2.3 — Blind Test Authoring' row with the impl-aware skip form",
+    "2.3 — Blind Test Authoring" in _s151_orch_checklist
+    and "[~skipped: blind_test_mode:impl-aware]" in _s151_orch_checklist,
+    "the Phase Checklist template must have a '2.3 — Blind Test Authoring' "
+    "row with the '[~skipped: blind_test_mode:impl-aware]' form",
+)
+
+# --- Site 2: orchestrator.md § Phase 2 — Implementation (parallel dispatch) -
+_s151_orch_2 = _slice_section(
+    _s151_orch, "## Phase 2 — Implementation", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-parallel-dispatch): '## Phase 2 — Implementation' "
+    "documents the concurrent dispatch of the blind lane in the same "
+    "Task-tool message",
+    "Concurrent blind-tester dispatch" in _s151_orch_2
+    and "SAME Task-tool message" in _s151_orch_2,
+    "Phase 2 must document the Concurrent blind-tester dispatch paragraph "
+    "and the same-Task-tool-message dispatch shape for parallel-blind",
+)
+
+# --- Site 3: orchestrator.md § Phase 2.7 — Test Authoring (gap-check) ------
+_s151_orch_27 = _slice_section(
+    _s151_orch, "## Phase 2.7 — Test Authoring", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-2.7-gap-check): '## Phase 2.7 — Test Authoring' "
+    "states gap-check + integration semantics and the never-re-author "
+    "invariant",
+    "gap-check + integration" in _s151_orch_27
+    and "NEVER re-authors" in _s151_orch_27,
+    "Phase 2.7 must state 'gap-check + integration' semantics and the "
+    "NEVER re-authors invariant for blind_suite: present",
+)
+
+# --- Site 4: orchestrator.md § Phase 3 — Verify (acceptance signal) --------
+_s151_orch_3 = _slice_section(
+    _s151_orch, "## Phase 3 — Verify", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-phase3-signal): '## Phase 3 — Verify' states the "
+    "blind intention-derived suite is the acceptance signal",
+    "Acceptance signal = intention-derived suite" in _s151_orch_3
+    and "qa" in _s151_orch_3
+    and "NOT the acceptance signal" in _s151_orch_3,
+    "Phase 3 must declare the blind intention-derived suite as the "
+    "acceptance signal and that implementer unit tests are NOT it",
+)
+
+# --- Site 5: orchestrator.md § Current State (state fields + phase enum) ---
+_s151_orch_state = _slice_section(
+    _s151_orch, "## Current State", ("\n## ",)
+)
+check(
+    "suite151(orchestrator-state-fields): '## Current State' declares "
+    "blind_test_mode, blind_worktree, blind_worktree_branch, and the "
+    "phase: enum includes 2.3",
+    "blind_test_mode" in _s151_orch_state
+    and "blind_worktree:" in _s151_orch_state
+    and "blind_worktree_branch:" in _s151_orch_state
+    and re.search(r"phase:\s*\{[^}]*\b2\.3\b", _s151_orch_state) is not None,
+    "Current State must declare blind_test_mode/blind_worktree/"
+    "blind_worktree_branch and the phase: enum must include 2.3",
+)
+
+# --- Site 6: tester.md § Mode: author-from-ac ------------------------------
+_s151_tester_afa = _slice_section(
+    _s151_tester, "## Mode: `author-from-ac`", ("\n## ",)
+)
+check(
+    "suite151(tester-author-from-ac): agents/tester.md declares "
+    "'## Mode: `author-from-ac`' with the same input/exclusion contract as "
+    "the orchestrator dispatch payload",
+    "Blindness contract" in _s151_tester_afa
+    and "MUST NOT read" in _s151_tester_afa
+    and _s151_impl_doc_literal in _s151_tester_afa,
+    "tester.md must declare Mode: author-from-ac with a blindness contract "
+    "excluding 02-implementation.md",
+)
+check(
+    "suite151(tester-acceptance-signal-declaration): '## Mode: "
+    "`author-from-ac`' declares the blind suite IS the acceptance signal "
+    "and the implementer's unit tests are NOT",
+    "Acceptance-signal declaration" in _s151_tester_afa
+    and "IS the acceptance signal" in _s151_tester_afa
+    and "never the acceptance signal" in _s151_tester_afa,
+    "tester.md Mode: author-from-ac must declare the Acceptance-signal "
+    "declaration paragraph naming the blind suite as the signal and the "
+    "implementer's unit tests as never the acceptance signal",
+)
+check(
+    "suite151(tester-model-floor): agents/tester.md frontmatter declares "
+    "model: sonnet (judgment-bearing floor, no escalation to opus)",
+    re.search(r"^model:\s*sonnet\s*$", _s151_tester, re.MULTILINE) is not None,
+    "tester.md frontmatter must declare model: sonnet — author-from-ac is "
+    "judgment-bearing per the criteria-based model-allocation policy",
+)
+check(
+    "suite151(tester-dedup-layer): '## Mode: `author-from-ac`' declares "
+    "dedup by layer ownership between the blind suite and the gap-check",
+    "Dedup by layer ownership" in _s151_tester_afa,
+    "tester.md Mode: author-from-ac must declare the 'Dedup by layer "
+    "ownership' paragraph",
+)
+
+# --- Site 7: tester.md § Mode: authoring (blind_suite parametrization) -----
+_s151_tester_authoring = _slice_section(
+    _s151_tester, "## Mode: `authoring`", ("\n## ",)
+)
+check(
+    "suite151(tester-authoring-parametrized): '## Mode: `authoring`' "
+    "documents blind_suite: present|absent",
+    "blind_suite: present | absent" in _s151_tester_authoring,
+    "tester.md Mode: authoring must document blind_suite: present|absent",
+)
+
+# --- Site 7b: tester.md § Return Protocol — mode enum includes -------------
+# --- author-from-ac ---------------------------------------------------------
+_s151_tester_return = _slice_section(
+    _s151_tester, "## Return Protocol", ("\n## ",)
+)
+check(
+    "suite151(tester-return-protocol-enum): '## Return Protocol' mode enum "
+    "includes author-from-ac",
+    re.search(
+        r"^mode:.*\bauthor-from-ac\b", _s151_tester_return, re.MULTILINE
+    )
+    is not None,
+    "tester.md Return Protocol mode enum line must include author-from-ac",
+)
+
+# --- Site 8: implementer.md § Unit tests are not the acceptance signal -----
+_s151_impl_slice = _slice_section(
+    _s151_implementer,
+    "### Unit tests are not the acceptance signal",
+    ("\n## ", "\n### "),
+)
+check(
+    "suite151(implementer-unit-not-signal): agents/implementer.md declares "
+    "'### Unit tests are not the acceptance signal'",
+    "NOT the acceptance signal" in _s151_impl_slice
+    and "blind suite" in _s151_impl_slice,
+    "implementer.md must declare that unit tests are not the acceptance "
+    "signal and point at the blind suite instead",
+)
+
+# --- Site 9: qa.md § Validate Mode (Immutable artifact invariant) ----------
+_s151_qa_slice = _slice_section(
+    _s151_qa, "### Validate Mode (default)", ("\n### ",)
+)
+check(
+    "suite151(qa-signal-note): agents/qa.md § Validate Mode notes the blind "
+    "suite as the cross-referenced acceptance signal",
+    "Acceptance-signal provenance" in _s151_qa_slice
+    and "intention-derived blind suite" in _s151_qa_slice,
+    "qa.md Validate Mode must note the intention-derived blind suite as "
+    "the Phase 3 acceptance-signal provenance",
+)
+
+# --- Site 10: ref-special-flows.md — feature-only scope + bug-flow fence ---
+_s151_ref_bugtable = _slice_section(
+    _s151_ref,
+    "### Phase structure (type: fix)",
+    ("**Feature-flow-only scope note.**",),
+)
+check(
+    "suite151(ref-bugflow-negative): the bug-flow '### Phase structure "
+    "(type: fix)' rows 2.0/2.7 do NOT carry blind-lane or "
+    "gap-check-parametrization tokens",
+    len(_s151_ref_bugtable) > 0
+    and _s151_author_mode_literal not in _s151_ref_bugtable
+    and _s151_blind_suite_literal not in _s151_ref_bugtable
+    and _s151_blind_phase_literal not in _s151_ref_bugtable,
+    "the bug-flow phase-structure table must not mention author-from-ac, "
+    "blind_suite, or Blind Test Authoring — those are feature-flow only",
+)
+
+_s151_ref_scopenote = _slice_section(
+    _s151_ref, "**Feature-flow-only scope note.**", ("\n### ", "\n## ")
+)
+check(
+    "suite151(ref-feature-only): ref-special-flows.md states the blind lane "
+    "+ gap-check conversion are feature-flow ONLY",
+    "feature-flow ONLY" in _s151_ref_scopenote
+    and "Phase 2.3" in _s151_ref_scopenote,
+    "ref-special-flows.md must declare the blind lane + gap-check "
+    "conversion feature-flow ONLY, referencing Phase 2.3",
+)
+
+# --- Site 11: docs/verification-packet.md § 2. Packet content contract ----
+_s151_packet_slice = _slice_section(
+    _s151_packet, "## 2. Packet content contract", ("\n## ",)
+)
+check(
+    "suite151(packet-coherence): docs/verification-packet.md § 2. Packet "
+    "content contract Test Artifact row reflects the integrated-suite "
+    "provenance",
+    "blind suite authored in Phase 2.3" in _s151_packet_slice
+    and "gap-check" in _s151_packet_slice,
+    "the Test Artifact row must reflect the blind-suite + gap-check "
+    "integrated-suite provenance",
+)
+
+# --- Site 12: docs/observability.md — Decision Ledger phase-id example -----
+_s151_observability_slice = _slice_section(
+    _s151_observability, "## Decision Ledger", ("\n## ",)
+)
+check(
+    "suite151(observability-phase-id): docs/observability.md Decision "
+    "Ledger phase-identifier examples include 2.3-blind-test-authoring",
+    "2.3-blind-test-authoring" in _s151_observability_slice,
+    "the Decision Ledger phase-identifier example list must include "
+    "2.3-blind-test-authoring",
+)
+
+# --- Self-referential guards (hygiene contract) ----------------------------
+_s151_own = read(Path(__file__))
+check(
+    "suite151(self-ref): test file contains 'Suite 151' and "
+    "'blind-test-authoring'",
+    "Suite 151" in _s151_own and "blind-test-authoring" in _s151_own,
+    "test file must self-reference Suite 151 and the marker "
+    "'blind-test-authoring'",
+)
+check(
+    "suite151(registry): docs/testing.md registers 'Suite 151' and "
+    "'blind-test-authoring'",
+    "Suite 151" in _s151_testing_md
+    and "blind-test-authoring" in _s151_testing_md,
+    "docs/testing.md must register Suite 151 and the "
+    "'blind-test-authoring' marker",
+)
+check(
+    "suite151(hygiene): CLAUDE.md does NOT contain 'Suite 151' (§11 "
+    "hygiene contract)",
+    "Suite 151" not in _s151_claude_md,
+    "CLAUDE.md must not mention Suite 151 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: blind-test-authoring
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
