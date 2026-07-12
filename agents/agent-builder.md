@@ -34,7 +34,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 `effort` — set the reasoning level the role actually needs:
 - `medium` — mechanical execution, even when polished output matters (delivery, tests by pattern, diagram passes). **This is the project floor; never use `low`.**
-- `high` — solid analytical or planning work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan).
+- `high` — solid analytical or planning work that doesn't need exhaustive exploration (lider routing, qa validation, implementer following a Work Plan).
 - `xhigh` — used sparingly when a task sits between `high` and `max`.
 - `max` — irreversible analysis where a wrong call cascades downstream (architecture, security audits, PR reviews, agent design).
 
@@ -49,7 +49,7 @@ The canonical `model` + `effort` matrix for the repo lives in `agents/README.md`
 1. **Read existing agents** — glob `agents/*.md` and read each to understand roles, structure, and patterns
 2. **Read existing commands** — glob `.claude/commands/*.md` to understand available tools
 3. **Check sync state** — note whether global (`~/.claude/agents/`) is in sync
-4. **Read `agents/orchestrator.md`** — understand how the orchestrator invokes agents (Return Protocol format)
+4. **Read `agents/orquestador.md`** — understand how the orquestador invokes agents (Return Protocol format)
 5. **Create workspaces if needed** — `workspaces/{agent-name}/`
 
 ---
@@ -148,14 +148,14 @@ Match the pattern to the problem. Don't default to orchestrator-workers for simp
 Every agent with an autonomous loop (retry, fix, iterate) MUST define explicit stopping conditions:
 
 - **Max iterations for internal loops:** 3 (e.g., build fix retries, lint fix retries)
-- **Max iterations with external supervision:** 5 (e.g., orchestrator-managed verify loops)
+- **Max iterations with external supervision:** 5 (e.g., orquestador-managed verify loops)
 - **On limit reached:** report `status: failed` with full context of the blockage — what was attempted, what keeps failing, and the last error
 
 Never allow unbounded loops. If the agent design includes a retry/fix cycle, it must specify the max iteration count in its system prompt.
 
 ### Return Protocol (mandatory for all worker agents)
 
-Every agent invoked by the orchestrator must end with this exact block:
+Every agent invoked by the orquestador must end with this exact block:
 
 ```
 agent: {name}
@@ -170,12 +170,12 @@ Do NOT repeat the full output content in the return block — it's in the file.
 
 ### Execution Log Protocol (mandatory)
 
-The orchestrator writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). Agents do not write to that file directly — they return timing data in their status blocks and the orchestrator propagates the events.
+The orquestador writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). Agents do not write to that file directly — they return timing data in their status blocks and the orquestador propagates the events.
 
 ### Session Documentation Protocol (mandatory)
 
 Agents write outputs to `workspaces/{feature-name}/`:
-- `00-execution-events.jsonl` / `00-execution-events.md` — observability event trace (orchestrator only; `.jsonl` in local mode, `.md` in obsidian mode)
+- `00-execution-events.jsonl` / `00-execution-events.md` — observability event trace (orquestador only; `.jsonl` in local mode, `.md` in obsidian mode)
 - `research/00-research.md` — research output (architect, research mode)
 - `01-plan.md` — architect output: spec (§ Review Summary) + architecture (§ Architecture) + task list (§ Task List)
 - `01-planning.md` — task breakdown (architect, planning mode)
@@ -220,7 +220,7 @@ Every new worker agent MUST have these sections (checked by `/th:lint`):
 - [ ] `## Execution Log Protocol`
 - [ ] `## Return Protocol`
 
-Orchestrator agents (`orchestrator`) are exempt from this check.
+Coordination agents (`lider`, `orquestador`) are exempt from this check.
 
 ---
 
@@ -230,7 +230,7 @@ Orchestrator agents (`orchestrator`) are exempt from this check.
 
 1. What is the agent/command supposed to do?
 2. What does it NEVER do?
-3. Who invokes it (orchestrator, user, another agent)?
+3. Who invokes it (orquestador, user, another agent)?
 4. What are its inputs and outputs?
 5. What model and tools does it need?
 
@@ -241,7 +241,7 @@ Ask clarifying questions if the purpose is ambiguous. Do not build until the sco
 ```
 glob agents/*.md
 glob .claude/commands/*.md
-read agents/orchestrator.md
+read agents/orquestador.md
 read agents/{most-similar-agent}.md
 ```
 
@@ -317,7 +317,7 @@ If lint fails → fix the issues before reporting done.
 
 - **Mega-prompts**: system prompts > 4000 tokens → split into phases and reference files
 - **Tool overload**: giving all tools when only read is needed
-- **No return protocol**: worker agent that doesn't report back to orchestrator
+- **No return protocol**: worker agent that doesn't report back to orquestador
 - **Missing mandatory sections**: `/th:lint` will catch this
 - **Ambiguous description**: the description field triggers delegation — be specific and concrete
 - **Wrong model**: using opus for simple search tasks, haiku for complex reasoning
@@ -385,7 +385,7 @@ Write design rationale to `workspaces/{agent-name}/01-agent-design.md`:
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{agent-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly.
+The orquestador writes observability events to `workspaces/{agent-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly.
 
 ---
 

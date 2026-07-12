@@ -1,8 +1,8 @@
 # Discover Phase — Intake Disposition Contract
 
-The Discover phase is the orchestrator's default intake posture for development tasks. It replaces the previous eager-dispatch model (architect fires on message arrival) with a patient-by-default model: the architect is dispatched **only** after the operator emits an explicit advance signal. Before that signal, the orchestrator stays conversational and cheap — no subagent dispatch during ideation.
+The Discover phase is th:lider's default intake posture for development tasks. It replaces the previous eager-dispatch model (architect fires on message arrival) with a patient-by-default model: the architect is dispatched **only** after the operator emits an explicit advance signal. Before that signal, th:lider stays conversational and cheap — no subagent dispatch during ideation.
 
-**Model.** Discovery is interactive and multi-turn: it frames the task, may ask clarifying questions, and WAITS for the operator's advance response across turns. A dispatched subagent runs single-shot and cannot hold a multi-turn conversation, so Discovery cannot run inside a subagent — it is necessarily performed at the **top level (the main chat session)**, and is therefore governed by the **session / chat model**, not by any subagent frontmatter. The orchestrator's own `model: opus` / `effort: high` frontmatter governs its non-interactive single-pass orchestration when it IS dispatched as a subagent — but that path cannot conduct interactive Discovery.
+**Model.** Discovery is interactive and multi-turn: it frames the task, may ask clarifying questions, and WAITS for the operator's advance response across turns. A dispatched subagent runs single-shot and cannot hold a multi-turn conversation, so Discovery cannot run inside a subagent — it is necessarily performed at the **top level (the main chat session)**, and is therefore governed by the **session / chat model**, not by any subagent frontmatter. th:orquestador's own `model: opus` / `effort: high` frontmatter governs its non-interactive single-pass orchestration when it IS dispatched as a subagent — but that path cannot conduct interactive Discovery.
 
 Practical consequence: Discovery quality tracks the chat model directly. Run the session on an Opus-class model for Discovery — it is a high-value framing/steering step. Raising the chat model to its strongest setting improves Discovery; lowering it (a faster/cheaper tier) degrades Discovery with it.
 
@@ -12,19 +12,19 @@ This document is the full contract. `CLAUDE.md §5` carries a one-line pointer t
 
 ## 1. Disposición predeterminada (default intake disposition)
 
-When Step 6b routes a request as `full pipeline`, the orchestrator does NOT proceed immediately to Step 7 (Classify) and Phase 1 (Design). Discovery ALWAYS runs first, and entry into planning is ALWAYS gated by an explicit operator confirmation.
+When Step 6b routes a request as `full pipeline`, th:lider does NOT proceed immediately to Step 7 (Classify) and Phase 1 (Design). Discovery ALWAYS runs first, and entry into planning is ALWAYS gated by an explicit operator confirmation.
 
-**HARD RULE — no silent advance into planning.** The orchestrator never transitions from intake to Phase 1 without first: (a) framing the task back to the operator — a 1–2 line restatement of what was understood plus the tentative pipeline shape / affected services; (b) asking any clarifying questions needed to gather the context required to plan well; and (c) emitting the planning-confirmation prompt and WAITING for an explicit advance response. An advance signal present in the operator's INITIAL message (e.g. `armá el plan`, `dale`, `analizá`) does NOT pre-satisfy this gate — the prompt is still shown and a fresh response is awaited. The ONLY bypass is an explicit operator-declared skip marker (§3.1).
+**HARD RULE — no silent advance into planning.** th:lider never transitions from intake to Phase 1 without first: (a) framing the task back to the operator — a 1–2 line restatement of what was understood plus the tentative pipeline shape / affected services; (b) asking any clarifying questions needed to gather the context required to plan well; and (c) emitting the planning-confirmation prompt and WAITING for an explicit advance response. An advance signal present in the operator's INITIAL message (e.g. `armá el plan`, `dale`, `analizá`) does NOT pre-satisfy this gate — the prompt is still shown and a fresh response is awaited. The ONLY bypass is an explicit operator-declared skip marker (§3.1).
 
 1. **Detect task clarity** (this sets framing depth, NOT whether to confirm). A task is "clear" when it carries a complete spec with stated AC, or an explicit skip marker. Otherwise it is "unclear". Either way, the confirmation gate fires (unless a skip marker is present).
 
 2. **Clear task (no marker) → brief framing gate (§3.2).** Restate, optionally ask clarifying questions, then confirm. Wait for the advance response.
 
-3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only the orchestrator's own capability. Do NOT dispatch any subagent (no architect, no qa-plan, no specifier). Remain until an advance response is received.
+3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only th:lider's own capability. Do NOT dispatch any subagent (no architect, no qa-plan, no specifier). Remain until an advance response is received.
 
-4. **Explicit skip marker → bypass (§3.1).** `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:` are deliberate opt-outs: proceed to the intake survey (§5) → Step 7 without the confirmation prompt.
+4. **Explicit skip marker → bypass (§3.1).** `--fast`, `[TIER: N]`, or `@th:lider this is a hotfix:` are deliberate opt-outs: proceed to the intake survey (§5) → Step 7 without the confirmation prompt.
 
-5. **Advance response received → intake survey (§5) → Step 7.** The survey captures meta-decisions, then the orchestrator proceeds to Step 7 (Classify) → Phase 0b (Specify) → Phase 1 (Design).
+5. **Advance response received → intake survey (§5) → Step 7.** The survey captures meta-decisions, then th:lider proceeds to Step 7 (Classify) → Phase 0b (Specify) → Phase 1 (Design).
 
 **An advance response to the planning-confirmation prompt — or an explicit skip marker — is the ONLY trigger for the architect.** Without one, the architect is never dispatched.
 
@@ -40,7 +40,7 @@ Any one of the following counts as an advance signal:
 | **Fast-path confirmation** | Any affirmative reply to the fast-path `[plan/explorar]` prompt — `plan`, `y`, `yes`, `sí`, `ok`, `adelante` |
 | **Close phrase** | `listo`, `ya está`, `eso es todo`, `done`, `that's it`, `terminé de pensar` |
 
-**Skip markers are NOT the same as advance keywords.** Literal operator-declared markers (`--fast`, `[TIER: N]`, `@th:orchestrator this is a hotfix:`) are a deliberate opt-out: they bypass the confirmation gate entirely (§3.1). Advance keywords and close phrases, by contrast, only close Discover when given as a **response to the planning-confirmation prompt** — the same words appearing in the operator's INITIAL message do NOT bypass the gate. The orchestrator still frames the task, may ask clarifying questions, and waits for a fresh advance response.
+**Skip markers are NOT the same as advance keywords.** Literal operator-declared markers (`--fast`, `[TIER: N]`, `@th:lider this is a hotfix:`) are a deliberate opt-out: they bypass the confirmation gate entirely (§3.1). Advance keywords and close phrases, by contrast, only close Discover when given as a **response to the planning-confirmation prompt** — the same words appearing in the operator's INITIAL message do NOT bypass the gate. th:lider still frames the task, may ask clarifying questions, and waits for a fresh advance response.
 
 **What does NOT count:** a question, a new piece of scope detail, "what do you think?", or "one more thing" — those extend the Discover conversation, they do not close it.
 
@@ -50,15 +50,15 @@ Any one of the following counts as an advance signal:
 
 This section defines Boundary B1 of the reasoning checkpoint (`docs/reasoning-checkpoint.md`). The Discover gate is generalized in-place as the intake→plan instance of the reusable three-boundary checkpoint. The mechanism is unchanged; the abstraction is made explicit so B2 (research→next) and B3 (postverify→next) share the same contract.
 
-**Enforcement.** In top-level sessions, `hooks/checkpoint-guard.sh` (`PreToolUse` / matcher `Task`) enforces this deterministically — the architect is not dispatched until both `checkpoint_advance_fresh: true` AND `functional_clarity_confirmed: true` are recorded in `00-state.md`. In nested-context sessions, the orchestrator self-check (Layer 2) applies; see `docs/reasoning-checkpoint.md § Layer 2`.
+**Enforcement.** In top-level sessions, `hooks/checkpoint-guard.sh` (`PreToolUse` / matcher `Task`) enforces this deterministically — the architect is not dispatched until both `checkpoint_advance_fresh: true` AND `functional_clarity_confirmed: true` are recorded in `00-state.md`. In nested-context sessions, the th:lider self-check (Layer 2) applies; see `docs/reasoning-checkpoint.md § Layer 2`.
 
 ### 3.1 Explicit skip marker → bypass
 
-The ONLY way to skip the confirmation gate is a deliberate operator-declared marker in the message: `--fast`, `[TIER: N]`, or `@th:orchestrator this is a hotfix:`. These mean "I have decided, skip the gate." Record `discover_state: bypassed`, skip the framing+confirm, and go straight to the intake survey (§5) → Step 7. (`--fast` still inherits every security carve-out — see §6 HI-1/HI-2; a skip marker is not a security waiver. A skip marker bypasses the checkpoint but NOT the security gate — this invariant holds at B1, B2, and B3.)
+The ONLY way to skip the confirmation gate is a deliberate operator-declared marker in the message: `--fast`, `[TIER: N]`, or `@th:lider this is a hotfix:`. These mean "I have decided, skip the gate." Record `discover_state: bypassed`, skip the framing+confirm, and go straight to the intake survey (§5) → Step 7. (`--fast` still inherits every security carve-out — see §6 HI-1/HI-2; a skip marker is not a security waiver. A skip marker bypasses the checkpoint but NOT the security gate — this invariant holds at B1, B2, and B3.)
 
 ### 3.2 Clear task (no marker) → brief framing gate
 
-When the task is clear but carries NO skip marker, the orchestrator still confirms before planning. Record `discover_state: open`, `checkpoint_boundary: intake-plan`, `checkpoint_advance_fresh: false`, `functional_clarity_confirmed: false`. Emit the framing and the confirmation in a single turn:
+When the task is clear but carries NO skip marker, th:lider still confirms before planning. Record `discover_state: open`, `checkpoint_boundary: intake-plan`, `checkpoint_advance_fresh: false`, `functional_clarity_confirmed: false`. Emit the framing and the confirmation in a single turn:
 
 ```
 Esto entendí: <1–2 line restatement + tentative pipeline shape / affected services>.
@@ -82,7 +82,7 @@ This is always at least ONE interaction. An advance keyword in the operator's in
 
 When the task is not clear, stay in the conversational Discover state:
 
-- Use the orchestrator's own capability to help the operator explore: clarify scope, suggest decompositions, ask targeted questions.
+- Use th:lider's own capability to help the operator explore: clarify scope, suggest decompositions, ask targeted questions.
 - Do NOT dispatch any subagent.
 - After N turns without an advance signal, emit a soft reminder (once):
   `Cuando quieras avanzar, decime y arranco la planeación.` / `Whenever you're ready, say the word and planning begins.`
@@ -119,13 +119,13 @@ Use `AskUserQuestion` where available. Where not available (e.g., takeover conte
 
 ### HI-1 + HI-4 — Depth DIAL, not stage switch
 
-The survey is a **depth dial**. Every gate still runs. "never simple, all dev runs full pipeline" (`orchestrator.md` Step 7) remains literally true. No survey answer can mark a Phase Checklist item as skipped unless the tier/`--fast` rules already authorize that skip today.
+The survey is a **depth dial**. Every gate still runs. "never simple, all dev runs full pipeline" (`lider.md` Step 7) remains literally true. No survey answer can mark a Phase Checklist item as skipped unless the tier/`--fast` rules already authorize that skip today.
 
-`survey_pipeline_shape: fast` maps exactly to `--fast` and inherits all its carve-outs, including the security design-review carve-out SEC-002 (`orchestrator.md` Step 7 fast mode). The survey does NOT introduce a new or more permissive semantics for `fast` — it is a strict alias for the operator-declared `--fast` marker.
+`survey_pipeline_shape: fast` maps exactly to `--fast` and inherits all its carve-outs, including the security design-review carve-out SEC-002 (`lider.md` Step 7 fast mode). The survey does NOT introduce a new or more permissive semantics for `fast` — it is a strict alias for the operator-declared `--fast` marker.
 
 ### HI-2 — Security floors are non-surveyable
 
-The survey **never writes `security_sensitive`**. That field is written ONLY by Step 7 path-pattern auto-escalation (`orchestrator.md:868`) and the bug-fix forcing rule.
+The survey **never writes `security_sensitive`**. That field is written ONLY by Step 7 path-pattern auto-escalation (`lider.md`) and the bug-fix forcing rule.
 
 The path-pattern auto-escalation is **input-independent** of every survey answer. Its result depends solely on the file paths touched (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`), never on `survey_pipeline_shape`, `survey_effort`, or `survey_iteration_autonomy`. Even if the survey records `shape=fast, effort=quick`, a task touching `auth/**` still gets `security-sensitive: true` + Tier 3 minimum — the escalation result is the same whether the survey capture runs before or after it.
 
@@ -187,8 +187,8 @@ All 7 survey fields in `00-state.md` are plain-text key: value pairs readable by
 The Discover phase emits `phase.start` and `phase.end` events with `phase: "0-discover"`:
 
 ```jsonl
-{"ts":"…","event":"phase.start","feature":"…","phase":"0-discover","agent":"orchestrator"}
-{"ts":"…","event":"phase.end","feature":"…","phase":"0-discover","agent":"orchestrator","status":"success","duration_ms":…,"extra":{"discover_state":"closed","advance_signal":"keyword:planeá","survey_source":"asked"}}
+{"ts":"…","event":"phase.start","feature":"…","phase":"0-discover","agent":"lider"}
+{"ts":"…","event":"phase.end","feature":"…","phase":"0-discover","agent":"lider","status":"success","duration_ms":…,"extra":{"discover_state":"closed","advance_signal":"keyword:planeá","survey_source":"asked"}}
 ```
 
 The Discover phase does NOT add a blocking item to the Phase Checklist — it is pre-Phase-0a conversational, not a phase that dispatches a subagent. It is recorded as a traced sub-step only (same precedent as Phase 3.75).
@@ -211,11 +211,11 @@ This line appears in the `## Main change` section, immediately below the one-sen
 
 ## 10. Spec co-authoring — `00-spec-seed.md` (Phase E2)
 
-After the intake survey and before dispatching the architect, the orchestrator offers the operator an opportunity to seed the spec. Full contract: `docs/spec-coauthoring.md`.
+After the intake survey and before dispatching the architect, th:lider offers the operator an opportunity to seed the spec. Full contract: `docs/spec-coauthoring.md`.
 
 ### 10.1 Seeding offer
 
-After recording survey answers in `00-state.md`, the orchestrator asks:
+After recording survey answers in `00-state.md`, th:lider asks:
 
 ```
 Antes de arrancar el diseño, ¿querés sembrar el spec? (opcional)
@@ -231,7 +231,7 @@ O decí "skip" para arrancar directo.
 
 ### 10.2 Artefact: `00-spec-seed.md`
 
-When the operator provides any response (other than "skip"), the orchestrator writes `{docs_root}/00-spec-seed.md` with the four sections above marked `**Source:** dev-seed`. Sets `spec_seed_present: true` in `00-state.md`.
+When the operator provides any response (other than "skip"), th:lider writes `{docs_root}/00-spec-seed.md` with the four sections above marked `**Source:** dev-seed`. Sets `spec_seed_present: true` in `00-state.md`.
 
 When the operator skips: no file is created; `spec_seed_present: false`. The architect runs in standard mode.
 
@@ -248,7 +248,7 @@ The `survey_scope_hint` captured in §5 above is passed to the architect regardl
 
 ## 11. Initiative detection — multi-project grouping (opt-in)
 
-This section is the full contract for the Step 6d-initiative sub-step in `agents/orchestrator.md`. It runs during Discover, after framing and before the intake survey.
+This section is the full contract for the Step 6d-initiative sub-step in `agents/lider.md`. It runs during Discover, after framing and before the intake survey.
 
 ### 11.1 Purpose and gating
 
@@ -270,7 +270,7 @@ Three signals may fire during Discover; none auto-creates the initiative — all
 
 ### 11.3 Confirmation gate (hard gate — never auto-create)
 
-After any signal fires, the orchestrator emits a single confirmation prompt:
+After any signal fires, th:lider emits a single confirmation prompt:
 
 ```
 This task appears to be part of initiative "{slug}".
@@ -289,7 +289,7 @@ An initiative spans multiple separate pipeline runs (one per project, possibly a
 1. Glob `{repo_base}/*_{slug}/overview.md` (Obsidian) or `{common-parent}/*_{slug}/overview.md` (local) — the `*_` wildcard absorbs any `{YYYY-MM-DD}_` prefix so a later-day run matches the day-1 dated folder.
 2. For each candidate, confirm `initiative: {slug}` in frontmatter — the frontmatter slug is the authoritative key.
 
-- **CREATE** — if no candidate confirms: write it from the template in `agents/orchestrator.md § overview.md Template`; the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`).
+- **CREATE** — if no candidate confirms: write it from the template in `agents/lider.md § overview.md Template`; the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`).
 - **JOIN** — on first confirmed match: read-modify-write, replacing this project's row in-place if it exists, appending a new row if absent. Rows are keyed by `project` slug; no row is ever duplicated.
 
 The join is idempotent: running the same project's pipeline twice updates its single row.
@@ -301,18 +301,34 @@ The join is idempotent: running the same project's pipeline twice updates its si
 - **Best-effort overview writes.** A write failure on `overview.md` logs a WARN and continues. The per-project pipeline never fails on an overview error.
 - **Local-mode per-project workspace unchanged.** In local mode, `base_path = "workspaces"` is not re-prefixed when an initiative is set. Only the overview location changes (common parent of sibling repos under a date-prefixed `{YYYY-MM-DD}_{initiative}/` folder).
 
+### 11.6 Repo-identity eligibility test — separate lanes vs same-repo batch (deterministic)
+
+Before th:lider multiplies orquestadores across what might be several projects, it runs a deterministic repo-identity test so it never spawns two lanes against what is actually one repository under two paths or names. Full contract: `agents/lider.md § Repo-identity verification and orquestador multiplication (AC-2.7)`.
+
+For each candidate project path `{p}`, read two signals:
+
+```bash
+git -C {p} rev-parse --git-common-dir
+git -C {p} remote get-url origin
+```
+
+- **Eligible for separate lanes (multi-project fan-out) only when both signals are pairwise-distinct across every candidate path.** A distinct `git-common-dir` AND a distinct `origin` URL means these are genuinely different repositories, and each earns its own orquestador lane.
+- **Same-repo fallback.** When two candidate paths resolve to the same `git-common-dir` OR the same `origin` URL, they are the SAME repository under two names. Do NOT route them through the multi-project initiative fan-out — route them through the same-repo multi-TASK batch contract instead (`agents/lider.md § Multi-Task fan-out`): one set of orquestadores, one per task, consolidated into a single delivery/PR. The multi-project fan-out is reserved for genuinely distinct repos; the batch contract is the correct home for multiple tasks inside one repo.
+
+The test is deterministic — it depends only on git metadata, never on directory names, which can collide or mislead. A sibling-directory layout under a generic root is a proposal aid only (filtered by the generic-root guard in §11.2), never a trigger; the `git-common-dir` + `origin` pair is the authoritative identity key. Per-lane worktree consequences of the eligibility result — each distinct repo is fetched and based against its OWN `origin/main` — are in `docs/worktree-discipline.md § Rule 6`.
+
 ---
 
 ## 12. Background research sweep (non-blocking, narrow trigger)
 
-The orchestrator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the `Step 6d-background-sweep` in `agents/orchestrator.md`.
+th:lider may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the `Step 6d-background-sweep` in `agents/lider.md`.
 
 ### 12.1 Trigger conditions (ALL must hold)
 
 The background sweep fires only when ALL of the following are true:
 
 1. **External knowledge gap exists.** The task involves a library, framework, migration, or external tool whose facts are NOT available from the repo itself (no relevant `docs/knowledge.md` entry, no existing spec or migration guide in the codebase).
-2. **The gap is a factual external question.** Examples that qualify: "does library X support tree-shaking as of v3?", "what is the migration path from Express v4 to v5?", "are there known security issues in package Y at this version?". Examples that do NOT qualify: "where is the auth module?", "what does the orchestrator do at Phase 3?", "how is feature X implemented?" — those are codebase-answerable questions.
+2. **The gap is a factual external question.** Examples that qualify: "does library X support tree-shaking as of v3?", "what is the migration path from Express v4 to v5?", "are there known security issues in package Y at this version?". Examples that do NOT qualify: "where is the auth module?", "what does th:orquestador do at Phase 3?", "how is feature X implemented?" — those are codebase-answerable questions.
 3. **The gap is material.** The architect would spend non-trivial time on raw WebSearch at Phase 1 without the pre-digested findings.
 
 ### 12.2 What fires
@@ -329,12 +345,12 @@ When the trigger conditions hold:
 - The sweep NEVER modifies `discover_state`, `checkpoint_advance_fresh`, or `functional_clarity_confirmed`. Discover continues independently.
 - The sweep is NOT an advance signal and never auto-advances the pipeline.
 - The sweep NEVER runs for code-location questions or any question answerable from the codebase.
-- The sweep NEVER blocks the dialogue. If the fan-out is slow, the orchestrator continues the conversation; the findings are opportunistically available at Phase 1.
+- The sweep NEVER blocks the dialogue. If the fan-out is slow, th:lider continues the conversation; the findings are opportunistically available at Phase 1.
 - **The sweep is single-pass.** The gap-closure loop (bounded multi-round follow-up dispatch governed by the round counter and gap gate in `agents/ref-special-flows.md § Research Flow`) applies ONLY to the primary `/th:research` flow, never to the background sweep. The sweep runs its researcher fan-out once, produces one `research/research-findings-discover.md`, and stops — no structured gaps block is evaluated, no follow-up rounds are dispatched, and no round counter is incremented.
 
 ### 12.4 Availability at Phase 1
 
-When the advance signal fires and the architect is dispatched for Phase 1, the orchestrator checks for `research.background_sweep.complete: true` in `{events_file}`. When found:
+When the advance signal fires and the architect is dispatched for Phase 1, th:orquestador checks for `research.background_sweep.complete: true` in `{events_file}`. When found:
 - The architect dispatch prompt includes the path `workspaces/{feature}/research/research-findings-discover.md`.
 - The architect reads the pre-digested findings as its primary external evidence base (same as the primary research flow path per `agents/architect.md § Research Mode — Process § Step 2`).
 - The architect may spot-fetch to fill specific gaps the consolidator flagged but does not re-run broad WebSearch passes over already-covered angles.

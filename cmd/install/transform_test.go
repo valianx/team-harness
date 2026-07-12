@@ -150,15 +150,15 @@ func TestTransform_BlankModelSkipped(t *testing.T) {
 	}
 }
 
-// TestTransform_ModeByRole_Orchestrator asserts the installer-layer mode-by-role
-// override: applying applyModeByRole to an already-transformed orchestrator file
+// TestTransform_ModeByRole_Lider asserts the installer-layer mode-by-role
+// override: applying applyModeByRole to an already-transformed lider file
 // replaces mode: subagent with mode: primary (AC-12 / S-5).
 //
 // This test is deliberately separate from the conformance fixture — the generic
 // transform always injects mode: subagent (fixture-bound / migrate.mjs parity);
 // the role override is an installer-specific post-projection step.
-func TestTransform_ModeByRole_Orchestrator(t *testing.T) {
-	input := "---\nname: orchestrator\nmodel: sonnet\ntools: Read\n---\nBody.\n"
+func TestTransform_ModeByRole_Lider(t *testing.T) {
+	input := "---\nname: lider\nmodel: opus\ntools: Read\n---\nBody.\n"
 	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)
 	if err != nil {
 		t.Fatalf("transform error: %v", err)
@@ -166,39 +166,40 @@ func TestTransform_ModeByRole_Orchestrator(t *testing.T) {
 
 	// After the generic transform, mode should be subagent.
 	if !strings.Contains(string(transformed), "mode: subagent") {
-		t.Error("generic transform should set mode: subagent for orchestrator")
+		t.Error("generic transform should set mode: subagent for lider")
 	}
 
 	// Apply the mode-by-role override.
-	final, err := applyModeByRole(transformed, "orchestrator")
+	final, err := applyModeByRole(transformed, "lider")
 	if err != nil {
 		t.Fatalf("applyModeByRole error: %v", err)
 	}
 	if !strings.Contains(string(final), "mode: primary") {
-		t.Error("after applyModeByRole, orchestrator should have mode: primary")
+		t.Error("after applyModeByRole, lider should have mode: primary")
 	}
 	if strings.Contains(string(final), "mode: subagent") {
-		t.Error("after applyModeByRole, 'mode: subagent' should be replaced in orchestrator")
+		t.Error("after applyModeByRole, 'mode: subagent' should be replaced in lider")
 	}
 }
 
-// TestTransform_ModeByRole_NonOrchestrator asserts that applyModeByRole leaves
-// non-orchestrator agents unchanged (mode: subagent preserved).
-func TestTransform_ModeByRole_NonOrchestrator(t *testing.T) {
-	input := "---\nname: architect\nmodel: opus\ntools: Read\n---\nBody.\n"
+// TestTransform_ModeByRole_NonLider asserts that applyModeByRole leaves
+// non-lider agents unchanged (mode: subagent preserved). orquestador — the
+// task-scoped execution engine — is a subagent, not the primary.
+func TestTransform_ModeByRole_NonLider(t *testing.T) {
+	input := "---\nname: orquestador\nmodel: sonnet\ntools: Read\n---\nBody.\n"
 	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)
 	if err != nil {
 		t.Fatalf("transform error: %v", err)
 	}
 
-	final, err := applyModeByRole(transformed, "architect")
+	final, err := applyModeByRole(transformed, "orquestador")
 	if err != nil {
 		t.Fatalf("applyModeByRole error: %v", err)
 	}
 
 	// Should still have mode: subagent.
 	if !strings.Contains(string(final), "mode: subagent") {
-		t.Error("non-orchestrator agent should retain mode: subagent after applyModeByRole")
+		t.Error("non-lider agent should retain mode: subagent after applyModeByRole")
 	}
 }
 

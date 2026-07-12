@@ -1,21 +1,21 @@
 ---
 name: ref-intake-flows
-description: Reference file for orchestrator Phase 0a conditional intake sub-flows (milestone continuity, initiative create-or-join, initiative detection + confirm, language/english-learning intent handling, ClickUp conversational intents). Read on-demand by the orchestrator — not a standalone agent.
+description: Reference file for th:lider Phase 0a conditional intake sub-flows (milestone continuity, initiative create-or-join, initiative detection + confirm, language/english-learning intent handling, ClickUp conversational intents). Read on-demand by th:lider — not a standalone agent.
 model: opus
 color: cyan
 ---
 
-# orchestrator — Intake Sub-Flows Reference
+# lider — Intake Sub-Flows Reference
 
-This file is read on-demand by the orchestrator during Phase 0a intake. It is NOT part of the orchestrator's system prompt.
+This file is read on-demand by `th:lider` during Phase 0a intake. It is NOT part of the lider's system prompt.
 
-**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Each section below is triggered by its own condition in `agents/orchestrator.md` Phase 0a (a 1-2 line trigger + pointer replaces the full body at the original site) — locate the top-level section heading for the active trigger and read only that section. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
+**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Each section below is triggered by its own condition in `agents/lider.md` Phase 0a (a 1-2 line trigger + pointer replaces the full body at the original site) — locate the top-level section heading for the active trigger and read only that section. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
 ---
 
 ## Milestone Continuity
 
-Triggered from `agents/orchestrator.md` Phase 0a Step 1d, before composing a fresh `docs_root`.
+Triggered from `agents/lider.md` Phase 0a Step 1d, before composing a fresh `docs_root`.
 
 **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
 
@@ -26,7 +26,7 @@ Detection algorithm:
 4. Update the plan's `00-state.md` milestone index (see **Milestone Index** below): replace the row for this milestone in-place (if it exists) or append it (if absent). Never duplicate a row for the same milestone slug.
 5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
 
-**Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The orchestrator maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
+**Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The owning `th:orquestador` maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
 ```text
 ## Milestone Index
 | Milestone | Slug | Status | Commit |
@@ -36,7 +36,7 @@ Detection algorithm:
 ```
 Status values: `pending` → `implementing` → `complete`. The `Commit` column records the commit sha after each milestone lands on the single feature branch. No per-milestone `PR` column — milestones are commits, not PRs. A single build-level PR is recorded once at the end (when ALL milestones are complete). Replace the row in-place; never append a duplicate row for the same slug.
 
-**Parallelization.** Independent milestone implementations MUST be PARALLELIZED whenever the `01-plan.md` dependency annotations allow, reusing the #285 in-message concurrent-`Task` mechanism at milestone granularity within ONE workspace. Dependent milestones serialize in dependency order. Each parallel lane works in an isolated worktree; at the convergence barrier the orchestrator applies each lane's diff as ONE COMMIT to the single feature branch in dependency order (committed serially, never concurrently). The result is one feature branch, one commit per milestone (in dependency order), ONE PR at the end.
+**Parallelization.** Independent milestone implementations MUST be PARALLELIZED whenever the `01-plan.md` dependency annotations allow, reusing the #285 in-message concurrent-`Task` mechanism at milestone granularity within ONE workspace. Dependent milestones serialize in dependency order. Each parallel lane works in an isolated worktree; at the convergence barrier the `th:orquestador` applies each lane's diff as ONE COMMIT to the single feature branch in dependency order (committed serially, never concurrently). The result is one feature branch, one commit per milestone (in dependency order), ONE PR at the end.
 
 This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace is the single home; the milestone index in the plan's `00-state.md` tracks per-milestone status and commit shas; stage files (`02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, `reviews/04-validation.md`) are FLAT, whole-task documents covering the entire build — not split or suffixed per milestone.
 
@@ -44,7 +44,7 @@ This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace 
 
 ## Initiative Create-or-Join
 
-Triggered from `agents/orchestrator.md` Phase 0a Step 1f, only when `initiative` is non-null in `00-state.md`.
+Triggered from `agents/lider.md` Phase 0a Step 1f, only when `initiative` is non-null in `00-state.md`.
 
 1f. **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
 
@@ -56,7 +56,7 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 1f, only when `initiative`
   2. **Confirm by frontmatter:** for each candidate, read its `overview.md` frontmatter and confirm `initiative: {slug}` equals the target slug. The frontmatter slug is the authoritative key — it never changes.
   3. **JOIN on first confirmed match** — read-modify-write the existing `overview.md`. **CREATE only if no candidate confirms** — when creating, the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`) which becomes the day-1 anchor for all subsequent runs.
 - **JOIN**: read the file, find the row for this project slug in `## Projects`. If the row exists, replace it in-place with the current values; if absent, append a new row. Never duplicate a row for the same project. This is idempotent: re-running the same project's pipeline updates its single row rather than accumulating rows.
-- **CREATE**: write the full `overview.md` template (see `## overview.md Template` section in `agents/orchestrator.md`) with this project as the first row.
+- **CREATE**: write the full `overview.md` template (see `## overview.md Template` section in `agents/lider.md`) with this project as the first row.
 
 **Write the initial project row** (project, branch-at-Design, status):
 ```text
@@ -76,7 +76,7 @@ Branch-at-Design is the current git branch if already on a feature branch, or `�
 
 ## Initiative Detection and Confirm
 
-Triggered from `agents/orchestrator.md` Phase 0a Step 6d-initiative, during Discover, after framing and before the intake survey.
+Triggered from `agents/lider.md` Phase 0a Step 6d-initiative, during Discover, after framing and before the intake survey.
 
 **Step 6d-initiative — Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
 
@@ -84,9 +84,9 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 6d-initiative, during Disc
 
 **Three detection signals** (any one *proposes*; none *auto-creates*; all three require confirmation):
 
-1. **Operator declaration (primary).** The operator explicitly names an initiative in the task — e.g. "this is part of the migration-2026 initiative", "junto con el backend repo". The orchestrator extracts the freeform label, slugifies it to `[a-z0-9-]` max 60 chars (same rule as feature-name), and proposes it.
+1. **Operator declaration (primary).** The operator explicitly names an initiative in the task — e.g. "this is part of the migration-2026 initiative", "junto con el backend repo". The lider extracts the freeform label, slugifies it to `[a-z0-9-]` max 60 chars (same rule as feature-name), and proposes it.
 2. **Existing-initiative-folder inspection (join aid).** At Discover time, inspect for an existing `overview.md` using the date-agnostic glob: obsidian mode → glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` and confirm by `initiative:` frontmatter; local mode → glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md` and confirm by frontmatter. A confirmed match surfaces a candidate to **join** — show the slug and ask the operator.
-3. **Sibling-directory inspection (proposal aid only).** If the cwd repo's parent contains sibling repos (directories with their own `.git`), the orchestrator may note this as a *prompt to ask* — never as an automatic trigger. **Generic-root guard:** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone — a flat parent is not an initiative signal.
+3. **Sibling-directory inspection (proposal aid only).** If the cwd repo's parent contains sibling repos (directories with their own `.git`), the lider may note this as a *prompt to ask* — never as an automatic trigger. **Generic-root guard:** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone — a flat parent is not an initiative signal.
 
 **After any signal fires**, emit a confirmation prompt naming the proposed/joined initiative slug and the resulting overview location:
 
@@ -98,7 +98,7 @@ Keep this name (Y), enter a different name (type it), or skip the initiative (n)
 
 Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit operator response.
 
-- **On Y (accept proposed name):** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, `agents/orchestrator.md`) during intake.
+- **On Y (accept proposed name):** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to Step 6d-initiative-join (Phase 0a, `agents/lider.md`) during intake.
 - **On a different name typed by the operator:** re-slugify the operator's input to `[a-z0-9-]` max 60 chars (same rule as the feature-name slug). Set `initiative` to that re-slugified value. If an existing `overview.md` is found under the new slug (same date-agnostic join-aid inspection as detection signal 2), JOIN it; otherwise CREATE. Proceed to Step 6d-initiative-join as usual. This path is also gated behind explicit operator input — it is a third explicit choice, not an auto-advance.
 - **On n (or no signal fires):** set `initiative: null` in `00-state.md § Current State`. Proceed exactly as today — zero behaviour change.
 
@@ -108,7 +108,7 @@ Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder bef
 
 ## Language and English-Learning Intent Handling
 
-Triggered from `agents/orchestrator.md` Phase 0a Step 6a, when the intent matches a `language-set` or `english-learning-set` row (the intent-pattern table itself stays in `agents/orchestrator.md`).
+Triggered from `agents/lider.md` Phase 0a Step 6a, when the intent matches a `language-set` or `english-learning-set` row (the intent-pattern table itself stays in `agents/lider.md`).
 
 **Language-set intent handling.** When the intent matches a `language-set` row:
 
@@ -139,12 +139,12 @@ Triggered from `agents/orchestrator.md` Phase 0a Step 6a, when the intent matche
 
 ## ClickUp Conversational Intents
 
-Triggered from `agents/orchestrator.md` Phase 0a Step 6c, when the utterance contains a ClickUp task identifier.
+Triggered from `agents/lider.md` Phase 0a Step 6c, when the utterance contains a ClickUp task identifier.
 
 **Step 6c — ClickUp conversational intents (MCP-direct, no pipeline).**
 
 ClickUp ops are routed to MCP tools directly when the operator references a specific task.
-This is NOT a direct mode and NOT the full pipeline — the orchestrator calls the MCP tool,
+This is NOT a direct mode and NOT the full pipeline — the lider calls the MCP tool,
 reports the result, and exits the routing step. The pipeline is not engaged.
 
 **Trigger condition.** The utterance MUST contain a task identifier:
@@ -173,7 +173,7 @@ intent — pipeline routing applies).
 5. If >5 matches: report the count and ask the operator to refine the name.
 Never call the action MCP tool without an explicit confirmation when the input is by name.
 
-**Status pass-through.** ClickUp workspaces define arbitrary statuses per list. The orchestrator
+**Status pass-through.** ClickUp workspaces define arbitrary statuses per list. The lider
 passes the operator's literal status string to `clickup_update_task`. If the MCP returns an
 invalid-status error, surface the error message verbatim and ask the operator for the correct
 status name. No hardcoded enum.

@@ -188,6 +188,60 @@ through the filesystem is needed.
 
 ---
 
+## Rule 6 — Per-lane worktree (th:lider fan-out)
+
+When th:lider fans out N orquestador lanes — a same-repo multi-task batch, or a multi-project
+initiative (`agents/lider.md § Multi-Task fan-out`) — each lane runs in its OWN git worktree. Rules
+1–5 apply per lane, with these lane-specific bindings:
+
+- **One worktree per lane, addressed by `git -C`.** Each lane's orquestador operates inside its own
+  worktree path; git operations target it explicitly with `git -C {worktree-path} …` rather than
+  relying on a shared process cwd — lanes run concurrently and cannot share a working directory.
+- **Base = the lane repo's freshly-updated `origin/main`.** Before creating a lane's worktree,
+  `git fetch origin main` in that lane's repository, then
+  `git worktree add -b {branch} {path} origin/main` (Round 1) — or the completed dependency branch
+  for a Round N task. In a multi-project initiative each project is a distinct repository (proven by
+  the repo-identity test, `docs/discover-phase.md § 11.6`), so "the lane repo's `origin/main`" is
+  per-repo: fetch and base each lane against its OWN origin, never against a sibling project's.
+- **STOP-on-unfamiliar-WIP, per lane.** The Rule 1 start-gate and the Rule 2 no-silent-reuse check
+  run independently for each lane's target path and branch
+  (`agents/lider.md § The fan-out mechanic → Pre-launch collision check`). An existing worktree or
+  branch at any lane's target is a per-lane STOP — surface it and wait for the operator; never
+  silently reuse or overwrite one lane's target because the other lanes were clean.
+- **Plan declares each lane's worktree (Rule 5).** Every lane records its `worktree` /
+  `worktree_branch` / `worktree_base` in its OWN orquestador `00-state.md`, so teardown after each
+  lane's PR merges (Rule 3/4) is a deterministic lookup, not a filesystem search.
+
+---
+
+## Capability cache — operator-confirmed, version-pinned
+
+The lider+orquestador split is opt-in on confirmed evidence: it runs only after the operator has
+confirmed, live, that this Claude Code build supports the nested-subagent gate-messaging round-trip
+(M3). That confirmation is recorded as the **capability-cache field**, subject to two floors
+(`agents/lider.md § Boot capability check (AC-2.6)`). It gates worktree-lane fan-out transitively —
+no orquestador spawns until it passes, so no per-lane worktree (Rule 6) is ever created on an
+unconfirmed or version-drifted environment.
+
+- **OPERATOR-CONFIRMED.** The `probe_result: PASS` value lives in the **Operator confirmation**
+  section of `tests/evidence/nested-lane-probes.md`, filled ONLY by the operator via the gated
+  `/th:setup` step — never written by an agent. An agent may read it; it may never author or advance
+  it.
+- **Version-PINNED (version-invalidation floor, AC-10.3).** The confirmation is pinned to the
+  specific CC `version` it was recorded against. th:lider's boot capability check reads the running
+  CC version and INVALIDATES the cached confirmation on any version drift — a PASS recorded on an
+  older CC build does not carry forward. If the running version cannot be determined, the
+  version-match is treated as FAILED; never assume a match.
+- **On invalidation → hard-STOP + re-confirmation; NO monolith fallback.** When the version-pin
+  fails (or the confirmation is absent), th:lider does NOT spawn an orquestador and does NOT run the
+  pipeline inline as a monolith. It STOPS with a single operator-facing error directing the operator
+  to upgrade Claude Code and re-confirm via `/th:setup`. A silent monolith fallback is deliberately
+  not provided — it would mask that the split is not actually running. Non-gated direct modes
+  (research, translate, diagram, define-ac, security audit) never spawn an orquestador and are
+  unaffected by this floor.
+
+---
+
 ## Known Caveats
 
 ### `worktree.baseRef: "fresh"` regression (#60588)

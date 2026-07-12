@@ -1,6 +1,6 @@
 # KG write-time policy
 <!-- Single source of truth for KG write-time content-policy + dedup gates.
-     Consumed by: agents/orchestrator.md (Phase 6 Knowledge Save + Phase 3
+     Consumed by: agents/orquestador.md (Phase 6 Knowledge Save + Phase 3
      security-finding writes) and agents/delivery.md (Step 11.5 passive capture).
      Read-only agents (qa, tester, security, architect) do NOT reference this —
      they never call create_nodes; they emit kg_save_candidates instead.
@@ -146,11 +146,11 @@ matches of the same node type. A `process-insight` candidate is never Absorbed i
 
 ## Session attribution (best-effort)
 
-**Origin of the `session_id`.** The orchestrator calls `mcp__memory__session_start` at
-Phase 0a Step 1b and writes the returned UUID to
+**Origin of the `session_id`.** `th:lider` calls `mcp__memory__session_start` at
+Phase 0a Intake (Step 2) and writes the returned UUID to
 `workspaces/{feature-name}/session.json` as `"session_id": "<uuid>"`. That file is the
 single source of truth for the session_id throughout the pipeline. The session is closed
-by `mcp__memory__session_end` at Phase 6.
+by `mcp__memory__session_end` at Phase 6 (owned by the `th:orquestador` instance).
 
 **Convention for every writer.** When calling `create_nodes`, pass `"session_id":
 "<uuid>"` alongside `"nodes"` if and only if all three conditions hold:

@@ -20,8 +20,46 @@
 // The CC payload carries the requested subagent_type but no agent_id yet
 // (agent_id is assigned by the runtime and only observable at SubagentStop),
 // so the emitted record omits agent_id.
+//
+// project key (TH-LANE marker): when the dispatching agent stamps a
+// `TH-LANE: {project-key}` line into the FIRST LINE of the dispatch prompt,
+// this hook stamps a `project` field on the breadcrumb. Only the first line
+// is trusted, mirroring checkpoint-guard's TH-STATE-REF controlled-header
+// parse: content forwarded or fetched into the rest of the prompt is
+// untrusted per CLAUDE.md §6.6, so a marker planted lower in the prompt
+// cannot smuggle a project key onto the breadcrumb. Charset/length are
+// bounded (PROJECT_KEY_RE) before the value ever reaches the JSONL sink — an
+// out-of-shape marker is treated as absent, never written raw. Marker
+// absent, invalid, or not on the first line → `project` is omitted and
+// readers fall back to file-order pairing (backward-compat, see
+// docs/observability.md). PreToolUse is the ONLY breadcrumb able to read
+// this marker — subagent-trace.ts (SubagentStop) has no prompt in its
+// payload; see that file's header comment for the stop-side residual.
 
 import type { NormalizedInput } from "../shim/normalized-v1.js";
+
+// ---------------------------------------------------------------------------
+// project key extraction — TH-LANE marker (charset/length bounded, AC-5.4;
+// first-line-only, mirrors checkpoint-guard's extractStateRefHeader)
+// ---------------------------------------------------------------------------
+
+const PROJECT_KEY_RE = /^[a-z0-9-]{1,60}$/;
+const TH_LANE_MARKER_RE = /^TH-LANE:\s*(\S+)/;
+
+/** Extract and bound-check the project key from the CONTROLLED HEADER (first
+ *  line only) of a dispatch prompt. A marker appearing anywhere else in the
+ *  prompt is untrusted content, not the dispatcher's own header, and is
+ *  never scanned. Returns the key when the marker is present on the first
+ *  line AND the captured value fits the charset/length bound; returns null
+ *  otherwise (marker absent, not on the first line, or present but
+ *  out-of-shape — every case omits `project`, never writes it unbounded). */
+function extractProjectKey(prompt: string): string | null {
+  const firstLine = prompt.split("\n", 1)[0] ?? "";
+  const match = TH_LANE_MARKER_RE.exec(firstLine);
+  if (match === null) return null;
+  const candidate = match[1] ?? "";
+  return PROJECT_KEY_RE.test(candidate) ? candidate : null;
+}
 
 // ---------------------------------------------------------------------------
 // SubagentStartWriter — injected by the entry module.
@@ -75,12 +113,22 @@ export function writeStart(input: NormalizedInput, writer: SubagentStartWriter):
     return null;
   }
 
-  // Build the JSONL record — matches AC-1's exact field set.
+  // Build the JSONL record — matches AC-1's exact field set, plus the
+  // optional `project` key (AC-5.1/5.3/5.4).
   const record: Record<string, string> = {
     ts: writer.now(),
     event: "subagent.start",
     agent_type: subagentType,
   };
+
+  const prompt =
+    typeof input.tool?.input?.["prompt"] === "string"
+      ? (input.tool.input["prompt"] as string)
+      : "";
+  const projectKey = extractProjectKey(prompt);
+  if (projectKey !== null) {
+    record["project"] = projectKey;
+  }
 
   const jsonLine = JSON.stringify(record);
   return writer.appendLine(workspace, TRACE_FILENAME + "\0" + jsonLine);

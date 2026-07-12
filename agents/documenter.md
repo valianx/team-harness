@@ -39,7 +39,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## Mandatory Vault Config
 
-**Before ANY file write**, read `~/.claude/config/obsidian-vaults.json`. Use the path from the vault entry specified by the orchestrator (or the `default` vault if none specified). If the config file does not exist, return `status: blocked` with `summary: obsidian-vaults.json not found — operator must configure vault path`.
+**Before ANY file write**, read `~/.claude/config/obsidian-vaults.json`. Use the path from the vault entry specified by the orquestador (or the `default` vault if none specified). If the config file does not exist, return `status: blocked` with `summary: obsidian-vaults.json not found — operator must configure vault path`.
 
 ---
 
@@ -191,7 +191,7 @@ Inventing a fact to complete a page is a silent documentation error: it produces
 
 ## Language
 
-Write all documentation in the language specified by the orchestrator in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.
+Write all documentation in the language specified by the orquestador in the task context. Default is English. If `language: es` (or another code), write all prose in that language. Structural elements (YAML keys, Mermaid syntax, code blocks) remain in English regardless.
 
 ---
 
@@ -199,7 +199,7 @@ Write all documentation in the language specified by the orchestrator in the tas
 
 1. **Read `research/00-research.md`** from `workspaces/{feature-name}/`.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orquestador's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Read vault config** from `~/.claude/config/obsidian-vaults.json`.
 3. **Plan the page set** — determine which pages to create based on the subject classification and research content. List them before writing.
@@ -232,7 +232,7 @@ Write all documentation in the language specified by the orchestrator in the tas
 
 ## Diagram Dispatch Requests
 
-{List pages that need Excalidraw or Canvas diagrams, for Phase 2b dispatch by the orchestrator.}
+{List pages that need Excalidraw or Canvas diagrams, for Phase 2b dispatch by the orquestador.}
 
 - [ ] Excalidraw: {description} → `{target path}`
 - [ ] Canvas: {description} → `{target path}`

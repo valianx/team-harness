@@ -78,19 +78,19 @@ Hard rule: when asked to "review", "audit", or "validate" a plan / inventory / t
 
 ### Routing when asked to "review the plan"
 
-If the orchestrator passes a task like "review the plan", "audit substance", "validate coverage of the architecture", "revisa el plan":
+If the orquestador passes a task like "review the plan", "audit substance", "validate coverage of the architecture", "revisa el plan":
 
 1. If the concern is **plan-shape** (Delivery Grouping, per-task ACs in GWT, consolidated docs, …) → return `status: blocked` with `summary: route to plan-reviewer agent`.
 2. If the concern is **substance coverage of AC vs Work Plan** → invoke Ratify-Plan Mode (append to `01-plan.md`). Do NOT create a separate file.
 3. If the concern is **substance refinement** (gaps in the architecture, missing sections, stale decisions) → return `status: blocked` with `summary: route back to architect for in-place refinement of 01-plan.md`.
 
-The orchestrator must pick one of the three. If the instruction is ambiguous, return `status: blocked` and ask. Do not silently improvise a fourth path.
+The orquestador must pick one of the three. If the instruction is ambiguous, return `status: blocked` and ask. Do not silently improvise a fourth path.
 
 ---
 
 ## Operating Modes
 
-Detect the mode from the orchestrator's instructions.
+Detect the mode from the orquestador's instructions.
 
 **Pre-code modes (ratify-plan, define-ac, reconcile, plan-review panel) have moved to `agents/qa-plan.md`.** This agent handles post-code modes only.
 
@@ -98,7 +98,7 @@ Detect the mode from the orchestrator's instructions.
 
 Used inside the pipeline after implementation. Validates code against existing AC from `01-plan.md` § Task List.
 
-- **Trigger:** orchestrator invokes for verification, or no explicit mode specified
+- **Trigger:** orquestador invokes for verification, or no explicit mode specified
 - **Flow:** Phase 0 → Phase 2 → Phase 3 (skip Phase 1 — AC already exist in `01-plan.md` § Task List)
 - **Output:** `workspaces/{feature-name}/reviews/04-validation.md`
 
@@ -178,7 +178,7 @@ Used inside the Documentation Flow (Phase 3) after the documenter produces vault
 
 An unbacked claim (endpoint, param, env var, config key, or CLI flag) that appears in a vault page but has no verifiable counterpart in the source is the canonical example of a fidelity finding. Such a claim FAILS the gate.
 
-- **Trigger:** orchestrator invokes for docs flow Phase 3 validation (after documenter write phase)
+- **Trigger:** orquestador invokes for docs flow Phase 3 validation (after documenter write phase)
 - **Input:** `research/00-research.md` (seed narrative), vault pages written by documenter
 - **Output:** `workspaces/{feature-name}/reviews/04-validation.md` with structural + fidelity verdicts
 
@@ -298,7 +298,7 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 **Before starting ANY work:**
 
-1. **Live AC read + packet-first (validate mode, Phase 3 of the pipeline).** Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your per-AC verdict baseline. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`) — as implementation-context digest only: the changed-files table, the implementer's Deviations, and the Phase 2.7 AC→test map. The packet carries NO acceptance-criteria copy; it is a non-authoritative navigation digest, not a substitute for `01-plan.md`/`02-implementation.md`/`03-testing.md`.
+1. **Live AC read + packet-first (validate mode, Phase 3 of the pipeline).** Live-read the per-task AC block from `01-plan.md § Task List` — mandatory, never sourced from the packet; this is your per-AC verdict baseline. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orquestador builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`) — as implementation-context digest only: the changed-files table, the implementer's Deviations, and the Phase 2.7 AC→test map. The packet carries NO acceptance-criteria copy; it is a non-authoritative navigation digest, not a substitute for `01-plan.md`/`02-implementation.md`/`03-testing.md`.
    - **Hard floor — fail-closed on absence.** `01-plan.md` is the mandatory live AC source — there is no verdict without it. When `01-plan.md` does not exist on disk (in either the packet-first or full-manifest path), do NOT fall back to a packet summary or an implicit AC list — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot form a validation verdict` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file.
    - **Depth-on-demand (never forbidden):** open a full workspace document from the input manifest below ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
    - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input-manifest read below, report `packet_integrity: stale|mismatch`.
@@ -311,10 +311,10 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
    - `02-implementation.md` — implementer output: files changed, deviations, scope-drift annotations
    - `03-testing.md` — test authoring record (which tests cover which AC)
    - `reviews/04-security.md` — security report (inform validation of security-related AC)
-   - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
+   - `failure-brief.md` — failure brief from orquestador (present only on re-dispatch)
    If any OTHER named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orquestador's resolved base or the session-start directive's announced base — never the repo-local default.
 
 3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -336,15 +336,15 @@ Used by `/th:cross-repo` to evaluate existing code against business rules from a
 
 **This phase runs in validate mode (default).** Read the acceptance criteria, then read source code and compare against them.
 
-**Per-task scoping (pipeline_version: 2).** When the orchestrator invokes you in Stage 2 with a `Task identifier` (e.g., `Task-1`), read **the AC block of that specific task** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-task AC block is your validation scope: validate exactly those ACs against the code of this task. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this task (by construction the union of per-task ACs covers it).
+**Per-task scoping (pipeline_version: 2).** When the orquestador invokes you in Stage 2 with a `Task identifier` (e.g., `Task-1`), read **the AC block of that specific task** in `workspaces/{feature-name}/01-plan.md` (§ Task List) — not the feature-wide AC list. The per-task AC block is your validation scope: validate exactly those ACs against the code of this task. The feature-wide AC list in `01-plan.md` § Review Summary is context, not the contract for this task (by construction the union of per-task ACs covers it).
 
-**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a task identifier — the orchestrator does not pass one in legacy mode.
+**Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy behaviour: read any available AC from session context for the full AC list and validate the whole feature. Do NOT scope to a task identifier — the orquestador does not pass one in legacy mode.
 
 **Distinction from Phase 1.5 (ratify-plan mode) and Phase 1.6 (plan-reviewer).** Phase 1.5 (`qa-plan` agent, mode `ratify-plan`) validates that the Work Plan covers every AC — substance coverage. Phase 1.6 (the `plan-reviewer` agent — different file) audits plan-shape rules — Delivery Grouping, per-task ACs in GWT, consolidated documents. Validate-mode (this section) is Phase 3 (per task in Stage 2): code vs AC. Three distinct phases, three distinct concerns.
 
 **AC formats:** Accept both `Given/When/Then` and `VERIFY: {condition}` formats. For VERIFY criteria, check that the code satisfies the stated condition and provide file:line evidence just like GWT criteria.
 
-**Spec annotations:** If any AC still has a `[CONSTRAINT-DISCOVERED]` tag (wasn't reconciled by the orchestrator), treat the annotation as context — validate against the AC as written but note the discrepancy in your report under Warnings.
+**Spec annotations:** If any AC still has a `[CONSTRAINT-DISCOVERED]` tag (wasn't reconciled by the orquestador), treat the annotation as context — validate against the AC as written but note the discrepancy in your report under Warnings.
 
 ### Bug-fix mode contract (validate mode for type: fix and type: hotfix)
 
@@ -371,7 +371,7 @@ The `reviews/04-validation.md` template for bug-fix mode adds a `Verified by` co
 2. **AC-2**: Regression test exists at `tests/date-range/picker.spec.ts` — PASS — `tests/date-range/picker.spec.ts:18-34` (test `should_exclude_to_boundary` fails on pre-fix, passes on post-fix) — verified by `02-regression-test.md` (authoring) + `03-testing.md` (post-fix suite).
 ```
 
-**`security-sensitive: true` is forced for `type: fix | hotfix`** at Phase 0a Step 7 in the orchestrator. The security agent runs in parallel with you at Phase 3 regardless of any other criterion. The qa validate-mode is unchanged by this — security findings live in `reviews/04-security.md`, not in your scope.
+**`security-sensitive: true` is forced for `type: fix | hotfix`** at Phase 0a Step 7 in the orquestador. The security agent runs in parallel with you at Phase 3 regardless of any other criterion. The qa validate-mode is unchanged by this — security findings live in `reviews/04-security.md`, not in your scope.
 
 1. **Verify each criterion** — check the code implements what was specified
 2. **Check test coverage** — ensure tests exist for the defined criteria
@@ -461,13 +461,13 @@ Before marking validation as complete:
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
+The orquestador writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
 
 ---
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orquestador already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In validate mode: an AC mentions a specific tool or library that may have a known `tool-gotcha` entity (e.g., "uses Prisma" → query `"Prisma gotchas"`).
@@ -477,8 +477,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 **How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
+- Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orquestador Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orquestador will pick it up.
+- Re-query for the same term the orquestador already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -487,7 +487,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: qa
@@ -512,20 +512,20 @@ issues: {list of failed criteria, or "none"}
 ```
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix` in validate mode):**
-- `regression_test_referenced: true | false | null` — for `bug_tier: 2 | 3 | 4`: `true` when AC-2 (regression-test-exists) is mapped in `reviews/04-validation.md` with file:line evidence pointing to both `02-regression-test.md` (authoring) and `03-testing.md` (post-fix suite confirmation); `false` blocks the acceptance gate. For `bug_tier: 1` with Phase 2.0 skipped (no-behavior-change): set to `null` — Phase 2.0 produced no `02-regression-test.md`, so there is nothing to reference. The acceptance gate accepts `null` only when the orchestrator confirms `regression_test_status: skipped` in `00-state.md`.
+- `regression_test_referenced: true | false | null` — for `bug_tier: 2 | 3 | 4`: `true` when AC-2 (regression-test-exists) is mapped in `reviews/04-validation.md` with file:line evidence pointing to both `02-regression-test.md` (authoring) and `03-testing.md` (post-fix suite confirmation); `false` blocks the acceptance gate. For `bug_tier: 1` with Phase 2.0 skipped (no-behavior-change): set to `null` — Phase 2.0 produced no `02-regression-test.md`, so there is nothing to reference. The acceptance gate accepts `null` only when the orquestador confirms `regression_test_status: skipped` in `00-state.md`.
 - `reproduction_steps_validated: true | false` — `true` when AC-1 (reproduction-no-longer-bug) — or its Tier 1 equivalent ("the diff resolves the cited issue") — is confirmed. `false` blocks the acceptance gate.
 
 **Mandatory tool-usage fields:**
 - `memory_consult` — count of Knowledge Graph queries made this run. Zero is a valid value.
-- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+- `kg_save_candidates` — names of KG entities you propose the orquestador persist (empty list `[]` is valid).
 
-The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl`.
+The orquestador propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl`.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orquestador uses this status block to gate phases without re-reading your output.
 
 ### Failure Brief (validate mode only, when `status: failed`)
 
-When you finish validate mode with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route the iteration without re-reading `reviews/04-validation.md`. Create the file if it doesn't exist.
+When you finish validate mode with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orquestador can route the iteration without re-reading `reviews/04-validation.md`. Create the file if it doesn't exist.
 
 ```markdown
 ## Iteration {N} — qa — {YYYY-MM-DD HH:MM}
@@ -545,7 +545,7 @@ When you finish validate mode with `status: failed`, **append** an iteration ent
 
 **Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC IDs and a targeted edit resolves it. Declare `structural` when the failure implicates multiple AC, overall design assumptions, or you cannot name the affected elements precisely. Default to `structural` when uncertain.
 
-Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing.
+Keep the brief tight: 5-10 lines per iteration. The orquestador reads ONLY this file to decide routing.
 
 ---
 

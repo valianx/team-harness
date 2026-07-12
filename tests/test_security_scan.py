@@ -58,7 +58,7 @@ READ_ONLY_AGENTS = {
 # Check 2 scopes web-facing detection to this set of real agent files only.
 # Source of truth: tests/test_agent_structure.py:76-83
 EXPECTED_AGENTS = [
-    "orchestrator", "architect", "agent-builder", "security", "reviewer",
+    "lider", "orquestador", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator",
     "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init", "implementer", "tester",
     "acceptance-checker", "plan-reviewer", "diagrammer", "likec4-diagrammer",

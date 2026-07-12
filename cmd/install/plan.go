@@ -42,14 +42,14 @@ type PlanDiff struct {
 // hashBytes is computed (S-1 idempotency fix). For the claude-code runtime,
 // pass nil (identity). For the opencode runtime, pass opencodeRuntimeTransform
 // which applies the generic CC→opencode transform AND the mode-by-role override
-// using the source path to identify the orchestrator. This ensures PlannedFile.SrcHash
+// using the source path to identify the lider. This ensures PlannedFile.SrcHash
 // is the hash of the transformed bytes and ApplyPlan writes the same transformed
 // bytes — a second apply will find dstHash == srcHash and produce no writes.
 //
 // Transform signature: func(src, kind, sourcePath) ([]byte, error)
 //   - src:        embedded source bytes
 //   - kind:       component kind ("agent", "skill", "hook", "command")
-//   - sourcePath: embedded FS path (e.g. "agents/orchestrator.md") — used by
+//   - sourcePath: embedded FS path (e.g. "agents/lider.md") — used by
 //                 the opencode transform to identify mode-by-role targets
 func ComputePlan(
 	modules []ModuleManifest,

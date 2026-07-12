@@ -82,7 +82,7 @@ When the `orchestrator` subagent returns a response containing **"Dispatch hando
 
 ## Takeover Protocol (static, identical for every handoff)
 
-**Takeover Pipeline Manifest (gate manifest) — read this first.** This manifest enumerates the inviolable gates that a takeover MUST NOT skip. It is a **gate manifest**, not the ordered phase sequence — the complete, ordered list of phases lives in the **Phase Dispatch table** in `agents/orchestrator.md`; read that table as the authoritative phase sequence. Read each gate's detailed contract (the agent `.md` and the matching `agents/orchestrator.md` / `agents/ref-special-flows.md` phase section) as you reach it — do NOT read them all up front. skipping any gate is a defect, not a shortcut; completing every item is the obligation. The takeover is not a lighter path: the same full-stage compliance that the `orchestrator-dispatch-rule` block requires for normal dispatch ("Full pipeline is the default… Do not skip stages") applies equally here.
+**Takeover Pipeline Manifest (gate manifest) — read this first.** This manifest enumerates the inviolable gates that a takeover MUST NOT skip. It is a **gate manifest**, not the ordered phase sequence — the complete, ordered list of phases lives in the **Phase Dispatch table** in `agents/orquestador.md`; read that table as the authoritative phase sequence. Read each gate's detailed contract (the agent `.md` and the matching `agents/orquestador.md` / `agents/ref-special-flows.md` phase section) as you reach it — do NOT read them all up front. skipping any gate is a defect, not a shortcut; completing every item is the obligation. The takeover is not a lighter path: the same full-stage compliance that the `orchestrator-dispatch-rule` block requires for normal dispatch ("Full pipeline is the default… Do not skip stages") applies equally here.
 
 Inviolable gates (annotate `dispatch_handoff.type` to determine which items apply):
 
@@ -90,7 +90,7 @@ Inviolable gates (annotate `dispatch_handoff.type` to determine which items appl
 - **Phase 1.6 plan-review** — inviolable plan review (`reviews/01-plan-review.md` with `**Combined verdict:**`). `[all types]` — **Note:** the orchestrator does NOT self-execute the plan-review panel inline in nested context. If the `plan-reviewer` Task invocation fails with a nesting refusal, the orchestrator emits a `dispatch_handoff` directed at `th:plan-reviewer`; top-level Claude dispatches the real subagent. The inline-fallback that previously existed in `agents/orchestrator.md` was retired (v2.48+): it pre-dated this protocol, contradicted Dispatch invariant #2 ("no degraded mode"), and could silently skip the security design-review. The same applies to Phase 1.7 (`ux-reviewer`): no inline self-execution — always dispatch_handoff.
 - **Phase 2.0 regression-test-first** — tester authors a failing test before any source change. `[fix/hotfix only]` (Tier 2-4; Tier 1 conditional skip). Read `agents/ref-special-flows.md § Bug-fix Flow` for the full tier system.
 - **Phase 3 verify** — `tester` + `qa` run in parallel. `[all types]`. Security agent also runs (`security-always`): `[fix/hotfix Tier 3+]` (Tier 2 skips unless path-pattern auto-escalation applies). Read `agents/ref-special-flows.md § Tier System` when `type: fix/hotfix`. **When `type` is null in a boot handoff, classify first (see step 4); security defaults to RUN until type is resolved.**
-- **Observability** — `00-execution-events.{jsonl|md}` + `00-pipeline-summary.md` + `00-state.md` updated at every phase transition. `[all types]`. Every `phase.end` event MUST include a `tokens` field (integer total). In takeover, `Task()` does not expose `total_tokens` in its result — apply the heuristic (`duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy) and emit `tokens_estimated: true`. The escape `"tokens": 0` is forbidden. Top-level Claude inherits this same fallback from the orchestrator's Phase Transition Protocol (see step 6 below and `agents/orchestrator.md § Phase Transition Protocol`).
+- **Observability** — `00-execution-events.{jsonl|md}` + `00-pipeline-summary.md` + `00-state.md` updated at every phase transition. `[all types]`. Every `phase.end` event MUST include a `tokens` field (integer total). In takeover, `Task()` does not expose `total_tokens` in its result — apply the heuristic (`duration_min × 1500` for opus-heavy phases, `× 800` for sonnet-heavy) and emit `tokens_estimated: true`. The escape `"tokens": 0` is forbidden. Top-level Claude inherits this same fallback from the orquestador's Phase Transition Protocol (see step 6 below and `agents/orquestador.md § Phase Transition Protocol`).
 - **Phase 3.5 Acceptance Gate + Phase 3.6 Acceptance Check** — acceptance-checker appends to `reviews/04-validation.md § Drift Analysis`. `[all types]`
 - **STAGE-GATE-3** — mandatory human approval before push; autonomy never covers this gate. `[all types]`
 - **KG passive capture** — `delivery` agent persists one `process-insight` node (best-effort). `[all types]`
@@ -115,7 +115,7 @@ This rule applies to **every** entry mode: `@th:orchestrator` mention, skill rou
 
 ## Session-Scoped Config Override Protocol
 
-The orchestrator supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; the orchestrator applies it for that pipeline run only.
+th:lider supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; th:lider applies it for that pipeline run only.
 
 ### Step order (load-bearing)
 
@@ -144,7 +144,7 @@ Follows `agents/_shared/output-template.md`: silent on success (events file only
 
 ### `/recover` behavior
 
-On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. The orchestrator logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
+On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. th:lider logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
 
 ### Collision guarantee
 
@@ -162,17 +162,17 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 | PR review | `reviewer` | Inline review, approve/request-changes |
 | Security review of hooks, installer, or MCP (elevated privileges on user's machine) | `security` | OWASP/CWE-aligned report |
 | Visualize agent flow | `diagrammer` / `likec4-diagrammer` / `d2-diagrammer` | Diagram file + preview |
-| Documentation (`type: docs`) | orchestrator → `architect` (research mode) → `documenter` → `diagrammer` (conditional) → `qa` | `research/00-research.md` + Obsidian vault pages + `02-documentation.md` manifest + `reviews/04-validation.md` |
+| Documentation (`type: docs`) | orquestador → `architect` (research mode) → `documenter` → `diagrammer` (conditional) → `qa` | `research/00-research.md` + Obsidian vault pages + `02-documentation.md` manifest + `reviews/04-validation.md` |
 | Frontend-scope tasks (`frontend_scope: true`) | Standard pipeline + `ux-reviewer` (enrich after architect in Stage 1, validate in parallel in Stage 3) | `reviews/01-ux-review.md` + `reviews/04-ux-validation.md` |
-| Bug fix (`type: fix`) | orchestrator → `architect` (root-cause mode) → `tester` (Phase 2.0 regression test) → `implementer` (scope-discipline) → `tester` + `qa` + `security` (always, parallel) → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
-| Hotfix (`type: hotfix`) | same as bug fix, Phase 1 skipped (no `01-root-cause.md`); orchestrator emits 1-sentence prose plan at STAGE-GATE-1 | full feature backbone minus `01-root-cause.md`; PR title appends `(hotfix)` suffix |
+| Bug fix (`type: fix`) | orquestador → `architect` (root-cause mode) → `tester` (Phase 2.0 regression test) → `implementer` (scope-discipline) → `tester` + `qa` + `security` (always, parallel) → `delivery` | `01-root-cause.md` + `02-regression-test.md` + full feature backbone + `### Fixed` CHANGELOG + `fix(area):` PR title |
+| Hotfix (`type: hotfix`) | same as bug fix, Phase 1 skipped (no `01-root-cause.md`); orquestador emits 1-sentence prose plan at STAGE-GATE-1 | full feature backbone minus `01-root-cause.md`; PR title appends `(hotfix)` suffix |
 
 **Escalation rules.**
 - Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
 - Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the orchestrator pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Changing the orquestador pipeline → architecture review mandatory; update `agents/orquestador.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
 ## `blocked-manual-push` Handling
 
-When the `delivery` agent returns `status: blocked-manual-push`, the orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. The orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
+When the `delivery` agent returns `status: blocked-manual-push`, th:orquestador emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. th:orquestador records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.

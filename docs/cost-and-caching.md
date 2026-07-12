@@ -44,7 +44,19 @@ Each agent the pipeline dispatches via the Task tool starts its own isolated con
 - **5-minute TTL for subagents.** Subagents use the 5-minute cache write TTL even when the operator is on a Claude subscription — the automatic 1-hour TTL applies only to the main conversation.
 - **Model tiering means separate caches by design.** opus agents (architect, agent-builder, security, …), sonnet agents (implementer, tester, qa, delivery, …), and haiku agents (researcher, init, acceptance-checker, translator) each have independent per-model caches. This is expected, not a defect; model tiering reduces absolute cost because cheaper models have lower base input prices.
 - **Re-dispatch reuse window.** Re-dispatching the same agent type within 5 minutes reuses that agent's warm cache (the prefix bytes are identical). Iteration loops, patch-mode selective re-runs, and parallel same-agent lanes all benefit when they stay inside this window.
-- **The operator's top-level session.** The orchestrator runs at the top level. On a subscription its session gets the 1-hour TTL, so the system prompt and CLAUDE.md stay cached across the full pipeline run.
+- **The operator's top-level session.** The lider runs at the top level. On a subscription its session gets the 1-hour TTL, so the system prompt and CLAUDE.md stay cached across the full pipeline run.
+
+## Lane cost model — th:lider's orquestador fan-out
+
+th:lider multiplies th:orquestador — one lane per task in a same-repo batch, one per project in a multi-project initiative (`agents/lider.md § Multi-Task fan-out`, `§ Repo-identity verification and orquestador multiplication`). Each lane is a fully isolated subagent conversation with its own system prompt, tool set, and cache; nothing in one lane's cache is visible to another.
+
+**5-minute TTL, and re-cost after a gate pause.** Every orquestador runs as a subagent, so its cache uses the 5-minute write TTL — not the 1-hour TTL the top-level session may hold (`§ Subagents and cost`). A STAGE-GATE pause is a wall-clock stop of unbounded length: when a lane's orquestador is parked at STAGE-GATE-1/2/3 waiting for the operator's panel reply, and that wait exceeds 5 minutes, the lane's 5-minute cache has already expired by the time the gate is released. The first turn after the release is therefore a cold write again, not a warm read — re-cost every gate resumption that idled longer than the 5-minute window as a fresh cache creation, not as a hit. An operator who expects long deliberation at a gate can opt the whole session into the 1-hour TTL (`ENABLE_PROMPT_CACHING_1H`, or the subscription-automatic 1-hour TTL on the top-level session), but the subagent lanes themselves stay on the 5-minute floor regardless — the 1-hour TTL is a main-conversation property.
+
+**N concurrent lanes → N cold starts, and the opus tier does not amortize.** The orquestador itself is `model: sonnet`, so N lanes are N sonnet cold starts. The expensive cold start is one tier down: every lane's orquestador dispatches its own `architect` (`model: opus`) at Phase 1 Design, plus opus-tier `security` / `plan-reviewer` work at Phase 1.6. The re-dispatch warm-reuse window (`§ Subagents and cost` — same agent type within 5 minutes reuses the warm prefix) does NOT rescue concurrent lanes: lanes launched in the same round start their architect dispatches simultaneously, so none has written a cache the others can read yet. N lanes launched together therefore pay N independent opus cold-start cache-creations, not one cold + (N−1) warm — cost scales with lane count at the opus tier, not sub-linearly. Serial dispatch (`--serial` / "one at a time") is the case where the 5-minute reuse window CAN help: a second lane's architect dispatched within 5 minutes of the first reuses the warm opus prefix.
+
+**The fan-out confirmation surfaces lane count + cost before approval.** th:lider never spawns N ≥ 2 lanes silently. Before dispatching a multi-lane fan-out (multi-task or multi-project), it shows the operator the lane count and an approximate cost estimate and waits for explicit confirmation (`agents/lider.md § Repo-identity verification` — "Fan-out confirm surfaces lane count + cost"). This is a dispatch-count decision the líder holds itself; it is NOT a STAGE-GATE (the líder never records a gate). `--serial` bypasses the confirm and runs lanes sequentially.
+
+**Ask-class caveat (cost has no bearing on the gate stop).** The outward-action gate that each lane's delivery push/merge passes through is `ask`-class, not `deny`-class — whether it actually stops depends on the session's permission posture, not on any cost setting. Full contract: `docs/dev-mode.md § Ask-class caveat` and `§ STAGE-GATE-3 presentation and the ask-class loosening (SEC-DR-G)`.
 
 ## Operator cost controls
 
@@ -82,7 +94,7 @@ Multipliers are relative to the base input token price for the same model. These
 | Fable 5, Sonnet 4.6, Haiku 3.5 / 3 | 2,048 tokens |
 | Sonnet 4.5 / 4.1 / 4 / 3.7 | 1,024 tokens |
 
-The pipeline's larger agent prompts (orchestrator, architect, the verifier agents) are well above the 4,096-token Opus minimum, so they cache; a very small standalone prompt may fall below the threshold and silently not cache.
+The pipeline's larger agent prompts (orquestador, architect, the verifier agents) are well above the 4,096-token Opus minimum, so they cache; a very small standalone prompt may fall below the threshold and silently not cache.
 
 ## Known issue — TTL regression
 

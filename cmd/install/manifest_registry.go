@@ -433,16 +433,16 @@ func buildHookSubdirComponents(embeddedFS fs.FS, srcDir, suffix, destSubdir, com
 // opencodeRuntimeTransform is the transform passed to ComputePlan for the
 // opencode runtime. It applies the generic CC→opencode transform AND the
 // mode-by-role installer layer (S-5):
-//   - orchestrator → mode: primary (derived from sourcePath)
+//   - lider → mode: primary (derived from sourcePath)
 //   - all other agents → mode: subagent (blanket from generic transform)
 //
-// sourcePath is the embedded FS path (e.g. "agents/orchestrator.md"), passed by
-// ComputePlan so this function can identify the orchestrator without a pre-built
+// sourcePath is the embedded FS path (e.g. "agents/lider.md"), passed by
+// ComputePlan so this function can identify the lider without a pre-built
 // lookup table.
 //
 // This is NOT the fixture-bound transformToOpencode function. The fixture binds
 // only the generic mapping to stay in lockstep with migrate.mjs. The role
-// override is asserted by a separate test (TestTransform_ModeByRole_Orchestrator,
+// override is asserted by a separate test (TestTransform_ModeByRole_Lider,
 // AC-12).
 func opencodeRuntimeTransform(src []byte, kind, sourcePath string) ([]byte, error) {
 	// Apply the generic CC→opencode transform first.
@@ -456,7 +456,7 @@ func opencodeRuntimeTransform(src []byte, kind, sourcePath string) ([]byte, erro
 		return transformed, nil
 	}
 
-	// Derive agent name from the source path (e.g. "agents/orchestrator.md").
+	// Derive agent name from the source path (e.g. "agents/lider.md").
 	parts := strings.Split(sourcePath, "/")
 	filename := parts[len(parts)-1]
 	agentName := strings.TrimSuffix(filename, ".md")

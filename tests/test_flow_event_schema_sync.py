@@ -334,13 +334,21 @@ def run_tests() -> int:
     """Return 0 on all pass, 1 on any failure, 2 on skip."""
     failures: list[str] = []
 
-    orchestrator_path = REPO_ROOT / "agents" / "orchestrator.md"
+    # "orchestrator" was split into agents/lider.md (Phase 0a/0b intake+specify) and
+    # agents/orquestador.md (Phase 1-6 execution). The Flow Telemetry Emission catalog
+    # documents runtime emission behaviour across the whole pipeline, so orquestador.md
+    # is the natural target; merge in lider.md too so the section-slice search isn't
+    # blind to any Phase-0-adjacent content.
+    orchestrator_path = REPO_ROOT / "agents" / "orquestador.md"
+    lider_path = REPO_ROOT / "agents" / "lider.md"
     if not orchestrator_path.exists():
-        failures.append("agents/orchestrator.md not found")
+        failures.append("agents/orquestador.md not found")
         _report(failures)
         return 1
 
     orchestrator_text = orchestrator_path.read_text(encoding="utf-8")
+    if lider_path.exists():
+        orchestrator_text = lider_path.read_text(encoding="utf-8") + "\n" + orchestrator_text
     section = _slice_flow_emission_section(orchestrator_text)
 
     # -----------------------------------------------------------------------

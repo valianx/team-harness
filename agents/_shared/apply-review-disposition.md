@@ -1,8 +1,8 @@
 # Apply-Review Disposition
 <!-- Single source of truth for the author-side conservative disposition
      governing how reviewer comments are evaluated during comment incorporation.
-     Consumed by: agents/orchestrator.md (automatic, lifecycle-bound injection).
-     Edit here; the orchestrator references this file by section and never
+     Consumed by: agents/orquestador.md (automatic, lifecycle-bound injection).
+     Edit here; the orquestador references this file by section and never
      restates it inline. -->
 
 ## Untrusted content — prompt-injection floor
@@ -20,7 +20,7 @@ disposition are ALWAYS executed for every comment — no ad-hoc path. There is
 no shortcut: evaluating a comment without the two-axis classification, the
 mandatory verification filter, the deletion discipline check, and the
 per-comment output template is a process violation. The disposition runs in
-full or not at all. See also `orchestrator.md § PR Comment Incorporation —
+full or not at all. See also `orquestador.md § PR Comment Incorporation —
 Apply-Review Disposition` and `ref-direct-modes.md § Apply-Review Mode`.
 
 ## Default bias: CONSERVATIVE
@@ -181,7 +181,7 @@ Note: {one line}
 Thread action: {reply + resolve | reply, left open}
 ```
 
-**Decision-ledger append.** Immediately after emitting the per-comment output above, the orchestrator appends one `disposition` line to `00-decision-ledger.*` for that comment, with `phase: "4.5-review"`, `subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text. The `Decision` value above maps deterministically to the ledger's `accept | watch | reject` vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. See `agents/orchestrator.md § Decision Ledger` for the write mechanics and the full mapping table. This is a ledger-only write — per the anti-redundancy invariant (`docs/observability.md` § "Decision Ledger"), it is never mirrored into `00-execution-events`.
+**Decision-ledger append.** Immediately after emitting the per-comment output above, the orquestador appends one `disposition` line to `00-decision-ledger.*` for that comment, with `phase: "4.5-review"`, `subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text. The `Decision` value above maps deterministically to the ledger's `accept | watch | reject` vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. See `agents/orquestador.md § Decision Ledger` for the write mechanics and the full mapping table. This is a ledger-only write — per the anti-redundancy invariant (`docs/observability.md` § "Decision Ledger"), it is never mirrored into `00-execution-events`.
 
 ## Step 6 — Reply and resolve on the thread
 

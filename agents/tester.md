@@ -42,22 +42,22 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## Pre-Fix Regression Test Mode (Bug-fix Flow, Phase 2.0)
 
-Used when the orchestrator dispatches you for **Phase 2.0** of the Bug-fix Flow (`type: fix` or `type: hotfix`). You author a **failing test** that captures the bug BEFORE the implementer runs. The test becomes the contract for Phase 2: the implementer must make this test pass without breaking the rest of the suite.
+Used when the orquestador dispatches you for **Phase 2.0** of the Bug-fix Flow (`type: fix` or `type: hotfix`). You author a **failing test** that captures the bug BEFORE the implementer runs. The test becomes the contract for Phase 2: the implementer must make this test pass without breaking the rest of the suite.
 
-- **Trigger:** orchestrator invokes with `mode: pre-fix-regression`
+- **Trigger:** orquestador invokes with `mode: pre-fix-regression`
 - **Flow:** Phase 0 (discovery — same as default mode) → read bug report → author failing test → verify it fails → write `02-regression-test.md`
 - **Output:** `workspaces/{feature-name}/02-regression-test.md`
 
 **This mode is mutually exclusive with Phase 3 verify mode.** Phase 2.0 runs BEFORE the implementer; Phase 3 (default tester behavior) runs AFTER the implementer.
 
-**Tier-gated dispatch (Phase 2.0 conditional skip).** The orchestrator passes `bug_tier: {1|2|3|4}` AND `pre_fix_test_required: {true|false}` in the task payload. The dispatch contract:
+**Tier-gated dispatch (Phase 2.0 conditional skip).** The orquestador passes `bug_tier: {1|2|3|4}` AND `pre_fix_test_required: {true|false}` in the task payload. The dispatch contract:
 
 | `pre_fix_test_required` | Source of the decision | Action |
 |---|---|---|
 | `true` | Default for `bug_tier: 2 | 3 | 4`, or `bug_tier: 1` with operator-declared `[regression-test: required]`, or `bug_tier: 1` with any touched path failing the no-behavior-change condition | Run the full Pre-Fix Regression Test flow as documented below. Produce `02-regression-test.md`. Return `status: success` with `regression_test_status: failing`. |
-| `false` | `bug_tier: 1` AND all touched paths match `*.md` / `LICENSE` / `CHANGELOG*` / `docs/**/*` / comments / non-functional strings AND no `*.test.*` / `*.spec.*` / `tests/` touched AND operator did NOT declare `[regression-test: required]` | **Skip authoring.** Do NOT produce `02-regression-test.md`. Return `status: success` with `pre_fix_test_status: skipped`, the rationale in the status block, and the no-behavior-change condition cited verbatim. The orchestrator handles the skip-side-effects (state update, JSONL trace, task-list placeholder mutation). |
+| `false` | `bug_tier: 1` AND all touched paths match `*.md` / `LICENSE` / `CHANGELOG*` / `docs/**/*` / comments / non-functional strings AND no `*.test.*` / `*.spec.*` / `tests/` touched AND operator did NOT declare `[regression-test: required]` | **Skip authoring.** Do NOT produce `02-regression-test.md`. Return `status: success` with `pre_fix_test_status: skipped`, the rationale in the status block, and the no-behavior-change condition cited verbatim. The orquestador handles the skip-side-effects (state update, JSONL trace, task-list placeholder mutation). |
 
-**Skip rationale (when `pre_fix_test_required: false`).** Cite the no-behavior-change condition: "All touched paths match Tier 1 patterns (docs/comments/non-functional strings); no `*.test.*` paths touched; no `[regression-test: required]` declaration." The operator at STAGE-GATE-1 already approved this path; do NOT second-guess the orchestrator's classification. If you genuinely believe the skip is wrong (e.g., the touched paths include UI strings the orchestrator missed), return `status: blocked` with `issues: pre_fix_test_required: false rejected — paths X, Y appear to change behavior; recommend re-tier to 2`. The orchestrator surfaces this to the operator.
+**Skip rationale (when `pre_fix_test_required: false`).** Cite the no-behavior-change condition: "All touched paths match Tier 1 patterns (docs/comments/non-functional strings); no `*.test.*` paths touched; no `[regression-test: required]` declaration." The operator at STAGE-GATE-1 already approved this path; do NOT second-guess the orquestador's classification. If you genuinely believe the skip is wrong (e.g., the touched paths include UI strings the orquestador missed), return `status: blocked` with `issues: pre_fix_test_required: false rejected — paths X, Y appear to change behavior; recommend re-tier to 2`. The orquestador surfaces this to the operator.
 
 **Operator override (no fallback):** the original design proposed a manual-repro-script fallback for race-condition, timing-dependent, or environment-dependent bugs. The fallback is **rejected**. Regression test is mandatory in Tier 2-4; in Tier 1 the conditional skip above is the only path. If you cannot author a regression test in Tier 2-4 (the bug is genuinely impossible to reproduce deterministically in a test environment), return `status: blocked` with a clear explanation in `issues`. The pipeline will block and surface to the operator. Do NOT improvise a runnable script — that path no longer exists in v2.9.
 
@@ -67,7 +67,7 @@ Used when the orchestrator dispatches you for **Phase 2.0** of the Bug-fix Flow 
 
 Read the following in order:
 1. `workspaces/{feature-name}/01-plan.md` § Review Summary — Bug Report block (Reported behaviour / Expected behaviour / Reproduction steps / Observed result / Environment / AC).
-2. `workspaces/{feature-name}/01-root-cause.md` — `## Regression Test Approach` section (Test layer / Test scaffold / Failing assertion). For `type: hotfix` there is no `01-root-cause.md`; use the orchestrator's one-sentence prose plan from the STAGE-GATE-1 record (passed in the task payload).
+2. `workspaces/{feature-name}/01-root-cause.md` — `## Regression Test Approach` section (Test layer / Test scaffold / Failing assertion). For `type: hotfix` there is no `01-root-cause.md`; use the orquestador's one-sentence prose plan from the STAGE-GATE-1 record (passed in the task payload).
 
 The `Test layer:` field tells you which layer reproduces the bug deterministically — unit, integration, or e2e, or any warranted type from Phase 0 step 3b (browser-mode, ui-component, visual, a11y). The `Failing assertion:` field tells you the specific assertion that fails today.
 
@@ -91,7 +91,7 @@ Execute the project's test command. Two things must be true:
 1. **The new test(s) MUST fail** (with the assertion documented in `01-root-cause.md` → `Failing assertion:`).
 2. **All previously-passing tests MUST still pass** — your new test must not leak state into the rest of the suite.
 
-If the new test does NOT fail (i.e., the bug is not reproducible at the chosen layer), return `status: failed` with `issues: bug-not-reproducible — the test does not capture the documented failure mechanism. Root-cause may be wrong or incomplete.` The orchestrator will route back to the architect for Phase 1 re-run.
+If the new test does NOT fail (i.e., the bug is not reproducible at the chosen layer), return `status: failed` with `issues: bug-not-reproducible — the test does not capture the documented failure mechanism. Root-cause may be wrong or incomplete.` The orquestador will route back to the architect for Phase 1 re-run.
 
 If existing tests fail because of the new test, your test is leaking state. Fix the leakage (test isolation) before finishing. Do NOT mask the leak by skipping the affected tests.
 
@@ -163,9 +163,9 @@ issues: {blockers — e.g., "bug-not-reproducible" — or "none"}
 
 ## Mode: `authoring` (Stage 2 — Phase 2.7, pre-verify)
 
-Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current task BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
+Used when the orquestador dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current task BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
 
-- **Trigger:** orchestrator invokes with `mode: authoring` (or dispatch instruction specifies "authoring mode, Phase 2.7")
+- **Trigger:** orquestador invokes with `mode: authoring` (or dispatch instruction specifies "authoring mode, Phase 2.7")
 - **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → read AC from `01-plan.md` § Task List (per-task AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
@@ -200,9 +200,9 @@ issues: {list of blockers or "none"}
 
 ## Mode: `verify-run` (Phase 3 — run-only)
 
-Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-only mode: you execute the frozen test suite (authored in Phase 2.7), confirm there are no regressions, and map each AC to the existing tests. You do NOT author new AC tests — authoring is complete.
+Used when the orquestador dispatches you for **Phase 3** verify. This is a run-only mode: you execute the frozen test suite (authored in Phase 2.7), confirm there are no regressions, and map each AC to the existing tests. You do NOT author new AC tests — authoring is complete.
 
-- **Trigger:** orchestrator invokes with `mode: verify-run` (or dispatch instruction specifies "run-only mode, Phase 3")
+- **Trigger:** orquestador invokes with `mode: verify-run` (or dispatch instruction specifies "run-only mode, Phase 3")
 - **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → run the full suite → confirm no regressions → map AC to existing tests → write or update `03-testing.md` (verify section)
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
@@ -325,7 +325,7 @@ For each business rule provided in the context:
 
 **Before starting ANY work:**
 
-1. **Live AC read + packet-first (run-only / verify-run mode, Phase 3 — NOT authoring mode).** For AC→test mapping confirmation, live-read the per-task AC block from `01-plan.md § Task List` first — mandatory, never sourced from the packet. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orchestrator builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`). It carries the changed-files table and the Phase 2.7 AC→test map (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest) — use it in place of separately reading `01-plan.md`/`02-implementation.md` for WORKSPACE-NARRATIVE context. **Authoring mode (Phase 2.7 itself) predates the packet and keeps the full input-manifest read below unconditionally** — the packet does not exist yet when authoring runs.
+1. **Live AC read + packet-first (run-only / verify-run mode, Phase 3 — NOT authoring mode).** For AC→test mapping confirmation, live-read the per-task AC block from `01-plan.md § Task List` first — mandatory, never sourced from the packet. Then read `{docs_root}/00-verify-packet.md` — the shared Stage-2 verification packet the orquestador builds at Phase 2.7 close (canonical schema: `docs/verification-packet.md`). It carries the changed-files table and the Phase 2.7 AC→test map (NO acceptance-criteria copy — the packet is a non-authoritative navigation digest) — use it in place of separately reading `01-plan.md`/`02-implementation.md` for WORKSPACE-NARRATIVE context. **Authoring mode (Phase 2.7 itself) predates the packet and keeps the full input-manifest read below unconditionally** — the packet does not exist yet when authoring runs.
    - **Hard floor — preserved read.** Suite execution and `02-regression-test.md` (fix flow) stay UNTOUCHED by the packet — the packet replaces workspace-narrative doc reads only, never the actual test run.
    - **Fail-closed on missing spec (run-only / verify-run mode only).** `01-plan.md` is the mandatory AC source for the AC→test mapping — there is no mapping without it. When `01-plan.md` does not exist on disk (packet-first or full-manifest path), do NOT run the suite and report a mapping anyway — return `status: blocked` with `summary: 01-plan.md missing — mandatory AC source absent, cannot map AC to tests` and `issues: missing 01-plan.md`. This overrides the general "if a named file is absent, skip it and continue" fallback in step 2 below, which does not apply to this file in run-only / verify-run mode.
    - **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to the full input manifest below, report `packet_integrity: stale|mismatch`.
@@ -338,10 +338,10 @@ For each business rule provided in the context:
    - `02-implementation.md` — implementer output: files changed, deviations, known limitations
    - `01-root-cause.md` — root-cause analysis and regression test approach (bug-fix flow only)
    - `02-regression-test.md` — prior regression test authoring (Phase 3 verify-run mode only)
-   - `failure-brief.md` — failure brief from orchestrator (present only on re-dispatch)
+   - `failure-brief.md` — failure brief from orquestador (present only on re-dispatch)
    If any OTHER named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orquestador's resolved base or the session-start directive's announced base — never the repo-local default.
 
 3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -479,11 +479,11 @@ triggers it.
 
 Tests verify the **acceptance criteria** from the spec. They are **ordered by the changed files** for dependency correctness.
 
-1. **Read the spec** — read `workspaces/{feature-name}/01-plan.md` § Task List (per-task AC block) or AC passed by the orchestrator. Extract the full list of acceptance criteria.
+1. **Read the spec** — read `workspaces/{feature-name}/01-plan.md` § Task List (per-task AC block) or AC passed by the orquestador. Extract the full list of acceptance criteria.
 2. **Map the changes** — read workspaces and git diff to determine what was modified. List every file, service, component, or endpoint that was added or changed.
 3. **AC Coverage Mapping** — for each acceptance criterion, identify which changed file(s) implement it and which test(s) will verify it. Every AC must map to at least one test. If an AC cannot be mapped to a test, flag it.
    - **AC formats:** Both `Given/When/Then` and `VERIFY: {condition}` are valid. For VERIFY criteria, write a test that asserts the stated condition holds true.
-   - **Large specs (>10 AC):** Group AC by component/area in the AC Coverage table. This helps the orchestrator and QA quickly understand coverage at a glance.
+   - **Large specs (>10 AC):** Group AC by component/area in the AC Coverage table. This helps the orquestador and QA quickly understand coverage at a glance.
 4. **Order by dependency** — start from the lowest-level changes (utilities, repositories, factories) up to the highest (controllers, pages, orchestrators). **Write tests in this exact order.** Each test file corresponds to a changed file.
 5. **For each changed unit, define:**
    - Which AC it satisfies (reference by AC number)
@@ -635,7 +635,7 @@ Write your summary to `workspaces/{feature-name}/03-testing.md`:
 
 **Where:** create or rewrite `TESTING.md` at the **target repo root** (the root of the repo being tested — resolved from the dispatch payload or workspace context, not the team-harness workspace or the team-harness repo root).
 
-**Team-harness repo guard:** before writing, check that the resolved target path is NOT the team-harness repo itself (identified by `agents/tester.md` or `agents/orchestrator.md` present at root). If the resolved target IS the team-harness repo (e.g., running inside a team-harness worktree with self-detected `frontend_scope`), skip generation entirely and note it in your status block: `testing_md_path: skipped (target is team-harness repo root)`.
+**Team-harness repo guard:** before writing, check that the resolved target path is NOT the team-harness repo itself (identified by `agents/tester.md` or `agents/orquestador.md` present at root). If the resolved target IS the team-harness repo (e.g., running inside a team-harness worktree with self-detected `frontend_scope`), skip generation entirely and note it in your status block: `testing_md_path: skipped (target is team-harness repo root)`.
 
 **Overwrite / redirect decision — stable machine sentinel:** The generated file MUST begin with the HTML comment `<!-- th:testing-guide v1 -->` on its very first line. On any subsequent run:
 - If `TESTING.md` already exists AND its first line is `<!-- th:testing-guide v1 -->` → overwrite in-place (consolidated rewrite, not a changelog).
@@ -851,13 +851,13 @@ When re-invoked for gap coverage (from Phase 3 coverage gate), the task payload 
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
+The orquestador writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
 
 ---
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The lider already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - In write mode: a test target uses a framework with known testing gotchas — query before writing tests (e.g., `"Vitest Prisma"`, `"Jest Next.js"`) to surface workarounds like pool settings or mock strategies.
@@ -867,8 +867,8 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 **How to query.** Use `mcp__memory__search_nodes` with 1-3 word semantic queries (e.g., `"Next.js auth"`, `"Prisma SQLite"`). Use `mcp__memory__open_nodes` with explicit entity names when you have them. Both tools are read-only and cheap (vector search, top-N).
 
 **Do NOT:**
-- Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
+- Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orquestador Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orquestador will pick it up.
+- Re-query for the same term the lider already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -877,7 +877,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 ## Return Protocol
 
-When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: tester
@@ -907,27 +907,27 @@ issues: {list of failing tests, or "none"}
 ```
 
 **Field semantics for bug-fix mode fields:**
-- `pre_fix_test_status: authored | skipped` — pre-fix-regression mode only. `authored` means you wrote `02-regression-test.md` per the standard contract. `skipped` means the orchestrator passed `pre_fix_test_required: false` (Tier 1 no-behavior-change) and you intentionally produced no test file. Omit in other modes.
-- `regression_test_path` — repo-relative path to the regression test file. In pre-fix-regression mode: the file you just authored (omit when `pre_fix_test_status: skipped`). In Phase 3 verify (post-fix) for `type: fix` / `type: hotfix` Tier 2-4: re-state the same path so the orchestrator can confirm the test is still in the suite (test-ratchet check) and the implementer did not delete it. For Tier 1 with Phase 2.0 skipped: omit or set to `null`.
+- `pre_fix_test_status: authored | skipped` — pre-fix-regression mode only. `authored` means you wrote `02-regression-test.md` per the standard contract. `skipped` means the orquestador passed `pre_fix_test_required: false` (Tier 1 no-behavior-change) and you intentionally produced no test file. Omit in other modes.
+- `regression_test_path` — repo-relative path to the regression test file. In pre-fix-regression mode: the file you just authored (omit when `pre_fix_test_status: skipped`). In Phase 3 verify (post-fix) for `type: fix` / `type: hotfix` Tier 2-4: re-state the same path so the orquestador can confirm the test is still in the suite (test-ratchet check) and the implementer did not delete it. For Tier 1 with Phase 2.0 skipped: omit or set to `null`.
 - `regression_test_status` — `failing` when authored in Phase 2.0 (the test captures the bug, suite confirms it fails). `passing` when re-run in Phase 3 (the implementer's fix made it pass). `skipped` when Phase 2.0 was skipped for Tier 1 no-behavior-change AND Phase 3 verify ran only the suite no-regress check. Omit the field for `type: feature` / `type: refactor` and other non-bug-fix runs.
 
 **Mandatory tool-usage fields:**
 - `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear.
 - `memory_consult` — count of Knowledge Graph queries made this run. Zero is valid.
-- `kg_save_candidates` — names of KG entities you propose the orchestrator persist (empty list `[]` is valid).
+- `kg_save_candidates` — names of KG entities you propose the orquestador persist (empty list `[]` is valid).
 
-The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md`.
+The orquestador propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md`.
 
 **Field semantics:**
 - `tests_count` — total individual test cases after this iteration (sum of `it()` / `test()` blocks across the suite, or your framework's equivalent). Count cases, not files.
 - `tests_deleted` — number of test cases removed this iteration. **Default: 0.**
-- `tests_deleted_reason` — required only when `tests_deleted > 0`. Examples that pass the orchestrator's test-ratchet gate: "obsolete tests for removed feature X", "duplicate tests consolidated into shared factory", "tests covered scenarios reverted by user request". Examples that FAIL the gate: "tests were broken", "tests were flaky", "couldn't make them pass" — these are NOT valid reasons to delete tests, fix the underlying issue instead.
+- `tests_deleted_reason` — required only when `tests_deleted > 0`. Examples that pass the orquestador's test-ratchet gate: "obsolete tests for removed feature X", "duplicate tests consolidated into shared factory", "tests covered scenarios reverted by user request". Examples that FAIL the gate: "tests were broken", "tests were flaky", "couldn't make them pass" — these are NOT valid reasons to delete tests, fix the underlying issue instead.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orquestador uses this status block to gate phases without re-reading your output.
 
 ### Failure Brief (when `status: failed` only)
 
-When you finish with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orchestrator can route the iteration without re-reading `03-testing.md`. Create the file if it doesn't exist.
+When you finish with `status: failed`, **append** an iteration entry to `workspaces/{feature-name}/failure-brief.md` so the orquestador can route the iteration without re-reading `03-testing.md`. Create the file if it doesn't exist.
 
 ```markdown
 ## Iteration {N} — tester — {YYYY-MM-DD HH:MM}
@@ -943,9 +943,9 @@ When you finish with `status: failed`, **append** an iteration entry to `workspa
 - ...
 ```
 
-**Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC or Step IDs and a targeted edit resolves it. Declare `structural` when the failure implicates the overall design, multiple interconnected components, or you cannot name the affected elements precisely. Default to `structural` when uncertain — the orchestrator uses this to determine whether to apply a bounded patch or a full re-dispatch.
+**Blast radius guidance:** declare `localized {IDs}` when the failure is confined to specific, named AC or Step IDs and a targeted edit resolves it. Declare `structural` when the failure implicates the overall design, multiple interconnected components, or you cannot name the affected elements precisely. Default to `structural` when uncertain — the orquestador uses this to determine whether to apply a bounded patch or a full re-dispatch.
 
-Keep the brief tight: 5-10 lines per iteration. The orchestrator reads ONLY this file to decide routing — no re-reads of the full test report.
+Keep the brief tight: 5-10 lines per iteration. The orquestador reads ONLY this file to decide routing — no re-reads of the full test report.
 
 ---
 

@@ -3,7 +3,7 @@ name: pipelines
 description: Show current state of all pipelines in workspaces.
 ---
 
-Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the orchestrator.
+Show the current state of all pipelines in workspaces. This is a standalone utility — does NOT route through the líder or any orquestador; it is a pure read-only renderer.
 
 ## Voice
 
@@ -139,7 +139,7 @@ No active pipelines in workspaces/.
 
 ## In-flight lanes
 
-**When rendered:** appended after the no-args Pipeline Status table, once per active pipeline row that has a `{resolved-path}/{feature}/00-subagent-trace.jsonl` file. This surfaces subagent dispatches that are blocked inside a concurrent `Task` call — precisely when the orchestrator itself cannot report progress.
+**When rendered:** appended after the no-args Pipeline Status table, once per active pipeline row that has a `{resolved-path}/{feature}/00-subagent-trace.jsonl` file. This surfaces subagent dispatches that are blocked inside a concurrent `Task` call — precisely when the orquestador itself cannot report progress.
 
 **Source:** `00-subagent-trace.jsonl`, written by two deterministic PreToolUse/SubagentStop hooks (`subagent-start.cjs` and `subagent-trace.sh`) — see `docs/observability.md § subagent.start` and `§ 00-subagent-trace.jsonl`. Read-only: parsing this file never triggers a write.
 
@@ -161,26 +161,30 @@ Sort in-flight lanes first (most recently started first), then completed pairs (
 
 ---
 
-## Initiative fan-out — parent/child lane rows
+## Líder → orquestador tree (roster-sourced, grouped by project)
 
-**When rendered:** when an active pipeline's `00-state.md` declares `initiative: {name}` AND the initiative-level `00-execution-events` file (`docs/observability.md § Initiative-level fan-out trace`) has a `fanout.start` event with no matching `fanout.converge` yet — a live fan-out.
+**When rendered:** when the resolved workspaces path (or, for an initiative, the initiative root) contains a `00-lider-roster.md` — the líder's durable index of every orquestador it has spawned (`agents/lider.md § 00-lider-roster.md`). The roster is the authoritative enumeration of the líder→orquestador tree; the per-project `00-state.md` files supply the fine-grained phase/status, and each lane's own events file supplies the cost.
 
-**Derivation.** Read the initiative-level `00-execution-events.jsonl` (or `.md`, JSONL-fence-extracted). Take the most recent `fanout.start` → `fanout.lane.*` → `fanout.converge` sequence:
-- `fanout.start` supplies the initiative name and `eligible_projects[]`.
-- A `fanout.lane.start` with no matching `fanout.lane.end` for the same `project` is a running child lane.
-- A `fanout.lane.start` paired with a `fanout.lane.end` is a completed child lane; status comes from the `status` field (`success`/`failed`/`iterating`).
-- A `fanout.converge` event closes the fan-out — render the converged set instead of treating it as live.
+**Source (read-only, three files):**
+- `00-lider-roster.md` — the líder's index. One row per orquestador: `Task/Project`, `State ref (docs_root)`, `Agent` (always `th:orquestador`), `Phase`, `Status`, `pending_gate`. The líder is the sole writer; this renderer only reads it.
+- each orquestador's own `{State ref}/00-state.md` — for the live `Stage` / `Phase` / `Status` of that lane (a roster row may lag; the orquestador's own file is fresher for its own fields).
+- each orquestador's own `{State ref}/00-execution-events.{jsonl|md}` — for the per-lane cost (sum of `phase.end` `tokens`, fence-extracted in obsidian mode).
 
-For each child lane, read that project's own `{project}/00-state.md` to surface its current `Stage` / `Phase` (same fields used by the main Pipeline Status table).
+**`pending_gate` is ADVISORY (never a gate-clear signal).** The `pending_gate` column is rendered verbatim from the roster's `pending_gate` field — a líder-maintained hint of which STAGE-GATE a lane is paused at. It is NEVER derived from a gate-clear inference: this renderer never reads `gate1_release` / `gate2_release_last` / `gate3_release` or any `stage.gate.release` event to decide gate status. The roster value is a tracking convenience, not an authoritative gate state (`agents/lider.md § 00-lider-roster.md`, where `pending_gate` is defined as ADVISORY; the líder that maintains it never records a gate and never derives gate status from a release field). Show it as-is; when the roster row's `pending_gate` is `—`, show `—`.
 
-**Render** (replaces the normal per-project rows for that initiative in the no-args view):
+**Cost rollup is READER-ONLY.** The per-lane cost is a reader-only aggregation of each orquestador's OWN events file — summed from that lane's `phase.end` `tokens`. This renderer (and the líder, when it builds the same initiative rollup — `docs/observability.md § Reader-only initiative rollup`) never writes to any orquestador's events file or `00-state.md`; the rollup is a pure read and never touches the gate seam.
+
+**Render (grouped by project — replaces the flat per-project rows for that initiative in the no-args view):**
 ```
-parent: {initiative}
-  ├─ {project-a}   Stage {N} / {phase}   {running|done}
-  └─ {project-b}   Stage {N} / {phase}   {running|done}
+parent: {initiative}   (líder roster: {N} orquestadores)
+  ├─ {project-a}   Stage {N} / {phase}   {status}   gate: {pending_gate|—}   ~{K}K tok
+  └─ {project-b}   Stage {N} / {phase}   {status}   gate: {pending_gate|—}   ~{K}K tok
 ```
+For a single-task run (N = 1, no initiative) the roster lives at the feature root; render the one orquestador as a single tree row under `parent: {feature}`.
 
-**Fail-soft.** No initiative-level events file, no `fanout.start` event, or a read/parse error → fall back silently to the normal per-project rows in the main Pipeline Status table. No crash, no error surfaced — this rendering is additive convenience, not a required view.
+**Live fan-out overlay (initiative-level `fanout.*` events).** When the initiative-level `00-execution-events` file (written by the líder — `docs/observability.md § Initiative-level fan-out trace`) has a `fanout.start` with no matching `fanout.converge`, overlay liveness onto the roster tree: read the most recent `fanout.start` → `fanout.lane.*` → `fanout.converge` sequence (JSONL-fence-extracted in obsidian mode). A `fanout.lane.start` with no matching `fanout.lane.end` for the same `project` is a running lane; a paired `fanout.lane.start`/`fanout.lane.end` is closed with `fanout.lane.end.status` (`success`/`failed`/`iterating`); a `fanout.converge` closes the fan-out. The roster remains the enumeration source — the fan-out events only add running/closed liveness.
+
+**Fail-soft.** No `00-lider-roster.md` → fall back silently to the flat per-project rows in the main Pipeline Status table (byte-identical to the pre-roster view). No initiative-level events file, no `fanout.*` events → render the roster tree without the liveness overlay. Any read/parse error → silently omit the tree and keep the flat table. This rendering is additive convenience, not a required view.
 
 ---
 
@@ -348,7 +352,7 @@ Agent Results
 -------------
 | Agent          | Phase                 | Status   | Summary                                     |
 |----------------|-----------------------|----------|---------------------------------------------|
-| orchestrator   | 0a-intake             | success  | feature classified standard, 8 AC           |
+| lider          | 0a-intake             | success  | feature classified standard, 8 AC           |
 | architect      | 1-design              | success  | 3 tasks, 11 AC                              |
 | implementer    | 2-implement (Task-1)    | success  | jwt issuance endpoint                       |
 | tester         | 3-verify (Task-3) iter 0| fail     | AC-3 null check missing in login.ts:42      |
@@ -390,7 +394,7 @@ Round R2 (1 task, started 14:21:49, closed 14:31:02):
 
 ## Important
 
-- This skill does NOT route through the orchestrator
+- This skill does NOT route through the líder or any orquestador
 - Read-only — never modifies workspaces
 - Works even if no `.gitignore` or CLAUDE.md exists
 - If `00-state.md` is missing but workspaces folder exists, report the folder as "no state file (legacy?)"

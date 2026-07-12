@@ -51,11 +51,11 @@ These four are native to the harness, carry no infrastructure assumptions, and h
 
 ### 2. Machine validation of pipeline state and events
 
-**What it is.** Synchronous JSON-Schema validation of the JSONL event stream the orchestrator writes, plus front-matter validation for `00-state.md`, surfaced through a `/th:trace --validate` mode. The events already have a documented schema; this enforces it at the point of writing instead of trusting human or agent reading at review time.
+**What it is.** Synchronous JSON-Schema validation of the JSONL event stream the orquestador writes, plus front-matter validation for `00-state.md`, surfaced through a `/th:trace --validate` mode. The events already have a documented schema; this enforces it at the point of writing instead of trusting human or agent reading at review time.
 
 **Why (protects the collaboration).** The recorded state is the pipeline's source of truth — the shared board the developer reads and another developer reviews later. Drift in it produces gates that fail open and progress that over-claims. The harness's own history makes the case: reviewers caught count drift by hand more than once, and a specific contract exists today precisely because a silently-zeroed token count once broke the cost rollup. Validating at the write point catches that class of defect where it happens, not in review.
 
-**Form (team-harness-native).** The orchestrator is the *sole* writer of the event stream, so validation is a synchronous step it runs before each append — not a fragile on-write parse hook (the runtime exposes no on-write trigger for an editor's write to a markdown file, so chasing one would be brittle). The JSONL substrate, which already has a documented schema, comes first; `00-state.md` front-matter validation follows as a second phase through the same synchronous step. Start non-blocking — a warning in `/th:trace --validate` — and promote to a hard gate only after observing zero false positives, because the harness has never blocked on internal state and a hard gate without that data would be risky for recovery flows.
+**Form (team-harness-native).** The orquestador is the *sole* writer of the event stream, so validation is a synchronous step it runs before each append — not a fragile on-write parse hook (the runtime exposes no on-write trigger for an editor's write to a markdown file, so chasing one would be brittle). The JSONL substrate, which already has a documented schema, comes first; `00-state.md` front-matter validation follows as a second phase through the same synchronous step. Start non-blocking — a warning in `/th:trace --validate` — and promote to a hard gate only after observing zero false positives, because the harness has never blocked on internal state and a hard gate without that data would be risky for recovery flows.
 
 ### 3. Specialized analyzer passes as agent teammates
 
@@ -71,7 +71,7 @@ These four are native to the harness, carry no infrastructure assumptions, and h
 
 **Why (enhances the collaboration).** Improving the harness has been blind: a multi-phase improvement program ran without a single number that said whether the result was a better harness than the version before it. A shared, versioned scoreboard is the channel through which *developers* direct improvement — a common language the developer and their agent team read together to negotiate what to change next cycle, and one the human team can speak among themselves about the tooling they all share. The developer sees "fail-closed coverage dropped from 9 to 7" and directs the team to fix it.
 
-**Form (team-harness-native).** A standalone skill (the `/th:lint` shape — it does not route through the orchestrator) with a versioned rubric and per-version score persistence. It *invokes* the existing per-agent evaluation as one of its categories rather than replacing it.
+**Form (team-harness-native).** A standalone skill (the `/th:lint` shape — it does not route through the líder) with a versioned rubric and per-version score persistence. It *invokes* the existing per-agent evaluation as one of its categories rather than replacing it.
 
 > **Explicitly not a self-tuning optimizer.** This item measures and reports; it never modifies the harness. A loop that measures, applies a change, and re-measures on its own would take the developer out of the improvement decision — the opposite of what the scoreboard is for. The score is the channel through which the human directs the change, with the agents executing and the human deciding what is worth changing. That invariant is part of the item, not a footnote to it.
 
@@ -107,9 +107,9 @@ These are improvements to the harness's own pipeline, surfaced by running it on 
 
 ### Fix the nested design-only dispatch path
 
-**What it is.** When the orchestrator runs design-only from a nested context, it must never self-author the plan or defer the plan-review panel. The producing agent always owns the plan, and the review panel always runs.
+**What it is.** When the orquestador runs design-only from a nested context, it must never self-author the plan or defer the plan-review panel. The producing agent always owns the plan, and the review panel always runs.
 
-**Why (protects the collaboration).** A plan the orchestrator wrote for itself, or a review panel that quietly did not run, breaks the legibility and the human stage-gate the whole collaboration rests on — the plan must be owned by the agent that produced it and reviewed before the developer approves it. This is being addressed next.
+**Why (protects the collaboration).** A plan the orquestador wrote for itself, or a review panel that quietly did not run, breaks the legibility and the human stage-gate the whole collaboration rests on — the plan must be owned by the agent that produced it and reviewed before the developer approves it. This is being addressed next.
 
 ### Wire a before/after quality measurement for the architect effort change
 

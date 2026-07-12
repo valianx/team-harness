@@ -79,7 +79,7 @@ def _slice_section(text: str, anchor: str) -> str:
 # File reads
 # ---------------------------------------------------------------------------
 _hooks_json_text = read(PLUGIN_DIR / "hooks.json")
-_orchestrator_text = read(AGENTS_DIR / "orchestrator.md")
+_orchestrator_text = read(AGENTS_DIR / "orquestador.md")
 _recover_skill_text = read(skill_path("recover"))
 _setup_skill_text = read(skill_path("setup"))
 _update_skill_text = read(skill_path("update"))
@@ -294,9 +294,12 @@ _s85_recover_safety_slice = _slice_section(_recover_skill_text, _S85_RECOVER_SAF
 _S85_ORCH_RECOVERY_ANCHOR = "## Recovery Instructions"
 _s85_orch_recovery_slice = _slice_section(_orchestrator_text, _S85_ORCH_RECOVERY_ANCHOR)
 
-# Anchor the current state schema in orchestrator.md
-# The schema section is identified by the "## Current State" heading
-_S85_CURRENT_STATE_ANCHOR = "## Current State"
+# Anchor the current state schema in orquestador.md
+# The schema section is identified by the "## Current State" heading.
+# Newline-anchored: orquestador.md's own "Mandatory boot sequence" prose
+# cross-references `` `## Current State` `` inline in backticks well before
+# the real heading — a bare substring match would lock onto that mention.
+_S85_CURRENT_STATE_ANCHOR = "\n## Current State\n"
 _s85_orch_current_state_slice = _slice_section(_orchestrator_text, _S85_CURRENT_STATE_ANCHOR)
 
 # Check F009-1: recover/SKILL.md references the decision-allowlist (not just event presence)
@@ -357,16 +360,25 @@ check(
 )
 
 # Check F009-4: orchestrator.md § Recovery Instructions references per-gate allowlist
+# orquestador.md's Recovery Instructions now delegates the literal allowlist to the
+# single-source `agents/_shared/gate-contract.md` ("per `gate-contract.md`") rather than
+# duplicating it inline — check that referenced file too when the pointer is present.
+_gate_contract_text = read(REPO_ROOT / "agents" / "_shared" / "gate-contract.md")
+_s85_orch_recovery_slice_ext = (
+    _s85_orch_recovery_slice + "\n" + _gate_contract_text
+    if "gate-contract.md" in _s85_orch_recovery_slice
+    else _s85_orch_recovery_slice
+)
 check(
     "F009-4: agents/orchestrator.md § Recovery Instructions contains"
     " gate-clear allowlist tokens (approved, approved-autonomous, next, ship)",
     bool(_s85_orch_recovery_slice) and all(
-        t in _s85_orch_recovery_slice for t in _GATE_CLEAR_ALLOWLIST_TOKENS
+        t in _s85_orch_recovery_slice_ext for t in _GATE_CLEAR_ALLOWLIST_TOKENS
     ),
     f"anchor '{_S85_ORCH_RECOVERY_ANCHOR}' missing or allowlist tokens absent in orchestrator;"
     f" anchor found: {bool(_s85_orch_recovery_slice)};"
     + " ".join(
-        f" '{t}': {t in _s85_orch_recovery_slice};"
+        f" '{t}': {t in _s85_orch_recovery_slice_ext};"
         for t in _GATE_CLEAR_ALLOWLIST_TOKENS
     ),
 )

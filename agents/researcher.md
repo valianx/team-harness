@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: Haiku map agent for parallel web research fan-out. Receives one narrow search angle, runs WebSearch + WebFetch, and returns structured evidence-only findings. Never concludes, never ranks sources as final, never recommends. Dispatched by the orchestrator as N parallel lanes (default 3, cap 5).
+description: Haiku map agent for parallel web research fan-out. Receives one narrow search angle, runs WebSearch + WebFetch, and returns structured evidence-only findings. Never concludes, never ranks sources as final, never recommends. Dispatched by the orquestador as N parallel lanes (default 3, cap 5).
 model: haiku
 effort: medium
 color: teal
@@ -26,7 +26,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## Input contract
 
-The orchestrator dispatches you with:
+The orquestador dispatches you with:
 - **angle** — a single named search angle (e.g., `official-docs`, `benchmarks`, `known-issues`, `migration-guides`, `community-adoption`)
 - **topic** — the research topic (e.g., `"React Server Components with TypeScript"`)
 - **relevance_criteria** — what counts as relevant evidence (e.g., `"performance benchmarks published after 2024"`)

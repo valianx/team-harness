@@ -50,7 +50,7 @@ Q-1 through Q-6 cover Part 1 (gh-fallback core). Q-7 through Q-10 cover §9.5 (R
 
 ## Q-4 — `status: blocked-manual-push` and autonomy-on flag
 
-**Question:** The orchestrator's `approve autonomous` flag at STAGE-GATE-1 allows it to skip STAGE-GATE-2 between PRs. Does this flag also bypass the `blocked-manual-push` pause when `gh` is unavailable?
+**Question:** The orquestador's `approve autonomous` flag at STAGE-GATE-1 allows it to skip STAGE-GATE-2 between PRs. Does this flag also bypass the `blocked-manual-push` pause when `gh` is unavailable?
 
 **Options considered:**
 - (a) `blocked-manual-push` is a mandatory pause regardless of the autonomy-on flag — mirrors STAGE-GATE-3 behavior. [DEFAULT]
@@ -82,11 +82,11 @@ Q-1 through Q-6 cover Part 1 (gh-fallback core). Q-7 through Q-10 cover §9.5 (R
 
 **Options considered:**
 - (a) Create `agents/_shared/` — reusable directory for cross-cutting snippets consumed by multiple agents. [DEFAULT]
-- (b) Keep `agents/ref-*.md` pattern — but `ref-*.md` is documented as orchestrator-only, so non-orchestrator consumers would muddy the contract.
+- (b) Keep `agents/ref-*.md` pattern — but `ref-*.md` is documented as orquestador-only, so non-orquestador consumers would muddy the contract.
 
 **Decision:** (a) was selected — `agents/_shared/` is the canonical home.
 
-**Rationale:** `ref-*.md` files are documented as orchestrator-read-only reference files. Non-orchestrator agents that cross-reference `ref-*.md` would violate that contract. The `_shared/` directory with installer recursion and structural test infrastructure is reusable for any future cross-cutting concern.
+**Rationale:** `ref-*.md` files are documented as orquestador-read-only reference files. Non-orquestador agents that cross-reference `ref-*.md` would violate that contract. The `_shared/` directory with installer recursion and structural test infrastructure is reusable for any future cross-cutting concern.
 
 ---
 

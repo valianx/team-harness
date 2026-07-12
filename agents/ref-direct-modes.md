@@ -1,13 +1,15 @@
 ---
 name: ref-direct-modes
-description: Reference file for orchestrator direct modes (diagram, likec4, d2, review, translate, plan-review). Read on-demand by the orchestrator — not a standalone agent.
+description: Reference file for lider direct modes (diagram, likec4, d2, review, translate, plan-review). Read on-demand by th:lider — not a standalone agent.
 model: opus
 color: cyan
 ---
 
-# orchestrator — Direct Mode Reference
+# lider — Direct Mode Reference
 
-This file is read on-demand by the orchestrator when executing a direct mode. It is NOT part of the orchestrator's system prompt.
+This file is read on-demand by `th:lider` when executing a direct mode. It is NOT part of its system prompt.
+
+**Role mapping (post-split, see `agents/lider.md` and `agents/orquestador.md`).** Every direct mode in this file is dispatched directly by `th:lider` — none of them carry a STAGE-GATE, so `th:lider` runs them without preparing, presenting, or relaying a gate. Where this file cross-references full-pipeline mechanics (Phase 2.7, Phase 4.5, the pipeline's Phase 4.5 internal review) those pointers resolve to `agents/orquestador.md`, since that content now lives there.
 
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active mode (e.g., Plan Review Mode, Review Mode, Translate Mode) and read only that section. Load additional sections only when the mode cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
@@ -15,7 +17,7 @@ This file is read on-demand by the orchestrator when executing a direct mode. It
 
 ## Plan Review Mode (standalone audit of Stage 1 artifacts)
 
-**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous orchestrator run, without re-running the full pipeline. Common trigger: developer hand-edits `01-plan.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
+**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous orquestador run, without re-running the full pipeline. Common trigger: developer hand-edits `01-plan.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
 
 **Routing:** the user invokes `/th:plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
 
@@ -35,7 +37,7 @@ The `plan-review` direct mode runs a panel of up to three reviewers that write t
 1. Read `00-state.md` (if it exists) and check for `security-sensitive: true` or `security_sensitive: true`.
 2. If absent, derive from path/keyword heuristic: scan `### Services Touched`, `## Review Summary`, and the AC blocks in `01-plan.md` using TWO complementary checks — both are sufficient independently to trigger security:
    - **Path glob match:** scan for the existing pipeline path auto-escalation list — `auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**` — which is the same list used by the bug-fix pipeline (reused, not a new divergent list).
-   - **Semantic keyword match (case-insensitive):** scan for security-relevant terms in prose — `auth`, `authentication`, `authorization`, `token`, `jwt`, `oauth`, `password`, `secret`, `credential`, `credentials`, `PII`, `encrypt`, `decrypt`, `encryption`, `session`, `cookie`, `permission`, `privilege`, `signature`, `csrf`, `xss`, `injection`, `deserialize`, `unserialize`, `pickle`, `SSRF`, `webhook`, `upload`, `sanitize`, `xxe`, `ssti`, `traversal`, `redirect`, `cors`. If ≥1 keyword is matched, treat as security-sensitive. (Note: this list — the design-review trigger list — is intentionally broader than Signal 1 in `orchestrator.md`, which is the escalation-to-Tier-4 list. The two lists serve different purposes and legitimately diverge; the divergence is by purpose, not drift. Signal 1 targets confirmed-exploit indicators; this list targets design-vulnerability classes. Do not merge them.)
+   - **Semantic keyword match (case-insensitive):** scan for security-relevant terms in prose — `auth`, `authentication`, `authorization`, `token`, `jwt`, `oauth`, `password`, `secret`, `credential`, `credentials`, `PII`, `encrypt`, `decrypt`, `encryption`, `session`, `cookie`, `permission`, `privilege`, `signature`, `csrf`, `xss`, `injection`, `deserialize`, `unserialize`, `pickle`, `SSRF`, `webhook`, `upload`, `sanitize`, `xxe`, `ssti`, `traversal`, `redirect`, `cors`. If ≥1 keyword is matched, treat as security-sensitive. (Note: this list — the design-review trigger list — is intentionally broader than Signal 1 in `lider.md`, which is the escalation-to-Tier-4 list. The two lists serve different purposes and legitimately diverge; the divergence is by purpose, not drift. Signal 1 targets confirmed-exploit indicators; this list targets design-vulnerability classes. Do not merge them.)
    If either path glob match OR semantic keyword match finds a result, treat as security-sensitive.
 3. Operator override: if the operator passed `--security` flag or explicitly said "include security" / "incluí seguridad", treat as security-sensitive regardless of the above.
 
@@ -225,9 +227,9 @@ In obsidian mode, the agent appends a `![[diagram.svg]]` embed to `{docs_root}/0
 
 When invoked with `Direct Mode Task: review`:
 
-The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The orchestrator and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
+The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) and passes everything inline. The lider and reviewer do ZERO Bash. The skill may request different submodes depending on whether a prior review exists.
 
-**No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The orchestrator writes the draft to a file and returns control to the skill. Publishing is the sole responsibility of the execution site that receives operator approval — one of three sites:
+**No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The lider writes the draft to a file and returns control to the skill. Publishing is the sole responsibility of the execution site that receives operator approval — one of three sites:
 - **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`): the decision menu is the preview gate; Phase 5 does the atomic `POST /reviews`.
 - **Orchestrator direct-mode path**: presents the draft and waits for operator OK before calling any write verb.
 - **Takeover/inline path** (top-level Claude after Task-strip): same requirement — present the draft and wait before calling any write verb. This is the least-supervised path and the highest-risk gap if the gate is absent.
@@ -254,7 +256,7 @@ The `### Publish Gate (preview-and-confirm)` section below defines the full cont
 
 **Execution sites — this gate applies at ALL three:**
 1. **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`) — decision menu is the existing preview-and-confirm mechanism; `--auto-publish` skips it.
-2. **Orchestrator direct-mode path** — when the orchestrator handles review without going through the skill's Phase 4, it MUST present the draft and wait for approval before calling any verb above.
+2. **Lider direct-mode path** — when the lider handles review without going through the skill's Phase 4, it MUST present the draft and wait for approval before calling any verb above.
 3. **Takeover/inline path** (top-level Claude after Task-strip, the least-supervised execution site) — the same gate applies. If top-level Claude reconstructs a publish by calling `gh api .../reviews` directly, it MUST present the draft and wait for explicit approval before executing. There is no execution path that bypasses this gate.
 
 **Anti-drift anchor:** Suite 57 in `tests/test_agent_structure.py` asserts the gate token at each of the three execution sites. A site that loses the gate turns the suite red.
@@ -297,7 +299,7 @@ Action required: operator reviews both bodies and decides the final verdict.
 The system cannot auto-resolve this disagreement. Resume with the chosen verdict.
 ```
 
-**Pipeline call site:** The SDD pipeline's Phase 4.5 internal review (`agents/orchestrator.md § Phase 4.5 — Internal Review`) reuses this same convergence contract for its pre-STAGE-GATE-3 dual-review pass. The `skills/review-pr` Phase 3.1 standalone path and the pipeline Phase 4.5 path are the two call sites of this contract.
+**Pipeline call site:** The SDD pipeline's Phase 4.5 internal review (`agents/orquestador.md § Phase 4.5 — Internal Review`) reuses this same convergence contract for its pre-STAGE-GATE-3 dual-review pass. The `skills/review-pr` Phase 3.1 standalone path and the pipeline Phase 4.5 path are the two call sites of this contract.
 
 ## Read-Only Working-Tree Guard
 
@@ -320,18 +322,18 @@ NEVER write to source files, configuration files, or any other path in the worki
 
 Scope: the `review` direct mode over the operator's active repo only.
 
-The orchestrator captures the working-tree state BEFORE invoking the reviewer:
+The lider captures the working-tree state BEFORE invoking the reviewer:
 
 ```bash
 git status --untracked-files=all
 git diff HEAD
 ```
 
-After the review completes, the orchestrator re-verifies using the same commands. The tree is considered clean if it is byte-identical to the pre-review state EXCEPT for the allowlisted draft zone `.claude/pr-review-*`.
+After the review completes, the lider re-verifies using the same commands. The tree is considered clean if it is byte-identical to the pre-review state EXCEPT for the allowlisted draft zone `.claude/pr-review-*`.
 
 Verification uses `git status --untracked-files=all` (not plain `git status`) to capture new untracked files outside the allowlisted zone — those would not appear in `git diff HEAD` and would otherwise be silently missed.
 
-If the post-review state differs outside the `.claude/pr-review-*` zone, the orchestrator MUST surface the detected changes explicitly as a defect:
+If the post-review state differs outside the `.claude/pr-review-*` zone, the lider MUST surface the detected changes explicitly as a defect:
 
 ```
 review mode modified the working tree — this is a defect.
@@ -343,7 +345,7 @@ The review output is still returned to the operator, but the defect report is pr
 
 ### Layer 4 — Mode-transition gate
 
-**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the full pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `orchestrator.md` Step 6 `review_context` guard).
+**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the full pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `lider.md` Phase 0a `review_context` guard).
 
 **When this gate fires:** Any of these signals appear while a review session is active (i.e., `review_context` is set in `00-state.md`):
 - Corrective language directed at the PR under review: "debemos corregirlo", "hay que arreglarlo", "fix this", "fix X", "corrige X", "arréglalo", "corrígelo", "implementa el fix", "aplica los cambios".
@@ -358,11 +360,11 @@ The review output is still returned to the operator, but the defect report is pr
 3. On an explicit `implementar` (or equivalent affirmative) response: clear `review_context` from `00-state.md`, then proceed to the full pipeline (Step 7 classify + Discover).
 4. On any other response (or no response): remain in review mode. Do NOT dispatch `implementer`. Do NOT exit review mode.
 
-**The global routing rule ("route all dev tasks through orchestrator") is neutralized within review mode and during the `review_context` window.** A corrective message that would otherwise map to `full pipeline` in Step 6 MUST pass through this gate first.
+**The global routing rule ("route all dev tasks through the lider") is neutralized within review mode and during the `review_context` window.** A corrective message that would otherwise map to `full pipeline` in Step 6 MUST pass through this gate first.
 
 ### Layer 5 — Branch-author guard
 
-**Purpose (closes #251 another-author-branch):** Before ANY edit/commit/push on a PR branch, the orchestrator resolves two identities and fails closed if either is indeterminate.
+**Purpose (closes #251 another-author-branch):** Before ANY edit/commit/push on a PR branch, the lider resolves two identities and fails closed if either is indeterminate.
 
 **Identity resolution (fail-closed by design — CWE-697):**
 - Author of the PR: `gh pr view {N} --json author --jq '.author.login'`
@@ -686,9 +688,9 @@ When `frontend_scope` is absent or `false`, the tester is invoked without the fl
 3. If no AC found, warn the user: "No acceptance criteria found in `01-plan.md § Task List`. Run `/th:define-ac {feature}` first."
 4. If payload carries `frontend_scope: true`, execute the `frontend_scope` bridge (above) before invoking the tester.
 5. Invoke `tester` (authoring mode) via Task tool, passing: feature name, workspaces path, AC list, `frontend_scope` flag (when true), and the instruction above.
-6. Before reporting results, apply the two console-path readiness gates (mirrors of the full-pipeline checks at `orchestrator.md` Phase 2.7):
-   - **A1-F3 — browser readiness:** when the tester's status block `warranted_types` contains `e2e` or `browser-mode` AND its findings report missing tooling or binaries, surface the proposed setup commands (e.g. `npx playwright install --with-deps`, dependency-add commands) directly in the result summary — NOT buried in `03-testing.md`. Do not skip silently. See `orchestrator.md` Phase 2.7 `**A1-F3**` for the canonical gate text and the exact operator prompt wording.
-   - **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND the tester's decision log in `03-testing.md § Test-Type Decisions` records a browser-API or interaction AC that was routed to jsdom, emit the Hot Context note defined in `orchestrator.md` Phase 2.7 `**A1-F4**` directly in the result summary. This note is non-blocking. Do NOT emit it when all AC are pure-logic or unit-level with no browser-API/interaction mismatch in the decision log.
+6. Before reporting results, apply the two console-path readiness gates (mirrors of the full-pipeline checks at `orquestador.md` Phase 2.7):
+   - **A1-F3 — browser readiness:** when the tester's status block `warranted_types` contains `e2e` or `browser-mode` AND its findings report missing tooling or binaries, surface the proposed setup commands (e.g. `npx playwright install --with-deps`, dependency-add commands) directly in the result summary — NOT buried in `03-testing.md`. Do not skip silently. See `orquestador.md` Phase 2.7 `**A1-F3**` for the canonical gate text and the exact operator prompt wording.
+   - **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND the tester's decision log in `03-testing.md § Test-Type Decisions` records a browser-API or interaction AC that was routed to jsdom, emit the Hot Context note defined in `orquestador.md` Phase 2.7 `**A1-F4**` directly in the result summary. This note is non-blocking. Do NOT emit it when all AC are pure-logic or unit-level with no browser-API/interaction mismatch in the decision log.
 7. Report results to user.
 
 ---
@@ -717,8 +719,8 @@ Any future change that conditions or removes this scan MUST add a compensating s
 
 At the consolidation and report step (see `ref-special-flows.md § Test Pipeline Flow` for the full sequence), apply the same two gates used in Test Mode:
 
-- **A1-F3 — browser readiness:** when any module-tester status block reports `warranted_types` containing `e2e` or `browser-mode` AND findings include missing tooling or binaries, surface the proposed setup commands directly in the consolidated result summary. See `orchestrator.md` Phase 2.7 `**A1-F3**` for the canonical gate text.
-- **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND any module's decision log records a browser-API or interaction AC routed to jsdom, emit the Hot Context note from `orchestrator.md` Phase 2.7 `**A1-F4**` in the consolidated result summary. Non-blocking; omit when no browser-API/interaction mismatch is present.
+- **A1-F3 — browser readiness:** when any module-tester status block reports `warranted_types` containing `e2e` or `browser-mode` AND findings include missing tooling or binaries, surface the proposed setup commands directly in the consolidated result summary. See `orquestador.md` Phase 2.7 `**A1-F3**` for the canonical gate text.
+- **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND any module's decision log records a browser-API or interaction AC routed to jsdom, emit the Hot Context note from `orquestador.md` Phase 2.7 `**A1-F4**` in the consolidated result summary. Non-blocking; omit when no browser-API/interaction mismatch is present.
 
 See `ref-special-flows.md § Test Pipeline Flow` for the full phase sequence, module splitting, and reporting contract.
 
@@ -728,9 +730,9 @@ See `ref-special-flows.md § Test Pipeline Flow` for the full phase sequence, mo
 
 When invoked with `Direct Mode Task: apply-review`:
 
-This is the explicit, on-demand entry point into the orchestrator's author-side
+This is the explicit, on-demand entry point into the lider's author-side
 apply-review handling. It is a COMPLEMENT to the automatic, lifecycle-bound trigger
-in `orchestrator.md § "PR Comment Incorporation — Apply-Review Disposition"`, not a
+in `orquestador.md § "PR Comment Incorporation — Apply-Review Disposition"`, not a
 replacement. Both paths load the same shared disposition snippet
 (`agents/_shared/apply-review-disposition.md`) and behave identically per comment.
 

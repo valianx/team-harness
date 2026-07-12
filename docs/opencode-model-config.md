@@ -11,11 +11,11 @@ this file's history.
 
 ## Decision: model-less agents (the v1 baseline)
 
-Every opencode agent th ships — the primary orchestrator **and** every subagent —
+Every opencode agent th ships — the primary lider **and** every subagent —
 is emitted with **no `model:` line**. Consequences (per opencode's own inheritance
 rules, confirmed below):
 
-- **Primary (orchestrator):** inherits the **globally selected model** — the
+- **Primary (lider):** inherits the **globally selected model** — the
   operator's `/model` pick at runtime.
 - **Subagents:** inherit the **model of the primary that invoked them**.
 
@@ -26,7 +26,7 @@ provider does not serve.
 
 **The tradeoff — uniform cost.** Because subagents inherit the primary's model,
 **every agent runs at the selected model's tier**. A cheap validation step costs the
-same as the orchestrator. This is the deliberate v1 baseline: it runs on every
+same as the lider. This is the deliberate v1 baseline: it runs on every
 provider out of the box. Cost differentiation is added later, per provider, as each
 is actually adopted.
 
@@ -115,7 +115,7 @@ CLI surface:
 
 ```shell
 install --runtime opencode --opencode-tier anthropic
-# bakes: orchestrator → anthropic/claude-opus-4-6; implementer → anthropic/claude-sonnet-4-6;
+# bakes: lider → anthropic/claude-opus-4-6; implementer → anthropic/claude-sonnet-4-6;
 #        init/acceptance-checker/translator/researcher → anthropic/claude-haiku-4-5
 /th:update-models   # later: refreshes those ids to the newest live versions per tier
 ```

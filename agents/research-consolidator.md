@@ -28,7 +28,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## Input contract
 
-The orchestrator dispatches you with:
+The orquestador dispatches you with:
 - **findings_files** — list of paths to per-lane findings files. These may be web-lane files (produced by `researcher` agents, containing `source_url` entries) or code-lane files (produced by `code-researcher` agents, containing `evidence_ref` entries). Both shapes may appear in the same consolidation run.
 - **topic** — the research topic
 - **output_file** — path to write the consolidated findings (typically `workspaces/{feature}/research/00-research.md`, or a warm-findings file for Discover mode)

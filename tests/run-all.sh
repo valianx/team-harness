@@ -394,6 +394,22 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 151: lane-marker-byte-identity (AC-7.4 floor)"
+echo "# Requires: python3. Skipped when absent."
+echo "############################################################"
+if ! command -v python3 >/dev/null 2>&1; then
+    report_skip_or_fail "lane-marker-byte-identity" "python3 not found — install Python 3 to run this suite"
+else
+    if python3 "$TESTS_DIR/test_lane_marker_identity.py"; then
+        echo "lane-marker-byte-identity: PASS (see PENDING notes above if agents/lider.md / agents/orquestador.md are not yet landed in this branch)"
+    else
+        echo "lane-marker-byte-identity: FAIL"
+        FAILED=$((FAILED + 1))
+    fi
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

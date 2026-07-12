@@ -132,10 +132,24 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
         "git push --force origin feature-branch",
         "git push origin +feature-branch",
     ],
-    "GH_PR_CREATE_RE": ["gh pr create --title x --body y"],
-    "GH_PR_MERGE_RE": ["gh pr merge 123 --squash"],
-    "GH_PR_REVIEW_RE": ["gh pr review 123 --approve"],
-    "GH_PR_COMMENT_RE": ["gh pr comment 123 --body hi"],
+    "GH_PR_CREATE_RE": [
+        "gh pr create --title x --body y",
+        # AC-6.1 (Task-6) — --repo/-R interspersed BEFORE the subcommand+verb
+        # must still route into the recognizer, not fall through unnoticed.
+        "gh --repo owner/repo pr create --title x --body y",
+    ],
+    "GH_PR_MERGE_RE": [
+        "gh pr merge 123 --squash",
+        "gh --repo owner/repo pr merge 123 --squash",
+    ],
+    "GH_PR_REVIEW_RE": [
+        "gh pr review 123 --approve",
+        "gh --repo owner/repo pr review 123 --approve",
+    ],
+    "GH_PR_COMMENT_RE": [
+        "gh pr comment 123 --body hi",
+        "gh --repo owner/repo pr comment 123 --body hi",
+    ],
     "GH_API_REST_PR_RE": ["gh api -X POST /repos/o/r/pulls/1/merge"],
     "GH_GRAPHQL_RE": [
         "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"x\"}){clientMutationId}}'"
@@ -147,6 +161,7 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
         "gh issue create --title x",
         "gh issue edit 5 --body y",
         "gh issue comment 5 --body z",
+        "gh --repo owner/repo issue create --title x",
     ],
     "CURL_WGET_MUTATING_RE": [
         "curl -X POST https://api.github.com/repos/o/r/pulls/1/merge",
@@ -179,8 +194,14 @@ OUTWARD_SAMPLES: dict[str, list[str]] = {
         "git push origin $BR",
     ],
     "GIT_PUSH_EXACT_RE": ["git push origin feat/x"],
-    "GH_PR_CREATE_EXACT_RE": ["gh pr create --title x"],
+    "GH_PR_CREATE_EXACT_RE": [
+        "gh pr create --title x",
+        "gh --repo owner/repo pr create --title x",
+    ],
     "BENIGN_PUSH_FLAG_RE": ["-u", "--set-upstream"],
+    # Task-6 (AC-6.1) additions below.
+    "GIT_C_DIR_PUSH_EXACT_RE": ["git -C /tmp/other push origin feat/x"],
+    "GH_REPO_FLAG_VALUE_RE": ["gh --repo owner/repo pr create --title x"],
 }
 
 missing_samples = sorted(set(extracted_patterns) - set(OUTWARD_SAMPLES))

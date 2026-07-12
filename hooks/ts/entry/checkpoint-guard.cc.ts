@@ -9,9 +9,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { execFileSync } from "node:child_process";
 import { inboundCC, outboundCC, ShimRejectError } from "../shim/shim.js";
 import { evaluate, type StateReader } from "../bodies/checkpoint-guard.js";
 import type { NormalizedDecision } from "../shim/normalized-v1.js";
+
+const GIT_EXEC_TIMEOUT_MS = 5_000;
 
 // ---------------------------------------------------------------------------
 // Real StateReader — reads from the live filesystem.
@@ -79,6 +82,36 @@ function makeStateReader(): StateReader {
 
     cwd(): string {
       return process.cwd();
+    },
+
+    realpath(filePath: string): string | null {
+      try {
+        return fs.realpathSync(filePath);
+      } catch {
+        return null;
+      }
+    },
+
+    // Worktree-stable repo name: derives from the MAIN repo's `.git`
+    // directory (git-common-dir), not cwd()'s own last path segment — a
+    // `th-wt-{slug}` worktree checkout has a basename that does NOT match
+    // the repo name (docs/worktree-discipline.md).
+    gitRepoName(): string | null {
+      try {
+        const out = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          timeout: GIT_EXEC_TIMEOUT_MS,
+          stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+        if (!out) return null;
+        const absCommonDir = path.isAbsolute(out) ? out : path.resolve(process.cwd(), out);
+        const repoRoot = path.dirname(absCommonDir); // strip the trailing ".git" segment
+        const name = path.basename(repoRoot);
+        return name || null;
+      } catch {
+        return null;
+      }
     },
   };
 }

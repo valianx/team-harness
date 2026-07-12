@@ -1,6 +1,6 @@
 # Output Discipline
 <!-- Cross-cutting output contract for agents and skills.
-     Consumed by: agents/{orchestrator,delivery,init,architect,implementer,tester,qa,security}.md
+     Consumed by: agents/{lider,orquestador,delivery,init,architect,implementer,tester,qa,security}.md
      and skills/{setup,lint,memory}/SKILL.md.
      Edit here; consumer files reference this file by section. -->
 
@@ -71,10 +71,10 @@ effort: {effective-effort-level}   # optional — include when known
 ...
 ```
 
-- **`model:`** — mandatory. The literal model ID the agent ran under for this dispatch (e.g. `claude-opus-4-6`, `claude-sonnet-5`), not the frontmatter default. The agent is the only party that reliably knows its effective model, particularly under a session model override (see `agents/orchestrator.md` § "Session model override") — the orchestrator cannot infer it after the fact.
+- **`model:`** — mandatory. The literal model ID the agent ran under for this dispatch (e.g. `claude-opus-4-6`, `claude-sonnet-5`), not the frontmatter default. The agent is the only party that reliably knows its effective model, particularly under a session model override (see `docs/observability.md` § "Session model override") — the orquestador cannot infer it after the fact.
 - **`effort:`** — optional. Include the line when the agent's effective reasoning-effort level is known (e.g. from its own frontmatter or an explicit override); omit the line entirely otherwise. Do not emit `effort: unknown` — omission is the "unknown" signal.
 
-The orchestrator propagates both fields verbatim onto the corresponding `phase.end` event, following the same mechanism already used for the `tools` field (see `agents/orchestrator.md` events schema). Downstream cost classification (`docs/observability.md`, `skills/trace/SKILL.md`) prefers `event.model` over frontmatter-derived inference when the field is present.
+The orquestador propagates both fields verbatim onto the corresponding `phase.end` event, following the same mechanism already used for the `tools` field (see `agents/orquestador.md` events schema). Downstream cost classification (`docs/observability.md`, `skills/trace/SKILL.md`) prefers `event.model` over frontmatter-derived inference when the field is present.
 
 ## How to reference this file
 

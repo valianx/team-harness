@@ -20,18 +20,18 @@ skills/
     └── references/      ← scripts, templates, reference material
 ```
 
-Convention: parse arguments, build a task payload, route to the `orchestrator` agent.
+Convention: parse arguments, build a task payload, route to the `lider` agent.
 
 ## Routing
 
-- **Routes to orchestrator** (default for pipeline work): `/th:issue`, `/th:plan`, `/th:design`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:recover`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`.
-- **Standalone** (no orchestrator involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:harness-audit`, `/th:todo`, `/th:mcp-optimize`.
+- **Routes to lider** (default for pipeline work): `/th:issue`, `/th:plan`, `/th:design`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:recover`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`.
+- **Standalone** (no lider involvement): `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:harness-audit`, `/th:todo`, `/th:mcp-optimize`.
 - **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
 
 ## Adding a skill
 
 1. Create `skills/<name>/SKILL.md` with frontmatter and a body.
-2. Default behaviour: parse args, route to orchestrator with a descriptive mode. Use existing skills as templates.
+2. Default behaviour: parse args, route to lider with a descriptive mode. Use existing skills as templates.
 3. For skills with supporting material, add `skills/<name>/references/` with the relevant files.
 4. **Plugin (canonical):** run `/plugin reload th` inside Claude Code to pick up the new skill.
    **Legacy (contributors):** run `go run ./cmd/install` from the repo root to propagate via the Go installer.

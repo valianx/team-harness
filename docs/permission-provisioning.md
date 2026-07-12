@@ -2,7 +2,7 @@
 
 By default, every subagent `Edit`/`Write` into a path outside the current session's working directory prompts for approval, and that approval does not persist across dispatches. This is expected friction for a one-off change. It is a repeated tax for two recurring, low-risk surfaces this pipeline already trusts: the operator's own obsidian workspace vault, and a work-surface repo (e.g. a git worktree) the pipeline itself created. Permission provisioning closes that gap by writing local Claude Code permission rules — once, gated, and reported — so future dispatches into those surfaces stop prompting.
 
-This document is the canonical contract. Every provisioning site in the codebase (`skills/setup/SKILL.md`, `agents/orchestrator.md`) implements exactly this mechanism; do not introduce a variant mechanism at a new site.
+This document is the canonical contract. Every provisioning site in the codebase (`skills/setup/SKILL.md`, `agents/lider.md`) implements exactly this mechanism; do not introduce a variant mechanism at a new site.
 
 ## The `//` double-slash anchor
 
@@ -48,7 +48,7 @@ Before any rule is constructed from a resolved `base`/`path`, this contract vali
 - A filesystem top-level directory — fewer than 2 non-empty path segments below root (depth < 2).
 - Contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`).
 
-This floor runs on the RESOLVED value, after normalization and before rule construction — it is the mechanism that guarantees "never a bare root rule" at the value level (a mis-resolved `base` of `/` or `~` would otherwise still pass the template-level guarantee in "Scoping" below, since the resulting rule string never literally matches the bare-root needle `//**`). Both provisioning sites (`skills/setup/SKILL.md` § 3a, `agents/orchestrator.md` Phase 0a Step 1g parts a and b) apply this floor identically before presenting any gate.
+This floor runs on the RESOLVED value, after normalization and before rule construction — it is the mechanism that guarantees "never a bare root rule" at the value level (a mis-resolved `base` of `/` or `~` would otherwise still pass the template-level guarantee in "Scoping" below, since the resulting rule string never literally matches the bare-root needle `//**`). Both provisioning sites (`skills/setup/SKILL.md` § 3a, `agents/lider.md` Phase 0a Step 1g parts a and b) apply this floor identically before presenting any gate.
 
 ## `.git/` exclusion invariant
 
@@ -74,7 +74,7 @@ Every rule this contract writes is scoped strictly to `{base}/**` for a single, 
 
 ## Read-only allowlist — disjointness invariant
 
-Both provisioning sites offer one additional class of `permissions.allow` rules in the same gated Y/n write as the `Edit`/`Write`/`additionalDirectories` triad above: a positive list of inert `Bash(...)` commands, four prefix-safe `gh` read verbs, `gh auth switch`, and the `mcp__memory__*` Knowledge Graph tool family. Unlike the `Edit`/`Write` rules, these are NOT scoped to `{base}/**` — Claude Code's `Bash` and MCP-tool permission rules match on a command/tool-name prefix, not on a filesystem path, so they apply wherever the session runs rather than only inside a provisioned base. This section is the canonical definition of that set; `skills/setup/SKILL.md` § 3a and `agents/orchestrator.md` Phase 0a Step 1g reproduce it identically (multi-site invariant (c)) — a divergence between the two sites is a defect, not an allowed variation.
+Both provisioning sites offer one additional class of `permissions.allow` rules in the same gated Y/n write as the `Edit`/`Write`/`additionalDirectories` triad above: a positive list of inert `Bash(...)` commands, four prefix-safe `gh` read verbs, `gh auth switch`, and the `mcp__memory__*` Knowledge Graph tool family. Unlike the `Edit`/`Write` rules, these are NOT scoped to `{base}/**` — Claude Code's `Bash` and MCP-tool permission rules match on a command/tool-name prefix, not on a filesystem path, so they apply wherever the session runs rather than only inside a provisioned base. This section is the canonical definition of that set; `skills/setup/SKILL.md` § 3a and `agents/lider.md` Phase 0a Step 1g reproduce it identically (multi-site invariant (c)) — a divergence between the two sites is a defect, not an allowed variation.
 
 ### The governing constraint — Claude Code issue #18312
 
@@ -127,7 +127,7 @@ This is the audit/revert surface: the operator can locate and remove any rule th
 A decline never widens access and never re-prompts within the same run:
 
 - **`/th:setup` § 3a (site A):** on decline, nothing is written; the operator can re-run `/th:setup` (or the targeted `/th:setup workspace`) at any time to be offered again.
-- **Orchestrator Phase 0a Step 1g (site B):** on decline, nothing is written; the decline is recorded in `00-state.md § Current State` as `permission_provisioning_decline: obsidian | cross-repo | both` — a session-scoped decision. The current pipeline run does not re-offer; the next pipeline run may offer again (declines do not persist across runs).
+- **Lider Phase 0a Step 1g (site B):** on decline, nothing is written; the decline is recorded in `00-state.md § Current State` as `permission_provisioning_decline: obsidian | cross-repo | both` — a session-scoped decision. The current pipeline run does not re-offer; the next pipeline run may offer again (declines do not persist across runs).
 
 ## Provisioning sites
 
@@ -136,7 +136,7 @@ Two surfaces, two destinations, matched to the lifecycle of the underlying data:
 | Site | Where | Destination | Lifecycle | Trigger |
 |---|---|---|---|---|
 | **A — Setup (KEYS-once)** | `skills/setup/SKILL.md` § 3a, after the Step 3 obsidian workspace configuration | `~/.claude/settings.json` (user, cross-project) | Set once at configuration time | Operator runs `/th:setup` in obsidian mode |
-| **B — Orchestrator Phase 0a (existing-install / recurring)** | `agents/orchestrator.md` § Phase 0a Step 1g | (a) `~/.claude/settings.json` for the obsidian workspace base — same destination as site A; (b) `.claude/settings.local.json` (project-local, gitignored) for cross-repo work-surface paths | (a) covers an install that never re-runs `/th:setup`, or a prior decline; (b) is per-pipeline, revertible | Every pipeline run, in obsidian mode (a) or when the pipeline declares an out-of-cwd work-surface path (b) |
+| **B — Lider Phase 0a (existing-install / recurring)** | `agents/lider.md` § Phase 0a Step 1g | (a) `~/.claude/settings.json` for the obsidian workspace base — same destination as site A; (b) `.claude/settings.local.json` (project-local, gitignored) for cross-repo work-surface paths | (a) covers an install that never re-runs `/th:setup`, or a prior decline; (b) is per-pipeline, revertible | Every pipeline run, in obsidian mode (a) or when the pipeline declares an out-of-cwd work-surface path (b) |
 
 Site B exists because `/th:setup` is a one-time configuration step that most operators never re-run after their first install — an operator who installed before this mechanism existed, or who declined the offer at setup time, would otherwise never be covered. Site B closes that gap by re-checking on every pipeline run and re-offering only when the rules are genuinely missing (see "Confirmation gate" above — already-present rules are a silent pass-through, not a repeated prompt).
 

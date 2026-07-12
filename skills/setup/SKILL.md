@@ -31,6 +31,8 @@ Match on the normalized argument containing any listed cue (substring or close s
 | **obsidian-tasks** | § Targeted: Obsidian Tasks | `obsidian tasks`, `obsidian-tasks`, `tasks plugin` | `tareas de obsidian`, `obsidian tasks` |
 | **flow-telemetry** | Step 4f — flow telemetry opt-in | `flow telemetry`, `flow-telemetry`, `telemetry`, `friction events` | `telemetría`, `telemetría de flujo`, `eventos de fricción` |
 | **python / deps** | Step 6b — python3 probe | `python`, `python3`, `dependencies`, `deps`, `secret scan`, `entropy` | `python`, `dependencias`, `escaneo de secretos` |
+| **gh-accounts** | Step 3b — per-account gh identity map | `gh accounts`, `gh config dir`, `gh_config_dir`, `gh identity`, `per-account gh`, `github accounts` | `cuentas gh`, `identidad gh`, `directorio de configuración gh`, `cuentas de github` |
+| **capability** | Step 6c — nested-lane capability probe_result | `capability`, `probe`, `probe result`, `probe_result`, `nested lane`, `nested-lane`, `gate messaging` | `capacidad`, `probe`, `resultado de probe`, `verificación de capacidad`, `carril anidado` |
 
 ### No-match fallback
 
@@ -49,6 +51,8 @@ Routable concerns for /th:setup <intent>:
   obsidian-tasks   — Obsidian Tasks integration
   flow-telemetry   — cross-user flow telemetry opt-in (default: off)
   python           — python3 presence and dependency probe
+  gh-accounts      — per-account GH_CONFIG_DIR identity map (paths only, no tokens)
+  capability       — nested-lane probe_result confirmation (version-pinned)
 
 Retype the command with one of the above concerns, or run /th:setup with no argument to walk the full configuration flow.
 ```
@@ -163,7 +167,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 1. Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX (`C:\vault\Work` → `/c/vault/Work`) and anchor it with a leading `//` (a single leading slash anchors to the settings-source directory, not the filesystem root, and silently fails to match paths outside the cwd — upstream Claude Code issue #25137).
 2. **Resolved-value validation floor (before any rule is constructed).** Reject and abort provisioning — no gate, no rule written — when the resolved `base` is empty, `/`, the user home (`~`, `$HOME`, or its expanded form), a filesystem top-level directory (fewer than 2 path segments below root), or contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`). Report a one-line reason (e.g. "Obsidian workspace path resolves to the filesystem root — provisioning aborted.") and continue to Step 3.5 without offering a gate. Full contract: `docs/permission-provisioning.md § Resolved-value validation floor`.
-3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, the read-only allowlist set below, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to the orchestrator's Phase 0a Step 1g part (a), so the two sites stay reconciled.
+3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, the read-only allowlist set below, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to th:lider's Phase 0a Intake permission-provisioning step (part (a)), so the two sites stay reconciled.
    - **Already present → no gate, no write** (silent pass-through) — report the covering rule(s) and target file for audit visibility, then continue to Step 3.5:
      ```text
      Permission rules for the obsidian workspace are already present in ~/.claude/settings.json:
@@ -215,7 +219,44 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md § "Outward-action gate").
 
-**Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's Phase 0a intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
+**Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at th:lider's Phase 0a Intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
+
+### 3b. Configure per-account gh identity map (gated)
+
+**Optional, gated. Skipped silently unless the operator opts in.** Records an account→`GH_CONFIG_DIR` **PATH** map so pipeline lanes select a gh identity by an isolated config directory rather than by a single, drift-prone global active account. This step **NEVER** stores, reads into a payload, or emits a gh token literal — no `ghp_…`, `github_pat_…`, `gho_…`, `ghs_…`, `ghu_…`, or `ghr_…` value is ever written to a payload, command, or file (AC-9.2; the `policy-block` deny floor treats such a literal as a hard block regardless). It records only directory **PATHS**; the tokens stay inside each `GH_CONFIG_DIR/hosts.yml`, owned by `gh`, never by this config file. This step **NEVER** runs `gh auth switch`, and it NEVER logs into any account for the operator — provisioning each `GH_CONFIG_DIR` (via `GH_CONFIG_DIR={dir} gh auth login`) is the operator's own prior action; this step only records the resulting PATHS. No account switch is ever performed automatically in a hook (AC-9.2).
+
+Why per-account config dirs: `gh` reads its credentials from `$GH_CONFIG_DIR/hosts.yml`. Pointing each account at its own directory lets a lane pin its identity by PATH (`GH_CONFIG_DIR={dir} gh --repo {owner/repo} …`) instead of relying on the single global `~/.config/gh/hosts.yml` whose "active account" drifts between subagent runs (the drift documented in `agents/delivery.md § Step 2b`).
+
+1. **Offer the gate.** Read the current `gh_config_dirs` map from `~/.claude/.team-harness.json` (if present) and show it as the default hint (PATHS only). Then:
+   ```text
+   Configure a per-account gh identity map (account → GH_CONFIG_DIR path)?
+   Records directory PATHS only — never a token — so each pipeline lane selects a gh
+   identity by an isolated config dir instead of a drift-prone global active account. [y/N]
+   ```
+   On `n`/Enter (decline) → write nothing, continue to Step 3.5.
+
+2. **Collect entries.** For each account the operator wants to map, prompt for (a) the account login (e.g. `valianx`) and (b) the absolute path to its `GH_CONFIG_DIR` — the directory that contains `hosts.yml` (e.g. `~/.config/gh-accounts/valianx`). Repeat until the operator enters a blank login.
+
+3. **Validate each path — all four checks must pass. On any failure, report the one-line reason and re-prompt or skip that entry; never record a rejected entry:**
+   - **Outside any repo worktree (AC-9.5).** Run `git -C {dir} rev-parse --is-inside-work-tree 2>/dev/null`. If it prints `true`, the directory sits inside a git worktree — REJECT (a `GH_CONFIG_DIR` under version control is stageable and committable, and would leak `hosts.yml`). Require a path outside every repo worktree (e.g. under `~/.config/`). The recorded PATH must never resolve inside a project working tree.
+   - **`hosts.yml` present.** Confirm `{dir}/hosts.yml` exists (the directory has been provisioned by a prior `gh auth login`). If absent, tell the operator to run `GH_CONFIG_DIR={dir} gh auth login` first, then re-run this step; do not record the entry.
+   - **`hosts.yml` is `0o600` (AC-9.5).** Stat `{dir}/hosts.yml`. If the mode is not `0o600`, tighten it in place — `chmod 600 {dir}/hosts.yml` — and tighten the directory to `0o700` (`chmod 700 {dir}`); report the tightening. The token file must never be group- or world-readable, and this step keeps it at `0o600`.
+   - **No token bytes read into this process's output (AC-9.2).** Do NOT `cat`, echo, print, or otherwise surface `hosts.yml`; do NOT copy any of its bytes into the map. Only the directory PATH and, optionally, the login string are recorded.
+
+4. **Optional login verification (advisory, no token emitted).** To confirm a path resolves to the expected account, the operator may allow `GH_CONFIG_DIR={dir} gh api user -q .login` — this returns only the login string; the token stays inside the `gh` process and is never printed. Record only the returned login. Skip on any error; verification is advisory and never blocks.
+
+5. **Persist via merge-write-whole-document.** Write the `gh_config_dirs` object (`{ "<login>": "<dir>", … }`) into `~/.claude/.team-harness.json` — read the full JSON, replace or add only the `gh_config_dirs` key, write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, `pricing`, `language`, and every other existing key. Every value is a PATH; before writing, assert no value matches a gh token shape (`ghp_`, `github_pat_`, `gho_`, `ghs_`, `ghu_`, `ghr_`) — abort the write and re-prompt if one does.
+
+6. **How the map is consumed (AC-9.1, AC-9.3).** The recorded map is the source the lane environment reads. Each `th:orquestador` lane exports its OWN `GH_CONFIG_DIR` in its environment, and the `delivery` specialist the orquestador dispatches selects gh identity by that PATH — `GH_CONFIG_DIR={dir} gh --repo {owner/repo} …` — never by a literal token in a payload, command, or file (AC-9.1). Because each lane's `GH_CONFIG_DIR` is isolated, a stray `gh auth switch` inside one lane mutates only that lane's own `hosts.yml`, never a sibling lane's config dir nor the global `~/.config/gh/hosts.yml` (AC-9.3). Identity is selected by the exported PATH, not by an automatic account flip — no `gh auth switch` is ever run automatically in a hook.
+
+7. **Allowlist evaluation note (AC-9.3).** Once identity is pinned per-lane by `GH_CONFIG_DIR`, the documented residual behind keeping `Bash(gh auth switch:*)` on the read-only allowlist — a repo-embedded instruction flipping the *global* active account ahead of a later auto-allowed push (`docs/permission-provisioning.md § Documented residuals`) — is neutralized: a switch can only touch the calling lane's isolated config dir. Removing `Bash(gh auth switch:*)` from the read-only allowlist (setup § 3a, `agents/lider.md` Phase 0a Step 1g, and the canonical set in `docs/permission-provisioning.md`) is therefore **under evaluation**. It is deferred here — not performed by this step — because that allowlist is a three-site invariant enforced by `tests/test_permission_disjointness.py` and `tests/test_agent_structure.py` (Suite 148); this step only records the map and never edits the allowlist.
+
+8. **Report.**
+   ```text
+   Per-account gh identity map recorded in ~/.claude/.team-harness.json:
+     <login> → <dir>   (hosts.yml 0o600, outside worktree)
+   Lanes select gh identity by GH_CONFIG_DIR path; no token stored.
+   ```
 
 ### 3.5. Configure default language
 
@@ -250,7 +291,7 @@ The canonical block (source of truth in `managed-blocks/orchestrator-dispatch-ru
 <!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
-**Foundation — the top-level agent IS the orchestrator.** Team Harness runs on Claude Code's native general-agent architecture: the top-level agent has `Task` and dispatches leaf agents (th:architect, th:implementer, th:tester, th:qa, th:security, th:delivery) DIRECTLY. This is not a mode — it is the CC architecture. No filesystem marker is required. Inline orchestration at top level is PERMITTED at all times; it is the expected and correct behavior. Executing the orchestrator role inline when the agent is itself running as a subagent inside another orchestrator is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED — use the opencode/legacy FALLBACK described below.
+**Foundation — the top-level agent IS th:lider.** Team Harness runs on Claude Code's native general-agent architecture: the top-level session agent is th:lider, the operator's functional coordinator. th:lider handles intake, discover/framing, and spec co-authoring, then spawns a th:orquestador subagent per development task to run the gated execution pipeline (architect → implementer → tester + qa + security → delivery). When the boot capability check in `agents/lider.md` does not pass, th:lider STOPS with a clear error instead of running the pipeline inline — there is no monolith fallback (a silent degradation would mask that the split is not running). This is not a mode — it is the CC architecture; no filesystem marker is required. th:lider spawning th:orquestador is the expected and correct behavior. A th:orquestador spawning another orquestador or a lider, or executing the orquestador's execution role inline when it is itself running as a nested subagent, is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED — use the opencode/legacy FALLBACK described below.
 
 **Development tasks route through the full pipeline.** Route each development task (features, fixes, refactors, enhancements, hotfixes, issue work, review) through the full pipeline (architect → implementer → tester + qa + security → delivery) with quality gates at each stage boundary. Do not skip stages or substitute yourself for a subagent — the pipeline runs in full or stops with a real error.
 
@@ -308,7 +349,7 @@ Use neutral, standard language that reads the same to a reader from any country.
 ### 4f. Configure flow telemetry opt-in
 
 Ask the operator whether to enable cross-user flow telemetry emission. When ON, the
-orchestrator emits metadata-only pipeline friction events (gate failures, guard blocks,
+th:orquestador emits metadata-only pipeline friction events (gate failures, guard blocks,
 iteration loops, etc.) to `context-harness-mcp` via the `record_flow_event` MCP tool for
 cross-fleet observability. Emission is always best-effort and non-blocking — it never affects
 the pipeline outcome. The default is OFF (opt-in, never on by surprise).
@@ -337,7 +378,7 @@ Write `~/.claude/.team-harness.json` with:
 }
 ```
 
-Preserve ALL existing fields (like `files`, `clickup`, `pricing`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, and any other operator-configured key.
+Preserve ALL existing fields (like `files`, `clickup`, `pricing`, `gh_config_dirs`, `nested_lane_capability`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, `gh_config_dirs` (Step 3b), `nested_lane_capability` (Step 6c), and any other operator-configured key.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
@@ -407,6 +448,38 @@ Install python3 now for full skill coverage? [Y/n]
 
 **Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. The deny-floor hooks are unaffected — they run on node regardless of python3 presence; only the python3-dependent skills remain in degraded/unavailable mode.
 
+### 6c. Confirm nested-lane capability (probe_result, version-pinned) — gated
+
+**Optional, gated. Never auto-written by an agent.** Records the operator-confirmed `probe_result` that the boot capability check in `agents/lider.md § Boot capability check` consults before spawning any `th:orquestador`. An agent NEVER fills this on the operator's behalf (AC-9.4) — the operator confirms the evidence artifact first, then explicitly answers the gate below. The confirmation is stored version-pinned to the Claude Code build it was observed on.
+
+**On a targeted run this is reached only via `/th:setup capability`.** Step 6 (MCP verification) does NOT run for this target (it is neither `memory` nor `context7`).
+
+1. **Point the operator at the evidence.** The confirmation source is the **Operator confirmation** section of `tests/evidence/nested-lane-probes.md`. Instruct the operator to review that artifact and fill its Operator-confirmation section (Confirmed by / Date / CC version / M2·M3·M4 results / Overall `probe_result`). This step does NOT write into that artifact — it is operator-owned; no agent writes that section (AC-9.4). The property that must read PASS is **M3 — the gate-messaging round-trip** (the FATAL-constraint probe; `Overall probe_result: PASS` already requires `M3: PASS`).
+2. **Resolve the running CC version.** Run `claude --version` and capture the version string. If it cannot be determined, STOP this step with a one-line note (`CC version could not be resolved — capability not recorded`) and continue to Step 7; never assume a version (the boot check treats an undeterminable version as a FAIL).
+3. **Gate.**
+   ```text
+   Have you reviewed tests/evidence/nested-lane-probes.md and confirmed the
+   nested-lane gate-messaging round-trip (M3) PASSES on Claude Code <version>? [y/N]
+   ```
+   On `n`/Enter (decline) → write nothing, continue to Step 7. Until this reads PASS for the running version, the boot capability check keeps the split gated OFF — a fresh install stops at boot with a clear error (`agents/lider.md § Boot capability check`).
+4. **On `y` (confirm).** Persist a namespaced `nested_lane_capability` object via **merge-write-whole-document** — read the full JSON, replace or add only the `nested_lane_capability` key, write the whole document back, preserving every other key:
+   ```json
+   "nested_lane_capability": {
+     "probe_result": "PASS",
+     "cc_version": "<version from step 2>",
+     "confirmed_at": "<current ISO date>"
+   }
+   ```
+   The operator's explicit `y` is the sole trigger; no agent writes this key on its own (AC-9.4). The boot capability check in `agents/lider.md` reads this namespaced key.
+5. **Version-drift re-confirmation (AC-9.4).** When this step runs and the stored `cc_version` differs from the version resolved in step 2, treat the cached result as INVALID: re-point the operator at the evidence artifact and re-run the gate. On a fresh `y`, rewrite ALL THREE of `probe_result`, `cc_version`, and `confirmed_at` together — never carry a stale confirmation forward. This mirrors the version-invalidation floor the boot check enforces (`agents/lider.md § Boot capability check`, AC-10.3).
+6. **Report.**
+   ```text
+   Nested-lane capability recorded in ~/.claude/.team-harness.json:
+     probe_result  PASS
+     cc_version    <version>
+     confirmed_at  <date>
+   ```
+
 ---
 
 ### 7. Show summary
@@ -422,7 +495,7 @@ Team Harness setup complete.
   Agents:      22 registered
   Skills:      38 available
 
-  Entry point: /th:orchestrator or talk to Claude directly
+  Entry point: talk to Claude directly (th:lider), or invoke a /th: skill
   Reconfigure: /th:setup
 ```
 
@@ -440,7 +513,7 @@ This skill can be run multiple times safely. Each run:
 
 This sub-step is reached ONLY via the argument router when the target concern is `clickup`. It is NOT part of the full no-argument flow.
 
-Configure the ClickUp workspace ID used by the orchestrator for issue linking.
+Configure the ClickUp workspace ID used by th:lider (intake) and th:orquestador (delivery) for issue linking.
 
 1. Read `~/.claude/.team-harness.json`. Show the current `clickup.workspace_id` value (if present) as the default hint.
 2. Prompt: `ClickUp workspace ID (press Enter to keep current value or leave blank to clear):`
