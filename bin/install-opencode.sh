@@ -141,14 +141,14 @@ chmod +x "$TMP/install"
 echo "Launching installer..."
 if [ -n "${MEMORY_MCP_URL:-}" ]; then
     # URL provided — pass it via argv (not via env that shell records in history).
-    if [ -e /dev/tty ]; then
+    if (exec < /dev/tty) 2>/dev/null; then
         "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@" </dev/tty
     else
         "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@"
     fi
 else
     # No URL — install assets only; MCP registration is skipped inside the binary.
-    if [ -e /dev/tty ]; then
+    if (exec < /dev/tty) 2>/dev/null; then
         "$TMP/install" apply --runtime opencode --scope global "$@" </dev/tty
     else
         "$TMP/install" apply --runtime opencode --scope global "$@"
