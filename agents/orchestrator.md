@@ -180,7 +180,8 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | Combined verdict (`reviews/01-plan-review.md`) | — |
 | **STAGE-GATE-1** | **human** | plan + verdict | approve / reject / edit | **MANDATORY STOP** |
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
-| 2.7 — Test Authoring | `tester` (authoring mode) | code + AC from `01-plan.md` | `03-testing.md` (authoring section) | must complete before Phase 3 |
+| 2.3 — Blind Test Authoring | `tester` (author-from-ac mode)† | AC pointer + `sketches/*` + blind worktree path | `03-blind-testing.md` | concurrent with Phase 2 (`parallel-blind`) or before Phase 2 (`serial-blind`); skipped for `impl-aware` |
+| 2.7 — Test Authoring | `tester` (authoring mode, `blind_suite: present\|absent`) | code + AC from `01-plan.md` (+ blind suite when `present`) | `03-testing.md` (authoring or gap-check section) | must complete before Phase 3 |
 | 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md` (verify section), `reviews/04-validation.md`, `reviews/04-security.md` | parallel dispatch over immutable artifact |
 | 3.5 — Acceptance Gate | orchestrator | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
 | 3.75 — Build Verification | orchestrator | build/lint commands | pass/fail | retry implementer once if fail |
@@ -191,7 +192,7 @@ This table is the operational index of the pipeline. It lists every phase, the a
 | 5 — GitHub Update | orchestrator | PR | issue comment + board update | — |
 | 6 — KG Save | orchestrator | pipeline insights | knowledge graph entities | — |
 
-*`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true` (enrich at Phase 1, validate at Phase 3).
+*`security` dispatched only when `security-sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true` (enrich at Phase 1, validate at Phase 3). †Phase 2.3 is feature-flow only (`type: feature | refactor | enhancement`); it does not run for `type: fix | hotfix` — see `## Phase 2.3 — Blind Test Authoring`.
 
 **On-demand reading:** each phase has a detailed section further in this document. When you reach a phase, read its section before dispatching. Use these approximate offsets (may shift after edits — use Grep for the section header if offset is stale):
 - Phase 0a (Intake): search the `Phase 0a` heading
@@ -489,6 +490,7 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 | `architect` | 1 (root-cause mode) | `01-root-cause.md` AND `01-plan.md` |
 | `architect` | 1 (docs-flow research mode) | `research/00-research.md` |
 | `implementer` | 2 | `02-implementation.md` |
+| `tester` | 2.3 (author-from-ac mode) | `03-blind-testing.md` |
 | `tester` | 2.7 (authoring mode) | `03-testing.md` |
 | `tester` | 3 (run-only mode) | `03-testing.md` |
 | `tester` | 2.0 (pre-fix regression) | `02-regression-test.md` |
@@ -503,6 +505,8 @@ After every agent dispatch that returns `status: success`, the orchestrator veri
 | `plan-reviewer` | 1.6 | `reviews/01-plan-review.md` (§ Plan Review + Combined verdict) |
 
 **Documentation flow note:** vault pages written by the `documenter` (docs-flow write phase) live in the Obsidian vault, outside `{docs_root}`. Their existence is verified by the DOC-GATE (not by this per-phase table) using a pages-on-disk count check against `pages_created` in `02-documentation.md`.
+
+**Blind test authoring note:** `tester` Phase 2.3 (`author-from-ac`) dispatches only when `blind_test_mode ∈ {parallel-blind, serial-blind}` for a feature-flow task (`## Phase 2.3 — Blind Test Authoring`). When `blind_test_mode: impl-aware` (or the field is absent, or `type: fix | hotfix`), Phase 2.3 is skipped and `03-blind-testing.md` is not an expected artifact for that task.
 
 **Verification mechanic:**
 
@@ -588,7 +592,7 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 ## Current State
 - pipeline_version: 2
 - type: {feature|fix|refactor|hotfix|enhancement|research|spike|docs}
-- phase: {0a|0b|1|1.5|1.6|2.0|2|2.5|3|3.5|3.75|3.6|4|4.5|5|6}
+- phase: {0a|0b|1|1.5|1.6|2.0|2|2.3|2.5|3|3.5|3.75|3.6|4|4.5|5|6}
 - stage: {1|2|3}
 - status: {in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-no-dispatch|blocked-incomplete}
 - iteration: {N}/3
@@ -607,6 +611,9 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - coderabbit_configured: {true|false}          # set at Phase 0a Step 7 from a repo-root file check; consumed by delivery Step 11.4 (a positive rollup signal can still yield `coderabbit: detected` even when this hint is false)
 - bug_tier: {0 | 1 | 2 | 3 | 4 | null}        # set at Phase 0a Step 7 for type: fix | hotfix; null otherwise
 - bug_tier_source: {auto | operator | architect-promote | null}  # how the tier was set; null for non-bug runs
+- blind_test_mode: {parallel-blind | serial-blind | impl-aware | null}  # per-task predicate read from `01-plan.md § Task List` `Blind-authorable:` field at Phase 2 dispatch (feature-flow only — always null for type: fix | hotfix); reflects the task currently dispatching Phase 2.3, mirroring the existing worktree/worktree_branch per-task-context convention. null = field absent / pipeline_version:1 → defaults to impl-aware behaviour (no Phase 2.3 dispatch)
+- blind_worktree: {absolute path | null}       # physical worktree cut from the task's base ref for the parallel-blind tester lane (`docs/worktree-discipline.md` Rule 1); null for serial-blind/impl-aware or when no task in this run used parallel-blind
+- blind_worktree_branch: {branch name | null}  # branch checked out in blind_worktree; null when blind_worktree is null
 - logs_mode: {local|obsidian}              # resolved at boot from manifest; persisted here for recovery
 - events_file: {00-execution-events.jsonl|00-execution-events.md}  # resolved at boot from logs_mode; persisted for recovery
 - docs_root: {full absolute path}          # fully resolved workspaces path for this run — all file refs use this
@@ -651,7 +658,8 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
      Skipping a phase without marking it [x] or [~skipped: reason] is a contract violation.
      Phases 2.0, 2.5, 4.5, and STAGE-GATE-2 are tracked via JSONL events only
      (phase.start/phase.end) and are not top-level checklist rows — they are conditional
-     or inter-task phases. Phase 2.7 is a top-level row (it has an explicit mark instruction). -->
+     or inter-task phases. Phase 2.3 and Phase 2.7 are top-level rows (each has an explicit
+     mark instruction, including the [~skipped: ...] form for Phase 2.3 on impl-aware tasks). -->
 - [ ] 0a — Intake (classify, create workspaces)
 - [ ] 0b — Specify (investigate codebase, build/verify AC)
 - [ ] 1 — Design (architect → 01-plan.md)
@@ -659,7 +667,8 @@ Next action: run `/th:recover` to investigate. Identify which agent produced `st
 - [ ] 1.6 — Plan Review (plan-reviewer audits plan shape)
 - [ ] STAGE-GATE-1 — Human review (mandatory stop)
 - [ ] 2 — Implement (per task)
-- [ ] 2.7 — Test Authoring (tester authoring mode)
+- [ ] 2.3 — Blind Test Authoring (tester author-from-ac mode; concurrent with Phase 2 for parallel-blind, before Phase 2 for serial-blind) [~skipped: blind_test_mode:impl-aware]
+- [ ] 2.7 — Test Authoring / Gap-Check (tester authoring mode; gap-check + integration when a blind suite is present)
 - [ ] 3 — Verify (tester + qa + security in parallel)
 - [ ] 3.5 — Acceptance Gate
 - [ ] 3.75 — Build Verification
@@ -1978,6 +1987,11 @@ The threshold alone never fires the gate, and a `yes` declaration alone never fi
 
 **Reconciling the never-divides invariant (DELIVERABLE vs EXECUTION).** The invariant above governs the DELIVERABLE — the task's plan, commit set, and PR are never autonomously divided by the pipeline. This mechanism governs EXECUTION — the work of implementing an already-approved, already-undivided task MAY fan out into parallel lanes when the gate above fires. A task whose lanes fan out still ships as exactly one plan, one implementation record, one commit set, one PR — the reader downstream of Phase 2 cannot tell the difference. The two axes are complementary, not in tension, mirroring the existing "decomposition vs division" reconciling clause in `agents/ref-special-flows.md § Milestone-Build Flow`. Third-mechanism documentation (distinct from this DAG and from `## Parallel Multi-Project Dispatch`): `docs/parallel-batch-implementation.md § Intra-task lane fan-out` and `agents/ref-special-flows.md § Milestone-Build Flow`.
 
+**Concurrent blind-tester dispatch (`Blind-authorable:` predicate).** Before invoking, read the task's `Blind-authorable:` field from `01-plan.md` § Task List (contract and worktree mechanics: `## Phase 2.3 — Blind Test Authoring`, below):
+- `parallel-blind` → dispatch `implementer` (this phase) and `tester` (mode `author-from-ac`, Phase 2.3) in the SAME Task-tool message — the same in-message concurrency mechanism already used for the Phase 3 tester+qa+security trio and for intra-task lane fan-out above. The blind tester runs in its own worktree cut from the task's base ref; it does not block on or wait for the implementer.
+- `serial-blind` → dispatch `tester` (mode `author-from-ac`, Phase 2.3) FIRST, wait for its `status: success`, then dispatch `implementer` alone — the implementer conforms to the already-authored suite.
+- `impl-aware`, or the field is absent (`pipeline_version: 1`) → dispatch `implementer` alone, exactly as today. Phase 2.3 is marked `[~skipped: blind_test_mode:impl-aware]` in the Phase Checklist; no behaviour change on this path.
+
 **Invoke via Task tool** with context:
 - Feature name for workspaces.
 - workspaces path: {resolved_workspaces_path}
@@ -2032,6 +2046,68 @@ JSONL
 fi
 ```
 > **Note (obsidian mode):** When `{events_file}` is `00-execution-events.md`, use the `events_content` extraction pattern before the `python3` idempotency check (see `## Content extraction for dual-format events file`).
+
+## Phase 2.3 — Blind Test Authoring
+
+**Agent:** `tester` (mode: `author-from-ac`) — dispatched concurrently with `implementer` (Phase 2) for `parallel-blind` tasks; before `implementer` for `serial-blind` tasks; skipped for `impl-aware` tasks and for legacy runs.
+
+**Feature-flow only.** This phase applies to `type: feature | refactor | enhancement`. It never runs for `type: fix | hotfix` — the bug-flow's generator/evaluator separation is already covered by Phase 2.0 (pre-fix regression test); Phase 2.0 and the bug-flow's Phase 2.7 are unaffected by this section (`agents/ref-special-flows.md § Phase structure (type: fix)`).
+
+**Purpose:** produce an acceptance suite derived from the task's AC and Stage-1 sketches, authored by a tester who cannot see the implementation. A self-consistent, implementation-aware suite hides exactly the class of bug the acceptance signal exists to catch — the tester in this phase never reads code written for this task.
+
+### The 3-way predicate (`Blind-authorable:`)
+
+Each task in `01-plan.md` § Task List declares `Blind-authorable: parallel-blind | serial-blind | impl-aware`. Read this field at the start of Phase 2 dispatch, per task:
+
+| Value | Dispatch shape |
+|---|---|
+| `parallel-blind` | `tester` (author-from-ac) dispatched in the SAME Task-tool message as `implementer` (Phase 2), in a physical worktree cut from the task's base ref — the implementation does not exist in that tree. |
+| `serial-blind` | `tester` (author-from-ac) dispatched BEFORE `implementer` — no separate worktree needed (the implementation genuinely does not exist yet when the tester authors); the implementer then conforms to the authored tests. |
+| `impl-aware` | Phase 2.3 is skipped for this task. Phase 2.7 authors the AC tests post-implementation exactly as before — a documented limitation for this task, not a regression. |
+
+**Field absent / `pipeline_version: 1`:** default to `impl-aware` behaviour (backward-compatible — Phase 2.3 does not dispatch).
+
+**Never a silent skip.** Whichever branch fires, write `blind_test_mode` to `00-state.md § Current State` and emit `phase.start`/`phase.end` events with `phase: "2.3"` and the resolved mode — including when the mode is `impl-aware` (the event still fires, with `status: "skipped"` and `extra: {"reason": "impl-aware"}`).
+
+### Blind worktree (`parallel-blind` only)
+
+Cut a physical worktree from the task's declared base ref, following `docs/worktree-discipline.md` Rule 1 (fetch the base ref first, `git worktree add -b {branch} {path} {base ref}`) and Rule 2 (no silent reuse). This worktree holds the task's source tree at the base ref — the implementer's changes never land in it. Record `blind_worktree` (path) and `blind_worktree_branch` (branch name) in `00-state.md`. Tear down per Rule 4 once the blind test files are integrated into the implementer's branch at Phase 2.7 (integration copies the authored test files across trees — it does not merge the blind worktree itself).
+
+### Dispatch payload — blindness contract (mandatory exclusion clause)
+
+The Task-tool dispatch for `tester` (author-from-ac) carries ONLY:
+- A pointer to this task's Acceptance Criteria block in `01-plan.md` § Task List (not the whole plan).
+- `sketches/*` for this task (Stage-1 interface sketches — the contract the blind tester derives expected values from).
+- The blind worktree path (`parallel-blind`) or the shared worktree path (`serial-blind` — the implementer has not started yet, so no separate tree is needed).
+- Repo test conventions (namespace, runner, naming) — the same convention context every tester dispatch receives.
+
+**Explicit exclusion clause (include verbatim in the dispatch prompt):** "You must NOT read `02-implementation.md`, the implementation diff, any implementer status block, or `00-verify-packet.md`. Derive every expected value from the AC and the sketches — never from code. If none of these excluded artifacts exist yet in your worktree (the common `parallel-blind` case), that is expected and correct — do not search for them elsewhere."
+
+**Output:** `03-blind-testing.md` — AC→test map, `blind_test_mode`, and confirmation that all authored tests pass against the contract-only fixtures/stubs the tester builds, never against implementation code (which does not exist in the `parallel-blind` tree).
+
+### Namespace (dedup by layer-owner)
+
+The blind suite lives in the repo's acceptance-test namespace (convention declared in the plan; default `tests/acceptance/` or `*.acceptance.test.*`) — separate from the implementer's internal unit-test namespace. No path collision by construction: the blind suite owns AC coverage, unit tests own white-box design/regression checks, and neither layer re-authors the other's tests.
+
+### Concurrency bound
+
+One `tester` (author-from-ac) lane per task-in-flight, deterministic — never a fan-out. This does NOT count against `GLOBAL_ROUND_CONCURRENCY_CAP` (which governs `implementer` subagents only), but it IS bounded by round size: a Stage-2 round with N parallel DAG tasks dispatches at most N concurrent blind-tester lanes (one per `parallel-blind`/`serial-blind` task in that round), never more. Consistent with KG `bounded-self-looping-fanout-cost-bound` — the cost ceiling is rounds, not lane count.
+
+**Emit events:**
+```json
+{"ts":"…","event":"phase.start","phase":"2.3","feature":"{feature}","extra":{"task":"Task-{N}","blind_test_mode":"{mode}"}}
+{"ts":"…","event":"phase.end","phase":"2.3","feature":"{feature}","status":"{success|skipped|failed}","extra":{"task":"Task-{N}","blind_test_mode":"{mode}"}}
+```
+
+**Gate (status-block):** Read the `tester` status block.
+- `parallel-blind`: wait for BOTH `implementer` (Phase 2) and `tester` (Phase 2.3) to return before proceeding — the two dispatches share one Task-tool message but the gate resolves only once both status blocks are in.
+- `serial-blind`: `tester` (Phase 2.3) must return `status: success` BEFORE `implementer` (Phase 2) is dispatched — the implementer conforms to the already-authored suite.
+- `impl-aware`: no gate — Phase 2.3 is marked `[~skipped: blind_test_mode:impl-aware]` and Phase 2 proceeds alone.
+- If `tester` returns `status: failed` → route back to `tester` (counts against max-3 budget); do not proceed to Phase 2.7 for that task until Phase 2.3 succeeds.
+
+**Phase Checklist:** Mark `[x] 2.3 — Blind Test Authoring` (or `[~skipped: blind_test_mode:impl-aware]`) before Phase 2.7 opens for that task.
+
+---
 
 ### Phase 2.5 — Constraint Reconciliation (between Phase 2 and Phase 3)
 
@@ -2091,20 +2167,35 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 ## Phase 2.7 — Test Authoring (pre-verify, Stage 2)
 
-**Agent:** `tester` (mode: `authoring`) — **runs BEFORE the Phase 3 parallel block**
+**Agent:** `tester` (mode: `authoring`, parameterized `blind_suite: present | absent`) — **runs BEFORE the Phase 3 parallel block**
 
 **Purpose:** Produce the frozen AC-test artifact before the parallel verify block opens. Once Phase 2.7 completes, `qa`, `tester` (run-only), and `security` operate on a stable, immutable working tree. This eliminates the race condition where `qa` reads the tree while `tester` is still writing test files.
 
-**When to run:** After Phase 2.5 (Constraint Reconciliation) and the Phase 2-close scope check complete. Before launching Phase 3. Applies to all pipeline types (`feature`, `refactor`, `enhancement`, `fix`, `hotfix`).
+**`blind_suite` parameter.** Set `blind_suite: present` when Phase 2.3 ran for this task (`blind_test_mode ∈ {parallel-blind, serial-blind}`) and returned `status: success`. Set `blind_suite: absent` for `impl-aware` tasks, legacy runs (`pipeline_version: 1` or the field absent), and the bug-flow (`type: fix | hotfix` never dispatches Phase 2.3 — feature-flow only; `agents/ref-special-flows.md § Phase structure (type: fix)` is unaffected).
+
+**When `blind_suite: present` — gap-check + integration (feature-flow, `parallel-blind` / `serial-blind`):**
+1. **Integrate** the blind suite's test files into the implementer's branch. For `parallel-blind`, copy the authored test files from `blind_worktree` into the task's active worktree/branch — the blind worktree itself is never merged, only its test files cross over. For `serial-blind`, the tests are already on the branch (the tester authored them there before the implementer ran).
+2. **Verify AC coverage** — cross-reference the AC→test map in `03-blind-testing.md` against `01-plan.md` § Task List: every AC in this task must map to ≥1 blind test. An AC with no blind-test coverage is a **finding**, routed back to `tester` (Phase 2.3, `author-from-ac`) to close the gap — it is NEVER silently filled by authoring a replacement test in Phase 2.7 itself.
+3. **Add gap tests ONLY** — tests for edges the implementation revealed that the blind suite (authored without seeing the implementation) could not have anticipated. Phase 2.7 in this mode NEVER re-authors or replaces an AC test.
+4. **Run the integrated suite once**, confirm all tests pass (blind suite + gap additions) and no regressions.
+5. **Write `03-testing.md`** — same file, same schema as the `blind_suite: absent` path (packet-coherence invariant, below): AC→test map (sourced from the integrated blind suite, gap tests annotated separately), suite result, `suite_still_passing: true`.
+
+**When `blind_suite: absent` — authoring (unchanged behaviour):** for `impl-aware` tasks and the bug-flow, Phase 2.7 authors the full AC-test suite post-implementation exactly as before this feature.
+
+**When to run:** After Phase 2.5 (Constraint Reconciliation) and the Phase 2-close scope check complete. Before launching Phase 3. Applies to all pipeline types (`feature`, `refactor`, `enhancement`, `fix`, `hotfix`); `blind_suite` is always `absent` for `fix`/`hotfix`.
 
 **Dispatch via Task tool:**
-- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-task AC block)** — the tester must map each AC to at least one test and run the suite once to confirm all authored tests pass. Reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
-- Instruction: "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this task. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)." When `frontend_scope: true`, append to the instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
+- `tester` in `authoring` mode: feature name, workspaces path, list of files created/modified (from implementer's status block), **acceptance criteria from `01-plan.md` § Task List (per-task AC block)**, `blind_suite: present|absent` — and, when `present`, the path to `03-blind-testing.md` plus the blind worktree/branch to integrate from. Reference to `00-knowledge-context.md` if it exists. When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
+- Instruction (`blind_suite: absent`): "You are in authoring mode (Phase 2.7, Stage 2). Write the AC tests for this task. Map each AC to at least one test. Run the suite once to confirm the new tests pass and no existing tests regress. Do NOT validate AC verdicts — that is qa's responsibility in Phase 3. Scope: test files only. Output your summary to `03-testing.md` (authoring section)." When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
+- Instruction (`blind_suite: present`): "You are in gap-check mode (Phase 2.7, Stage 2, blind_suite: present). Integrate the blind suite from `03-blind-testing.md` into this branch. Verify every AC maps to ≥1 blind test — report any uncovered AC as a finding, do NOT author a replacement test for it yourself. Add tests ONLY for implementation-revealed edges the blind suite could not have anticipated. NEVER re-author or edit an AC test authored in Phase 2.3. Run the integrated suite once, confirm all tests pass. Output your summary to `03-testing.md` (gap-check section)." When `frontend_scope: true` is present in `00-state.md`, pass `frontend_scope: true` in the dispatch payload.
+- When `frontend_scope: true`, append to either instruction above: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
 
-**Scope constraint (security advisory):** The `authoring` mode must not become a seam to touch production code. The tester writes and edits test files exclusively — the same "test files only" invariant that governs all other tester modes.
+**Scope constraint (security advisory):** The `authoring` mode must not become a seam to touch production code. The tester writes and edits test files exclusively — the same "test files only" invariant that governs all other tester modes. This holds identically in gap-check mode: the tester integrates and adds test files only, never production code.
+
+**Uncovered-AC routing (`blind_suite: present` only).** If Phase 2.7 reports 1+ AC with no blind-test coverage, route back to `tester` (Phase 2.3, `author-from-ac`) with the uncovered AC identifiers before re-running the gap-check. This counts as an iteration (max-3 budget). Never proceed to Phase 3 with an AC that has zero test coverage.
 
 **Gate (status-block):** Read the `tester` status block only.
-- If `status: success` → proceed to Phase 3. The working tree now has a complete, stable AC-test artifact.
+- If `status: success` → proceed to Phase 3. The working tree now has a complete, stable AC-test artifact (blind + gap, or fully authored, depending on `blind_suite`).
 - If `status: failed` → read `failure-brief.md` and route back to tester (counts against max-3 budget). Do NOT launch Phase 3 until authoring succeeds.
 
 **A1-F3 — Browser readiness check (runs before Phase 3, non-blocking on the authoring success path):** When the tester's authoring status block reports `warranted_types` containing `e2e` or `browser-mode` AND its findings propose missing tooling or binaries (e.g. Playwright executables not installed), surface the proposed setup commands (e.g. `npx playwright install`, dependency adds) to the operator at this gate BEFORE launching Phase 3. Do NOT proceed silently — runtime failures in Phase 3 are harder to diagnose than a pre-flight prompt here. Present as: "Browser-real tests were authored but require browser/binary setup. Proposed commands: `{commands}`. Run these in the target repo, then confirm to proceed to Phase 3." Phase 3 does not launch until the operator confirms (or declines and accepts that browser suites will be skipped at runtime).
@@ -2115,14 +2206,14 @@ If no annotations were found, log a single `phase.end` with `extra.trivial: 0, .
 
 Note: a frontend repo with zero browser-real types is legitimately jsdom-only when all AC are pure-logic or unit-level (no browser-API/interaction mismatch in the decision log). Do NOT emit the note in that case.
 
-**Verification packet build (mandatory before Phase 3 dispatch).** After the tester's authoring status block returns `status: success` (and after the A1-F3/A1-F4 checks above), write `{docs_root}/00-verify-packet.md` — the shared entry point every Stage-2 verifier reads first. Canonical schema, size cap, and rebuild rules: `docs/verification-packet.md`. Contents in order: header (`feature`, `Task identifier`, `Built:` timestamp, `Packet version: 1`, `Tree anchor:` from `git rev-parse HEAD` [+ dirty-diff hash], `Base ref:` the task's recorded base); scope flags from `00-state.md`; a changed-files table + `git diff --stat`; the implementer's summary with verbatim `Deviations from Architecture` and surviving `[CONSTRAINT-DISCOVERED]` tags; the Phase 2.7 test artifact (suite result, AC→test map, `regression_test_path` for the bug-fix flow); and full-document pointers as the depth-on-demand escape hatch. The packet carries NO acceptance-criteria section — it is a non-authoritative navigation digest on which no verifier verdict may rest as sole evidence; every AC-baselining verifier live-reads `01-plan.md § Task List` at dispatch time (`docs/verification-packet.md § 4` Step 0). Hard cap ≤120 lines. Overwrite the file in place on every rebuild — never create a `00-verify-packet-v2.md` sibling.
+**Verification packet build (mandatory before Phase 3 dispatch).** After the tester's authoring status block returns `status: success` (and after the A1-F3/A1-F4 checks above), write `{docs_root}/00-verify-packet.md` — the shared entry point every Stage-2 verifier reads first. Canonical schema, size cap, and rebuild rules: `docs/verification-packet.md`. Contents in order: header (`feature`, `Task identifier`, `Built:` timestamp, `Packet version: 1`, `Tree anchor:` from `git rev-parse HEAD` [+ dirty-diff hash], `Base ref:` the task's recorded base); scope flags from `00-state.md`; a changed-files table + `git diff --stat`; the implementer's summary with verbatim `Deviations from Architecture` and surviving `[CONSTRAINT-DISCOVERED]` tags; the Phase 2.7 test artifact (suite result, AC→test map — sourced from the integrated blind suite when `blind_suite: present`, or fully Phase-2.7-authored when `absent` — plus `regression_test_path` for the bug-fix flow); and full-document pointers as the depth-on-demand escape hatch. The packet carries NO acceptance-criteria section — it is a non-authoritative navigation digest on which no verifier verdict may rest as sole evidence; every AC-baselining verifier live-reads `01-plan.md § Task List` at dispatch time (`docs/verification-packet.md § 4` Step 0). Hard cap ≤120 lines. Overwrite the file in place on every rebuild — never create a `00-verify-packet-v2.md` sibling.
 
 **Packet staleness — rebuild triggers (applies for the remainder of the pipeline).** Rebuild `00-verify-packet.md` in place (increment `Packet version`, overwrite) before the next verifier dispatch whenever EITHER of these fire: (1) any iteration re-dispatch (bounded patch or structural, Cases A-D) — rebuild after the producer's patch, before re-running verifiers; (2) non-empty `git diff --name-only` against the packet's tree anchor at dispatch time. There is NO AC-edit rebuild trigger: an AC edit (Phase 2.5 late reconciliation, Case C reword, operator review-surface edit) does not stale the packet because the packet carries no AC — the edit reaches the next verifier through its live `01-plan.md § Task List` read with no orchestrator action required. Full rationale: `docs/verification-packet.md § 6`.
 
 **Emit events:**
 ```json
-{"ts":"…","event":"phase.start","phase":"2.7","feature":"{feature}"}
-{"ts":"…","event":"phase.end","phase":"2.7","feature":"{feature}","status":"{success|failed}"}
+{"ts":"…","event":"phase.start","phase":"2.7","feature":"{feature}","extra":{"blind_suite":"present|absent"}}
+{"ts":"…","event":"phase.end","phase":"2.7","feature":"{feature}","status":"{success|failed}","extra":{"blind_suite":"present|absent"}}
 ```
 
 **Phase Checklist:** Mark `[x] 2.7-test-authoring` on success before launching Phase 3.
@@ -2134,6 +2225,8 @@ Note: a frontend repo with zero browser-real types is legitimately jsdom-only wh
 **Agents:** `tester` (run-only mode) + `qa` (validate mode) + `security` (conditional) — **launched in parallel over an immutable artifact**
 
 **Immutable artifact invariant:** Phase 2.7 has completed before Phase 3 opens. The AC tests already exist. The tester in Phase 3 is run-only: it executes the frozen suite, confirms no regressions, and maps AC to existing tests. It does NOT author new AC tests. `qa` and `security` read the same stable working tree without risk of observing partially-written test files.
+
+**Acceptance signal = intention-derived suite (feature-flow).** For tasks where Phase 2.3 ran (`blind_test_mode ∈ {parallel-blind, serial-blind}`), the frozen suite Phase 3 executes is the blind (intention-derived) suite integrated by Phase 2.7's gap-check — authored from the AC and Stage-1 sketches, never from the implementation. `qa`'s AC-coverage verdict in Phase 3 (validate mode) consumes this integrated suite's result. Implementer-authored unit tests remain a permitted design/regression tool but are explicitly NOT the acceptance signal (`agents/implementer.md § Unit tests are not the acceptance signal`). For `impl-aware` tasks and the bug-flow, the signal remains the Phase-2.7-authored suite exactly as before this feature — a documented limitation for `impl-aware`, not a regression. The recorded-state gate below stays coherent either way: Phase 2.7 (gap-check or authoring) already ran the suite once and recorded `suite_still_passing: true` before Phase 3 opens — this is unchanged by the `blind_suite` parametrization.
 
 **For `type: fix` and `type: hotfix`:** the Phase 3 parallel-dispatch is tier-gated. The "security runs always for bugs" rule from PR #50 is preserved for Tier 3+ — the tier system is what determines whether the bug is Tier 3+. Tier 1 and Tier 2 fixes skip the security agent because the impacted scope is non-functional or non-production code; any fix touching a security-sensitive path auto-promotes to Tier 3 at classification time, so a Tier 1/2 run cannot accidentally bypass security on sensitive paths.
 
