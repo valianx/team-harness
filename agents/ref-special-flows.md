@@ -471,6 +471,8 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | 5 GitHub update | orchestrator | — | Comment with regression test path + Before/After (regression test omitted for Tier 1 skipped) |
 | 6 KG save | orchestrator | — | `process-insight` describes failure mode learned, not feature shipped |
 
+**Feature-flow-only scope note.** The parallel blind test-authoring lane (Phase 2.3, `tester` mode `author-from-ac`) and the Phase 2.7 gap-check conversion (`blind_suite: present`) apply to the feature-flow ONLY (see `agents/orchestrator.md § Phase 2.3 — Blind Test Authoring` and `§ Phase 2.7 — Test Authoring`). The bug-flow table above is unchanged: Phase 2.0 remains the generator/evaluator regression-test authoring (`mode: pre-fix-regression`), and Phase 2.7 remains implementation-aware AC-test authoring (`mode: authoring`, `blind_suite: absent`) exactly as documented in rows 2.0 and 2.7. Bug-flow and hotfix tasks never route through the blind lane or the gap-check semantics.
+
 ### Phase 2.0 — Regression Test Authoring (mandatory, never skipped)
 
 **Why this slots between STAGE-GATE-1 and Phase 2.** The human at STAGE-GATE-1 approves the approach (root-cause + regression-test plan). After approval, the tester writes the failing test. The implementer is dispatched at Phase 2 with a test that is already failing. The contract: "make this test pass without breaking the rest." This is the cleanest test-driven bug-fix pattern.

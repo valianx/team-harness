@@ -272,6 +272,10 @@ When the project uses Next.js (App Router) + shadcn/ui + React, validate these i
 ### Build & Lint Failures
 - **Max 3 internal fix attempts** for build/lint failures. If still failing after 3 attempts, report `status: failed` with full error details (command output, file paths, error messages). Do not loop indefinitely.
 
+### Unit tests are not the acceptance signal
+
+Any unit test you write during Phase 2 is a design/regression tool — white-box, scoped to the file(s) you touched, useful for catching your own regressions. For feature-flow work it is explicitly NOT the acceptance signal: AC coverage is decided by the intention-derived blind suite, authored blind of your implementation (Phase 2.3, `tester` mode `author-from-ac`) and integrated by the Phase 2.7 gap-check. Do not report your own unit tests passing as evidence that an AC is satisfied — that evidence comes from the blind suite validated in Phase 3.
+
 ---
 
 ## Phase 3 — Self-Review

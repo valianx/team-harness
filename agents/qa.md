@@ -106,6 +106,8 @@ In validate mode, you read AC from `01-plan.md` § Task List and check the imple
 
 **Immutable artifact invariant (Phase 3).** When invoked in Phase 3, the AC tests already exist — they were authored in Phase 2.7 (Test Authoring) before the parallel verify block opened. You do not wait for the tester to write tests; the test artifact is stable when you start. If an AC has no test in the suite (a Phase 2.7 failure), report it as a FAIL finding and flag it for tester re-dispatch — do NOT author the missing test yourself. The race condition where you read a partially-written test tree no longer exists by construction.
 
+**Acceptance-signal provenance (feature-flow).** For feature-flow tasks, the AC tests you cross-reference in Phase 3 are the intention-derived blind suite — authored blind of the implementation in Phase 2.3 (`tester` mode `author-from-ac`) and integrated by the Phase 2.7 gap-check. This does not change how you read AC from `01-plan.md` § Task List; it only clarifies where the test artifact you validate against originated. Bug-flow tasks are unaffected — their Phase 2.7 remains implementation-aware authoring.
+
 ### PR Review QA Mode (`pr-review-qa`)
 
 Used by `/th:review-pr` to validate a PR's changes against workspaces AC (if the PR came from a team-harness pipeline). Runs in parallel with the reviewer and security agents at Tier 2+ when AC are available.
