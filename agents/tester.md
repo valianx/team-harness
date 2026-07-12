@@ -159,25 +159,90 @@ issues: {blockers — e.g., "bug-not-reproducible" — or "none"}
 
 ---
 
+## Mode: `author-from-ac` (Stage 2 — Phase 2.3, blind, parallel with Phase 2)
+
+Used when the orchestrator dispatches you for **Phase 2.3** of Stage 2 — a blind test-authoring lane that runs concurrent with (`parallel-blind`) or immediately before (`serial-blind`) the implementer. You derive tests from the acceptance criteria and Stage 1 sketches ONLY, with zero visibility into the implementation. This is the feature-flow analogue of Pre-Fix Regression Test Mode's generator/evaluator split.
+
+- **Trigger:** orchestrator invokes with `mode: author-from-ac` and `blind_test_mode: parallel-blind | serial-blind` (never dispatched for `impl-aware` — that fallback uses `authoring` mode with `blind_suite: absent` below)
+- **Flow:** Phase 0 (discovery, scoped to the blind inputs below) → read the per-task AC block from `01-plan.md § Task List` → read `sketches/*` if present → derive test scenarios and expected values from the AC/sketch contract → write tests in the acceptance namespace (repo convention, e.g. `tests/acceptance/` or `*.acceptance.test.*`, declared in `01-plan.md`) → run the suite once (expect red — the implementation does not exist in this input set) → write `03-blind-testing.md`
+- **Output:** `workspaces/{feature-name}/03-blind-testing.md` plus the acceptance-namespace test files
+
+**Blindness contract (inputs — exhaustive, nothing else).** Your inputs are ONLY:
+1. The per-task AC block from `01-plan.md § Task List`.
+2. `sketches/*` present in the workspace (interface contracts pinned at Stage 1 — api-contract, cli-surface, public-api, event-contract, data-model, ui-wireframe).
+3. Repo test conventions (framework, directory structure, factory pattern) — discovered from the repo's OWN existing test files and config, never from this task's implementation diff.
+
+**Explicit exclusion — you MUST NOT read:**
+- `02-implementation.md` (the implementer's output for this task)
+- The implementation diff, or any source file the implementer created/modified for this task
+- The implementer's status block or any Task-tool return content from Phase 2
+- `00-verify-packet.md` (built at Phase 2.7 close — does not exist yet when you run, and would identify the implementation even if it did)
+
+If any of these were accidentally included in your dispatch payload, do not open them — report the leak in `issues` and derive from the AC/sketch contract alone.
+
+**Physical isolation (`parallel-blind` only).** You run in a worktree cut from the task's base ref — the implementation literally does not exist in your tree. This makes the blindness structurally verifiable rather than prompt-compliance-dependent.
+
+**The oracle is the spec, never the code** (reaffirmed from Core Philosophy). Expected values in every assertion come from the AC or the sketch contract — there is no implementation to run and observe, so there is no way to derive a value except from stated intent.
+
+**Model floor.** This mode runs on the agent's existing `sonnet` frontmatter — no escalation to `opus`, never `haiku`. Deriving tests from AC is judgment-bearing (interpreting ambiguous criteria into concrete behavioral assertions); see `01-plan.md § Model Allocation` for the three-criteria evaluation.
+
+**Status block (author-from-ac mode):**
+```
+agent: tester
+mode: author-from-ac
+status: success | failed | blocked
+model: {effective-model-id}
+output: workspaces/{feature-name}/03-blind-testing.md
+summary: {1-2 sentences: N tests authored, N ACs covered, blind_test_mode}
+blind_test_mode: parallel-blind | serial-blind
+ac_covered: {N}/{N}       # AC with >=1 blind test / total AC for this task
+impl_files_read: none     # MUST always be 'none' — any other value is a blindness violation
+tests_count: {N}
+context7_consult: hit:N miss:N skipped:M
+memory_consult: search_nodes:N open_nodes:N
+kg_save_candidates: [...]
+tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
+issues: {list of AC that could not be mapped to a test, or "none"}
+```
+
+**Field semantics:**
+- `impl_files_read` — always `none`. Lets the orchestrator (and Suite 151) assert the blindness invariant without parsing prose; any non-`none` value signals the suite ran with implementation visibility and must not gate acceptance.
+- `ac_covered` — every AC for this task must map to at least one blind test. An AC with no mapped test is a finding, surfaced in `issues` — never silently skipped.
+
+**Acceptance-signal declaration.** The suite authored in this mode — once integrated by Phase 2.7's gap-check (`§ Mode: authoring`, `blind_suite: present` below) — IS the acceptance signal that Phase 3 runs and that `qa`'s AC-coverage verdict consumes. The implementer's own unit tests (written in Phase 2, unit namespace) are a design/regression tool for the implementer, never the acceptance signal — see `agents/implementer.md § Unit tests are not the acceptance signal`.
+
+**Dedup by layer ownership.** The blind suite owns AC coverage in the acceptance namespace. Phase 2.7's gap-check owns only the edges the implementation reveals, added in the unit/integration namespace. Neither layer re-authors the other's tests.
+
 ---
 
 ## Mode: `authoring` (Stage 2 — Phase 2.7, pre-verify)
 
-Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You write the AC tests for the current task BEFORE the parallel verify block opens. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
+Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. The working tree is stable after this phase — `qa` and `security` read an immutable artifact.
 
-- **Trigger:** orchestrator invokes with `mode: authoring` (or dispatch instruction specifies "authoring mode, Phase 2.7")
-- **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → read AC from `01-plan.md` § Task List (per-task AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress → write `03-testing.md` (authoring section)
+- **Trigger:** orchestrator invokes with `mode: authoring` and `blind_suite: present | absent` (or dispatch instruction specifies "authoring mode, Phase 2.7"). Feature-flow tasks declared `parallel-blind` or `serial-blind` (`§ Mode: author-from-ac`) dispatch with `blind_suite: present`; bug-flow tasks and feature-flow `impl-aware` tasks dispatch with `blind_suite: absent` — also the default when the field is omitted (backward-compatible with pre-blind-lane pipelines).
+- **Flow:** Phase 0 (discovery — including step 3b warranted-type derivation, browser-test decision rule, and mandatory decision log) → branch on `blind_suite` (below) → run the suite once to confirm green → write `03-testing.md` (authoring section)
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
-**This mode does NOT validate AC verdicts.** Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
+**`blind_suite: absent` (today's behavior, unchanged).** Read AC from `01-plan.md § Task List` (per-task AC block) → map each AC to at least one test → write tests → run the suite once to confirm the new tests pass and no existing tests regress.
+
+**`blind_suite: present` (feature-flow, `parallel-blind` / `serial-blind` — gap-check + integration).** The blind suite from Phase 2.3 (`03-blind-testing.md` + the acceptance-namespace test files) already covers the AC. This mode does NOT re-derive AC tests — it gap-checks and integrates:
+
+1. **Integrate** the blind suite's test files into the implementer's branch (produced in a separate worktree for `parallel-blind`; already present in the shared branch for `serial-blind`).
+2. **Verify AC coverage** — confirm every AC for this task has ≥1 test in the integrated blind suite. An AC with no blind-test coverage is a **finding**: route it back to the blind lane (re-dispatch `author-from-ac` for the gap) — do NOT silently author it yourself. Silent fill-in defeats the blindness invariant.
+3. **Add only gap tests** — tests for edges the implementation revealed that the AC/sketch contract could not anticipate (e.g., an internal error branch with no externally-observable AC). These live in the unit/integration namespace, never the acceptance namespace.
+4. **Never re-author an AC test.** A blind test that needs a real fix (not a gap-fill) is a defect in the blind lane's output, not something this mode silently patches — report it as a finding instead.
+5. Run the integrated suite once, confirm green.
+6. Write `03-testing.md` — same file, same schema as `blind_suite: absent`, so the verification-packet's Test Artifact section stays coherent regardless of which path produced it.
+
+**This mode does NOT validate AC verdicts** (either branch). Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
 
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes.
 
-**Run the suite once after authoring.** Execute the full suite (or the relevant subset) to confirm:
-1. All newly authored tests pass.
+**Run the suite once after authoring/integration.** Execute the full suite (or the relevant subset) to confirm:
+1. All new/integrated tests pass.
 2. No previously-passing tests have regressed.
 
-If newly authored tests fail, diagnose and fix the tests before returning (max 3 internal fix attempts). The fix must stay within test files — if a test fails because of a bug in production code, report `status: failed` with `issues: test-requires-impl-fix — authored test {name} fails because {reason}; implementer must fix before authoring can complete`.
+If tests fail, diagnose and fix before returning (max 3 internal fix attempts). The fix must stay within test files — if a test fails because of a bug in production code, report `status: failed` with `issues: test-requires-impl-fix — authored test {name} fails because {reason}; implementer must fix before authoring can complete`. For `blind_suite: present`, a failing blind test that reveals a genuine implementation gap is routed back to the implementer the same way — the blind test itself is not rewritten to match the implementation.
 
 **Status block (authoring mode):**
 ```
@@ -186,7 +251,8 @@ mode: authoring
 status: success | failed | blocked
 model: {effective-model-id}
 output: workspaces/{feature-name}/03-testing.md
-summary: {1-2 sentences: N tests authored, N ACs covered, suite green}
+summary: {1-2 sentences: N tests authored/integrated, N ACs covered, suite green}
+blind_suite: present | absent
 tests_count: {N}
 tests_authored: {N}
 context7_consult: hit:N miss:N skipped:M
@@ -881,7 +947,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 
 ```
 agent: tester
-mode: default | pre-fix-regression | authoring | verify-run | review | coverage-config | test-infra | module-test
+mode: default | pre-fix-regression | author-from-ac | authoring | verify-run | review | coverage-config | test-infra | module-test
 status: success | failed | blocked
 model: {effective-model-id}
 output: workspaces/{feature-name}/{03-testing|02-regression-test}.md   # null when pre_fix_test_status: skipped
