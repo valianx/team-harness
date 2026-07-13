@@ -1,51 +1,39 @@
 #!/bin/bash
 # tests/test_leader_orchestrator_split.sh
-# Structural (spec-derived) regression suite for Task-2 of the
-# nested-orchestrator-lanes plan: "Split orchestrator.md -> leader.md +
-# orchestrator.md".
+# Structural regression suite for the leader/orchestrator split: the combined
+# coordinator+engine role is split into two distinct agents -- leader.md
+# (top-level coordinator) and orchestrator.md (task-scoped engine that reuses
+# the filename but not the old combined role). Assertions reference the
+# single-sourced gate contract (agents/_shared/gate-contract.md) as an
+# interface, never copied content.
 #
-# AUTHORED TEST-FIRST, INDEPENDENT of any implementation: every assertion
-# below is derived only from
-#   - workspaces plan 01-plan.md, Task List -> Task-2 (AC-2.1..AC-2.13)
-#   - research/00-test-plan.md, section A (GBL-*) and B (WS-*)
-#   - agents/_shared/gate-contract.md (Task-1, already merged) as the
-#     REFERENCED interface, never copied content
-# It does NOT read agents/leader.md or agents/orchestrator.md as a source of
-# truth for what to assert -- those files do not exist yet at authoring time.
-#
-# What this suite checks (deterministic-test scenarios only; GBL-2/3/4,
-# WS-1/2/5, MO-*, RD-* are behavioral-scenario/probe and belong to
-# tests/run-behavioral.sh / tests/probe_nested_dispatch.md, not here):
-#   - SPLIT COMPLETENESS: the monolith is split into two distinct agents —
-#     leader.md (coordinator) + orchestrator.md (task-scoped engine, reusing the
-#     filename but NOT the old monolith's combined coordinator+engine role).
-#   - GATE-MEDIATION LEADER (GBL-1, GBL-5, GBL-6, GBL-7; AC-2.1/2.8/2.10/2.11/2.12):
-#     leader.md carries zero dual-record schema tokens (it never records a
-#     release), declares its gate role as present-inline + relay-with-attribution
-#     (leader-relayed-operator), references gate-contract.md for the STOP-block
-#     templates it presents, restricts its write surface to overview.md +
-#     00-leader-roster.md, treats pending_gate as advisory-only, and defines
-#     leader-recover as coarse-phase/status-only.
-#   - PREPARE+RECORD SEAM (AC-2.2/2.5): orchestrator.md references (never copies)
+# What this suite checks (deterministic assertions only; behavioral-scenario and
+# probe cases live in tests/run-behavioral.sh / tests/probe_nested_dispatch.md,
+# not here):
+#   - SPLIT COMPLETENESS: leader.md (coordinator) + orchestrator.md (task-scoped
+#     engine, reusing the filename but NOT the old combined coordinator+engine
+#     role) are two distinct agents.
+#   - GATE-MEDIATION LEADER: leader.md carries zero dual-record schema tokens (it
+#     never records a release), declares its gate role as present-inline +
+#     relay-with-attribution (leader-relayed-operator), references gate-contract.md
+#     for the STOP-block templates it presents, restricts its write surface to
+#     overview.md + 00-leader-roster.md, treats pending_gate as advisory-only, and
+#     defines leader-recover as coarse-phase/status-only.
+#   - PREPARE+RECORD SEAM: orchestrator.md references (never copies)
 #     gate-contract.md, prepares and records all three STAGE-GATEs with the
 #     dual-record tokens present, is sole-writer of its own 00-state.md, accepts
-#     a th:leader-relayed decision ONLY with operator-verbatim + leader-relayed-operator
+#     a leader-relayed decision ONLY with operator-verbatim + leader-relayed-operator
 #     attribution, and rejects a synthesized/unattributed relay.
-#   - LEGIBILITY (AC-2.3): orchestrator dispatches specialists only.
-#   - MODEL ALLOCATION (AC-2.13): leader = opus/xhigh, orchestrator =
-#     sonnet/xhigh.
-#   - CAPABILITY FLOOR (AC-2.6): boot check literal + no-fallback hard STOP.
+#   - LEGIBILITY: orchestrator dispatches specialists only.
+#   - MODEL ALLOCATION: leader = opus/xhigh, orchestrator = sonnet/xhigh.
+#   - CAPABILITY FLOOR: boot check literal + no-fallback hard STOP.
 #
-# Assertions test CONTRACT properties (presence/absence of authority),
-# not exact prose -- a reasonable implementation of the plan passes; only a
-# real deviation (a leader that emits/records a gate, an orchestrator that
-# copies the contract instead of referencing it, a dispatched second
-# orchestrator, a wrong frontmatter model) fails.
-#
-# Every file-scoped assertion FAILS (never silently passes) when its target
-# file does not exist -- this is what keeps the RED state honest: with
-# agents/leader.md and agents/orchestrator.md absent, every assertion in this
-# suite must report "file not found", not a false PASS.
+# Assertions test CONTRACT properties (presence/absence of authority), not exact
+# prose -- a reasonable implementation passes; only a real deviation (a leader
+# that emits/records a gate, an orchestrator that copies the contract instead of
+# referencing it, a dispatched second orchestrator, a wrong frontmatter model)
+# fails. Every file-scoped assertion FAILS (never silently passes) when its
+# target file does not exist.
 #
 # Usage:
 #   ./tests/test_leader_orchestrator_split.sh
@@ -279,8 +267,19 @@ assert_contains "AC-2.12-proc" "$LEADER" 'leader-recover|l.der-recover' \
     "leader.md defines a leader-recover procedure"
 assert_contains "AC-2.12-coarse" "$LEADER" 'coarse' \
     "leader.md scopes leader-recover reads to coarse phase/status fields"
-assert_not_contains "AC-2.12-no-dual" "$LEADER" 'leader-recover.{0,400}(gate1_release|gate2_release_last|gate3_release|stage\.gate\.release)' \
-    "leader.md's leader-recover section never names the dual-record fields"
+# Extract the full leader-recover section (its heading to the next heading or
+# horizontal rule) with awk, then confirm the section names no dual-record
+# field. Section extraction is used instead of a fixed single-line window
+# because grep -E is line-based and '.' never spans a newline -- a field named
+# several lines below the heading would otherwise escape a windowed regex.
+if [ ! -f "$LEADER" ]; then
+    fail "AC-2.12-no-dual" "leader.md's leader-recover section never names the dual-record fields -- file not found: $LEADER"
+elif awk '/^### leader-recover/{f=1; print; next} f && (/^##/ || /^---/){f=0} f' "$LEADER" \
+        | grep -qiE -- 'gate1_release|gate2_release_last|gate3_release|stage\.gate\.release'; then
+    fail "AC-2.12-no-dual" "leader.md's leader-recover section names a dual-record field"
+else
+    pass "AC-2.12-no-dual" "leader.md's leader-recover section never names the dual-record fields"
+fi
 
 # ---------------------------------------------------------------------------
 # Group B — PREPARE+RECORD SEAM inside orchestrator.md (AC-2.2, AC-2.5)

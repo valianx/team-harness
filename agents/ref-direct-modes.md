@@ -231,7 +231,7 @@ The `/review-pr` skill handles ALL Bash (fetching PR metadata, git diff, etc.) a
 
 **No-publish invariant:** the reviewer NEVER calls any GitHub API write endpoint. In all submodes (fresh, update-body, reply, internal), the reviewer returns a draft inline in its status block. The leader writes the draft to a file and returns control to the skill. Publishing is the sole responsibility of the execution site that receives operator approval — one of three sites:
 - **Skill Phase 4 / Phase 5** (`skills/review-pr/SKILL.md`): the decision menu is the preview gate; Phase 5 does the atomic `POST /reviews`.
-- **Orchestrator direct-mode path**: presents the draft and waits for operator OK before calling any write verb.
+- **Leader direct-mode path**: the leader (the top-level agent) owns the operator-facing preview, relay, and GitHub publication in this direct mode — it presents the draft and waits for explicit operator OK before any write verb is called.
 - **Takeover/inline path** (top-level Claude after Task-strip): same requirement — present the draft and wait before calling any write verb. This is the least-supervised path and the highest-risk gap if the gate is absent.
 
 The `### Publish Gate (preview-and-confirm)` section below defines the full contract binding all three sites.
@@ -322,14 +322,14 @@ NEVER write to source files, configuration files, or any other path in the worki
 
 Scope: the `review` direct mode over the operator's active repo only.
 
-The leader captures the working-tree state BEFORE invoking the reviewer:
+The `/review-pr` skill — which owns all Bash — captures the working-tree state BEFORE the reviewer runs and passes the pre-review snapshot to the leader:
 
 ```bash
 git status --untracked-files=all
 git diff HEAD
 ```
 
-After the review completes, the leader re-verifies using the same commands. The tree is considered clean if it is byte-identical to the pre-review state EXCEPT for the allowlisted draft zone `.claude/pr-review-*`.
+After the review completes, `/review-pr` re-runs the same commands and passes the post-review snapshot to the leader, which compares the two. The tree is considered clean if the post-review snapshot is byte-identical to the pre-review one EXCEPT for the allowlisted draft zone `.claude/pr-review-*`.
 
 Verification uses `git status --untracked-files=all` (not plain `git status`) to capture new untracked files outside the allowlisted zone — those would not appear in `git diff HEAD` and would otherwise be silently missed.
 
@@ -364,9 +364,9 @@ The review output is still returned to the operator, but the defect report is pr
 
 ### Layer 5 — Branch-author guard
 
-**Purpose (closes #251 another-author-branch):** Before ANY edit/commit/push on a PR branch, the leader resolves two identities and fails closed if either is indeterminate.
+**Purpose (closes #251 another-author-branch):** Before ANY edit/commit/push on a PR branch, two identities must be resolved. `/review-pr` — which owns all Bash — runs the resolution commands and passes the two resolved logins to the leader, which fails closed if either is indeterminate.
 
-**Identity resolution (fail-closed by design — CWE-697):**
+**Identity resolution (fail-closed by design — CWE-697) — `/review-pr` runs these and passes the resolved logins to the leader:**
 - Author of the PR: `gh pr view {N} --json author --jq '.author.login'`
 - Identity of the operator: `gh api user --jq '.login'`
 

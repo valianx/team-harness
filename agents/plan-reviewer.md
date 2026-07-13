@@ -63,7 +63,7 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 1. **Glob `workspaces/{feature-name}/`** — confirm the folder exists. If it doesn't, return `status: blocked` immediately with `issues: workspaces not found`.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default. This resolved path — the override when one was provided, `workspaces/{feature-name}/` ONLY as the fallback when none was — is the base for EVERY read, write, and returned path in this file (the `01-plan.md`/`01-root-cause.md` reads, the `reviews/01-plan-review.md` output, the `01-plan.md` attestation line, event-file inspection, and the `output:` path in the status block). The `workspaces/{feature-name}/` notation used throughout below is shorthand for that resolved path.
 
 2. **Determine the design doc filename from the `type` field** in the task payload (sourced from `00-state.md`):
    - `type: feature | refactor | enhancement` → design doc is `01-plan.md`.
@@ -73,7 +73,7 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 3. **Read these files in this order:**
    - `01-plan.md` — for the full plan: `## Review Summary` (spec, original description, and feature ACs — used by Rule 5 service-identity), `## Architecture` (including `### Services Touched` and `### Work Plan`), and `## Task List` (task list with `Service:`, `Files:`, `Acceptance Criteria:` fields, plus the `### Delivery Grouping` block carrying `Base:`/`Split reason:`). **For `type: fix`, also read `01-root-cause.md` for the `## Regression Test Approach` section (Rule 7) and `## Bug Location` / `## Scope of Fix` sections.** **For `type: fix` / `type: hotfix`, cross-check the regression-test AC reference in `01-plan.md` (§ Task List) per Rule 8.**
 
-4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `02-regression-test.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), not against `02-regression-test.md` itself (which does not yet exist at Phase 1.6).
+4. **Do NOT read** `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `02-implementation.md`, `03-testing.md`, `reviews/04-validation.md`, source code, or any other file. Plan-shape rules are policy on the files above; reading more is wasted work. `02-regression-test.md` is off-limits too, with ONE narrow exception: **Rule 8 may read `02-regression-test.md` ONLY when the task provides a concrete regression-test path** (the test already exists — a re-review or patch-mode pass after Phase 2.0, and the file is present). At the initial Phase 1.6 pass it does not yet exist, so Rule 8 cross-checks against the regression-test AC text in `01-plan.md` (§ Task List), never against `02-regression-test.md`. Keep it prohibited whenever no concrete regression-test path is supplied.
 
 5. **Do NOT write to** any workspace doc except `reviews/01-plan-review.md`, plus the single `**Reviews:**` attestation line in `01-plan.md`'s title block (see Critical Rules).
 
@@ -286,7 +286,7 @@ When `spec_seed_dissents: false` or the field is absent from the task payload: n
 
 **What to check (`type: fix`):**
 
-1. The design doc for bug-fix is `01-root-cause.md` (not `01-plan.md`). The plan-reviewer reads `01-root-cause.md` instead of `01-plan.md` when `type: fix`.
+1. The design doc for bug-fix is `01-root-cause.md` (not `01-plan.md`). The plan-reviewer reads `01-root-cause.md` **in addition to** `01-plan.md` when `type: fix` — `01-root-cause.md` is the design doc Rule 7 audits, while `01-plan.md` (§ Task List) is still read for Rule 8's regression-test cross-reference and the shape rules.
 2. `01-root-cause.md` MUST contain a `## Regression Test Approach` section with three required sub-fields:
    - `Test layer:` — value MUST be one of `unit | integration | e2e`. **The legacy `manual-repro-script` value is rejected per operator override; if present, this is a Rule 7 fail finding with reason "manual-repro-script fallback rejected — operator override mandates regression test always."**
    - `Test scaffold:` — non-empty description of fixtures, mocks, or environment needed.

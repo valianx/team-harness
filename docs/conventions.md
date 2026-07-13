@@ -19,7 +19,7 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 | `01-plan.md` | operator-facing | Intrinsic plan schema (`## Review Summary` first, `## Architecture`, `## Task List`); consolidated, ordered, final state before implementation (`## Review Summary` is the plan's own operator summary — not reviewer output) | architect (content); see write-scope table in `agents/_shared/plan-consolidation.md` |
 | `sketches/*` | operator-facing | `docs/plan-sketches.md` manifest (unchanged) | architect |
 | `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
-| `overview.md` (initiative) | operator-facing | `leader.md § overview.md Template` (unchanged) | leader / delivery |
+| `overview.md` (initiative) | operator-facing | `leader.md § overview.md Template` (unchanged) | leader (sole writer; `delivery` only RETURNS per-project completion-row data, the leader reconciles and writes it) |
 | `reviews/01-plan-review.md` | agentic | Fixed skeleton of anchored sections; no `## Review Summary`/`## Technical Detail` split; minimal prose, tables and labels | panel (single-writer-per-section) |
 | `reviews/04-*.md`, `reviews/01-ux-review.md` | agentic | Each agent's current fixed structure; no two-tier obligation. The Spanish-language contract for security/reviewer bodies is unchanged — language is orthogonal to format | qa / security / adversary / reviewer / ux-reviewer / acceptance-checker |
 | `02-implementation.md`, `03-testing.md`, `02-regression-test.md`, `02-documentation.md`, `02-gcp-infra.md` | agentic | Each agent's current fixed structure; no two-tier obligation | implementer / tester / documenter / gcp-infra |

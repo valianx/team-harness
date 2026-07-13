@@ -484,6 +484,24 @@ KG writes (all sites): N attempted, M succeeded{breakdown}
      and fall back to printing the `## Cost` section of `00-pipeline-summary.md`
      (if it exists).
 
+6. **Initiative-level cost rollup (reader-only) — reachable during `--cost`.**
+   After rendering the per-feature table, read the feature's `00-state.md`. When
+   it declares `initiative: {name}`, resolve the initiative-level
+   `00-execution-events` trace at the initiative root — detect the `.md` variant
+   first (Glob), then `.jsonl`, applying the same fence-extraction used by every
+   other mode (source paths and derivation in "Parallel region rendering
+   (fan-out)" below). Filter to `fanout.*` events; when a
+   `fanout.start`/`fanout.converge` pair is present, sum token counts across all
+   lanes' own `{project}/00-execution-events.*` files (each lane keeps its full
+   per-phase trace) to produce one initiative-level cost figure, appended below
+   the per-feature cost table with the header
+   `Initiative cost rollup — {initiative}`. This is a pure read of each lane's
+   OWN events file — it never writes to any lane's events file or `00-state.md`
+   and never touches the gate seam.
+   **Fail-soft:** no `initiative` field, no initiative-level events file, no
+   `fanout.*` events, or a read/parse error → omit the rollup silently; the
+   per-feature cost output is unaffected.
+
 ---
 
 ## Parallel region rendering (fan-out)
@@ -517,7 +535,7 @@ fanout.converge  {ts | "(not yet — region still open)"}
 
 Lanes render side-by-side in `eligible_projects[]` order (not start-time order), so the same project always occupies the same row across repeated invocations while a region is open.
 
-**`--cost` interaction (reader-only rollup).** When a `fanout.start`/`fanout.converge` pair is present, `--cost` sums token counts across all lanes' own `{project}/00-execution-events.*` files (each lane keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`. This is a pure read of each lane's OWN events file — the same reader-only aggregation the leader performs (`docs/observability.md § Reader-only initiative rollup`); it never writes to any lane's events file or `00-state.md` and never touches the gate seam.
+**`--cost` interaction (reader-only rollup).** Executed by `--cost` mode step 6 above — the initiative-level trace is resolved during `--cost` execution, not only default-mode rendering. When a `fanout.start`/`fanout.converge` pair is present, `--cost` sums token counts across all lanes' own `{project}/00-execution-events.*` files (each lane keeps its full per-phase trace) to produce one initiative-level cost figure, appended below the per-feature cost table with the header `Initiative cost rollup — {initiative}`. This is a pure read of each lane's OWN events file — the same reader-only aggregation the leader performs (`docs/observability.md § Reader-only initiative rollup`); it never writes to any lane's events file or `00-state.md` and never touches the gate seam.
 
 **Fail-soft.** No `initiative` field, no initiative-level events file, no `fanout.*` events, or a read/parse error → omit this section silently. It never blocks or degrades any other mode.
 
