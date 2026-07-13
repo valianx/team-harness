@@ -8,7 +8,7 @@ This document describes the end-to-end integration between **team-harness** (the
 
 **team-harness** is a Claude Code plugin that turns the chat into a Spec-Driven Development pipeline. It dispatches specialized subagents (architect, implementer, tester, qa, security, delivery) that coordinate across three mandatory stages. Between pipeline runs, agents need a place to store and retrieve technical memory — patterns discovered, errors fixed, architectural decisions made.
 
-**context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools that the orchestrator and delivery agent call on a running pipeline's behalf.
+**context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools that the leader (discovery-time reads), the orchestrator, and the delivery agent call on a running pipeline's behalf.
 
 The seam between the two products is a single HTTP endpoint and a `mcpServers.memory` entry in `~/.claude.json`. Nothing else crosses the boundary at runtime.
 
@@ -17,6 +17,7 @@ Claude Code
     │
     └── team-harness plugin
             │
+            ├── leader (discovery-time KG session open + prior-art read)
             ├── orchestrator (Phase 6 knowledge-save + security-finding writes)
             ├── delivery agent (Step 11.5 passive capture)
             └── any agent reading the KG (search_nodes, open_nodes, read_graph)
@@ -161,7 +162,7 @@ The trace output includes `kg_write` events with `attempted` / `succeeded` count
 @th:leader give me the work plan for this task: <your task description>
 ```
 
-The first pipeline run exercises the full integration: the orchestrator reads the KG at Phase 6 (if any relevant prior art exists), and writes at Phase 6 after delivery.
+The first pipeline run exercises the full integration: the leader reads relevant KG prior art during discovery, and the orchestrator writes reusable learning at Phase 6 after delivery.
 
 ---
 

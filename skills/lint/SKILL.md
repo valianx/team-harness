@@ -188,10 +188,10 @@ Canonical matrix (must match exactly):
 | `leader` | opus | xhigh |
 | `orchestrator` | sonnet | xhigh |
 | `architect` | opus | high |
-| `agent-builder` | opus | max |
-| `security` | opus | max |
-| `adversary` | opus | max |
-| `reviewer` | opus | max |
+| `agent-builder` | opus | xhigh |
+| `security` | opus | xhigh |
+| `adversary` | sonnet | xhigh |
+| `reviewer` | sonnet | xhigh |
 | `qa` | sonnet | high |
 | `qa-plan` | opus | high |
 | `gcp-cost-analyzer` | opus | high |

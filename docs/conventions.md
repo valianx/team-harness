@@ -34,7 +34,7 @@ Consequence: the old universal mandate ("every workspace doc gets `## Review Sum
 Two output modes are available, controlled by `logs-mode` in `~/.claude/.team-harness.json`:
 
 - **local** (default) — writes to `./workspaces/{feature-name}/` in the repo working tree.
-- **obsidian** — writes to the configured Obsidian vault at `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`. The orchestrator resolves the base path once at pipeline start and passes it to every subagent. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent) to every workspace doc.
+- **obsidian** — writes to the configured Obsidian vault at `{logs-path}/{logs-subfolder}/{repo-name}/{date}_{feature}/`. The leader resolves configuration and the base path once, then passes `docs_root` to each orchestrator, which forwards it to every subagent it dispatches. Obsidian mode adds YAML frontmatter (repo, feature, pipeline, date, agent) to every workspace Markdown doc.
 
 The operator switches modes via `/th:setup` or a session override in `00-state.md`.
 

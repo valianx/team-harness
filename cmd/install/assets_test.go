@@ -15,7 +15,7 @@ import (
 // Note: agents/_shared/ contains cross-cutting snippets (not invocable agents)
 // and is intentionally excluded from the count.
 func TestEmbeddedAssets_AgentCount(t *testing.T) {
-	const wantAgents = 28 // orchestrator split into leader + orchestrator; embed-count integrity check, not a lowCostMatrix/model-allocation change
+	const wantAgents = 28 // expected count of invocable top-level agent .md files; canary against a silent embed regression
 	embedded := EmbeddedAssets()
 
 	var mdFiles []string
@@ -91,7 +91,7 @@ func TestEmbeddedAssets_SharedSnippets(t *testing.T) {
 // added to the repo but the embed directive is still pointing at the old directory.
 func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 	roster := []string{
-		"acceptance-checker", "agent-builder", "architect", "code-researcher",
+		"acceptance-checker", "adversary", "agent-builder", "architect", "code-researcher",
 		"d2-diagrammer", "delivery", "diagrammer", "documenter", "gcp-cost-analyzer",
 		"gcp-infra", "implementer", "init", "leader", "likec4-diagrammer", "mentor",
 		"orchestrator", "plan-reviewer", "qa", "qa-plan", "research-consolidator",

@@ -163,7 +163,7 @@ All commands run from the repo root.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Plan-review panel centralization** — worst-of verdict; panel writes `reviews/01-plan-review.md`. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
-- **Orchestrator disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the leader; outward actions gated by `dev-guard`, which fires unconditionally and gates by destination (non-default branch push to origin → allow, else ask). See `docs/dev-mode.md`.
+- **Leader disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the leader; outward actions gated by `dev-guard`, which fires unconditionally and gates by destination (non-default branch push to origin → allow, else ask). See `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.
 - **Obsidian-mode diagram embed.** D2/LikeC4 render to vault + `![[…]]` embed in `05-diagram.md`. See `docs/conventions.md`.
 - **Milestone standard.** milestones = commits, NOT PRs; a single task is never split across delivery groups; default `Delivery Grouping` is `all-tasks-one-pr` (same-repo batch consolidates into ONE PR). See `agents/ref-special-flows.md § Milestone-Build Flow`.
