@@ -17,9 +17,9 @@ Both mechanisms are bidirectional: the developer catches over-engineering; the a
 
 ## 2. Spec co-authoring — `00-spec-seed.md`
 
-### 2.1 When the orchestrator offers seeding
+### 2.1 When the leader offers seeding
 
-During Discover open (Step 6d, `docs/discover-phase.md §4`), after the advance signal and intake survey but before dispatching the architect, the orchestrator offers the operator a chance to seed the spec:
+During Discover open (Step 6d, `docs/discover-phase.md §4`), after the advance signal and intake survey but before dispatching the architect, the leader offers the operator a chance to seed the spec:
 
 ```
 Antes de arrancar el diseño, ¿querés sembrar el spec?
@@ -37,7 +37,7 @@ The scope hint captured in the intake survey (`survey_scope_hint`) serves as a f
 
 ### 2.2 The `00-spec-seed.md` artefact
 
-When the operator provides any seeding response, the orchestrator writes `{docs_root}/00-spec-seed.md`. Format:
+When the operator provides any seeding response, the leader writes `{docs_root}/00-spec-seed.md`. Format:
 
 ```markdown
 # Spec Seed: {feature-name}
@@ -99,7 +99,7 @@ When `00-spec-seed.md` is written, the orchestrator sets in `00-state.md § Curr
 
 ### 3.1 Phase 0b Step 5 payload
 
-The orchestrator adds to the in-memory dispatch payload (alongside the existing 9 fields):
+The leader adds to the in-memory dispatch payload (alongside the existing 9 fields):
 
 - **`spec_seed` (pointer):** `"00-spec-seed.md present — read it as your primary prior before codebase exploration"` (or `"no spec seed — standard mode"` when `spec_seed_present: false`)
 - **`scope_hint`:** the `survey_scope_hint` value from `00-state.md` (or `null`)
@@ -150,7 +150,7 @@ When `spec_seed_present: false` or `spec_seed_dissents: false`, the check is a n
 
 ### 4.3 Why `## Review Summary` (not inline)
 
-STAGE-GATE-1 copies `## Review Summary` verbatim into the STOP block (`orchestrator.md:1411`). The dissent must be where the operator already looks — inline markers in the plan body would be missed at the gate.
+STAGE-GATE-1 copies `## Review Summary` verbatim into the STOP block (`orchestrator.md § STAGE-GATE-1`). The dissent must be where the operator already looks — inline markers in the plan body would be missed at the gate.
 
 ---
 
@@ -182,7 +182,7 @@ The approach status line in the Phase Checklist:
 - [ ] 1.0-approach-check — approach checkpoint [~auto-confirmed: approach_freedom:low]
 ```
 
-This line is non-blocking (same pattern as `1.7-ux-enrich` at `orchestrator.md:535`): it is marked `[~auto-confirmed: ...]` when the architect declared `low`, never blocks the Phase Checklist gate.
+This line is non-blocking (same pattern as `1.7-ux-enrich` at `orchestrator.md`): it is marked `[~auto-confirmed: ...]` when the architect declared `low`, never blocks the Phase Checklist gate.
 
 ### 5.3 Observability
 

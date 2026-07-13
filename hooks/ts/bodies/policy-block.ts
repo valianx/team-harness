@@ -12,6 +12,50 @@
 //
 // AC-9: Shannon entropy formula verbatim; threshold >= 3.5; boundary fixtures tested.
 // AC-15: reason names the pattern CLASS, never the captured value (CWE-200).
+//
+// Task-6 (AC-6.2/AC-6.4/AC-6.5, SEC-DR-B): a `claude ... --dangerously-skip-
+// permissions` spawn bypasses every downstream hook at whatever depth it
+// runs — the process it launches never re-enters this gate.
+//
+// HONEST FRAMING (SEC-001 remediation, Round 1-2 — see docs/dev-mode.md
+// § Outward-Action Gate): this deny is a BEST-EFFORT text-heuristic
+// backstop for the LEGACY Bash-spawn path only, NOT a security boundary. A
+// PreToolUse hook that only sees a raw Bash command STRING cannot robustly
+// deny by parsing it — a determined caller evades a command-string matcher
+// via runtime shell evaluation the matcher structurally cannot see: variable
+// indirection (`X=--flag; claude $X`), command substitution (`$(...)`,
+// backticks), and equivalent wrapper scripts. The value bash actually
+// executes is only known at shell-expansion time, after this hook has
+// already made its decision — that gap is not closable by any command-string
+// regex, normalization included, and is a documented residual, not a bug in
+// this heuristic.
+//
+// What normalization DOES close (Round 2): every SINGLE-PASS lexical-noise
+// evasion — inserting empty quote pairs or an escaping backslash anywhere
+// inside a literal token to defeat a naive substring/regex match, without
+// changing what the token evaluates to at shell-expansion time (`cla""ude`,
+// `"claude"`, `c'l'aude`, `\claude`, `cl\aude` all evaluate to the plain
+// string `claude`). `normalizeLexicalNoise()` performs this class of
+// bash quote/escape removal ONCE, ahead of matching, instead of chasing each
+// instance with its own regex — see that function for the bounded linear-scan
+// implementation (no full shell parser, no ReDoS exposure).
+//
+// The HARD guarantee that a lane never spawns a skip-permissions child is
+// AC-6.4 (native Task-tool spawn in the split path): once the split's
+// capability floor is met, orchestrators spawn via the Task tool — no Bash
+// `claude` invocation exists on that path at all, so there is nothing for
+// any evasion to hide inside. AC-6.4 is the structural control; this file's
+// deny is defense-in-depth for the path that structural control does not
+// yet cover. The single carve-out below exists for the legacy/tmux path
+// only (agents/orchestrator.md, the top-level batch-spawn confirmed to
+// invoke `claude --dangerously-skip-permissions` via Bash) and is an EXACT,
+// anti-forgeable match of that command's full literal form (AC-6.5) — not a
+// prefix, not a substring, and never conditioned on anything the forger
+// could also supply. The exemption match runs against the RAW (non-
+// normalized) command string deliberately: normalization is lossy by design
+// (it deletes quote/escape characters), and the exemption's anti-forgery
+// guarantee depends on matching the literal template byte-for-byte,
+// including the quoting inside its embedded --settings JSON blob.
 
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
 
@@ -45,6 +89,199 @@ function askReason(reason: string): NormalizedDecision {
 
 function none(): NormalizedDecision {
   return { decision: "none", reason: "", mutations: null };
+}
+
+// ---------------------------------------------------------------------------
+// SKIP-PERMISSIONS SPAWN — best-effort text-heuristic deny (AC-6.2/SEC-DR-B),
+// with a single anti-forgeable exact-match carve-out (AC-6.5) for the legacy
+// top-level tmux batch-spawn template. See module-header comment for the
+// honest-framing rationale (AC-6.4 native Task-tool spawn is the structural
+// control; this heuristic is defense-in-depth for the legacy Bash-spawn path
+// only, and does not reach runtime shell evaluation).
+// ---------------------------------------------------------------------------
+
+// Escapes every regex metacharacter in a literal string so it can be spliced
+// into a larger pattern without being interpreted. Declared first — used by
+// buildClaudeSkipPermissionsRouterRegex below and by
+// buildLegacyTmuxSpawnExemptionRegex further down this file.
+function escapeRegExpLiteral(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// LEXICAL NORMALIZATION (SEC-001 remediation, Round 2) — replaces the
+// per-pattern quote-tolerant/path-qualifier patchwork with a single bounded
+// pre-pass. Bash's own quote-removal and backslash-escape-removal steps turn
+// `cla""ude`, `"claude"`, `c'l'aude`, `\claude`, and `cl\aude` into the exact
+// same token — `claude` — at shell-expansion time, entirely independent of
+// where in the token the quote/backslash noise is planted. A literal-text or
+// per-instance regex matcher chases each new placement of that noise
+// forever; this function performs the SAME bash normalization ONCE, ahead of
+// matching, closing the whole class in one pass instead of the next
+// instance of it.
+//
+// What this strips (bounded, linear scan, O(n), no backtracking → no ReDoS):
+//   - `'` / `"` quote delimiters — removed wherever encountered (both empty
+//     pairs like `""` and pairs wrapping real characters); inside a single
+//     quote, no other character is touched (matches bash: single quotes
+//     suppress ALL escaping).
+//   - a `\` immediately followed by another character, outside single
+//     quotes — the backslash is dropped and the following character is kept
+//     literally (matches bash's escape-removal for the common case; a minor
+//     over-normalization versus bash's double-quote-specific escape rules,
+//     which only WIDENS what gets flagged, never narrows it).
+//
+// Deliberately NOT attempted (out of scope by design — see module-header
+// honest-framing note): variable indirection (`$X`), command substitution
+// (`$(...)`, backticks), and wrapper scripts. Those require evaluating the
+// shell at runtime, which a static PreToolUse matcher over the raw command
+// string structurally cannot do.
+function normalizeLexicalNoise(cmd: string): string {
+  let out = "";
+  let inSingleQuote = false;
+  let i = 0;
+
+  while (i < cmd.length) {
+    const ch = cmd[i];
+
+    if (inSingleQuote) {
+      if (ch === "'") {
+        inSingleQuote = false;
+      } else {
+        out += ch;
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === "'") {
+      inSingleQuote = true;
+      i++;
+      continue;
+    }
+
+    if (ch === '"') {
+      i++;
+      continue;
+    }
+
+    if (ch === "\\" && i + 1 < cmd.length) {
+      out += cmd[i + 1];
+      i += 2;
+      continue;
+    }
+
+    out += ch;
+    i++;
+  }
+
+  return out;
+}
+
+// Broad router: ANY invocation of the `claude` binary carrying
+// --dangerously-skip-permissions anywhere in the same command counts as
+// covered, however dressed up (extra/reordered flags, multi-line
+// continuation via `\`, an embedded --settings JSON blob). This is
+// deliberately NOT the decision itself — the sole carve-out is
+// LEGACY_TMUX_SPAWN_EXEMPTION_RE below. `[\s\S]*?` (not `.*?`) so the match
+// spans real newlines in a multi-line Bash tool command. This regex is
+// always evaluated against `normalizeLexicalNoise(cmd)`, never against the
+// raw command — that is where the quote/backslash-noise class gets closed
+// (see normalizeLexicalNoise above), so the flag/basename literals below are
+// plain escaped text, not their own quote-tolerant variants.
+//
+// SEC-001 hardening (Round 1, retained): basename-tolerant `claude` match —
+// the leading-boundary alternation only requires the character immediately
+// before `claude` to be a shell separator or start-of-string; a path
+// separator (`/`, as in `/usr/bin/claude` or `./claude`) is neither, so the
+// optional non-capturing group below absorbs any path-qualifier prefix
+// (`usr/bin/`, `./`, `bin/`, …) so the match still anchors on `claude` as the
+// invoked basename.
+function buildClaudeSkipPermissionsRouterRegex(): RegExp {
+  // `$` stays excluded from the path-qualifier segment (unlike quotes, its
+  // exclusion is not superseded by normalizeLexicalNoise — command
+  // substitution markers are left untouched by design, see module header).
+  const pathQualifierPrefix = String.raw`(?:[^\s|;&<>()\x60$]*/)?`;
+  const flagLiteral = escapeRegExpLiteral("--dangerously-skip-permissions");
+  return new RegExp(
+    String.raw`(^|[\s|;&<>()\x60])${pathQualifierPrefix}claude\b[\s\S]*?${flagLiteral}\b`,
+    "i"
+  );
+}
+
+const CLAUDE_SKIP_PERMISSIONS_RE = buildClaudeSkipPermissionsRouterRegex();
+
+// Replaces every occurrence of `token` in `escapedText` (already
+// regex-escaped) with `firstGroup` on the FIRST occurrence and `laterGroup`
+// on every subsequent one — used to turn a repeated doc placeholder into one
+// capturing group plus backreferences, so the exemption requires the SAME
+// value at every occurrence (anti-forgeable: a forged variant with
+// inconsistent values across occurrences fails the match).
+function groupRepeatedPlaceholder(
+  escapedText: string,
+  token: string,
+  firstGroup: string,
+  laterGroup: string
+): string {
+  const parts = escapedText.split(token);
+  if (parts.length === 1) return escapedText;
+  let result = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    result += (i === 1 ? firstGroup : laterGroup) + parts[i];
+  }
+  return result;
+}
+
+// Verbatim raw text of the legacy top-level batch-spawn command
+// (agents/orchestrator.md:4040-4047 at the time of Task-6), byte-identical
+// to the fenced bash block in that file (verified via a scripted roundtrip
+// during implementation — see 02-implementation.md). `{task-name}` and
+// `{number}` are the doc's own placeholder tokens.
+const LEGACY_TMUX_SPAWN_RAW =
+  "claude --worktree {task-name} --tmux --dangerously-skip-permissions \\\n  --settings '{\n    \"hooks\": {\n      \"Stop\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"STATE=$(cat workspaces/*/00-state.md 2>/dev/null); STATUS=$(echo \\\"$STATE\\\" | grep -oP \\\"status: \\\\K\\\\w+\\\" | head -1); SUMMARY=$(echo \\\"$STATE\\\" | grep -A1 \\\"^## Agent Results\\\" | tail -1 | head -c 200); printf \\\"%s|%s|%s\\\\n\\\" \\\"{task-name}\\\" \\\"${STATUS:-unknown}\\\" \\\"${SUMMARY:-no summary}\\\" > /tmp/batch-results/{task-name}.done; echo $(date +%s) {task-name} DONE >> /tmp/batch-results/events.log\"}]}],\n      \"PostToolUse\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"if echo \\\"$TOOL_INPUT\\\" | grep -q 00-state.md; then PHASE=$(grep -oP \\\"phase: \\\\K[\\\\w.]+\\\" workspaces/*/00-state.md 2>/dev/null | head -1); printf \\\"%s|%s\\\\n\\\" \\\"{task-name}\\\" \\\"${PHASE:-unknown}\\\" > /tmp/batch-results/{task-name}.progress; echo $(date +%s) {task-name} PROGRESS >> /tmp/batch-results/events.log; fi\"}]}]\n    }\n  }' \\\n  -p \"/th:issue #{number} --skip-delivery\"";
+
+// Builds the anchored exact-match exemption regex from LEGACY_TMUX_SPAWN_RAW:
+// every literal character is escaped, then `{task-name}` (7 occurrences)
+// becomes one capturing group plus 6 backreferences (the same task name must
+// appear at every site) and `{number}` becomes a digit-bounded group. A
+// reordered flag, an injected `&&`, an extra argument, a mismatched
+// task-name across occurrences, or any deviation from this literal template
+// fails the match (AC-6.5 anti-forgeable) and falls through to the deny
+// above. Matched against the RAW command, not the normalized one — see
+// module-header note on why the exemption must not run on lossy
+// normalization.
+function buildLegacyTmuxSpawnExemptionRegex(): RegExp {
+  const escaped = escapeRegExpLiteral(LEGACY_TMUX_SPAWN_RAW);
+  const withTaskName = groupRepeatedPlaceholder(
+    escaped,
+    escapeRegExpLiteral("{task-name}"),
+    "([A-Za-z0-9._-]{1,80})",
+    "\\1"
+  );
+  const withNumber = groupRepeatedPlaceholder(
+    withTaskName,
+    escapeRegExpLiteral("{number}"),
+    "([0-9]{1,10})",
+    "\\2"
+  );
+  return new RegExp(`^${withNumber}$`);
+}
+
+const LEGACY_TMUX_SPAWN_EXEMPTION_RE = buildLegacyTmuxSpawnExemptionRegex();
+
+// Returns the deny decision when `cmd` spawns `claude --dangerously-skip-
+// permissions` and is NOT the exact legacy exemption; null when the command
+// does not carry the flag at all, or is exactly the exempted legacy form.
+// The router regex runs against the lexically-normalized command
+// (normalizeLexicalNoise) so quote/backslash-noise evasions are already
+// closed before matching; the exemption regex runs against the RAW command
+// (see buildLegacyTmuxSpawnExemptionRegex comment).
+function evaluateClaudeSkipPermissionsSpawn(cmd: string): NormalizedDecision | null {
+  if (!CLAUDE_SKIP_PERMISSIONS_RE.test(normalizeLexicalNoise(cmd))) return null;
+  if (LEGACY_TMUX_SPAWN_EXEMPTION_RE.test(cmd)) return null;
+
+  return deny(
+    "spawning `claude` with --dangerously-skip-permissions bypasses every downstream hook at whatever depth the spawned process runs (SEC-DR-B). This is a best-effort text heuristic, not a security boundary — it cannot see runtime shell evaluation (variable indirection, command substitution, wrapper scripts). The hard guarantee against this bypass is AC-6.4 (native Task-tool spawn in the split path, where no Bash `claude` invocation exists to evade). The only exemption here is the exact-match legacy top-level tmux batch-spawn template, see docs/dev-mode.md § Outward-Action Gate"
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +665,13 @@ export function evaluate(input: NormalizedInput): NormalizedDecision {
   if (toolName === "Bash") {
     const cmd = typeof toolInput["command"] === "string" ? (toolInput["command"] as string) : "";
     if (!cmd) return none();
+
+    // AC-6.2/SEC-DR-B — best-effort skip-permissions spawn heuristic
+    // (checked first: a skip-permissions spawn is the highest-severity
+    // covered action, since it bypasses every OTHER check in this file at
+    // whatever depth it runs).
+    const skipPermissionsDecision = evaluateClaudeSkipPermissionsSpawn(cmd);
+    if (skipPermissionsDecision) return skipPermissionsDecision;
 
     // DENIED_BASH patterns
     for (const [pattern, label] of DENIED_BASH) {

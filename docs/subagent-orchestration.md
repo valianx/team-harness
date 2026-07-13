@@ -115,7 +115,7 @@ This rule applies to **every** entry mode: `@th:orchestrator` mention, skill rou
 
 ## Session-Scoped Config Override Protocol
 
-The orchestrator supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; the orchestrator applies it for that pipeline run only.
+th:leader supports per-session overrides of a closed whitelist of config keys. The operator states the override in chat; th:leader applies it for that pipeline run only.
 
 ### Step order (load-bearing)
 
@@ -144,7 +144,7 @@ Follows `agents/_shared/output-template.md`: silent on success (events file only
 
 ### `/recover` behavior
 
-On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. The orchestrator logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
+On recovery, the resolved config is re-read from `00-state.md` § Current State — the chat is not re-parsed. th:leader logs `operation.success` with detail `override re-applied from 00-state.md`. If the operator re-states an override during recovery, it is treated as a new session override for the resumed run.
 
 ### Collision guarantee
 
@@ -171,8 +171,8 @@ On recovery, the resolved config is re-read from `00-state.md` § Current State 
 - Touching `bin/install.sh`, `bin/install.ps1`, or any file under `cmd/install/` → route to `architect` first (installer contract with `~/.claude/` and `~/.claude.json` is load-bearing).
 - Adding/removing an agent → route to `architect` + `agent-builder`; also update `README.md` agent roster and the system diagram.
 - Hook changes or MCP server changes → flag for `security` review (both execute with the user's privileges).
-- Changing the orchestrator pipeline → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Changing the orchestrator pipeline → architecture review mandatory; update `agents/leader.md` + `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
 ## `blocked-manual-push` Handling
 
-When the `delivery` agent returns `status: blocked-manual-push`, the orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. The orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.
+When the `delivery` agent returns `status: blocked-manual-push`, th:orchestrator emits a STOP block with the compare URL and `workspaces/{feature}/inputs/pr-body.md` path. The operator opens the PR manually, then replies `pr opened #N`. th:orchestrator records the PR number in `00-state.md` and continues to Phase 5. This is distinct from `blocked-no-dispatch`: no auto-takeover, just a manual-action pause. See `agents/_shared/gh-fallback.md` § "`status: blocked-manual-push`" for the full protocol.

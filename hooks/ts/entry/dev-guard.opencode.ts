@@ -42,24 +42,35 @@ const GIT_EXEC_TIMEOUT_MS = 5_000;
 // into a command string — CWE-78), timeout-bounded, fail-open to null.
 // ---------------------------------------------------------------------------
 
+// Task-6 (AC-6.1) — when `dir` is given (the `git -C {dir} push` closed
+// form), every git read below is scoped to THAT directory via Node's `cwd`
+// exec option, never a shell `-C` argument (no injection surface regardless
+// of dir's content — `cwd` is a filesystem path resolved by the OS, not
+// shell-interpreted). A dir that does not exist or is not a git repo simply
+// fails the exec (caught below) → null. On opencode `allow` proceeds SILENTLY
+// (no human in the loop) — an unresolvable target must never surface as
+// `allow` here, and it does not: the body maps a null reader result to `ask`,
+// which opencode's outbound mapping throws (fail-closed).
 function makeReader(): DevGuardReader {
   return {
-    gitCurrentBranch(): string | null {
+    gitCurrentBranch(dir?: string): string | null {
       try {
         return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
           encoding: "utf8",
           timeout: GIT_EXEC_TIMEOUT_MS,
+          ...(dir !== undefined ? { cwd: dir } : {}),
         }).trim();
       } catch {
         return null;
       }
     },
 
-    resolveDefaultBranch(): string | null {
+    resolveDefaultBranch(dir?: string): string | null {
       try {
         const out = execFileSync("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
           encoding: "utf8",
           timeout: GIT_EXEC_TIMEOUT_MS,
+          ...(dir !== undefined ? { cwd: dir } : {}),
         }).trim();
         if (!out) return null;
         // "origin/main" → "main".
@@ -70,7 +81,7 @@ function makeReader(): DevGuardReader {
       }
     },
 
-    resolveEffectivePushRemoteRef(): string | null {
+    resolveEffectivePushRemoteRef(dir?: string): string | null {
       try {
         // Delegates to git's own @{push} resolution instead of re-implementing
         // the branch.<n>.pushRemote / remote.pushDefault / branch.<n>.remote
@@ -78,7 +89,11 @@ function makeReader(): DevGuardReader {
         const out = execFileSync(
           "git",
           ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{push}"],
-          { encoding: "utf8", timeout: GIT_EXEC_TIMEOUT_MS }
+          {
+            encoding: "utf8",
+            timeout: GIT_EXEC_TIMEOUT_MS,
+            ...(dir !== undefined ? { cwd: dir } : {}),
+          }
         ).trim();
         return out || null;
       } catch {

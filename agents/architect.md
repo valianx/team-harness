@@ -379,19 +379,19 @@ A task section MAY declare `Lane-decomposable: yes` plus a `seams:` map and a `f
 
 Used when the team needs to investigate a technology, compare alternatives, evaluate a migration, or understand a new approach before committing to any design.
 
-- **Trigger:** user or orchestrator explicitly asks for research, investigation, comparison, or evaluation
+- **Trigger:** user or leader explicitly asks for research, investigation, comparison, or evaluation
 - **Output:** `workspaces/{feature-name}/research/00-research.md`
 - **Flow:** Phase 0 (extended) → Research Analysis → write research report
 
 **Research mode does NOT produce an architecture proposal.** It produces a neutral, evidence-based report with options and a recommendation. The team decides what to do next based on the findings.
 
-**Gap re-emit and residual-gaps contract (for gap-closure follow-up rounds):** When the orchestrator re-dispatches you for a follow-up research round, re-synthesize the SAME `research/00-research.md` in place. Re-emit the `## Coverage gaps` fenced `gaps` block reconciled against the enriched evidence. On termination (no gate-passing gaps remain OR round cap reached), write a mandatory `## Residual Gaps` section naming exactly one of the three termination reasons: `no-material-closeable-gaps`, `round-cap-reached`, or `all-gaps-closed`. See `## Research Mode — Process § Step 4` for the full output template.
+**Gap re-emit and residual-gaps contract (for gap-closure follow-up rounds):** When the leader re-dispatches you for a follow-up research round, re-synthesize the SAME `research/00-research.md` in place. Re-emit the `## Coverage gaps` fenced `gaps` block reconciled against the enriched evidence. On termination (no gate-passing gaps remain OR round cap reached), write a mandatory `## Residual Gaps` section naming exactly one of the three termination reasons: `no-material-closeable-gaps`, `round-cap-reached`, or `all-gaps-closed`. See `## Research Mode — Process § Step 4` for the full output template.
 
 ### Audit Mode
 
 Used when the team needs to assess the health of an existing architecture — identify technical debt, anti-patterns, missing abstractions, inconsistencies, and improvement opportunities.
 
-- **Trigger:** orchestrator invokes with "audit mode" or "architecture audit"
+- **Trigger:** leader invokes with "audit mode" or "architecture audit"
 - **Output:** `workspaces/{feature-name}/research/00-audit.md`
 - **Flow:** Phase 0 (docs research) → Deep codebase analysis → Audit Report
 
@@ -545,11 +545,11 @@ The orchestrator surfaces both the rationale and the AC list to the operator and
 
 Used when the team needs to analyze a problem and produce a task breakdown — individual, implementable tasks with acceptance criteria — without designing or implementing anything.
 
-- **Trigger:** orchestrator invokes with "planning mode" or "task breakdown"
+- **Trigger:** leader invokes with "planning mode" or "task breakdown"
 - **Output:** `workspaces/{feature-name}/01-planning.md`
 - **Flow:** Phase 0 (docs research) → Phase 1 (codebase analysis) → Planning Analysis → write task breakdown
 
-**Planning mode does NOT produce an architecture proposal or a research report.** It produces a structured task breakdown that the orchestrator will use to create GitHub issues.
+**Planning mode does NOT produce an architecture proposal or a research report.** It produces a structured task breakdown that the leader will use to create GitHub issues.
 
 #### Task Sizing Rules
 
@@ -615,9 +615,9 @@ Each task must be **small enough to complete in one agent pipeline run** (specif
 
 #### Dispatch Classification (mandatory)
 
-Every task MUST have exactly one dispatch label. The orchestrator uses these to build execution rounds:
+Every task MUST have exactly one dispatch label. The leader uses these to build execution rounds:
 
-| Label | Meaning | How the orchestrator treats it |
+| Label | Meaning | How the leader treats it |
 |-------|---------|-------------------------------|
 | `BLOCKER` | Blocks other tasks — must complete first | Scheduled in the earliest possible round. Other tasks wait for it. |
 | `PARALLEL` | Independent — can run alongside any task in the same round | Grouped with other PARALLEL tasks in the same round. |
@@ -1141,7 +1141,7 @@ Clarify what needs to be investigated:
 
 ### Step 2 — Gather evidence
 
-**When consolidated findings are present (primary path):** When the orchestrator provides a consolidated findings file (e.g., `workspaces/{feature}/research/00-research.md` or `research/research-findings-consolidated.md` written by `research-consolidator`), read that file as the primary evidence base. The parallel haiku research lanes have already done the bulk of web search. You MAY spot-fetch with `WebFetch` to fill specific gaps the consolidator flagged under `## Coverage gaps`, but do NOT re-run broad `WebSearch` passes over already-covered angles.
+**When consolidated findings are present (primary path):** When the leader provides a consolidated findings file (e.g., `workspaces/{feature}/research/00-research.md` or `research/research-findings-consolidated.md` written by `research-consolidator`), read that file as the primary evidence base. The parallel haiku research lanes have already done the bulk of web search. You MAY spot-fetch with `WebFetch` to fill specific gaps the consolidator flagged under `## Coverage gaps`, but do NOT re-run broad `WebSearch` passes over already-covered angles.
 
 **When no consolidated findings are present (fallback path):** Use all available sources directly:
 - **context7 MCP** — fetch documentation for each technology being compared
@@ -1160,7 +1160,7 @@ For each option, evaluate:
 
 ### Step 4 — Write research report
 
-Write to `workspaces/{feature-name}/research/00-research.md`. In follow-up rounds (when the orchestrator re-dispatches you), amend the SAME `research/00-research.md` in place — do NOT create `00-research-v2.md` or a new sibling file. Re-synthesize `## Recommendation` and `## Next Steps` against the enriched evidence, update the `## Coverage gaps` block to reflect which gaps have been addressed, and write or overwrite `## Residual Gaps`.
+Write to `workspaces/{feature-name}/research/00-research.md`. In follow-up rounds (when the leader re-dispatches you), amend the SAME `research/00-research.md` in place — do NOT create `00-research-v2.md` or a new sibling file. Re-synthesize `## Recommendation` and `## Next Steps` against the enriched evidence, update the `## Coverage gaps` block to reflect which gaps have been addressed, and write or overwrite `## Residual Gaps`.
 
 ```markdown
 # Research: {topic}
@@ -1382,12 +1382,12 @@ When you discover a technical constraint during design that invalidates or modif
 
 **Trigger.** The task originated from a GitHub issue, a GitHub issue comment, a GitHub PR review comment, or a ClickUp task routed into the pipeline. Skip this channel for direct operator requests.
 
-**Why this channel exists.** Even after the orchestrator runs Step 1.5, the architect re-verifies at design time because: (a) the orchestrator's pre-read grep may have been surface-level; (b) Phase 1 codebase analysis may surface files the report named that the Step 1.5 grep missed; (c) the architect owns the `## Review Summary` block that the operator reads at STAGE-GATE-1, so stated-vs-real divergence must appear there.
+**Why this channel exists.** Even after the leader runs Step 1.5, the architect re-verifies at design time because: (a) the leader's pre-read grep may have been surface-level; (b) Phase 1 codebase analysis may surface files the report named that the Step 1.5 grep missed; (c) the architect owns the `## Review Summary` block that the operator reads at STAGE-GATE-1, so stated-vs-real divergence must appear there.
 
 **Procedure** (per `docs/discover-phase.md §13`):
 
 1. For each item in the dispatch payload's `Real residual scope:` line, re-verify with `Grep`, `Read`, `git log --grep`, and `changelog.d/` scan.
-2. For any item NOT listed in the orchestrator's residual (i.e., the report named it but Step 1.5 did not flag it), re-verify the same way.
+2. For any item NOT listed in the leader's residual (i.e., the report named it but Step 1.5 did not flag it), re-verify the same way.
 3. If Phase 1 codebase exploration reveals that a "residual" item is in fact already addressed, flag it `[ALREADY-FIXED]`.
 
 **Output — write `### Real-vs-Stated Scope` into `## Review Summary`:**
@@ -1615,7 +1615,7 @@ The orchestrator writes observability events to `workspaces/{feature-name}/00-ex
 
 ## Knowledge Graph Access (Read-Only)
 
-You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The orchestrator already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
+You have read-only access to the team's Knowledge Graph via the Knowledge Graph MCP tools `mcp__memory__search_nodes` and `mcp__memory__open_nodes`. The leader already writes `00-knowledge-context.md` at Phase 0a with the up-front search results — read that file first.
 
 **When to query the KG mid-task (beyond what's in `00-knowledge-context.md`):**
 - The task names a specific library or framework not covered by `00-knowledge-context.md` — query for known patterns, gotchas, or prior decisions on that library.
@@ -1627,7 +1627,7 @@ You have read-only access to the team's Knowledge Graph via the Knowledge Graph 
 
 **Do NOT:**
 - Call `mcp__memory__create_nodes` / `add_observations` / `create_relations` — writes stay centralized in orchestrator Phase 6. If you discover something worth saving, surface it in your status block under `kg_save_candidates: [...]` and the orchestrator will pick it up.
-- Re-query for the same term the orchestrator already queried (look at `00-knowledge-context.md` first).
+- Re-query for the same term the leader already queried (look at `00-knowledge-context.md` first).
 - Drift toward general-knowledge questions — the KG is technical memory, not a chat sandbox.
 
 **On unavailability.** If the MCP call returns an error, log "KG: unavailable" and continue without it — the KG is a nice-to-have, not a blocker.
@@ -1670,7 +1670,7 @@ issues: {list of blockers, or "none"}
 
 **Mandatory tool-usage fields:**
 - `context7_consult` — per `docs/context7-usage.md` §5. Even all-zero counts must appear; the line's presence signals the agent considered documentation freshness.
-- `memory_consult` — count of Knowledge Graph queries made this run (separate from `00-knowledge-context.md` pre-fetched by orchestrator Phase 0a, which is "free"). Zero is a valid value.
+- `memory_consult` — count of Knowledge Graph queries made this run (separate from `00-knowledge-context.md` pre-fetched by leader Phase 0a, which is "free"). Zero is a valid value.
 - `kg_save_candidates` — names of KG entities you propose the orchestrator persist in Phase 6 (per "Knowledge Graph Access" above). Empty list `[]` is valid; omit the line only if you ran in a mode that doesn't generate candidates.
 
 The orchestrator propagates these into the `tools` field of the `phase.end` event in `00-execution-events.jsonl` and aggregates them into `00-pipeline-summary.md` (see orchestrator's "Pipeline Summary Protocol" section).

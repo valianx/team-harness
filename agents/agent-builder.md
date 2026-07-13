@@ -34,7 +34,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 `effort` — set the reasoning level the role actually needs:
 - `medium` — mechanical execution, even when polished output matters (delivery, tests by pattern, diagram passes). **This is the project floor; never use `low`.**
-- `high` — solid analytical or planning work that doesn't need exhaustive exploration (orchestrator routing, qa validation, implementer following a Work Plan).
+- `high` — solid analytical or planning work that doesn't need exhaustive exploration (leader routing, qa validation, implementer following a Work Plan).
 - `xhigh` — used sparingly when a task sits between `high` and `max`.
 - `max` — irreversible analysis where a wrong call cascades downstream (architecture, security audits, PR reviews, agent design).
 
@@ -220,7 +220,7 @@ Every new worker agent MUST have these sections (checked by `/th:lint`):
 - [ ] `## Execution Log Protocol`
 - [ ] `## Return Protocol`
 
-Orchestrator agents (`orchestrator`) are exempt from this check.
+Coordination agents (`leader`, `orchestrator`) are exempt from this check.
 
 ---
 

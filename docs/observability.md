@@ -137,6 +137,15 @@ per-phase context. The orchestrator's `phase.end` events in `00-execution-events
 remain the authoritative rich observability record. The SubagentStop payload
 simply does not carry that data.
 
+**`project` key — stop-side residual (permanent, not a TODO).** Unlike the
+start-side breadcrumb below, `subagent.stop` lines never carry a `project`
+key. The SubagentStop payload exposes `agent_type`/`agent_id`/`stop_reason`
+only — there is no prompt to read a `TH-LANE: {project-key}` marker from at
+stop time. Readers that need the authoritative per-agent project/timing
+record for a lane-scoped run should use the orchestrator's `phase.end` event
+(which does carry `project`), not this breadcrumb. See "subagent.start" below
+for how pairing is redefined when `project` is present on the start side.
+
 **Non-suppressible breadcrumb.** The existence breadcrumb (the `subagent.stop`
 write) runs unconditionally — `TH_HOOK_PROFILE=minimal` does NOT suppress it.
 Only the scope guard (non-`th:` agent → silent exit) and the base-path check
@@ -180,13 +189,45 @@ derivable from a single file.
 
 Line schema:
 ```json
-{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>"}
+{"ts":"<ISO>","event":"subagent.start","agent_type":"th:<agent>","project":"<optional — bounded [a-z0-9-]{1,60}>"}
 ```
 
 `agent_id` is intentionally absent — at PreToolUse time the runtime has not
 yet assigned one (it only becomes observable on the corresponding
 `SubagentStop` payload). Readers pair a `subagent.start` line with the next
 `subagent.stop` line carrying the same `agent_type` in file order.
+
+**`project` key (lane-scoped dispatch, bounded).** When the dispatching
+agent's prompt carries a `TH-LANE: {project-key}` line, this hook stamps a
+`project` field on the `subagent.start` record with that key. The value is
+charset/length-bounded (`[a-z0-9-]{1,60}`) before it ever reaches the JSONL
+sink — a marker present but out of that shape is treated as absent (`project`
+omitted), never written unbounded. When the marker is absent altogether,
+`project` is omitted and pairing falls back to the plain `agent_type`
+file-order rule above (backward-compat — byte-identical to pre-lane behavior).
+
+**Pairing redefinition within `project` (AC-5.2).** When one or more
+`subagent.start` lines in the trace carry a `project` key, same-agent-type
+pairing is scoped WITHIN that key: a `subagent.stop` line is matched to the
+oldest pending `subagent.start` line sharing the same `agent_type` **and**
+the same `project`, not merely the same `agent_type` file-order-wide. This
+matters once two or more orchestrator lanes dispatch the same specialist
+type (e.g. two lanes each dispatching `th:implementer`) into a shared trace
+file — plain `agent_type` FIFO pairing would cross-wire lane A's start with
+lane B's stop. Lines with no `project` key continue to pair against each
+other under the original agent_type-only FIFO rule (backward-compat).
+
+**Stop-side residual — cannot be enforced by the writer, only by the
+reader.** `subagent.stop` lines never carry `project` (see "00-subagent-trace.jsonl"
+above) — the SubagentStop payload has no prompt to read `TH-LANE` from. A
+reader implementing the pairing rule above therefore cannot join on `project`
+at the stop-line level; it must derive the pairing from the `project`-tagged
+`subagent.start` side only (e.g., scope each pending-starts queue by
+`(agent_type, project)`, and let ungrouped/legacy `subagent.start` lines with
+no `project` share one `agent_type`-only queue). The authoritative per-agent,
+per-lane timing record remains the orchestrator's `phase.end` event, which
+does carry `project` end-to-end — this breadcrumb pairing rule is a
+best-effort backstop, not a replacement.
 
 **Complements, never replaces, `phase.end`.** Same relationship as the stop
 breadcrumb: this file proves a `th:*` boundary occurred and, paired with the
@@ -266,10 +307,10 @@ suggestion on failure — without event persistence.
 
 ## overview.md — initiative parent index (NOT an events file)
 
-When the `initiative` field in `00-state.md` is set, the orchestrator also
+When the `initiative` field in `00-state.md` is set, the leader also
 maintains a parent-level `overview.md` at the initiative root. This file is
 **not an events file** and does not contain pipeline observability data. It is
-a living index — one row per project, updated by the orchestrator at intake and
+a living index — one row per project, updated by the leader at intake and
 by the delivery agent at Step 11.7.
 
 **What it is:**
@@ -291,17 +332,17 @@ by the delivery agent at Step 11.7.
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md`
 - Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/overview.md`
 
-Full template and section-ownership map: `agents/orchestrator.md § overview.md Template`.
+Full template and section-ownership map: `agents/leader.md § overview.md Template`.
 
 ## Initiative-level fan-out trace (parallel multi-project dispatch)
 
-When the orchestrator fans out 2+ projects concurrently (see `agents/orchestrator.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
+When the leader fans out 2+ projects concurrently (see `agents/leader.md § Parallel Multi-Project Dispatch`), an **initiative-level** `00-execution-events` file is written in addition to each project's per-project trace. This file is separate from `overview.md` (which is NOT an events file) and from the per-project `00-execution-events.*` (which remain per-project, unchanged).
 
 **Location:**
 - Obsidian: `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/00-execution-events.md`
 - Local: `{common-parent-of-sibling-repos}/{YYYY-MM-DD}_{initiative}/00-execution-events.jsonl`
 
-**Fan-out lifecycle events** (written by the orchestrator into the initiative-level file):
+**Fan-out lifecycle events** (written by the leader into the initiative-level file):
 
 | Event | Fields | When emitted |
 |-------|--------|--------------|
@@ -314,13 +355,43 @@ Each event carries a `project` key so `/trace` can group events by lane and rend
 
 **Per-project traces are unchanged.** Each project continues writing its own `{project}/00-execution-events.*` file with its per-phase `phase.start` / `phase.end` / `gate.*` events exactly as today. The initiative-level file is additive — it carries only fan-out lifecycle events, not per-phase detail.
 
-**`/th:pipelines` rendering:** when an initiative has a live fan-out, `/th:pipelines` shows the initiative as a parent row with each concurrent project as a child lane row (Stage / Phase columns per lane). This reuses the Stage/Phase surfacing exception already documented for `/th:pipelines`.
+**`/th:pipelines` rendering:** when a `00-leader-roster.md` is present, `/th:pipelines` renders the leader→orchestrator tree grouped by project — the initiative as a parent row, each orchestrator as a child lane row with `Stage` / `Phase` / `Status`, the advisory `pending_gate` (from the roster), and a per-lane cost (summed from that lane's own `phase.end` tokens). When a live fan-out is also present, the `fanout.*` events overlay running/closed liveness onto the tree. This reuses the Stage/Phase surfacing exception already documented for `/th:pipelines`.
 
-**`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps) and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure.
+**`/trace` rendering:** `/trace` reads the initiative-level fan-out events to render the parallel region (lanes side-by-side with start/end timestamps), shows each lane's advisory `pending_gate` from the roster when present, and can drill into any lane's per-project trace. The `--cost` rollup sums token counts across all lanes for an initiative-level cost figure (reader-only — see "Reader-only initiative rollup" below).
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when a fan-out is actually dispatched. Single-project runs (`initiative: null`) and serial multi-project runs do not produce this file. The file is mandatory for any run where `fanout.start` fires — a fan-out that emits no initiative-level trace violates the observability contract.
 
-**Implementation status.** Both renderers documented above are implemented: `skills/pipelines/SKILL.md § Initiative fan-out — parent/child lane rows` and `skills/trace/SKILL.md § Parallel region rendering (fan-out)`.
+**Implementation status.** Both renderers documented above are implemented: `skills/pipelines/SKILL.md § Leader → orchestrator tree (roster-sourced, grouped by project)` and `skills/trace/SKILL.md § Parallel region rendering (fan-out)`.
+
+### 00-leader-roster.md — the leader's index (leader→orchestrator tree source)
+
+`00-leader-roster.md` is the leader's durable tracking file — the authoritative enumeration of every `th:orchestrator` the leader has spawned. It is **not an events file** (no JSONL, no `phase.*`/`operation.*`/`fanout.*` events) and it is distinct from `overview.md` (which carries the cross-project narrative, not the per-orchestrator tracking rows). The **leader is the sole writer**; every observability reader (`/th:pipelines`, `/trace`, `/th:recover`) treats it as read-only.
+
+**Location (mode-independent path shape):** `{initiative-root}/00-leader-roster.md` when `initiative` is set (N > 1 projects); `{feature-root}/00-leader-roster.md` for a single-task run (N = 1). Full contract: `agents/leader.md § 00-leader-roster.md`.
+
+**Columns:** `Task/Project`, `State ref (docs_root)`, `Agent` (always `th:orchestrator`), `Phase`, `Status`, `pending_gate`. `Phase`/`Status` are the coarse fields the leader reads from each orchestrator's `00-state.md § Current State` (never a gate-release field). This is what makes the roster the leader→orchestrator **tree source**: it names each orchestrator, points at its `docs_root` (the `State ref`), and carries its coarse position.
+
+**`pending_gate` is ADVISORY.** The `pending_gate` column is a leader-maintained hint of which STAGE-GATE a lane is paused at, used only to drive the leader's gate-presentation/routing behaviour. It is **never a gate-clear signal** and nothing downstream treats a roster row as authoritative for gate status — the leader that writes it never reads or writes any orchestrator's `gate1_release`/`gate2_release_last`/`gate3_release` field or any `stage.gate.release` event; it presents each gate to the operator inline and relays the decision back, but never records a gate-release. Renderers surface `pending_gate` verbatim and must never infer a gate-clear from it.
+
+### Reader-only initiative rollup
+
+The initiative view that `/th:pipelines` and `/trace --cost` present — and that the leader itself builds to summarize an initiative — is a **reader-only aggregation**. It joins, by the roster's `State ref`, each orchestrator's OWN `00-execution-events.{jsonl|md}` (`phase.end` `tokens`/`status`) and coarse `00-state.md § Current State` fields into one per-initiative cost + status view.
+
+**The leader is aggregator/reader, never writer of any orchestrator's stream.** Building this rollup, the leader never writes to any orchestrator's `00-execution-events.*` or `00-state.md` — those files stay exclusively the owning orchestrator's. The rollup **never touches the gate seam**: it reads coarse phase/status and `phase.end` token counts only, never a gate-release field or a `stage.gate.release` event. Its inputs are each orchestrator's own per-lane trace plus the roster; its output is a read, added additively to the tree render. The initiative-level `fanout.*` file (which the leader DOES write — see above) is the one initiative-scoped stream the leader authors, and it carries fan-out lifecycle events only, never per-phase detail lifted out of a lane's trace.
+
+### leader-recover vs orchestrator-recover (two-tier recovery)
+
+Recovery is split along the same present-and-relay vs. prepare-and-record seam. `/th:recover` reads state and routes; it presents no gate and records no release itself.
+
+| | **leader-recover** | **orchestrator-recover** |
+|---|---|---|
+| Owner | `th:leader` (top-level) | the pipeline's own `th:orchestrator` |
+| Rebuilds from | `00-leader-roster.md` + each orchestrator's coarse `phase`/`status`/`next_action` (+ `overview.md` if an initiative) | that orchestrator's OWN `00-state.md § Current State` dual-record + its `{events_file}` |
+| Answers | "which orchestrators exist and roughly where are they" | "is this STAGE-GATE cleared, and what runs next" |
+| Gate behaviour | **presenter/relayer, never recorder** — never reads or writes a gate-release field; re-presents inline any `gate_pending` an orchestrator returns on resume and relays the operator's decision back | **preparer/recorder** — re-reads its own dual-record (structural: `stage.gate.release` event present AND per-gate release field in the clear-allowlist) and returns a `gate_pending` to `th:leader` for any un-cleared STAGE-GATE, per its Recover safety contract |
+| Contract | `agents/leader.md § leader-recover` | `agents/orchestrator.md § orchestrator-recover` |
+
+`/th:recover` itself is read-only: it runs the structural gate-cleared check only to surface which gate is un-cleared and route to the right orchestrator — it never records a release. The leader rebuilds coarse tracking (never reading or writing any gate-release record) and re-spawns the relevant orchestrator; that orchestrator, on boot, re-reads its own dual-record and returns a `gate_pending` for any un-cleared STAGE-GATE, which the leader re-presents to the operator inline. This is why an un-cleared gate can never be silently bypassed on recovery: cleared-status derives ONLY from the structural dual-record check the owning orchestrator runs — never from prose and never from the advisory roster — so the leader's coarse tracking can never mark a gate cleared, and the re-presentation flows leader-mediated from the orchestrator's `gate_pending`.
 
 ## Additional pipeline event types
 
@@ -510,7 +581,7 @@ Sanity Check, step 6).
      these agents as `opus` regardless of any other assumption:
      `architect`, `security`, `adversary`, `qa-plan`, `ux-reviewer`, `reviewer`,
      `reviewer-consolidator`, `agent-builder`, `mentor`, `gcp-infra`, `gcp-cost-analyzer`,
-     `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
+     `leader`, `orchestrator`. This is the canonical static list — `skills/trace/SKILL.md` reads the
      same enumeration and MUST NOT diverge from it.
    - **No "all others → sonnet" default.** When none of the three paths above resolve a
      classification, classify as `sonnet` and mark the row with `(?)` to signal that the

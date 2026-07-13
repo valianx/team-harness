@@ -18,6 +18,16 @@
 //     read from the payload and copied into the record verbatim, never
 //     parsed, decoded, or used for control flow.
 //
+// STOP-SIDE RESIDUAL (`project` key, see subagent-start.ts): the SubagentStop
+// payload carries agent_type/agent_id/stop_reason only — no prompt field —
+// so this hook CANNOT read a `TH-LANE: {project-key}` marker the way the
+// PreToolUse start-side breadcrumb does. `subagent.stop` records never carry
+// `project`. This is a documented, permanent gap, not a TODO: the authoritative
+// per-agent timing record is the orchestrator's `phase.end` event (which does
+// carry `project` when the dispatching orchestrator is lane-scoped); this
+// breadcrumb remains the coarse existence proof it always was. See
+// docs/observability.md for the pairing rule this residual implies.
+//
 // The body exposes a SubagentTraceWriter interface for testability.
 // The CC entry injects a real filesystem writer; tests inject a mock.
 //

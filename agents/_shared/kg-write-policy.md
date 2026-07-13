@@ -146,11 +146,11 @@ matches of the same node type. A `process-insight` candidate is never Absorbed i
 
 ## Session attribution (best-effort)
 
-**Origin of the `session_id`.** The orchestrator calls `mcp__memory__session_start` at
-Phase 0a Step 1b and writes the returned UUID to
+**Origin of the `session_id`.** `th:leader` calls `mcp__memory__session_start` at
+Phase 0a Intake (Step 2) and writes the returned UUID to
 `workspaces/{feature-name}/session.json` as `"session_id": "<uuid>"`. That file is the
 single source of truth for the session_id throughout the pipeline. The session is closed
-by `mcp__memory__session_end` at Phase 6.
+by `mcp__memory__session_end` at Phase 6 (owned by the `th:orchestrator` instance).
 
 **Convention for every writer.** When calling `create_nodes`, pass `"session_id":
 "<uuid>"` alongside `"nodes"` if and only if all three conditions hold:

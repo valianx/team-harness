@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.127.0] - 2026-07-13
+
+### Added
+- `agents/leader.md`, `agents/orchestrator.md`, and `agents/_shared/gate-contract.md` — the split runtime agents and the single-source STAGE-GATE contract (dual-record release, record-based recover backstop, STOP-block templates, ambiguous-reply rule, and the preparer+recorder / presenter+relayer flow).
+
+### Changed
+- Split the pipeline coordinator into two agents. `th:leader` is the top-level session agent and the operator's single point of contact — it owns Intake, Discover/framing, Specify, spec/AC co-authoring, config/language resolution, and initiative/`overview.md` ownership, and it multiplies `th:orchestrator` instances (one per task or project). `th:orchestrator` is a task-scoped execution engine that runs Design → Delivery for one task and prepares and records all three STAGE-GATEs. The single-source gate mechanism moves to `agents/_shared/gate-contract.md`, referenced by both agents.
+- STAGE-GATEs are now leader-mediated. The `th:orchestrator` prepares and records each gate but returns a `gate_pending` status to `th:leader`, which presents the gate to the operator inline and relays the operator's verbatim decision back (tagged `leader-relayed-operator`) for the orchestrator to record as the dual-record. The orchestrator remains the sole writer of gate state and of its own `00-state.md`; `th:leader` never writes a gate-release. `dev-guard`'s native prompt remains the deterministic floor on irreversible outward actions (git push, `gh pr create/merge`).
+
 ## [2.126.0] - 2026-07-06
 
 ### Added

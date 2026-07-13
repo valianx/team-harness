@@ -96,6 +96,171 @@ assert_allow "git clean (no -f)" '{"tool_name":"Bash","tool_input":{"command":"g
 assert_allow "git commit -m message" '{"tool_name":"Bash","tool_input":{"command":"git commit -m hello"}}'
 
 echo
+echo "=== Bash: claude --dangerously-skip-permissions spawn (Task-6, AC-6.2/6.4/6.5) ==="
+
+# Builds a Bash tool-call JSON payload for an arbitrary (possibly multi-line,
+# quote-heavy) command string via python3's json.dumps — hand-escaping a
+# command this size into a single-quoted bash string literal is exactly the
+# kind of transcription error this test suite must not risk.
+make_bash_payload() {
+    local cmd="$1"
+    python3 -c "
+import json, sys
+cmd = sys.argv[1]
+print(json.dumps({'tool_name': 'Bash', 'tool_input': {'command': cmd}}))
+" "$cmd"
+}
+
+# Verbatim raw text of the legacy top-level tmux batch-spawn command
+# (agents/orchestrator.md:4040-4047 at the time of Task-6) — byte-identical
+# to hooks/ts/bodies/policy-block.ts's LEGACY_TMUX_SPAWN_RAW (both were
+# derived from the same source file). The single-quoted heredoc delimiter
+# ('EOF') disables ALL bash expansion/interpolation, so this is taken 100%
+# literally — no manual escaping, no risk of a bash-side transcription error
+# diverging from the doc.
+LEGACY_TMUX_SPAWN_TEMPLATE=$(cat <<'EOF'
+claude --worktree {task-name} --tmux --dangerously-skip-permissions \
+  --settings '{
+    "hooks": {
+      "Stop": [{"hooks": [{"type": "command", "command": "STATE=$(cat workspaces/*/00-state.md 2>/dev/null); STATUS=$(echo \"$STATE\" | grep -oP \"status: \\K\\w+\" | head -1); SUMMARY=$(echo \"$STATE\" | grep -A1 \"^## Agent Results\" | tail -1 | head -c 200); printf \"%s|%s|%s\\n\" \"{task-name}\" \"${STATUS:-unknown}\" \"${SUMMARY:-no summary}\" > /tmp/batch-results/{task-name}.done; echo $(date +%s) {task-name} DONE >> /tmp/batch-results/events.log"}]}],
+      "PostToolUse": [{"hooks": [{"type": "command", "command": "if echo \"$TOOL_INPUT\" | grep -q 00-state.md; then PHASE=$(grep -oP \"phase: \\K[\\w.]+\" workspaces/*/00-state.md 2>/dev/null | head -1); printf \"%s|%s\\n\" \"{task-name}\" \"${PHASE:-unknown}\" > /tmp/batch-results/{task-name}.progress; echo $(date +%s) {task-name} PROGRESS >> /tmp/batch-results/events.log; fi"}]}]
+    }
+  }' \
+  -p "/th:issue #{number} --skip-delivery"
+EOF
+)
+LEGACY_TMUX_SPAWN_VALID="${LEGACY_TMUX_SPAWN_TEMPLATE//\{task-name\}/my-task-1}"
+LEGACY_TMUX_SPAWN_VALID="${LEGACY_TMUX_SPAWN_VALID//\{number\}/123}"
+
+echo "--- bare/simple skip-permissions spawns (DENY, no exemption applies) ---"
+assert_deny "claude --dangerously-skip-permissions (bare)" \
+    "$(make_bash_payload 'claude --dangerously-skip-permissions')"
+assert_deny "claude -p \"do X\" --dangerously-skip-permissions (reordered, minimal)" \
+    "$(make_bash_payload 'claude -p "do X" --dangerously-skip-permissions')"
+assert_deny "nohup claude --dangerously-skip-permissions & (composed)" \
+    "$(make_bash_payload 'nohup claude --dangerously-skip-permissions &')"
+
+echo
+echo "--- exact legacy top-level tmux batch-spawn (agents/orchestrator.md:4040) -> exempt, no deny ---"
+assert_allow "legacy tmux batch-spawn, exact literal form (AC-6.5 exemption)" \
+    "$(make_bash_payload "$LEGACY_TMUX_SPAWN_VALID")"
+
+echo
+echo "--- anti-forgeable: variants of the legacy template must NOT match the exemption (DENY) ---"
+
+# Mismatched task-name across occurrences (only the FIRST of 7 occurrences
+# differs) — the exemption requires the SAME value at every occurrence via
+# backreference; an inconsistent value fails the match.
+LEGACY_TMUX_SPAWN_MISMATCH="${LEGACY_TMUX_SPAWN_VALID/my-task-1/task-mismatch}"
+assert_deny "legacy template with mismatched task-name across occurrences" \
+    "$(make_bash_payload "$LEGACY_TMUX_SPAWN_MISMATCH")"
+
+# Extra injected argument appended after the exact template.
+assert_deny "legacy template with an injected trailing command" \
+    "$(make_bash_payload "$LEGACY_TMUX_SPAWN_VALID && rm -rf /tmp/pwned")"
+
+# Reordered flags on the first line (--dangerously-skip-permissions before
+# --worktree/--tmux instead of after).
+LEGACY_TMUX_SPAWN_REORDERED="${LEGACY_TMUX_SPAWN_VALID/claude --worktree my-task-1 --tmux --dangerously-skip-permissions/claude --dangerously-skip-permissions --worktree my-task-1 --tmux}"
+assert_deny "legacy template with reordered spawn flags" \
+    "$(make_bash_payload "$LEGACY_TMUX_SPAWN_REORDERED")"
+
+# task-name outside the charset-bounded wildcard (a space breaks the
+# [A-Za-z0-9._-]{1,80} group).
+LEGACY_TMUX_SPAWN_BAD_CHARSET="${LEGACY_TMUX_SPAWN_TEMPLATE//\{task-name\}/task name with spaces}"
+LEGACY_TMUX_SPAWN_BAD_CHARSET="${LEGACY_TMUX_SPAWN_BAD_CHARSET//\{number\}/123}"
+assert_deny "legacy template with task-name outside the charset-bounded wildcard" \
+    "$(make_bash_payload "$LEGACY_TMUX_SPAWN_BAD_CHARSET")"
+
+echo
+echo "--- benign claude invocations without the flag (ALLOW, unaffected) ---"
+assert_allow "claude -p \"hello\" (no skip-permissions flag)" \
+    "$(make_bash_payload 'claude -p "hello"')"
+
+echo
+echo "--- SEC-001 remediation: path-qualified and quote-split evasions (DENY) ---"
+
+# Path-qualified invocation of the same `claude` binary — the leading-boundary
+# class alone required the character immediately before `claude` to be a
+# shell separator or start-of-string; a path separator is neither, so this
+# form previously evaded the router entirely (fell through to none()).
+assert_deny "/usr/bin/claude --dangerously-skip-permissions (absolute path)" \
+    "$(make_bash_payload '/usr/bin/claude --dangerously-skip-permissions')"
+assert_deny "./claude --dangerously-skip-permissions (relative path)" \
+    "$(make_bash_payload './claude --dangerously-skip-permissions')"
+assert_deny "bin/claude --dangerously-skip-permissions (bare relative path)" \
+    "$(make_bash_payload 'bin/claude --dangerously-skip-permissions')"
+
+# Quote-splitting the flag: bash concatenates adjacent quoted strings, so
+# --dangerously-skip-permiss""ions evaluates at runtime to the identical
+# flag; the literal-text matcher previously required one contiguous
+# substring and missed this.
+assert_deny "claude --dangerously-skip-permiss\"\"ions (quote-split flag)" \
+    "$(make_bash_payload 'claude --dangerously-skip-permiss""ions')"
+
+# Basename-only match must not false-positive on a name that merely ends in
+# "claude" without a boundary immediately before it.
+assert_allow "myclaude --dangerously-skip-permissions (not the claude binary)" \
+    "$(make_bash_payload 'myclaude --dangerously-skip-permissions')"
+
+echo
+echo "--- SEC-001 remediation Round 2: lexical-noise class closed by normalizeLexicalNoise (DENY) ---"
+
+# Quote-split the `claude` token itself (not just the flag, as Round 1
+# covered): bash removes the empty quote pair at parse time, so
+# `cla""ude` evaluates to the identical binary name `claude`.
+assert_deny "cla\"\"ude --dangerously-skip-permissions (quote-split claude token)" \
+    "$(make_bash_payload 'cla""ude --dangerously-skip-permissions')"
+
+# Whole-token double-quoting: the leading boundary char immediately before
+# `claude` was the quote mark itself, which is not in the boundary class —
+# this was reachable before normalization closed the general class.
+assert_deny "\"claude\" --dangerously-skip-permissions (whole-token double-quoted)" \
+    "$(make_bash_payload '"claude" --dangerously-skip-permissions')"
+
+# Single-quote noise spliced mid-token.
+assert_deny "c'l'aude --dangerously-skip-permissions (single-quote-split claude token)" \
+    "$(make_bash_payload "c'l'aude --dangerously-skip-permissions")"
+
+# Leading backslash: bash's alias-bypass idiom (`\claude` skips shell
+# function/alias resolution but still runs the `claude` binary) — the
+# character immediately before `claude` was `\`, not in the boundary class.
+assert_deny "\\claude --dangerously-skip-permissions (leading backslash)" \
+    "$(make_bash_payload '\claude --dangerously-skip-permissions')"
+
+# Backslash noise mid-token.
+assert_deny "cl\\aude --dangerously-skip-permissions (mid-token backslash)" \
+    "$(make_bash_payload 'cl\aude --dangerously-skip-permissions')"
+
+echo
+echo "--- SEC-001 remediation Round 2: known-accepted runtime-evaluation residual (documented, NOT denied) ---"
+
+# Variable indirection: the literal flag text never appears in the command
+# string a PreToolUse hook receives — only `$X` does. No static
+# command-string matcher (regex, normalization, or otherwise) can see the
+# value bash assigns to X at expansion time; this is a structural limit, not
+# a gap in normalizeLexicalNoise. The residual is closed structurally by
+# AC-6.4 (native Task-tool spawn in the split path — no Bash `claude`
+# invocation exists there for this residual to hide inside). Do NOT "fix"
+# this by attempting to resolve shell variables in policy-block.ts — that
+# requires a shell interpreter, which this hook deliberately is not.
+assert_allow "X=--dangerously-skip-permissions; claude \$X (runtime variable indirection, accepted residual)" \
+    "$(make_bash_payload 'X=--dangerously-skip-permissions; claude $X')"
+
+echo
+echo "--- SEC-001 remediation Round 2: deny reason string must not overclaim (honest framing) ---"
+
+SKIP_PERMISSIONS_DENY_OUTPUT=$(make_bash_payload 'claude --dangerously-skip-permissions' | _exec_hook 2>&1)
+if echo "$SKIP_PERMISSIONS_DENY_OUTPUT" | grep -qi "unconditional"; then
+    FAIL=$((FAIL + 1))
+    FAILURES+=("deny reason must not claim 'unconditional' (overclaim) | output: $SKIP_PERMISSIONS_DENY_OUTPUT")
+    echo "  [FAIL] deny reason does not contain 'unconditional' (got: $SKIP_PERMISSIONS_DENY_OUTPUT)"
+else
+    PASS=$((PASS + 1))
+    echo "  [PASS] deny reason does not contain 'unconditional'"
+fi
+
+echo
 echo "=== Bash: destructive SQL via shell (DENY) ==="
 assert_deny "DROP TABLE" '{"tool_name":"Bash","tool_input":{"command":"psql -c \"DROP TABLE users\""}}'
 assert_deny "drop database (lowercase)" '{"tool_name":"Bash","tool_input":{"command":"psql -c \"drop database analytics\""}}'

@@ -26,6 +26,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var fs = __toESM(require("node:fs"), 1);
 var path = __toESM(require("node:path"), 1);
 var os = __toESM(require("node:os"), 1);
+var import_node_child_process = require("node:child_process");
 
 // shim/normalized-v1.ts
 var MAX_PAYLOAD_BYTES = 1048576;
@@ -207,9 +208,53 @@ function isTerminalStatus(content) {
   if (status === null) return false;
   return status === "complete" || status.startsWith("blocked-");
 }
-function evaluate(input, reader) {
-  void input;
-  const subagentType = typeof input.tool?.input?.["subagent_type"] === "string" ? input.tool.input["subagent_type"] : "";
+function extractStateRefHeader(promptText) {
+  const firstLine = promptText.split("\n", 1)[0] ?? "";
+  const m = /^TH-STATE-REF:\s*(.+?)\s*$/.exec(firstLine);
+  return m ? m[1] : null;
+}
+function normalizeSep(p) {
+  return p.replace(/\\/g, "/");
+}
+function isPathWithin(child, root) {
+  const c = normalizeSep(child);
+  const r = normalizeSep(root).replace(/\/+$/, "");
+  return c === r || c.startsWith(r + "/");
+}
+function resolveRepoName(reader) {
+  const gitName = reader.gitRepoName();
+  if (gitName) return gitName;
+  return reader.cwd().split(/[/\\]/).filter(Boolean).pop() ?? "";
+}
+function containmentRoots(reader) {
+  const roots = [];
+  const localRoot = reader.realpath(reader.cwd());
+  if (localRoot !== null) roots.push(localRoot);
+  const config = reader.readConfig();
+  if (config !== null) {
+    const logsMode = typeof config["logs-mode"] === "string" ? config["logs-mode"] : "";
+    const logsPath = typeof config["logs-path"] === "string" ? config["logs-path"] : "";
+    const logsSub = typeof config["logs-subfolder"] === "string" ? config["logs-subfolder"] : "work-logs";
+    if (logsMode === "obsidian" && logsPath) {
+      const repoName = resolveRepoName(reader);
+      if (repoName) {
+        const vaultRoot = `${logsPath}/${logsSub}/${repoName}`;
+        const realVaultRoot = reader.realpath(vaultRoot);
+        if (realVaultRoot !== null) roots.push(realVaultRoot);
+      }
+    }
+  }
+  return roots;
+}
+function resolveContainedStateRef(rawPath, reader) {
+  if (!rawPath) return null;
+  const realTarget = reader.realpath(rawPath);
+  if (realTarget === null) return null;
+  const roots = containmentRoots(reader);
+  const contained = roots.some((root) => isPathWithin(realTarget, root));
+  return contained ? realTarget : null;
+}
+function selectByMtime(reader) {
   const searchRoot = reader.cwd();
   const rawCandidates = reader.findFiles(searchRoot, "00-state.md", 4);
   const config = reader.readConfig();
@@ -218,7 +263,7 @@ function evaluate(input, reader) {
     const logsPath = typeof config["logs-path"] === "string" ? config["logs-path"] : "";
     const logsSub = typeof config["logs-subfolder"] === "string" ? config["logs-subfolder"] : "work-logs";
     if (logsMode === "obsidian" && logsPath) {
-      const repoName = searchRoot.split(/[/\\]/).filter(Boolean).pop() ?? "";
+      const repoName = resolveRepoName(reader);
       if (repoName) {
         const vaultRoot = `${logsPath}/${logsSub}/${repoName}`;
         const vaultCandidates = reader.findFiles(vaultRoot, "00-state.md", 3);
@@ -227,17 +272,24 @@ function evaluate(input, reader) {
     }
   }
   if (rawCandidates.length === 0) {
-    return allow();
+    return null;
   }
   const sorted = rawCandidates.slice().sort((a, b) => reader.mtime(b) - reader.mtime(a));
-  let stateContent = null;
   for (const candidate of sorted) {
     const content = reader.readFile(candidate);
     if (content === null) continue;
     if (isTerminalStatus(content)) continue;
-    stateContent = content;
-    break;
+    return content;
   }
+  return null;
+}
+function evaluate(input, reader) {
+  const subagentType = typeof input.tool?.input?.["subagent_type"] === "string" ? input.tool.input["subagent_type"] : "";
+  const promptText = typeof input.tool?.input?.["prompt"] === "string" ? input.tool.input["prompt"] : "";
+  const stateRefRaw = extractStateRefHeader(promptText);
+  const stateRefPath = stateRefRaw !== null ? resolveContainedStateRef(stateRefRaw, reader) : null;
+  const refContent = stateRefPath !== null ? reader.readFile(stateRefPath) : null;
+  const stateContent = refContent !== null ? refContent : selectByMtime(reader);
   if (stateContent === null) {
     return allow();
   }
@@ -314,6 +366,7 @@ function evaluate(input, reader) {
 }
 
 // entry/checkpoint-guard.cc.ts
+var GIT_EXEC_TIMEOUT_MS = 5e3;
 function makeStateReader() {
   return {
     readFile(filePath) {
@@ -370,6 +423,34 @@ function makeStateReader() {
     },
     cwd() {
       return process.cwd();
+    },
+    realpath(filePath) {
+      try {
+        return fs.realpathSync(filePath);
+      } catch {
+        return null;
+      }
+    },
+    // Worktree-stable repo name: derives from the MAIN repo's `.git`
+    // directory (git-common-dir), not cwd()'s own last path segment — a
+    // `th-wt-{slug}` worktree checkout has a basename that does NOT match
+    // the repo name (docs/worktree-discipline.md).
+    gitRepoName() {
+      try {
+        const out = (0, import_node_child_process.execFileSync)("git", ["rev-parse", "--git-common-dir"], {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          timeout: GIT_EXEC_TIMEOUT_MS,
+          stdio: ["ignore", "pipe", "ignore"]
+        }).trim();
+        if (!out) return null;
+        const absCommonDir = path.isAbsolute(out) ? out : path.resolve(process.cwd(), out);
+        const repoRoot = path.dirname(absCommonDir);
+        const name = path.basename(repoRoot);
+        return name || null;
+      } catch {
+        return null;
+      }
     }
   };
 }

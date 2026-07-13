@@ -39,6 +39,29 @@ The gate fires UNCONDITIONALLY for covered outward actions and gates by destinat
 
 ---
 
+## Ask-class caveat — the gate stops only when the session stops on `ask`
+
+The outward-action gate is `ask`-class, not `deny`-class. When `dev-guard` returns `permissionDecision: "ask"` for a lane's push / merge / PR write, that decision only STOPS the action if the operator's session actually halts on an `ask` — i.e. the session is interactive and a present operator answers the prompt. It is not a `deny`: the runtime does not refuse the action outright; it defers to the operator's normal permission flow. This is a deliberate loosening (a delivery push at STAGE-GATE-3 must be able to proceed through operator approval), and its consequences must be stated honestly rather than oversold.
+
+- **Do not assume `ask` stops under a broad Bash auto-allow.** If the operator's session runs with a blanket `Bash` allow, `--dangerously-skip-permissions`, or any posture that auto-satisfies `ask` prompts, an `ask` is auto-answered and the outward action proceeds with no human in the loop. The gate did its job (it issued `ask`); the session's permission posture is what determined whether that `ask` actually halted.
+- **Do not assume `ask` stops under a non-interactive or bridged posture.** In a headless / `-p` / bridged / relay session there may be no interactive operator to answer the prompt; how the runtime handles an unanswered `ask` is a session-posture property outside the gate's control.
+- **th:leader's gate presentation must not oversell this.** When th:leader presents a lane's STAGE-GATE to the operator inline and relays the decision back to the owning orchestrator (`agents/leader.md § Gate presentation protocol` — "Ask-class caveat"), the presentation is a request for a human decision, not a claim that anything is being mechanically "halted." The leader does not know the session's permission posture and must not imply a guarantee the `ask`-class gate does not make.
+- **The in-lane skip-permissions prohibition IS a `deny` floor — correctly so.** Where an outward-action `ask` is deliberately soft, the security-critical case of a lane spawning a `claude … --dangerously-skip-permissions` child is a `deny` in `policy-block` (SEC-DR-B, AC-6.2) — fail-closed, not deferred. The asymmetry is intentional: a skip-permissions spawn would bypass every downstream hook at any depth, so it is refused outright rather than handed to a permission prompt that a broad auto-allow could satisfy. AC-6.4 (native `Task`-tool spawn on the split path — no Bash `claude` invocation exists to evade) is the structural control; the `policy-block` deny is the defense-in-depth backstop for the legacy Bash-spawn path.
+
+---
+
+## STAGE-GATE-3 presentation and the ask-class loosening (SEC-DR-G)
+
+The ask-class caveat has a direct consequence for how STAGE-GATE-3 — the human push/PR gate — is surfaced and released in the leader+orchestrator split.
+
+**(a) The leader presents STAGE-GATE-3 inline and relays the operator's decision.** STAGE-GATE-3 is prepared and recorded inside the orchestrator that owns the task; the leader presents its STOP block to the operator inline — in the operator's main conversation, the only reliably reachable channel — and relays the operator's decision (verbatim, tagged `leader-relayed-operator`) back to the orchestrator, which records the release (`agents/leader.md § Gate presentation protocol`). Because the outward-action `ask` does not itself guarantee a stop (it can be auto-satisfied), the presentation must be an active, unmissable interactive surface that names three things: the orchestrator (its slug), the gate (`STAGE-GATE-3`), and the decision the operator is being asked to make. A passive breadcrumb the operator might scroll past is insufficient — the human decision is the actual control here. The deterministic floor on the actual push/PR remains `dev-guard`'s native `ask`, not this presentation; the presentation is what routes the operator to that decision.
+
+**(b) Anti-pattern: broad Bash auto-allow + lane mode.** Running a multi-lane fan-out under a blanket `Bash` auto-allow (or any posture that auto-answers `ask`) is an anti-pattern: it removes the human from the STAGE-GATE-3 outward-action prompt, so a lane's delivery push/merge could proceed without the operator ever entering the gate. The operator releases STAGE-GATE-3 by replying to the leader's inline presentation; the leader relays that decision to the owning orchestrator, which records the release (the gate release travels operator → leader → orchestrator, tagged `leader-relayed-operator`), and recover's STAGE-GATE-3 clear-allowlist requires `gate3_release = ship` (`skills/recover/SKILL.md § Rule 1`). The broad auto-allow posture defeats the interactive stop this design depends on.
+
+**(c) recover's fail-safe covers gate NON-release, not an already-run `ask`-satisfied action.** `/th:recover`'s Rule 1 (re-present any un-cleared STAGE-GATE, fail-closed — `skills/recover/SKILL.md`) protects the case where a gate was never released: on resume it finds no `gate3_release = ship` plus `stage.gate.release` event and the orchestrator returns its `gate_pending`, which `th:leader` re-presents inline. It does NOT and cannot undo an outward action that ALREADY RAN because an `ask` was auto-satisfied under a broad auto-allow — a push that already landed is not an un-cleared gate, it is a completed irreversible action with no state to re-present. The fail-safe is a forward re-prompt for un-taken decisions, never a rollback of a taken one. This is the residual the ask-class loosening acknowledges: the deterministic floor for the truly irreversible in-lane case is the `deny` in `policy-block` (see the ask-class caveat above), not recover.
+
+---
+
 ## Inline Orchestration Permit (SEC-DR-2)
 
 **Re-founded in v2.89.0.** Executing the orchestrator role inline at top level is the CC native architecture — the general agent IS the orchestrator. No filesystem marker is required. The condition for inline orchestration is:
@@ -87,7 +110,7 @@ The orchestrator disposition is a **signal of routing topology** — the same ca
 The following security mechanisms run **input-independent** and are NOT waivable:
 
 - **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
-- **Path-pattern auto-escalation (`orchestrator.md` Step 7):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
+- **Path-pattern auto-escalation (`leader.md § Phase 0a` classification):** sets `security_sensitive: true` based on file paths touched by the PR. This runs on the diff, not on the session state.
 - **Bug-fix forcing rule:** for `type: fix` and `type: hotfix`, `security_sensitive: true` is forced and the security agent always runs at Phase 3.
 
 ---
@@ -114,7 +137,8 @@ On the CC foreground path (top-level, `Task` available), the Layer-1 hook fires 
 
 When the orchestrator disposition is active, the top-level agent reads and applies the following files (by pointer — the output style body does not duplicate their content):
 
-- `agents/orchestrator.md` — Step 6 routing, Discover phase, all phase contracts and gate enforcement.
+- `agents/leader.md` — intake, Discover phase, classification and routing.
+- `agents/orchestrator.md` — all phase contracts and gate enforcement.
 - `docs/discover-phase.md` — patient intake, advance-signal gate, intake survey.
 - `docs/reasoning-checkpoint.md` — B1/B2/B3 boundaries and advance contract.
 - `docs/subagent-orchestration.md` — dispatch protocol and Takeover Pipeline Manifest.

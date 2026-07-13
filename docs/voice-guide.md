@@ -58,7 +58,7 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 **Documented exceptions** (committed artefacts where Spanish is allowed):
 
 - **`agents/security.md` report-body template, `reviews/04-security.md` report bodies, `agents/reviewer.md` review-body templates, `reviews/04-internal-review.md` reviewer outputs.** The two agents produce Spanish-language reports per their contracts. The Spanish output is only the body of those workspace doc reports (and the GitHub PR-review comment). The agent's system prompt, status-block fields, and framework-level fields remain English.
-- **`agents/orchestrator.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language.
+- **`agents/leader.md` Step 6 intent-detection routing table.** The table lists patterns in both English and Spanish so the operator can chat in either language.
 
 **`agents/translator.md` example glossary tables** are domain illustrations, not operator copy. Out of scope for this guide.
 
@@ -96,7 +96,7 @@ The table below defines which operations are **silent** vs **operator-facing**. 
 |----------|-----------|------------|-----------|
 | Config load (read `.team-harness.json`, resolve paths) | SILENT — log `operation.*` event | one-line error + suggestion | The operator does not need to see each config read |
 | MCP verify (memory / context7 connectivity probe) | SILENT — log `operation.*` event | one-line error + suggestion | Connectivity OK is noise; failure is actionable |
-| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the orchestrator boot |
+| Initialization / boot sequence | SILENT | one-line error + suggestion | Already the established pattern for the leader boot |
 | Phase-transition status blocks | PERMITTED (operator-facing) | PERMITTED | The operator needs to know which stage is active |
 | Tool error (any tool call fails) | n/a | SURFACE one-line summary + next-step; full output → events | Errors are always reported — never raw dumps |
 
@@ -104,11 +104,11 @@ The table below defines which operations are **silent** vs **operator-facing**. 
 
 ---
 
-## orchestrator as the Canonical Entry Point (§7.5)
+## leader as the Canonical Entry Point (§7.5)
 
-When documenting how to invoke the system, treat `@th:orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+When documenting how to invoke the system, treat `@th:leader <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
 
-The operator's mental model is: orchestrator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+The operator's mental model is: leader is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
 
 ## Application Checklist for Contributors (§7.6)
 
@@ -118,7 +118,7 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
 - [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, workspace doc templates). Exception: `/th:pipelines` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `reviews/04-security.md` / `reviews/04-internal-review.md` outputs; `agents/orchestrator.md` Step 6 routing table.
-- [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
+- [ ] All committed copy is in English. Exception: `agents/security.md` and `agents/reviewer.md` report-body templates and their `reviews/04-security.md` / `reviews/04-internal-review.md` outputs; `agents/leader.md` Step 6 routing table.
+- [ ] If the change documents how to invoke the system, the example uses `@th:leader <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 
 `tests/test_agent_structure.py` Suite 25 enforces a mechanical subset of these rules at CI time. The checklist above covers the human-judgement cases the test suite cannot catch (e.g., tone of a multi-sentence error message).

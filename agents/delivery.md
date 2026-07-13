@@ -67,7 +67,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
    Use the loaded context to write accurate documentation.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -978,7 +978,7 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 **Automated review (CodeRabbit) detection.** Not every consumer repo has CodeRabbit configured — team-harness does, but this step runs against whatever repo the pipeline targets, so detect before framing the review surface. CodeRabbit is `detected` when ANY of:
 
-1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at orchestrator Phase 0a Step 7), OR
+1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at leader Phase 0a Step 7), OR
 2. `.coderabbit.yaml` or `.coderabbit.yml` exists at the target repo root (cheap file check), OR
 3. the already-fetched `statusCheckRollup` (from the query above) contains a check entry whose name contains `CodeRabbit`.
 
@@ -1210,7 +1210,7 @@ The delivery agent's resilience contract is unchanged: **never fail the delivery
 
 #### Path derivation
 
-Derive from the workspaces path (resolved at orchestrator boot, passed in the dispatch):
+Derive from the workspaces path (resolved at leader boot, passed in the dispatch):
 
 ```
 feature_dir = basename(docs_root)                          # e.g. "2026-06-06_obsidian-worklog-interlinking"
@@ -1390,37 +1390,29 @@ The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfol
 
 **Gate:** proceed only when `initiative` in `00-state.md § Current State` is non-null (a confirmed initiative slug). When `initiative == null`, this step is a **no-op** — log `initiative_overview: skipped: no-initiative` and continue. This step is **best-effort**: any failure logs a one-line WARN and continues — the pipeline NEVER fails or blocks on an overview-write error.
 
-**Purpose:** update this project's row in `overview.md` with the resolved branch, version, PR number/URL, and status, now that Delivery has that information.
+**Purpose:** surface this project's resolved row data — branch, version, PR number/URL, and status — so `overview.md` reflects that Delivery has shipped. In lane mode, `th:leader` performs the actual `overview.md` write; Delivery only returns the data.
 
-**Resolve `overview_path`** using the same date-agnostic JOIN rule as orchestrator Phase 0a Step 1f (delivery JOINs the day-1 dated folder; it does NOT create):
-- Obsidian: glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` (the `*_` wildcard absorbs the `{YYYY-MM-DD}_` prefix); confirm by `initiative:` frontmatter. The located path is the dated `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/overview.md` folder.
-- Local: glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md`; confirm by frontmatter.
+**Lane mode — Delivery does NOT write `overview.md`.** A non-null `initiative` means this delivery run is an initiative lane spawned by `th:leader` (equivalently, a `lane_mode: true` spawn signal). `th:leader` is the **sole writer** of `overview.md`; a lane's Delivery MUST NOT glob for, read, or write that file. Instead of a read-modify-write, resolve this project's row data and **return it in the delivery status block** for `th:leader` to write:
 
-If `overview_path` does not exist, log `initiative_overview: skipped: overview-not-found` and continue. Do NOT create the file in this step — creation is the orchestrator's job at intake.
-
-**Read-modify-write:** read the full `overview.md`, locate the row whose `Project` column equals this run's `{project-slug}` (derived from `repo_name`). Replace that row in-place with the updated values:
-
-```
-| {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
-```
-
-Where:
+- `{project-slug}` — derived from `repo_name`
 - `{branch}` — the feature branch created in Step 3 of this delivery run
 - `{version}` — the bumped version from Step 9 (or `—` if version was skipped)
-- `{#PR-number}` — the PR number from Step 11 (or `—` if no PR was created)
-- `delivered` — the status is advanced to `delivered` on successful delivery
+- `{#PR-number}` — the PR number/URL from Step 11 (or `—` if no PR was created)
+- `status` — `delivered` on successful delivery
 
-Also update `updated:` in the frontmatter to today's date. Write the whole document back. Never write a partial payload.
+Return the row in the status block as a single pipe-delimited line:
 
-If the row for this project does not exist in the `## Projects` table, append a new row rather than failing — a delivery run should always be able to record its outcome.
+```
+initiative_row: | {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
+```
 
-**On-completion final reconcile:** after writing this project's row, re-read all rows in the `## Projects` table. If every row now shows status `delivered`, perform a final reconcile: update the frontmatter `updated:` to today's date and add a completion signal (e.g. `status: complete`), then finalize `## Functional Description` to reflect shipped reality by re-reading all sibling `01-plan.md` files. Write the whole document back.
+Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:leader`'s responsibility (see `agents/leader.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-leader (lane mode)` and continue.
 
-**Concurrency compatibility (parallel multi-project dispatch).** When the initiative uses parallel fan-out (see `agents/orchestrator.md § Parallel Multi-Project Dispatch`), each per-lane delivery run executes this step independently for its own project row. The `## Projects` rows are keyed per-project, so concurrent per-lane writes touch different rows and are safe under concurrency. The on-completion final-reconcile fires independently in each lane's delivery; the reconcile-ordering rule (parent serializes its own `overview.md` read-modify-writes; lane completions processed in arrival order) is enforced at the orchestrator level. Delivery's responsibility is unchanged: operate per-lane, write only this project's row, remain best-effort.
+**Single-writer model (why Delivery no longer writes `overview.md`).** `th:leader` is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each per-lane Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so two concurrent lane writes — or a lane write overlapping a leader reconcile — can clobber a sibling's row or a reconcile in flight. The suppression model above replaces it: every lane returns its row data and `th:leader` serializes all writes.
 
 **Status line (add to delivery status block):**
 ```
-initiative_overview: updated | skipped: no-initiative | skipped: overview-not-found | failed: {error}
+initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | failed: {error}
 ```
 
 ---

@@ -92,7 +92,7 @@ Per [`CLAUDE.md` §14](./CLAUDE.md#14-subagent-orchestration):
 
 - Adding or modifying an agent → route through `architect` first, then `agent-builder` writes the prompt.
 - Installer / hooks / MCP server changes → `architect` then `security` review (elevated privileges on the user's machine).
-- Pipeline phase changes → architecture review mandatory; update `agents/orchestrator.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
+- Pipeline phase changes → architecture review mandatory; update `agents/leader.md` + `agents/orchestrator.md` + `agents/_shared/gate-contract.md` + `agents/ref-direct-modes.md` + `agents/ref-special-flows.md` atomically.
 
 ## Verifying your change
 
