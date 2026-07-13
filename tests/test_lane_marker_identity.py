@@ -17,7 +17,7 @@ anchor and then checks the SAME literal appears in the injector.
 
 Task ordering note: this repo's plan (`01-plan.md` § Work Plan) makes
 Task-7 (this script) depend only on Task-4/5/6 (hooks), not on Task-2
-(the split itself, which authors `agents/lider.md` / `agents/orquestador.md`
+(the split itself, which authors `agents/leader.md` / `agents/orchestrator.md`
 — the injector side). When those files are absent, this script reports a
 distinct PENDING status (exit 0, never a false PASS) rather than silently
 skipping — see `tests/evidence/nested-lane-probes.md` § "Marker
@@ -46,8 +46,8 @@ CHECKPOINT_GUARD_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.
 SUBAGENT_START_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts"
 
 # Injector candidates — the split authors these in Task-2/Task-3, not Task-7.
-ORQUESTADOR_MD = REPO_ROOT / "agents" / "orquestador.md"
-LIDER_MD = REPO_ROOT / "agents" / "lider.md"
+ORCHESTRATOR_MD = REPO_ROOT / "agents" / "orchestrator.md"
+LEADER_MD = REPO_ROOT / "agents" / "leader.md"
 
 results: list[tuple[bool, str]] = []
 pending: list[str] = []
@@ -126,40 +126,40 @@ if not (state_ref_anchored and lane_anchored):
 # ---------------------------------------------------------------------------
 # Injector side (Task-2/Task-3 — may not exist yet in this branch).
 # ---------------------------------------------------------------------------
-orquestador_exists = ORQUESTADOR_MD.exists()
-lider_exists = LIDER_MD.exists()
+orchestrator_exists = ORCHESTRATOR_MD.exists()
+leader_exists = LEADER_MD.exists()
 
-if not orquestador_exists:
+if not orchestrator_exists:
     note_pending(
-        "agents/orquestador.md carries TH-STATE-REF: literal",
+        "agents/orchestrator.md carries TH-STATE-REF: literal",
         "file does not exist in this worktree yet (Task-2 not landed) — "
         "see tests/evidence/nested-lane-probes.md",
     )
 else:
-    orquestador_src = read(ORQUESTADOR_MD)
+    orchestrator_src = read(ORCHESTRATOR_MD)
     check(
-        "agents/orquestador.md carries the identical TH-STATE-REF: literal",
-        injector_carries(orquestador_src, "TH-STATE-REF"),
-        "orquestador.md's specialist-dispatch payload does not stamp the "
+        "agents/orchestrator.md carries the identical TH-STATE-REF: literal",
+        injector_carries(orchestrator_src, "TH-STATE-REF"),
+        "orchestrator.md's specialist-dispatch payload does not stamp the "
         "exact literal checkpoint-guard.ts parses — marker drift",
     )
 
-if not orquestador_exists and not lider_exists:
+if not orchestrator_exists and not leader_exists:
     note_pending(
-        "agents/lider.md or agents/orquestador.md carries TH-LANE: literal",
+        "agents/leader.md or agents/orchestrator.md carries TH-LANE: literal",
         "neither file exists in this worktree yet (Task-2/3 not landed) — "
         "see tests/evidence/nested-lane-probes.md",
     )
 else:
     lane_hits = []
-    if lider_exists:
-        lane_hits.append(("agents/lider.md", injector_carries(read(LIDER_MD), "TH-LANE")))
-    if orquestador_exists:
+    if leader_exists:
+        lane_hits.append(("agents/leader.md", injector_carries(read(LEADER_MD), "TH-LANE")))
+    if orchestrator_exists:
         lane_hits.append(
-            ("agents/orquestador.md", injector_carries(read(ORQUESTADOR_MD), "TH-LANE"))
+            ("agents/orchestrator.md", injector_carries(read(ORCHESTRATOR_MD), "TH-LANE"))
         )
     check(
-        "at least one injector (lider.md spawn / orquestador.md dispatch) "
+        "at least one injector (leader.md spawn / orchestrator.md dispatch) "
         "carries the identical TH-LANE: literal",
         any(ok for _, ok in lane_hits),
         f"checked {[name for name, _ in lane_hits]}, none carried the "

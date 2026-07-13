@@ -191,8 +191,8 @@ When a multi-project initiative is active (`initiative != null`, parent `overvie
 The gate blocks plan approval if the work triggers a sketch and it is missing. Detection
 is bounded booleans, not judgment.
 
-**Gate script:** `hooks/sketch-guard.sh` is invoked by the orquestador at STAGE-GATE-1.
-It is an orquestador-invoked gate script (like the TS-based `notify-stage` hook,
+**Gate script:** `hooks/sketch-guard.sh` is invoked by the orchestrator at STAGE-GATE-1.
+It is an orchestrator-invoked gate script (like the TS-based `notify-stage` hook,
 run via `hooks/run-ts-hook.sh notify-stage`), NOT a `PreToolUse` event hook. Do NOT
 add it to `.claude-plugin/hooks.json`.
 
@@ -217,7 +217,7 @@ also see the classification block and the diff signal. The check is `concerns`-s
 | Stage 1 Design (alongside `01-plan.md`) | architect | Records the classification block in each project's `00-state.md` (required for every project including all-false); produces exactly the manifest-required `sketches/*` files |
 | Phase 1.5 (Plan Ratification) | qa-plan | Checks sketch↔AC consistency (functional-acceptance sketch matches `§ Task List` AC) |
 | Phase 1.6 (Plan Review) | plan-reviewer | Rule 11 — sketch completeness per-project (shape-only, fail-OPEN parity); each project's block audited independently in multi-project dispatch |
-| STAGE-GATE-1 | orquestador | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
+| STAGE-GATE-1 | orchestrator | Invokes `sketch-guard.sh`; folds its verdict into the combined verdict; human reviews sketches |
 | Stage 2 Implementation | implementer | **Required reading:** reads every triggered `sketches/*` file (or consolidated `{overview_root}/sketches/` paths in multi-project workspaces) before writing any code; builds the delivered surface TO the sketch contracts; emits `sketches_read` in status block |
 | Stage 2 Test Authoring | tester | **Required reading:** reads the triggered `sketches/*` files; derives test cases from each declared contract surface (endpoint, table, call-hop, etc.) in addition to the per-task AC; emits `sketches_read` in status block |
 | Phase 3 Validation | qa | **Required reading:** reads the triggered `sketches/*` files; cross-checks the delivered API/data/UI/call-flow against the corresponding sketch contract as part of AC validation; emits `sketches_read` in status block |
@@ -233,9 +233,9 @@ also see the classification block and the diff signal. The check is `concerns`-s
 |-------------|-------------------------------|-----------------|---------------------|---------------|
 | `feature` / `refactor` / `enhancement` | Yes (architect, Stage 1) | yes (collapsed surfaces) | per booleans | Yes, at STAGE-GATE-1 |
 | `fix` Tier 2-4 | Yes (architect root-cause mode records the block in `00-state.md`) | yes (AC in § Task List) | only if the fix touches a contract surface (rare); booleans default false | Yes, at STAGE-GATE-1 |
-| `fix` Tier 1 / `hotfix` | No architect → orquestador records all-false block when it self-authors `01-plan.md` | yes (minimum 4-line AC) | none (all false) | Yes — no-op pass (all-false → empty required set) |
+| `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | yes (minimum 4-line AC) | none (all false) | Yes — no-op pass (all-false → empty required set) |
 | `fix` Tier 0 / `docs` Tier 0 | **Exempt** — no workspace exists (CLAUDE.md §5 observability exemption) | n/a | n/a | Not invoked (no `00-state.md`) |
-| `docs` flow (Tier ≥1) | architect docs research → orquestador records all-false block (docs do not touch product contracts) | yes | none | Yes — no-op pass |
+| `docs` flow (Tier ≥1) | architect docs research → orchestrator records all-false block (docs do not touch product contracts) | yes | none | Yes — no-op pass |
 
 ---
 

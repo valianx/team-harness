@@ -6,7 +6,7 @@ name: audit-security
 
 Run the five-check security self-scan over this repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) and present the severity-tagged report. REPORT-only — no auto-fix action is taken on any audited file.
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `lider` agent or any other agent. Execute the scanner yourself using Bash and present the output verbatim.
+**IMPORTANT:** This skill runs directly — do NOT invoke the `leader` agent or any other agent. Execute the scanner yourself using Bash and present the output verbatim.
 
 ## Voice
 

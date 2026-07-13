@@ -11,7 +11,7 @@ name: audit
 ## Mode 1 — Specific target
 
 1. Parse the target: a directory, file, module, or system area to audit
-2. Pass to the `lider` agent:
+2. Pass to the `leader` agent:
    ```
    Direct Mode Task:
    - Mode: audit
@@ -24,7 +24,7 @@ name: audit
 1. Extract the issue number
 2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Use `gh issue view {number} --json number,title,body,labels` when `has_gh=true`; curl fallback otherwise.
 3. If the issue cannot be fetched automatically, tell the user: "Issue #{number} could not be fetched automatically. Pasting the issue body as text also works — paste it below or paste the URL again."
-4. Pass to the `lider` agent:
+4. Pass to the `leader` agent:
    ```
    Direct Mode Task:
    - Mode: audit
@@ -49,7 +49,7 @@ name: audit
 
 ## Important
 
-- Always invoke the `lider` agent — do NOT invoke agents directly
-- The lider will invoke the architect in audit mode
+- Always invoke the `leader` agent — do NOT invoke agents directly
+- The leader will invoke the architect in audit mode
 - Output: `workspaces/{feature-name}/research/00-audit.md`
 - An audit reviews architecture health, not security (use `/th:security` for that)

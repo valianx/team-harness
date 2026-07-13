@@ -10,17 +10,17 @@ itself lives only here (multi-site invariant, `01-plan.md`).
 86K/run) because each verifier re-read the same workspace narrative independently, with no
 shared-read mechanism across separate agent contexts. The packet applies the same
 build-once-read-many shape already used for `00-knowledge-context.md`
-(`agents/lider.md § Phase 0a`) to the Stage-2 verify block.
+(`agents/leader.md § Phase 0a`) to the Stage-2 verify block.
 
 ---
 
 ## 1. Build site
 
-**Who:** the orquestador, never a leaf agent.
+**Who:** the orchestrator, never a leaf agent.
 
 **When:** Phase 2.7 close — after the tester's authoring status block returns
 `status: success` and after the A1-F3/A1-F4 browser-readiness checks, before Phase 3 is
-launched. See `agents/orquestador.md § Phase 2.7`.
+launched. See `agents/orchestrator.md § Phase 2.7`.
 
 **Where:** `{docs_root}/00-verify-packet.md` — one file per task, overwritten in place on
 every rebuild. **Never create a `00-verify-packet-v2.md` sibling** — the `Packet version`
@@ -36,7 +36,7 @@ silently.
 
 | Section | Content | Source |
 |---|---|---|
-| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (`git rev-parse HEAD`, plus a dirty-tree diff hash when uncommitted changes exist — same anchor mechanic as the recorded-state gate, `agents/orquestador.md § Phase 3`), `Base ref:` (the task's recorded base, e.g. `origin/main`) | orquestador |
+| **Header** | `Feature:`, `Task identifier:`, `Built:` (ISO timestamp), `Packet version: N`, `Tree anchor:` (`git rev-parse HEAD`, plus a dirty-tree diff hash when uncommitted changes exist — same anchor mechanic as the recorded-state gate, `agents/orchestrator.md § Phase 3`), `Base ref:` (the task's recorded base, e.g. `origin/main`) | orchestrator |
 | **Scope** | `type`, `bug_tier`, `security_sensitive`, `frontend_scope`, `complexity` | `00-state.md` |
 | **Changed files** | Table: path + `new`\|`modify` + one-line role, plus `git diff --stat` output | implementer status block + `git diff --stat` |
 | **Implementation summary** | Implementer status-block summary; `Deviations from Architecture` copied verbatim (or `"none"`); surviving `[CONSTRAINT-DISCOVERED]` annotations verbatim (or `"none"`) | `02-implementation.md` |
@@ -179,8 +179,8 @@ packet_escapes: {N}          # count of full docs opened beyond the packet
 packet_integrity: ok | stale | mismatch | n-a
 ```
 
-The orquestador propagates these into the `phase.end` event's `tools.packet` object (see
-`agents/orquestador.md § Populating the tools field on phase.end`).
+The orchestrator propagates these into the `phase.end` event's `tools.packet` object (see
+`agents/orchestrator.md § Populating the tools field on phase.end`).
 
 ---
 
@@ -202,7 +202,7 @@ explicitly per agent so the floor is auditable, not implied:
 
 ## 6. Staleness — rebuild triggers
 
-The packet is a snapshot, not a live view. The orquestador MUST rebuild it in place
+The packet is a snapshot, not a live view. The orchestrator MUST rebuild it in place
 (overwrite, increment `Packet version` — never a sibling file) before the next verifier
 dispatch whenever EITHER of these fire:
 
@@ -213,8 +213,8 @@ dispatch whenever EITHER of these fire:
 There is NO AC-edit rebuild trigger. An AC edit (Phase 2.5 late reconciliation, Case C
 reword, operator review-surface edit) does not stale the packet because the packet carries
 no AC (§2) — the edit reaches the next verifier through its live `01-plan.md § Task List`
-read (§4 Step 0) with no orquestador action required. Both remaining triggers are
-git-grounded; neither depends on the orquestador noticing a document edit outside the
+read (§4 Step 0) with no orchestrator action required. Both remaining triggers are
+git-grounded; neither depends on the orchestrator noticing a document edit outside the
 code tree.
 
 ---
@@ -280,11 +280,11 @@ line as `UNMEASURABLE` — never as parity. N=0 always reads UNMEASURABLE, never
 
 **Telemetry-missing ALWAYS counts as fallback-signal, never as acceptance.** A backfilled
 event structurally cannot carry packet telemetry (the reconciliation backstop derives only
-`duration_ms` from breadcrumbs — see `agents/orquestador.md § Execution Events JSONL`), so
+`duration_ms` from breadcrumbs — see `agents/orchestrator.md § Execution Events JSONL`), so
 counting it any other way would let emission loss impersonate packet acceptance.
 
 **What each run reports** (via the Task-1 `## Cost` checkpoint contract in
-`agents/orquestador.md § Pipeline Summary Protocol` — the `## Verification Packet`
+`agents/orchestrator.md § Pipeline Summary Protocol` — the `## Verification Packet`
 section of `00-pipeline-summary.md`): the three-bucket breakdown above, and verifier catch
 rates read from the workspace verdict documents, not from `phase.end` telemetry — security
 findings by severity from `reviews/04-security.md`, qa AC-fail rate from
@@ -301,12 +301,12 @@ owned by the contract itself. Rollback is a one-line contract flip shipped as a 
 the packet-first ladder default in the five verifier Session Context Protocols
 (`agents/{qa,security,adversary,tester,ux-reviewer}.md` — §4 Step 1) flips back to the full
 input-manifest read as the unconditional default (the §4 Step 3 fail-open fallback becomes
-the primary path), and the orquestador's packet build (§1) and digest-dispatch (§3) steps
+the primary path), and the orchestrator's packet build (§1) and digest-dispatch (§3) steps
 are suspended until the schema (§2) is enriched. No clause in this contract computes this
 automatically, and no text here claims one does.
 
 **Honest bound (reporting aid, not a gate).** The parity line is rendered by the
-orquestador at prompt level and consumed by the operator — nothing gates on it. That
+orchestrator at prompt level and consumed by the operator — nothing gates on it. That
 reliability class is acceptable here precisely because the consumer is human: a missing or
 malformed line is itself visible evidence to the reader, and parity is only ever concluded
 by the operator reading the line — silence cannot impersonate parity. The Task-1

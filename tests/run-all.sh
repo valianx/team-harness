@@ -401,7 +401,7 @@ if ! command -v python3 >/dev/null 2>&1; then
     report_skip_or_fail "lane-marker-byte-identity" "python3 not found — install Python 3 to run this suite"
 else
     if python3 "$TESTS_DIR/test_lane_marker_identity.py"; then
-        echo "lane-marker-byte-identity: PASS (see PENDING notes above if agents/lider.md / agents/orquestador.md are not yet landed in this branch)"
+        echo "lane-marker-byte-identity: PASS (see PENDING notes above if agents/leader.md / agents/orchestrator.md are not yet landed in this branch)"
     else
         echo "lane-marker-byte-identity: FAIL"
         FAILED=$((FAILED + 1))

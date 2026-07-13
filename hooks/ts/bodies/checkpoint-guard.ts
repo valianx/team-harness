@@ -100,7 +100,7 @@ function isTerminalStatus(content: string): boolean {
 // ---------------------------------------------------------------------------
 // TH-STATE-REF dispatch marker — explicit state scoping (AC-4.1..4.6).
 //
-// A dispatching orquestador stamps its own 00-state.md path into the FIRST
+// A dispatching orchestrator stamps its own 00-state.md path into the FIRST
 // LINE of the Task dispatch prompt as `TH-STATE-REF: {path}`. This lets
 // checkpoint-guard evaluate boundary B1 against the state of the pipeline
 // that is actually dispatching, instead of guessing from mtime across

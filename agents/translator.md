@@ -46,7 +46,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 Complete i18n setup: discover → glossary → setup → extract → translate → replace → document.
 
-- **Trigger:** no specific mode specified, or orquestador invokes without mode
+- **Trigger:** no specific mode specified, or orchestrator invokes without mode
 - **Output:** `workspaces/{feature-name}/00-translation.md`
 - **Flow:** Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 
@@ -54,7 +54,7 @@ Complete i18n setup: discover → glossary → setup → extract → translate �
 
 Discover strings and build the glossary without modifying any code.
 
-- **Trigger:** orquestador specifies `mode: glossary-only`
+- **Trigger:** orchestrator specifies `mode: glossary-only`
 - **Output:** `workspaces/{feature-name}/00-translation.md` (glossary section only)
 - **Flow:** Phase 0 → Phase 1 → Phase 5 (report only)
 
@@ -62,17 +62,17 @@ Discover strings and build the glossary without modifying any code.
 
 Apply translations using an existing glossary. Assumes i18n is already set up.
 
-- **Trigger:** orquestador specifies `mode: translate-only`
+- **Trigger:** orchestrator specifies `mode: translate-only`
 - **Prerequisites:** existing glossary in `workspaces/{feature-name}/00-translation.md` or `docs/glossary.md`
 - **Output:** updated locale files + updated report
 - **Flow:** Phase 0 → Phase 3 → Phase 4 → Phase 5
 
 ### Parallel-Batch Mode
 
-Translate a specific subset of files as part of a parallelized run. Receives all context from the orquestador — does NOT discover, does NOT build glossary, does NOT set up i18n.
+Translate a specific subset of files as part of a parallelized run. Receives all context from the orchestrator — does NOT discover, does NOT build glossary, does NOT set up i18n.
 
-- **Trigger:** orquestador specifies `mode: parallel-batch`
-- **Prerequisites:** ALL of the following passed inline by orquestador:
+- **Trigger:** orchestrator specifies `mode: parallel-batch`
+- **Prerequisites:** ALL of the following passed inline by orchestrator:
   - `glossary`: path to `docs/glossary.md` (read-only, do NOT modify)
   - `i18n-config`: framework, library, key naming convention, interpolation syntax
   - `files`: list of files to translate (this agent's batch)
@@ -86,7 +86,7 @@ Translate a specific subset of files as part of a parallelized run. Receives all
 - **Rules:**
   - Use ONLY the provided glossary for translations — never invent terms
   - All keys MUST be prefixed with the assigned namespace: `{namespace}.{section}.{descriptor}`
-  - Write locale fragments as separate files (`{namespace}.en.json`, `{namespace}.es.json`), NOT the main `en.json`/`es.json` — the orquestador merges them after all batches complete
+  - Write locale fragments as separate files (`{namespace}.en.json`, `{namespace}.es.json`), NOT the main `en.json`/`es.json` — the orchestrator merges them after all batches complete
   - Do NOT touch files outside your assigned batch
   - Do NOT modify `docs/glossary.md` — it's shared read-only across all parallel agents
   - Do NOT modify i18n config files — setup is already done
@@ -96,7 +96,7 @@ Translate a specific subset of files as part of a parallelized run. Receives all
 
 Merge locale fragments from parallel batches into final locale files, verify build, produce final report.
 
-- **Trigger:** orquestador specifies `mode: merge`
+- **Trigger:** orchestrator specifies `mode: merge`
 - **Prerequisites:**
   - All parallel-batch agents have completed
   - Locale fragment files exist in locale directory (`{namespace}.en.json`, `{namespace}.es.json`)
@@ -117,7 +117,7 @@ Merge locale fragments from parallel batches into final locale files, verify bui
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand task scope and any prior translation work.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orquestador's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -570,13 +570,13 @@ Write the full translation report to `workspaces/{feature-name}/00-translation.m
 
 ## Execution Log Protocol
 
-The orquestador writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: translator
@@ -592,4 +592,4 @@ glossary: docs/glossary.md
 
 The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness for the i18n library.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orquestador uses this status block to decide next steps.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to decide next steps.

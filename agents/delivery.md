@@ -31,8 +31,8 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** modify feature code — you only update docs, changelog, version, and commit
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
-- **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orquestador passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `reviews/04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: failed`. The orquestador gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orquestador.md` "Done.yml" deprecation banner.)
+- **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `reviews/04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
@@ -67,7 +67,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
    Use the loaded context to write accurate documentation.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the lider's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -93,7 +93,7 @@ Determine `{feature_name}` in this order:
 
 ### Step 0 — Acceptance Gate (MANDATORY, abort if it fails)
 
-**Before doing anything else**, verify the verification stage actually passed. The orquestador should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the workspaces.
+**Before doing anything else**, verify the verification stage actually passed. The orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the workspaces.
 
 1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
 2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
@@ -298,7 +298,7 @@ Append knowledge to `docs/knowledge.md`. One file, flat bullets, no rigid struct
 - Max ~30 entries — when approaching the limit, consolidate or remove entries that are now obvious from the code
 - If no knowledge was extracted in Step 4, skip this step
 
-**Cross-link to KG.** If the orquestador's Phase 6 saved KG entities for this feature (the orquestador passes the list of saved entity names in its handoff), append a `[kg]` bullet for each entity so a reader of `docs/knowledge.md` knows where the deeper context lives:
+**Cross-link to KG.** If the orchestrator's Phase 6 saved KG entities for this feature (the orchestrator passes the list of saved entity names in its handoff), append a `[kg]` bullet for each entity so a reader of `docs/knowledge.md` knows where the deeper context lives:
 
 ```markdown
 - **[kg]** {entity-name} ({entityType}): {one-line gloss} — see `/th:kg show {entity-name}`
@@ -308,7 +308,7 @@ Example:
 - **[kg]** nextjs-prisma-trpc-b2b-saas (stack-profile): default stack for B2B SaaS admin dashboards — see `/th:kg show nextjs-prisma-trpc-b2b-saas`
 
 **Rules for the `[kg]` bullets:**
-- Only add bullets for entities the orquestador confirms were saved this run (from its Phase 6 entity list) — do NOT guess.
+- Only add bullets for entities the orchestrator confirms were saved this run (from its Phase 6 entity list) — do NOT guess.
 - Skip if `docs/knowledge.md` does not exist.
 - Deduplicate — skip if the entity name already appears in the file.
 - One bullet per entity; omit entities that only triggered `add_observations` (already cross-linked in a prior run).
@@ -417,7 +417,7 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 ### Step 9 — Version bump
 
-**Sole version-bump site.** Delivery is the ONLY agent that sets the project version. No implementer, inline, or orquestador step may set or modify the project version (its version manifest, or any equivalent version site). If a version change is detected in the diff that was not authored by this delivery run, flag it as an unauthorized bump and do NOT proceed with Step 9 until the unauthorized change is reverted or confirmed intentional by the operator. An over-bump above the mechanical SemVer floor (e.g., a MINOR applied to a PATCH-floor diff) requires a `bump-override: minor — <reason>` justification committed as a trailer in the PR body or as a git commit trailer, matching the prepublish-guard hard-deny token (see `hooks/prepublish-guard.sh` bump-floor sub-stage). Without that justification, the `prepublish-guard.sh` hook will deny the push at `git push` time.
+**Sole version-bump site.** Delivery is the ONLY agent that sets the project version. No implementer, inline, or orchestrator step may set or modify the project version (its version manifest, or any equivalent version site). If a version change is detected in the diff that was not authored by this delivery run, flag it as an unauthorized bump and do NOT proceed with Step 9 until the unauthorized change is reverted or confirmed intentional by the operator. An over-bump above the mechanical SemVer floor (e.g., a MINOR applied to a PATCH-floor diff) requires a `bump-override: minor — <reason>` justification committed as a trailer in the PR body or as a git commit trailer, matching the prepublish-guard hard-deny token (see `hooks/prepublish-guard.sh` bump-floor sub-stage). Without that justification, the `prepublish-guard.sh` hook will deny the push at `git push` time.
 
 **Shipped default vs repo-local deferral:**
 
@@ -425,8 +425,8 @@ This step is gateway-aware: if the project does not have an external gateway (or
 |------|--------|----------|
 | **Per-PR bump (shipped default)** | no `skip-version` flag, or `skip-version: false` | Proceed with Step 9. Bump the project version once at assembly (min one, max one) and update the CHANGELOG directly (or via a `changelog.d/` fragment where that convention exists — see Step 9e). |
 | **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (e.g., team-harness's own `CLAUDE.md §6.3`) | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). If this change is a consumer-facing bump that produces no `changelog.d/` fragment (internal refactor), write a `version.d/{slug}.bump` marker (one line: `patch`, `minor`, or `major`) so the deferred release step can include it. |
-| **Deferred release cut (opt-in, NOT a shipped default)** | `release-mode: true` (passed by a repo-local release tool — e.g. team-harness's own `/th:release` — via the orquestador) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. Cuts a separate `release/vX.Y.Z` branch/PR. |
-| **Inline release cut (opt-in, NOT a shipped default)** | `inline-release: true` (passed by `/th:release --with <feature-branch>` via the orquestador) | Proceed with Step 9 ON THE FEATURE BRANCH ITSELF — no separate `release/vX.Y.Z` branch. Discover bump level via sub-step 9-R (same aggregation as `release-mode`), bump all three version sites, assemble `changelog.d/` (Step 9e), and write the `version.d/.release-cut` marker (sub-step 9-R-5 below) so `prepublish-guard.ts` recognizes this feature-branch push as a release-path push. One PR, one CI run — see `skills/release/SKILL.md § Mode — Inline release`. |
+| **Deferred release cut (opt-in, NOT a shipped default)** | `release-mode: true` (passed by a repo-local release tool — e.g. team-harness's own `/th:release` — via the orchestrator) | Proceed with Step 9. Discover bump level by aggregating all pending `changelog.d/` fragments and `version.d/` markers (sub-step 9-R below), then run Steps 9.0–9e normally. Cuts a separate `release/vX.Y.Z` branch/PR. |
+| **Inline release cut (opt-in, NOT a shipped default)** | `inline-release: true` (passed by `/th:release --with <feature-branch>` via the orchestrator) | Proceed with Step 9 ON THE FEATURE BRANCH ITSELF — no separate `release/vX.Y.Z` branch. Discover bump level via sub-step 9-R (same aggregation as `release-mode`), bump all three version sites, assemble `changelog.d/` (Step 9e), and write the `version.d/.release-cut` marker (sub-step 9-R-5 below) so `prepublish-guard.ts` recognizes this feature-branch push as a release-path push. One PR, one CI run — see `skills/release/SKILL.md § Mode — Inline release`. |
 
 **Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true`, `release-mode: true`, and `inline-release: true` exist for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally.
 
@@ -436,9 +436,9 @@ This step is gateway-aware: if the project does not have an external gateway (or
 
 The `{slug}` is the PR slug (same convention as `changelog.d/`). The file contains exactly one line: `patch`, `minor`, or `major`. The `version.d/` directory is tracked by git (not gitignored) so the deferred release step on a fresh checkout sees the markers. Stage it in Step 10.0 alongside the changelog fragment.
 
-**If the orquestador passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
+**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
 
-**If the orquestador passed `release-mode: true` OR `inline-release: true` → continue below through Step 9-R and then Steps 9.0–9e.** (Sub-step 9-R-5 below runs ONLY under `inline-release: true`.)
+**If the orchestrator passed `release-mode: true` OR `inline-release: true` → continue below through Step 9-R and then Steps 9.0–9e.** (Sub-step 9-R-5 below runs ONLY under `inline-release: true`.)
 
 ### Step 9-R — Deferred release-cut bump-level discovery (runs when `release-mode: true` OR `inline-release: true`, a repo-local deferral convention)
 
@@ -511,7 +511,7 @@ Read the first match and extract the current version. For `.claude-plugin/plugin
 
 **Version rules — analyze actual changes to determine bump:**
 
-`skip-version: true` overrides this entire table: when the orquestador passes `skip-version: true`, Step 9 is skipped entirely (existing Critical Rule and Step 9 gate, unchanged). The rules below apply only when a bump is being made at all.
+`skip-version: true` overrides this entire table: when the orchestrator passes `skip-version: true`, Step 9 is skipped entirely (existing Critical Rule and Step 9 gate, unchanged). The rules below apply only when a bump is being made at all.
 
 Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!workspaces'`) and workspaces to understand the scope of changes. Classify each change against Table 2, then pick the **highest applicable level** and justify the chosen level from the diff.
 
@@ -614,7 +614,7 @@ Re-run the test gate ONLY when one of these three exceptions applies:
 - (s1) delivery's HEAD is ahead of the commit the `security` (or `adversary`) agent reviewed — i.e., commits were added after the Phase 3 security verdict was recorded.
 - (s2) A security-relevant file changed since the verdict: any file under `auth/`, `api/`, `db/`, `crypto/`, `session/`, hook scripts, or any file whose change the plan classified as `security_sensitive`.
 
-When the security verdict is stale: block delivery and signal the orquestador to re-run the `security` and `adversary` (when applicable) agents before the next delivery attempt. Do NOT proceed to commit with a stale security verdict. Record the staleness reason in `00-state.md § Delivery` under "Security verdict stale".
+When the security verdict is stale: block delivery and signal the orchestrator to re-run the `security` and `adversary` (when applicable) agents before the next delivery attempt. Do NOT proceed to commit with a stale security verdict. Record the staleness reason in `00-state.md § Delivery` under "Security verdict stale".
 
 Lint, typecheck, and build rows that were NOT covered by Phase 3 verify still run regardless.
 
@@ -634,7 +634,7 @@ Before staging, run the project's quality gates. Discover DoD commands from two 
 
 **Classification rule for future commands:** if a new command is added to CLAUDE.md §4, classify it at the point of reading. Any command whose description mentions a cost, a price per run, an external API call, or the word "interactive", "TUI", or "prompt" is paid or interactive and is excluded. When classification is ambiguous, default to **free-verification** (safer to gate than to skip).
 
-**Opt-in path for paid / interactive commands.** When the orquestador passes `run-paid-suite: true` or `run-interactive-check: true` in the task context, the corresponding excluded class is promoted to a DoD gate for this run only. Without an explicit opt-in, excluded commands are never run by delivery.
+**Opt-in path for paid / interactive commands.** When the orchestrator passes `run-paid-suite: true` or `run-interactive-check: true` in the task context, the corresponding excluded class is promoted to a DoD gate for this run only. Without an explicit opt-in, excluded commands are never run by delivery.
 
 **Source 2 — Project manifest (secondary, for other project types):** Read the project's manifest files (`package.json` scripts, `Makefile`, `pyproject.toml`, `Cargo.toml`) for additional gates not already covered by Source 1.
 
@@ -759,7 +759,7 @@ Do NOT stage unrelated files.
 
 **Always target `main`. The base of every PR is `main`, never a sibling branch. Stacked PRs are PROHIBITED (same rationale as Step 3 — GitHub async auto-retargeting). For a multi-group `§ Delivery Grouping`, follow the serial-merge contract: open group N+1's PR only after group N's PR is merged to `main`; branch from updated `main`; rebase on current `main` before merging each subsequent PR.**
 
-**One approved Task List = one delivery per `§ Delivery Grouping`.** Open only the PR(s) declared by the approved `01-plan.md § Task List` → `§ Delivery Grouping` (default: all tasks ship as ONE PR). Never open an additional PR that is not covered by the approved grouping (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orquestador post-approval-division rule).
+**One approved Task List = one delivery per `§ Delivery Grouping`.** Open only the PR(s) declared by the approved `01-plan.md § Task List` → `§ Delivery Grouping` (default: all tasks ship as ONE PR). Never open an additional PR that is not covered by the approved grouping (e.g., a "transport standardization sweep" PR) on your own authority — that is plan drift requiring an architect re-run + operator confirmation (see orchestrator post-approval-division rule).
 
 **Step 11.0 — Check for existing PR:**
 
@@ -978,7 +978,7 @@ gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
 
 **Automated review (CodeRabbit) detection.** Not every consumer repo has CodeRabbit configured — team-harness does, but this step runs against whatever repo the pipeline targets, so detect before framing the review surface. CodeRabbit is `detected` when ANY of:
 
-1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at lider Phase 0a Step 7), OR
+1. `00-state.md § Current State` carries `coderabbit_configured: true` (boot-time hint, set at leader Phase 0a Step 7), OR
 2. `.coderabbit.yaml` or `.coderabbit.yml` exists at the target repo root (cheap file check), OR
 3. the already-fetched `statusCheckRollup` (from the query above) contains a check entry whose name contains `CodeRabbit`.
 
@@ -1181,13 +1181,13 @@ The operator replays by reading the file and invoking the appropriate MCP tool f
 
 **Status block addition.** Add one line: `kg_passive_capture: written | written-with-relation-note: <related-to> | merged-into: <existing-name> | skipped: <reason> | failed: <error>`.
 
-The orquestador propagates this into the `kg_passive_capture` sub-field of the `tools` object on the `phase.end` event in `00-execution-events.jsonl`. The `/th:trace <feature> --tools` view surfaces it under "Tool Effectiveness".
+The orchestrator propagates this into the `kg_passive_capture` sub-field of the `tools` object on the `phase.end` event in `00-execution-events.jsonl`. The `/th:trace <feature> --tools` view surfaces it under "Tool Effectiveness".
 
 #### kg_write site:delivery-passive-capture — event source declaration
 
-The orquestador emits a `kg_write` event with `site: delivery-passive-capture` during `phase.end` processing for Phase 4, using the `kg_passive_capture` line from this status block as the authoritative source. This is a **best-effort observability event** — the delivery pipeline never fails because of it.
+The orchestrator emits a `kg_write` event with `site: delivery-passive-capture` during `phase.end` processing for Phase 4, using the `kg_passive_capture` line from this status block as the authoritative source. This is a **best-effort observability event** — the delivery pipeline never fails because of it.
 
-The orquestador maps delivery's `kg_passive_capture` string to the 4-code reason vocabulary as follows:
+The orchestrator maps delivery's `kg_passive_capture` string to the 4-code reason vocabulary as follows:
 
 | `kg_passive_capture` value | `kg_write` `reason` code | `succeeded` |
 |---------------------------|--------------------------|-------------|
@@ -1210,7 +1210,7 @@ The delivery agent's resilience contract is unchanged: **never fail the delivery
 
 #### Path derivation
 
-Derive from the workspaces path (resolved at lider boot, passed in the dispatch):
+Derive from the workspaces path (resolved at leader boot, passed in the dispatch):
 
 ```
 feature_dir = basename(docs_root)                          # e.g. "2026-06-06_obsidian-worklog-interlinking"
@@ -1390,9 +1390,9 @@ The index/MOC files are written to the Obsidian vault (`{logs-path}/{logs-subfol
 
 **Gate:** proceed only when `initiative` in `00-state.md § Current State` is non-null (a confirmed initiative slug). When `initiative == null`, this step is a **no-op** — log `initiative_overview: skipped: no-initiative` and continue. This step is **best-effort**: any failure logs a one-line WARN and continues — the pipeline NEVER fails or blocks on an overview-write error.
 
-**Purpose:** surface this project's resolved row data — branch, version, PR number/URL, and status — so `overview.md` reflects that Delivery has shipped. In lane mode, `th:lider` performs the actual `overview.md` write; Delivery only returns the data.
+**Purpose:** surface this project's resolved row data — branch, version, PR number/URL, and status — so `overview.md` reflects that Delivery has shipped. In lane mode, `th:leader` performs the actual `overview.md` write; Delivery only returns the data.
 
-**Lane mode — Delivery does NOT write `overview.md`.** A non-null `initiative` means this delivery run is an initiative lane spawned by `th:lider` (equivalently, a `lane_mode: true` spawn signal). `th:lider` is the **sole writer** of `overview.md`; a lane's Delivery MUST NOT glob for, read, or write that file. Instead of a read-modify-write, resolve this project's row data and **return it in the delivery status block** for `th:lider` to write:
+**Lane mode — Delivery does NOT write `overview.md`.** A non-null `initiative` means this delivery run is an initiative lane spawned by `th:leader` (equivalently, a `lane_mode: true` spawn signal). `th:leader` is the **sole writer** of `overview.md`; a lane's Delivery MUST NOT glob for, read, or write that file. Instead of a read-modify-write, resolve this project's row data and **return it in the delivery status block** for `th:leader` to write:
 
 - `{project-slug}` — derived from `repo_name`
 - `{branch}` — the feature branch created in Step 3 of this delivery run
@@ -1406,13 +1406,13 @@ Return the row in the status block as a single pipe-delimited line:
 initiative_row: | {project-slug} | {branch} | {version} | {#PR-number or PR-URL or —} | delivered |
 ```
 
-Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:lider`'s responsibility (see `agents/lider.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-lider (lane mode)` and continue.
+Do NOT resolve an `overview_path`, do NOT read or write `overview.md`, and do NOT run any on-completion reconcile — locating the file, writing each row, ordering lane completions, and the final all-`delivered` reconcile are `th:leader`'s responsibility (see `agents/leader.md § overview.md Template` and § Parallel Multi-Project Dispatch). Log `initiative_overview: deferred-to-leader (lane mode)` and continue.
 
-**Single-writer model (why Delivery no longer writes `overview.md`).** `th:lider` is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each per-lane Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so two concurrent lane writes — or a lane write overlapping a líder reconcile — can clobber a sibling's row or a reconcile in flight. The suppression model above replaces it: every lane returns its row data and `th:lider` serializes all writes.
+**Single-writer model (why Delivery no longer writes `overview.md`).** `th:leader` is the only agent that writes `overview.md` — there is exactly one writer, always. An earlier revision had each per-lane Delivery run its own full-document read-modify-write of `overview.md` on the theory that per-project rows were concurrency-safe. That claim was false and self-contradictory: a full-document read-modify-write races on the entire file, not on a single row, so two concurrent lane writes — or a lane write overlapping a leader reconcile — can clobber a sibling's row or a reconcile in flight. The suppression model above replaces it: every lane returns its row data and `th:leader` serializes all writes.
 
 **Status line (add to delivery status block):**
 ```
-initiative_overview: deferred-to-lider (lane mode) | skipped: no-initiative | failed: {error}
+initiative_overview: deferred-to-leader (lane mode) | skipped: no-initiative | failed: {error}
 ```
 
 ---
@@ -1483,13 +1483,13 @@ Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}
 
 ## Execution Log Protocol
 
-The orquestador writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: delivery
@@ -1544,9 +1544,9 @@ tools: read:N write:N edit:N bash:N grep:N glob:N context7:N mcp_memory:N
 issues: gh pr create failed: {error message}
 ```
 
-The orquestador pauses and waits for the operator to reply `pr opened #N`. On continue, the pipeline re-probes the PR number with a Tier A read and records it in `00-state.md`.
+The orchestrator pauses and waits for the operator to reply `pr opened #N`. On continue, the pipeline re-probes the PR number with a Tier A read and records it in `00-state.md`.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orquestador uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
 ---
 

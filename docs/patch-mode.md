@@ -1,6 +1,6 @@
 # Patch Mode — Delta-Granular Iteration Contract
 
-Patch mode institutionalizes the observation from Phase C of the pipeline-collaboration-cost-redesign program: when a verifier fails and the failure scope is bounded, the producer edits only the named elements and the orquestador re-runs only the verifier whose domain was touched. This is faster and cheaper than full re-dispatch while preserving all pipeline invariants.
+Patch mode institutionalizes the observation from Phase C of the pipeline-collaboration-cost-redesign program: when a verifier fails and the failure scope is bounded, the producer edits only the named elements and the orchestrator re-runs only the verifier whose domain was touched. This is faster and cheaper than full re-dispatch while preserving all pipeline invariants.
 
 ## Core Concept: Blast Radius
 
@@ -9,7 +9,7 @@ Every verifier that writes a `failure-brief.md` declares a **blast radius** — 
 - **`localized {IDs}`** — the failure is confined to specific, named elements (AC identifiers, Work Plan Step IDs, files, or functions). A targeted edit resolves it without touching the rest of the implementation or design.
 - **`structural`** — the failure implicates the overall design, multiple interconnected components, or the verifier cannot name the affected elements with confidence. Requires a full re-dispatch.
 
-**The verifier declares blast radius; the orquestador reads and routes.** The orquestador never infers blast radius from the brief content — doing so would require re-reading the full workspace files (5-15K tokens each), defeating the purpose of the brief.
+**The verifier declares blast radius; the orchestrator reads and routes.** The orchestrator never infers blast radius from the brief content — doing so would require re-reading the full workspace files (5-15K tokens each), defeating the purpose of the brief.
 
 ## Classification Rules
 
@@ -34,7 +34,7 @@ The verifier (tester / qa / security) declares blast radius in the `failure-brie
 
 ## BOUNDED-PATCH Contract (Producer Side)
 
-When the orquestador dispatches a producer with `Blast radius: localized {IDs}`, the producer applies the **BOUNDED-PATCH** contract:
+When the orchestrator dispatches a producer with `Blast radius: localized {IDs}`, the producer applies the **BOUNDED-PATCH** contract:
 
 1. **Edit only the elements named in `{IDs}`.** Do not touch anything outside the named scope.
 2. **Emit a diff summary** describing what changed and why.
@@ -42,9 +42,9 @@ When the orquestador dispatches a producer with `Blast radius: localized {IDs}`,
 
 When `Blast radius: structural`, the standard full re-dispatch contract applies — the producer re-derives/re-implements as normal.
 
-## Selective Verifier Re-Run (Orquestador Side)
+## Selective Verifier Re-Run (Orchestrator Side)
 
-After a localized patch, the orquestador re-runs only the verifier(s) whose domain the patch touched. Re-dispatching the same agent within the 5-minute subagent cache TTL reuses that agent's warm cache, so keep selective re-runs prompt (see `docs/cost-and-caching.md`).
+After a localized patch, the orchestrator re-runs only the verifier(s) whose domain the patch touched. Re-dispatching the same agent within the 5-minute subagent cache TTL reuses that agent's warm cache, so keep selective re-runs prompt (see `docs/cost-and-caching.md`).
 
 | Case | Localized re-run | Full re-run (structural) |
 |------|-----------------|--------------------------|
@@ -55,7 +55,7 @@ After a localized patch, the orquestador re-runs only the verifier(s) whose doma
 
 ## Coherence Gate (Mandatory — Never Skipped)
 
-After every localized patch, the orquestador runs a coherence gate to confirm the patch did not introduce inconsistency. The gate is selective (cheaper) but never absent:
+After every localized patch, the orchestrator runs a coherence gate to confirm the patch did not introduce inconsistency. The gate is selective (cheaper) but never absent:
 
 - **Patch of implementation (Case A/D localized):** dispatch `qa` in validate mode on the patched AC IDs. Pass → clear iteration. Fail → new iteration (counts against max-3).
 - **Patch of plan (Case B localized):** dispatch `plan-reviewer` on the updated `01-plan.md`. Pass → clear iteration. Fail/concerns → new iteration.

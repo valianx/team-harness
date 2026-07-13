@@ -17,24 +17,24 @@ func wellFormedModule() ModuleManifest {
 		Module:         "core-agents",
 		Description:    "Core agents",
 		DefaultInstall: "always",
-		Components:     []string{"lider-agent"},
+		Components:     []string{"leader-agent"},
 	}
 }
 
 // wellFormedComponent returns a valid ComponentManifest for testing.
-// Source = "agents/lider.md" which exists in the embedded FS.
+// Source = "agents/leader.md" which exists in the embedded FS.
 func wellFormedComponent() ComponentManifest {
 	return ComponentManifest{
 		SchemaVersion:  1,
-		Component:      "lider-agent",
+		Component:      "leader-agent",
 		Module:         "core-agents",
 		Kind:           "agent",
-		Source:         "agents/lider.md",
+		Source:         "agents/leader.md",
 		Cost:           "high",
 		Stability:      "stable",
 		DefaultInstall: true,
 		Emits: OwnershipTags{
-			Files:      []string{"{config_root}/agents/lider.md"},
+			Files:      []string{"{config_root}/agents/leader.md"},
 			ConfigKeys: []string{"logs-mode"},
 		},
 	}
@@ -67,7 +67,7 @@ func TestParseModuleManifest_UnknownField(t *testing.T) {
 
 // TestParseComponentManifest_UnknownField verifies strict parsing for components.
 func TestParseComponentManifest_UnknownField(t *testing.T) {
-	raw := `{"schemaVersion":1,"component":"c","module":"m","kind":"agent","source":"agents/lider.md","cost":"low","stability":"stable","defaultInstall":false,"emits":{"files":[],"configKeys":[]},"extra":"oops"}`
+	raw := `{"schemaVersion":1,"component":"c","module":"m","kind":"agent","source":"agents/leader.md","cost":"low","stability":"stable","defaultInstall":false,"emits":{"files":[],"configKeys":[]},"extra":"oops"}`
 	if _, err := parseComponentManifest([]byte(raw)); err == nil {
 		t.Error("expected error for unknown field, got nil")
 	}
@@ -98,7 +98,7 @@ func TestValidateManifests_ComponentSchemaVersionTwo(t *testing.T) {
 func TestValidateManifests_DanglingComponentRef(t *testing.T) {
 	m := wellFormedModule()
 	m.Components = []string{"missing-component"}
-	// component manifest has lider-agent, not missing-component
+	// component manifest has leader-agent, not missing-component
 	c := wellFormedComponent()
 	err := validateManifests([]ModuleManifest{m}, []ComponentManifest{c}, nil)
 	if err == nil {
@@ -140,7 +140,7 @@ func TestValidateManifests_OutOfEnumStability(t *testing.T) {
 // that does not start with {config_root} is rejected.
 func TestValidateManifests_EmitsFilesNonConfigRoot(t *testing.T) {
 	c := wellFormedComponent()
-	c.Emits.Files = []string{"/home/user/.claude/agents/lider.md"} // absolute, no token
+	c.Emits.Files = []string{"/home/user/.claude/agents/leader.md"} // absolute, no token
 	moduleMap := map[string]ModuleManifest{"core-agents": wellFormedModule()}
 	if err := validateComponentManifest(c, moduleMap, nil); err == nil {
 		t.Error("expected error for Emits.Files entry not starting with {config_root}, got nil")
@@ -230,7 +230,7 @@ func TestValidateManifests_OutOfEnumDefaultInstall(t *testing.T) {
 // IDs in the same manifest set are rejected.
 func TestValidateManifests_DuplicateComponentID(t *testing.T) {
 	m := wellFormedModule()
-	m.Components = []string{"lider-agent", "lider-agent"}
+	m.Components = []string{"leader-agent", "leader-agent"}
 	if err := validateModuleManifest(m); err == nil {
 		t.Error("expected error for duplicate component id in module, got nil")
 	}

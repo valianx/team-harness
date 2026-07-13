@@ -4,22 +4,22 @@ Team-harness turns Claude Code into a Spec-Driven Development pipeline. Every fe
 
 ---
 
-## Entry point: talk to th:lider
+## Entry point: talk to th:leader
 
-**`th:lider` is the top-level session agent and your single point of contact.** You drive the entire lifecycle by talking to it conversationally — design, implementation, delivery, and recovery all enter through the same agent. `th:lider` owns Intake, Discover/framing, Specify, and spec + AC co-authoring; for each development task it spawns a task-scoped **`th:orquestador`** that runs the gated pipeline (Design → Delivery). The orquestador prepares and records all three STAGE-GATEs, but at each one it returns control to `th:lider`, which presents the STOP block inline in your conversation and relays your decision back for the orquestador to record. For the lighter direct modes (research, docs, mentor, and similar) `th:lider` dispatches the specialist agents itself — no orquestador, no STAGE-GATE. The full runtime agent tree is in [`docs/agent-tree.md`](./agent-tree.md).
+**`th:leader` is the top-level session agent and your single point of contact.** You drive the entire lifecycle by talking to it conversationally — design, implementation, delivery, and recovery all enter through the same agent. `th:leader` owns Intake, Discover/framing, Specify, and spec + AC co-authoring; for each development task it spawns a task-scoped **`th:orchestrator`** that runs the gated pipeline (Design → Delivery). The orchestrator prepares and records all three STAGE-GATEs, but at each one it returns control to `th:leader`, which presents the STOP block inline in your conversation and relays your decision back for the orchestrator to record. For the lighter direct modes (research, docs, mentor, and similar) `th:leader` dispatches the specialist agents itself — no orchestrator, no STAGE-GATE. The full runtime agent tree is in [`docs/agent-tree.md`](./agent-tree.md).
 
 Phrasings that route correctly:
 
 ```
-@th:lider give me the work plan for this task: <description>   # → Stage 1 design
-@th:lider implement it                                          # → Stage 2 implementation
-@th:lider open the PR                                           # → Stage 3 delivery + push
-@th:lider recover <feature>                                     # → resume from 00-state.md
+@th:leader give me the work plan for this task: <description>   # → Stage 1 design
+@th:leader implement it                                          # → Stage 2 implementation
+@th:leader open the PR                                           # → Stage 3 delivery + push
+@th:leader recover <feature>                                     # → resume from 00-state.md
 ```
 
 The intake step classifies the natural-language request and routes it to the right pipeline or direct mode — design, implementation, verify, delivery, plan-review, validate, deliver, research, and others. Verbs such as `design`, `give me the plan`, `implement`, `open the PR`, `validate`, `review the plan`, `research`, and `recover` map to specific phases. The intent-detection patterns are bilingual; the operator can use either English or Spanish at the chat layer, but repo artefacts (this doc included) are written in English.
 
-**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/th:pipelines` exist and work, but they all route into the same `th:lider` front door under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@th:lider` path covers everything.
+**Skills (slash commands) are optional shortcuts.** Skills like `/design`, `/deliver`, `/recover`, `/issue`, `/research`, `/th:pipelines` exist and work, but they all route into the same `th:leader` front door under the hood. They give you a deterministic entry point (no intent-detection step) and a few extras like `/design #5` fetching GitHub issue #5 automatically — but the conversational `@th:leader` path covers everything.
 
 Pick whichever feels more natural. The rest of this doc uses the conversational form.
 
@@ -27,11 +27,11 @@ Pick whichever feels more natural. The rest of this doc uses the conversational 
 
 ## The pipeline
 
-You tell th:lider: `@th:lider give me the work plan for this task: add a daily reports endpoint`.
+You tell th:leader: `@th:leader give me the work plan for this task: add a daily reports endpoint`.
 
 ### Stage 1 — Analysis
 
-`th:lider` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal. Only after that signal does it spawn a task-scoped `th:orquestador`, which creates `workspaces/daily-reports/` and dispatches the `architect`.
+`th:leader` runs the **Discover phase** first: it frames the task, may ask clarifying questions, captures an intake survey (pipeline shape, effort, autonomy, scope hint), and waits for an advance signal. Only after that signal does it spawn a task-scoped `th:orchestrator`, which creates `workspaces/daily-reports/` and dispatches the `architect`.
 
 The architect reads `docs/knowledge.md`, the codebase, and any prior workspaces; produces `01-plan.md` — a single merged document with `§ Architecture` (the design proposal) and `§ Task List` (one section per task, with Given/When/Then acceptance criteria, plus a `§ Delivery Grouping` declaring how tasks map to PRs). It also writes plan sketches (`sketches/api-contract.md`, `sketches/data-model.md`, etc.) when the change touches those surfaces. `qa-plan` runs Phase 1.5 to confirm every AC maps to a Work Plan step, writing to `reviews/01-plan-review.md § Plan Ratification`. `plan-reviewer` runs Phase 1.6 to audit the plan-shape; its verdict is written to `reviews/01-plan-review.md § Plan Review` (`**Combined verdict:**`), and a one-line `**Reviews:**` attestation is reflected back into `01-plan.md`'s title block — the plan itself stays clean.
 
@@ -52,7 +52,7 @@ Tasks run in parallel rounds computed from their `Depends on:` field (round 1 is
 
 `delivery` updates the CHANGELOG, bumps the version, creates the feature branch, commits with conventional messages (Phase 4). Phase 4.5 **Internal Review** runs the `reviewer` advisory-mode on the freshly-pushed diff and surfaces the top 3 issues.
 
-**STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the orquestador proceeds to Phase 5 (GitHub Update): the PR is opened on GitHub with `Fixes #N` and labels. The PR is NOT opened during the Phase 4 commit step — STAGE-GATE-3 must complete first.
+**STAGE-GATE-3** is your final stop — reply `ship` / `amend` / `abort`. On `ship`, the orchestrator proceeds to Phase 5 (GitHub Update): the PR is opened on GitHub with `Fixes #N` and labels. The PR is NOT opened during the Phase 4 commit step — STAGE-GATE-3 must complete first.
 
 ---
 
@@ -64,7 +64,7 @@ For full reference coverage of every pipeline — including the refactor flow, d
 
 ## Bug-fix flow (type: fix and type: hotfix)
 
-When th:lider classifies a request as `type: fix` or `type: hotfix` (via signals like `bug`, `solucionar`, `arreglar`, `corregir`, `regresión`, urgency markers, or GitHub `bug` label), the pipeline runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. Nothing is stripped from the workspaces backbone; every artifact a feature produces is also produced for a bug fix.
+When th:leader classifies a request as `type: fix` or `type: hotfix` (via signals like `bug`, `solucionar`, `arreglar`, `corregir`, `regresión`, urgency markers, or GitHub `bug` label), the pipeline runs the **Bug-fix Pipeline** — the same 3-stage shell as feature flow, with type-specific content shifts. Nothing is stripped from the workspaces backbone; every artifact a feature produces is also produced for a bug fix.
 
 | Stage | Bug-fix difference |
 |---|---|
@@ -74,11 +74,11 @@ When th:lider classifies a request as `type: fix` or `type: hotfix` (via signals
 | Stage 2 — Verify | `security` agent runs **always** in parallel with `tester` and `qa`, regardless of any other criterion. Defense-in-depth: many bugs have non-obvious security implications. |
 | Stage 3 — Delivery | CHANGELOG entry goes under `### Fixed`. PR title is `fix(area): <summary>` (or `... (hotfix)` for hotfix). PR body includes a mandatory **Bug Report** section with reproduction steps + root cause + regression test path. `Fixes #N` triggers GitHub's auto-close. |
 
-For `type: hotfix`: Phase 1 (architect root-cause) is skipped entirely; th:orquestador emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 (regression test) is still mandatory.
+For `type: hotfix`: Phase 1 (architect root-cause) is skipped entirely; th:orchestrator emits a one-sentence prose plan at STAGE-GATE-1 instead. Phase 2.0 (regression test) is still mandatory.
 
 ### Tier System (0–4)
 
-The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bugs skip ceremony and critical bugs get extended analysis. th:lider combines three signals — keywords in the bug report (low-tier hints like `typo`, high-tier triggers like `auth`/`injection`/`token`/`bypass`), file-path patterns (Tier 1: `*.md` / `docs/**`; Tier 2: `.github/**` / `scripts/**` / `*.test.*`; Tier 3: `src/**` / `lib/**` / `app/**` / `cmd/**`; Tier 4: sensitive paths combined with high-tier keywords), and operator overrides (`[TIER: N]`, `[regression-test: required]`, `[security: required]`) — to derive `bug_tier: 0 | 1 | 2 | 3 | 4`. Sensitive paths (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) force a minimum of Tier 3 regardless of the operator's hint, so a Tier 1 / Tier 2 run cannot accidentally bypass security on production-critical code.
+The Bug-fix Pipeline is **tier-classified** at Phase 0a (Classify) so trivial bugs skip ceremony and critical bugs get extended analysis. th:leader combines three signals — keywords in the bug report (low-tier hints like `typo`, high-tier triggers like `auth`/`injection`/`token`/`bypass`), file-path patterns (Tier 1: `*.md` / `docs/**`; Tier 2: `.github/**` / `scripts/**` / `*.test.*`; Tier 3: `src/**` / `lib/**` / `app/**` / `cmd/**`; Tier 4: sensitive paths combined with high-tier keywords), and operator overrides (`[TIER: N]`, `[regression-test: required]`, `[security: required]`) — to derive `bug_tier: 0 | 1 | 2 | 3 | 4`. Sensitive paths (`auth/**`, `middleware/**`, `api/**`, `db/**`, `security/**`, `crypto/**`, `session/**`) force a minimum of Tier 3 regardless of the operator's hint, so a Tier 1 / Tier 2 run cannot accidentally bypass security on production-critical code.
 
 | Tier | Name | Phase 1 (root-cause) | Phase 2.0 (regression test) | Phase 3 agents | workspaces |
 |---|---|---|---|---|---|
@@ -124,16 +124,16 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 ## What ships
 
-- **Agents.** 28 agents. The two coordination agents — `lider` (top-level session agent) and `orquestador` (task-scoped execution engine) — plus the specialists: `architect`, `implementer`, `tester`, `qa`, `qa-plan`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `reviewer-consolidator`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
-- **Skills** (slash commands). Most route through `th:lider`; standalone utilities include `/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/plan`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through th:lider.
+- **Agents.** 28 agents. The two coordination agents — `leader` (top-level session agent) and `orchestrator` (task-scoped execution engine) — plus the specialists: `architect`, `implementer`, `tester`, `qa`, `qa-plan`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `reviewer-consolidator`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
+- **Skills** (slash commands). Most route through `th:leader`; standalone utilities include `/lint`, `/th:pipelines`, `/th:kg`, `/tmux`, `/th-update`, and `/background`. Common routed entries: `/design`, `/plan`, `/recover`, `/deliver`, `/review-pr`, `/issue`. `/background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through th:leader.
 - **Hooks.** Multiple `PreToolUse` / `PreCompact` hooks gate destructive operations and enforce invariants: `policy-block.sh` (48 tested cases: `rm -rf`, force-push, secret-file writes, SQL DROP/TRUNCATE, sensitive-path writes), `dev-guard.sh` (outward-action gate for `git push`, `gh pr`, GitHub API writes — requires explicit operator approval), `checkpoint-guard.sh` (B1/B2/B3 reasoning-checkpoint enforcement), `sketch-guard.sh` (STAGE-GATE-1 sketch-presence validation), `worktree-guard.sh` (worktree discipline), `prepublish-guard.sh` (pre-publish safety checks). Notification scripts per OS are optional opt-in. Full hook catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
 
 ---
 
-## Dev mode (top-level-is-lider, SEC-DR-2)
+## Dev mode (top-level-is-leader, SEC-DR-2)
 
-Since v2.56 / SEC-DR-2, **the top-level Claude Code agent IS `th:lider`** — the coordination agent, not a specialist. No filesystem marker, no mode flag, and no special invocation is required — when Claude Code runs at the top level, it operates with the full `th:lider` role: it handles intake/discover/specify directly and spawns a task-scoped `th:orquestador` (via the `Task` tool) to run each gated pipeline. The orquestador in turn dispatches the specialist subagents (architect, implementer, tester, qa, etc.) via `Task`. When `th:lider`'s boot capability check does not pass, it does not spawn a separate orquestador and does not run the pipeline inline — it STOPS with a clear error (the split requires Claude Code ≥ v2.1.199 with confirmed nested-subagent gate messaging). There is no monolith fallback.
+Since v2.56 / SEC-DR-2, **the top-level Claude Code agent IS `th:leader`** — the coordination agent, not a specialist. No filesystem marker, no mode flag, and no special invocation is required — when Claude Code runs at the top level, it operates with the full `th:leader` role: it handles intake/discover/specify directly and spawns a task-scoped `th:orchestrator` (via the `Task` tool) to run each gated pipeline. The orchestrator in turn dispatches the specialist subagents (architect, implementer, tester, qa, etc.) via `Task`. When `th:leader`'s boot capability check does not pass, it does not spawn a separate orchestrator and does not run the pipeline inline — it STOPS with a clear error (the split requires Claude Code ≥ v2.1.199 with confirmed nested-subagent gate messaging). There is no monolith fallback.
 
 **Outward-action gate.** All outward actions (`git push`, `gh pr create`, `gh pr merge`, GitHub API writes, ClickUp MCP writes) are evaluated via `hooks/dev-guard.sh`. The hook fires unconditionally and gates by destination — the agent cannot auto-approve regardless of autonomy grants. A `git push` whose single recognized refspec targets a non-default branch on `origin` resolves to `allow` (no prompt); a push to the default branch, a tag push, a force push, `gh pr create`/`merge`, GitHub API writes, and ClickUp MCP writes still resolve to `ask`, requiring explicit operator approval.
 

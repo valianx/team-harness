@@ -30,8 +30,8 @@
   {
     "name": "agent_effort_dropped",
     "surface": "agent",
-    "input": "---\nname: lider\nmodel: opus\neffort: xhigh\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: lider\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "input": "---\nname: leader\nmodel: opus\neffort: xhigh\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: leader\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
     "note": "S-4: effort is dropped — opencode has no effort field. This case asserts the drop so a future reader does not restore it."
   },
   {
@@ -125,9 +125,9 @@
   {
     "name": "agent_blanket_mode_subagent",
     "surface": "agent",
-    "input": "---\nname: lider\nmodel: opus\ntools: Read\n---\nBody.\n",
-    "expectedOutput": "---\nname: lider\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
-    "note": "Generic transform injects mode: subagent for ALL agents — including lider. The mode-by-role override (lider → primary) is an installer layer applied AFTER this generic transform and is NOT reflected here (AC-12)."
+    "input": "---\nname: leader\nmodel: opus\ntools: Read\n---\nBody.\n",
+    "expectedOutput": "---\nname: leader\npermission: {read: allow}\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "Generic transform injects mode: subagent for ALL agents — including leader. The mode-by-role override (leader → primary) is an installer layer applied AFTER this generic transform and is NOT reflected here (AC-12)."
   },
   {
     "name": "agent_all_mapped_tools",

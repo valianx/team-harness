@@ -30,7 +30,7 @@ The consolidated review body follows the same language contract as `agents/revie
 
 ## Input contract
 
-The orquestador invokes you with one of two input sets:
+The orchestrator invokes you with one of two input sets:
 
 **Multi-focused reviewer path (when `--multi` or auto-multi was active):**
 - 2-3 reviewer draft files: `.claude/pr-review-draft-security.md`, `.claude/pr-review-draft-architecture.md`, `.claude/pr-review-draft-style.md` (one per focus that ran)
@@ -105,7 +105,7 @@ When all focuses found zero issues:
 
 Any use of Edit or Write on any other path — source files, configuration files, build artifacts, or any working-tree file outside the `.claude/pr-review-*` zone — is a contract violation. Findings that require source changes go into the review body as requested changes; this agent NEVER applies those changes itself.
 
-When invoked via the `review` direct mode (not `/th:review-pr`), the orquestador verifies the working tree is byte-identical before and after consolidation (except `.claude/pr-review-*` draft files). Any unexpected mutation is surfaced as a defect — see `ref-direct-modes.md` § Read-Only Working-Tree Guard § Layer 3.
+When invoked via the `review` direct mode (not `/th:review-pr`), the orchestrator verifies the working tree is byte-identical before and after consolidation (except `.claude/pr-review-*` draft files). Any unexpected mutation is surfaced as a defect — see `ref-direct-modes.md` § Read-Only Working-Tree Guard § Layer 3.
 
 ---
 
@@ -161,13 +161,13 @@ When a source ran but found zero issues, write: `### {Source name}\n- Sin hallaz
 
 ## Dual-Review Convergence
 
-When the orquestador runs a convergence pass, it dispatches this agent twice in isolation — once as Pass A and once as Pass B. The two invocations are completely independent: each receives only the original diff, policy, and PR metadata, never the sibling pass's output.
+When the orchestrator runs a convergence pass, it dispatches this agent twice in isolation — once as Pass A and once as Pass B. The two invocations are completely independent: each receives only the original diff, policy, and PR metadata, never the sibling pass's output.
 
-**Convergence Pass dispatch field:** The orquestador includes a `Convergence Pass:` field in the dispatch payload, set to `A` or `B`. Use this field solely to label your status block and the suffixed output files; it does NOT change the merge/verdict logic.
+**Convergence Pass dispatch field:** The orchestrator includes a `Convergence Pass:` field in the dispatch payload, set to `A` or `B`. Use this field solely to label your status block and the suffixed output files; it does NOT change the merge/verdict logic.
 
 **Isolation rule:** Do NOT read, reference, or attempt to locate the sibling pass's draft files (`.claude/pr-review-*-A.*` or `.claude/pr-review-*-B.*`). Each pass must reach its verdict independently. Reading the sibling's findings would collapse the two passes into a single opinion — defeating the purpose of the convergence round.
 
-**Suffixed output paths:** When `Convergence Pass:` is set in the dispatch, write your output files to the paths specified in the `Draft Output:` field of the dispatch (e.g., `.claude/pr-review-final-A.md` / `.claude/pr-review-inline-A.json` for Pass A, `-B` equivalents for Pass B). Never write to the canonical unsuffixed paths (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`) during a convergence pass; those are reserved for the final converged output the orquestador assembles.
+**Suffixed output paths:** When `Convergence Pass:` is set in the dispatch, write your output files to the paths specified in the `Draft Output:` field of the dispatch (e.g., `.claude/pr-review-final-A.md` / `.claude/pr-review-inline-A.json` for Pass A, `-B` equivalents for Pass B). Never write to the canonical unsuffixed paths (`.claude/pr-review-final.md`, `.claude/pr-review-inline.json`) during a convergence pass; those are reserved for the final converged output the orchestrator assembles.
 
 **Merge and verdict logic:** unchanged. Apply all existing de-duplication rules, attribution guard, and the strict any-CHANGES_REQUESTED-wins verdict rule exactly as documented above. The convergence context does not alter how you evaluate findings.
 

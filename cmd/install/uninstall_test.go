@@ -787,7 +787,7 @@ func TestUninstall_RemoveEntry_NeverTripsSecretScan(t *testing.T) {
 		Op:        "remove",
 		Component: "clean-comp",
 		Owns: OwnershipTags{
-			Files:      []string{"{config_root}/agents/lider.md"},
+			Files:      []string{"{config_root}/agents/leader.md"},
 			ConfigKeys: []string{"logs-mode", "logs-path", "clickup.workspace_id"},
 		},
 	}

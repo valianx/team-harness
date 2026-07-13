@@ -85,11 +85,11 @@ Inventory and describe the resources in question; produce a plan report. **No sc
 
 Generate the full package, validate it, present the gate, and (on approval) apply the change.
 
-**Generated vs. run distinction (load-bearing).** A **generated** script is a plan artifact produced for review. A **run** script is one that has been executed. The full package — essential artifacts + executable script(s) + `02-runbook.md` — is the standard deliverable of any change-intent request. It is GENERATED, VALIDATED (Phase 3), and REVIEWED (Phase 3.5 independent audit by the orquestador) but is NEVER RUN without the Phase 4 STOP gate and explicit operator approval. A change-intent request that produces the plan without `--apply` still produces the full package; the apply still requires the gate. A purely read-only/inspection request still emits NO script.
+**Generated vs. run distinction (load-bearing).** A **generated** script is a plan artifact produced for review. A **run** script is one that has been executed. The full package — essential artifacts + executable script(s) + `02-runbook.md` — is the standard deliverable of any change-intent request. It is GENERATED, VALIDATED (Phase 3), and REVIEWED (Phase 3.5 independent audit by the orchestrator) but is NEVER RUN without the Phase 4 STOP gate and explicit operator approval. A change-intent request that produces the plan without `--apply` still produces the full package; the apply still requires the gate. A purely read-only/inspection request still emits NO script.
 
 - **Trigger:** a request that explicitly asks to change/provision/configure/apply a GCP resource (optionally signalled by `--apply`). `--apply` is intent only — it is NOT authorization; the STOP gate remains the sole authorization path.
 - **Output:** `workspaces/{feature-name}/02-gcp-infra.md` + `workspaces/{feature-name}/02-apply.sh` + `workspaces/{feature-name}/02-runbook.md`.
-- **Flow:** Phase 0 → Phase 1 → Phase 2 → Phase 3 (self-validation) → [orquestador dispatches Phase 3.5 audit] → Phase 4 (STOP gate) → Phase 5 (gated apply).
+- **Flow:** Phase 0 → Phase 1 → Phase 2 → Phase 3 (self-validation) → [orchestrator dispatches Phase 3.5 audit] → Phase 4 (STOP gate) → Phase 5 (gated apply).
 
 ---
 
@@ -99,7 +99,7 @@ Generate the full package, validate it, present the gate, and (on approval) appl
 
 1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand task scope.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orquestador's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
 2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 3. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
@@ -465,13 +465,13 @@ When no third-party library or version-sensitive CLI surface was involved, write
 
 ## Execution Log Protocol
 
-The orquestador writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: gcp-infra

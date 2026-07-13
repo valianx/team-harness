@@ -26,12 +26,12 @@ This document covers ONE parallelism mechanism: an operator-authorized batch of 
 
 | Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
 |---|---|---|---|---|
-| Inter-task DAG scheduler | tasks within one plan | one implementer per task | none — parallel-by-default, `Depends on:` rounds | `agents/orquestador.md § Phase 2 — Implementation → Stage 2 scheduler (DAG by Depends on:)` |
-| Parallel Multi-Project Dispatch | projects within one initiative | one implement+verify lane per project | operator confirm gate (`parallel` / `serial`) | `agents/lider.md § Parallel Multi-Project Dispatch` |
+| Inter-task DAG scheduler | tasks within one plan | one implementer per task | none — parallel-by-default, `Depends on:` rounds | `agents/orchestrator.md § Phase 2 — Implementation → Stage 2 scheduler (DAG by Depends on:)` |
+| Parallel Multi-Project Dispatch | projects within one initiative | one implement+verify lane per project | operator confirm gate (`parallel` / `serial`) | `agents/leader.md § Parallel Multi-Project Dispatch` |
 | Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
-| **Intra-task execution-lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/orquestador.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
+| **Intra-task execution-lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
 
-**Intra-task execution-lane decomposition, in brief.** A task's architect-declared `seams:` (disjoint file subsets) and `frozen-contracts:` (shared files/symbols no seam may modify) let the orquestador fan out ONE task's implementation into up to `LANE_CAP` (5) fresh-context implementer lanes at dispatch time, capped globally at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round (summing inter-task DAG parallelism and intra-task lanes). A lane that discovers it must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`; the orquestador aborts the fan-out and re-dispatches the whole task monolithically — never a silent stop. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes — the reader downstream of Phase 2 sees one task, one `02-implementation.md`, one commit set, exactly as the 1:1 path. Full gate mechanics, trace events, and the `00-state.md` schema live at `agents/orquestador.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`.
+**Intra-task execution-lane decomposition, in brief.** A task's architect-declared `seams:` (disjoint file subsets) and `frozen-contracts:` (shared files/symbols no seam may modify) let the orchestrator fan out ONE task's implementation into up to `LANE_CAP` (5) fresh-context implementer lanes at dispatch time, capped globally at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round (summing inter-task DAG parallelism and intra-task lanes). A lane that discovers it must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`; the orchestrator aborts the fan-out and re-dispatches the whole task monolithically — never a silent stop. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes — the reader downstream of Phase 2 sees one task, one `02-implementation.md`, one commit set, exactly as the 1:1 path. Full gate mechanics, trace events, and the `00-state.md` schema live at `agents/orchestrator.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`.
 
 **Why this is not the same as this document's batch mechanism.** This document's batch mechanism fans out independent ITEMS — each with its own worktree, its own branch, its own full Stage-1-through-verify pipeline run, consolidated at the END via sequential `git merge`. Intra-task lane decomposition fans out FILES within a SINGLE task that already cleared Stage 1 — lanes share the SAME worktree and branch (deliverable cohesion, not execution cohesion), write disjoint files, and consolidate via a compact status-block report, never a merge. Do not apply this document's worktree-isolation or edit-class-split machinery to lane decomposition; it operates at a different, finer grain.
 
@@ -51,9 +51,9 @@ Concurrent implementers never contend on the same working tree because each hold
 
 ## Concurrent implementer fan-out
 
-Dispatch N implementers in parallel via concurrent `Task` calls in the parent orquestador session. This is the same in-message mechanism already used for `tester + qa + security` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`.
+Dispatch N implementers in parallel via concurrent `Task` calls in the parent orchestrator session. This is the same in-message mechanism already used for `tester + qa + security` at Phase 3 and for project lanes in `## Parallel Multi-Project Dispatch`.
 
-Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/lider.md § Multi-Task fan-out`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
+Cap the concurrency at `batch_concurrency` (default 5) using the eager slot-fill wave model from `agents/leader.md § Multi-Task fan-out`: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
 
 ---
 
@@ -64,17 +64,17 @@ Every file an item touches MUST be declared in that item's `01-plan.md` with its
 | Class | Examples | Where edited | Reconciliation |
 |-------|----------|--------------|----------------|
 | **item-local** | new skill/agent/script/doc file; the item's own pre-reserved suite block in `tests/test_agent_structure.py`; the item's own new `docs/` file | inside the item's worktree — no other item touches the same file | wholesale `git checkout <item-branch> -- <item-local-paths>` into the consolidation tree |
-| **shared-serial** | `tests/test_agent_structure.py` overall (other items' suite blocks); `docs/testing.md` registry rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orquestador extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
+| **shared-serial** | `tests/test_agent_structure.py` overall (other items' suite blocks); `docs/testing.md` registry rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orchestrator extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
 
-**The invariant:** a shared-serial file is never edited in an item's worktree. An item that needs to contribute to a shared-serial file declares its reserved insertion block in the plan (`01-plan.md` § Files, with class: `shared-serial`, content: `<the exact insertion>`). The orquestador performs the splice centrally.
+**The invariant:** a shared-serial file is never edited in an item's worktree. An item that needs to contribute to a shared-serial file declares its reserved insertion block in the plan (`01-plan.md` § Files, with class: `shared-serial`, content: `<the exact insertion>`). The orchestrator performs the splice centrally.
 
-Items that touch only item-local files can be fully autonomous in their worktree (no coordination needed at file-write time). Items that touch shared-serial files are autonomous in their worktree too — they just do not write those files; the orquestador handles the write at consolidation.
+Items that touch only item-local files can be fully autonomous in their worktree (no coordination needed at file-write time). Items that touch shared-serial files are autonomous in their worktree too — they just do not write those files; the orchestrator handles the write at consolidation.
 
 ---
 
 ## Consolidation
 
-Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. It runs after all N implementers have finished and each item has passed its in-worktree verify. A SINGLE consolidator (a dedicated consolidator orquestador) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it one at a time.
+Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. It runs after all N implementers have finished and each item has passed its in-worktree verify. A SINGLE consolidator (a dedicated consolidator orchestrator) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it one at a time.
 
 ### Sequential merge, validate after each
 
@@ -133,7 +133,7 @@ The consolidated full-suite run is the gate that separates the parallel implemen
 
 ## Consolidator role and directives
 
-Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orquestador, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated, each commit carrying the other item's suite block.
+Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of `tests/test_agent_structure.py` cross-contaminated, each commit carrying the other item's suite block.
 
 Four directives:
 

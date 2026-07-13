@@ -8,7 +8,7 @@ This document describes the end-to-end integration between **team-harness** (the
 
 **team-harness** is a Claude Code plugin that turns the chat into a Spec-Driven Development pipeline. It dispatches specialized subagents (architect, implementer, tester, qa, security, delivery) that coordinate across three mandatory stages. Between pipeline runs, agents need a place to store and retrieve technical memory — patterns discovered, errors fixed, architectural decisions made.
 
-**context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools that the orquestador and delivery agent call on a running pipeline's behalf.
+**context-harness-mcp** is the server that provides that memory. It is a Go-based MCP (Model Context Protocol) server backed by Postgres with pgvector for semantic search, ONNX embeddings computed locally, and a content filter (gitleaks + taxonomy) that enforces the write-time content policy. It exposes 16 MCP tools that the orchestrator and delivery agent call on a running pipeline's behalf.
 
 The seam between the two products is a single HTTP endpoint and a `mcpServers.memory` entry in `~/.claude.json`. Nothing else crosses the boundary at runtime.
 
@@ -17,7 +17,7 @@ Claude Code
     │
     └── team-harness plugin
             │
-            ├── orquestador (Phase 6 knowledge-save + security-finding writes)
+            ├── orchestrator (Phase 6 knowledge-save + security-finding writes)
             ├── delivery agent (Step 11.5 passive capture)
             └── any agent reading the KG (search_nodes, open_nodes, read_graph)
                         │
@@ -158,10 +158,10 @@ The trace output includes `kg_write` events with `attempted` / `succeeded` count
 ### Step 5 — First pipeline run
 
 ```
-@th:lider give me the work plan for this task: <your task description>
+@th:leader give me the work plan for this task: <your task description>
 ```
 
-The first pipeline run exercises the full integration: the orquestador reads the KG at Phase 6 (if any relevant prior art exists), and writes at Phase 6 after delivery.
+The first pipeline run exercises the full integration: the orchestrator reads the KG at Phase 6 (if any relevant prior art exists), and writes at Phase 6 after delivery.
 
 ---
 
@@ -200,7 +200,7 @@ All content written to the KG must comply with the policy in `docs/kg-content-po
 - **No secrets.** API keys, tokens, bearer credentials, and internal IPs are forbidden, even in observation text.
 - **No absolute user paths.** Paths like `C:/Users/<name>/...` are not portable and must not be persisted.
 - **Date-anchor all state claims.** Observations about "current" state must include an explicit date (`As of 2026-05-29, ...`). Undated "currently" claims rot.
-- **Write-time enforcement.** The orquestador's content filter (Phase 6, delivery Step 11.5, and the security-finding write site) applies the policy before calling `create_nodes` or `add_observations`. The context-harness-mcp server applies a defense-in-depth filter (gitleaks + taxonomy) on the server side.
+- **Write-time enforcement.** The orchestrator's content filter (Phase 6, delivery Step 11.5, and the security-finding write site) applies the policy before calling `create_nodes` or `add_observations`. The context-harness-mcp server applies a defense-in-depth filter (gitleaks + taxonomy) on the server side.
 
 Full policy reference: `docs/kg-content-policy.md`
 
@@ -246,7 +246,7 @@ If `/th:setup` reports a connectivity failure on the smoke test:
 
 ### Smoke test passes but no writes on first pipeline
 
-The smoke test (`read_graph`) only validates transport. A write is first exercised at Phase 6 of the pipeline. If Phase 6 shows `attempted: 0` in the trace, the orquestador found no reusable learning to persist from that run — this is expected for trivial tasks. Run a substantive pipeline (a feature with architectural decisions or a bug fix with a root cause) to exercise the write path.
+The smoke test (`read_graph`) only validates transport. A write is first exercised at Phase 6 of the pipeline. If Phase 6 shows `attempted: 0` in the trace, the orchestrator found no reusable learning to persist from that run — this is expected for trivial tasks. Run a substantive pipeline (a feature with architectural decisions or a bug fix with a root cause) to exercise the write path.
 
 ---
 

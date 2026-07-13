@@ -1,6 +1,6 @@
 ---
 name: d2-diagrammer
-description: Generates D2 diagrams from architect analysis. Invoked by the orquestador after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
+description: Generates D2 diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.
 model: sonnet
 effort: medium
 color: orange
@@ -39,7 +39,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 **Before starting ANY work:**
 
-1. **Read the orquestador's invocation** — extract:
+1. **Read the orchestrator's invocation** — extract:
    - Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
    - Path to skill: `.claude/skills/d2-diagram/`
    - Output path: `workspaces/{feature}/diagram.d2`
@@ -174,7 +174,7 @@ In obsidian mode, append this marker to `{docs_root}/05-diagram.md` in place of 
 > Source: `diagram.d2`
 ```
 
-Status remains `success` when the source was produced and validated. Add `render: skipped` to the status block so the orquestador/operator can see the degradation explicitly.
+Status remains `success` when the source was produced and validated. Add `render: skipped` to the status block so the orchestrator/operator can see the degradation explicitly.
 
 ---
 
@@ -280,13 +280,13 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 
 ## Execution Log Protocol
 
-The orquestador writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
+The orchestrator writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: d2-diagrammer
@@ -313,4 +313,4 @@ issues: {blocking issues if failed/blocked, or "none"}
 - Windows: `winget install terrastruct.d2`
 - macOS/Linux: `curl -fsSL https://d2lang.com/install.sh | sh -s --`
 
-Do NOT repeat the full workspaces content in your final message. The orquestador uses this status block to validate completeness.
+Do NOT repeat the full workspaces content in your final message. The orchestrator uses this status block to validate completeness.

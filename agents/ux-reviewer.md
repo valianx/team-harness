@@ -34,7 +34,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ---
 
-**Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the lider's resolved base or the session-start directive's announced base — never the repo-local default.
+**Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the leader's resolved base or the session-start directive's announced base — never the repo-local default.
 
 ## Operating Modes
 

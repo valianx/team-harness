@@ -103,7 +103,7 @@ Never imply a safety that does not exist.
 
 Applies after Phase 3 validation completes. Skipped for read-only / inspection requests (no script generated).
 
-The orquestador dispatches two subagents in sequence, writing results to `02-gcp-review.md`:
+The orchestrator dispatches two subagents in sequence, writing results to `02-gcp-review.md`:
 
 1. **`th:security`** — audits `02-apply.sh` for: injected secrets, ambient-project reliance, variable-interpolated verbs (contract violation), missing `--project` flags, dangerous patterns (`--recursive`/`--all` without explicit scope), over-privileged IAM bindings, and any deviation from CRITICAL RULES in `agents/gcp-infra.md`.
 

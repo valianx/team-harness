@@ -6,7 +6,7 @@ name: lint
 
 Validate the health of agents and skills in this dev-team system. Run all 4 checks below **in sequence**, then show the consolidated report.
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `th:lider` or `th:orquestador` agents or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
+**IMPORTANT:** This skill runs directly — do NOT invoke the `th:leader` or `th:orchestrator` agents or any other agent. Execute all checks yourself using the tools available to you (Bash, Glob, Read, Grep).
 
 ## Voice
 
@@ -79,7 +79,7 @@ name: lint
 
 For each `.md` file in `agents/`:
 
-1. **Skip** `lider.md` and `orquestador.md` (they have a different structure as the coordination agents)
+1. **Skip** `leader.md` and `orchestrator.md` (they have a different structure as the coordination agents)
 2. For all other agent files, check that these **mandatory sections** exist (as `## Section Name` headings):
    - `## Core Philosophy`
    - `## Session Context Protocol`
@@ -101,7 +101,7 @@ name: lint
 For each `.md` file in `agents/`:
 
 1. **Skip** these files (they have their own guardrail model or Write/Edit IS their job):
-   - `lider.md`, `orquestador.md` — coordination agents, different structure
+   - `leader.md`, `orchestrator.md` — coordination agents, different structure
    - `diagrammer.md`, `d2-diagrammer.md`, `likec4-diagrammer.md` — generate diagram files (Write/Edit is their core function)
    - `init.md` — generates CLAUDE.md (Write/Edit is its core function)
 2. For each remaining agent, check its tool grants (from frontmatter or Tool Scoping section) and verify:
@@ -117,18 +117,18 @@ Result:
 ---
 name: lint
 
-## Check 5 — orquestador/lider coherence
+## Check 5 — orchestrator/leader coherence
 
-Cross-reference the orquestador's team table against actual agent files.
+Cross-reference the orchestrator's team table against actual agent files.
 
-1. **Read `agents/orquestador.md`** and extract the team table (the `| Agent | Role |` table)
-2. **List all `.md` files in `agents/`** (excluding `lider.md`, `orquestador.md`, and `ref-*.md` reference files)
+1. **Read `agents/orchestrator.md`** and extract the team table (the `| Agent | Role |` table)
+2. **List all `.md` files in `agents/`** (excluding `leader.md`, `orchestrator.md`, and `ref-*.md` reference files)
 3. **Cross-check:**
    - For each agent in the team table → verify a corresponding `.md` file exists in `agents/`
-   - For each agent `.md` file (excluding lider.md, orquestador.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note (in `lider.md`)
+   - For each agent `.md` file (excluding leader.md, orchestrator.md, ref-*.md) → verify it appears in either the team table OR the "Standalone agents" note (in `leader.md`)
    - Report: agents in table but missing file, agents with file but not in table/standalone note
 4. **Workspace-doc conflicts:** Extract the `Workspace doc` column from the team table. Check for duplicate output files (two agents writing to the same workspace doc). Report any duplicates.
-5. **Direct modes coherence:** Read the Direct Modes table in `lider.md`. For each agent referenced in the direct modes table, verify it exists as a file in `agents/`.
+5. **Direct modes coherence:** Read the Direct Modes table in `leader.md`. For each agent referenced in the direct modes table, verify it exists as a file in `agents/`.
 
 Result:
 - **PASS** if all cross-references are consistent and no workspace doc conflicts
@@ -142,7 +142,7 @@ name: lint
 
 Analyze agent definitions for contradictions and overlap.
 
-1. **Role boundary check:** For each agent, extract its "NEVER" statements (e.g., "NEVER writes code", "NEVER modify files"). Cross-check against the orquestador's team table `Writes code` column. Report contradictions (e.g., agent says "NEVER writes code" but orquestador marks it as "Yes" for writes code).
+1. **Role boundary check:** For each agent, extract its "NEVER" statements (e.g., "NEVER writes code", "NEVER modify files"). Cross-check against the orchestrator's team table `Writes code` column. Report contradictions (e.g., agent says "NEVER writes code" but orchestrator marks it as "Yes" for writes code).
 2. **Workspace-doc write conflicts:** For each agent, search for the workspace doc filename it writes to (from `## Session Documentation` section or output references). Verify no two agents write to the same file. Report conflicts.
 
 Result:
@@ -185,8 +185,8 @@ Canonical matrix (must match exactly):
 
 | Agent | Model | Effort |
 |---|---|---|
-| `lider` | opus | xhigh |
-| `orquestador` | sonnet | xhigh |
+| `leader` | opus | xhigh |
+| `orchestrator` | sonnet | xhigh |
 | `architect` | opus | high |
 | `agent-builder` | opus | max |
 | `security` | opus | max |
@@ -237,7 +237,7 @@ Detect near-duplicate skills so the team does not accumulate redundant slash com
 For each skill, build a comparison profile from its `SKILL.md`:
 - `name` — the frontmatter `name` (or directory name if frontmatter is absent).
 - `desc_tokens` — lowercased word set of the frontmatter `description`, minus stopwords (`the, a, an, and, or, to, of, for, in, on, with, use, when, this, that, run`).
-- `keyword_tokens` — union of `desc_tokens`, the routing class (`lider` | `standalone`), and any verb in the skill name.
+- `keyword_tokens` — union of `desc_tokens`, the routing class (`leader` | `standalone`), and any verb in the skill name.
 
 Compute three overlap signals per pair (A, B):
 1. **Name overlap** — `1.0` if `name_A` is a substring of `name_B` or vice versa; else token-set Jaccard of hyphen-split names.
@@ -275,7 +275,7 @@ Apply a per-skill quality checklist as a quick scan. REPORT-only — this check 
 | Q2 | Voice-rule compliance | A `## Voice` block is present OR the skill references `agents/_shared/operational-rules.md`; body contains none of the forbidden enthusiasm/emoji markers (`✅`, `⚠️`, `🎉`, `✨`, "Perfecto", "Excelente", "Great job"). |
 | Q3 | Output discipline | An `## Output Discipline` block is present (or an explicit Output Format contract section). |
 | Q4 | No orphaned references | Every `agents/<x>.md`, `skills/<x>/`, `docs/<x>.md`, or `hooks/<x>` path referenced in the body resolves on disk. Unresolvable internal path → finding. |
-| Q5 | Correct routing classification | The skill's actual behavior (declares "runs directly" / does NOT route to lider → standalone; builds a task payload and routes → lider) matches its classification in `skills/README.md` Routing. Mismatch → finding. |
+| Q5 | Correct routing classification | The skill's actual behavior (declares "runs directly" / does NOT route to leader → standalone; builds a task payload and routes → leader) matches its classification in `skills/README.md` Routing. Mismatch → finding. |
 
 Result:
 - **PASS** if every scanned skill satisfies Q1–Q5.
@@ -351,7 +351,7 @@ Status: {PASS|WARN}
 {for each agent with issues: "  {agent}: has {capability} but missing {guardrail}"}
 {if PASS: "All agents have appropriate guardrails for their tool access"}
 
---- Check 5: orquestador/lider coherence ---
+--- Check 5: orchestrator/leader coherence ---
 Status: {PASS|WARN|FAIL}
 Team table:  {N agents} referenced | {N matched} | {mismatches}
 workspaces: {N unique} / {N total} | {conflicts or "no conflicts"}

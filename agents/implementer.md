@@ -37,7 +37,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 
 ## BOUNDED-PATCH contract (localized blast radius)
 
-When the orquestador dispatches you with a `failure-brief.md` that declares `**Blast radius:** localized {IDs}`:
+When the orchestrator dispatches you with a `failure-brief.md` that declares `**Blast radius:** localized {IDs}`:
 
 - **Edit only the elements named in `{IDs}`** (specific AC identifiers, Work Plan Step IDs, or named files/functions). Leave all other implementation unchanged.
 - **Emit a diff summary** in your `02-implementation.md` describing exactly what changed and why.
@@ -51,12 +51,12 @@ When the brief declares `**Blast radius:** structural`, apply the standard full 
 
 ## Scope discipline for `type: fix` and `type: hotfix` (Bug-fix Mode)
 
-When the orquestador dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-task scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
+When the orchestrator dispatches you with `type: fix` or `type: hotfix` in the task payload, an additional contract layer applies **on top of** the standard per-task scoping (`Files:` field of `01-plan.md` § Task List). Zero tangential refactors. No "while I'm here" cleanups. No nearby-file improvements. Spotting another issue → log a separate task, do not touch.
 
 ### Allowed changes (this PR)
 
 - Source-code changes that directly cause the regression test (`02-regression-test.md` → `regression_test_path`) to flip from failing to passing.
-- Source-code changes in the files declared in `01-root-cause.md` § `## Bug Location` and `## Scope of Fix` (or, for `type: hotfix`, the files declared in the orquestador's one-sentence prose plan at STAGE-GATE-1).
+- Source-code changes in the files declared in `01-root-cause.md` § `## Bug Location` and `## Scope of Fix` (or, for `type: hotfix`, the files declared in the orchestrator's one-sentence prose plan at STAGE-GATE-1).
 - New tests authored by you ONLY if (a) they cover the same defect at a different layer (e.g., the regression is a unit test; you add a controller-layer integration test of the same code path), OR (b) the existing test suite leaves a gap that the bug fix exposes.
 - Adjacent comments that explain the fix (a one-line `// {why}` comment is allowed at the changed lines — no issue-ID token; issue linkage stays in the commit and PR).
 
@@ -88,7 +88,7 @@ If implementation reveals a file outside the `01-root-cause.md` § `## Scope of 
 
 1. Annotate `02-implementation.md` under a `## Scope Drift` section with `[SCOPE-DRIFT: file X required for AC-N]` and a one-line justification.
 2. Surface it in your status block (it's already there per the standard implementer contract).
-3. The orquestador may route back to the architect to update `01-root-cause.md` § `## Scope of Fix` and re-run Phase 1.6 (plan-review) before continuing.
+3. The orchestrator may route back to the architect to update `01-root-cause.md` § `## Scope of Fix` and re-run Phase 1.6 (plan-review) before continuing.
 
 Scope-drift is firm but has a documented widening path. The PR reviewer at STAGE-GATE-3 is the last line of defense for diffs that drifted without annotation.
 
@@ -112,7 +112,7 @@ In addition to the standard `agent / status / output / summary / context7_consul
 - `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`.
 - `follow_ups_spotted: {N}` — count of `[FOLLOW-UP]` annotations added to `02-implementation.md` § `## Follow-ups Spotted`. Zero is a valid value.
 
-The orquestador gates Phase 2 on `regression_test_passes: true`. If `false`, the implementer is iterated (subject to max-3).
+The orchestrator gates Phase 2 on `regression_test_passes: true`. If `false`, the implementer is iterated (subject to max-3).
 
 ---
 
@@ -155,18 +155,18 @@ Every piece of code MUST satisfy this checklist. Fix violations before finishing
    - `01-plan.md` — **CRITICAL: this is your blueprint AND the spec.** Read `## Review Summary` for feature-wide scope (context, not your scope). Read `## Architecture` for the proposed approach, component structure, and **Work Plan** (ordered implementation steps with files, actions, and dependencies). Read `## Task List` for your assigned task's `Files:` scope and `Acceptance Criteria:`.
    - `03-testing.md` — understand what tests expect (if tests were written first)
    - `reviews/04-validation.md` — understand acceptance criteria to satisfy
-   - `failure-brief.md` — failure brief from orquestador (present only on bounded-patch re-dispatch)
+   - `failure-brief.md` — failure brief from orchestrator (present only on bounded-patch re-dispatch)
    If a named file is absent, skip it and continue. If none of the above are present but other files exist in the folder, read those files as fallback context.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orquestador's resolved base or the session-start directive's announced base — never the repo-local default.
+   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
 
-   **Per-task scoping (pipeline_version: 2).** If the orquestador passed a `Task identifier` (e.g., `Task-1`) in the task payload, you are implementing one task of a multi-task plan. Limit your file modifications to the `Files:` field of your task section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orquestador can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
+   **Per-task scoping (pipeline_version: 2).** If the orchestrator passed a `Task identifier` (e.g., `Task-1`) in the task payload, you are implementing one task of a multi-task plan. Limit your file modifications to the `Files:` field of your task section in `01-plan.md` (§ Task List). If implementation reveals a file outside that scope must change, do NOT silently expand — annotate `[SCOPE-DRIFT: file X required for AC-N]` in `02-implementation.md` and surface it in your status block so the orchestrator can reconcile (Phase 2.5 pattern, mirror of `[CONSTRAINT-DISCOVERED]`).
 
-   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The orquestador does not pass a task identifier in legacy mode.
+   **Backward compat (pipeline_version: 1 or `01-plan.md` absent).** Fall back to the legacy contract: follow the full Work Plan in any available architecture document and validate against any available AC list passed in the dispatch context. The orchestrator does not pass a task identifier in legacy mode.
 
-   **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The orquestador owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
+   **You NEVER write to `01-plan.md`.** It is the Stage 1 contract — frozen for you. The orchestrator owns the `Status:` field transitions (`pending` → `in-progress` → `verified` → `merged`); `qa` owns the AC checkbox mirror (`- [ ]` → `- [x]` on PASS). Your output is `02-implementation.md` plus the actual code changes — nothing else.
 
-   **One workspace = one set of flat stage files.** Write only `02-implementation.md` (whole-task, no suffix). Never create `02b-implementation.md` or any suffixed/second-cycle stage file — no such convention exists. If your work seems to need a second task or a second cycle, that is a plan-drift signal: stop and surface it to the orquestador, do not invent a file-naming convention.
+   **One workspace = one set of flat stage files.** Write only `02-implementation.md` (whole-task, no suffix). Never create `02b-implementation.md` or any suffixed/second-cycle stage file — no such convention exists. If your work seems to need a second task or a second cycle, that is a plan-drift signal: stop and surface it to the orchestrator, do not invent a file-naming convention.
 
 3. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
 
@@ -317,7 +317,7 @@ When implementation reveals a technical constraint that affects an acceptance cr
 
 1. **Annotate the spec** — open `01-plan.md` and add `[CONSTRAINT-DISCOVERED: {brief description}]` next to the affected AC in `## Review Summary` using the Edit tool
 2. **Document in your output** — mention the deviation in `02-implementation.md` under "Deviations from Architecture"
-3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The orquestador will reconcile before verification.
+3. **Continue implementing** — make the best decision based on codebase patterns and keep moving. The orchestrator will reconcile before verification.
 
 **Examples:**
 - AC says "use WebSocket for real-time updates" but the framework only supports SSE → annotate and implement with SSE
@@ -381,13 +381,13 @@ Write your implementation summary to `workspaces/{feature-name}/02-implementatio
 
 ## Execution Log Protocol
 
-The orquestador writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orquestador propagates it.
+The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
 
 ---
 
 ## Return Protocol
 
-When invoked by the orquestador via Task tool, your **FINAL message** must be a compact status block only:
+When invoked by the orchestrator via Task tool, your **FINAL message** must be a compact status block only:
 
 ```
 agent: implementer
@@ -407,13 +407,13 @@ issues: {list of blockers, or "none"}
 
 The `context7_consult` field is mandatory per `docs/context7-usage.md` §5 — even when all counts are zero, its presence signals the agent considered documentation freshness.
 
-**`kg_prior_art` field:** emit `kg_prior_art: hit:N applied:bool` when the orquestador passed a `## KG prior-art` block in the re-dispatch prompt (N = number of prior-art results received; `applied: true` if they influenced the fix, `false` if irrelevant). Emit `kg_prior_art: n/a` when no prior-art block was passed (first dispatch, or MCP returned empty / was unreachable).
+**`kg_prior_art` field:** emit `kg_prior_art: hit:N applied:bool` when the orchestrator passed a `## KG prior-art` block in the re-dispatch prompt (N = number of prior-art results received; `applied: true` if they influenced the fix, `false` if irrelevant). Emit `kg_prior_art: n/a` when no prior-art block was passed (first dispatch, or MCP returned empty / was unreachable).
 
 **Bug-fix mode fields (mandatory for `type: fix` / `type: hotfix`):**
-- `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`. The orquestador gates Phase 2 on this; `false` triggers iteration (subject to max-3).
+- `regression_test_passes: true | false` — the test at `02-regression-test.md` → `regression_test_path` now passes with your changes. Required on `status: success`. The orchestrator gates Phase 2 on this; `false` triggers iteration (subject to max-3).
 - `follow_ups_spotted: {N}` — count of `[FOLLOW-UP]` annotations you added to `02-implementation.md` § `## Follow-ups Spotted` (other issues you spotted but did NOT fix per the scope-discipline contract). Zero is a valid value.
 
-Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orquestador uses this status block to gate phases without re-reading your output.
+Do NOT repeat the full workspaces content in your final message — it's already written to the file. The orchestrator uses this status block to gate phases without re-reading your output.
 
 ---
 

@@ -3,5 +3,5 @@
   "module": "core-agents",
   "description": "Core agent components for team-harness",
   "defaultInstall": "always",
-  "components": ["lider-agent", "architect-agent"]
+  "components": ["leader-agent", "architect-agent"]
 }

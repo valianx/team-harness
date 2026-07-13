@@ -1,6 +1,6 @@
 # Probe M3 — Gate Messaging Round-Trip (Panel Resume + Dual-Record)
 
-> **SUPERSEDED — design pivot (retained as historical record).** This probe specifies the now-retired *gate-blind* design, in which the operator replied to a paused orquestador **in the orquestador's own subagent panel** (direct in-session-subagent messaging), and that same subagent resumed as sole witness and recorder. That premise proved unreachable in real clients — herdr and other TUIs expose no reachable in-session-subagent reply path, and a paused subagent is reaped — so the gate-blind design **deadlocked**. Gates are now **líder-mediated**: the orquestador returns a `gate_pending` status; `th:lider` **presents** the gate **inline** in the operator's main conversation (reachable) and **relays** the operator's verbatim decision back to the orquestador, tagged `lider-relayed-operator`, which records the dual-record. The live in-session-subagent messaging property this probe targets is therefore **no longer load-bearing**, and M3 is **no longer the FATAL constraint**; the capability floor is now the parent→child spawn-and-resume path (Claude Code ≥ v2.1.199 — `th:lider` resuming a dormant orquestador to deliver a relayed decision). See `agents/_shared/gate-contract.md § "preparer + recorder ... presenter + relayer"` and `agents/lider.md § "Gate mediation"`. The original probe body below is retained verbatim as historical record.
+> **SUPERSEDED — design pivot (retained as historical record).** This probe specifies the now-retired *gate-blind* design, in which the operator replied to a paused orchestrator **in the orchestrator's own subagent panel** (direct in-session-subagent messaging), and that same subagent resumed as sole witness and recorder. That premise proved unreachable in real clients — herdr and other TUIs expose no reachable in-session-subagent reply path, and a paused subagent is reaped — so the gate-blind design **deadlocked**. Gates are now **leader-mediated**: the orchestrator returns a `gate_pending` status; `th:leader` **presents** the gate **inline** in the operator's main conversation (reachable) and **relays** the operator's verbatim decision back to the orchestrator, tagged `leader-relayed-operator`, which records the dual-record. The live in-session-subagent messaging property this probe targets is therefore **no longer load-bearing**, and M3 is **no longer the FATAL constraint**; the capability floor is now the parent→child spawn-and-resume path (Claude Code ≥ v2.1.199 — `th:leader` resuming a dormant orchestrator to deliver a relayed decision). See `agents/_shared/gate-contract.md § "preparer + recorder ... presenter + relayer"` and `agents/leader.md § "Gate mediation"`. The original probe body below is retained verbatim as historical record.
 
 **Probe ID:** M3
 **Feeds:** `tests/evidence/nested-lane-probes.md`, `01-plan.md` AC-7.2, capability-floor `probe_result` (Task-9)
@@ -9,9 +9,9 @@
 
 ## Objective
 
-Verify the mechanism the entire gate seam redesign depends on (`01-plan.md § "The gate seam — welded inside the orquestador"`): a th:orquestador subagent, paused at a synthetic STOP it emitted **in its own transcript**, resumes with context intact when the operator replies **in that same transcript** (subagent-panel direct messaging — not a top-level relay), and then writes both halves of the dual-record (`gateN_release` field + `stage.gate.release` event) atomically as the one who witnessed the reply.
+Verify the mechanism the entire gate seam redesign depends on (`01-plan.md § "The gate seam — welded inside the orchestrator"`): a th:orchestrator subagent, paused at a synthetic STOP it emitted **in its own transcript**, resumes with context intact when the operator replies **in that same transcript** (subagent-panel direct messaging — not a top-level relay), and then writes both halves of the dual-record (`gateN_release` field + `stage.gate.release` event) atomically as the one who witnessed the reply.
 
-This is the probe that closes the loop the plan calls "`presenter == witness == recorder == sole-writer`" — the FATAL constraint the split's whole gate-blind líder design rests on.
+This is the probe that closes the loop the plan calls "`presenter == witness == recorder == sole-writer`" — the FATAL constraint the split's whole gate-blind leader design rests on.
 
 ## Why this probe has no spike precursor
 
@@ -21,12 +21,12 @@ The `01-plan.md § Documentation Consulted` note records the platform capability
 
 ## Method (operator-run; REQUIRES-LIVE-RUN)
 
-1. Dispatch a th:orquestador-shaped subagent for a trivial synthetic task.
+1. Dispatch a th:orchestrator-shaped subagent for a trivial synthetic task.
 2. Have it reach a point where it emits a STOP-block matching the `agents/_shared/gate-contract.md` template (Task-1) for one of the three STAGE-GATEs, in its **own** transcript, and halt (no further tool calls) — mirroring the "presenter" half of the contract.
-3. The operator replies **in that subagent's own panel** (not the top-level líder transcript) with a value from the gate's closed allowlist (e.g., `approve` for STAGE-GATE-1).
+3. The operator replies **in that subagent's own panel** (not the top-level leader transcript) with a value from the gate's closed allowlist (e.g., `approve` for STAGE-GATE-1).
 4. Observe:
    - **(a) Context retention on resume.** Does the subagent's next action correctly reference the state it had before the STOP (e.g., does it proceed to the correct next phase, not restart or lose the boundary it was gating)?
-   - **(b) Witness identity.** Is the reply consumed by the SAME subagent that emitted the STOP (panel-scoped), not relayed through or re-interpreted by the top-level líder?
+   - **(b) Witness identity.** Is the reply consumed by the SAME subagent that emitted the STOP (panel-scoped), not relayed through or re-interpreted by the top-level leader?
    - **(c) Dual-record write.** After the reply is consumed, does the subagent write BOTH halves atomically — the `gateN_release` field in its own `00-state.md` AND the `stage.gate.release` event in its own events file — in the same phase-transition write, per the gate-contract's atomicity rule?
 5. Repeat for at least one more gate (ideally all three: STAGE-GATE-1 `approve`, STAGE-GATE-2 `next`, STAGE-GATE-3 `ship`) to confirm the mechanism generalizes, not a one-gate coincidence.
 
@@ -48,5 +48,5 @@ Step 4(c) — the dual-record's **atomicity property** (never a half-written rec
 
 ## Caveats
 
-- If Step 4(b) shows the reply was instead consumed by the líder (top-level) rather than the orquestador subagent's own panel, this is a **probe FAIL**, not a soft finding — it falsifies the FATAL gate-blind constraint the whole split design rests on and blocks the capability floor from ever returning PASS (`01-plan.md § "The gate seam"`).
+- If Step 4(b) shows the reply was instead consumed by the leader (top-level) rather than the orchestrator subagent's own panel, this is a **probe FAIL**, not a soft finding — it falsifies the FATAL gate-blind constraint the whole split design rests on and blocks the capability floor from ever returning PASS (`01-plan.md § "The gate seam"`).
 - A probe that reports PASS without the operator having personally observed the panel exchange (self-attested by an agent) is explicitly disallowed by `01-plan.md`'s framing ("Probe PASS auto-atestado... rechazado", `research/00-test-plan.md` RF-6) — M3's PASS requires operator confirmation, not agent self-report.

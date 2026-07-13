@@ -3,7 +3,7 @@ name: update
 description: Update the th plugin — refresh catalog, download the new version, sync managed CLAUDE.md blocks. Reload is operator-driven.
 ---
 
-Refresh the `team-harness` plugin marketplace catalog, report whether a new `th` release is available, and keep the managed `~/.claude/CLAUDE.md` blocks aligned with the running plugin version. This is a standalone utility — it does NOT route through th:lider. It is the repeatable update command; `/th:setup` is the one-time bootstrap and is never part of this flow.
+Refresh the `team-harness` plugin marketplace catalog, report whether a new `th` release is available, and keep the managed `~/.claude/CLAUDE.md` blocks aligned with the running plugin version. This is a standalone utility — it does NOT route through th:leader. It is the repeatable update command; `/th:setup` is the one-time bootstrap and is never part of this flow.
 
 Usage: `/th:update [--force-blocks]`
 

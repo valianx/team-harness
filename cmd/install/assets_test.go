@@ -15,7 +15,7 @@ import (
 // Note: agents/_shared/ contains cross-cutting snippets (not invocable agents)
 // and is intentionally excluded from the count.
 func TestEmbeddedAssets_AgentCount(t *testing.T) {
-	const wantAgents = 28 // orchestrator split into lider + orquestador; embed-count integrity check, not a lowCostMatrix/model-allocation change
+	const wantAgents = 28 // orchestrator split into leader + orchestrator; embed-count integrity check, not a lowCostMatrix/model-allocation change
 	embedded := EmbeddedAssets()
 
 	var mdFiles []string
@@ -93,8 +93,8 @@ func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 	roster := []string{
 		"acceptance-checker", "agent-builder", "architect", "code-researcher",
 		"d2-diagrammer", "delivery", "diagrammer", "documenter", "gcp-cost-analyzer",
-		"gcp-infra", "implementer", "init", "lider", "likec4-diagrammer", "mentor",
-		"orquestador", "plan-reviewer", "qa", "qa-plan", "research-consolidator",
+		"gcp-infra", "implementer", "init", "leader", "likec4-diagrammer", "mentor",
+		"orchestrator", "plan-reviewer", "qa", "qa-plan", "research-consolidator",
 		"researcher", "reviewer", "reviewer-consolidator", "security", "tester",
 		"translator", "ux-reviewer",
 	}

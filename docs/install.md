@@ -102,19 +102,19 @@ After installing, two optional scaffolds are available via `/th:bootstrap`:
 
 ## Invoking the bug-fix and feature pipelines
 
-The canonical entry point after install is the `lider` agent. Type `@th:lider <task>` in your Claude Code session:
+The canonical entry point after install is the `leader` agent. Type `@th:leader <task>` in your Claude Code session:
 
 ```
-@th:lider fix the pagination bug in the users list
-@th:lider add an export-to-CSV feature to the invoices page
-@th:lider refactor the auth middleware to use the new JWT library
+@th:leader fix the pagination bug in the users list
+@th:leader add an export-to-CSV feature to the invoices page
+@th:leader refactor the auth middleware to use the new JWT library
 ```
 
-**Slash-command shortcuts** route to the same lider via `Task` from top-level — they are equivalent to the `@th:lider` path:
+**Slash-command shortcuts** route to the same leader via `Task` from top-level — they are equivalent to the `@th:leader` path:
 
 | Command | Equivalent to |
 |---|---|
-| `/issue #N` | `@th:lider` with the GitHub issue body fetched automatically |
+| `/issue #N` | `@th:leader` with the GitHub issue body fetched automatically |
 | `/design <feature>` | Routes to design direct mode |
 | `/deliver` | Routes to delivery direct mode |
 | `/recover <feature>` | Resumes an interrupted pipeline |

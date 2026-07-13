@@ -79,7 +79,7 @@ def _slice_section(text: str, anchor: str) -> str:
 # File reads
 # ---------------------------------------------------------------------------
 _hooks_json_text = read(PLUGIN_DIR / "hooks.json")
-_orchestrator_text = read(AGENTS_DIR / "orquestador.md")
+_orchestrator_text = read(AGENTS_DIR / "orchestrator.md")
 _recover_skill_text = read(skill_path("recover"))
 _setup_skill_text = read(skill_path("setup"))
 _update_skill_text = read(skill_path("update"))
@@ -294,9 +294,9 @@ _s85_recover_safety_slice = _slice_section(_recover_skill_text, _S85_RECOVER_SAF
 _S85_ORCH_RECOVERY_ANCHOR = "## Recovery Instructions"
 _s85_orch_recovery_slice = _slice_section(_orchestrator_text, _S85_ORCH_RECOVERY_ANCHOR)
 
-# Anchor the current state schema in orquestador.md
+# Anchor the current state schema in orchestrator.md
 # The schema section is identified by the "## Current State" heading.
-# Newline-anchored: orquestador.md's own "Mandatory boot sequence" prose
+# Newline-anchored: orchestrator.md's own "Mandatory boot sequence" prose
 # cross-references `` `## Current State` `` inline in backticks well before
 # the real heading — a bare substring match would lock onto that mention.
 _S85_CURRENT_STATE_ANCHOR = "\n## Current State\n"
@@ -360,7 +360,7 @@ check(
 )
 
 # Check F009-4: orchestrator.md § Recovery Instructions references per-gate allowlist
-# orquestador.md's Recovery Instructions now delegates the literal allowlist to the
+# orchestrator.md's Recovery Instructions now delegates the literal allowlist to the
 # single-source `agents/_shared/gate-contract.md` ("per `gate-contract.md`") rather than
 # duplicating it inline — check that referenced file too when the pointer is present.
 _gate_contract_text = read(REPO_ROOT / "agents" / "_shared" / "gate-contract.md")

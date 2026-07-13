@@ -19,7 +19,7 @@ import (
 //   - all 19 expected agents are present
 func TestLowCostMatrixInvariants(t *testing.T) {
 	expectedAgents := []string{
-		"lider", "orquestador", "architect", "agent-builder", "security", "reviewer",
+		"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer",
 		"reviewer-consolidator",
 		"qa", "plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "acceptance-checker", "diagrammer", "likec4-diagrammer",
@@ -48,7 +48,7 @@ func TestLowCostMatrixInvariants(t *testing.T) {
 
 // TestLowCostMatrixTally verifies the 7 high / 11 medium split from the architecture.
 func TestLowCostMatrixTally(t *testing.T) {
-	high := []string{"lider", "orquestador", "architect", "agent-builder", "security", "reviewer", "qa"}
+	high := []string{"leader", "orchestrator", "architect", "agent-builder", "security", "reviewer", "qa"}
 	medium := []string{
 		"plan-reviewer", "gcp-cost-analyzer", "init", "implementer",
 		"tester", "acceptance-checker", "diagrammer", "likec4-diagrammer",
@@ -273,7 +273,7 @@ func TestAgentNameFromPath(t *testing.T) {
 			path string
 			want string
 		}{
-			{`C:\Users\user\.claude\agents\lider.md`, "lider"},
+			{`C:\Users\user\.claude\agents\leader.md`, "leader"},
 		}
 		for _, tc := range windowsCases {
 			got := agentNameFromPath(tc.path)
