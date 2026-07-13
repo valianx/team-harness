@@ -160,6 +160,7 @@ All commands run from the repo root.
 - **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`. Exception: Tier 0 fixes (`workspaces: NONE`) are exempt. Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs against context7 before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** For `type: fix`/`hotfix`. Full flow: `agents/ref-special-flows.md § Bug-fix Flow`.
+- **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan (`agents/orchestrator.md § Phase 2.6`) bounces work-narration comments on added diff lines; `qa` validate-mode `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction — AC satisfaction alone does not pass. Canonical pattern set + site enumeration: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Plan-review panel centralization** — worst-of verdict; panel writes `reviews/01-plan-review.md`. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).

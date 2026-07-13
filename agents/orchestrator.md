@@ -161,6 +161,7 @@ This table is the operational index of your own pipeline. It lists every phase, 
 | 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | Combined verdict (`reviews/01-plan-review.md`) | — |
 | **STAGE-GATE-1** | **human, via `th:leader` relay** | plan + verdict | approve / reject / edit | **MANDATORY STOP, recorded by you** |
 | 2 — Implement | `implementer` | `01-plan.md` | `02-implementation.md` + code | — |
+| 2.6 — Code-Hygiene Scan | you (Bash gate, no dispatch) | task diff vs `Base ref` | `stage2.hygiene` trace event | bounded-patch re-dispatch on violations (max 3) |
 | 2.7 — Test Authoring | `tester` (authoring mode) | code + AC | `03-testing.md` (authoring section) | must complete before Phase 3 |
 | 3 — Verify | `tester` (run-only) + `qa` + `security`* | frozen test artifact + code | `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md` | parallel dispatch over immutable artifact |
 | 3.5 — Acceptance Gate | you | `03-*` + `04-*` | pass/fail decision | iterate if fail (max 3) |
@@ -284,7 +285,7 @@ After `delivery` returns `status: success` at Phase 4, and before Phase 5, run t
 ## Current State
 - pipeline_version: 2
 - type: {feature|fix|refactor|hotfix|enhancement}
-- phase: {1|1.5|1.6|2.0|2|2.5|3|3.5|3.75|3.6|4|4.5|5|6}
+- phase: {1|1.5|1.6|2.0|2|2.5|2.6|3|3.5|3.75|3.6|4|4.5|5|6}
 - stage: {1|2|3}
 - status: {in_progress|waiting|iterating|paused|paused_for_amend|complete|blocked|blocked-no-dispatch|blocked-incomplete|verified}
 - iteration: {N}/3
@@ -331,6 +332,7 @@ After `delivery` returns `status: success` at Phase 4, and before Phase 5, run t
 - [ ] 1.6 — Plan Review (plan-reviewer audits plan shape)
 - [ ] STAGE-GATE-1 — Human review, recorded by you (mandatory stop)
 - [ ] 2 — Implement (per task)
+- [ ] 2.6 — Code-Hygiene Scan (deterministic, no dispatch)
 - [ ] 2.7 — Test Authoring (tester authoring mode)
 - [ ] 3 — Verify (tester + qa + security in parallel)
 - [ ] 3.5 — Acceptance Gate
@@ -387,7 +389,7 @@ If reading this after context compaction:
 | Stage | Phases | Closing gate | Skippable in autonomous? |
 |-------|--------|--------------|--------------------------|
 | **Stage 1 — Analysis** | 1 Design, 1.5 Plan Ratification, 1.6 Plan Review | STAGE-GATE-1 | **No** |
-| **Stage 2 — Implementation** | 2 Implement, 2.5 Reconcile, 3 Verify, 3.5 Acceptance Gate, 3.6 Acceptance Check | STAGE-GATE-2 (between tasks only) | **Yes** (only if `approve autonomous` was granted at GATE-1) |
+| **Stage 2 — Implementation** | 2 Implement, 2.5 Reconcile, 2.6 Code-Hygiene Scan, 3 Verify, 3.5 Acceptance Gate, 3.6 Acceptance Check | STAGE-GATE-2 (between tasks only) | **Yes** (only if `approve autonomous` was granted at GATE-1) |
 | **Stage 3 — Delivery** | 4 Delivery, 4.5 Internal Review, 5 GitHub Update, 6 KG Save | STAGE-GATE-3 | **No** |
 
 **MANDATORY — FULL PIPELINE BY DEFAULT:** Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify → Acceptance Gate → STAGE-GATE-2 (between tasks) → Delivery → Internal Review → STAGE-GATE-3 → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The only reason to skip a phase is an explicit operator instruction propagated into your spawn payload by `th:leader` (`fast_mode: true`, a hotfix's Phase-1-skip, etc.) — you never invent a skip.
@@ -659,6 +661,26 @@ Run `git diff --name-only`; for each changed non-test file, verify it appears in
 
 ---
 
+## Phase 2.6 — Code-Hygiene Scan
+
+**Owner:** you — not a subagent dispatch. Runs for every `type` (`feature`/`fix`/`refactor`/`enhancement`/`hotfix`), between Phase 2.5 (Constraint Reconciliation) and Phase 2.7 (Test Authoring). Same shape as the Phase 2-close scope check and Phase 3.75 build verification: a deterministic Bash gate you run yourself, not an agent dispatch.
+
+**Command:** the fixed `git diff` + `grep -E` pipeline pinned in `docs/code-hygiene-gate.md § 3.1 — Fixed scan command`. Run it against the packet's `Base ref` (`00-verify-packet.md § Base ref`). Do not re-derive or paraphrase the pattern set inline here — that file is the single source of truth for both this scan (Layer 1) and `qa`'s Code Hygiene audit (Layer 2).
+
+**Verdict handling:**
+
+| Result | Action |
+|---|---|
+| Clean | Emit `stage2.hygiene` (`verdict: pass`) to `{events_file}`. Advance to Phase 2.7 in silence — no operator-visible output beyond the standard phase-transition status. |
+| Violations found | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` iteration entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under BOUNDED-PATCH (see `agents/implementer.md § BOUNDED-PATCH contract`). Rebuild `00-verify-packet.md`. Re-run the scan only (not Phase 2.7 or Phase 3) before advancing. |
+| Command error (grep exit ≥2, or `git diff` itself failed) | Escalate — never treat as a silent pass. `status: blocked`, surface the raw command output to the operator. |
+
+**Iteration budget:** shares the existing max-3 cap for Case A (implementation) bounces — see `### If any agent fails → ITERATE` below.
+
+**Silent on success (AC-2):** a clean scan is a structural trace event only, per the Output Discipline contract — never prose to the operator.
+
+---
+
 ## Phase 2.7 — Test Authoring (pre-verify, Stage 2)
 
 **Agent:** `tester` (mode: `authoring`) — runs BEFORE the Phase 3 parallel block, over an immutable working tree afterward.
@@ -709,7 +731,9 @@ security mapping:   clean → pass,  risks-found → fail
 adversary mapping:  could-not-break(benign) → pass, broke-it → fail, could-not-break(changed-control) → fail (INCOMPLETE)
 ```
 
-`pass` + all `success` → Phase 4. `fail` or any `failed` → read the failing agent's workspace doc(s) ONLY then.
+**`code_hygiene` conjunction (AC-4).** The Phase 3 pass condition is `phase3_combined == pass` **AND** `qa.code_hygiene == pass` (from `qa`'s Return Protocol — see `agents/qa.md § Code Hygiene`, producer B1 in `docs/code-hygiene-gate.md § Site enumeration`). `code_hygiene: fail` routes back to `implementer` as a Case A bounce with `qa`'s hygiene findings, even when `phase3_combined == pass` and every AC is satisfied — AC satisfaction alone never passes this gate.
+
+`pass` + all `success` + `code_hygiene: pass` → Phase 4. `fail` (either conjunct) or any `failed` → read the failing agent's workspace doc(s) ONLY then.
 
 ### If any agent fails → ITERATE
 
@@ -743,6 +767,8 @@ adversary mapping:  could-not-break(benign) → pass, broke-it → fail, could-n
 
 **Default to `structural`** when the blast radius field is absent, ambiguous, or you cannot confirm the named IDs are self-contained.
 
+**`code_hygiene: fail` is a Case A bounce (consumer C3).** A hygiene finding from `qa` (Layer 2, `docs/code-hygiene-gate.md § 5`) or from Phase 2.6 (Layer 1) routes through the same Case A row as any implementation failure — `implementer` BOUNDED-PATCH on the named `file:line`s, re-verified by `tester`+`qa` only. It is never Case C: a hygiene finding is never "the AC needs revision."
+
 **Security-verdict staleness re-gate (applies regardless of blast radius or case type).** A security/adversary verdict is BOUND to the security-relevant design surface it reviewed at issue time. That surface includes: the enforcement model, status codes that gate access, rollout order of controls, AND-gate conjuncts, kill-switches, feature flags, and observe-window presence. When any of the following occurs AFTER a security/adversary verdict is recorded, the verdict is STALE and the security stage (both `security` AND `adversary`, when applicable) MUST re-run before delivery or push proceeds: an operator "simplify/remove" edit modifies or removes any element of the security-relevant design surface (even if the edit seems benign — fail-SAFE on doubt); new implementation files are committed that touch auth/API/DB/crypto/session paths not part of the reviewed surface; a diff-hash/mtime check shows the security-relevant design surface changed since the last recorded verdict.
 
 **Fail-SAFE:** when in doubt whether a post-verdict change touches the security-relevant surface, re-run the security stage. The cost of a spurious re-run is latency; the cost of a missed re-run is a stale GO on a changed design. Never fail-open on this decision.
@@ -768,6 +794,7 @@ After Phase 3 succeeds and BEFORE `delivery`, re-verify acceptance traceability 
 5. **UX gate (`frontend_scope: true` only):** read `reviews/04-ux-validation.md`; any `critical` (WCAG A) finding fails the gate (route to implementer, Case A). `high`/`medium`/`suggestion` never block.
 6. **Regression-still-passing (type: fix/hotfix, Tier 2-4):** confirm `regression_test_path` shows PASS in `03-testing.md`, not `skip`/`xfail`; read the actual assertion body at `regression_test_path` and confirm it matches the authored pattern in `02-regression-test.md` (a weakened/replaced assertion fails the gate even if the test name and PASS status are intact).
 7. **Test-ratchet check:** compare `tests_count` against `last_tests_count` (Hot Context). `tests_deleted > 0` with no valid `tests_deleted_reason` (or a forbidden pattern: `broken`, `flaky`, `couldn't make them pass`, `removing failing tests`) → ratchet FAILS, route back to tester.
+8. **`code_hygiene` re-assertion (consumer C2, defensive — AC-4).** Read the `code_hygiene` value `qa` recorded at Phase 3 (already gated once at the Phase 3 verdict above). `fail` closes this gate regardless of AC/security/build outcome — AC satisfaction alone is never sufficient. This step exists so a `code_hygiene: fail` cannot slip through if a future edit ever loosens the Phase 3 gate wording; it is a re-check, not a new evaluation.
 
 **Decision:** all pass → Phase 4. Any fail → route back with a focused fix brief (counts toward max-3). AC count mismatch between qa report and `01-plan.md § Task List` → abort with `status: blocked` (plan drifted, needs reconciliation).
 
@@ -1178,7 +1205,7 @@ After Phase 3 succeeds, drop agent invocation details and read workspace content
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone. |
-| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `dispatch.blocked`, `orchestrator.spawned`. |
+| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `dispatch.blocked`, `orchestrator.spawned`. |
 | `feature` | yes | Kebab-case, matches workspace folder. |
 | `phase` | conditional | `1-design`, `2-implement`, `3-verify`, etc. |
 | `stage` | conditional | `1`/`2`/`3` — required for `stage.gate*`. |
