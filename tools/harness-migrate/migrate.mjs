@@ -155,6 +155,15 @@ function resolveTieredModel(provider, sourceModelAlias) {
 /** Mode values injected by the forward pass, dropped on inverse for CC-origin files. */
 const INJECTED_MODE_VALUES = new Set(["primary", "subagent", "all"]);
 
+/**
+ * Display-name values injected by applyModeByRole's forward pass. Unlike
+ * `mode` (which CC frontmatter simply omits), `name` is required in both
+ * formats — so the inverse (transformToCC) cannot drop it; it must restore
+ * the canonical CC name derived from the source filename (mirrors
+ * applyModeByRole's "leader" -> "TH Leader" forward rename).
+ */
+const INJECTED_NAME_VALUES = new Set(["TH Leader"]);
+
 /** Writable-prefix allowlist: directories the transform is permitted to write into,
  *  relative to the repo root (forward-slash normalized, no trailing slash). */
 const WRITABLE_PREFIXES = [
@@ -1195,7 +1204,14 @@ function transformToCC(filePath, content, repoRoot) {
   const projected = {};
 
   if (surface === "agent") {
-    if (fm["name"] !== undefined) projected["name"] = fm["name"];
+    // name: restore the canonical CC name (filename-derived) when the current
+    // value is a known injected display-name artifact (e.g. "TH Leader");
+    // otherwise carry it through unchanged. See INJECTED_NAME_VALUES.
+    if (fm["name"] !== undefined) {
+      projected["name"] = INJECTED_NAME_VALUES.has(String(fm["name"]))
+        ? path.basename(filePath, ".md")
+        : fm["name"];
+    }
     if (fm["description"] !== undefined) projected["description"] = fm["description"];
     if (fm["model"] !== undefined) projected["model"] = toBareModel(String(fm["model"]));
     // Agent permission is now an object {key: "allow"} — convert back to CC tools string.

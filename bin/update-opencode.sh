@@ -57,12 +57,23 @@ BIN_URL="${BASE_URL}/${ASSET}"
 # On any read uncertainty, fall through to download + the authoritative Go-side
 # comparison (which parses JSON robustly and is idempotent).
 #
-# Skipped when passthrough args are present ($# -gt 0). Flags like
-# --opencode-dir point the Go binary at a non-default config root; the
-# shell-side check only reads the default global path and would incorrectly
-# short-circuit before the binary resolves the correct root from those args.
+# Skipped ONLY when --opencode-dir is among the passthrough args — that flag
+# (in either "--opencode-dir <path>" or "--opencode-dir=<path>" form) points
+# the Go binary at a non-default config root, and the shell-side check only
+# reads the default global path, so it would incorrectly short-circuit before
+# the binary resolves the correct root. --non-interactive does not affect
+# config-root resolution, so its presence alone must not skip the pre-check.
 # ---------------------------------------------------------------------------
-if [ $# -eq 0 ]; then
+HAS_OPENCODE_DIR_FLAG=0
+for _arg in "$@"; do
+    case "$_arg" in
+        --opencode-dir|--opencode-dir=*)
+            HAS_OPENCODE_DIR_FLAG=1
+            ;;
+    esac
+done
+
+if [ "$HAS_OPENCODE_DIR_FLAG" -eq 0 ]; then
 if [ -n "${XDG_CONFIG_HOME:-}" ]; then
     OC_CONFIG_DIR="${XDG_CONFIG_HOME}/opencode"
 else
@@ -125,7 +136,7 @@ EOF
         exit 0
     fi
 fi
-fi # end: $# -eq 0 pre-check guard
+fi # end: HAS_OPENCODE_DIR_FLAG -eq 0 pre-check guard
 
 # ---------------------------------------------------------------------------
 # Download and verify (mirrors install-opencode.sh byte-for-byte — AC-10).

@@ -1093,6 +1093,32 @@ Leader body.
   }
 }
 
+{
+  // Round-trip: project the leader agent forward (generic + role layer), then
+  // project the result back to CC form. The inverse must restore the
+  // canonical CC name ("leader") rather than carry through the injected
+  // opencode display name ("TH Leader") — the defect found in the dual
+  // review of this feature.
+  const leaderInput = `---
+name: leader
+description: Coordinator.
+model: claude-opus-4-5
+tools: Read
+---
+
+Leader body.
+`;
+  const forwardGeneric = transformToOpencode("agents/leader.md", leaderInput, "/fake-repo").content;
+  const forwardRoled = applyModeByRole(forwardGeneric, "leader");
+  const { frontmatter: forwardFm } = parseFrontmatter(forwardRoled);
+  assert("round-trip fixture: forward pass produced the injected display name", forwardFm["name"] === "TH Leader");
+
+  const back = transformToCC(".opencode/agents/leader.md", forwardRoled, "/fake-repo");
+  const { frontmatter: backFm } = parseFrontmatter(back.content);
+  assert("round-trip: inverse restores canonical name 'leader', not the injected 'TH Leader'", backFm["name"] === "leader");
+  assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH Leader");
+}
+
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
