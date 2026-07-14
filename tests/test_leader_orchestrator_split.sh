@@ -357,7 +357,8 @@ assert_frontmatter_field "AC-2.13-orq-model"    "$ORCHESTRATOR" "model"  '"?sonn
 assert_frontmatter_field "AC-2.13-orq-effort"   "$ORCHESTRATOR" "effort" '"?xhigh"?'  "orchestrator.md frontmatter effort: xhigh"
 
 # ---------------------------------------------------------------------------
-# Group E — CAPABILITY FLOOR + NO-FALLBACK (AC-2.6)
+# Group E — CAPABILITY FLOOR + NO-FALLBACK (AC-2.6), extended with the
+# tri-state runtime discriminator (opencode-runtime-aware-boot Task-1, AC-8).
 # ---------------------------------------------------------------------------
 echo
 echo "-- Group E: capability floor + no-fallback --"
@@ -382,6 +383,69 @@ else
     fail "AC-2.6-floor-literal" "capability floor literal v2.1.199 — neither leader.md nor orchestrator.md exists"
     fail "AC-2.6-nofallback" "hard-STOP-no-fallback path — neither leader.md nor orchestrator.md exists"
 fi
+
+# AC-8(b): the tri-state discriminator is documented — claude-present-but-
+# version-unreadable hard-STOPs and does NOT fall through to opencode even
+# when a config root coexists.
+assert_contains "AC-8-tristate-state-b" "$LEADER" \
+    'do NOT fall through to state \(c\)|never fall through to (the )?opencode|does NOT fall through to opencode' \
+    "state (b) (claude present, version unreadable) hard-STOPs without falling through to opencode"
+
+# AC-8(c): a valid opencode session (claude absent + config root present) is
+# documented to proceed without a hard STOP, and without gating on
+# claude --version or a CC-builtin agent-type probe.
+assert_contains "AC-8-tristate-state-c" "$LEADER" \
+    'config root confirmed.*proceed|opencode config root exists' \
+    "state (c) (claude absent, config root present) proceeds without a hard STOP"
+assert_contains "AC-8-no-cc-gating-on-opencode" "$LEADER" \
+    'no `?claude --version`? floor|no CC-builtin.*(general-purpose|agent-type) probe' \
+    "opencode branch does not gate on claude --version or a CC-builtin agent-type probe"
+
+# AC-8(d): the config-root probe is validated (absolute, no ..) and
+# existence-only, mirroring resolveOpencodeConfigRoot's SEC-OC-R3 hardening.
+assert_contains "AC-8-configroot-hardening" "$LEADER" \
+    'resolveOpencodeConfigRoot' \
+    "config-root probe reuses resolveOpencodeConfigRoot's resolution order"
+assert_contains "AC-8-configroot-absolute-no-traversal" "$LEADER" \
+    'absolute path with NO `?\.\.`? traversal|absolute.*no.*\.\.' \
+    "config-root override honored only if absolute with no .. traversal (SEC-OC-R3)"
+assert_contains "AC-8-configroot-existence-only" "$LEADER" \
+    'EXISTENCE only|existence-only|never read config content' \
+    "config-root probe checks directory existence only, never config content"
+
+# AC-8(e): the no-monolith-fallback invariant holds for BOTH runtime
+# branches, not just the CC path — reiterated by test to guard the tri-state
+# rewrite from silently narrowing the invariant to state (a) only.
+assert_contains "AC-8-nomonolith-both-branches" "$LEADER" \
+    'never a silent monolith' \
+    "neither-runtime and off-PATH-residual paths are documented to never fall back to a silent monolith"
+
+# AC-5: state (c), neither runtime confirmable -- hard STOP with a clear
+# "cannot determine runtime" operator-facing error, never a silent monolith.
+assert_contains "AC-5-neither-runtime-stop" "$LEADER" \
+    'cannot determine runtime' \
+    "state (c) with no confirmable runtime hard-STOPs with a 'cannot determine runtime' error"
+
+# AC-7: the accepted worst-case residual of the positive-config-root signal
+# is named explicitly (off-PATH real-CC session + coexisting config root ->
+# possible takeover-resumption deadlock, never a silent monolith or a
+# STAGE-GATE bypass), and the prose states the tri-state discriminator
+# closes the higher-risk SEC-DR-1 path.
+assert_contains "AC-7-residual-offpath-named" "$LEADER" \
+    'off the Bash-tool PATH' \
+    "accepted residual names the claude-off-the-Bash-tool-PATH case explicitly"
+assert_contains "AC-7-residual-takeover-deadlock" "$LEADER" \
+    'takeover-resumption deadlock' \
+    "accepted residual bounds its worst case to a takeover-resumption deadlock"
+assert_contains "AC-7-closes-sec-dr-1" "$LEADER" \
+    'closes SEC-DR-1' \
+    "state (b) prose states the tri-state discriminator closes the higher-risk SEC-DR-1 path"
+
+# T3-AC-4: cross-task regression guard (installer-transform Task-3, AC-4) --
+# the shared CC-canonical source frontmatter name: must stay 'leader'; the
+# display rename lives only in the installer transform layer, never here.
+assert_frontmatter_field "T3-AC-4-frontmatter-name-leader" "$LEADER" "name" '"?leader"?' \
+    "leader.md frontmatter name: stays 'leader' (rename lives in the transform, not the shared source)"
 
 # ---------------------------------------------------------------------------
 # Group F — sanity: gate-contract.md itself still intact (Task-1 regression
