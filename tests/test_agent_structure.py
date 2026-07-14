@@ -34335,6 +34335,105 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 153 -- opencode th-update executes the fail-closed updater
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 153: opencode th-update executes the dedicated updater ===")
+
+_s153_th_update = read(
+    REPO_ROOT / "installer-assets" / "opencode-commands" / "th-update.md"
+)
+
+check(
+    "suite153(executes-updater): th-update.md references "
+    "'update-opencode.sh', not only the full installer",
+    "update-opencode.sh" in _s153_th_update,
+    "th-update.md must reference 'update-opencode.sh' (the dedicated "
+    "updater), not just print the full install-opencode.sh line",
+)
+check(
+    "suite153(not-full-installer): th-update.md names "
+    "'install-opencode.sh' only to explicitly rule it out as the target "
+    "of this command",
+    "NOT `install-opencode.sh`" in _s153_th_update
+    or "not `install-opencode.sh`" in _s153_th_update.lower(),
+    "th-update.md must explicitly state that install-opencode.sh (the "
+    "full first-install script) is NOT what this command runs",
+)
+check(
+    "suite153(bash-execution): th-update.md directs execution through "
+    "the Bash tool, not a print-only instruction",
+    "Bash tool" in _s153_th_update,
+    "th-update.md must direct the agent to execute the updater via the "
+    "Bash tool rather than merely printing a command line",
+)
+
+_s153_three_states = ("already current", "updated", "installed ahead")
+_s153_missing_states = [
+    state for state in _s153_three_states if state not in _s153_th_update
+]
+check(
+    "suite153(three-state-result): th-update.md documents all three "
+    "outcomes {already current | updated | installed ahead}",
+    not _s153_missing_states,
+    f"th-update.md is missing outcome states: {_s153_missing_states}",
+)
+check(
+    "suite153(restart-named): th-update.md names restarting the "
+    "opencode session as the single manual operator step after 'updated'",
+    "restart" in _s153_th_update.lower(),
+    "th-update.md must name restarting the opencode session as the "
+    "remaining manual step",
+)
+
+check(
+    "suite153(no-skip-verify): th-update.md never introduces a "
+    "'--skip-verify' bypass or an alternate/unverified download path",
+    "--skip-verify" not in _s153_th_update,
+    "th-update.md must not mention '--skip-verify' or any verification "
+    "bypass flag",
+)
+check(
+    "suite153(sha256-floor-named): th-update.md names the SHA256 "
+    "verification as never skipped",
+    "SHA256" in _s153_th_update and "never" in _s153_th_update.lower(),
+    "th-update.md must state that the SHA256 verification is never "
+    "skipped",
+)
+check(
+    "suite153(flag-allowlist): th-update.md restricts itself to a fixed "
+    "flag allowlist ('--opencode-dir', '--non-interactive') and warns "
+    "against interpolating free operator text into the command line",
+    "--opencode-dir" in _s153_th_update
+    and "--non-interactive" in _s153_th_update
+    and "interpolat" in _s153_th_update.lower(),
+    "th-update.md must name the fixed flag allowlist and warn against "
+    "interpolating operator text into the shell command line",
+)
+
+check(
+    "suite153(standalone-not-gated): th-update.md declares itself a "
+    "standalone utility never gated by the leader boot capability check",
+    "standalone" in _s153_th_update.lower()
+    and "boot capability check" in _s153_th_update,
+    "th-update.md must explicitly declare itself standalone and never "
+    "gated by the leader boot capability check",
+)
+
+# Self-referential guard (hygiene contract) — mirrors the Suite 152 pattern.
+_s153_own = read(Path(__file__))
+check(
+    "suite153(self-ref): test file contains 'Suite 153' and "
+    "'opencode-th-update-executes'",
+    "Suite 153" in _s153_own and "opencode-th-update-executes" in _s153_own,
+    "test file must self-reference Suite 153 and the marker "
+    "'opencode-th-update-executes'",
+)
+
+# Marker: opencode-th-update-executes
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
