@@ -33990,7 +33990,7 @@ check(
 # ---------------------------------------------------------------------------
 _S152_CMD_ANCHOR = "### 3.1 Fixed scan command"
 _s152_cmd_slice = _s152_slice(_s152_hygiene, _S152_CMD_ANCHOR)
-_s152_cmd_match = re.search(r"```\n(.*?)\n```", _s152_cmd_slice, re.DOTALL)
+_s152_cmd_match = re.search(r"```\w*\n(.*?)\n```", _s152_cmd_slice, re.DOTALL)
 _s152_cmd_block = _s152_cmd_match.group(1) if _s152_cmd_match else ""
 _S152_COMMENT_LEADERS = ("//", "/*", "*", "#", "<!--", "--", ";")
 _s152_cmd_bad_lines = [

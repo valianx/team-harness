@@ -58,7 +58,8 @@ Both layers reference this exact command as the ground truth for "what counts as
 Run against the packet's `Base ref` (`00-verify-packet.md § Base ref`), scoped to the task's
 diff:
 
-```
+```bash
+set -o pipefail
 git diff --unified=0 "${BASE_REF}"...HEAD -- . \
   ':(exclude)*.md' ':(exclude)*.markdown' \
   ':(exclude)*.rst' ':(exclude)*.txt' ':(exclude)*.adoc' \
@@ -88,10 +89,10 @@ alternation.
 **Exit-code contract.** The final `grep` exits `1` (no lines matched) on a clean diff, `0` (lines
 matched) on a violation, or `2`+ on a genuine error (malformed regex, missing file). Treat exit
 `2`+ as an **escalation**, never a silent pass — a broken command must not be misread as "no
-violations found." Because `git diff` sits at the head of the pipe, wrap the invocation with
-`pipefail` (or check `git diff`'s own exit status independently before trusting the grep chain's
-exit code) — otherwise a failing `git diff` produces empty input that every downstream `grep`
-reads as "zero matches," masking the real failure as a false-clean scan.
+violations found." Because `git diff` sits at the head of the pipe, the pinned command opens with
+`set -o pipefail` so a failing `git diff` propagates as a pipeline failure instead of feeding empty
+input to the downstream `grep` chain, which would otherwise read "zero matches" and mask the real
+failure as a false-clean scan.
 
 **File:line resolution.** The pinned command above resolves WHICH lines violate the pattern set;
 resolving the exact `file:line` for the failure brief is a standard unified-diff line-tracking

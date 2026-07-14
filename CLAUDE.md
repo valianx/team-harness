@@ -110,7 +110,7 @@ team-harness/
 
 **Current version:** `2.127.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
-**Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE` env var, `modes.go::lowCostMatrix`) transformed agent frontmatter for the retired Claude Code install path (see the Installer row above). Neither mode is wired into the opencode manifest engine (`install apply --runtime opencode`); the functions remain as unreferenced Go code, not a live capability. This — not matrix staleness — is why `cmd/install/` stays frozen for fleet model-allocation changes. See [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode) for the historical tally.
+**Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
 **Dependencies.** TUI: `charm.land/huh/v2` (bubbletea v2, lipgloss v2, bubbles v2 transitive). Binary size: 7.9–8.5 MB. No build step beyond `go build`.
 
@@ -348,9 +348,9 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
-**Inline orchestration at top level — SEC-DR-2 re-founding (v2.89.0):** executing the leader role inline at top level is the CC native architecture — the general agent IS the leader. No filesystem marker is required. Outward actions are gated by `dev-guard` unconditionally. Executing orchestration inline when the agent is itself running as a subagent inside another orchestrator is the ad-hoc improvisation that weakens gate enforcement and is PROHIBITED; use the FALLBACK below. See `docs/dev-mode.md § Outward-Action Gate`.
+**Inline orchestration at top level — SEC-DR-2 re-founding (v2.89.0).** No filesystem marker is required — the general agent IS the leader (CC native architecture) and `dev-guard` gates outward actions unconditionally. Nesting this inline inside another orchestrator is the ad-hoc improvisation that is PROHIBITED — use the FALLBACK below. See `docs/dev-mode.md § Outward-Action Gate`.
 
-**FALLBACK — nested-handoff/takeover (opencode/legacy path):** on the CC foreground path, nested subagents retain `Task` (M1 probe confirmed). The `dispatch_handoff`/takeover machinery is RETAINED for opencode compatibility — when `th:orchestrator` is invoked as a subagent and the harness strips `Task`, the orchestrator emits a `dispatch_handoff` directive and the top-level agent takes over dispatch. Full protocol in `docs/subagent-orchestration.md`.
+**FALLBACK — nested-handoff/takeover (opencode/legacy path).** Nested subagents retain `Task` on the CC foreground path (M1 probe confirmed); `dispatch_handoff` takeover is RETAINED for opencode compatibility only. Full protocol: `docs/subagent-orchestration.md`.
 
 **Universal rule — auto-takeover on `blocked-no-dispatch`:** when the orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. Parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. This is not a user-decision point. Full takeover protocol (8 steps), handoff JSON schema, and `blocked-manual-push` handling are in `docs/subagent-orchestration.md`.
 

@@ -46,7 +46,7 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 
 ## Installer identity
 
-The Go installer (`cmd/install/`) is the **opencode packager and installer**. It does not install Claude Code, has no CC install path reachable from a bare invocation, and its low-cost frontmatter-rewrite mode (`modes.go::lowCostMatrix`) is unreferenced code from the retired CC path — not a live capability of any runtime this binary currently serves. `cmd/install/` therefore stays frozen for fleet model-allocation changes: there is no live low-cost consumer left to keep in sync.
+The Go installer (`cmd/install/`) is the **opencode packager and installer**. It does not install Claude Code, has no CC install path reachable from a bare invocation, and its low-cost frontmatter-rewrite mode (`modes.go::lowCostMatrix`) is unreferenced code from the retired CC path — not a live capability of any runtime this binary currently serves. `cmd/install/` therefore stays frozen for fleet model-allocation changes: there is no live low-cost consumer left to keep in sync. The `standard`/`low-cost` split is driven by the `INSTALL_MODE` env var and is not wired into the opencode manifest engine (`install apply --runtime opencode`).
 
 The marketplace plugin (`/plugin marketplace add valianx/team-harness`) is the only Claude Code install channel. The Go binary (`install apply|update|uninstall --runtime opencode`) is the only opencode install channel. Neither channel serves the other runtime.
 
