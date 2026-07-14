@@ -1708,9 +1708,11 @@ for ref in sorted(plausible_agent_refs):
 #    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
+    # 2.6 is the Code-Hygiene Scan (deterministic, all types), sequenced between
+    # sub-phases 2.5 and 2.7. See docs/code-hygiene-gate.md.
     # 2.7 is the Test Authoring sub-phase (Stage 2, pre-verify): tester writes AC tests
     # before the Phase 3 parallel verify block. Introduced by fix/phase3-tester-qa-race-condition.
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
@@ -11969,7 +11971,10 @@ def _window_around(text: str, anchor: str, before: int = 800, after: int = 200) 
 # For verifier template checks: look in a 800-char window BEFORE the guidance
 # anchor to confirm **Blast radius:** is present in the template block.
 _s50_tester_window = _window_around(_s50_tester, _S50_TESTER_ANCHOR)
-_s50_qa_window     = _window_around(_s50_qa,     _S50_QA_ANCHOR)
+# qa.md's template grew a "### Hygiene findings" block (docs/code-hygiene-gate.md
+# Layer 2) between "### Failing AC" and "### Remediation" — widen the window so
+# the pre-existing anchor still reaches back to "**Root cause type:**".
+_s50_qa_window     = _window_around(_s50_qa,     _S50_QA_ANCHOR, before=1300)
 _s50_sec_window    = _window_around(_s50_sec,    _S50_SEC_ANCHOR)
 
 # For orchestrator checks: the iteration section's ```markdown block also has
@@ -33908,6 +33913,425 @@ check(
 )
 
 # Marker: batched-graphql-review-disposition
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 152 -- Stage-2 code-hygiene gate (deterministic scan + qa audit)
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 152: Stage-2 code-hygiene gate ===")
+
+def _s152_slice(text: str, anchor: str) -> str:
+    """Anchor-to-next-heading slice, scoped to this suite.
+
+    A same-named `_slice_section` helper is redefined with a different
+    signature later in this file (module-level name collision, pre-
+    existing) — a distinct local name avoids depending on whichever
+    definition happens to be active at this point in the module.
+    """
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+_s152_hygiene_path = REPO_ROOT / "docs" / "code-hygiene-gate.md"
+_s152_hygiene = _read_or_empty(_s152_hygiene_path)
+_s152_comments_md = read(REPO_ROOT / "docs" / "code-comments.md")
+_s152_orch = read(AGENTS_DIR / "orchestrator.md")
+_s152_takeover = read(REPO_ROOT / "docs" / "subagent-orchestration.md")
+_s152_flows = read(AGENTS_DIR / "ref-special-flows.md")
+_s152_qa = read(AGENTS_DIR / "qa.md")
+_s152_implementer = read(AGENTS_DIR / "implementer.md")
+_s152_observability = read(REPO_ROOT / "docs" / "observability.md")
+_s152_testing_md = read(REPO_ROOT / "docs" / "testing.md")
+_s152_claude_md = read(REPO_ROOT / "CLAUDE.md")
+
+check(
+    "suite152(canonical-doc): docs/code-hygiene-gate.md exists",
+    bool(_s152_hygiene),
+    f"expected a non-empty file at {_s152_hygiene_path}",
+)
+
+for _section in (
+    "## 3. Work-narration patterns",
+    "## 4. Layer 1",
+    "## 5. Layer 2",
+    "## 7. Site enumeration",
+    "## 8. Anti-residue discipline",
+):
+    check(
+        f"suite152(canonical-doc-section): docs/code-hygiene-gate.md "
+        f"contains '{_section}'",
+        _section in _s152_hygiene,
+        f"missing required section '{_section}'",
+    )
+
+check(
+    "suite152(operational-definition): docs/code-hygiene-gate.md defines "
+    "'source-code comment' with the prose-extension exclusion list",
+    "source-code comment" in _s152_hygiene
+    and ".markdown" in _s152_hygiene
+    and ".adoc" in _s152_hygiene,
+    "the canonical doc must define 'source-code comment' and the prose "
+    "exclusion list (.md/.markdown/.rst/.txt/.adoc)",
+)
+
+# ---------------------------------------------------------------------------
+# Comment-safety of the pinned command block -- extract the fenced code
+# block that follows the "Fixed scan command" anchor and assert no non-
+# blank line begins with a source-code comment leader (the block would
+# otherwise flag its own authoring diff -- the exact self-inflicted trap
+# this gate exists to avoid).
+# ---------------------------------------------------------------------------
+_S152_CMD_ANCHOR = "### 3.1 Fixed scan command"
+_s152_cmd_slice = _s152_slice(_s152_hygiene, _S152_CMD_ANCHOR)
+_s152_cmd_match = re.search(r"```\w*\n(.*?)\n```", _s152_cmd_slice, re.DOTALL)
+_s152_cmd_block = _s152_cmd_match.group(1) if _s152_cmd_match else ""
+_S152_COMMENT_LEADERS = ("//", "/*", "*", "#", "<!--", "--", ";")
+_s152_cmd_bad_lines = [
+    line for line in _s152_cmd_block.splitlines()
+    if line.strip() and line.lstrip().startswith(_S152_COMMENT_LEADERS)
+]
+check(
+    "suite152(command-comment-safety): every line of the pinned scan "
+    "command starts with 'grep'/'|'/'-e', never a source-code comment "
+    "leader",
+    bool(_s152_cmd_block) and not _s152_cmd_bad_lines,
+    "command block empty, or contains comment-leader lines: "
+    f"{_s152_cmd_bad_lines}",
+)
+
+_s152_patterns = re.findall(r"-e '([^']+)'", _s152_cmd_block)
+check(
+    "suite152(pattern-extraction): the pinned command declares at least "
+    "8 -e alternation patterns",
+    len(_s152_patterns) >= 8,
+    f"found {len(_s152_patterns)} patterns; expected at least 8",
+)
+
+# AC-6: the scan must evaluate ADDED lines only, never pre-existing/context
+# lines, and comment content only, never non-comment code -- pattern
+# matching alone (checked above) is not enough evidence of this; the
+# pipeline stages that enforce it must be present in the pinned command.
+check(
+    "suite152(added-lines-only): the pinned command filters to added "
+    "diff lines ('^\\+') and drops the '+++' file-header line before "
+    "matching, never evaluating pre-existing/context lines",
+    "^\\+" in _s152_cmd_block and "^\\+\\+\\+" in _s152_cmd_block,
+    "pinned command must filter added lines ('^\\+') and exclude the "
+    "'+++' header ('^\\+\\+\\+') ahead of the pattern alternation",
+)
+check(
+    "suite152(comment-leader-filter): the pinned command restricts "
+    "matching to comment-leader lines before applying the work-narration "
+    "alternation, never evaluating non-comment code content",
+    all(
+        leader in _s152_cmd_block
+        # "/\*" not "/*" -- the pinned regex escapes the literal asterisk.
+        for leader in ("//", "/\\*", "<!--", "--", ";")
+    ),
+    "pinned command must include the comment-leader alternation "
+    "(//|/\\*|\\*|#|<!--|--|;) ahead of the work-narration pattern set",
+)
+
+if _s152_patterns:
+    _s152_combined = "|".join(_s152_patterns)
+    # Bad-example fixtures are built via concatenation, never as a
+    # contiguous literal, and never inside a committed '#' comment.
+    _s152_bad_a = "# added for " + "issue #" + "42, see " + "Phase 2" + " notes"
+    _s152_bad_b = "// see " + "work" + "spaces/foo.ts for context"
+    _s152_good = "# retried once because the upstream API rate-limits at 5rps"
+    check(
+        "suite152(pattern-fixture-bad-a): the canonical pattern set "
+        "matches a synthetic work-narration example",
+        re.search(_s152_combined, _s152_bad_a) is not None,
+        "pattern alternation failed to match the known-bad work-narration "
+        "fixture",
+    )
+    check(
+        "suite152(pattern-fixture-bad-b): the canonical pattern set "
+        "matches a synthetic workspaces/-path example",
+        re.search(_s152_combined, _s152_bad_b) is not None,
+        "pattern alternation failed to match the known-bad "
+        "workspaces/-path fixture",
+    )
+    check(
+        "suite152(pattern-fixture-good): the canonical pattern set does "
+        "NOT match a legitimate WHY-comment",
+        re.search(_s152_combined, _s152_good) is None,
+        "pattern alternation false-positived on a legitimate WHY-comment",
+    )
+
+# ---------------------------------------------------------------------------
+# Scan-site A1 -- primary dispatch path (agents/orchestrator.md)
+# ---------------------------------------------------------------------------
+_S152_A1_HEADING = "## Phase 2.6 — Code-Hygiene Scan"
+check(
+    "suite152(A1-heading): agents/orchestrator.md contains "
+    "'## Phase 2.6 — Code-Hygiene Scan'",
+    _S152_A1_HEADING in _s152_orch,
+    f"heading '{_S152_A1_HEADING}' not found in orchestrator.md",
+)
+
+_s152_idx_25 = _s152_orch.find("### Phase 2.5 — Constraint Reconciliation")
+_s152_idx_26 = _s152_orch.find(_S152_A1_HEADING)
+_s152_idx_27 = _s152_orch.find("## Phase 2.7 — Test Authoring")
+check(
+    "suite152(A1-ordering): Phase 2.6 is positioned between Phase 2.5 "
+    "and Phase 2.7 in agents/orchestrator.md",
+    -1 not in (_s152_idx_25, _s152_idx_26, _s152_idx_27)
+    and _s152_idx_25 < _s152_idx_26 < _s152_idx_27,
+    "expected order: Phase 2.5 < Phase 2.6 < Phase 2.7 "
+    f"(found indices {_s152_idx_25}, {_s152_idx_26}, {_s152_idx_27})",
+)
+
+_s152_a1_slice = _s152_slice(_s152_orch, _S152_A1_HEADING)
+check(
+    "suite152(A1-content): the Phase 2.6 section documents bounded-patch "
+    "re-dispatch, the max-3 cap, and silent-on-clean behavior",
+    "BOUNDED-PATCH" in _s152_a1_slice
+    and "max-3" in _s152_a1_slice
+    and "silence" in _s152_a1_slice.lower(),
+    "Phase 2.6 section must document BOUNDED-PATCH re-dispatch, the "
+    "max-3 iteration cap, and silent-on-clean behavior",
+)
+
+# ---------------------------------------------------------------------------
+# Scan-site A2 -- takeover/inline path (docs/subagent-orchestration.md)
+# ---------------------------------------------------------------------------
+_S152_A2_ANCHOR = "Inviolable gates (annotate"
+_s152_a2_slice = _s152_slice(_s152_takeover, _S152_A2_ANCHOR)
+check(
+    "suite152(A2-manifest): the Takeover Pipeline Manifest lists the "
+    "Phase 2.6 code-hygiene scan as an inviolable gate, [all types]",
+    "Phase 2.6 code-hygiene scan" in _s152_a2_slice
+    and "[all types]" in _s152_a2_slice,
+    "Takeover Pipeline Manifest must list 'Phase 2.6 code-hygiene scan' "
+    "with the [all types] scope tag",
+)
+
+# ---------------------------------------------------------------------------
+# Scan-site A3 -- special-flow pointers (agents/ref-special-flows.md)
+# ---------------------------------------------------------------------------
+# Bounded by the next real top-level ("## ") heading rather than
+# _s152_slice's any-level stop rule: both flows nest dense "### " sub-
+# sections (and, for Milestone-Build Flow, a "## Milestone Index" example
+# heading INSIDE a fenced code block) that would truncate the slice long
+# before reaching the pointer this suite is checking for.
+def _s152_bounded_region(text: str, start_heading: str, end_heading: str) -> str:
+    start = text.find(start_heading)
+    end = text.find(end_heading, start + 1) if start != -1 else -1
+    if start == -1 or end == -1:
+        return ""
+    return text[start:end]
+
+
+_s152_bugfix_slice = _s152_bounded_region(
+    _s152_flows, "## Bug-fix Flow", "## Hotfix sub-flow (type: hotfix)"
+)
+_s152_milestone_slice = _s152_bounded_region(
+    _s152_flows,
+    "## Milestone-Build Flow (single-repo",
+    "## Parallel Dispatch Flow",
+)
+check(
+    "suite152(A3-bugfix-pointer): Bug-fix Flow points to "
+    "docs/code-hygiene-gate.md for the Phase 2.6 scan",
+    "docs/code-hygiene-gate.md" in _s152_bugfix_slice,
+    "Bug-fix Flow must point to docs/code-hygiene-gate.md",
+)
+check(
+    "suite152(A3-milestone-pointer): Milestone-Build Flow points to "
+    "docs/code-hygiene-gate.md for the Phase 2.6 scan",
+    "docs/code-hygiene-gate.md" in _s152_milestone_slice,
+    "Milestone-Build Flow must point to docs/code-hygiene-gate.md",
+)
+check(
+    "suite152(A3-no-replicate): agents/ref-special-flows.md never "
+    "replicates the pinned grep command (pointer only)",
+    "grep -E" not in _s152_flows,
+    "ref-special-flows.md must point to the canonical command, never "
+    "replicate 'grep -E' inline",
+)
+
+# ---------------------------------------------------------------------------
+# Producer B1 -- agents/qa.md
+# ---------------------------------------------------------------------------
+check(
+    "suite152(B1-heading): agents/qa.md contains a '## Code Hygiene' "
+    "section",
+    "## Code Hygiene" in _s152_qa,
+    "agents/qa.md must contain a '## Code Hygiene' section",
+)
+check(
+    "suite152(B1-field): agents/qa.md Return Protocol declares "
+    "'code_hygiene: pass | fail'",
+    "code_hygiene: pass | fail" in _s152_qa,
+    "agents/qa.md Return Protocol must declare 'code_hygiene: pass | fail'",
+)
+check(
+    "suite152(B1-not-duplicated): '## Code Hygiene' is NOT duplicated "
+    "into agents/orchestrator.md (qa.md is the sole producer)",
+    "## Code Hygiene" not in _s152_orch,
+    "'## Code Hygiene' must not appear in agents/orchestrator.md — "
+    "agents/qa.md is the sole producer",
+)
+
+# AC-3 requires the section to actually audit five named categories, not
+# merely exist under the right heading -- a heading-only check would pass
+# even if the section body were empty or scoped to something else. Runs of
+# whitespace are collapsed before matching -- markdown line-wrap inside the
+# prose (e.g. a phrase split across two lines) is a formatting concern, not
+# an audit-category gap, and is out of scope for this check.
+_s152_b1_slice = re.sub(r"\s+", " ", _s152_slice(_s152_qa, "## Code Hygiene"))
+_s152_b1_category_terms = (
+    "40 lines",
+    "4 parameters",
+    "3 nesting levels",
+    "Reviewability Exceptions",
+    "WHAT-restating",
+    "Work-narration",
+    "Dead code",
+    "Magic numbers",
+)
+_s152_b1_missing_terms = [
+    term for term in _s152_b1_category_terms if term not in _s152_b1_slice
+]
+check(
+    "suite152(B1-audit-categories): agents/qa.md's Code Hygiene section "
+    "audits over-cap functions (with the Reviewability Exceptions "
+    "cross-ref), WHAT-restating comments, work-narration comments, dead "
+    "code, and magic numbers",
+    not _s152_b1_missing_terms,
+    f"agents/qa.md's Code Hygiene section is missing: {_s152_b1_missing_terms}",
+)
+
+# ---------------------------------------------------------------------------
+# Consumers C1/C2/C3 -- agents/orchestrator.md
+# ---------------------------------------------------------------------------
+_s152_gate_slice = _s152_slice(
+    _s152_orch, "**Gate — worst-of combined verdict:**"
+)
+check(
+    "suite152(C1-phase3-gate): the Phase 3 worst-of gate consumes "
+    "code_hygiene as a conjunction",
+    "code_hygiene" in _s152_gate_slice,
+    "the Phase 3 gate section must reference 'code_hygiene' as a "
+    "conjunction of the pass condition",
+)
+
+_s152_35_slice = _s152_slice(
+    _s152_orch, "## Phase 3.5 — Acceptance Gate"
+)
+check(
+    "suite152(C2-phase35-reassert): Phase 3.5 re-asserts code_hygiene "
+    "defensively",
+    "code_hygiene" in _s152_35_slice,
+    "the Phase 3.5 section must re-assert 'code_hygiene'",
+)
+
+# _s152_bounded_region (not _s152_slice): the iteration section's own
+# ```markdown``` template block contains a "## Iteration {N} — ..." example
+# heading, which would stop the any-level slicer before reaching the Case
+# A note below the template.
+_s152_iter_slice = _s152_bounded_region(
+    # Leading "\n### " anchors on the real heading, not the inline
+    # backtick cross-reference the Phase 2.6 section makes to it.
+    _s152_orch,
+    "\n### If any agent fails → ITERATE",
+    "## Phase 3.5 — Acceptance Gate",
+)
+check(
+    "suite152(C3-iteration-routing): iteration routing notes "
+    "code_hygiene: fail as a Case A bounce",
+    "code_hygiene" in _s152_iter_slice and "Case A" in _s152_iter_slice,
+    "iteration routing must note a code_hygiene failure as a Case A bounce",
+)
+
+# ---------------------------------------------------------------------------
+# Anti-producer-absent -- both sides of the multi-site contract must be
+# present; a consumer enumerated without its producer (or vice versa) is
+# a false-green gate by construction.
+# ---------------------------------------------------------------------------
+check(
+    "suite152(anti-producer-absent): 'code_hygiene' is defined in the "
+    "producer (agents/qa.md) AND referenced by the consumer "
+    "(agents/orchestrator.md)",
+    "code_hygiene" in _s152_qa and "code_hygiene" in _s152_orch,
+    "both agents/qa.md (producer) and agents/orchestrator.md (consumer) "
+    "must reference 'code_hygiene', or the gate is false-green",
+)
+
+# ---------------------------------------------------------------------------
+# Observability event -- stage2.hygiene
+# ---------------------------------------------------------------------------
+check(
+    "suite152(event-orchestrator): 'stage2.hygiene' is registered in the "
+    "agents/orchestrator.md event enum",
+    "stage2.hygiene" in _s152_orch,
+    "'stage2.hygiene' must appear in the orchestrator.md event enum",
+)
+check(
+    "suite152(event-observability): 'stage2.hygiene' is registered in "
+    "docs/observability.md",
+    "stage2.hygiene" in _s152_observability,
+    "'stage2.hygiene' must appear in docs/observability.md",
+)
+
+# ---------------------------------------------------------------------------
+# Byte-consistency (AC-5) -- the cap-exception gate wording must match
+# verbatim between implementer.md and qa.md.
+# ---------------------------------------------------------------------------
+check(
+    "suite152(byte-consistency): 'explained or under cap' appears "
+    "verbatim in both agents/implementer.md and agents/qa.md",
+    "explained or under cap" in _s152_implementer
+    and "explained or under cap" in _s152_qa,
+    "the phrase 'explained or under cap' must appear in both "
+    "agents/implementer.md and agents/qa.md",
+)
+
+# ---------------------------------------------------------------------------
+# Cross-reference -- docs/code-comments.md
+# ---------------------------------------------------------------------------
+check(
+    "suite152(cross-ref): docs/code-comments.md points to "
+    "docs/code-hygiene-gate.md",
+    "docs/code-hygiene-gate.md" in _s152_comments_md,
+    "docs/code-comments.md must point to docs/code-hygiene-gate.md",
+)
+
+# Self-referential guards (hygiene contract)
+_s152_own = read(Path(__file__))
+check(
+    "suite152(self-ref): test file contains 'Suite 152' and "
+    "'stage2-code-hygiene-gate'",
+    "Suite 152" in _s152_own and "stage2-code-hygiene-gate" in _s152_own,
+    "test file must self-reference Suite 152 and the marker "
+    "'stage2-code-hygiene-gate'",
+)
+check(
+    "suite152(registry): docs/testing.md registers 'Suite 152' and "
+    "'stage2-code-hygiene-gate'",
+    "Suite 152" in _s152_testing_md
+    and "stage2-code-hygiene-gate" in _s152_testing_md,
+    "docs/testing.md must register Suite 152 and the "
+    "'stage2-code-hygiene-gate' marker",
+)
+check(
+    "suite152(hygiene): CLAUDE.md does NOT contain 'Suite 152' (§11 "
+    "hygiene contract)",
+    "Suite 152" not in _s152_claude_md,
+    "CLAUDE.md must not mention Suite 152 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: stage2-code-hygiene-gate
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

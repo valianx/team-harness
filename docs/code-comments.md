@@ -197,6 +197,13 @@ sweep of existing load-bearing comments — it governs new comments authored in 
 Severity of work-narration / session-cruft violations: **SUGGESTION** (misleads and leaks
 internal mechanics into shipped code, but does not affect correctness).
 
+**Stage-2 enforcement (mechanical + judgment).** The `comment-rot` lens above runs at Stage-3
+review (advisory, non-blocking). `docs/code-hygiene-gate.md` documents the Stage-2 enforcement
+layer that turns this guide's §4 forbidden-cruft list into a blocking gate: a deterministic
+pre-verify scan (`agents/orchestrator.md § Phase 2.6`) plus a judgment audit
+(`agents/qa.md § Code Hygiene`) — see that file for the canonical pattern set and the full
+execution-site enumeration.
+
 ---
 
 ## 9. Pointers
@@ -205,3 +212,6 @@ internal mechanics into shipped code, but does not affect correctness).
 - `CLAUDE.md §9` — positive-pattern pointer
 - `docs/voice-guide.md` — sibling guide (how we write prose in operator-facing surfaces)
 - `agents/review-lenses/comment-rot.md` — the lens that enforces this guide at review time
+- `docs/code-hygiene-gate.md` — the Stage-2 enforcement contract (deterministic scan + qa audit)
+  that turns this guide's §4 forbidden-cruft list into a blocking gate, before the advisory
+  Stage-3 `comment-rot` lens ever runs

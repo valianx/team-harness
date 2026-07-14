@@ -402,6 +402,7 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `gate` | When a human-checkpoint gate is reached (DOC-GATE, STAGE-GATE approval prompt) | `gate` (name), `action` (`stop`/`approved`) |
 | `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
+| `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 

@@ -325,6 +325,8 @@ Status values: `pending` → `implementing` → `complete`. One row per mileston
 | (verify) | once, whole-task | The flat whole-task `03-testing.md` / `reviews/04-validation.md` (and `reviews/04-security.md` if tier-gated) cover the whole task. No gate fires per milestone. |
 | STAGE-GATE-3 | ONCE | After ALL milestones are complete (functionality complete). ONE PR opened with all milestone commits. NOT per-milestone. |
 
+**Code-hygiene scan (Phase 2.6).** Runs once per Phase 2-close over the WHOLE-TASK diff accumulated so far — not per milestone. See `docs/code-hygiene-gate.md § Layer 1` for the pinned command; the mechanic is identical to the feature flow.
+
 ---
 
 ## Parallel Dispatch Flow (DEFAULT for 2+ tasks)
@@ -463,6 +465,7 @@ Every bug-fix pipeline produces the backbone artifacts; the tier modulates which
 | **2.0 Regression Test** | tester (mode: pre-fix-regression) | `02-regression-test.md` (Tier 2-4 mandatory; Tier 1 conditional skip) | Tier 1 with no-behavior-change: skipped (`pre_fix_test_required: false`). Tier 2-4: mandatory, no fallback. Distinct from the AC-test authoring of Phase 2.7 — this test captures the bug before the implementer runs. |
 | 2 Implement | implementer | `02-implementation.md` | Scope-discipline contract: zero tangential refactors |
 | 2.5 Reconcile | orchestrator + qa-plan (reconcile) | — | Same as feature flow |
+| 2.6 Code-Hygiene Scan | orchestrator (no dispatch) | `stage2.hygiene` trace event | Same as feature flow — deterministic scan, `[all types]`. See `docs/code-hygiene-gate.md § Layer 1` for the pinned command; not replicated here. |
 | **2.7 Test Authoring** | tester (mode: authoring) | `03-testing.md` (authoring section) | AC-test authoring pre-verify: tester maps each AC to at least one test, runs suite once to confirm green. This is DISTINCT from Phase 2.0 (regression test for the bug). Phase 2.7 is the general AC-test authoring that gates the parallel verify block. |
 | 3 Verify | tester (run-only) + qa + security (tier-gated) | `03-testing.md`, `reviews/04-validation.md`, `reviews/04-security.md` (Tier 3+) | The tester is run-only in Phase 3: executes the frozen suite (authored in Phase 2.7), confirms no regressions, does NOT write new AC tests. Tier 1: tester (run-only, suite no-regress) + qa (simplified). Tier 2: tester (run-only) + qa. Tier 3: tester (run-only) + qa + security. Tier 4: same + extended analysis. `qa`, tester, and security parallelize over an immutable artifact — no race condition. |
 | 3.5 Acceptance gate | orchestrator | — | Same as feature flow; regression test must still be in suite (Tier 2-4) or `regression_test_status: skipped` confirmed (Tier 1). Gate also checks assertion-content match: authored assertion patterns from `02-regression-test.md` must still be present in the actual test file at `regression_test_path` — a weakened/replaced assertion body fails the gate (see orchestrator.md Phase 3.5 Step 6). |
