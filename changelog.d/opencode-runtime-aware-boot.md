@@ -1,0 +1,6 @@
+### Fixed
+- Made the leader's boot capability check runtime-aware: the Claude Code branch is byte-identical (unchanged `≥ v2.1.199` floor, hard STOP on failure), and a new opencode branch is grounded in a positive, read-only config-root signal (existence-only check of `$OPENCODE_CONFIG_DIR`/XDG/homedir, fail-closed with no fallthrough between an invalid override and the fallback tiers). Fixes the "Unknown agent type: general-purpose" hard STOP that blocked every leader-routed command, including `/th-update`, in opencode sessions.
+- Made the opencode `/th-update` command actually execute the fail-closed, SHA256-verified updater (`bin/update-opencode.sh`) instead of only printing a command line; reports the three-state result (already-current / updated / installed-ahead) and names restarting the session as the sole remaining manual step.
+
+### Added
+- Durable `TH Leader` display rename for the opencode-installed leader agent (`name: TH Leader`, `mode: primary`), applied at the installer transform layer (`cmd/install/transform.go::applyModeByRole`, mirrored in `tools/harness-migrate/migrate.mjs`) so it survives re-installs. The shared Claude-Code-canonical `agents/leader.md` frontmatter (`name: leader`) is untouched.
