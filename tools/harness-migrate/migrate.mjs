@@ -1096,6 +1096,29 @@ function transformToOpencode(filePath, content, repoRoot) {
 }
 
 /**
+ * applyModeByRole mirrors cmd/install/transform.go::applyModeByRole: the
+ * leader agent (the top-level coordinator) receives mode: "primary" and
+ * displays as "TH Leader" in the opencode agent picker; every other agent —
+ * including orchestrator, the task-scoped execution engine — is returned
+ * unchanged. Applied as a POST-PROJECTION step in runTransform, ON TOP OF
+ * the generic transformToOpencode output, and deliberately NOT part of the
+ * transform-conformance.json fixture (which binds only the generic
+ * mapping, so transformToOpencode's exported output stays name: leader /
+ * mode: subagent for the leader).
+ */
+function applyModeByRole(content, agentName) {
+  if (agentName !== "leader") {
+    // No change needed — the generic transform already set mode: subagent.
+    return content;
+  }
+
+  const { frontmatter: fm, body } = parseFrontmatter(content);
+  fm["mode"] = "primary";
+  fm["name"] = "TH Leader";
+  return serializeFrontmatter(fm, body);
+}
+
+/**
  * transformToOpencodeTiered applies the generic, fixture-bound
  * transformToOpencode AND bakes a concrete model: line for provider, derived
  * from the agent's CC source model: tier. Used only when the operator has
@@ -1355,6 +1378,15 @@ async function runTransform(direction, repoRoot, options = {}) {
       continue;
     }
 
+    // Installer-layer role override (mirrors
+    // manifest_registry.go::opencodeRuntimeTransform): applied as a SEPARATE
+    // post-projection step so the fixture-bound transformToOpencode output
+    // stays name: leader / mode: subagent for the leader.
+    if (direction === DIRECTION_TO_OPENCODE && transformed.surface === "agent") {
+      const agentName = path.basename(srcPath, ".md");
+      transformed = { ...transformed, content: applyModeByRole(transformed.content, agentName) };
+    }
+
     // Validate output path (containment dry-run).
     let realOutputPath;
     try {
@@ -1416,6 +1448,7 @@ export {
   rejectPollutionKeys,
   transformToOpencode,
   transformToOpencodeTiered,
+  applyModeByRole,
   transformToCC,
   validateOutputPath,
   mkdirPerSegment,
