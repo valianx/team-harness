@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.128.0] - 2026-07-13
+
+### Added
+- Enforce the implementer code-hygiene contract in Stage 2 via a two-layer gate: a deterministic pre-verify scan (new `Phase 2.6 — Code-Hygiene Scan`) that catches work-narration comments on added diff lines and bounces the implementer with a localized failure brief, plus a `qa` validate-mode `## Code Hygiene` audit (over-cap functions without a documented exception, WHAT-restating comments, work-narration comments, dead code, magic numbers) emitting a new `code_hygiene: pass | fail` field consumed as a Phase 3 gate conjunction. AC satisfaction alone no longer passes the gate. See `docs/code-hygiene-gate.md`.
+
 ## [2.127.0] - 2026-07-13
 
 ### Added
