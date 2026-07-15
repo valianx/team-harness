@@ -79,7 +79,8 @@ estimate carries **no enforcement, no remaining-budget field, and no STOP.**
 
 **Heuristic base (the floor):** fixed per-lane cost-by-shape — inline ~5K; express ~90K-150K;
 full ~600K-1M+ — scaled by a task-shape multiplier derived from file count, AC count,
-`complexity`, and `security_sensitive` (from the intake survey).
+`complexity`, and `security_sensitive` (the resolved classification field from Discover→classify,
+per § 2a above — never intake-survey state; the survey must never write `security_sensitive`).
 
 **Lookback refinement:** glob prior `00-pipeline-summary.md § Cost` entries in the vault for
 same-lane, similar-shape runs and blend a rolling average with the heuristic. Cold repo (no
@@ -129,7 +130,7 @@ confirm.
 
 **The risk statement (verbatim, byte-consistent across every site that shows it):**
 
-```
+```text
 inline waives the security review on a sensitive path (auth/db/crypto/session/api): NO automated check for auth-bypass, injection, or secret-exposure issues before this ships. Confirm? (y/N)
 ```
 

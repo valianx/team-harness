@@ -445,7 +445,7 @@ runs alongside — not instead of — `§ Bug tier` below for `type: fix`/`hotfi
 2. **Present the offer**, always showing all three lanes, their estimates, and the
    recommendation with rationale, e.g.:
 
-   ```
+   ```text
    Lane:  express (recommended)
      inline  (~5K tokens)   — not recommended: touches product code
      express (~120K tokens) — recommended: single-file config change, reversible
@@ -478,7 +478,7 @@ runs alongside — not instead of — `§ Bug tier` below for `type: fix`/`hotfi
    the exact risk statement from `docs/pipeline-lanes.md § 5` verbatim (never a euphemism) and
    require an explicit `y` (default `N`) in this live conversation before proceeding:
 
-   ```
+   ```text
    inline waives the security review on a sensitive path (auth/db/crypto/session/api): NO automated check for auth-bypass, injection, or secret-exposure issues before this ships. Confirm? (y/N)
    ```
 

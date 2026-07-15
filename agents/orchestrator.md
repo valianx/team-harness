@@ -440,7 +440,7 @@ Express folds the three full-lane gates into ONE upfront combined "here is the p
 
 **STOP block you return to `th:leader` as `gate_pending`:**
 
-```
+```text
 ========================================
  EXPRESS GATE — Plan + delivery ready for human approval
 ========================================
@@ -517,7 +517,7 @@ Express folds the three full-lane gates into ONE upfront combined "here is the p
 
 **Exceeding the max-2 budget** (a third scope expansion of either classification, once two `new-information` expansions have already been counted) STOPs to the operator instead of silently re-dispatching a third time:
 
-```
+```text
 Scope-freeze budget exceeded — the architect has expanded scope twice since the initial freeze
 ({scope_frozen at freeze} → {current proposed scope}).
 
@@ -846,13 +846,22 @@ Run `git diff --name-only`; for each changed non-test file, verify it appears in
 
 **Content-trigger check (in addition to the path-pattern check).** A name-only diff yields paths only and cannot evaluate § 2a's content-based triggers at a benign-named path. Run the actual diff content — the same pinned base ref, `git diff "${BASE_REF}"...HEAD` (not `--name-only` this time) — through a deterministic `grep -E` pass for the content-based trigger categories § 2a already defines: authentication, authorization, secrets, payments, PII handling, and injection-vector construction (building SQL/command/template strings, or deserializing untrusted content). Mirror the Phase 2.6 Code-Hygiene Scan's own `git diff` + `grep -E` pipeline (`docs/code-hygiene-gate.md § 3.1`) as the structural template for how a check like this is built in this file — a fixed `git diff` piped through `grep -E` against a pinned base ref — but this is a distinct check with its own keyword set (security-sensitivity content triggers, not work-narration-comment patterns); do not reuse the code-hygiene gate's pattern list or share a command between the two checks.
 
+**Scans both added and removed lines (never additions-only).** Removing a security control (an auth check, a permission guard, a secret-handling branch) from a benign-named file is exactly as sensitivity-relevant as adding one — an additions-only scan would fail-open on a control REMOVAL. The pinned command below evaluates both added AND removed diff lines against the keyword check, while excluding the true `--- a/path` / `--- /dev/null` / `+++ b/path` / `+++ /dev/null` diff-header lines.
+
+**Header exclusion is POSITIONAL, never content-based.** A real diff header line and a removed/added CONTENT line that happens to start with the same characters (e.g. a removed `--`-style SQL/Lua/Haskell/Ada comment, or a line deliberately crafted to open with a header-shaped token) can be byte-identical in isolation — no regex evaluating a single line's text can reliably tell them apart on content alone, and each attempt to do so with an ever-more-specific content pattern only narrows, never closes, the collision. The pinned command instead tracks POSITION in the diff stream with a small `awk` state machine: a real header pair (`--- `/`+++ `) can only ever appear once per file, immediately after that file's `diff --git` line and before its first `@@` hunk marker — this is git's own diff-format invariant, and it cannot be forged by an attacker who only controls a file's own text content (the file's content becomes hunk lines, never format-control lines; git generates the header lines itself, deterministically, from the diff engine, not from the files being compared). The state machine treats `--- `/`+++ ` lines as headers ONLY while positioned between a `diff --git` line and that file's first `@@` marker; once a `@@` is seen, EVERY subsequent `+`/`-` line is unconditionally content, regardless of what it starts with — because a real header can never appear there. This closes the entire class of content-based header disguises structurally, rather than chasing the next content-based counter-example.
+
 **Fixed scan command (pinned, copy verbatim):**
 
 ```bash
 set -o pipefail
 git diff "${BASE_REF}"...HEAD \
-| grep -E '^\+' \
-| grep -v '^\+\+\+' \
+| awk '
+  /^diff --git / { in_headers = 1; next }
+  in_headers && /^--- / { next }
+  in_headers && /^\+\+\+ / { in_headers = 0; next }
+  /^@@/ { in_headers = 0; next }
+  /^[+-]/ { print }
+' \
 | grep -iE \
   -e 'auth(entication|entic|oriz(e|ation))' \
   -e '\blogin\b' \
@@ -879,11 +888,15 @@ git diff "${BASE_REF}"...HEAD \
   -e 'template[_-]?inject'
 ```
 
-**Exit-code contract.** Mirrors the sibling Code-Hygiene Scan's own contract verbatim (`docs/code-hygiene-gate.md § 3.1`): the final `grep` exits `1` (no lines matched) on a clean diff, `0` (lines matched) on a content-trigger hit, or `2`+ on a genuine error (malformed regex, missing file). Treat exit `2`+ as an **escalation**, never a silent pass — a broken command must not be misread as "no content triggers found." Because `git diff` sits at the head of the pipe, the pinned command opens with `set -o pipefail` so a failing `git diff` propagates as a pipeline failure instead of feeding empty input to the downstream `grep` chain, which would otherwise read "zero matches" and mask the real failure as a false-clean scan.
+**Exit-code contract.** Mirrors the sibling Code-Hygiene Scan's own contract verbatim (`docs/code-hygiene-gate.md § 3.1`): the final `grep` exits `1` (no lines matched) on a clean diff, `0` (lines matched, on an added OR a removed line) on a content-trigger hit, or `2`+ on a genuine error (malformed regex, missing file). Treat exit `2`+ as an **escalation**, never a silent pass — a broken command must not be misread as "no content triggers found." **The `awk` stage sits in the middle of the pipe, not at its end** — it does not change this contract: under `pipefail`, the pipeline's exit code is the rightmost non-zero exit among all stages, and the rightmost stage is still the keyword `grep`, exactly as before this fix. The `awk` script uses only baseline, portable syntax (no GNU-specific extensions) and always exits `0` on normal completion, so it never masks the keyword `grep`'s own exit code under ordinary operation.
+
+**Known, disclosed limitation (`pipefail` does not fully cover a `git diff` that fails before producing any output — pre-existing, shared with the sibling scan, out of scope for this directionality fix).** `set -o pipefail` reports the rightmost NON-ZERO exit among the pipe's stages. When `git diff` fails outright before emitting any output (an unresolvable `${BASE_REF}`, a shallow clone missing the merge-base, a permissions error), `awk` and the keyword `grep` both receive empty input; the keyword `grep` then exits its own standard `1` ("zero lines matched", indistinguishable from a genuinely clean diff) — and because `grep` is the rightmost stage, `pipefail` reports that same `1`, not an error code. `git diff`'s own non-zero exit is not separately surfaced. This is a pre-existing characteristic of the pinned single-pipeline shape (identical in the original, pre-patch command, and shared verbatim with `docs/code-hygiene-gate.md § 3.1`'s own pipeline) — not introduced by, and not scoped to, this directionality fix; closing it fully would require restructuring both this command and its sibling into an explicit-error-trapping script, a larger change tracked separately. The **"Fail-closed on ambiguity"** rule immediately below is the existing compensating control at the orchestrator's judgment layer: an unexpectedly empty diff when changes were expected is never read as clean.
 
 On any match — path-pattern OR content-trigger — where `security_sensitive` is not already `true` in this task's `00-state.md § Current State`, force-set it to `true` for the remainder of the task and ensure Phase 3 dispatches BOTH `security` and `adversary` — per the single shared Phase-3 floor predicate, § Phase 3 (T2-AC-10).
 
 **Fail-closed on ambiguity.** If either check is inconclusive for any reason — a path only partially matches, a command cannot run, OR the diff is unexpectedly EMPTY when changes were expected for this task (e.g., the implementer's changes are already committed/staged past the pinned base ref) — treat the task as sensitive. An inconclusive result, including an unexpectedly empty diff, is never read as "no sensitive files, clean" and is never treated as a clean pass.
+
+**Known, disclosed limitation (keyword-lexicon coverage, out of scope for this scan's directionality fix).** The content-trigger keyword list above is intentionally narrow (anchored substrings, not a general identifier matcher) and does not catch every real-world camelCase/prefixed control identifier (e.g. `requireAuth(`, `authGuard`, `isAdmin`, `hasRole`) — a removal or addition of such an identifier, at a benign path, with no other matching keyword nearby, can still pass this scan uncaught. This is a pre-existing lexicon-completeness gap independent of, and not introduced by, the added/removed-lines directionality this scan fixes; it is not remediated here to keep this change bounded to the reported defect (an additions-only scan fail-opening on control removals). The path-pattern check above and the leader's own upstream classification remain the primary defenses against this narrower residual.
 
 **Independent of, and in addition to, the leader's own classification.** This is a deterministic, code-level safety net that runs regardless of what the leader already classified at Discover→classify (`docs/pipeline-lanes.md § 2a`). It exists specifically to catch a sensitive path the leader's classification missed — it never replaces that classification, and the leader's classification never substitutes for this backstop either; both run.
 
@@ -1584,7 +1597,7 @@ In obsidian mode (`{events_file}` = `00-execution-events.md`), extract the JSONL
 ## Communication Protocol
 
 ### To the operator — report at every phase transition:
-```
+```text
 Lane: {inline|express|full}
 ✓ Phase {N}/{total} — {Phase Name} — {result}
   Agent: {agent} | Output: {workspace doc file}
@@ -1595,7 +1608,7 @@ Lane: {inline|express|full}
 **`Lane:` line (T2-AC-9, mandatory).** Read `lane` from your own `00-state.md § Current State` and render it verbatim as the first line of every phase-transition status block — this is what keeps the running lane visible at every orchestrator-owned checkpoint, per `docs/pipeline-lanes.md § 8`. It appears identically in every STAGE-GATE STOP block header and the express combined-gate STOP block (see each gate section below).
 
 On failure/iteration:
-```
+```text
 Lane: {inline|express|full}
 ✗ Phase {N}/{total} — {Phase Name} — FAILED
   Agent: {agent} | Issue: {what went wrong}

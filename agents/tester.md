@@ -157,7 +157,8 @@ If existing tests fail because of the new test, your test is leaking state. Fix 
 
 In this SAME dispatch, also write (or create) `workspaces/{feature-name}/03-testing.md` with a
 `## Test Plan` section — the skeleton Phase 2.7 (`authoring` mode) will resume from instead of
-re-deriving AC coverage from scratch:
+re-deriving AC coverage from scratch. Enumerate one row per ACTUAL AC identifier read from
+`01-plan.md § Task List` for this task — never the two sample rows below verbatim. The shape is:
 
 ```markdown
 ## Test Plan
@@ -171,17 +172,20 @@ re-deriving AC coverage from scratch:
 ### Planned AC coverage (Phase 2.7 — to complete)
 | AC | Planned test | Status |
 |----|--------------|--------|
-| AC-1 | {planned test name/file} | pending |
-| AC-2 | {planned test name/file} | pending |
+| {actual AC id, e.g. AC-1} | {planned test name/file} | pending |
+| {one row per remaining AC in 01-plan.md § Task List} | {planned test name/file} | pending |
 ```
 
-This is a plan, not a promise of exact final test names — Phase 2.7 may adjust individual entries as
+The two rows above are a shape example only — the persisted `03-testing.md` must contain one row
+per AC actually present in `01-plan.md § Task List` for this task (not a fixed count of two, and
+never the literal placeholder identifiers `AC-1`/`AC-2` when the real AC numbering differs). This
+is a plan, not a promise of exact final test names — Phase 2.7 may adjust individual entries as
 implementation details become concrete, but it resumes from this skeleton rather than re-reading
 `01-plan.md § Task List` + code from a cold start.
 
 ### Status block from tester (pre-fix-regression mode)
 
-```
+```text
 agent: tester
 mode: pre-fix-regression
 status: success | failed | blocked
@@ -219,13 +223,18 @@ Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You writ
 
 **This mode does NOT validate AC verdicts.** Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
 
-**Bug-fix flow (`type: fix`/`hotfix`) — resume, do not re-derive.** When this dispatch is part of the
-Bug-fix Flow, this is the SAME tester contract Phase 2.0 started (see "Test-phase consolidation"
-under Pre-Fix Regression Test Mode above). Read your own `03-testing.md § Test Plan` — already
-written at Phase 2.0 — and complete the remaining "Planned AC coverage" rows from that plan rather
-than re-deriving AC coverage from `01-plan.md § Task List` + code from a cold start. For a
-non-bug-fix flow (no Phase 2.0), this dispatch is a single, independent authoring pass exactly as
-described above — there is no prior `§ Test Plan` to resume from.
+**Bug-fix flow (`type: fix`/`hotfix`) — resume, do not re-derive, EXCEPT when Phase 2.0 was skipped.**
+When this dispatch is part of the Bug-fix Flow AND Phase 2.0 actually ran (`bug_tier` 2-4, or
+`bug_tier: 1` with a regression test required — see "Tier-gated dispatch" above), this is the SAME
+tester contract Phase 2.0 started (see "Test-phase consolidation" under Pre-Fix Regression Test Mode
+above). Read your own `03-testing.md § Test Plan` — already written at Phase 2.0 — and complete the
+remaining "Planned AC coverage" rows from that plan rather than re-deriving AC coverage from
+`01-plan.md § Task List` + code from a cold start. When Phase 2.0 was skipped (`bug_tier: 1`
+no-behavior-change, `pre_fix_test_status: skipped`), there is no prior `§ Test Plan` — treat this
+dispatch as a single, independent authoring pass exactly as described above, authoring the AC
+coverage plan directly from `01-plan.md § Task List`. For a non-bug-fix flow (no Phase 2.0 in the
+flow at all), this dispatch is likewise a single, independent authoring pass exactly as described
+above — there is no prior `§ Test Plan` to resume from.
 
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes.
 

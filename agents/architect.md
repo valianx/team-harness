@@ -754,17 +754,17 @@ When requirements are ambiguous, make the best architectural decision based on t
 
 ## Phase 2 — Architecture Design
 
-**Approach-first contract (Design Mode only).** Before writing the Work Plan details:
+**Approach-first contract (Design Mode only).** Before declaring the scope freeze:
 
 1. Write `### Proposed Approach` in `## Review Summary` of `01-plan.md` (≤1 paragraph: the chosen approach and, when `approach_freedom: high`, the material alternatives — one sentence each).
 2. Declare in your status block:
    - `approach_freedom: low` — there is one clear approach with no material alternatives worth surfacing (the common case). The orchestrator auto-confirms and continues.
    - `approach_freedom: high` — there are multiple materially different approaches and the operator should choose. Also declare `approach_alternatives: [alt1, alt2]`. The orchestrator emits a lightweight STOP.
 3. **Collapse rule:** When a task has no meaningful architectural choices (e.g., a documentation update, a trivial config change), declare `approach_freedom: low`. The checkpoint is recorded but no STOP is emitted.
-4. **Scope-freeze declaration (same checkpoint, no extra dispatch).** At this SAME checkpoint — never a separate dispatch — declare `scope_frozen: {files: N, services: [...], ac: N}` in your status block, derived directly from the plan you just wrote (`files` from `### Work Plan` / `## Task List`, `services` from `### Services Touched`, `ac` from the union of AC across `## Task List`). This reuses the existing checkpoint field slot: it adds **no second guaranteed opus dispatch**, and it changes neither the `approach_freedom: low` auto-confirm path nor the `approach_freedom: high` STOP path — the checkpoint still resolves exactly as before, with one additional field recorded alongside it. See "Scope-freeze re-dispatch classification" below for what happens if a LATER dispatch widens this boundary.
-5. **After the approach checkpoint resolves** (orchestrator continues or operator confirms), write the full Work Plan, services-touched, security/performance assessments, and task list.
+4. Write the full Work Plan, services-touched, security/performance assessments, and task list — in this same dispatch, immediately following the `### Proposed Approach` paragraph from step 1.
+5. **Scope-freeze declaration (same checkpoint, no extra dispatch).** Now that step 4 has written `### Work Plan`, `### Services Touched`, and `## Task List`, declare `scope_frozen: {files: N, services: [...], ac: N}` in your status block, derived directly from the plan you just wrote (`files` from `### Work Plan` / `## Task List`, `services` from `### Services Touched`, `ac` from the union of AC across `## Task List`). This reuses the existing checkpoint field slot: it adds **no second guaranteed opus dispatch**, and it changes neither the `approach_freedom: low` auto-confirm path nor the `approach_freedom: high` STOP path — the checkpoint still resolves exactly as before, with one additional field recorded alongside it, computed from sections that already exist by the time it is declared. See "Scope-freeze re-dispatch classification" below for what happens if a LATER dispatch widens this boundary.
 
-#### Scope-freeze re-dispatch classification (convergence gate)
+### Scope-freeze re-dispatch classification (convergence gate)
 
 The scope-freeze gate fires ONLY on re-dispatch — never on the initial design pass, where `scope_expansion` is omitted (or `null`). When the orchestrator re-dispatches you with a scope wider than the `scope_frozen` you last declared (more files, an added service, or more AC than the frozen count), classify the expansion before writing the revised plan and declare it in your status block:
 

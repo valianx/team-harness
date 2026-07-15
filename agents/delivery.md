@@ -32,7 +32,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
 - **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `reviews/04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings) + `reviews/04-adversary.md` if it exists (most recently recorded verdict — `broke-it`, or `could-not-break` + `incomplete_on_changed_control: true` with no matching `disposition` entry in `00-decision-ledger.md` accepting the residual). If any AC lacks PASS, lacks a test, security reports critical/high, or adversary's recorded verdict resolves to an abort per the rule above, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings) + `reviews/04-adversary.md` if it exists (most recently recorded verdict — `broke-it`, or `could-not-break` + `incomplete_on_changed_control: true` with no matching `disposition` entry in `00-decision-ledger.md` accepting the residual) — **lane-gated:** on `lane: full` (or absent) also read `reviews/04-validation.md` (qa PASS/FAIL per AC); on `lane: express`, `reviews/04-validation.md` is legitimately absent (`qa` never runs there) and `03-testing.md` alone is the acceptance evidence — see Step 0 below for the full per-lane branch. If any AC lacks PASS (per-lane evidence source), lacks a test, security reports critical/high, or adversary's recorded verdict resolves to an abort per the rule above, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
@@ -98,17 +98,18 @@ Determine `{feature_name}` in this order:
 **On `lane: full` (or when `lane` is absent, legacy payload):**
 
 1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
-2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
-3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table.
+2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC. **`bug_tier: 1` exception (`type: fix`/`hotfix` only):** per `agents/ref-special-flows.md § "Full workspaces artifact set"`, Tier 1 produces a simplified `reviews/04-validation.md` (≤15 lines, no per-AC table) — read its simplified pass/fail statement instead of a per-AC table; there is no per-AC breakdown to parse on this tier.
+3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table. **`bug_tier: 1` exception:** `03-testing.md` is suite-no-regress only on this tier (no per-AC coverage table, per the same artifact-set table) — verify instead that the suite ran with no regressions.
 4. If `reviews/04-security.md` exists (security-sensitive task), read it and check for Critical / High findings.
 
 **Abort criteria (full) — return `status: failed` immediately if:**
-- Any AC is missing a `PASS` in `reviews/04-validation.md`.
-- Any AC has no test in `03-testing.md` AC Coverage table.
+- **`bug_tier` absent, or `2`/`3`/`4`:** Any AC is missing a `PASS` in `reviews/04-validation.md`.
+- **`bug_tier` absent, or `2`/`3`/`4`:** Any AC has no test in `03-testing.md` AC Coverage table.
+- **`bug_tier: 1` only:** `reviews/04-validation.md`'s simplified statement is not an unambiguous pass, OR `03-testing.md` reports a regression or a suite failure. (Tier 1 never has a per-AC table on either artifact — the two criteria above do not apply to it.)
 - `reviews/04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
 - `security_sensitive: true` (i.e. `security_floor_applies == true` per `agents/orchestrator.md § "Single shared Phase-3 floor predicate"`) and `reviews/04-security.md` is absent — the floor predicate guarantees `security` ran on a sensitive-path task regardless of lane; a missing report means the orchestrator failed its own dispatch, not a legitimate skip. When the same predicate also required `adversary` (`security_floor_applies == true`), apply the identical check to `reviews/04-adversary.md`.
 - `reviews/04-adversary.md` exists (per the predicate above) — read the file's final/most-recent verdict line: if `broke-it` → abort; if `could-not-break` + `incomplete_on_changed_control: true` → check `00-decision-ledger.md` for a matching `disposition` entry accepting the residual — if none exists, abort; if one exists, proceed. Presence alone (checked by the criterion above) is not sufficient — the recorded content must resolve to a benign state before delivery proceeds.
-- Any expected workspace doc is missing.
+- Any expected workspace doc is missing (`bug_tier: 1` never expects `01-root-cause.md`, `02-regression-test.md` when Phase 2.0 was skipped, or a per-AC table in either acceptance artifact — see `agents/ref-special-flows.md § "Full workspaces artifact set"` for the tier-conditional artifact list).
 
 **On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`):** `qa` never runs on this lane — the operator's combined-gate review substitutes for the `qa` validate pass, the same lane contract `agents/tester.md § "Express lane — one combined dispatch, same two modes"` already documents on the tester side. `reviews/04-validation.md` is legitimately ABSENT by design on this lane, never a missing artifact — do NOT require it to exist or to contain a PASS table.
 
@@ -661,7 +662,7 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 ### Step 9c — Acceptance Matrix
 
-Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/reviews/04-validation.md` as a new `## Acceptance Matrix` section — an addition, never a rewrite of qa's existing `## Acceptance Criteria Results` content:
+**On `lane: full` (or when `lane` is absent):** Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/reviews/04-validation.md` as a new `## Acceptance Matrix` section — an addition, never a rewrite of qa's existing `## Acceptance Criteria Results` content:
 
 ```markdown
 ## Acceptance Matrix
@@ -672,7 +673,17 @@ Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-t
 | AC-2 | {gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
 ```
 
-**Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` — inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body at Step 11.2, which is the durable, human-facing surface for this content; Step 10.0 does not stage `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place, since this step never produces one.
+**On `lane: express`:** `reviews/04-validation.md` is legitimately absent — `qa` never ran on this lane (Step 0 above). Do NOT create it. Build the same matrix shape from `01-plan.md` § Task List (AC list), `03-testing.md` (the tester's combined authoring+verify evidence, which substitutes for the QA-evidence column), and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/03-testing.md` instead, as a new `## Acceptance Matrix` section — the one acceptance-evidence artifact express always produces:
+
+```markdown
+## Acceptance Matrix
+
+| AC | Description (1 line) | Test (file:line) | QA evidence (file:line) | Security |
+|----|----------------------|------------------|-------------------------|----------|
+| AC-1 | {gist} | `auth.spec.ts:42` PASS | n/a (express — tester combined result) | clean |
+```
+
+**Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body at Step 11.2, which is the durable, human-facing surface for this content; Step 10.0 does not stage `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
 
 ### Step 9d — Reviewability size gate
 
@@ -889,7 +900,7 @@ When deletions dominate (deletions > 2× additions, or the change is relocation-
 - **After:** {observable behaviour after this PR}
 
 ## Acceptance Matrix (mandatory)
-{paste the table from workspaces/{feature-name}/reviews/04-validation.md § Acceptance Matrix}
+{paste the table from workspaces/{feature-name}/reviews/04-validation.md § Acceptance Matrix on `lane: full`, or workspaces/{feature-name}/03-testing.md § Acceptance Matrix on `lane: express` (Step 9c)}
 
 ## Definition of Done (mandatory)
 - [x] Lint: {command} → PASS
