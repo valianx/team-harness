@@ -304,6 +304,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 - **2026-06-29** — `refreshManagedConfigKeys`: update writes only managed keys (`format_version`/`installed_version`/`updated_at`); operator keys preserved. → `cmd/install/opencode_config.go`
 - **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
+- **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
