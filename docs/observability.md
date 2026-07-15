@@ -403,8 +403,11 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
 | `stage2.hygiene` | When the Phase 2.6 code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
+| `plan_structure` | When the Phase 1.5a deterministic plan-structure scan completes, before any `qa-plan` dispatch (deterministic, orchestrator-run — see `docs/plan-structure-gate.md § 2`) | `verdict` (`pass`/`fail`), `extra.check`/`extra.detail` (on `fail`, the specific mechanical failure) |
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
+
+Note: the `lane` field on `research.lane.skipped` names a **research fan-out lane** (one angle of a `/th:research-code` fan-out) — an unrelated homonym of the pipeline **execution lane** (`inline`/`express`/`full`) documented in "Active-lane observability surface" below. The two never appear on the same event.
 
 ## kg_write event
 
@@ -457,6 +460,50 @@ Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (auto
 | `skipped:policy-filtered` | The content-policy filter or an MCP `policy/*` return discarded the write. | Content-policy drop, MCP `policy/<code>` response |
 
 **Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A Phase 6 batch may write up to 5 nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes. See the orchestrator's "Emitting kg_write events" subsection for the full rationale and the explicit exception.
+
+## Active-lane observability surface
+
+The three-lane execution model (`inline`/`express`/`full`, canonical contract: `docs/pipeline-lanes.md`) is a dispatch-time classification, not a new enforcement layer. This section documents where the running lane is visible across the observability surfaces this file defines, and states plainly what this contract deliberately does NOT add.
+
+### `lane` field — `00-state.md` + status-block/STOP-header echo
+
+`lane` is a `00-state.md § Current State` field (`inline | express | full`), copied verbatim by the orchestrator from the leader's spawn payload — `--fast`, `[TIER: N]`, and Simple-Mode keywords all resolve to a lane value upstream, at the leader, so the orchestrator never re-derives lane from a legacy flag itself. The orchestrator echoes `Lane: {lane}` as the first line of every phase-transition status block and every STAGE-GATE / express-combined-gate STOP block header (`agents/orchestrator.md § "Lane: line"`, canonical visibility contract at `docs/pipeline-lanes.md § 8`).
+
+**Honest scope — not (yet) a discrete `phase.end` JSONL key.** `lane` lives in the state file and in the human-facing status-block/STOP-block text; the `phase.end` schema (§ "Execution Events JSONL" above) does not currently stamp its own `lane` key. A reader who needs the running lane for a given phase reads `00-state.md` alongside `{events_file}`, the same way `stage`/`phase` are already cross-read together with the trace.
+
+**Naming note.** This execution-lane `lane` is unrelated to the `lane` field on `research.lane.skipped` (§ "Additional pipeline event types" above), which names one angle of a `/th:research-code` fan-out. The two homonyms never appear on the same event.
+
+### `operator-inline-security-waiver` audit marker
+
+`inline` on a security-sensitive path requires a fresh, live, per-invocation operator confirm to the risk statement defined in `docs/pipeline-lanes.md § 5`. When granted, the leader writes a distinct audit marker — `operator-inline-security-waiver` — to `00-execution-events` (when a workspace exists) or the leader's own session tracking (inline runs with no orchestrator). The marker is deliberately distinct from `leader-relayed-operator` (the mechanism that authorizes STAGE-GATE decisions elsewhere in this file): it records the sensitive path(s) that triggered the floor, the exact risk string shown, the operator's literal reply, and a timestamp. Full mechanism, the fail-closed rules, and the non-persistence guarantee (no config key — including `lane_autoselect` — makes the waiver sticky or default) live in `docs/pipeline-lanes.md § 5`.
+
+### No `budget` config key, no `budget_pending` event
+
+An earlier design iteration proposed a hard token-budget config key (`budget`) with a budget-driven STOP (constraint C). It was evaluated and removed before this contract shipped — a budget-STOP that could recommend `inline` on a sensitive path was identified as a fail-open security vector (a pre-flight budget check reaching a security recommendation before the security-relevant classification ran); see `docs/pipeline-lanes.md § 9 "Historical note — constraint C removed"` for the full rationale. This observability contract documents the trace and config surface exactly as shipped: **no `budget` key exists in `~/.claude/.team-harness.json`, and no `budget_pending` (or equivalent) event exists in the `event` enum** (§ "Execution Events JSONL" § Schema above). The only cost-visibility surface remains the existing read-only `## Cost` rollup (§ "Cost rollup" below) — a render of `phase.end` tokens, never a gate, never a STOP.
+
+### Security floor unaffected by lane
+
+`security_floor_applies` — the single shared Phase-3 predicate that dispatches `security` + `adversary` on a sensitive path — is computed from `security_sensitive` alone; no lane, trim, flag, or env var changes its evaluation (`agents/orchestrator.md § "Preserves the 'unless sensitive' guard..."`). This is a trace-observable invariant: a sensitive-path run's `phase.end` events show the same `security`/`adversary` phase entries on `lane: express` as on `lane: full`, and the express combined-gate STOP block surfaces the same verdicts inline rather than omitting them (`docs/pipeline-lanes.md § 7 "Two-lens floor"`).
+
+## Stage-1 selective panel re-firing — observability surface
+
+Stage-1 selective panel re-firing (canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`) reduces cost on plan-review re-dispatches after an operator correction. Like the active-lane surface above, everything documented here is a read-only trace/audit addition over the existing Phase 1.5/1.6 gate model — no new enforcement key, no new verdict value, no change to what "pass" means at STAGE-GATE-1.
+
+### `plan_structure` event (Phase 1.5a, deterministic)
+
+Documented in the "Additional pipeline event types" table above. Emitted by the orchestrator itself (never a subagent dispatch) at Phase 1.5a, before any `qa-plan` ratify-plan dispatch, for every plan that does not take the self-authored-plan carve-out. Same shape as `stage2.hygiene`: a structural trace event carrying a `verdict`, never operator-facing prose on the clean path. `verdict: pass` proceeds to `qa-plan`; `verdict: fail` bounces to `architect` under the BOUNDED-PATCH contract with `extra.check`/`extra.detail` naming the specific mechanical failure. The four Layer-1 checks (AC-count-vs-summary reconciliation, dangling `T{n}-AC-{m}` cross-references, DAG acyclicity, cross-task file-disjointness) are defined canonically in `docs/plan-structure-gate.md § 2` — this file does not re-derive or paraphrase that check set.
+
+### Correction-classification + routing record (`reviews/01-plan-review.md § Panel Rounds`)
+
+When a corrected plan re-enters Phase 1.5/1.6, the orchestrator classifies the correction into one of 5 buckets (broad-structural, security-relevant surface, non-security coverage change, editorial/operator-decided reduction, shape/consistency-only — `docs/patch-mode.md § "The correction classifier"`) and routes only the lens(es) that bucket requires. This classification and routing decision is recorded as a `§ Panel Rounds` row in `reviews/01-plan-review.md` — a workspace document, not a new event-file field — naming the bucket, which lens(es) fired, and which sub-verdicts were carried forward. The record is read-only audit detail for a decision already made deterministically by the ordered, first-match-wins classification rules; it does not itself gate anything.
+
+### Carried-forward sub-verdict labeling
+
+When fewer than all lenses re-fire, each non-firing lens's most recent sub-verdict and its open-findings ledger are carried forward into `reviews/01-plan-review.md` and explicitly labelled `(carried forward from round N — surface unchanged this round)` — never silently presented as fresh. The combined verdict is recomputed as worst-of over {fresh sub-verdicts} ∪ {carried-forward sub-verdicts}, preserving each lens's own severity→verdict mapping. A `security` sub-verdict is never carried forward when the correction touched the security-relevant surface (bucket 2 always forces a fresh `security` run) — the Stage-1 analog of the existing Phase-3 security-verdict staleness re-gate (`agents/orchestrator.md § "If any agent fails → ITERATE"`). Full mechanism: `docs/patch-mode.md § "Carried-forward sub-verdicts + combined-verdict recomputation"`.
+
+### No new enforcement key
+
+This entire surface is additive trace/audit detail over an existing enforcement model: `plan_structure: pass/fail` is a structural gate that already existed in shape (mirrors `stage2.hygiene`, itself already documented above); the correction-bucket routing changes WHICH lens re-fires, never WHETHER Phase 1.5/1.6 must reach a combined verdict before STAGE-GATE-1; and the combined-verdict recomputation rule (worst-of over fresh ∪ carried-forward) preserves the existing `pass`/`concerns`/`fail` semantics — it introduces no new verdict value and no new config key.
 
 ## Cost rollup
 
