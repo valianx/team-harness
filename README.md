@@ -191,6 +191,7 @@ Full contract: docs/dev-mode.md.
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
 | [Agent tree](./docs/agent-tree.md) | How `th:leader`, `th:orchestrator`, and the leaf specialists relate at runtime |
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
+| [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
 | [Integration guide](./docs/integration.md) | context-harness-mcp setup, mcpServers config, 16-tool contract, troubleshooting |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |

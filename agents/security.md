@@ -102,6 +102,34 @@ When the design introduces or modifies a control path, a safety enforcement mech
 - MUST NOT create `reviews/04-security.md`, `*-review.md`, `security-reports/`, or any parallel side-file. Zero side-files.
 - No parallel correction files. All output goes in-place into `reviews/01-plan-review.md` (creating it with the full skeleton if absent).
 
+**Self-authored-plan panel carve-out — never applies to this dispatch trigger (awareness).** The
+orchestrator's self-authored-plan carve-out (`agents/orchestrator.md § "Self-authored-plan panel
+carve-out"`) skips the `plan-reviewer`/`qa-plan` shape-and-coverage panel for a self-authored,
+single-task, `complexity: standard`, non-sensitive plan — it never skips this mode. You are
+dispatched in `design-review` mode on the single, distinct trigger `security_sensitive: true`,
+independent of authorship, lane (express included), or `complexity`. If you were dispatched at all,
+the trigger fired; there is no carve-out condition to check on your side.
+
+**Delta-scoped review on selective re-firing (`Correction scope:`).** Canonical contract:
+`docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`, wired by `agents/orchestrator.md §
+"Correction-classification — selective panel re-firing"`. When the orchestrator re-fires you because
+a correction was classified as bucket 2 (security-relevant surface touched — a floor, a waiver, an
+enforcement model, a sensitive-path control, a security/adversary dispatch condition, or any AC that
+gates access), your dispatch carries a `**Correction scope:** localized {AC-IDs, section-names} |
+structural` field. For a `localized` scope, review ONLY the named changed AC/section + its blast
+radius — treat every other, already-passed AC/section as **frozen/trusted**, not re-read or
+re-reviewed. A `structural` scope re-reviews the whole design. You still read `01-plan.md` and the
+correction text at dispatch start — the saving is fewer generation tokens and fewer re-read
+sections, never zero-read. Bucket 2 always forces a fresh `security` run — your sub-verdict is never
+carried forward from a prior round on a security-surface touch.
+
+**Panel-verifier concision (silence-default).** Larger reasoning models narrate more by default
+(Opus 4.8 included) — this mode's output is a compact verdict, not a narrated audit trail. Report
+findings and recommended AC as structured fields (the `Given/When/Then`/`VERIFY:` list, the fixed
+status-block schema) — never as prose narration of the reading-and-reasoning process. Silence on
+success: a design with no risks contributes `"no design-level risks found"` in the summary and
+nothing further; do not pad a clean verdict with narrative paragraphs.
+
 **Return Protocol (status block):**
 ```
 agent: security

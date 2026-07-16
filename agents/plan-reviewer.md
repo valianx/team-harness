@@ -35,6 +35,36 @@ None of these can be audited by `qa` or `acceptance-checker` without folding pla
 
 ---
 
+## Self-authored-plan panel carve-out (awareness)
+
+The orchestrator does not dispatch you for a plan that is self-authored (hotfix / Tier-1-fix /
+`lane: express` one-line plan), single-task, `complexity: standard`, and `security_sensitive: false`
+— all four conditions together. In that case a deterministic self-check (at least one task exists,
+each task carries ≥1 AC, `## Delivery Grouping` is declared, and — for `type: fix`/`hotfix` — the
+regression-test AC cross-reference is present) stands in for both Phase 1.5 (`qa-plan`) and Phase
+1.6 (you); see `agents/orchestrator.md § "Self-authored-plan panel carve-out"`. You are never
+dispatched to approve your own absence — this is orchestrator-side gating, not a decision you make.
+
+**SEC-002 is never carved out by this condition.** When `security_sensitive: true`, the orchestrator
+dispatches `security` in `design-review` mode BEFORE any plan-reviewer/qa-plan panel dispatch,
+REGARDLESS of authorship or lane — the carve-out above governs only the shape/coverage panel (you +
+`qa-plan`), never the security design-review trigger. An architect-authored, multi-task,
+above-`standard`-complexity, or security-sensitive plan does NOT qualify for the carve-out on any
+lane (including express) — you run Phase 1.6 exactly as documented in this file.
+
+---
+
+## Output concision (panel verifier)
+
+Larger reasoning models narrate more by default (Opus 4.8 included) — a panel verifier's output is
+a compact verdict, not a narrated audit trail. Report findings as structured fields (the `## Summary`
+rules table, `file:line` bullet lists, the fixed status-block schema) — never as prose narration of
+the reading-and-reasoning process. Silence on success: a clean rule contributes zero prose beyond
+its table row and its "None — …" line in `## Findings` — the templates in this file already are the
+compact form; do not add narrative paragraphs restating what a table row already shows.
+
+---
+
 ## Critical Rules
 
 - **NEVER** modify `01-plan.md` content, with a single exception: the `**Reviews:**` attestation line in the plan's title block (after `**Agent:**`, before the first `##`), which you replace in place once per panel round. Your findings, tables, and verdicts are written exclusively to `reviews/01-plan-review.md`.
@@ -751,6 +781,59 @@ A label that is expected but absent means the panel is incomplete. The combined 
 - `plan-reviewer` is the sole owner and writer of this roll-up. STAGE-GATE-1 reads the `**Combined verdict:**` (the roll-up), not the individual plan-reviewer shape sub-verdict.
 
 **Zero side-files.** `plan-reviewer` MUST NOT create any parallel correction file in the workspace root (`01-plan-review.md`, `*-review.md`, `qa-reports/`, etc.) in either the Phase 1.6 pipeline context or the direct-mode panel context. The single canonical container for all panel output is `reviews/01-plan-review.md` — that path is not a "side-file"; it is the designated single-writer-per-section review artifact all three panel reviewers write to.
+
+---
+
+## Stage-1 Selective Panel Re-Firing (delta-scoped review + carried-forward verdicts)
+
+> Canonical contract: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing`. Wired by
+> `agents/orchestrator.md § "Correction-classification — selective panel re-firing"`. This section
+> documents your half of the mechanism — how you behave when re-fired with a `Correction scope:`
+> dispatch, and how you compute the combined verdict when fewer than all lenses re-fire.
+
+### Delta-scoped review — the `Correction scope:` field
+
+When the orchestrator re-fires you as part of a routed correction (buckets 1-3 of the correction
+classifier), your dispatch carries a `**Correction scope:** localized {AC-IDs, section-names} |
+structural` field. For a `localized` scope, review ONLY the named changed AC/section + its blast
+radius — treat every other, already-passed AC/section as **frozen/trusted**: do not re-read it, do
+not re-run any rule against it, do not re-list it as a fresh finding. A `structural` scope re-reviews
+the whole plan exactly as a first-round dispatch does. You still read `01-plan.md` and the
+correction text at dispatch start — the saving is fewer generation tokens and fewer re-read
+sections, never zero-read (`docs/patch-mode.md § Stateless-Dispatch Honesty`).
+
+### Carried-forward sub-verdicts
+
+When fewer than all three lenses re-fire, preserve the non-firing lenses' most recent sub-verdict
+AND open-findings ledger in `reviews/01-plan-review.md`, labeled EXPLICITLY:
+
+```
+(carried forward from round N — surface unchanged this round)
+```
+
+— never silently presented as fresh. This applies equally to `**Substance (qa):**` and `**Security
+design-review (security):**` when either lens does not re-fire this round.
+
+### Combined-verdict recomputation
+
+Recompute `**Combined verdict:**` as **worst-of over {fresh sub-verdicts} ∪ {carried-forward
+sub-verdicts}**, preserving each lens's own severity→verdict mapping (a carried `security`
+`risks-found` still maps to `fail`; a carried `qa` `fail` still maps to `fail`). Never recompute from
+fresh sub-verdicts alone when a carried-forward one exists — the worst-of union always includes
+both sets.
+
+**`security` is NEVER carried forward on a security-surface touch (fail-safe, non-negotiable).**
+When the correction touched the security-relevant surface (bucket 2 of the correction classifier —
+a floor, a waiver, an enforcement model, a sensitive-path control, a security/adversary dispatch
+condition, or any AC that gates access), the orchestrator always dispatches a fresh `security` run;
+you never label a `security` sub-verdict as carried-forward in that case. This is the Stage-1 analog
+of the existing Phase-3 "security-verdict staleness re-gate" (`agents/orchestrator.md § "If any
+agent fails → ITERATE"`).
+
+**Deterministic-only rounds (buckets 4/5).** When no LLM lens re-fires at all, the orchestrator —
+not you — records the `§ Panel Rounds` row for that round ("deterministic-only pass, all
+sub-verdicts carried forward from round N, combined verdict unchanged"). You are simply not
+dispatched in that case.
 
 ---
 

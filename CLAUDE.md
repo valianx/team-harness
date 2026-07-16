@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.128.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.129.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -162,6 +162,7 @@ All commands run from the repo root.
 - **Bug-fix flow forces security review + regression test.** For `type: fix`/`hotfix`. Full flow: `agents/ref-special-flows.md § Bug-fix Flow`.
 - **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan (`agents/orchestrator.md § Phase 2.6`) bounces work-narration comments on added diff lines; `qa` validate-mode `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction — AC satisfaction alone does not pass. Canonical pattern set + site enumeration: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
+- **Three-lane execution model (inline/express/full).** One classification system (`--fast`/`[TIER: N]`/Simple-Mode are aliases); informational cost estimate, no budget mechanism; inline-only operator-confirmed security waiver. Canonical: `docs/pipeline-lanes.md`.
 - **Plan-review panel centralization** — worst-of verdict; panel writes `reviews/01-plan-review.md`. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Leader disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the leader; outward actions gated by `dev-guard`, which fires unconditionally and gates by destination (non-default branch push to origin → allow, else ask). See `docs/dev-mode.md`.
@@ -303,6 +304,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 <!-- Populated by the delivery agent after each feature. Empty at init. -->
 - **2026-06-29** — `refreshManagedConfigKeys`: update writes only managed keys (`format_version`/`installed_version`/`updated_at`); operator keys preserved. → `cmd/install/opencode_config.go`
 - **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`
+- **2026-07-15** — Lanes own cost/speed, floor stays orthogonal. → `docs/pipeline-lanes.md`
 
 ## 9. Patterns & Conventions
 <!-- Populated by the delivery agent after each feature. Empty at init. -->

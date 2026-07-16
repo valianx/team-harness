@@ -45,10 +45,32 @@ This is a prompt-level floor — defense in depth that complements the determini
 Used when the orchestrator dispatches you for **Phase 2.0** of the Bug-fix Flow (`type: fix` or `type: hotfix`). You author a **failing test** that captures the bug BEFORE the implementer runs. The test becomes the contract for Phase 2: the implementer must make this test pass without breaking the rest of the suite.
 
 - **Trigger:** orchestrator invokes with `mode: pre-fix-regression`
-- **Flow:** Phase 0 (discovery — same as default mode) → read bug report → author failing test → verify it fails → write `02-regression-test.md`
-- **Output:** `workspaces/{feature-name}/02-regression-test.md`
+- **Flow:** Phase 0 (discovery — same as default mode) → read bug report → author failing test → verify it fails → write `02-regression-test.md` and the `03-testing.md § Test Plan` skeleton (see "Test-phase consolidation" below)
+- **Output:** `workspaces/{feature-name}/02-regression-test.md` + `workspaces/{feature-name}/03-testing.md § Test Plan`
 
 **This mode is mutually exclusive with Phase 3 verify mode.** Phase 2.0 runs BEFORE the implementer; Phase 3 (default tester behavior) runs AFTER the implementer.
+
+### Test-phase consolidation — one tester contract, two write points
+
+Phase 2.0 (this mode) and Phase 2.7 (`authoring` mode, below) are ONE tester **contract** authored
+across a single dispatch at Phase 2.0, not two independent dispatches that each re-derive the test
+plan from scratch (`agents/orchestrator.md § "Test-phase consolidation — one tester contract, two
+write points"`). In THIS Phase 2.0 dispatch, in addition to the failing regression test, also write
+`03-testing.md § Test Plan` — a skeleton covering both the pre-fix regression test (this phase,
+failing against current code today) AND the planned AC-test mapping you will complete at Phase 2.7.
+At Phase 2.7, the SAME contract resumes: read your own `§ Test Plan` (already written here), complete
+the remaining AC tests from that plan, and run the suite once — no re-derivation, no second cold-start
+read of `01-plan.md § Task List` + code.
+
+**Both pre-existing guarantees are preserved, unchanged by this consolidation:**
+- **Pre-fix ordering** — the regression test still fails against current code BEFORE `implementer`
+  touches anything; Phase 2.0 still gates Phase 2 exactly as before.
+- **Pre-Phase-3 immutable-artifact guarantee** — the AC tests are still completed and frozen at
+  Phase 2.7, before the Phase 3 parallel verify block opens.
+
+**Scope.** This consolidation applies to the bug-fix flow only (`type: fix`/`hotfix`, where Phase 2.0
+exists). Non-bug-fix flows have no Phase 2.0 — `authoring` mode there is a single, independent
+dispatch exactly as always.
 
 **Tier-gated dispatch (Phase 2.0 conditional skip).** The orchestrator passes `bug_tier: {1|2|3|4}` AND `pre_fix_test_required: {true|false}` in the task payload. The dispatch contract:
 
@@ -131,14 +153,44 @@ If existing tests fail because of the new test, your test is leaking state. Fix 
 - [ ] Implementer (Phase 2) — make these tests pass without modifying them
 ```
 
+#### Step 6 — Write the `03-testing.md § Test Plan` skeleton (test-phase consolidation)
+
+In this SAME dispatch, also write (or create) `workspaces/{feature-name}/03-testing.md` with a
+`## Test Plan` section — the skeleton Phase 2.7 (`authoring` mode) will resume from instead of
+re-deriving AC coverage from scratch. Enumerate one row per ACTUAL AC identifier read from
+`01-plan.md § Task List` for this task — never the two sample rows below verbatim. The shape is:
+
+```markdown
+## Test Plan
+**Written at:** Phase 2.0 (pre-fix-regression) | **Completed at:** Phase 2.7 (authoring)
+
+### Regression test (Phase 2.0 — done)
+| Test name | File | Status |
+|-----------|------|--------|
+| `should_X_when_Y` | {path/to/test.spec.ts} | failing (expected — captures the bug) |
+
+### Planned AC coverage (Phase 2.7 — to complete)
+| AC | Planned test | Status |
+|----|--------------|--------|
+| {actual AC id, e.g. AC-1} | {planned test name/file} | pending |
+| {one row per remaining AC in 01-plan.md § Task List} | {planned test name/file} | pending |
+```
+
+The two rows above are a shape example only — the persisted `03-testing.md` must contain one row
+per AC actually present in `01-plan.md § Task List` for this task (not a fixed count of two, and
+never the literal placeholder identifiers `AC-1`/`AC-2` when the real AC numbering differs). This
+is a plan, not a promise of exact final test names — Phase 2.7 may adjust individual entries as
+implementation details become concrete, but it resumes from this skeleton rather than re-reading
+`01-plan.md § Task List` + code from a cold start.
+
 ### Status block from tester (pre-fix-regression mode)
 
-```
+```text
 agent: tester
 mode: pre-fix-regression
 status: success | failed | blocked
 model: {effective-model-id}
-output: workspaces/{feature-name}/02-regression-test.md
+output: workspaces/{feature-name}/02-regression-test.md + 03-testing.md § Test Plan
 regression_test_path: {test-file-path}
 regression_test_status: failing
 tests_added: {N}
@@ -170,6 +222,19 @@ Used when the orchestrator dispatches you for **Phase 2.7** of Stage 2. You writ
 - **Output:** `workspaces/{feature-name}/03-testing.md`
 
 **This mode does NOT validate AC verdicts.** Determining whether AC pass or fail is `qa`'s responsibility in Phase 3. Your role in authoring mode is to ensure each AC has at least one test that can be executed — not to render verdicts on those tests.
+
+**Bug-fix flow (`type: fix`/`hotfix`) — resume, do not re-derive, EXCEPT when Phase 2.0 was skipped.**
+When this dispatch is part of the Bug-fix Flow AND Phase 2.0 actually ran (`bug_tier` 2-4, or
+`bug_tier: 1` with a regression test required — see "Tier-gated dispatch" above), this is the SAME
+tester contract Phase 2.0 started (see "Test-phase consolidation" under Pre-Fix Regression Test Mode
+above). Read your own `03-testing.md § Test Plan` — already written at Phase 2.0 — and complete the
+remaining "Planned AC coverage" rows from that plan rather than re-deriving AC coverage from
+`01-plan.md § Task List` + code from a cold start. When Phase 2.0 was skipped (`bug_tier: 1`
+no-behavior-change, `pre_fix_test_status: skipped`), there is no prior `§ Test Plan` — treat this
+dispatch as a single, independent authoring pass exactly as described above, authoring the AC
+coverage plan directly from `01-plan.md § Task List`. For a non-bug-fix flow (no Phase 2.0 in the
+flow at all), this dispatch is likewise a single, independent authoring pass exactly as described
+above — there is no prior `§ Test Plan` to resume from.
 
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes.
 
@@ -211,6 +276,18 @@ Used when the orchestrator dispatches you for **Phase 3** verify. This is a run-
 **Scope — test files only.** NEVER modify production source code, configuration files, or documentation. This invariant is identical to all other tester modes. In run-only mode, test-file writes are restricted to updating `03-testing.md` (the workspace doc) — no new test files, no edits to existing test files.
 
 **For `type: fix` / `type: hotfix` (Tier 2-4):** confirm the regression test from `02-regression-test.md` now passes and the full suite has no regressions. Set `regression_test_status: passing` in your status block.
+
+### Express lane — one combined dispatch, same two modes (awareness)
+
+On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`), Phase 2.7 and Phase 3 collapse
+into ONE targeted test phase scoped to the diff: the orchestrator invokes you once, instructing you to
+author AND run in the same dispatch — no separate authoring-then-verify round-trip, and `qa` does not
+run (the operator's combined-gate review substitutes for the `qa` validate pass on express). This does
+NOT introduce a third mode: follow the `authoring` mode instructions above to map the diff's AC to
+tests, then follow the `verify-run` mode instructions to run the suite once and confirm no
+regressions, both within the single dispatch. Map only the diff's AC — express's test phase is scoped
+to the diff, not the whole task. On `lane: full` (or when `lane` is absent), `authoring` and
+`verify-run` remain two separate dispatches exactly as described in their own sections above.
 
 ---
 
@@ -586,6 +663,8 @@ scripts/**
 ## Session Documentation
 
 **Document format:** `03-testing.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. Follow the fixed template below.
+
+**Bug-fix flow addition.** For `type: fix`/`hotfix`, `03-testing.md` also carries the `## Test Plan` section written at Phase 2.0 and completed at Phase 2.7 (see "Test-phase consolidation" under Pre-Fix Regression Test Mode above) — that section is additive to the template below, not a replacement for it.
 
 Write your summary to `workspaces/{feature-name}/03-testing.md`:
 
