@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.129.0] - 2026-07-16
+
+### Added
+- Three-lane execution model (`inline`/`express`/`full`) at Discover→classify: every lane is always shown with a per-lane token estimate and a risk-based recommendation; `--fast`, `[TIER: N]`, and Simple-Mode keywords now resolve as aliases of the same lane system instead of a second, parallel classification mechanism. See `docs/pipeline-lanes.md`.
+- An inline-only, operator-confirmed security waiver (constraint E): selecting the inline lane on a sensitive path requires an explicit `y` (default `N`) against a named worst-case risk statement, and records a distinct `operator-inline-security-waiver` audit marker. The security floor is never waivable on express or full.
+- A deterministic, type-agnostic `security_sensitive` backstop (Phase-2-close, plus a Stage-1 sibling pre-check before the panel carve-out) that independently re-derives sensitivity for every task type from a pinned, case-insensitive path+content check, fail-closed on ambiguity — generalizing the previous fix/hotfix-only re-tier gate.
+- An express orchestrator profile: one combined plan+delivery gate, one targeted test phase, no plan-review panel on a self-authored/standard/non-sensitive plan, and minimal delivery artifacts — while still running the Phase-3 security review unconditionally on a sensitive path via a single shared floor predicate (`security_floor_applies`).
+- Stage-1 selective panel re-firing: after the full panel runs once at initial design, operator corrections are classified into 5 buckets and re-dispatch only the affected lens(es), with carried-forward sub-verdicts explicitly labelled. See `docs/patch-mode.md`.
+- A deterministic Phase-1.5a plan-structure scan (mirroring the code-hygiene two-layer gate) that runs before `qa-plan`'s judgment-only dispatch, right-sizing `qa-plan` from `opus` to `sonnet`. See `docs/plan-structure-gate.md`.
+
+### Changed
+- `agents/architect.md` now declares a `scope_frozen` boundary at the approach checkpoint and classifies any later scope expansion as `new-information` or `known-at-freeze`; provenance-scaled root-cause verification (T1/T2/T3) reuses a byte-consistent taxonomy with the leader.
+- Delivery no longer commits a pipeline spec/acceptance-matrix into the product repo's `docs/specs/` — the acceptance matrix is embedded in the PR body instead, on every lane.
+- `/th:release` no longer dispatches the orchestrator/delivery agent: the release cut (both batch and `--with` inline modes) is a fixed mechanical edit sequence executed directly by the leader — the three-site version invariant is enforced deterministically by `prepublish-guard` + CI, and pushes/PR-create stay gated by dev-guard.
+- `agents/leader.md` § Lane classification gains a standing directive: simple/mechanical work is executed inline by the leader (no orchestrator spawn); the pipeline is dispatched only for tasks with real design/code judgment or on operator request. The security floor is unaffected — sensitive paths still never run inline without the constraint-E waiver.
+
 ## [2.128.0] - 2026-07-13
 
 ### Added

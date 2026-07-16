@@ -1708,7 +1708,7 @@ for ref in sorted(plausible_agent_refs):
 #    orchestrator.md) are in the canonical set.
 #    Canonical phases (per the Pipeline Flow ASCII art and Stage table):
 CANONICAL_PHASES = {
-    "0a", "0b", "1", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
+    "0a", "0b", "1", "1.5a", "1.5", "1.6", "1.7", "2.0", "2", "2.5", "2.6", "2.7", "3", "3.4", "3.5", "3.6", "3.75", "4", "4.5", "5", "6",
     # 2.0 is the Bug-fix Pipeline regression-test phase (type: fix | hotfix only),
     # inserted between STAGE-GATE-1 and Phase 2. See ref-special-flows.md § Bug-fix Flow.
     # 2.6 is the Code-Hygiene Scan (deterministic, all types), sequenced between
@@ -1718,6 +1718,8 @@ CANONICAL_PHASES = {
     # 3.75 is Build Verification, a sub-step of Verify between Phase 3.5 and 3.6.
     # 1.7 is ux-reviewer enrich (frontend_scope: true only); executes after architect, before 1.5.
     # 3.4 is ux-reviewer validate (frontend_scope: true only); runs in the Phase 3 parallel block.
+    # 1.5a is the deterministic Plan-Structure Scan (all types, non-self-authored plans),
+    # sequenced before the Phase 1.5 qa-plan dispatch. See docs/plan-structure-gate.md.
 }
 # Scoped to the dev-pipeline spine only, not SPLIT_CORPUS — ref-special-flows.md
 # and ref-direct-modes.md host independently-numbered sub-flows (the docs

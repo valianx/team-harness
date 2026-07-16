@@ -30,6 +30,7 @@ Match on the normalized argument containing any listed cue (substring or close s
 | **clickup** | § Targeted: ClickUp | `clickup`, `click up`, `clickup workspace`, `clickup id` | `clickup`, `id de clickup`, `espacio de clickup` |
 | **obsidian-tasks** | § Targeted: Obsidian Tasks | `obsidian tasks`, `obsidian-tasks`, `tasks plugin` | `tareas de obsidian`, `obsidian tasks` |
 | **flow-telemetry** | Step 4f — flow telemetry opt-in | `flow telemetry`, `flow-telemetry`, `telemetry`, `friction events` | `telemetría`, `telemetría de flujo`, `eventos de fricción` |
+| **lane** | § Targeted: Lane Auto-select | `lane`, `lane autoselect`, `lane auto-select`, `auto-select lane`, `announce and proceed` | `carril`, `selección de carril`, `auto-selección de carril` |
 | **python / deps** | Step 6b — python3 probe | `python`, `python3`, `dependencies`, `deps`, `secret scan`, `entropy` | `python`, `dependencias`, `escaneo de secretos` |
 | **gh-accounts** | Step 3b — per-account gh identity map | `gh accounts`, `gh config dir`, `gh_config_dir`, `gh identity`, `per-account gh`, `github accounts` | `cuentas gh`, `identidad gh`, `directorio de configuración gh`, `cuentas de github` |
 | **capability** | Step 6c — nested-lane capability probe_result | `capability`, `probe`, `probe result`, `probe_result`, `nested lane`, `nested-lane`, `gate messaging` | `capacidad`, `probe`, `resultado de probe`, `verificación de capacidad`, `carril anidado` |
@@ -50,6 +51,7 @@ Routable concerns for /th:setup <intent>:
   clickup          — ClickUp workspace ID
   obsidian-tasks   — Obsidian Tasks integration
   flow-telemetry   — cross-user flow telemetry opt-in (default: off)
+  lane             — lane auto-select behavior (announce-and-proceed-on-trivial / always-stop)
   python           — python3 presence and dependency probe
   gh-accounts      — per-account GH_CONFIG_DIR identity map (paths only, no tokens)
   capability       — nested-lane probe_result confirmation (version-pinned)
@@ -378,7 +380,7 @@ Write `~/.claude/.team-harness.json` with:
 }
 ```
 
-Preserve ALL existing fields (like `files`, `clickup`, `pricing`, `gh_config_dirs`, `nested_lane_capability`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, `gh_config_dirs` (Step 3b), `nested_lane_capability` (Step 6c), and any other operator-configured key.
+Preserve ALL existing fields (like `files`, `clickup`, `pricing`, `gh_config_dirs`, `nested_lane_capability`, `lane_autoselect`) if the manifest already exists. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy `files`, `clickup`, `pricing`, `gh_config_dirs` (Step 3b), `nested_lane_capability` (Step 6c), `lane_autoselect` (§ Targeted: Lane Auto-select), and any other operator-configured key.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
@@ -545,6 +547,45 @@ Configure the Obsidian Tasks integration setting. This key controls whether the 
    Then stop.
 
 ---
+
+## Targeted: Lane Auto-select
+
+This sub-step is reached ONLY via the argument router when the target concern is `lane`. It is
+NOT part of the full no-argument flow.
+
+Configure `lane_autoselect`, the veto key for the three-lane execution model's adaptive-stop
+mechanism (`docs/pipeline-lanes.md § 4` and § 9). This key controls whether the leader
+announces-and-proceeds on a trivial, inline-eligible, non-sensitive, unambiguous, reversible
+change, or always stops and waits for an explicit lane pick.
+
+1. Read `~/.claude/.team-harness.json`. Show the current `lane_autoselect` value (if present;
+   default hint `announce-and-proceed-on-trivial` when absent).
+2. Prompt:
+   ```
+   Lane auto-select behavior:
+     (1) announce-and-proceed-on-trivial [default] — auto-proceed on inline-eligible,
+         non-sensitive, unambiguous, reversible changes; stop-and-wait otherwise
+     (2) always-stop — always stop and wait for an explicit lane pick, even on trivial changes
+   Choose 1 or 2 (Enter to keep current value):
+   ```
+3. Accept `1` (`announce-and-proceed-on-trivial`) or `2` (`always-stop`); Enter with no input
+   keeps the current value, or defaults to `announce-and-proceed-on-trivial` if none is set.
+4. Persist via **merge-write-whole-document**: read the full JSON, replace or add only the
+   `lane_autoselect` key, write the whole document back. All other keys (`format_version`,
+   `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, `language`,
+   `english_learning`, `files`, `clickup`, `pricing`, `gh_config_dirs`,
+   `nested_lane_capability`, and any others) are preserved — never a partial payload.
+5. Note (always show, regardless of the value chosen): `lane_autoselect` can NEVER itself
+   select `inline` for a sensitive-path change, under either value — only the operator's
+   explicit, manual, per-invocation lane pick reaches inline-on-sensitive, and only behind the
+   constraint-E risk confirm (`docs/pipeline-lanes.md § 5`). This key never makes the
+   inline-on-sensitive waiver sticky or persistent.
+6. Print a one-line targeted summary:
+   ```
+   th setup — lane configured
+     lane_autoselect  <announce-and-proceed-on-trivial|always-stop>
+   ```
+   Then stop.
 
 ## Output Discipline
 

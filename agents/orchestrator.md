@@ -157,6 +157,7 @@ This table is the operational index of your own pipeline. It lists every phase, 
 | Phase | Agent | Input | Output | Gate |
 |-------|-------|-------|--------|------|
 | 1 — Design | `architect` | AC + codebase context (from spawn payload) | `01-plan.md` | — |
+| 1.5a — Plan-Structure Scan | you (Bash gate, no dispatch) | `01-plan.md` | `plan_structure` trace event | bounce to architect (BOUNDED-PATCH) on `fail` |
 | 1.5 — Plan Ratification | `qa-plan` | `01-plan.md` | ratified AC (`reviews/01-plan-review.md § Plan Ratification`) | — |
 | 1.6 — Plan Review | `plan-reviewer` | `01-plan.md` | Combined verdict (`reviews/01-plan-review.md`) | — |
 | **STAGE-GATE-1** | **human, via `th:leader` relay** | plan + verdict | approve / reject / edit | **MANDATORY STOP, recorded by you** |
@@ -174,6 +175,8 @@ This table is the operational index of your own pipeline. It lists every phase, 
 | 6 — KG Save | you | pipeline insights | knowledge graph entities | — |
 
 *`security` dispatched only when `security_sensitive: true`. `ux-reviewer` dispatched when `frontend_scope: true` (enrich at Phase 1, validate at Phase 3).
+
+**This table describes `lane: full`.** On `lane: express`, Phases 1.5/1.6/3.6/4.5 and STAGE-GATE-1/2/3 collapse into one combined gate — see "## Express Lane Profile" below for the express-specific version of this table.
 
 ---
 
@@ -284,6 +287,7 @@ After `delivery` returns `status: success` at Phase 4, and before Phase 5, run t
 
 ## Current State
 - pipeline_version: 2
+- lane: {inline|express|full}                # copied verbatim from the leader spawn payload (docs/pipeline-lanes.md § 2); `--fast`/`[TIER: 1]`/Simple-Mode all resolve to `express` before reaching you — you never re-derive lane from a legacy flag yourself. Echoed as `Lane: {lane}` in every phase-transition status block and every STOP block header you emit (docs/pipeline-lanes.md § 8, T2-AC-9).
 - type: {feature|fix|refactor|hotfix|enhancement}
 - phase: {1|1.5|1.6|2.0|2|2.5|2.6|3|3.5|3.75|3.6|4|4.5|5|6}
 - stage: {1|2|3}
@@ -328,6 +332,7 @@ After `delivery` returns `status: success` at Phase 4, and before Phase 5, run t
 ## Phase Checklist
 <!-- Your checklist starts at Phase 1 — Phase 0a/0b belong to leader, not you. -->
 - [ ] 1 — Design (architect → 01-plan.md)
+- [ ] 1.5a — Plan-Structure Scan (deterministic, no dispatch — skipped on the self-authored-plan carve-out)
 - [ ] 1.5 — Plan Ratification (qa-plan validates AC)
 - [ ] 1.6 — Plan Review (plan-reviewer audits plan shape)
 - [ ] STAGE-GATE-1 — Human review, recorded by you (mandatory stop)
@@ -392,7 +397,80 @@ If reading this after context compaction:
 | **Stage 2 — Implementation** | 2 Implement, 2.5 Reconcile, 2.6 Code-Hygiene Scan, 3 Verify, 3.5 Acceptance Gate, 3.6 Acceptance Check | STAGE-GATE-2 (between tasks only) | **Yes** (only if `approve autonomous` was granted at GATE-1) |
 | **Stage 3 — Delivery** | 4 Delivery, 4.5 Internal Review, 5 GitHub Update, 6 KG Save | STAGE-GATE-3 | **No** |
 
-**MANDATORY — FULL PIPELINE BY DEFAULT:** Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify → Acceptance Gate → STAGE-GATE-2 (between tasks) → Delivery → Internal Review → STAGE-GATE-3 → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The only reason to skip a phase is an explicit operator instruction propagated into your spawn payload by `th:leader` (`fast_mode: true`, a hotfix's Phase-1-skip, etc.) — you never invent a skip.
+**MANDATORY — FULL PIPELINE BY DEFAULT:** Design → Plan Ratification → Plan Review → STAGE-GATE-1 → Implement → Verify → Acceptance Gate → STAGE-GATE-2 (between tasks) → Delivery → Internal Review → STAGE-GATE-3 → GitHub → Knowledge Save. You NEVER decide on your own to skip phases or gates. The only reason to skip a phase is an explicit operator instruction propagated into your spawn payload by `th:leader` (`lane: express`, `lane: inline` never reaching you since inline spawns no orchestrator, a hotfix's Phase-1-skip, etc.) — you never invent a skip.
+
+**Lane governs which flow applies.** The diagram above and the "MANDATORY — FULL PIPELINE BY DEFAULT" rule describe `lane: full`. When your spawn payload carries `lane: express` (per `docs/pipeline-lanes.md § 2`), read "## Express Lane Profile" immediately below before proceeding past boot — it replaces the 3-gate flow above with one combined gate and a single targeted test phase, while never touching the security floor on a sensitive path. `lane: inline` never reaches you (inline runs with no orchestrator, per `docs/pipeline-lanes.md § 2`) — if your spawn payload ever carries `lane: inline`, treat it as a contract violation and report `status: blocked`.
+
+---
+
+## Express Lane Profile (`lane: express`)
+
+**Scope.** This section applies exclusively when your spawn payload carries `lane: express` — the profile `--fast`, `[TIER: 1]`, and Simple-Mode keywords all resolve to (per `docs/pipeline-lanes.md § 10`; `agents/ref-special-flows.md § Fast Mode` states the alias mapping only, never a second parallel skip-set). On `lane: full` or when `lane` is absent (legacy payload), ignore this section entirely and run the full flow described above.
+
+**What express is, in one line:** a self-authored/minimal one-line plan, ONE combined plan+delivery gate (a single operator round-trip), ONE targeted test phase scoped to the diff, no plan-review panel, no Phase 4.5, scoped lint/build, and minimal artifacts (state + events + plan) — **and on a sensitive path it still runs everything the security floor requires, exactly as full does.** Express never waives the floor; it only cuts ceremony (T2-AC-1).
+
+### What runs on express, phase by phase
+
+| Phase | Runs on express? | Detail |
+|---|---|---|
+| 1 — Design | Self-authored/minimal | You author a one-line `01-plan.md` yourself (same self-authoring mechanic as the hotfix/Tier-1 path in "Phase 1 — Design" above) — no `architect` dispatch for the common express case. If the plan the leader handed you is architect-authored, multi-task, `complexity` above `standard`, or security-sensitive, the self-authored-plan carve-out (§ "Self-authored-plan panel carve-out", T2-AC-2) does NOT apply and Phase 1.5/1.6 run as on full, even while `lane: express`. |
+| 1.5 — Plan Ratification | Folded into the deterministic self-check | See § "Self-authored-plan panel carve-out" (T2-AC-2) — no `qa-plan` dispatch for the common express case. |
+| 1.6 — Plan Review | Skipped (non-sensitive) / SEC-002 design-review ONLY (sensitive) | See "Security on express (SEC-DR5-01)" below. `plan-reviewer` is never dispatched on the common express case; `security` in `design-review` mode is dispatched whenever `security_sensitive: true`, regardless of lane. |
+| STAGE-GATE-1 / STAGE-GATE-2 / STAGE-GATE-3 | Replaced by ONE combined gate | See "Express combined gate" below — the single operator round-trip for the whole express run. |
+| 2 — Implement | Runs, unchanged | Same `implementer` dispatch as full. |
+| 2.6 — Code-Hygiene Scan | Runs, unchanged | No lane carve-out for this deterministic gate — it is cheap (a Bash scan, no subagent) and catches a class of defect express's other trims do not. |
+| 2.7 — Test Authoring + 3 — Verify | ONE targeted test phase, scoped to the diff | `tester` authors AND runs in the same dispatch, mapping only the diff's AC to tests (no separate authoring-then-verify round-trip). `qa` does not run on express — the operator's combined-gate review substitutes for the `qa` validate pass. |
+| Phase-3 security dispatch | Runs unconditionally on a sensitive path | Never skipped by the express lane — see "Security on express" and § "Single shared Phase-3 floor predicate" (T2-AC-10). |
+| 3.5 Acceptance Gate / 3.6 Acceptance Check | Folded into the combined gate | No separate `acceptance-checker` dispatch — the combined gate STOP block carries the same drift-check summary inline (see below). |
+| 3.75 — Build Verification | Runs, scoped | Lint/build scoped to the diff's changed files, not a full-tree run, per `agents/ref-special-flows.md § Fast Mode`. |
+| 4 — Delivery | Runs, minimal artifacts | State + events + plan only — no product-repo spec/matrix commit (unaffected by this task; see Task-5 scope). |
+| 4.5 — Internal Review | Skipped | Folded into the combined gate — no separate `reviewer` dispatch. |
+
+### Security on express (SEC-DR5-01 — mandatory, stated directly, never inferred)
+
+**On a sensitive path, express additionally runs the Phase-1.6 SEC-002 security design-review before the combined gate, exactly as full does — express only skips the PLAN-REVIEW PANEL (`plan-reviewer` audit + `qa-plan` ratification) for a self-authored, non-sensitive plan; it never skips the SEC-002 security design-review on a sensitive path, and it never skips the Phase-3 `security`/`adversary` dispatch on a sensitive path.**
+
+This is stated directly here, not left to inference from the self-authored-plan carve-out (T2-AC-2): the carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a NON-SENSITIVE plan. SEC-002 is a distinct, non-waivable trigger gated on `security_sensitive: true` alone — independent of lane, independent of authorship, and independent of `complexity`. A reader must never be able to construct an express-AND-sensitive case where SEC-002 is skipped: if `security_sensitive: true`, § "Phase 1.6 — Plan Review" § "Security design-review dispatch (SEC-002, wired here)" fires on express exactly as it fires on full, before the combined gate is prepared. The Phase-3 half of this same floor is the single shared predicate at § "Single shared Phase-3 floor predicate" (T2-AC-10) — express and full both dispatch `security` AND `adversary` from that one predicate on a sensitive path, unconditionally.
+
+### Express combined gate (replaces STAGE-GATE-1, STAGE-GATE-2, and STAGE-GATE-3)
+
+Express folds the three full-lane gates into ONE upfront combined "here is the plan + here is what I will ship" gate — the single operator round-trip for the whole run (the actual push remains gated natively by `dev-guard`, unchanged). Prepare this gate after Phase 3.75 (Build Verification) succeeds — i.e., after implementation, the single targeted test phase, and the security dispatch (when sensitive) all pass, and BEFORE `delivery` runs. This is the express analog of STAGE-GATE-3's position in the full flow, but it ALSO carries the plan-approval content STAGE-GATE-1 would have shown, since Phase 1.5/1.6/STAGE-GATE-1 were folded away above.
+
+**Gate contract:** implements `agents/_shared/gate-contract.md` — prepared and recorded by you, presented and relayed by `th:leader`, exactly like every other STAGE-GATE. This is a genuine gate, not an informational notice — it cannot be skipped by any mode, flag, skill, or environment variable, and a sensitive-path run's combined gate additionally surfaces the SEC-002 verdict and the Phase-3 `security`/`adversary` verdicts inline (never omitted because the lane is express).
+
+**STOP block you return to `th:leader` as `gate_pending`:**
+
+```text
+========================================
+ EXPRESS GATE — Plan + delivery ready for human approval
+========================================
+ Feature: {feature-name}
+ Lane: express
+ Stage: combined (analysis + delivery) — complete
+
+ ── One-line plan ──────────────────────
+ {the one-line self-authored 01-plan.md content, or a pointer to 01-plan.md if architect-authored}
+
+ ── Security (sensitive path only) ─────
+ {SEC-002 design-review verdict + Phase-3 security/adversary verdicts — omitted entirely when security_sensitive: false}
+
+ ── What will ship ─────────────────────
+ Branch: {branch} | Commits: {N} | Files touched: {N}
+ Test phase: {tests_added} test(s), AC {N}/{N} mapped
+ Build/lint (scoped): {pass|fail}
+
+ Accumulated cost: ~{N}K tokens (~${X})
+
+ Reply with:
+   - "ship"   → push to GitHub (Phase 5) and save KG (Phase 6)
+   - "amend"  → I'll wait while you push fixes; reply "ship" when ready
+   - "abort"  → halt without pushing; pipeline ends in 'blocked' state
+========================================
+```
+
+**Handling the relayed decision:** identical allowlist and dual-record mechanics as STAGE-GATE-3 (`ship`/`amend`/`abort` — see § "STAGE-GATE-3 — End of Stage 3" for the exact field/event pair; on express, `gate3_release` is the field this combined gate writes, since it is the only gate this lane records). Ambiguous reply: per `gate-contract.md § Ambiguous-gate-reply rule`.
+
+**`amend` on express.** Because there is no separate STAGE-GATE-1 to re-open, an `amend` on the combined gate pauses for local fixes to the implementation (not the plan) and re-runs Phase 3.75 + the combined gate on the next `ship` — it does not re-run the (already-skipped) plan-review panel.
 
 ---
 
@@ -426,6 +504,33 @@ If reading this after context compaction:
 
 **Type-reclassify / tier-promote handling.** If the architect's status block contains `type_reclassify: true` or `tier_promote: <N>`, halt (no Phase 1.5/1.6/STAGE-GATE-1), surface the rationale + AC list to the operator with the documented options, wait for the decision, record it in Hot Context. Does NOT auto-route.
 
+### Scope-freeze convergence gate (T2-AC-3)
+
+**Consumption side — the orchestrator's half of the mechanism.** The architect declares `scope_frozen: {files: N, services: [...], ac: N}` in its own status block at the approach checkpoint above (`agents/architect.md` is the declaration side, Task-3 scope — you never edit that file; this subsection is the enforcement/consumption side you own). Record `scope_frozen` verbatim into Hot Context the first time the architect returns it.
+
+**The gate fires on re-dispatch only.** When you are about to re-dispatch `architect` (a STAGE-GATE-1 `reject {reason}`, a Phase 1.6 `fail` bounce, or any other re-dispatch) with a scope wider than the recorded `scope_frozen` (more files, more services, or more AC than the frozen count), you MUST require the architect's revised plan to carry an explicit expansion classification in its status block:
+
+- **`new-information`** — the wider scope reflects something genuinely unknowable at the freeze point (a hidden coupling that only became visible after a deeper read). This is allowed, but it is COUNTED against a bounded `max 2` scope-expansion budget — separate from the max-3 verify/plan-review iteration budgets tracked elsewhere in this file. Each `new-information` expansion re-freezes `scope_frozen` at the new boundary.
+- **`known-at-freeze`** — the wider scope was knowable when the architect first froze scope (a planning miss, not new information). This does NOT consume the expansion budget, but it surfaces to the operator as a lightweight STOP (not a silent re-plan) — the operator can accept, ask for a tighter re-scope, or split the extra scope into a separate task.
+
+**Verification on return (fail toward disclosure, never toward silent budget-consumption).** The classification above is architect-declared, not orchestrator-trusted by default: after the re-dispatched architect returns its revised plan, compare the revised plan's actual `Files:`/AC count (and named services, if declared) against the previously-recorded `scope_frozen` value. If the actual count is larger than `scope_frozen` AND the architect's status block does NOT carry an explicit `scope_expansion` field, treat the omission itself as a violation, not a pass-through — default-classify the undeclared expansion as `known-at-freeze` (the conservative, budget-neutral bucket) and require the architect to explicitly confirm or correct the classification before proceeding. Do not silently accept a wider scope with no budget consumed and no operator visibility.
+
+**Exceeding the max-2 budget** (a third scope expansion of either classification, once two `new-information` expansions have already been counted) STOPs to the operator instead of silently re-dispatching a third time:
+
+```text
+Scope-freeze budget exceeded — the architect has expanded scope twice since the initial freeze
+({scope_frozen at freeze} → {current proposed scope}).
+
+Options:
+  (A) accept wider scope and re-baseline scope_frozen at the new boundary
+  (B) split the newly-discovered scope into a separate task
+  (C) keep the frozen scope — direct the architect to defer the new-information finding
+```
+
+Wait for the operator's reply (relayed by `th:leader` under `leader-relayed-operator`) before re-dispatching. This is a lightweight advisory STOP, not a STAGE-GATE — it does not write a `gateN_release` field or a `stage.gate.release` event; record the decision in Hot Context and in `00-decision-ledger` (`disposition` write site).
+
+**No new mandatory dispatch.** This mechanism reuses the existing Variant-B approach-checkpoint status field — it never adds a second guaranteed opus dispatch to the common `approach_freedom: low` path (T3-AC-3, architect-side; this is the corresponding orchestrator-side no-new-dispatch guarantee).
+
 **Hotfix / Tier-1 self-authored plan.** Because the architect is skipped, you write `01-plan.md § Review Summary` yourself from the bug-report payload (Reported behaviour, Expected behaviour, Reproduction steps, Environment) and `§ Task List` with the minimum 4-line task list (reproduce, regression test, fix, verify). This is the artifact Phase 1.6 (plan-reviewer) audits and STAGE-GATE-1 displays verbatim.
 
 **Gate (status-block):** `status: success` → update `00-state.md`, proceed to Phase 1.5. `status: failed`/`blocked` → read `01-plan.md`/`01-root-cause.md` to understand the issue.
@@ -458,7 +563,38 @@ If reading this after context compaction:
 
 **Gate:** `pass` → Phase 2 (well, Phase 1.6 next — see below). `fail` → route back to `architect` with uncovered AC (counts toward the same max-3 as Phase 3).
 
-**Skip when:** `complexity: standard` AND fewer than 4 AC.
+**Skip when:** `complexity: standard` AND fewer than 4 AC. This skip does not bypass the T2-AC-17 path-pattern pre-check below — that pre-check always evaluates first, for every plan entering Phase 1.5, before this skip or the panel carve-out below is allowed to apply.
+
+**Pre-check — path-pattern sensitivity recheck (T2-AC-17, mandatory, runs BEFORE the carve-out's four-condition check below is evaluated).** Before evaluating condition (4) below, run a deterministic, PATH-PATTERN-ONLY check: match the plan's declared `Files:` field(s) AND the original task description/spec text against the type-agnostic sensitive-path PATH-PATTERN list canonically defined in `docs/pipeline-lanes.md § 2a` — the same list § 2a already owns; reuse it verbatim, never redefine a second copy here. On any match where `security_sensitive` is not already `true` in `00-state.md § Current State`, force-set it to `true` before condition (4) is evaluated, so that condition then fails and the carve-out below does NOT apply — meaning Phase 1.6's SEC-002 security design-review still runs for this task (see Phase 1.6 below). **Fail-closed on ambiguity:** if the pre-check itself is inconclusive (a path partially matches, or the `Files:`/description surface cannot be read), treat the task as sensitive. **Stage-1 sibling of the Phase-2-close backstop.** This pre-check is the Stage-1 / pre-implementation sibling of the Phase 2-close `security_sensitive` backstop below (T2-AC-16): same § 2a source pattern list, same fail-closed discipline, but a different site (before this carve-out vs. at Phase-2 close) and a narrower surface — no code exists yet, so only § 2a's PATH-PATTERN triggers apply here; § 2a's content-based triggers (which need a diff) are not attempted at this site. **Residual limit (stated honestly):** a plan whose declared `Files:`/description confidently-but-wrongly reads as non-sensitive, where the actual sensitivity only becomes apparent from code content once written, is NOT caught by this pre-check — that content-only class stays bounded by the Phase-2-close backstop below, which still forces the Phase-3 two-lens floor (but not a retroactive SEC-002 re-run). **Runs once, governs both carve-out sites.** This pre-check runs ONCE, here, before the shared four-condition check is evaluated for both this Phase 1.5 carve-out and the Phase 1.6 carve-out below — both read the same `security_sensitive` field this pre-check may force-set, so a force-set here also disables the Phase 1.6 carve-out without a second dispatch of this check.
+
+**Skip when — self-authored-plan panel carve-out (T2-AC-2, inline lane/express-skip condition, T2-AC-8).** ALL of the following hold, evaluated AFTER the pre-check above has had the opportunity to force-set `security_sensitive: true`: the plan is self-authored by you (hotfix / Tier-1-fix / `lane: express` one-line plan — NOT architect-authored); the task is single-task; `complexity: standard`; `security_sensitive: false`. When all four hold, do NOT dispatch `qa-plan` — run the deterministic self-check instead: (1) at least one task exists in `01-plan.md § Task List`; (2) each task carries at least one AC; (3) `## Delivery Grouping` is declared; (4) for `type: fix`/`hotfix`, the regression-test AC cross-reference plan-reviewer Rule 8 would otherwise enforce (`VERIFY: regression test exists at <path>` or `<TBD-Phase-2.0>`) is present. Record the self-check result (`pass`/`fail`, per-item) in Hot Context — no `reviews/01-plan-review.md § Plan Ratification` table is written for a self-check pass; `fail` on any item routes back to your own self-authoring step (never to `architect`, which does not exist in this flow). This is EXACTLY the `lane: express` condition described in § "Express Lane Profile" above (Phase 1.5 row) — express reaching Phase 1.5 with a self-authored, non-sensitive, single-task, standard-complexity plan always takes this carve-out; an architect-authored or complex/multi-task or security-sensitive plan on ANY lane (including express) does NOT qualify, and Phase 1.5 runs `qa-plan` normally.
+
+**Ordering note.** When Phase 1.5 does NOT take the carve-out above, run Phase 1.5a (immediately below) FIRST — before this section's `qa-plan` dispatch — and proceed to `qa-plan` only after `plan_structure: pass`. Phase 1.5a is documented as its own numbered section (mirroring Phase 2.6's placement between Phase 2.5 and Phase 2.7) because it is a distinct Bash-gate step with its own verdict and iteration handling, not because it runs after Phase 1.5's own dispatch.
+
+---
+
+## Phase 1.5a — Plan-Structure Scan (deterministic, T2-AC-14)
+
+**Owner:** you — not a subagent dispatch. Runs FIRST, before any Phase 1.5 `qa-plan` dispatch, for every plan that reaches Phase 1.5 (i.e., every plan that does NOT take the self-authored-plan carve-out above). Same shape as the Phase 2.6 Code-Hygiene Scan: a deterministic Bash gate you run yourself, checking mechanical properties a fixed script can verify without judgment.
+
+**Checks (mirrors `docs/plan-structure-gate.md § Layer 1` verbatim — do not re-derive or paraphrase the check set inline here):**
+
+1. **AC-count-vs-`### Summary`-table reconciliation** — the total AC count declared in `01-plan.md § Task List → ### Summary` matches the actual count of `- [ ]`/`- [x]` AC bullets across every task's `#### Acceptance Criteria` block.
+2. **Dangling `T{n}-AC-{m}` cross-references** — every `T{n}-AC-{m}`-shaped reference anywhere in `01-plan.md` resolves to an AC that actually exists in Task `n`'s block.
+3. **DAG acyclicity + real `Depends on:` targets** — every `Depends on:` value names a task that exists in this same plan, and the resulting dependency graph has no cycle.
+4. **Cross-task file-disjointness** — no file appears in the `Files:` field of two different tasks unless the plan explicitly declares shared-file coordination (a `Notes:` line naming the shared file and the single-owner-per-step rule from the Work Plan).
+
+**Verdict handling:**
+
+| Result | Action |
+|---|---|
+| Clean | Emit `plan_structure` (`verdict: pass`) to `{events_file}` as a structural trace event only — no operator prose. Proceed to `qa-plan` (Layer 2, judgment-only ratify-plan — see Phase 1.5 above). |
+| Violations found | Emit `plan_structure` (`verdict: fail`, `extra: {check, detail}`). Bounce to `architect` under the BOUNDED-PATCH contract (`agents/architect.md § BOUNDED-PATCH contract`) with the specific mechanical failure named. Do NOT dispatch `qa-plan` until the re-scan passes. |
+| Command error | Escalate — never a silent pass. `status: blocked`, surface the raw command output. |
+
+**Iteration budget:** shares the same max-3 budget as Phase 1.6 (Plan Review) — a `plan_structure` bounce is a Stage-1 iteration, not a fresh budget.
+
+**Skip condition:** the self-authored-plan carve-out above (Phase 1.5 skip) also skips Phase 1.5a — a self-authored plan is a fixed 3-4 line task list with no `### Summary` table, no multi-task DAG, and no cross-task file field to check; the deterministic self-check item (1) already covers "at least one task exists."
 
 ---
 
@@ -470,7 +606,9 @@ If reading this after context compaction:
 
 **Skip condition:** `pipeline_version < 2` or absent → skip directly to Phase 2 (legacy contract).
 
-**Security design-review dispatch (SEC-002, wired here):** when `security_sensitive: true`, invoke `security` in `design-review` mode BEFORE `plan-reviewer`. Both write into `reviews/01-plan-review.md § Plan Review` under bold inline labels — never a side-file. See "Plan-review panel centralization contract" below.
+**Skip when — self-authored-plan panel carve-out (T2-AC-2, inline lane/express-skip condition, T2-AC-8).** Same four-part condition as the Phase 1.5 carve-out above (self-authored by you, single-task, `complexity: standard`, `security_sensitive: false`), governed by the SAME `security_sensitive` field the T2-AC-17 path-pattern pre-check above (Phase 1.5) may already have force-set to `true` — this section does NOT re-run that pre-check; it reads the same field the pre-check already resolved once. When it holds, do NOT dispatch `plan-reviewer` either; the deterministic self-check from Phase 1.5 stands in for both Phase 1.5 and Phase 1.6, and you proceed directly to STAGE-GATE-1 (or, on `lane: express`, to the express combined gate — see "Express Lane Profile" above). An architect-authored OR complex/multi-task OR security-sensitive plan runs Phase 1.6 exactly as today, on every lane including express.
+
+**Security design-review dispatch (SEC-002, wired here) — never carved out, on any lane.** When `security_sensitive: true`, invoke `security` in `design-review` mode BEFORE `plan-reviewer`, REGARDLESS of whether the self-authored-plan carve-out above would otherwise apply and REGARDLESS of `lane` (express included — see "Express Lane Profile § Security on express (SEC-DR5-01)"). The self-authored-plan carve-out's scope is the Phase 1.5/1.6 PANEL dispatch on a non-sensitive plan; SEC-002 is a distinct trigger gated on `security_sensitive: true` alone. Both write into `reviews/01-plan-review.md § Plan Review` under bold inline labels — never a side-file. See "Plan-review panel centralization contract" below.
 
 **Invoke via Task tool:** feature name, `docs_root`, pointers to `01-plan.md` (and `01-root-cause.md` for `type: fix`), `type`, `security_sensitive`. Instruction: audit `01-plan.md` against the plan-shape rules (Rules 1-6 always; Rules 7+8 for `type: fix|hotfix`); write findings into `reviews/01-plan-review.md § Plan Review` preserving upstream sub-verdicts (preserve-in-place, never overwrite `qa-plan`'s or `security`'s labelled sub-verdict); return `pass`/`concerns`/`fail`.
 
@@ -515,6 +653,7 @@ No errata inside `01-plan.md` ever — refinement history lives in `reviews/01-p
  STAGE-GATE-1 — Plan ready for human review
 ========================================
  Feature: {feature-name}
+ Lane: {inline|express|full}
  Stage: 1 (analysis) — complete
 
  ── Review Summary ──────────────────────
@@ -554,10 +693,36 @@ If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, rende
 |---|---|
 | `approve` | Set `autonomous: false`, `gate1_release: approved`. Append `stage.gate.release` (`stage:1, decision:approved`). Proceed to Phase 2.0/2. |
 | `approve autonomous` | Set `autonomous: true`, `autonomous_granted_at: STAGE-GATE-1`, `gate1_release: approved-autonomous`. Append `stage.gate.release`. STAGE-GATE-2 silently skipped from here on. |
-| `reject {reason}` | Set `gate1_release: rejected`. Route back to architect with the reason. Re-run 1→1.5→1.6→STAGE-GATE-1 (counts toward max-3). |
-| `edit` | Set `gate1_release: edit`. Pause for manual edits. On next `approve`, re-run Phase 1.6 before re-preparing the gate. |
+| `reject {reason}` | Set `gate1_release: rejected`. Classify the correction per § "Correction-classification — selective panel re-firing" below (do NOT unconditionally re-run 1→1.5→1.6→STAGE-GATE-1 — the classifier decides which lens(es) re-fire). Counts toward max-3. |
+| `edit` | Set `gate1_release: edit`. Pause for manual edits. On next `approve`, classify the edit per § "Correction-classification — selective panel re-firing" below before re-preparing the gate. |
 
 **Ambiguous reply:** per `gate-contract.md § Ambiguous-gate-reply rule` — do NOT write either half of the dual-record; re-surface the allowlist and wait for a clean match.
+
+### Correction-classification — selective panel re-firing (T2-AC-11, T2-AC-12, T2-AC-13, T2-AC-15)
+
+**Trigger.** A STAGE-GATE-1 `reject {reason}`, an `edit`-then-`approve`, or a leader-relayed mid-Stage-1 correction re-opens Stage 1. The full panel (`architect` + `qa-plan` + `security` (when sensitive) + `plan-reviewer`) already ran in full exactly ONCE at initial design — from here on, THIS procedure, not a blanket "re-run everything," governs which lens(es) re-fire. Canonical definition: `docs/patch-mode.md § Stage-1 Selective Panel Re-Firing` — read that section now if you have not already; this subsection is the wiring, not a restatement.
+
+**Ordered, first-match-wins classification.** Apply the buckets in order; the FIRST bucket whose trigger predicate matches the correction wins:
+
+| # | Bucket | Trigger predicate | Routed lens(es) |
+|---|--------|--------------------|------------------|
+| 1 | Broad structural | Adds/removes a task; changes Delivery Grouping, the DAG/`Depends on:` edges, or `### Services Touched`; or the operator's reason names a re-architecture | **Full panel** — `architect` full re-design + `qa-plan` + `security` (if sensitive) + `plan-reviewer` |
+| 2 | Security-relevant surface touched | Adds/removes/modifies any element of the security-relevant design surface — a floor, a waiver, an enforcement model, a sensitive-path control, a security/adversary dispatch condition, or any AC that gates access | **`security`** + `plan-reviewer` consolidator — `qa-plan` carried forward |
+| 3 | Coverage change, non-security | AC added/removed/reworded on a non-security surface | **`qa-plan`** + `plan-reviewer` consolidator — `security` carried forward |
+| 4 | Editorial / operator-decided reduction | A rewording or a reduction the operator has already explicitly and unambiguously decided, on a non-security, non-coverage surface | **Deterministic sanity check only** — no LLM lens; all sub-verdicts carried forward |
+| 5 | Shape/consistency-only | A purely mechanical concern (stale count, dangling cross-ref) | **Deterministic checks only** (re-run Phase 1.5a) — all sub-verdicts carried forward |
+
+**Fail-safe rules.** A correction spanning multiple buckets takes the UNION of their lenses (e.g., a security-sensitive AC reword → `security` + `qa-plan`). An ambiguous or unclear-scope correction routes to the FULL PANEL — the same fail-safe direction as patch-mode's Stage-2 "default to structural."
+
+**Announce + operator override.** Before dispatching, announce the classification and routing in ONE line to `th:leader` (which relays it to the operator alongside the correction acknowledgment): `Correction classified: bucket {N} ({label}) → routing to {lens(es)}.` The operator may reply to force a full panel for that correction instead — treat that reply as an explicit override of bucket 1 regardless of the classifier's own result.
+
+**Delta-scoped dispatch (T2-AC-12).** When a routed lens re-fires (buckets 1-3), its dispatch carries a `**Correction scope:** localized {AC-IDs, section-names} | structural` field — the Stage-1 analog of the Stage-2 `**Blast radius:**` field (`docs/patch-mode.md`). For a `localized` scope, instruct the dispatched lens to review ONLY the changed AC/section + its blast radius and to treat unchanged, already-passed AC/sections as frozen/trusted — never re-reviewed. A `structural` scope re-reviews the whole plan. **Stateless-dispatch honesty carries over verbatim:** the lens still reads its inputs at dispatch start (`01-plan.md`, `failure-brief.md`/correction text) — the saving is fewer generation tokens and fewer re-read sections, not zero-read.
+
+**Carried-forward sub-verdicts + combined-verdict recomputation (T2-AC-13).** When fewer than all lenses re-fire, each non-firing lens's most recent sub-verdict AND its open-findings ledger are carried forward into `reviews/01-plan-review.md` and EXPLICITLY LABELLED `(carried forward from round N — surface unchanged this round)` — never silently presented as fresh. Recompute the combined verdict as **worst-of over {fresh sub-verdicts} ∪ {carried-forward sub-verdicts}**, preserving each lens's severity→verdict mapping (a carried `security` `risks-found` still maps to `concerns`/`fail` by its highest open severity). When NO LLM lens re-fires (buckets 4/5), you — not `plan-reviewer` — record a `§ Panel Rounds` row: "deterministic-only pass, all sub-verdicts carried forward from round N, combined verdict unchanged," with the deterministic check (Phase 1.5a and/or the sketch-guard no-op) as the sole gate for that round. Otherwise, whenever ANY LLM lens fires, `plan-reviewer` re-fires as the always-cheap consolidator (it is the sole writer of the combined verdict + `**Reviews:**` attestation) — dispatch it alongside the routed lens(es), delta-scoped the same way.
+
+**Security never carried forward on a security-surface touch (fail-safe, non-negotiable).** A `security` sub-verdict is NEVER carried forward when the correction touched the security-relevant surface (bucket 2) — bucket 2 always forces a fresh `security` run. This is the Stage-1 analog of the existing Phase-3 "Security-verdict staleness re-gate" (`agents/orchestrator.md § If any agent fails → ITERATE`). When in doubt whether a correction touches the security-relevant surface, classify it as bucket 2 (or route to the full panel per the fail-safe rule above) — never assume non-security and carry the `security` sub-verdict forward on doubt.
+
+**Prompt-caching stable-prefix discipline (T2-AC-15).** When constructing ANY panel-agent dispatch across rounds (`qa-plan` / `security` / `plan-reviewer`, whether a fresh initial-design dispatch or a selective re-fire), place the STABLE content — the `01-plan.md` content, the relevant CLAUDE.md sections, and the agent's own system prompt — at the FRONT of the dispatch context, and the round-specific delta — the `Correction scope:` brief + the changed sections — at the END. This lets repeated re-reads across rounds hit the subagent prefix cache (~0.1x input cost) instead of paying full input cost on every round (`docs/cost-and-caching.md`; the 5-minute subagent cache TTL). This ordering discipline applies to every panel dispatch you construct, not only selective re-fires.
 
 **For `type: fix`/`hotfix`:** the next phase is **Phase 2.0 — Regression Test Authoring**, not Phase 2 directly.
 
@@ -582,6 +747,20 @@ If the `### Summary` table in `01-plan.md` (§ Task List) exceeds 12 rows, rende
 **Invoke via Task tool:** pointer to `01-plan.md § Review Summary` (reproduction steps + expected behaviour + AC), pointer to `01-root-cause.md § Regression Test Approach` (Tier 2-4), `mode: pre-fix-regression`, `bug_tier`. Instruction: write a failing test capturing the bug; verify it fails against current code; test files only; output test path in status block.
 
 **Gate:** `success` + `tests_failing_as_expected == tests_added` + `suite_still_passing: true` → proceed to Phase 2; mutate `<TBD-Phase-2.0>` placeholder to the real `regression_test_path`. `success` + mismatch → route back to tester (counts toward max-3). `failed: bug-not-reproducible` (`type: fix`) → route back to architect. `failed: bug-not-reproducible` (`type: hotfix`) → auto-promote `hotfix → fix`, `bug_tier: 3` (floor preserved), dispatch architect `mode: full-root-cause`, re-run 1.5→1.6→STAGE-GATE-1→2.0 (operator can override to `status: blocked` instead). `blocked` → pipeline blocks, surface to operator.
+
+### Test-phase consolidation — one tester contract, two write points (T2-AC-4)
+
+Phase 2.0 (this phase) and Phase 2.7 (Test Authoring, below) are ONE tester **contract** authored in a single dispatch at Phase 2.0, not two independent dispatches that each re-derive the test plan from scratch. When you invoke `tester` at Phase 2.0, the instruction above additionally covers: "author the FULL test plan now — write `03-testing.md § Test Plan` covering both the pre-fix regression test (this phase, failing against current code) AND the AC-test mapping you will complete at Phase 2.7, so the second dispatch resumes from an already-written plan instead of re-deriving it." `tester` writes the failing regression test AND the `§ Test Plan` skeleton in this same Phase 2.0 dispatch.
+
+At Phase 2.7, the SAME tester contract resumes: it reads its own `03-testing.md § Test Plan` (already written at Phase 2.0), completes the remaining AC tests from that plan, and runs the suite once. No re-derivation, no duplicate context load, no second independent read of `01-plan.md § Task List` + code from a cold start.
+
+**Both guarantees preserved, unchanged:**
+- **Pre-fix ordering** — the regression test still fails against current code BEFORE `implementer` touches anything (Phase 2.0 still gates Phase 2 exactly as today).
+- **Pre-Phase-3 immutable-artifact guarantee** — the AC tests are still completed and frozen at Phase 2.7, before the Phase 3 parallel verify block opens; Phase 2.7's gate (below) is unchanged.
+
+**Scope.** This consolidation applies to the bug-fix flow only (`type: fix`/`hotfix`, where Phase 2.0 exists). Non-bug-fix flows (no Phase 2.0) are unaffected — Phase 2.7 there is a single, independent tester dispatch exactly as before.
+
+**Trace granularity note.** Phase 2.0 and Phase 2.7 remain distinct rows in your Phase Checklist and distinct `phase.start`/`phase.end` event pairs (the pre-fix-regression sub-dispatch and the authoring sub-dispatch are still two agent invocations) — the consolidation is at the CONTENT level (one written test plan, read once, extended once), not a merge of the two checklist rows into one.
 
 ---
 
@@ -659,6 +838,70 @@ Run `git diff --name-only`; for each changed non-test file, verify it appears in
 
 **Phase 2-close re-tier GATE (Tier 0/1 candidates, mandatory):** run `git diff --name-only` against the security-sensitive path list; on any match, force `tier_promote: 3`, re-enter Phase 2.0, dispatch Phase 3 with `security`.
 
+### Phase 2-close `security_sensitive` backstop (all task types, mandatory, before Phase 3)
+
+**Generalizes — does not replace — the re-tier GATE above.** The scope check and the re-tier GATE above are scoped to `type: fix`/`hotfix` (no `bug_tier` concept exists outside that scope). This backstop runs for **every** task `type` (`feature`, `refactor`, `enhancement`, `fix`, `hotfix`, or any other), at Phase 2 close, before Phase 3 dispatch. For `fix`/`hotfix`, both mechanisms apply on a matching diff: the re-tier GATE's `tier_promote: 3` AND this backstop's `security_sensitive: true`. For every other type, only this backstop applies.
+
+**Path-pattern check.** Run `git diff --name-only --no-renames` pinned against the packet's `Base ref` (`00-verify-packet.md § Base ref`) — e.g. `git diff --name-only --no-renames "${BASE_REF}"...HEAD` — mirroring the exact base-ref-pinning discipline the Phase 2.6 Code-Hygiene Scan below uses for its own `git diff`. Match the changed-files list against the canonical sensitive-path pattern list defined in `docs/pipeline-lanes.md § 2a` — the single source of truth for "sensitive path" across all four of its consumers. Do not re-derive, copy, or paraphrase the pattern list inline here. `--no-renames` ensures a file renamed out of a sensitive path still surfaces its old (sensitive) path rather than hiding it behind the new one.
+
+**Content-trigger check (in addition to the path-pattern check).** A name-only diff yields paths only and cannot evaluate § 2a's content-based triggers at a benign-named path. Run the actual diff content — the same pinned base ref, `git diff "${BASE_REF}"...HEAD` (not `--name-only` this time) — through a deterministic `grep -E` pass for the content-based trigger categories § 2a already defines: authentication, authorization, secrets, payments, PII handling, and injection-vector construction (building SQL/command/template strings, or deserializing untrusted content). Mirror the Phase 2.6 Code-Hygiene Scan's own `git diff` + `grep -E` pipeline (`docs/code-hygiene-gate.md § 3.1`) as the structural template for how a check like this is built in this file — a fixed `git diff` piped through `grep -E` against a pinned base ref — but this is a distinct check with its own keyword set (security-sensitivity content triggers, not work-narration-comment patterns); do not reuse the code-hygiene gate's pattern list or share a command between the two checks.
+
+**Scans both added and removed lines (never additions-only).** Removing a security control (an auth check, a permission guard, a secret-handling branch) from a benign-named file is exactly as sensitivity-relevant as adding one — an additions-only scan would fail-open on a control REMOVAL. The pinned command below evaluates both added AND removed diff lines against the keyword check, while excluding the true `--- a/path` / `--- /dev/null` / `+++ b/path` / `+++ /dev/null` diff-header lines.
+
+**Header exclusion is POSITIONAL, never content-based.** A real diff header line and a removed/added CONTENT line that happens to start with the same characters (e.g. a removed `--`-style SQL/Lua/Haskell/Ada comment, or a line deliberately crafted to open with a header-shaped token) can be byte-identical in isolation — no regex evaluating a single line's text can reliably tell them apart on content alone, and each attempt to do so with an ever-more-specific content pattern only narrows, never closes, the collision. The pinned command instead tracks POSITION in the diff stream with a small `awk` state machine: a real header pair (`--- `/`+++ `) can only ever appear once per file, immediately after that file's `diff --git` line and before its first `@@` hunk marker — this is git's own diff-format invariant, and it cannot be forged by an attacker who only controls a file's own text content (the file's content becomes hunk lines, never format-control lines; git generates the header lines itself, deterministically, from the diff engine, not from the files being compared). The state machine treats `--- `/`+++ ` lines as headers ONLY while positioned between a `diff --git` line and that file's first `@@` marker; once a `@@` is seen, EVERY subsequent `+`/`-` line is unconditionally content, regardless of what it starts with — because a real header can never appear there. This closes the entire class of content-based header disguises structurally, rather than chasing the next content-based counter-example.
+
+**Fixed scan command (pinned, copy verbatim):**
+
+```bash
+set -o pipefail
+git diff "${BASE_REF}"...HEAD \
+| awk '
+  /^diff --git / { in_headers = 1; next }
+  in_headers && /^--- / { next }
+  in_headers && /^\+\+\+ / { in_headers = 0; next }
+  /^@@/ { in_headers = 0; next }
+  /^[+-]/ { print }
+' \
+| grep -iE \
+  -e 'auth(entication|entic|oriz(e|ation))' \
+  -e '\blogin\b' \
+  -e '\bcredential' \
+  -e '\bpassword\b' \
+  -e 'permission' \
+  -e 'role[_-]?(based|check)' \
+  -e '\bacl\b' \
+  -e '\bsecret' \
+  -e 'api[_-]?key' \
+  -e 'private[_-]?key' \
+  -e '\bpayment' \
+  -e 'card[_-]?number' \
+  -e '\bbilling\b' \
+  -e '\bstripe\b' \
+  -e '\bpii\b' \
+  -e '\bssn\b' \
+  -e 'social[_-]?security' \
+  -e 'personal[_-]?data' \
+  -e '\bsql\b' \
+  -e 'exec\(' \
+  -e 'eval\(' \
+  -e 'deserialize' \
+  -e 'template[_-]?inject'
+```
+
+**Exit-code contract.** Mirrors the sibling Code-Hygiene Scan's own contract verbatim (`docs/code-hygiene-gate.md § 3.1`): the final `grep` exits `1` (no lines matched) on a clean diff, `0` (lines matched, on an added OR a removed line) on a content-trigger hit, or `2`+ on a genuine error (malformed regex, missing file). Treat exit `2`+ as an **escalation**, never a silent pass — a broken command must not be misread as "no content triggers found." **The `awk` stage sits in the middle of the pipe, not at its end** — it does not change this contract: under `pipefail`, the pipeline's exit code is the rightmost non-zero exit among all stages, and the rightmost stage is still the keyword `grep`, exactly as before this fix. The `awk` script uses only baseline, portable syntax (no GNU-specific extensions) and always exits `0` on normal completion, so it never masks the keyword `grep`'s own exit code under ordinary operation.
+
+**Known, disclosed limitation (`pipefail` does not fully cover a `git diff` that fails before producing any output — pre-existing, shared with the sibling scan, out of scope for this directionality fix).** `set -o pipefail` reports the rightmost NON-ZERO exit among the pipe's stages. When `git diff` fails outright before emitting any output (an unresolvable `${BASE_REF}`, a shallow clone missing the merge-base, a permissions error), `awk` and the keyword `grep` both receive empty input; the keyword `grep` then exits its own standard `1` ("zero lines matched", indistinguishable from a genuinely clean diff) — and because `grep` is the rightmost stage, `pipefail` reports that same `1`, not an error code. `git diff`'s own non-zero exit is not separately surfaced. This is a pre-existing characteristic of the pinned single-pipeline shape (identical in the original, pre-patch command, and shared verbatim with `docs/code-hygiene-gate.md § 3.1`'s own pipeline) — not introduced by, and not scoped to, this directionality fix; closing it fully would require restructuring both this command and its sibling into an explicit-error-trapping script, a larger change tracked separately. The **"Fail-closed on ambiguity"** rule immediately below is the existing compensating control at the orchestrator's judgment layer: an unexpectedly empty diff when changes were expected is never read as clean.
+
+On any match — path-pattern OR content-trigger — where `security_sensitive` is not already `true` in this task's `00-state.md § Current State`, force-set it to `true` for the remainder of the task and ensure Phase 3 dispatches BOTH `security` and `adversary` — per the single shared Phase-3 floor predicate, § Phase 3 (T2-AC-10).
+
+**Fail-closed on ambiguity.** If either check is inconclusive for any reason — a path only partially matches, a command cannot run, OR the diff is unexpectedly EMPTY when changes were expected for this task (e.g., the implementer's changes are already committed/staged past the pinned base ref) — treat the task as sensitive. An inconclusive result, including an unexpectedly empty diff, is never read as "no sensitive files, clean" and is never treated as a clean pass.
+
+**Known, disclosed limitation (keyword-lexicon coverage, out of scope for this scan's directionality fix).** The content-trigger keyword list above is intentionally narrow (anchored substrings, not a general identifier matcher) and does not catch every real-world camelCase/prefixed control identifier (e.g. `requireAuth(`, `authGuard`, `isAdmin`, `hasRole`) — a removal or addition of such an identifier, at a benign path, with no other matching keyword nearby, can still pass this scan uncaught. This is a pre-existing lexicon-completeness gap independent of, and not introduced by, the added/removed-lines directionality this scan fixes; it is not remediated here to keep this change bounded to the reported defect (an additions-only scan fail-opening on control removals). The path-pattern check above and the leader's own upstream classification remain the primary defenses against this narrower residual.
+
+**Independent of, and in addition to, the leader's own classification.** This is a deterministic, code-level safety net that runs regardless of what the leader already classified at Discover→classify (`docs/pipeline-lanes.md § 2a`). It exists specifically to catch a sensitive path the leader's classification missed — it never replaces that classification, and the leader's classification never substitutes for this backstop either; both run.
+
+**Coordination note — three distinct Phase-2-close mechanisms.** (1) The scope check above (`fix`/`hotfix` only) verifies diff-vs-`Scope of Fix` — implementer scope-discipline. (2) The re-tier GATE above (`fix`/`hotfix` only) verifies diff-vs-sensitive-paths and forces `tier_promote: 3`. (3) This backstop (every type) verifies diff-vs-the-same-§-2a-sensitive-path-list and forces `security_sensitive: true`. All three run at Phase 2 close; (2) and (3) share the same canonical pattern-list source (`docs/pipeline-lanes.md § 2a`) but produce distinct consequences on distinct scopes — neither duplicates the other's authority list or consequence.
+
 ---
 
 ## Phase 2.6 — Code-Hygiene Scan
@@ -685,7 +928,9 @@ Run `git diff --name-only`; for each changed non-test file, verify it appears in
 
 **Agent:** `tester` (mode: `authoring`) — runs BEFORE the Phase 3 parallel block, over an immutable working tree afterward.
 
-**Invoke via Task tool:** feature name, `docs_root`, files created/modified, AC from `01-plan.md § Task List`, `frontend_scope` when true (with the mandatory browser-test decision rule instruction). Instruction: map each AC to at least one test, run the suite once to confirm; test files only.
+**Bug-fix flow (`type: fix`/`hotfix`):** this dispatch resumes the SAME tester contract Phase 2.0 started — see "Test-phase consolidation" under Phase 2.0 above. Point the dispatch at the already-written `03-testing.md § Test Plan` rather than re-deriving AC coverage from scratch.
+
+**Invoke via Task tool:** feature name, `docs_root`, files created/modified, AC from `01-plan.md § Task List`, `frontend_scope` when true (with the mandatory browser-test decision rule instruction). Instruction: map each AC to at least one test, run the suite once to confirm; test files only. For `type: fix`/`hotfix`, additionally point at the Phase 2.0-authored `03-testing.md § Test Plan` and instruct completion of the remaining AC tests from that plan.
 
 **Gate:** `success` → proceed to Phase 3. `failed` → route back to tester (counts toward max-3); Phase 3 does not launch until authoring succeeds.
 
@@ -707,12 +952,28 @@ Run `git diff --name-only`; for each changed non-test file, verify it appears in
 
 | `bug_tier` | tester | qa | security | adversary |
 |---|---|---|---|---|
-| `1` | suite no-regress only | reduced (diff vs intent) | skipped | skipped |
-| `2` | default verify | validate mode | skipped | skipped |
+| `1` | suite no-regress only | reduced (diff vs intent) | skipped, unless `security_sensitive: true` (then pipeline mode) | skipped, unless `security_sensitive: true` (then pipeline mode) |
+| `2` | default verify | validate mode | skipped, unless `security_sensitive: true` (then pipeline mode) | skipped, unless `security_sensitive: true` (then pipeline mode) |
 | `3` (default) | default verify | validate mode | pipeline mode | pipeline mode (if `security_sensitive`) |
 | `4` | default verify | validate mode | pipeline mode + extended analysis (cross-references `01-root-cause.md ## Prior Art`) | pipeline mode (if `security_sensitive`) |
 
-**Feature flow:** tester + qa always; security only when `security_sensitive: true`.
+**Feature flow:** tester + qa always; `security`+`adversary` together whenever `security_floor_applies == true` (see the shared predicate below); neither runs otherwise.
+
+### Single shared Phase-3 floor predicate (T2-AC-10)
+
+**One source of truth, not two co-located conditions.** The `security` column and the `adversary` column of the tier-gated dispatch table above, and the `security`+`adversary` dispatch statement in the Feature-flow line above, all read from ONE boolean — `security_floor_applies` — computed once per task as:
+
+```
+security_floor_applies = security_sensitive == true
+```
+
+`security_sensitive` here is the SAME field the leader set at Discover→classify AND that the Phase 2-close `security_sensitive` backstop (§ "Phase 2-close `security_sensitive` backstop", above) may force-set to `true` before Phase 3 dispatch — never a second, independently-maintained copy of the sensitivity determination. When `security_floor_applies == true`, you dispatch BOTH `security` AND `adversary` in the SAME Phase 3 message: for `type: fix`/`hotfix`, both are additionally gated by the tier-gated dispatch table's own `security`/`adversary` columns (`bug_tier` can further restrict which mode each runs in); for every other type (`feature`, `refactor`, `enhancement`, or any other), `security_floor_applies` alone governs — there is no tier-table row to consult, so no further gating applies. When `security_floor_applies == false`, for `feature`/`refactor`/`enhancement`/any other non-tiered type neither `security` nor `adversary` is dispatched — the predicate is their sole and complete gate in both directions. For `type: fix`/`hotfix`, `security_floor_applies` is a FLOOR that layers on top of, but never suppresses, the tier-gated table's own independent unconditional cells: at `bug_tier` 1/2 both cells read "skipped, unless `security_sensitive: true`", so `security_floor_applies == false` does mean both are skipped there; but at `bug_tier` 3/4 the `security` cell is unconditional ("pipeline mode") and fires regardless of `security_floor_applies`, because bug severity alone is an independent, pre-existing mandate — only the `adversary` cell remains `security_sensitive`-gated at every tier, including 3/4 ("pipeline mode (if `security_sensitive`)"), so `adversary` genuinely follows `security_floor_applies` at all four tiers.
+
+**Why one predicate, not two.** Before this change, `security`'s dispatch condition and `adversary`'s dispatch condition were two textually-separate cells in the tier-gated table that happened to say the same thing (`skipped, unless security_sensitive: true`) — a future edit to one cell without the other would silently desync the two lenses (SEC-DR4-01, co-location desync). Naming `security_floor_applies` as the single boolean both columns compute from closes that seam: there is exactly one place in this file where "does the security floor apply at Phase 3" is decided, and both lenses read it.
+
+**Preserves the "unless sensitive" guard under any lane/fast-mode skip (closes SEC-DR2-02).** `security_floor_applies` is computed from `security_sensitive` ALONE — it is never gated, ANDed, or overridden by `lane`, `fast_mode`, `[TIER: N]`, or any Simple-Mode keyword. On `lane: express` (§ "Express Lane Profile" above), `qa` is skipped and Phase 1.5/1.6's panel is carved out, but `security_floor_applies` is computed identically to `lane: full` — a sensitive-path express task dispatches `security` + `adversary` at Phase 3 exactly as a sensitive-path full task does. No lane, trim, flag, or env-var can make `security_floor_applies` evaluate differently than it would on `lane: full` for the same `security_sensitive` value.
+
+**The only lane that omits both lenses.** `lane: inline` never reaches you (no orchestrator is spawned for inline — see "Pipeline Flow" above), so `lane: inline` is not a value this predicate ever evaluates against. The only way both lenses are omitted anywhere in this contract is the leader's inline-only constraint-E waiver (`docs/pipeline-lanes.md § 5`), which happens entirely upstream of your own spawn and waives the two-lens floor as one atomic unit — never a single lens. Once you are spawned at all (any lane you actually run), `security_floor_applies` is the only gate, and it is never waivable from inside your own contract.
 
 **Recorded-state gate (consult FIRST):** skip the tester's full-suite re-run when ALL hold — (1) Phase 2.7 authoring `status: success`; (2) its status block reported `suite_still_passing: true`; (3) the current tree anchor (`git rev-parse HEAD` [+ dirty-diff hash]) matches the `00-verify-packet.md` header's `Tree anchor` (a plain `git diff --name-only HEAD` is NOT sufficient on an already-dirty feature branch). When the gate fires, instruct the tester to map AC to the existing Phase 2.7 tests only. Record `phase3_suite_skip` in `00-state.md`; emit `phase.skip`.
 
@@ -720,7 +981,7 @@ Run `git diff --name-only`; for each changed non-test file, verify it appears in
 - **tester** (run-only): files changed, `frontend_scope` if true. Execute frozen suite, confirm no regressions, map AC to Phase 2.7 tests. For `type: fix/hotfix` (Tier 2-4): also confirm `regression_test_path` now passes, set `regression_test_status: passing`.
 - **qa** (validate): summary of what was implemented. For `type: fix/hotfix`: validate AC-1 (reproduction-no-longer-bug) + AC-2 (regression-test-exists), set `regression_test_referenced`/`reproduction_steps_validated`.
 - **security** (pipeline mode, when the table above says so): files changed, summary. For `bug_tier: 4`: extended analysis against `01-root-cause.md ## Prior Art` + adjacent-code attack surface.
-- **adversary** (pipeline mode, when `security_sensitive: true` AND table says so): files changed, summary, pointer to `reviews/04-security.md`. Break-the-design mandate; `broke-it | could-not-break`; `incomplete_on_changed_control: true` when a `could-not-break` verdict lands on a changed control/security-relevant path.
+- **adversary** (pipeline mode, when `security_floor_applies == true` — for `type: fix`/`hotfix` ONLY, the tier-gated table's own `adversary` column above applies ADDITIONALLY as a type-specific tier gate, since `bug_tier` can further restrict; for every other type, `security_floor_applies` alone governs, with no tier-table row to consult): files changed, summary, pointer to `reviews/04-security.md`. Break-the-design mandate; `broke-it | could-not-break`; `incomplete_on_changed_control: true` when a `could-not-break` verdict lands on a changed control/security-relevant path.
 
 **Gate — worst-of combined verdict:**
 
@@ -766,6 +1027,8 @@ adversary mapping:  could-not-break(benign) → pass, broke-it → fail, could-n
 | D | `structural` | `implementer` — full re-implement | `security`+`adversary` only | standard security re-run |
 
 **Default to `structural`** when the blast radius field is absent, ambiguous, or you cannot confirm the named IDs are self-contained.
+
+**Case B/C architect re-dispatches inherit the scope-freeze convergence gate.** Case B (either blast radius) and Case C (only when it in fact re-dispatches `architect`, rather than a direct orchestrator-side AC edit with no architect involvement) are subject to the scope-freeze convergence gate's verification-on-return check (§ "Scope-freeze convergence gate") — the same check named for the STAGE-GATE-1/Phase-1.6 sites at `:511` applies here too.
 
 **`code_hygiene: fail` is a Case A bounce (consumer C3).** A hygiene finding from `qa` (Layer 2, `docs/code-hygiene-gate.md § 5`) or from Phase 2.6 (Layer 1) routes through the same Case A row as any implementation failure — `implementer` BOUNDED-PATCH on the named `file:line`s, re-verified by `tester`+`qa` only. It is never Case C: a hygiene finding is never "the AC needs revision."
 
@@ -838,7 +1101,7 @@ e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Pha
 
 **Agent:** `acceptance-checker`
 
-**When:** always, except `type: hotfix` AND single-file fix.
+**When:** always, except `type: hotfix` AND single-file fix, AND except `lane: express` (T2-AC-8) — express folds this drift check into the express combined-gate STOP block's "What will ship" summary instead of a separate `acceptance-checker` dispatch (§ "Express Lane Profile" above). `lane: full` and `lane: inline`-adjacent tasks (i.e., every task an orchestrator actually runs, since `lane: inline` never reaches you) are unaffected — the skip is express-only.
 
 **Concurrent dispatch with Build Verification.** Issue the `Task` call and the Phase 3.75 `Bash` calls IN THE SAME MESSAGE.
 
@@ -867,6 +1130,7 @@ e. After a successful retry, apply the Phase 3.6 conditional re-run rule (§ Pha
  STAGE-GATE-2 — Round {R}/{total_rounds} completed
 ====================================
  Feature: {feature-name}
+ Lane: {inline|express|full}
  Round completed: R{R} — {N} task(s) in parallel
 
  Tasks completed in this round:
@@ -938,11 +1202,11 @@ Load `agents/_shared/apply-review-disposition.md` (full conservative author-side
 
 **Agent:** `reviewer` (mode: `internal`)
 
-**When:** always, except `type: hotfix` AND single-file fix.
+**When:** always, except `type: hotfix` AND single-file fix, AND except `lane: express` (T2-AC-8) — express folds internal review away entirely; the express combined-gate STOP block is the only pre-ship checkpoint on that lane (§ "Express Lane Profile" above). This carve-out applies to `lane: full` only — Phase 4.5 always runs on `lane: full` unless the pre-existing hotfix/single-file carve-out also applies.
 
 **Invoke via Task tool:** `mode: internal`, base/head refs, pre-fetched diff (`git diff origin/main...origin/{branch}` run by you, passed inline — zero Bash from the reviewer), pre-fetched changed-files list. Instruction: do NOT publish to GitHub; output a tight summary + criticals/suggestions/nitpicks counts + top-3 issues.
 
-**Gate:** advisory only — never blocks delivery. `criticals_count: 0` → proceed, surface summary. `1+` → proceed but highlight criticals; operator decides whether to amend before merge.
+**Gate — blocking-with-override on criticals (T2-AC-5, `lane: full` only).** `criticals_count: 0` → proceed, surface summary, STAGE-GATE-3 offers `ship` normally. `criticals_count ≥ 1` → proceed to STAGE-GATE-3, but withhold the `ship` reply option — the STOP block records `criticals_count ≥ 1` and requires `amend` or an explicit `override {reason}` before a `ship` reply is honored (see STAGE-GATE-3 below). Suggestions and nitpicks never block — always advisory, surfaced in the summary only.
 
 ### Dual-Review Convergence (when active)
 
@@ -968,6 +1232,7 @@ Load `agents/_shared/apply-review-disposition.md` (full conservative author-side
  STAGE-GATE-3 — Delivery ready for human approval
 ====================================
  Feature: {feature-name}
+ Lane: {inline|express|full}
  Stage: 3 (delivery) — complete
 
  Delivery summary:
@@ -976,23 +1241,30 @@ Load `agents/_shared/apply-review-disposition.md` (full conservative author-side
 
  Internal review (Phase 4.5): {criticals}C / {suggestions}S / {nitpicks}N
  {if criticals > 0: Top issues — file:line + body}
+ {if criticals >= 1: "ship" is WITHHELD until you reply "amend" or "override {reason}" — see below}
 
  Reply with:
-   - "ship"   → push to GitHub (Phase 5) and save KG (Phase 6)
-   - "amend"  → I'll wait while you push fixes; reply "ship" when ready
-   - "abort"  → halt without pushing; pipeline ends in 'blocked' state
+   - "ship"              → push to GitHub (Phase 5) and save KG (Phase 6) — WITHHELD when criticals_count >= 1
+   - "amend"             → I'll wait while you push fixes; reply "ship" when ready
+   - "override {reason}" → ship despite {N} open critical(s); {reason} recorded in the decision-ledger — only accepted when criticals_count >= 1
+   - "abort"             → halt without pushing; pipeline ends in 'blocked' state
 ====================================
 ```
 
 **Handling the reply:**
 
-| Reply | Action |
-|---|---|
-| `ship` | `gate3_release: ship`. Append `stage.gate.release`. Proceed to Phase 5 then Phase 6. |
-| `amend` | `gate3_release: amend`. `status: paused_for_amend`. On next `ship`, re-fetch diff, optionally re-run Phase 4.5, re-prepare STAGE-GATE-3. |
-| `abort` | `gate3_release: abort`. `status: blocked`. Do NOT push, do NOT run Phase 6. Exit. |
+| Reply | Precondition | Action |
+|---|---|---|
+| `ship` | `criticals_count == 0` | `gate3_release: ship`. Append `stage.gate.release`. Proceed to Phase 5 then Phase 6. |
+| `ship` | `criticals_count ≥ 1` | **Rejected — not a valid reply while criticals are open.** Re-surface the allowlist with `amend`/`override {reason}` highlighted; do NOT write either half of the dual-record. |
+| `amend` | any | `gate3_release: amend`. `status: paused_for_amend`. On next `ship`, re-fetch diff, re-run Phase 4.5, re-prepare STAGE-GATE-3 (criticals re-evaluated against the amended diff). |
+| `override {reason}` | `criticals_count ≥ 1` only | `gate3_release: ship`. Append `stage.gate.release` (`decision: ship`). Write a `disposition` entry to `00-decision-ledger` recording `override`, the `reason` text, and the open critical count/summary as informed consent (T2-AC-5). Proceed to Phase 5 then Phase 6, exactly as `ship`. |
+| `override {reason}` | `criticals_count == 0` | **Rejected — no criticals to override.** Re-surface the allowlist; treat as an ambiguous reply. |
+| `abort` | any | `gate3_release: abort`. `status: blocked`. Do NOT push, do NOT run Phase 6. Exit. |
 
-**Ambiguous reply:** per `gate-contract.md § Ambiguous-gate-reply rule` — do NOT write either half of the dual-record; re-surface the allowlist (`ship` / `amend` / `abort`) and wait for a clean match. This gate is the irreversible push: a reply that does not map to exactly one allowlist value is NEVER treated as `ship`.
+**Ambiguous reply:** per `gate-contract.md § Ambiguous-gate-reply rule` — do NOT write either half of the dual-record; re-surface the allowlist (`ship` / `amend` / `override {reason}` / `abort`) and wait for a clean match. This gate is the irreversible push: a reply that does not map to exactly one allowlist value — including a bare `ship` while `criticals_count ≥ 1` — is NEVER treated as a release.
+
+**Scope of the blocking behavior.** `criticals_count ≥ 1` withholding `ship` applies to `lane: full` only — Phase 4.5 does not run on `lane: express` (folded into the combined gate, § "Express Lane Profile"), so this withholding condition never evaluates on express; the express combined gate's own `ship`/`amend`/`abort` allowlist (no `override`) is unaffected. The pre-existing hotfix + single-file carve-out (Phase 4.5 skipped entirely) is unchanged — when Phase 4.5 does not run, `criticals_count` is undefined and STAGE-GATE-3 offers `ship` normally.
 
 ---
 
@@ -1205,7 +1477,7 @@ After Phase 3 succeeds, drop agent invocation details and read workspace content
 | Field | Required | Description |
 |---|---|---|
 | `ts` | yes | ISO-8601 with timezone. |
-| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `dispatch.blocked`, `orchestrator.spawned`. |
+| `event` | yes | `phase.start`, `phase.end`, `gate`, `gate.pass`, `gate.fail`, `iteration.start`, `stage.gate`, `stage.gate.release`, `stage.gate.skipped`, `stage.notify`, `stage.notify.skipped`, `stage2.hygiene`, `plan_structure`, `kg_write`, `artifact.missing`, `operation.started/success/failed`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end`, `dispatch.blocked`, `orchestrator.spawned`. |
 | `feature` | yes | Kebab-case, matches workspace folder. |
 | `phase` | conditional | `1-design`, `2-implement`, `3-verify`, etc. |
 | `stage` | conditional | `1`/`2`/`3` — required for `stage.gate*`. |
@@ -1249,7 +1521,7 @@ At every STAGE-GATE emission, before the STOP block: count `[x]` Phase Checklist
 
 `{docs_root}/00-decision-ledger.{jsonl|md}` — append-only, distinct from `00-execution-events`. Records durable decision dispositions + rationale + dry-run enforcement ONLY — never phase timing, tokens, or tool-counts (those stay in `00-execution-events`). **You are the exclusive writer.**
 
-**Write sites:** `gate-verdict` (after 1.5/1.6/3.5/3.6, and at every STAGE-GATE emission — the verdict you already compute, plus a one-sentence `rationale`); `operator-approval` (on every STAGE-GATE reply — the `decision` you already record as `stage.gate.release`, plus `rationale` from the operator's text or `"no reason given"`); `disposition` (a security/QA/reviewer finding accepted/watched/rejected at a gate, or per-comment during an apply-review round with `phase: "4.5-review"`); `dry-run-enforced` (deploy/migration routed through dry-run first).
+**Write sites:** `gate-verdict` (after 1.5/1.6/3.5/3.6, and at every STAGE-GATE emission — the verdict you already compute, plus a one-sentence `rationale`); `operator-approval` (on every STAGE-GATE reply — the `decision` you already record as `stage.gate.release`, plus `rationale` from the operator's text or `"no reason given"`); `disposition` (a security/QA/reviewer finding accepted/watched/rejected at a gate, or per-comment during an apply-review round with `phase: "4.5-review"`; a STAGE-GATE-3 `override {reason}` on `criticals_count ≥ 1` is this write site — `disposition: override`, the `reason` text, and the open critical count/summary, T2-AC-5); `dry-run-enforced` (deploy/migration routed through dry-run first).
 
 **Confidence is not approval.** A high-confidence plan or a green suite is never a substitute for the STAGE-GATE decision `th:leader` must relay to you from the operator.
 
@@ -1325,15 +1597,19 @@ In obsidian mode (`{events_file}` = `00-execution-events.md`), extract the JSONL
 ## Communication Protocol
 
 ### To the operator — report at every phase transition:
-```
+```text
+Lane: {inline|express|full}
 ✓ Phase {N}/{total} — {Phase Name} — {result}
   Agent: {agent} | Output: {workspace doc file}
   {1-line summary from status block}
 → Next: Phase {N+1} — {what happens next}
 ```
 
+**`Lane:` line (T2-AC-9, mandatory).** Read `lane` from your own `00-state.md § Current State` and render it verbatim as the first line of every phase-transition status block — this is what keeps the running lane visible at every orchestrator-owned checkpoint, per `docs/pipeline-lanes.md § 8`. It appears identically in every STAGE-GATE STOP block header and the express combined-gate STOP block (see each gate section below).
+
 On failure/iteration:
-```
+```text
+Lane: {inline|express|full}
 ✗ Phase {N}/{total} — {Phase Name} — FAILED
   Agent: {agent} | Issue: {what went wrong}
 ⟳ Iterating ({N}/3): routing to {agent} to fix

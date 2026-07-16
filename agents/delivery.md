@@ -32,7 +32,7 @@ This is a prompt-level floor — defense in depth that complements the determini
 - **NEVER** commit directly to main — always use a feature branch
 - **NEVER** force push (`--force`, `--force-with-lease`) — if push is rejected, diagnose and report
 - **ALWAYS** bump the project version once per PR at assembly (min one, max one) — this is the shipped default. **NEVER** bump when the orchestrator passes `skip-version: true` in the task context: that flag is set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (see Step 9.0). If you see `skip-version: true`, skip Step 9 entirely and log "Version bump skipped: repo-local deferral convention (skip-version: true)"
-- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `reviews/04-validation.md` (qa PASS/FAIL per AC) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings). If any AC lacks PASS, lacks a test, or security reports critical/high, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
+- **ALWAYS** re-derive completion criteria at the top of Step 0 (before any branch / commit / push) by reading `01-plan.md` § Task List (AC list) + `03-testing.md` (tests per AC) + `reviews/04-security.md` if it exists (critical/high findings) + `reviews/04-adversary.md` if it exists (most recently recorded verdict — `broke-it`, or `could-not-break` + `incomplete_on_changed_control: true` with no matching `disposition` entry in `00-decision-ledger.md` accepting the residual) — **lane-gated:** on `lane: full` (or absent) also read `reviews/04-validation.md` (qa PASS/FAIL per AC); on `lane: express`, `reviews/04-validation.md` is legitimately absent (`qa` never runs there) and `03-testing.md` alone is the acceptance evidence — see Step 0 below for the full per-lane branch. If any AC lacks PASS (per-lane evidence source), lacks a test, security reports critical/high, or adversary's recorded verdict resolves to an abort per the rule above, abort with `status: failed`. The orchestrator gates on Phase 3.5 / 3.6; this re-derivation is your secondary self-check that those gates produced consistent results. (Historical note: a `done.yml` artifact was previously specified for this purpose — deprecated 2026-05-21, see `agents/orchestrator.md` "Done.yml" deprecation banner.)
 - **ALWAYS** check if the remote branch is ahead before pushing (fetch + rev-list). If ahead, rebase first
 - **ALWAYS** check PR state before creating or updating a PR. If merged/closed, create a new branch
 - **Outward actions require operator approval.** The PreToolUse hook `dev-guard.sh` intercepts every `git push`, `gh pr create`, `gh pr merge`, and equivalent outward action unconditionally, and emits `permissionDecision: "ask"`. The **operator** must approve each call interactively — the delivery agent CANNOT auto-approve. Route publish actions normally; the gate escalates them to the operator at the point of execution. See `docs/dev-mode.md § Outward-Action Gate`.
@@ -95,16 +95,34 @@ Determine `{feature_name}` in this order:
 
 **Before doing anything else**, verify the verification stage actually passed. The orchestrator should have only invoked you after Phase 3 succeeded, but never trust that — re-verify directly from the workspaces.
 
+**On `lane: full` (or when `lane` is absent, legacy payload):**
+
 1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list (count and identifiers — `AC-1`, `AC-2`, …).
-2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC.
-3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table.
+2. Read `workspaces/{feature-name}/reviews/04-validation.md` (qa) and parse the AC results table. Count `PASS` vs `FAIL` per AC. **`bug_tier: 1` exception (`type: fix`/`hotfix` only):** per `agents/ref-special-flows.md § "Full workspaces artifact set"`, Tier 1 produces a simplified `reviews/04-validation.md` (≤15 lines, no per-AC table) — read its simplified pass/fail statement instead of a per-AC table; there is no per-AC breakdown to parse on this tier.
+3. Read `workspaces/{feature-name}/03-testing.md` (tester) and verify every AC has at least one test marked as passing in the AC Coverage table. **`bug_tier: 1` exception:** `03-testing.md` is suite-no-regress only on this tier (no per-AC coverage table, per the same artifact-set table) — verify instead that the suite ran with no regressions.
 4. If `reviews/04-security.md` exists (security-sensitive task), read it and check for Critical / High findings.
 
-**Abort criteria — return `status: failed` immediately if:**
-- Any AC is missing a `PASS` in `reviews/04-validation.md`.
-- Any AC has no test in `03-testing.md` AC Coverage table.
+**Abort criteria (full) — return `status: failed` immediately if:**
+- **`bug_tier` absent, or `2`/`3`/`4`:** Any AC is missing a `PASS` in `reviews/04-validation.md`.
+- **`bug_tier` absent, or `2`/`3`/`4`:** Any AC has no test in `03-testing.md` AC Coverage table.
+- **`bug_tier: 1` only:** `reviews/04-validation.md`'s simplified statement is not an unambiguous pass, OR `03-testing.md` reports a regression or a suite failure. (Tier 1 never has a per-AC table on either artifact — the two criteria above do not apply to it.)
 - `reviews/04-security.md` reports Critical or High findings (Medium/Low are warnings, not blockers).
-- Any expected workspace doc is missing.
+- `security_sensitive: true` (i.e. `security_floor_applies == true` per `agents/orchestrator.md § "Single shared Phase-3 floor predicate"`) and `reviews/04-security.md` is absent — the floor predicate guarantees `security` ran on a sensitive-path task regardless of lane; a missing report means the orchestrator failed its own dispatch, not a legitimate skip. When the same predicate also required `adversary` (`security_floor_applies == true`), apply the identical check to `reviews/04-adversary.md`.
+- `reviews/04-adversary.md` exists (per the predicate above) — read the file's final/most-recent verdict line: if `broke-it` → abort; if `could-not-break` + `incomplete_on_changed_control: true` → check `00-decision-ledger.md` for a matching `disposition` entry accepting the residual — if none exists, abort; if one exists, proceed. Presence alone (checked by the criterion above) is not sufficient — the recorded content must resolve to a benign state before delivery proceeds.
+- Any expected workspace doc is missing (`bug_tier: 1` never expects `01-root-cause.md`, `02-regression-test.md` when Phase 2.0 was skipped, or a per-AC table in either acceptance artifact — see `agents/ref-special-flows.md § "Full workspaces artifact set"` for the tier-conditional artifact list).
+
+**On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`):** `qa` never runs on this lane — the operator's combined-gate review substitutes for the `qa` validate pass, the same lane contract `agents/tester.md § "Express lane — one combined dispatch, same two modes"` already documents on the tester side. `reviews/04-validation.md` is legitimately ABSENT by design on this lane, never a missing artifact — do NOT require it to exist or to contain a PASS table.
+
+1. Read `workspaces/{feature-name}/01-plan.md` § Task List and extract the AC list.
+2. Read `workspaces/{feature-name}/03-testing.md` and verify every diff-scoped AC has at least one passing test. This is the tester's combined authoring+verify result (Phase 2.7 and Phase 3 collapsed into one dispatch on this lane) — it substitutes for `qa`'s AC results table as the acceptance evidence on `lane: express`.
+3. If `reviews/04-security.md` exists (a sensitive-path express run still ran SEC-DR5-01/Phase-3 security), read it and check for Critical / High findings, identically to full.
+
+**Abort criteria (express) — return `status: failed` immediately if:**
+- Any diff-scoped AC has no passing test in `03-testing.md`.
+- `reviews/04-security.md` reports Critical or High findings, when it exists.
+- `03-testing.md` itself is missing — the one acceptance-evidence artifact express always produces.
+- `security_sensitive: true` (i.e. `security_floor_applies == true` per `agents/orchestrator.md § "Single shared Phase-3 floor predicate"`) and `reviews/04-security.md` is absent — the floor predicate guarantees `security` ran on a sensitive-path task regardless of lane; a missing report means the orchestrator failed its own dispatch, not a legitimate skip. When the same predicate also required `adversary` (`security_floor_applies == true`), apply the identical check to `reviews/04-adversary.md`. This criterion never extends to `reviews/04-validation.md`, which remains express's one intentional, by-design absence (qa never runs on this lane).
+- `reviews/04-adversary.md` exists (per the predicate above) — read the file's final/most-recent verdict line: if `broke-it` → abort; if `could-not-break` + `incomplete_on_changed_control: true` → check `00-decision-ledger.md` for a matching `disposition` entry accepting the residual — if none exists, abort; if one exists, proceed. Presence alone (checked by the criterion above) is not sufficient — the recorded content must resolve to a benign state before delivery proceeds.
 
 When aborting, append a `## Delivery` section to `workspaces/{feature-name}/00-state.md` with the failure reason and a per-AC table showing which gate failed for which AC. Do NOT create a branch, do NOT commit.
 
@@ -312,17 +330,6 @@ Example:
 - Skip if `docs/knowledge.md` does not exist.
 - Deduplicate — skip if the entity name already appears in the file.
 - One bullet per entity; omit entities that only triggered `add_observations` (already cross-linked in a prior run).
-
-### Step 5c — Archive Spec (if valuable)
-
-If the feature was non-trivial (had >2 AC or documented significant decisions), archive the final spec for future reference:
-
-1. Create `docs/specs/` directory if it doesn't exist
-2. Copy the `## Review Summary` section of `workspaces/{feature-name}/01-plan.md` to `docs/specs/{feature-name}.md`
-3. Add a header line: `**Status:** DELIVERED | **Date:** {date}`
-4. Stage the file: `git add docs/specs/{feature-name}.md`
-
-**Skip if:** the feature was a simple bug fix, hotfix, or had ≤2 AC. Only archive specs that document significant decisions or complex requirements.
 
 ### Step 6 — Update README.md
 
@@ -600,6 +607,8 @@ Move the accumulated `[Unreleased]` entries (including anything assembled from f
 
 ### Step 9b — Definition of Done (DoD) checklist
 
+**On `lane: express` (`agents/orchestrator.md § "Express Lane Profile"`):** delivery produces minimal artifacts only — `00-state.md` (state), `00-execution-events.*` (events), and `01-plan.md` (the self-authored plan) — no full `02-implementation.md`/`03-testing.md`-adjacent documentation set beyond what the express dispatches themselves already wrote. The lint/build gates below are scoped to the diff's changed files (`git diff origin/main...HEAD --name-only`) rather than a full-tree run, mirroring Phase 3.75's own scoping in the same profile ("3.75 — Build Verification" row). On `lane: full` (or when `lane` is absent), the checklist below runs full-tree, unchanged.
+
 **Recorded-state gate (consult this FIRST):** Before running any Golden Command, check whether Phase 3 verify already recorded a green outcome. The gate is satisfied by the recorded outcome — WITHOUT re-running — when ALL three of the following are present:
 1. `03-testing.md` verify section reports no regressions (the tester wrote this artifact in Phase 3).
 2. The tester status block contains `regression_test_status: passing` and `suite_still_passing: true`.
@@ -653,10 +662,10 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 ### Step 9c — Acceptance Matrix
 
-Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Save it to `docs/specs/{feature-name}/acceptance-matrix.md` (create the folder if it does not exist):
+**On `lane: full` (or when `lane` is absent):** Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/reviews/04-validation.md` as a new `## Acceptance Matrix` section — an addition, never a rewrite of qa's existing `## Acceptance Criteria Results` content:
 
 ```markdown
-# Acceptance Matrix: {feature-name}
+## Acceptance Matrix
 
 | AC | Description (1 line) | Test (file:line) | QA evidence (file:line) | Security |
 |----|----------------------|------------------|-------------------------|----------|
@@ -664,7 +673,17 @@ Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-t
 | AC-2 | {gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
 ```
 
-This file becomes part of the PR body in Step 11.2. Stage it together with the other delivery artifacts in Step 10.0 (`git add docs/specs/{feature-name}/acceptance-matrix.md`). The path `docs/specs/` is tracked by git (not git-ignored), so the matrix is committed with the PR.
+**On `lane: express`:** `reviews/04-validation.md` is legitimately absent — `qa` never ran on this lane (Step 0 above). Do NOT create it. Build the same matrix shape from `01-plan.md` § Task List (AC list), `03-testing.md` (the tester's combined authoring+verify evidence, which substitutes for the QA-evidence column), and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/03-testing.md` instead, as a new `## Acceptance Matrix` section — the one acceptance-evidence artifact express always produces:
+
+```markdown
+## Acceptance Matrix
+
+| AC | Description (1 line) | Test (file:line) | QA evidence (file:line) | Security |
+|----|----------------------|------------------|-------------------------|----------|
+| AC-1 | {gist} | `auth.spec.ts:42` PASS | n/a (express — tester combined result) | clean |
+```
+
+**Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body at Step 11.2, which is the durable, human-facing surface for this content; Step 10.0 does not stage `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
 
 ### Step 9d — Reviewability size gate
 
@@ -710,7 +729,7 @@ Before staging, reconcile the PR description (or runbook) against the shipped co
 ```
 git add CLAUDE.md CHANGELOG.md
 git add .claude-plugin/plugin.json .claude-plugin/marketplace.json  # ONLY if version was bumped in Step 9 (skip if Step 9.0 skipped)
-git add docs/                 # only if created/modified in Step 5b or 5c (includes docs/specs/ acceptance matrix)
+git add docs/                 # only if created/modified in Step 5b (docs/knowledge.md) — never docs/specs/: no pipeline spec or acceptance matrix is ever staged into the product repo (see Step 9c)
 git add README.md             # only if modified in Step 6
 git add openapi/openapi.yaml  # only if updated in Step 8
 git add changelog.d/{pr-slug}.md  # ALWAYS stage the fragment when one was written (feature-mode or release-mode before assembly)
@@ -881,7 +900,7 @@ When deletions dominate (deletions > 2× additions, or the change is relocation-
 - **After:** {observable behaviour after this PR}
 
 ## Acceptance Matrix (mandatory)
-{paste the table from docs/specs/{feature-name}/acceptance-matrix.md}
+{paste the table from workspaces/{feature-name}/reviews/04-validation.md § Acceptance Matrix on `lane: full`, or workspaces/{feature-name}/03-testing.md § Acceptance Matrix on `lane: express` (Step 9c)}
 
 ## Definition of Done (mandatory)
 - [x] Lint: {command} → PASS
@@ -1438,9 +1457,6 @@ Append delivery summary as a `## Delivery` section to `workspaces/{feature-name}
 
 ## docs/knowledge.md Updated
 - {entries added, or "No updates needed"}
-
-## Spec Archived
-- {yes → `docs/specs/{feature-name}.md` | no → "Skipped (≤2 AC)" | N/A}
 
 ## README.md
 - Updated: {yes/no}
