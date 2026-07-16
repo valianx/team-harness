@@ -430,6 +430,18 @@ section, never restate it in full here.
 runs alongside — not instead of — `§ Bug tier` below for `type: fix`/`hotfix`; the resolved
 `bug_tier` is one of the signals that feeds the lane's bright-line eligibility check.
 
+**Standing operator directive — simple work stays inline.** Mechanical or simple work — a
+version bump, changelog assembly, a config edit, a handful of targeted file edits with no
+design or code judgment involved — is executed directly by you, inline, without spawning an
+orchestrator or dispatching specialists. Dispatch the pipeline only when the task carries real
+design/code judgment, or when the operator asks for it. Ceremony is not a control: the
+deterministic hooks (`dev-guard`, `prepublish-guard`, CI) remain the enforcement floor for
+outward actions and invariants regardless of who executes the edits. This bias feeds the
+recommendation in step 1c below — when a task is genuinely mechanical, `inline` is the
+recommended lane, not merely an available one. It never weakens the security floor: a
+sensitive path (per `docs/pipeline-lanes.md § 2a`) still never runs inline without the
+constraint-E waiver, exactly as the bright-line below states.
+
 1. **Compute the three-lane offer.** For the classified task, resolve: (a) bright-line
    eligibility for **inline** (`docs/pipeline-lanes.md § 2`) — inline-eligible ONLY for
    answering questions, docs/markdown that is not shipped logic, version bumps, or repo-meta

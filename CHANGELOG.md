@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `agents/architect.md` now declares a `scope_frozen` boundary at the approach checkpoint and classifies any later scope expansion as `new-information` or `known-at-freeze`; provenance-scaled root-cause verification (T1/T2/T3) reuses a byte-consistent taxonomy with the leader.
 - Delivery no longer commits a pipeline spec/acceptance-matrix into the product repo's `docs/specs/` — the acceptance matrix is embedded in the PR body instead, on every lane.
 - `/th:release` no longer dispatches the orchestrator/delivery agent: the release cut (both batch and `--with` inline modes) is a fixed mechanical edit sequence executed directly by the leader — the three-site version invariant is enforced deterministically by `prepublish-guard` + CI, and pushes/PR-create stay gated by dev-guard.
+- `agents/leader.md` § Lane classification gains a standing directive: simple/mechanical work is executed inline by the leader (no orchestrator spawn); the pipeline is dispatched only for tasks with real design/code judgment or on operator request. The security floor is unaffected — sensitive paths still never run inline without the constraint-E waiver.
 
 ## [2.128.0] - 2026-07-13
 
