@@ -531,7 +531,7 @@ func TestTHUpdateCommand_CanonicalURLAndNoSubstitutableTokens(t *testing.T) {
 		t.Fatalf("read th-update.md: %v", err)
 	}
 
-	const canonicalURL = "https://valianx.github.io/team-harness/install-opencode.sh"
+	const canonicalURL = "https://valianx.github.io/team-harness/update-opencode.sh"
 	if !bytes.Contains(data, []byte(canonicalURL)) {
 		t.Errorf("th-update.md does not contain the canonical URL %q", canonicalURL)
 	}

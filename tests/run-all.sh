@@ -410,6 +410,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 154: update-opencode.sh cheap pre-check honors --non-interactive (AC-9)"
+echo "############################################################"
+if bash "$TESTS_DIR/test_update_opencode_sh.sh"; then
+    echo "update-opencode-sh-precheck: PASS"
+else
+    echo "update-opencode-sh-precheck: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

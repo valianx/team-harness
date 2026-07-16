@@ -328,11 +328,14 @@ func insertModelLine(transformed []byte, concrete string) []byte {
 }
 
 // applyModeByRole applies the installer-specific mode-by-role override:
-// the leader agent (the top-level coordinator) receives mode: primary; all
-// others — including orchestrator, the task-scoped execution engine — remain
-// subagent. This is layered ON TOP of the generic transform output and is NOT
-// part of the transform-conformance.json fixture (which binds only the generic
-// mapping).
+// the leader agent (the top-level coordinator) receives mode: primary and
+// displays as "TH Leader" in the opencode agent picker; all others —
+// including orchestrator, the task-scoped execution engine — remain
+// subagent with their name unchanged. This is layered ON TOP of the generic
+// transform output and is NOT part of the transform-conformance.json fixture
+// (which binds only the generic mapping). The CC-canonical source keeps
+// frontmatter name: leader — the display rename lives only in this
+// installer-layer projection, so it never reaches the Claude Code output.
 func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 	if agentName != "leader" {
 		// No change needed — generic transform already set mode: subagent.
@@ -344,6 +347,7 @@ func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 		return nil, fmt.Errorf("applyModeByRole parse: %v", err)
 	}
 	fm["mode"] = "primary"
+	fm["name"] = "TH Leader"
 	return serializeFrontmatterYAML(fm, body), nil
 }
 
