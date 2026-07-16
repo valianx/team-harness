@@ -15,7 +15,7 @@ Analyze the input: $ARGUMENTS
 
 1. **Read-only discovery** — lists all pending `changelog.d/` fragments and `version.d/` markers, derives the bump level and target version, and presents a summary for operator confirmation.
 2. **Confirmation gate** — waits for the operator to confirm before any version change or push.
-3. **Release cut** — routes through the orchestrator into delivery `release-mode`, which bumps all three synchronized version sites once, assembles `changelog.d/` fragments into the versioned CHANGELOG section, empties `version.d/`, tags, and pushes a `release/vX.Y.Z` branch.
+3. **Release cut** — executed directly by the leader as a mechanical, deterministic edit sequence (no orchestrator or delivery dispatch): bumps all three synchronized version sites once, assembles `changelog.d/` fragments into the versioned CHANGELOG section, empties `version.d/`, and pushes a `release/vX.Y.Z` branch. The three-site invariant is enforced deterministically by `hooks/ts/bodies/prepublish-guard.ts` + CI — no reasoning agent is needed to custody it.
 
 **Urgent single-PR override:** to release immediately after an urgent/security merge without waiting to batch other pending work, run `/th:release` right after the merge. The release step aggregates all pending fragments including the just-merged one.
 
@@ -85,26 +85,16 @@ Wait for operator reply. If the operator replies `n` or `no`, abort with no chan
 
 ---
 
-## Step 2 — Route to orchestrator in release-mode
+## Step 2 — Execute the release cut inline (leader, no dispatch)
 
-Pass to the `orchestrator` agent:
+The cut is a fixed, mechanical edit sequence. Execute it directly — do NOT dispatch the orchestrator or the delivery agent for this; there is no design or code judgment involved, and the three-site invariant is enforced by `prepublish-guard` + CI regardless of who edits the files.
 
-```
-Direct Mode Task:
-- Mode: deliver
-- Feature: release-v{X.Y.Z}
-- release-mode: true
-- target-version: {X.Y.Z}
-- Branch: release/v{X.Y.Z}
-- Summary: Release v{X.Y.Z} — aggregate {N} changelog.d/ fragments and {M} version.d/ markers; bump level {major|minor|patch}
-```
-
-The orchestrator routes to the `delivery` agent in `release-mode`, which:
-- Passes `skip-version: false` and `release-mode: true` to delivery
-- Delivery runs Step 9-R (bump-level aggregation), Steps 9.0–9.4a (version bump at all three sites), and Step 9e (CHANGELOG assembly)
-- Delivery empties `version.d/` after aggregation (Step 9-R-4)
-- Delivery creates and pushes the `release/v{X.Y.Z}` branch
-- Delivery opens a PR from `release/v{X.Y.Z}` → `main`
+1. Create the branch `release/v{X.Y.Z}` from up-to-date `main` (in a worktree per `docs/worktree-discipline.md` if other work is in flight).
+2. Bump the version to `{X.Y.Z}` at all three sites: `.claude-plugin/plugin.json` (`"version"`), `.claude-plugin/marketplace.json` (the `th` plugin entry's `"version"` — NOT the marketplace's own top-level `version`), and `CLAUDE.md` §3 (`**Current version:**`). Use targeted single-line replacements — never rewrite/reformat a whole JSON file to change one field.
+3. Assemble every `changelog.d/*.md` fragment, in filename order, into a new `## [{X.Y.Z}] - {YYYY-MM-DD}` section at the top of `CHANGELOG.md` (directly under `## [Unreleased]`), merging same-named subsections (`### Added`, `### Changed`, …).
+4. Delete the assembled `changelog.d/*.md` fragments and all `version.d/*.bump` markers.
+5. Commit with `chore(release): v{X.Y.Z}` and push the `release/v{X.Y.Z}` branch. Open a PR from `release/v{X.Y.Z}` → `main` (`gh pr create` remains an outward action gated by dev-guard).
+6. Verify the three-site invariant after the edits (grep all three sites for `{X.Y.Z}`) — the same check `prepublish-guard` and CI will re-run.
 
 ---
 
@@ -214,7 +204,7 @@ The release will:
   - Write version.d/.release-cut = v{X.Y.Z} so prepublish-guard recognizes the release-path
     on this feature branch
   - Delete all changelog.d/ fragments and version.d/*.bump markers (the .release-cut marker
-    itself is not deleted — see agents/delivery.md Step 9-R-5)
+    itself is persistent — updated in place, never deleted)
   - Fold all of the above into {feature-branch}'s existing (or about-to-open) PR — no second PR
 
 Confirm inline release? [Y/n]
@@ -222,19 +212,14 @@ Confirm inline release? [Y/n]
 
 Wait for operator reply; abort with no changes on `n`/`no`.
 
-**Step 2 (inline) — Route to orchestrator in inline-release mode.** Pass to the `orchestrator` agent:
+**Step 2 (inline) — Execute the cut on the feature branch (leader, no dispatch).** Same mechanical sequence as Step 2 above, executed directly on `{feature-branch}` (its worktree if one exists):
 
-```
-Direct Mode Task:
-- Mode: deliver
-- Feature: {feature-branch's own feature name}
-- inline-release: true
-- target-version: {X.Y.Z}
-- Branch: {feature-branch}
-- Summary: Inline release v{X.Y.Z} on {feature-branch} — aggregate {N} changelog.d/ fragments and {M} version.d/ markers; bump level {major|minor|patch}
-```
-
-The orchestrator routes to `delivery` in `inline-release` mode (see `agents/delivery.md` Step 9's mode table), which bumps all three sites, assembles `changelog.d/`, writes the `version.d/.release-cut` marker, and continues the SAME feature PR through its normal STAGE-GATE-3 — no separate release branch, no second PR.
+1. Bump the version to `{X.Y.Z}` at all three sites (same targeted-replacement rule as batch Step 2.2).
+2. Assemble the `changelog.d/*.md` fragments into `## [{X.Y.Z}] - {YYYY-MM-DD}` at the top of `CHANGELOG.md`.
+3. Write `version.d/.release-cut` = `v{X.Y.Z}` (the marker is persistent — updated in place each inline release, never deleted).
+4. Delete the assembled `changelog.d/*.md` fragments and all `version.d/*.bump` markers.
+5. Commit with `chore(release): v{X.Y.Z} — inline release folded into PR #{N}` and push to the SAME feature branch — the existing PR updates; no new branch, no second PR.
+6. Verify the three-site invariant (grep all three sites for `{X.Y.Z}`).
 
 **Step 3 (inline) — Verify the tag, same as batch mode.** Once the feature PR merges to `main`, the tag verification in Step 3 above applies unchanged (`tag-sync.yml` is the single tag authority regardless of which mode cut the release).
 
@@ -242,7 +227,7 @@ The orchestrator routes to `delivery` in `inline-release` mode (see `agents/deli
 
 ## Important
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly.
+- The release cut is executed directly by the leader — do NOT dispatch the orchestrator or the delivery agent for it. It is a fixed mechanical edit sequence with zero design judgment; its one invariant (three version sites bumped and matching) is enforced deterministically by `prepublish-guard` + CI, and the pushes/PR-create remain gated by dev-guard like any outward action.
 - Batch mode: the `release/vX.Y.Z` branch name is the release-PR discriminator used by `hooks/ts/bodies/prepublish-guard.ts`. Inline mode: the `version.d/.release-cut` marker (or a `release-cut: vX.Y.Z` commit trailer) is the discriminator instead — the branch name stays the feature branch's own name. Either path enforces the same three-site-bumped-and-matching invariant; the marker authorizes RUNNING that check on a feature branch, never bypassing it.
 - Do NOT skip the confirmation gate at Step 1e (batch mode) or its inline-mode equivalent — the operator must confirm before any version change is made.
 - After the PR is merged to `main`, `claude plugin update` will serve the new version to all operators, and Step 3 above verifies the tag that feeds the opencode artifact pipeline (`release.yml`).
