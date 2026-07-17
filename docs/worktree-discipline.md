@@ -332,7 +332,15 @@ initial-remove failure, collapse the re-check and the repair itself into **one s
 invocation** — a shell conditional, not two separate agent-issued tool calls:
 
 ```bash
-if [ -z "$(git -C <path> status --porcelain)" ]; then git worktree prune; git worktree remove --force <path>; else echo "ABORT: worktree became dirty since last check, not force-removing"; fi
+porcelain="$(git -C <path> status --porcelain)"
+tainted="$(printf '%s\n' "$porcelain" | awk '{code=substr($0,1,2); if (code=="??" || code ~ /D/) print}')"
+if [ -z "$porcelain" ] || { [ -z "$tainted" ] && \
+    [ -z "$(git -C <path> diff --numstat | awk '$1!=0||$2!=0')" ] && \
+    [ -z "$(git -C <path> diff --cached --numstat | awk '$1!=0||$2!=0')" ]; }; then
+  git worktree prune; git worktree remove --force <path>
+else
+  echo "ABORT: worktree became dirty since last check, not force-removing"
+fi
 ```
 
 - The `if` branch fires only when the re-check comes back **still clean** (mode-only-or-nothing,
