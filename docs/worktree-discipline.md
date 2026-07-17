@@ -245,9 +245,20 @@ All FOUR conditions below must hold for a worktree to be auto-removed. Any singl
 **leave it and report** — never a silent skip, and never an auto-removal on a partial match.
 
 **1. Not the main tree and not the current session's own active worktree.** Exclude the
-repository's main working tree. Exclude the worktree this session itself is actively using — read
-the `worktree:` field of this session's own `00-state.md`, if one already exists at this point in
-the boot sequence (Rule 5's existing mechanism supplies this field; no new lookup is invented).
+repository's main working tree. Exclude the worktree this session itself is actively using, via TWO
+independent signals — both applied, neither replacing the other:
+
+- **Canonical-path comparison against the resolved session cwd/repository root.** Available at
+  boot time regardless of whether any state file exists yet. Compare each candidate worktree's
+  canonical path against the currently-resolved session cwd; a match excludes it. This is the
+  primary signal and the only one guaranteed to exist at the very start of a boot sequence.
+- **The `worktree:` field of this session's own `00-state.md`** (Rule 5's existing mechanism),
+  when one already exists at this point in the boot sequence — a secondary, additional exclusion,
+  not a substitute for the cwd comparison.
+
+A session boots before its own `00-state.md` is written, so the state-file signal alone can miss
+the exclusion at that moment; the cwd comparison closes that gap independent of file-write timing.
+Either signal matching excludes the candidate.
 
 **2. Pipeline provenance.** Either signal is sufficient:
 - The branch name matches a conventional pipeline prefix (`feat/`, `fix/`, `refactor/`, `chore/`,
