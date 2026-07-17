@@ -14238,15 +14238,15 @@ def _s59_ver_tuple(v):
     except Exception:
         return (0, 0, 0)
 
+# Mirrors CLAUDE_VERSION_RE in hooks/ts/bodies/prepublish-guard.ts:75 exactly
+# (source of truth — Python cannot import TS, so this pattern is duplicated
+# here; keep the two in sync on any change to either side).
+_S59_CLAUDE_VERSION_RE = re.compile(r"\*\*Current version:\*\* `([0-9]+\.[0-9]+\.[0-9]+)`")
+
 def _s59_claude_current_version(text):
-    """Parse the backtick-quoted version token from the 'Current version' line in CLAUDE.md §3."""
-    for line in text.splitlines():
-        if "Current version" in line and "`" in line:
-            try:
-                return line.split("`")[1].strip()
-            except IndexError:
-                return None
-    return None
+    """Parse the version token from CLAUDE.md §3 using the guard's exact literal shape."""
+    m = _S59_CLAUDE_VERSION_RE.search(text)
+    return m.group(1) if m else None
 
 _s59_claude_ver = _s59_claude_current_version(_s59_claude)
 
