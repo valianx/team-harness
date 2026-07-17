@@ -288,7 +288,7 @@ The three things a developer already knows how to ask for — a work plan, an im
 
 Every committed artefact is in English. workspaces prose follows the operator's chat language (structure stays English). Live chat is not a committed artefact — operator may chat in any language.
 
-**Documented exceptions:** security/reviewer report bodies (Spanish per contract), leader intent-detection routing table (bilingual intent patterns). Full language boundary table, workspaces rules, and contributor checklist are in `docs/voice-guide.md`.
+**Documented exceptions:** `agents/leader.md` live chat and Step 6 intent-detection routing table render in the operator's resolved language, never a hardcoded language. No other committed artefact carries a language exception; reports stay English. See `docs/voice-guide.md`.
 
 ---
 
@@ -346,7 +346,7 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 ## 14. Subagent Orchestration
 
-**The `leader` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the leader's intent-detection dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts into the same leader. All repo artefacts are written in English; live chat accepts Spanish and English.
+**The `leader` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the leader's intent-detection dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts into the same leader. Repo artefacts are written in English; live chat renders in the operator's resolved language.
 
 Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
