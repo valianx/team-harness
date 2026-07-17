@@ -346,6 +346,107 @@ is a low-frequency, bounded exposure (only uncommitted or committed-but-unmerged
 that window is at risk; a worktree that is genuinely merged-and-clean at both checks has nothing
 left to lose), not a claim of zero risk.
 
+### Lock protocol — serializing cooperating sweepers (layered atop atomicity discipline)
+
+The atomicity discipline above minimizes the TOCTOU window but cannot close it, because it runs as
+sequential agent-issued Bash calls with no mutual-exclusion primitive. This subsection adds a
+directory lock as an ADDITIONAL, external layer — it does not replace the atomicity discipline
+above, which remains the sweep's only defense against a non-cooperating writer (see "Residual
+closure" at the end of this subsection).
+
+**1. Acquisition primitive — `mkdir "$LOCK"`.** `mkdir` of a not-yet-existing directory is atomic
+creation in a single shell invocation: it fails with a nonzero exit (`EEXIST`) if the directory
+already exists, and that atomicity is an OS-level guarantee (`mkdir(2)`), not a shell option.
+Rejected alternative: `set -C; > file` (`noclobber`) — (a) `set -C` is a shell option, not an OS
+guarantee, and its behavior is not uniform across Git Bash / non-bash shells / PowerShell (this repo
+is cross-platform, per `CLAUDE.md §3`); (b) it persists in the shell's own state and would affect
+every later redirection in that agent session; (c) a lock directory gives a natural place to also
+hold the holder file. Acquisition and metadata write happen in one step:
+`mkdir "$LOCK" 2>/dev/null && printf '...' > "$LOCK/holder"` — the `mkdir` is the atomic gate; the
+`printf` only runs if the race was won.
+
+**2. Location — central, under the common git dir, never inside the worktree.**
+`LOCK_ROOT="$(git -C <path> rev-parse --git-common-dir)/th-worktree-sweep-locks"`;
+`LOCK="$LOCK_ROOT/<key>.lock"`, with `<key>` the worktree's absolute path, sanitized (every run of
+non-alphanumeric characters replaced by a single `-`; the path is already unique, so no collision
+and no hashing tool is needed). Rationale: `git worktree remove <path>` deletes (a) the working
+directory at `<path>` and (b) the per-worktree admin directory at
+`<main>/.git/worktrees/<name>/` — it never touches any other path under the common `.git`. Living in
+a sibling namespace under the common `.git` means: (i) `git worktree remove` (with or without
+`--force`) never sees, rejects, or deletes it; (ii) `git status` of any tree never reports
+`.git/**` as untracked, so the lock never trips condition 4 of the predicate above (a lock placed
+inside the working tree would — that is why it is rejected); (iii) the lock survives the remove, so
+release is deterministic and stale detection is always reachable (the lock always sits at a
+computable path, never "stale-undetectable").
+
+**3. Holder identification.** A `holder` file inside the lock directory, one `key=value` per line:
+`pid=<acquiring shell's PID>`, `host=<hostname>`, `epoch=<acquisition epoch-seconds>`,
+`holder=<th:leader-preflight-sweep | delivery:<feature>>`. `pid`/`host` are diagnostic only — for
+the report line when a lock is found already held — not the operative liveness signal: the "holder"
+is an ephemeral LLM-agent process with no reliable heartbeat (the shell that ran `mkdir` exits once
+that command returns, so `kill -0 <pid>` is not reliable). The operative liveness signal is the
+lock's age (next point).
+
+**4. Stale-lock expiry — 15 minutes.** A lock is held only for the duration of one worktree's
+re-check-to-remove sequence (seconds to tens of seconds, per the atomicity discipline above). 15
+minutes is roughly 30-100x that expected hold, so an older lock is overwhelmingly likely orphaned (a
+crashed or abandoned agent session), while still short enough that it does not block the next
+legitimate sweep (the next boot is typically more than 15 minutes later). Single-invocation, portable
+check (GNU/BSD/Git-Bash `find`): `find "$LOCK" -maxdepth 0 -mmin +15` prints the path when the lock
+directory's mtime (set at `mkdir` time) is older than 15 minutes, empty otherwise. Age by mtime is
+the signal — not the holder file's contents, which stay diagnostic-only. If stale: break it
+(`rm -rf "$LOCK"`) and retry acquisition. **Named residual (stale-break race):** breaking a stale
+lock is itself a small race — two processes could both see it as stale, both `rm -rf`, both
+`mkdir`, and the loser's `rm -rf` could delete the winner's fresh lock (both then believe they hold
+it). Accepted, because: (a) it only happens when breaking an ALREADY-stale lock (the prior holder
+already crashed or was abandoned — a rare event, not the steady state); (b) it only affects sweep
+ORDERING, never causes data loss by itself — every sweeper that proceeds after a stale-break still
+runs the full four-condition predicate plus the immediate-adjacency re-check (atomicity discipline,
+retained) before `git worktree remove`; the lock is a serialization optimization, not the safety
+mechanism. Deliberately kept simple (an age check via `find`, not a full health-check protocol).
+
+**5. Fail-safe defaults.** (a) **Acquisition fails** (another process holds a live, non-stale lock):
+skip that worktree this pass, report, retry next boot — the same "never a silent, permanent skip"
+contract Rule 7 already carries; report line
+`worktree_swept: left <path> — sweep lock held (retry next boot)`. (b) **The lock mechanism itself
+errors** (e.g., `rev-parse --git-common-dir` fails, `mkdir` fails for a reason other than `EEXIST`,
+`find` errors, a filesystem permission error): treat as "cannot proceed safely" — leave the
+worktree, report, do NOT remove; report line
+`worktree_swept: left <path> — lock mechanism error, not auto-removed`. **Fail-safe direction:**
+here the safe default is to LEAVE (conservative, no deletion) — not fail-open — unlike the guard
+(whose fail-open permits a push, a recoverable action); here deletion is unrecoverable, so the
+failure direction must be "do not delete". This is fail-safe, consistent with this repo's
+convention for destructive operations.
+
+**Sequence and release.** Acquire the lock → [re-check conditions 3 and 4 (atomicity discipline,
+retained) + `git worktree remove` while holding the lock] → release (`rm -rf "$LOCK"`, best-effort;
+if it fails, the stale-expiry check above cleans it up on a later pass). Release happens on BOTH the
+remove path and the leave path — the lock is acquired for the re-check; it is released once a
+decision is made either way.
+
+**Residual closure — honest, not overclaimed.** Acquiring the lock immediately before the final
+re-check and holding it through `git worktree remove` fully CLOSES the TOCTOU window for
+COOPERATING processes: two `th:leader`/`delivery` instances that both follow this protocol
+serialize — one acquires, the other's `mkdir` fails (`EEXIST`), so it skips that worktree, reports,
+and retries next boot; the two can never both be inside the re-check-to-remove window for the same
+worktree at the same time. The sweeper-vs-sweeper race that originally motivated the atomicity
+discipline above is now fully closed. **Remaining residual (NOT closed by the lock):** a genuinely
+non-cooperating actor — a human editing files directly in the worktree through their own terminal
+(the human-two-session path) who never runs `mkdir` on the lock — is not coordinated by it (the lock
+coordinates sweepers with each other, not a sweeper with a human's raw `git commit`/edit). Against
+that human writer, the only defense remains the atomicity discipline above (which still catches a
+commit landing before the final re-check); the one truly irreducible sliver is a human edit/commit
+landing in the single-tool-call gap between the final re-check and the `git worktree remove` call
+itself — the residual already named in the atomicity discipline subsection, which the lock does not
+narrow (it was never sweeper-vs-sweeper contention to begin with). Additional bound (not
+overclaimed): the removal never uses `--force` at either site, so a tree the human left dirty makes
+`git worktree remove` REFUSE (a git-level backstop); and a human commit in that sliver survives on
+the branch ref/reflog after the remove (the remove deletes the working directory and per-worktree
+admin metadata, not the branch or its commits) — genuinely unrecoverable loss is limited to
+uncommitted work in that sliver, which git's refusal-without-`--force` already covers. **The lock
+does not eliminate the risk an out-of-band human edit could cause; it reduces it to that bounded
+sliver and names it explicitly.**
+
 ### Squash-merge detection limit (documented, not a bug)
 
 The durable reaping path depends on `gh pr view` succeeding for the `MERGED` detection. The
