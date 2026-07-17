@@ -6,25 +6,15 @@
 
 ## 1. Purpose & Boundaries
 
-**What this repo is.** `team-harness` is a **pure distribution of a Claude Code agent system** (today; a future v2 will abstract over the runtime — see README Roadmap). It packages a curated set of agents (system prompts), skills (slash commands), hooks (OS-native notifications), and a cross-platform Go installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. The Memory MCP server (Knowledge Graph) is an **external service** — it lives outside this repo and is configured by a single URL during install. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
+**What this repo is.** `team-harness` is a **pure distribution of a Claude Code agent system** (today; a future v2 will abstract over the runtime — see README Roadmap). It packages agents (system prompts), skills (slash commands), hooks (OS-native notifications), and a cross-platform Go installer that wires everything into a developer's `~/.claude/` + `~/.claude.json`. The Memory MCP server (Knowledge Graph) is an **external service**, configured by a single URL during install. Target audience: developers on Mario's team who already use Claude Code and want a standardized orchestrated dev-team setup.
 
-**What this repo is NOT.**
-- Not an application, library, API, or service.
-- Not a runtime — nothing executes from this repo except the installer and the MCP server (after installation).
-- No test suite, no build step.
-- Not a general-purpose framework — it encodes a specific opinionated workflow (leader + orchestrator + specialized subagents + SDD pipeline).
+**What this repo is NOT.** Not an application, library, API, or service; not a runtime beyond the installer and the (post-install) MCP server; no test suite, no build step; not a general-purpose framework — it encodes one opinionated workflow (leader + orchestrator + specialized subagents + SDD pipeline).
 
-**External dependencies (required).**
-- **context7 API key** — for library docs retrieval. Get one at https://context7.com/ (the installer prompts for it or reads `CONTEXT7_API_KEY` from the environment).
-- **Memory MCP URL** — public URL of a running MCP-compatible server (e.g., `context-harness-mcp` deployed to Railway/Render/Fly/Docker, or a local container). The installer prompts for it (interactive TTY) or reads `MEMORY_MCP_URL` from the environment (non-interactive / CI). **No default URL** — empty input is rejected and a missing env var exits the installer with an explicit error (rationale: `docs/knowledge.md`). Example format only: `https://your-mcp.example.com/mcp`.
+**External dependencies (required).** A **context7 API key** (get one at https://context7.com/, or set `CONTEXT7_API_KEY`) and a **Memory MCP URL** — the public URL of any MCP-compatible server (e.g., Railway/Render/Fly/Docker, or a local container). The installer prompts for it interactively or reads `MEMORY_MCP_URL` non-interactively. **No default URL** — empty input is rejected and a missing env var exits the installer with an explicit error (rationale: `docs/knowledge.md`). Example format only: `https://your-mcp.example.com/mcp`.
 
-**External dependencies (recommended).**
-- `gh` — GitHub CLI. Enables full GitHub integration for `/issue`, `/review-pr`, `/deliver`, and others. Install: https://cli.github.com/ — When absent or unauthenticated, skills use `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or fall back to operator-paste paths with `blocked-manual-push` status. See `agents/_shared/gh-fallback.md` for the degradation contract.
+**External dependencies (recommended).** `gh` — GitHub CLI, for full GitHub integration in `/issue`, `/review-pr`, `/deliver`, and others (install: https://cli.github.com/). When absent or unauthenticated, skills fall back to `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or operator-paste paths with `blocked-manual-push` status. See `agents/_shared/gh-fallback.md`.
 
-**External dependencies (optional).**
-- `d2` CLI — for `/d2-diagram`.
-- `likec4` CLI — for `/likec4-diagram`.
-- Playwright (auto-installed by the Excalidraw skill on first use).
+**External dependencies (optional).** `d2` CLI (`/d2-diagram`), `likec4` CLI (`/likec4-diagram`), Playwright (auto-installed by the Excalidraw skill on first use).
 
 **Target OS.** Windows, macOS, or Linux.
 
@@ -98,8 +88,8 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | **opencode-only.** Go 1.23+ (cross-compiled binaries shipped as GH Release assets; `cmd/install/main.go` is the source). Does NOT install Claude Code — the marketplace plugin is the only CC channel; a bare invocation prints a redirect notice. Serves opencode exclusively (`install apply\|update\|uninstall --runtime opencode`). Agents, skills, and hooks embed at compile time via `//go:embed all:agents skills hooks installer-assets` in `assets.go` — self-contained, no repo clone at runtime. TUI: `charm.land/huh/v2`. **`cmd/install/` frozen for fleet model-allocation:** the binary is opencode-only, so `modes.go::lowCostMatrix` stays as a historical low-cost-mode reference and is not extended for new agents — low-cost mode is a CC-plugin-only concept. See `agents/README.md §"Low-cost mode"`. Full lifecycle detail: `docs/lifecycle.md`. |
-| Bootstrap scripts | **opencode-only.** Bash (`install.sh`) + PowerShell (`install.ps1`) + cmd.exe (`install.cmd`) — detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call). Served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via a GitHub Pages workflow. Zero Python, zero `uv` required. See `bin/README.md`. |
+| Installer | **opencode-only.** Go 1.23+, cross-compiled to GH Release assets (`cmd/install/main.go` is the source). Does NOT install Claude Code — the marketplace plugin is the only CC channel. Serves opencode exclusively (`install apply\|update\|uninstall --runtime opencode`); agents/skills/hooks embed at compile time via `//go:embed` in `assets.go` — self-contained, no repo clone at runtime. TUI: `charm.land/huh/v2`. `cmd/install/` is frozen for fleet model-allocation (opencode-only binary — `modes.go::lowCostMatrix` is a historical reference, not extended for new agents; see `agents/README.md §"Low-cost mode"`). Full lifecycle detail: `docs/lifecycle.md`. |
+| Bootstrap scripts | **opencode-only.** Bash/PowerShell/cmd.exe (`install.sh`/`.ps1`/`.cmd`) detect OS+arch and download the released binary from the deterministic `releases/latest/download/` URL (no GitHub API call), served via a GitHub Pages workflow. Zero Python, zero `uv` required. See `bin/README.md`. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
 | Hooks | TypeScript (`hooks/ts/bodies/*.ts` → tracked `dist/*.cjs`) — single gate-logic source for CC and opencode. `hooks.json` wires CC via `run-ts-hook.sh` (fail-closed launcher). Only `sketch-guard.sh` remains Bash. |
@@ -142,7 +132,7 @@ All commands run from the repo root.
 > Extended detail for conventions without a dedicated docs/ file: see `docs/conventions.md`.
 
 - **One concern per file.** One agent per `.md` in `agents/`. One skill per `.md` in `skills/` (complex skills get their own subfolder).
-- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). `architect`, `agent-builder`, `security`, and the coordination tier use `opus`; `researcher` and `init` run on `haiku`; all others — including `adversary`, `reviewer`, `acceptance-checker`, and `translator` — use `sonnet`. The effort ceiling is `xhigh` (`max` retired); on Claude Code effort is session-global, so per-agent `effort` is opencode-honored and advisory on CC.
+- **Frontmatter-driven agents.** Every agent file starts with YAML frontmatter (`name`, `description`, `model`, `color`, `effort`). Model tiers: `opus` (architect/agent-builder/security/coordination), `haiku` (researcher/init), `sonnet` (all others). Effort ceiling `xhigh`; session-global on CC, per-agent-advisory on opencode.
 - **leader is the hub.** Skills never invoke agents directly — they build a task payload and route to `leader`. Exceptions: standalone utilities (`/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`).
 - **Workspaces as the shared board.** Agents communicate through files in `workspaces/{feature-name}/`; the operator uses it as a review surface. Never through return values. `workspaces/` is always git-ignored. See `docs/conventions.md`.
 - **Dual-mode workspaces.** Local (`./workspaces/`) or Obsidian vault, via `logs-mode` in `~/.claude/.team-harness.json`. See `docs/conventions.md`.
@@ -160,9 +150,9 @@ All commands run from the repo root.
 - **Pipeline observability is mandatory.** Every run produces `00-execution-events.jsonl`/`.md` and `00-pipeline-summary.md`. Exception: Tier 0 fixes (`workspaces: NONE`) are exempt. Full contract: `docs/observability.md`.
 - **Documentation freshness via context7.** Verify third-party APIs against context7 before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow forces security review + regression test.** For `type: fix`/`hotfix`. Full flow: `agents/ref-special-flows.md § Bug-fix Flow`.
-- **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan (`agents/orchestrator.md § Phase 2.6`) bounces work-narration comments on added diff lines; `qa` validate-mode `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction — AC satisfaction alone does not pass. Canonical pattern set + site enumeration: `docs/code-hygiene-gate.md`.
+- **Stage-2 code-hygiene gate (two-layer, mandatory for all types).** Deterministic pre-verify scan bounces work-narration comments on added diff lines; `qa`'s `## Code Hygiene` audit emits `code_hygiene: pass|fail` as a Phase 3 gate conjunction. Canonical pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
-- **Three-lane execution model (inline/express/full).** One classification system (`--fast`/`[TIER: N]`/Simple-Mode are aliases); informational cost estimate, no budget mechanism; inline-only operator-confirmed security waiver. Canonical: `docs/pipeline-lanes.md`.
+- **Three-lane execution model (inline/express/full).** One classification system (`--fast`/`[TIER: N]`/Simple-Mode are aliases); informational cost estimate, no budget mechanism. Canonical: `docs/pipeline-lanes.md`.
 - **Plan-review panel centralization** — worst-of verdict; panel writes `reviews/01-plan-review.md`. See `agents/ref-direct-modes.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. See `docs/discover-phase.md` (E1), `docs/spec-coauthoring.md` (E2).
 - **Leader disposition — unconditional, top-level (SEC-DR-2, v2.89.0).** Top-level agent IS the leader; outward actions gated by `dev-guard`, which fires unconditionally and gates by destination (non-default branch push to origin → allow, else ask). See `docs/dev-mode.md`.
@@ -173,8 +163,8 @@ All commands run from the repo root.
 - **Plan-stage sketches.** See `docs/plan-sketches.md`.
 - **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is unreachable by any hook (U1 — discipline, not a gate). Full 5-rule contract: `docs/worktree-discipline.md`.
 - **Parallel batch implementation.** ADDITIVE items concurrently; consolidated into ONE PR. See `docs/parallel-batch-implementation.md`.
-- **`/th:research-code` hybrid codebase-research flow.** `code-researcher` (sonnet, read-only) fans out per-file/module lanes; optional web lanes; consolidator surfaces docs-vs-code conflicts; bounded gap-closure via `code_closeable` gate. → `agents/code-researcher.md`, `skills/research-code/SKILL.md`.
-- **Gated local permission provisioning.** `//` double-slash anchor + `additionalDirectories`, merge-write-whole-document, gated Y/n, two sites (`/th:setup` § 3a; leader Phase 0a Step 7). Never touches outward-action rules. See `docs/permission-provisioning.md`.
+- **`/th:research-code` hybrid codebase-research flow.** `code-researcher` (sonnet, read-only) fans out per-file/module lanes plus optional web lanes; consolidator surfaces docs-vs-code conflicts. → `agents/code-researcher.md`, `skills/research-code/SKILL.md`.
+- **Gated local permission provisioning.** Adds `additionalDirectories` via a `//` double-slash anchor, gated Y/n, at two sites (`/th:setup` § 3a; leader Phase 0a Step 7); never touches outward-action rules. See `docs/permission-provisioning.md`.
 
 **Architectural changes must be reviewed by the `architect` subagent before implementation.** Applies especially to: adding an agent, changing the pipeline flow, modifying the installer's contract with `~/.claude/` or `~/.claude.json`, introducing a new memory layer.
 
@@ -346,15 +336,15 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 ## 14. Subagent Orchestration
 
-**The `leader` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the leader's intent-detection dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts into the same leader. Repo artefacts are written in English; live chat renders in the operator's resolved language.
+**The `leader` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the leader's intent-detection dispatches the right phase or direct mode. Skills (`/design`, `/deliver`, `/recover`, `/issue`, etc.) are optional shortcuts into the same leader. Repo artefacts are written in English; live chat renders in the operator's resolved language.
 
-Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
+Routing table and escalation rules: `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
-**Inline orchestration at top level — SEC-DR-2 re-founding (v2.89.0).** No filesystem marker is required — the general agent IS the leader (CC native architecture) and `dev-guard` gates outward actions unconditionally. Nesting this inline inside another orchestrator is the ad-hoc improvisation that is PROHIBITED — use the FALLBACK below. See `docs/dev-mode.md § Outward-Action Gate`.
+**Inline orchestration at top level — SEC-DR-2 re-founding (v2.89.0).** No filesystem marker is required — the general agent IS the leader, and `dev-guard` gates outward actions unconditionally. Nesting this inline inside another orchestrator is the ad-hoc improvisation that is PROHIBITED — use the FALLBACK below. See `docs/dev-mode.md § Outward-Action Gate`.
 
-**FALLBACK — nested-handoff/takeover (opencode/legacy path).** Nested subagents retain `Task` on the CC foreground path (M1 probe confirmed); `dispatch_handoff` takeover is RETAINED for opencode compatibility only. Full protocol: `docs/subagent-orchestration.md`.
+**FALLBACK — nested-handoff/takeover (opencode/legacy path).** Nested subagents retain `Task` on the CC foreground path; `dispatch_handoff` takeover is RETAINED for opencode compatibility only. Full protocol: `docs/subagent-orchestration.md`.
 
-**Universal rule — auto-takeover on `blocked-no-dispatch`:** when the orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately. Parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue the pipeline. This is not a user-decision point. Full takeover protocol (8 steps), handoff JSON schema, and `blocked-manual-push` handling are in `docs/subagent-orchestration.md`.
+**Universal rule — auto-takeover on `blocked-no-dispatch`:** when the orchestrator returns "Dispatch handoff — top-level Claude takes over now", or `00-state.md` has `status: blocked-no-dispatch`, top-level Claude **MUST** take over dispatch immediately — parse the `dispatch_handoff` JSON, dispatch the named agent via `Task`, and continue. Not a user-decision point. Full 8-step protocol, JSON schema, and `blocked-manual-push` handling: `docs/subagent-orchestration.md`.
 
 ---
 
