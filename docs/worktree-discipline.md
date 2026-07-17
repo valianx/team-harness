@@ -303,6 +303,45 @@ per-file partial removal, it is a per-worktree pass/fail.
 Never a silent, permanent skip: an unresolved worktree's report line reappears at every boot until
 the operator resolves it (merges the branch, cleans the tree, or removes it manually).
 
+### Atomicity discipline — minimize the TOCTOU window, do not claim to eliminate it
+
+The four-condition predicate above is prose evaluated by an agent through separate, sequential
+Bash tool calls — `git worktree list`, `gh pr view`/`git branch --merged`, `git rev-list`,
+`git status`/`git diff --numstat`, and the final `git worktree remove` are each an independent
+invocation, not one atomic transaction. There is no file-system lock, no PID file, and no
+mutual-exclusion mechanism serializing this sweep against a concurrent writer. This is a genuine
+time-of-check-to-time-of-use (TOCTOU) window: work can land in a candidate worktree after the
+sweep's own safety check and before its `git worktree remove` call.
+
+To minimize this window, the sweep MUST follow this discipline for every candidate:
+
+1. **Process one worktree candidate fully before starting the next.** Do not evaluate conditions
+   1–4 across all candidates first and remove them in a second pass. Each candidate goes through
+   check → immediate re-check → remove-or-leave, in that order, before the sweep moves on to the
+   next candidate.
+2. **Re-verify conditions 3 and 4 immediately adjacent to the `git worktree remove` call for that
+   specific worktree.** Once the first full four-condition pass qualifies a candidate for removal,
+   re-run condition 3 (merged AND no commits ahead) and condition 4 (clean beyond the mode-only
+   allow-list) again, right before issuing `git worktree remove <path>` — with no other Bash call,
+   no other worktree's processing, and no unrelated work interleaved between this final re-check
+   and the removal of that same worktree.
+3. **Any re-check failure aborts the removal for that candidate.** If the immediate re-check finds
+   a new commit, an unmerged state, or a dirty tree that the first pass did not see, treat the
+   worktree as if it had failed the predicate on the first pass — leave it and report; do not
+   remove.
+
+**Residual risk, named honestly.** This discipline minimizes the TOCTOU window; it does not close
+it. There is no true file-system-level lock in this agent-instruction-driven protocol — a human
+editing or committing to the same worktree in the sub-second span between the final re-check and
+the `git worktree remove` call is still technically possible and would not be caught. Any earlier
+framing of this predicate as one that "cannot cause a false removal" only holds for a single
+atomic evaluation, which this multi-step, agent-executed reality is not. The realistic concurrent
+writer is the human-two-session path (Rule 1's own U1 boundary statement) — a human actively
+working in a worktree the sweep independently determines is merged-and-clean. This is a
+low-frequency, bounded exposure (only uncommitted or committed-but-unmerged work landing in the
+sub-second window is at risk; a worktree that is genuinely merged-and-clean at both checks has
+nothing left to lose), not a claim of zero risk.
+
 ### Squash-merge detection limit (documented, not a bug)
 
 The durable reaping path depends on `gh pr view` succeeding for the `MERGED` detection. The
