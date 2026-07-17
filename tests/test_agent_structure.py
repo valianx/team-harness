@@ -30122,10 +30122,19 @@ check(
 )
 
 # -------------------------------------------------------------------
-# AC-3 (#383) — existing WARN and hard-block UNCHANGED (regression guard)
+# AC-3 (#383) — existing WARN unchanged; hard-block retargeted for the
+# per-pr-version-bump refactor (regression guard)
 # (AC-3a's original marker was a retired Bash-source COMMENT, not the
 # actual warn message — checked here against the real warnUnderBump()
 # message content, which the TS port carries verbatim.)
+#
+# AC-3b originally asserted the retired feature-path hard-block (a stray
+# bump on a non-release branch was denied). The per-pr-version-bump
+# refactor deleted runFeaturePath entirely and replaced it with the
+# universal path's hard-block: a distributed-asset push is now denied
+# when the three version sites are NOT all bumped, on any branch — the
+# opposite polarity of the retired check. Retargeted to the real
+# runVersionSiteCheck() deny-reason text.
 # -------------------------------------------------------------------
 check(
     "s125/AC-3a: prepublish-guard.ts under-bump WARN still present",
@@ -30134,10 +30143,12 @@ check(
     "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) existing under-bump WARN removed",
 )
 check(
-    "s125/AC-3b: prepublish-guard.ts no-bump hard-block still present",
-    "prepublish-guard: distributed assets" in _s125_hook,
-    "marker 'prepublish-guard: distributed assets' not found "
-    "in hooks/ts/bodies/prepublish-guard.ts — AC-3 (#383) no-bump hard-block removed",
+    "s125/AC-3b: prepublish-guard.ts universal three-site hard-block present (retired feature-path"
+    " stray-bump block replaced by the per-pr-version-bump refactor)",
+    "all three version sites (.claude-plugin/plugin.json, .claude-plugin/marketplace.json, CLAUDE.md §3) "
+    "must be bumped vs origin/main" in _s125_hook,
+    "marker 'all three version sites ... must be bumped vs origin/main' not found "
+    "in hooks/ts/bodies/prepublish-guard.ts — the universal three-site hard-block deny-reason is missing",
 )
 
 # -------------------------------------------------------------------
@@ -31079,62 +31090,36 @@ for _agent_path in _leaf_agent_files:
     )
 
 # ---------------------------------------------------------------------------
-# Suite 132 — release-tag-sync (issue #450)
+# Suite 132 — release-tag-sync (issue #450; retargeted for the per-pr-version-bump
+# refactor — the deferred-release skill and its post-tag local-apply feature
+# are retired, no replacement to verify)
 #
-# Structural guard for the release-tag unification fix: an explicit
-# post-merge tag step in both operator-facing (skills/release/SKILL.md) and
-# agent-contract (agents/delivery.md) surfaces, plus (when present) the
-# deterministic tag-sync.yml workflow that dispatches release.yml — since a
-# GITHUB_TOKEN-created tag does not itself trigger release.yml's
-# `on: push: tags` listener (Actions recursion prevention).
+# Structural guard for the release-tag unification fix: an explicit tag
+# verification step in the agent-contract (agents/delivery.md) surface, plus
+# (when present) the deterministic tag-sync.yml workflow that dispatches
+# release.yml — since a GITHUB_TOKEN-created tag does not itself trigger
+# release.yml's `on: push: tags` listener (Actions recursion prevention).
+#
+# `skills/release/SKILL.md` (the former owner of groups a and d below) was
+# deleted as part of the per-pr-version-bump refactor: team-harness now bumps
+# its own version once per PR via `delivery` Step 9, the same path shipped to
+# consuming repos, so a dedicated release-cut skill (and its post-tag
+# local-runtime-apply automation) has no replacement to test — the local-apply
+# capability it duplicated already lives in `/th:update`.
 #
 # AC coverage:
-#   AC-1 — skills/release/SKILL.md and agents/delivery.md both document the
-#          explicit post-merge tag step (dev-guard gated).
+#   AC-1 — agents/delivery.md documents the tag verification step (dev-guard
+#          gated fallback) and gates on a per-PR version bump + PR-merged.
 #   AC-2/AC-4/AC-5 — if tag-sync.yml exists: path-filtered trigger, version
 #          read, idempotent no-op guard, workflow_dispatch of release.yml
 #          with the `tag` input, minimal pinned permissions.
-#
-# Group d extends the same suite for the release-apply-local-updates feature:
-# the post-tag "## Step 4 — Apply the release to local runtimes" step in
-# skills/release/SKILL.md, which applies the just-published release to both
-# local runtimes (Claude Code plugin cache, opencode installation) with
-# per-leg failure isolation and operator-driven activation. d1-d4 fix the
-# anchor and the two legs' commands/gate/honesty tokens (authored by the
-# implementer). d5-d11 close tester-authored gaps: anchor-boundary negative
-# guards on both untouched surfaces (Step 3 slice, delivery.md), the gate's
-# poll cadence + timeout-reporting language (AC-1), the no-revert/no-fail
-# language of per-leg isolation (AC-4), the never-claim-active wording on
-# both legs (AC-2/AC-3), the {X.Y.Z}-only placeholder hygiene (AC-8), and
-# the division-of-labour cross-reference in skills/update/SKILL.md (AC-7).
 #
 # Marker: release-tag-sync
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 132: release-tag-sync structural checks ===")
 
-_s132_skill = read(REPO_ROOT / "skills" / "release" / "SKILL.md")
 _s132_delivery = read(AGENTS_DIR / "delivery.md")
-
-_S132_SKILL_STOPS = ("\n## ", "\n---\n")
-_s132_skill_slice = _slice_section(
-    _s132_skill, "## Step 3 — Verify the release tag (post-merge)", _S132_SKILL_STOPS
-)
-check(
-    "s132(a1): skills/release/SKILL.md documents an explicit post-merge tag step",
-    bool(_s132_skill_slice),
-    "'## Step 3 — Verify the release tag (post-merge)' not found in skills/release/SKILL.md",
-)
-check(
-    "s132(a2): SKILL.md tag step includes 'git tag' and 'git push'",
-    "git tag" in _s132_skill_slice and "git push" in _s132_skill_slice,
-    "SKILL.md tag step must show the actual git tag + push commands",
-)
-check(
-    "s132(a3): SKILL.md tag step states it is dev-guard gated",
-    "dev-guard" in _s132_skill_slice,
-    "SKILL.md tag step must state the push is gated by hooks/dev-guard.sh",
-)
 
 _S132_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
 _s132_delivery_slice = _slice_section(
@@ -31146,9 +31131,11 @@ check(
     "'### Step 11.4c — Release tag verification' not found in agents/delivery.md",
 )
 check(
-    "s132(b2): delivery.md tag step is gated on release-mode and PR-merged",
-    "release-mode: true" in _s132_delivery_slice and "confirmed merged" in _s132_delivery_slice,
-    "delivery.md tag step must gate on release-mode: true AND the PR being confirmed merged",
+    "s132(b2): delivery.md tag step is gated on a per-PR version bump and PR-merged",
+    "a version bump for this PR" in _s132_delivery_slice
+    and "confirmed merged" in _s132_delivery_slice,
+    "delivery.md tag step must gate on Step 9 having performed a version bump for this PR "
+    "AND the PR being confirmed merged — the retired release-mode gate no longer applies",
 )
 check(
     "s132(b3): delivery.md tag step includes 'git tag' and states dev-guard gating",
@@ -31198,100 +31185,17 @@ if _s132_tag_sync_exists:
         "tag-sync.yml must pin actions/checkout to a version tag",
     )
 
-_S132_STEP4_STOPS = ("\n## ", "\n---\n")
-_s132_step4_slice = _slice_section(
-    _s132_skill,
-    "## Step 4 — Apply the release to local runtimes",
-    _S132_STEP4_STOPS,
-)
 check(
-    "s132(d1): skills/release/SKILL.md documents the post-tag local-runtime apply step",
-    bool(_s132_step4_slice),
-    "'## Step 4 — Apply the release to local runtimes' not found in skills/release/SKILL.md",
-)
-check(
-    "s132(d2): Step 4 covers both the Claude Code leg and the opencode leg",
-    "claude plugin update" in _s132_step4_slice and "update-opencode" in _s132_step4_slice,
-    "Step 4 must reference both 'claude plugin update' (Claude Code leg) and 'update-opencode' (opencode leg)",
-)
-check(
-    "s132(d3): Step 4 gates the opencode leg on the published VERSION asset with a bounded poll",
-    "releases/latest/download/VERSION" in _s132_step4_slice
-    and "180" in _s132_step4_slice,
-    "Step 4 must poll 'releases/latest/download/VERSION' and state the bounded timeout (180s ceiling)",
-)
-check(
-    "s132(d4): Step 4 states restart-to-activate honesty and per-leg failure isolation",
-    "/reload-plugins" in _s132_step4_slice
-    and "operator" in _s132_step4_slice
-    and "does not block the other leg" in _s132_step4_slice,
-    "Step 4 must state '/reload-plugins' is operator-driven and that a per-leg failure does not "
-    "block the other leg or revert the release",
-)
-check(
-    "s132(d5): Step 3 slice does not bleed into the Step 4 header (anchor boundary intact)",
-    "Apply the release to local runtimes" not in _s132_skill_slice,
-    "The '## Step 3' slice (grp a) must stop before '## Step 4' — a boundary regression here "
-    "would silently widen the a1-a3 checks to cover Step 4 content too",
-)
-check(
-    "s132(d6): agents/delivery.md stays untouched by the local-apply feature",
-    "Apply the release to local runtimes" not in _s132_delivery
-    and "update-opencode" not in _s132_delivery,
-    "agents/delivery.md must not mention the Step 4 local-apply content — the feature is "
-    "skill-side only and delivery.md's Step 11.4c tag-creation contract is unrelated/unchanged",
-)
-check(
-    "s132(d7): opencode gate timeout path pins the poll cadence and reports the manual command "
-    "without aborting",
-    "15" in _s132_step4_slice
-    and "12" in _s132_step4_slice
-    and "timed out" in _s132_step4_slice
-    and "run the updater manually" in _s132_step4_slice
-    and "Do not abort" in _s132_step4_slice,
-    "Step 4 must pin the opencode publication gate's poll interval (15s) and max attempts (12), "
-    "and state that a timed-out gate reports the manual updater command and does not abort or "
-    "retry beyond the 180s ceiling — AC-1",
-)
-check(
-    "s132(d8): per-leg failure isolation states the release is never reverted or marked failed",
-    "reverts the tag" in _s132_step4_slice and "marks the release as failed" in _s132_step4_slice,
-    "Step 4 must state that neither leg's failure reverts the tag or marks the release as "
-    "failed — AC-4",
-)
-check(
-    "s132(d9): both legs individually state they never claim the new version is active",
-    _s132_step4_slice.count("never state that") >= 2
-    and "restarting opencode" in _s132_step4_slice,
-    "Step 4 must state, once per leg, that it never claims '{X.Y.Z} is active', and the opencode "
-    "leg's activation must be phrased as 'restarting opencode' being operator-driven — AC-2/AC-3",
-)
-check(
-    "s132(d10): Step 4 prose uses only the {X.Y.Z} placeholder — no hardcoded version literals",
-    re.search(r"\bv?\d+\.\d+\.\d+\b", _s132_step4_slice) is None,
-    "Step 4 conceptual prose must not contain a hardcoded 'X.Y.Z'-shaped version literal — "
-    "only the '{X.Y.Z}' placeholder is allowed — AC-8",
+    "s132(e1): skills/release/SKILL.md is retired — no dangling structural expectation remains",
+    not (REPO_ROOT / "skills" / "release" / "SKILL.md").exists(),
+    "skills/release/SKILL.md must stay deleted under the per-pr-version-bump model",
 )
 
 _s132_update_skill = read(REPO_ROOT / "skills" / "update" / "SKILL.md")
 check(
-    "s132(d11): skills/update/SKILL.md cross-references /th:release Step 4's division of labour",
-    "/th:release" in _s132_update_skill
-    and "Step 4" in _s132_update_skill
-    and "does NOT sync the managed" in _s132_update_skill,
-    "skills/update/SKILL.md must state that /th:release's Step 4 runs the same download/apply "
-    "legs at release-cut time but does NOT sync the managed CLAUDE.md blocks, which stays "
-    "/th:update's own contract — AC-7",
-)
-check(
-    "s132(d12): Step 4 emits a single per-runtime final report, neutral voice, no emoji",
-    "release local-apply" in _s132_step4_slice
-    and "claude code" in _s132_step4_slice
-    and "opencode" in _s132_step4_slice
-    and "exactly one operator-facing message" in _s132_step4_slice
-    and re.search(r"[\U0001F300-\U0001FAFF☀-➿]", _s132_step4_slice) is None,
-    "Step 4 must emit exactly one operator-facing final report (the 'release local-apply' "
-    "template) with a row for each runtime ('claude code', 'opencode') and no emoji — AC-5",
+    "s132(e2): skills/update/SKILL.md carries no dangling '/th:release' cross-reference",
+    "/th:release" not in _s132_update_skill,
+    "skills/update/SKILL.md must not reference the retired /th:release skill",
 )
 
 # Self-referential guards (hygiene contract)
@@ -34482,19 +34386,16 @@ _s155_conventions = read(REPO_ROOT / "docs" / "conventions.md")
 _s155_claude_md = read(REPO_ROOT / "CLAUDE.md")
 _s155_readme = read(AGENTS_DIR / "README.md")
 _s155_adversary = read(AGENTS_DIR / "adversary.md")
-_s155_changelog_frag = _read_or_empty(
-    REPO_ROOT / "changelog.d" / "refactor-full-lane-output-verbosity-trim.md"
-)
-if not _s155_changelog_frag:
-    # Post-release-cut state: the fragment is consumed into the versioned
-    # CHANGELOG section. The AC asserts the change is changelogged, not that
-    # the transient fragment file survives the cut, so fall back to the
-    # assembled section.
-    _s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
-    for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
-        if "output-contract-patterns.md" in _s155_section:
-            _s155_changelog_frag = _s155_section
-            break
+# team-harness bumps its own version once per PR (CLAUDE.md §6.3) and writes
+# the versioned CHANGELOG.md section directly in the same PR -- there is no
+# per-PR changelog.d/ fragment stage to read the entry from, so this asserts
+# against the durable versioned section directly.
+_s155_changelog_frag = ""
+_s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
+for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
+    if "output-contract-patterns.md" in _s155_section:
+        _s155_changelog_frag = _s155_section
+        break
 
 
 def _s155_slice(text: str, anchor: str) -> str:
@@ -34702,12 +34603,11 @@ check(
 # to restate).
 # ---------------------------------------------------------------------------
 check(
-    "suite155(task1-ac7-changelog-exists): the change is changelogged "
-    "(pending changelog.d fragment OR assembled CHANGELOG.md section) "
-    "with a '### Changed' entry",
+    "suite155(task1-ac7-changelog-exists): the change is changelogged in the "
+    "durable versioned CHANGELOG.md section with a '### Changed' entry",
     bool(_s155_changelog_frag) and "### Changed" in _s155_changelog_frag,
-    "changelog entry is missing (neither a pending fragment nor an "
-    "assembled CHANGELOG.md section) or lacks a '### Changed' heading",
+    "no versioned CHANGELOG.md '## [X.Y.Z]' section mentions "
+    "output-contract-patterns.md, or it lacks a '### Changed' heading",
 )
 check(
     "suite155(task1-ac7-covers-both): the changelog entry covers BOTH "
@@ -34881,54 +34781,17 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Task-5 AC-6 -- the two surviving operator-language surfaces (leader live
-# chat + Step 6 intent-detection table) are unchanged: agents/leader.md
-# is not in this task's Files list, so it must carry NO diff at all
-# (unreachable-by-construction, not just "intended to be unreachable").
-# Diffs against the PR's merge-base with origin/main (falling back to a
-# local main), not bare HEAD -- a bare-HEAD diff only catches uncommitted
-# changes, so a change to agents/leader.md committed earlier in this same
-# PR would slip through undetected. Subprocess-based git checks are
-# precedented in this file (Suite 103, harness-scorecard determinism check).
+# Task-5 AC-6 -- originally asserted that agents/leader.md carried no diff
+# relative to origin/main, verifying that PR #493's Task-5 (out of Files
+# scope for that task) never touched the file. That invariant was scoped to
+# PR #493's own implementation window and is permanently satisfied by its
+# already-merged, immutable history (commit f9e17b0) -- diffing against a
+# moving origin/main perpetually re-tests a different, incorrect claim ("no
+# future PR ever touches leader.md"), which blocks any later PR that
+# legitimately edits the file (e.g. the per-pr-version-bump refactor's
+# worktree-sweep preflight step). Removed: the behavior once verified has no
+# forward-looking replacement to check.
 # ---------------------------------------------------------------------------
-try:
-    _s155_leader_base_ref = None
-    for _s155_leader_candidate_ref in ("origin/main", "main"):
-        _s155_leader_ref_check = _s155_subprocess.run(
-            ["git", "rev-parse", "--verify", "--quiet", _s155_leader_candidate_ref],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if _s155_leader_ref_check.returncode == 0:
-            _s155_leader_base_ref = _s155_leader_candidate_ref
-            break
-    if _s155_leader_base_ref is None:
-        raise _s155_subprocess.SubprocessError(
-            "no resolvable base ref (origin/main or main)"
-        )
-    _s155_leader_diff = _s155_subprocess.run(
-        ["git", "diff", "--stat", f"{_s155_leader_base_ref}...HEAD", "--", "agents/leader.md"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    _s155_leader_untouched = (
-        _s155_leader_diff.returncode == 0 and _s155_leader_diff.stdout.strip() == ""
-    )
-    _s155_leader_detail = _s155_leader_diff.stdout.strip()
-except (OSError, _s155_subprocess.SubprocessError):
-    _s155_leader_untouched = False
-    _s155_leader_detail = "git invocation failed"
-check(
-    "suite155(task5-ac6-leader-untouched): agents/leader.md carries no "
-    "uncommitted diff -- unreachable-by-construction confirmed in "
-    "practice, not just by Files-list intent",
-    _s155_leader_untouched,
-    f"agents/leader.md has uncommitted changes: {_s155_leader_detail}",
-)
 
 # ---------------------------------------------------------------------------
 # Task-5 AC-7 -- two-tier rule declared canonically in both docs/
