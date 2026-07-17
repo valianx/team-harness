@@ -305,8 +305,13 @@ check("reviewer.md Internal Review explicitly does not publish",
       "Does NOT publish to GitHub" in reviewer or "no GitHub publish" in reviewer.lower())
 check("reviewer.md has Reviewability Assessment section",
       "Reviewability Assessment" in reviewer)
+_reviewability_start = reviewer.find("### Reviewability Assessment")
+_reviewability_end = reviewer.find("### Goal Assessment", _reviewability_start)
+_reviewability_slice = (
+    reviewer[_reviewability_start:_reviewability_end] if _reviewability_start != -1 else ""
+)
 check("reviewer.md Reviewability score has high/medium/low",
-      all(t in reviewer for t in ["high", "medium", "low"]))
+      _reviewability_start != -1 and all(t in _reviewability_slice for t in ["high", "medium", "low"]))
 check("reviewer.md Reviewability mentions 40 lines / 4 params / 3 levels",
       "40" in reviewer and ("3 niveles" in reviewer or "3 levels" in reviewer))
 
@@ -2923,10 +2928,10 @@ check(
 )
 
 # (11) Affirmative: security/reviewer report bodies are English (regression guard).
-# Updated by full-lane-output-verbosity-trim Task-2: the Spanish report-body exception
-# was intentionally and canonically removed (docs/voice-guide.md § Documented exceptions,
-# docs/conventions.md § Two-tier language rule) — this guard now affirms the NEW English
-# behavior instead of the old Spanish one, per the same regression-guard intent.
+# The Spanish report-body exception was intentionally and canonically removed
+# (docs/voice-guide.md § Documented exceptions, docs/conventions.md § Two-tier
+# language rule) — this guard affirms the current English behavior so a future
+# reintroduction of a report-body language exception fails loudly.
 _security_md = read(AGENTS_DIR / "security.md")
 _reviewer_md = read(AGENTS_DIR / "reviewer.md")
 check(
@@ -7508,15 +7513,15 @@ _S38_AI_LENS_ANCHOR   = "### AI-Authored PR Review Lens"
 _S38_NOPUB_ANCHOR     = "## No-Publish Invariant"
 _S38_BEHAV_ANCHOR     = "### Step 1.6 — Behavioral Verification"
 _S38_VERDICT_ANCHOR   = "## Verdict rule — fenced"
-# NOTE (full-lane-output-verbosity-trim Task-2): the anchor was widened from the bare
-# "## Verdict rule" because Task-2 added a cross-reference sentence earlier in the file
-# (agents/reviewer-consolidator.md § Language contract) that mentions the heading name
-# inline inside backticks ("...the merge/verdict logic in `## Verdict rule` below is
-# unaffected..."). `_slice_section` does a plain substring `find`, so the bare anchor
-# matched that inline mention first and sliced an empty/wrong region instead of the
-# real "## Verdict rule — fenced, ..." heading below. The heading itself was also
-# renamed by Task-2 to append the fence note, so anchoring on the full renamed prefix
-# is both correct and unambiguous (the renamed heading text is unique in the file).
+# NOTE: the anchor is widened from the bare "## Verdict rule" because a
+# cross-reference sentence earlier in the file (agents/reviewer-consolidator.md
+# § Language contract) mentions the heading name inline inside backticks
+# ("...the merge/verdict logic in `## Verdict rule` below is unaffected...").
+# `_slice_section` does a plain substring `find`, so the bare anchor matches
+# that inline mention first and slices an empty/wrong region instead of the
+# real "## Verdict rule — fenced, ..." heading below. Anchoring on the full
+# renamed heading prefix is both correct and unambiguous (that text is unique
+# in the file).
 _S38_REVIEW_MODE_ANCHOR = "## Review Mode"
 
 # ---- slices ----------------------------------------------------------------
@@ -34455,15 +34460,15 @@ check(
 # ---------------------------------------------------------------------------
 # Suite 155 -- full-lane-output-verbosity-trim (Round 1: Task-1 + Task-5)
 # ---------------------------------------------------------------------------
-# Checks the two Round-1 foundations of the output-verbosity-trim refactor:
+# Checks the two foundations of the output-verbosity-trim refactor covered by
+# this suite:
 #   Task-1 (docs/output-contract-patterns.md + compact mirror + changelog
 #           fragment) -- AC-1..AC-7
 #   Task-5 (Spanish report-body exception removal + two-tier language rule,
 #           declared in docs/voice-guide.md / docs/conventions.md / CLAUDE.md
 #           / agents/README.md) -- AC-1..AC-7
-# Round-2 tasks (Task-2/3/4) are NOT yet dispatched -- any AC clause whose
-# evidence lives in a Round-2 file is noted as deferred, never force-tested
-# against content that does not exist yet.
+# Any AC clause whose evidence lives in a file owned by a different task is
+# noted as deferred, never force-tested against content owned elsewhere.
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 155: full-lane-output-verbosity-trim (Round 1) ===")
@@ -34638,14 +34643,14 @@ _s155_renarr_slice = _s155_slice(_s155_output_contract, "## 5. Iteration Re-Narr
 check(
     "suite155(task1-ac5-renarration-ban): § 5 names failure-brief.md as "
     "the sole vehicle for patch/verify narratives and cites "
-    "agents/adversary.md:274-291's 5-10 line contract as the pattern to "
-    "imitate",
+    "agents/adversary.md § Failure Brief's 5-10 line contract as the "
+    "pattern to imitate",
     bool(_s155_renarr_slice)
     and "failure-brief.md" in _s155_renarr_slice
-    and "adversary.md:274-291" in _s155_renarr_slice
+    and "adversary.md` § Failure Brief" in _s155_renarr_slice
     and "5-10 line" in _s155_renarr_slice,
     "§ 5 must name failure-brief.md as the sole vehicle and cite "
-    "agents/adversary.md:274-291's 5-10 line contract",
+    "agents/adversary.md § Failure Brief's 5-10 line contract",
 )
 check(
     "suite155(task1-ac5-pointer-target-real): agents/adversary.md really "
@@ -34680,11 +34685,11 @@ check(
 # Task-1 AC-7 -- changelog fragment (covers both caps and the Spanish
 # exception removal); no plugin.json version bump.
 # NOTE: the "no plugin.json version bump" half of AC-7 is a diff-scope
-# fact (skip-version), not doc content -- verified once via `git status`/
-# `git diff --stat` during authoring (.claude-plugin/plugin.json did not
-# appear in the changed-files list), not re-asserted here as a regex
-# check against fragment prose (which would be a hollow content check for
-# a fact the fragment prose does not need to restate).
+# fact (skip-version), not doc content -- it is verified via `git status`/
+# `git diff --stat` (.claude-plugin/plugin.json absent from the changed-files
+# list), not re-asserted here as a regex check against fragment prose (which
+# would be a hollow content check for a fact the fragment prose does not need
+# to restate).
 # ---------------------------------------------------------------------------
 check(
     "suite155(task1-ac7-changelog-exists): changelog.d/refactor-full-"
@@ -34868,13 +34873,31 @@ check(
 # chat + Step 6 intent-detection table) are unchanged: agents/leader.md
 # is not in this task's Files list, so it must carry NO diff at all
 # (unreachable-by-construction, not just "intended to be unreachable").
-# Uses `git diff --stat HEAD` (local commit, no network/origin dependency)
-# -- subprocess-based git checks are precedented in this file (Suite 103,
-# harness-scorecard determinism check).
+# Diffs against the PR's merge-base with origin/main (falling back to a
+# local main), not bare HEAD -- a bare-HEAD diff only catches uncommitted
+# changes, so a change to agents/leader.md committed earlier in this same
+# PR would slip through undetected. Subprocess-based git checks are
+# precedented in this file (Suite 103, harness-scorecard determinism check).
 # ---------------------------------------------------------------------------
 try:
+    _s155_leader_base_ref = None
+    for _s155_leader_candidate_ref in ("origin/main", "main"):
+        _s155_leader_ref_check = _s155_subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", _s155_leader_candidate_ref],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if _s155_leader_ref_check.returncode == 0:
+            _s155_leader_base_ref = _s155_leader_candidate_ref
+            break
+    if _s155_leader_base_ref is None:
+        raise _s155_subprocess.SubprocessError(
+            "no resolvable base ref (origin/main or main)"
+        )
     _s155_leader_diff = _s155_subprocess.run(
-        ["git", "diff", "--stat", "HEAD", "--", "agents/leader.md"],
+        ["git", "diff", "--stat", f"{_s155_leader_base_ref}...HEAD", "--", "agents/leader.md"],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
@@ -34958,7 +34981,7 @@ check(
 # ---------------------------------------------------------------------------
 # Suite 156 -- full-lane-output-verbosity-trim (Round 2: Task-2 + Task-3 + Task-4)
 # ---------------------------------------------------------------------------
-# Checks the three Round-2 appliers of the output-verbosity-trim refactor:
+# Checks the three appliers of the output-verbosity-trim refactor:
 #   Task-2 (agents/security.md, agents/adversary.md, agents/reviewer.md,
 #           agents/reviewer-consolidator.md) -- findings-first prose budget +
 #           English report-body conversion -- AC-1..AC-12
@@ -34968,9 +34991,8 @@ check(
 #   Task-4 (agents/orchestrator.md, docs/observability.md) -- bounded infra
 #           files + English Team table + tier-aware language propagation --
 #           AC-1..AC-7
-# Plus one cross-task closure check for Task-5 AC-7's previously-deferred
-# reverse cross-reference (Round 1's Suite 155 left this untested pending
-# Task-4; it is testable now that Task-4 has landed).
+# Plus one cross-task closure check verifying Task-5 AC-7's bidirectional
+# cross-reference exists on both sides now that Task-4's file is in place.
 # ---------------------------------------------------------------------------
 print()
 print("=== Suite 156: full-lane-output-verbosity-trim (Round 2) ===")
@@ -35604,12 +35626,13 @@ check(
 # Task-4 AC-6 -- orchestrator.md's Team table rows for security/adversary
 # are converted to English; no descriptive Spanish reference remains.
 # ---------------------------------------------------------------------------
+_s156_team_table_slice = _s156_slice(_s156_orchestrator, "## Your Team")
 check(
     "suite156(task4-ac6-team-table-english): orchestrator.md's Team table "
     "rows for security/adversary read 'in English', not 'in Spanish'",
-    "reports in English" in _s156_orchestrator
-    and "report in English" in _s156_orchestrator
-    and not _s156_spanish_mandate_pattern.search(_s156_orchestrator),
+    "reports in English" in _s156_team_table_slice
+    and "report in English" in _s156_team_table_slice
+    and not _s156_spanish_mandate_pattern.search(_s156_team_table_slice),
     "orchestrator.md's Team table must describe security/adversary reports "
     "as English, with no residual Spanish reference",
 )
@@ -35668,9 +35691,9 @@ check(
 
 # Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
 # pattern. The docs/testing.md registry entry is deliberately NOT
-# self-checked here, for the same out-of-scope reason documented in
-# 03-testing.md (registering a new suite in the canonical registry is a
-# documentation edit, not a test-authoring task).
+# self-checked here: registering a new suite in the canonical registry is a
+# documentation edit performed alongside test authoring, not a property the
+# test file can assert about itself.
 _s156_own = read(Path(__file__))
 check(
     "suite156(self-ref): test file contains 'Suite 156' and "
