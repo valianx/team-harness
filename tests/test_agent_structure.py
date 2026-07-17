@@ -34485,6 +34485,16 @@ _s155_adversary = read(AGENTS_DIR / "adversary.md")
 _s155_changelog_frag = _read_or_empty(
     REPO_ROOT / "changelog.d" / "refactor-full-lane-output-verbosity-trim.md"
 )
+if not _s155_changelog_frag:
+    # Post-release-cut state: the fragment is consumed into the versioned
+    # CHANGELOG section. The AC asserts the change is changelogged, not that
+    # the transient fragment file survives the cut, so fall back to the
+    # assembled section.
+    _s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
+    for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
+        if "output-contract-patterns.md" in _s155_section:
+            _s155_changelog_frag = _s155_section
+            break
 
 
 def _s155_slice(text: str, anchor: str) -> str:
@@ -34692,18 +34702,20 @@ check(
 # to restate).
 # ---------------------------------------------------------------------------
 check(
-    "suite155(task1-ac7-changelog-exists): changelog.d/refactor-full-"
-    "lane-output-verbosity-trim.md exists with a '### Changed' entry",
+    "suite155(task1-ac7-changelog-exists): the change is changelogged "
+    "(pending changelog.d fragment OR assembled CHANGELOG.md section) "
+    "with a '### Changed' entry",
     bool(_s155_changelog_frag) and "### Changed" in _s155_changelog_frag,
-    "changelog fragment is missing or lacks a '### Changed' heading",
+    "changelog entry is missing (neither a pending fragment nor an "
+    "assembled CHANGELOG.md section) or lacks a '### Changed' heading",
 )
 check(
-    "suite155(task1-ac7-covers-both): the changelog fragment covers BOTH "
+    "suite155(task1-ac7-covers-both): the changelog entry covers BOTH "
     "the verbosity-cap contract and the Spanish report-body exception "
     "removal",
     "intensity level" in _s155_changelog_frag.lower()
     and "spanish" in _s155_changelog_frag.lower(),
-    "changelog fragment must mention both the intensity-level contract "
+    "changelog entry must mention both the intensity-level contract "
     "and the Spanish exception removal",
 )
 
