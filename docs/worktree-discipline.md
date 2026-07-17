@@ -332,15 +332,19 @@ To minimize this window, the sweep MUST follow this discipline for every candida
 
 **Residual risk, named honestly.** This discipline minimizes the TOCTOU window; it does not close
 it. There is no true file-system-level lock in this agent-instruction-driven protocol — a human
-editing or committing to the same worktree in the sub-second span between the final re-check and
-the `git worktree remove` call is still technically possible and would not be caught. Any earlier
-framing of this predicate as one that "cannot cause a false removal" only holds for a single
-atomic evaluation, which this multi-step, agent-executed reality is not. The realistic concurrent
-writer is the human-two-session path (Rule 1's own U1 boundary statement) — a human actively
-working in a worktree the sweep independently determines is merged-and-clean. This is a
-low-frequency, bounded exposure (only uncommitted or committed-but-unmerged work landing in the
-sub-second window is at risk; a worktree that is genuinely merged-and-clean at both checks has
-nothing left to lose), not a claim of zero risk.
+editing or committing to the same worktree in the window between the final re-check and the
+`git worktree remove` call is still technically possible and would not be caught. That window is
+the width of several sequential tool-call round-trips — the re-check alone spans `git rev-list`,
+`git status`/`git diff --numstat`, then the removal call itself, each a separate agent-issued Bash
+invocation carrying its own inference and dispatch latency — realistically seconds to tens of
+seconds, not sub-second, since this discipline runs as agent-issued commands, not a single atomic
+system call. Any earlier framing of this predicate as one that "cannot cause a false removal" only
+holds for a single atomic evaluation, which this multi-step, agent-executed reality is not. The
+realistic concurrent writer is the human-two-session path (Rule 1's own U1 boundary statement) — a
+human actively working in a worktree the sweep independently determines is merged-and-clean. This
+is a low-frequency, bounded exposure (only uncommitted or committed-but-unmerged work landing in
+that window is at risk; a worktree that is genuinely merged-and-clean at both checks has nothing
+left to lose), not a claim of zero risk.
 
 ### Squash-merge detection limit (documented, not a bug)
 

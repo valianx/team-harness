@@ -1003,9 +1003,9 @@ Read the `worktree:` field from `00-state.md § Current State` to get `<path>`.
 git -C <path> status --porcelain
 ```
 
-If the output is empty, the worktree is clean — proceed to step 2. If output exists, apply the mode-only allow-list defined in `docs/worktree-discipline.md § Rule 7` (referenced here, not redefined): a modified path is mode-only, and does not count as dirty, only when BOTH `git -C <path> diff --numstat` and `git -C <path> diff --cached --numstat` show `0\t0` for that path (e.g., an executable-bit flip on `hooks/sketch-guard.sh`). Any non-zero numstat, any untracked (`??`) path, or any deleted path is a content change and blocks teardown.
+If the output is empty, the worktree is clean — proceed to step 1b. If output exists, apply the mode-only allow-list defined in `docs/worktree-discipline.md § Rule 7` (referenced here, not redefined): a modified path is mode-only, and does not count as dirty, only when BOTH `git -C <path> diff --numstat` and `git -C <path> diff --cached --numstat` show `0\t0` for that path (e.g., an executable-bit flip on `hooks/sketch-guard.sh`). Any non-zero numstat, any untracked (`??`) path, or any deleted path is a content change and blocks teardown.
 
-- Every modified path is mode-only → treat the worktree as clean. Proceed to step 2.
+- Every modified path is mode-only → treat the worktree as clean. Proceed to step 1b.
 - Any modified path carries a content change, or an untracked/deleted path exists → **STOP**. Do not remove. Surface to the operator:
 ```
 STOP: worktree <path> has uncommitted changes — teardown blocked.
@@ -1013,6 +1013,15 @@ Inspect with: cd <path> && git status
 Options: (A) commit or stash, then re-run teardown; (B) discard with `git -C <path> checkout .`, then teardown; (C) keep for inspection and remove manually.
 ```
 Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proceed.
+
+**1b. Re-verify condition 3 (merged AND no commits ahead) immediately before removal.** This step's Gate evaluated condition 3 once, before the Teardown protocol began — time has passed since then (this same step's condition-4 check, at minimum). Per `docs/worktree-discipline.md § Rule 7`'s Atomicity discipline (referenced here, not redefined), re-run the ancestry check with no other Bash call interleaved between this re-check and step 2's `git worktree remove`:
+
+```bash
+git -C <path> rev-list origin/main..HEAD
+```
+
+- Empty output → condition 3 still holds. Proceed to step 2.
+- Non-empty output → a commit landed in `<path>` after the Gate's check. **STOP.** Do not remove. Treat the worktree as unmerged: log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point`. Do NOT proceed to step 2.
 
 **2. Remove the worktree (clean path only):**
 
