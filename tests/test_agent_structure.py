@@ -35589,6 +35589,358 @@ check(
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Suite 157 — per-pr-version-bump structural contract
+#
+# Task-2 (agents/delivery.md retire deferred-release model, CLAUDE.md §6.3
+# rewrite, docs/CI/template sweep) and Task-4 (docs/worktree-discipline.md
+# Rule 7 + agents/leader.md Phase 0a preflight sweep) content-VERIFY ACs that
+# were not already covered by Suite 125 (AC-3b), Suite 132 (b2, e1, e2), or
+# Suite 93 (Rule 3/4 pre-existing text, still verbatim after this refactor).
+# Task-1's ACs are covered by tests/test_prepublish_bump_floor.sh and
+# tests/test_prepublish_guard.sh (rewritten by that task's own implementer),
+# not here. Task-2 AC-3 (Step 11.4c gate) is Suite 132's existing b2 check --
+# not repeated. Task-2 AC-10 (consumer-boundary behavior-identical) is
+# explicitly a direct-inspection VERIFY per the plan's own "Método de
+# verificación (obligatorio)" clause -- qa/acceptance-checker performs the
+# before/after diff read; the shallow presence guard below only catches an
+# accidental deletion of the two-row Step 9 table, not a behavior regression.
+#
+# Marker: per-pr-version-bump
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 157: per-pr-version-bump structural checks ===")
+
+_s157_delivery = read(AGENTS_DIR / "delivery.md")
+_s157_claude = read(REPO_ROOT / "CLAUDE.md")
+_s157_cost_caching = read(REPO_ROOT / "docs" / "cost-and-caching.md")
+_s157_lifecycle = read(REPO_ROOT / "docs" / "lifecycle.md")
+_s157_knowledge = read(REPO_ROOT / "docs" / "knowledge.md")
+_s157_pr_template = read(REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md")
+_s157_test_yml = read(REPO_ROOT / ".github" / "workflows" / "test.yml")
+_s157_discipline = read(REPO_ROOT / "docs" / "worktree-discipline.md")
+_s157_leader = read(AGENTS_DIR / "leader.md")
+
+# --- Task-2 AC-1: internal carve-out retired, per-PR bump applies to
+# team-harness itself (not just consumers) ---------------------------------
+check(
+    "s157(t2-ac1a): delivery.md states team-harness does not use the "
+    "repo-local-deferral escape hatch",
+    "team-harness itself does not use this escape hatch" in _s157_delivery,
+    "marker 'team-harness itself does not use this escape hatch' not found "
+    "in agents/delivery.md — Task-2 AC-1 carve-out retirement missing",
+)
+check(
+    "s157(t2-ac1b): delivery.md frames team-harness's own CLAUDE.md §6.3 as "
+    "the per-PR shipped default, not a deferral",
+    "documents the per-PR shipped default, not a deferral" in _s157_delivery,
+    "marker 'documents the per-PR shipped default, not a deferral' not found "
+    "in agents/delivery.md — Task-2 AC-1 framing missing",
+)
+
+# --- Task-2 AC-2: version.d/ machinery + release-mode/inline-release modes
+# retired from delivery.md (regression guard against reversion) ------------
+check(
+    "s157(t2-ac2a): delivery.md no longer references the retired "
+    "release-mode gate",
+    "release-mode" not in _s157_delivery,
+    "agents/delivery.md still contains 'release-mode' — Task-2 AC-2 "
+    "requires this retired gate fully removed",
+)
+check(
+    "s157(t2-ac2b): delivery.md no longer references the retired "
+    "inline-release mode",
+    "inline-release" not in _s157_delivery,
+    "agents/delivery.md still contains 'inline-release' — Task-2 AC-2 "
+    "requires this retired mode fully removed",
+)
+check(
+    "s157(t2-ac2c): delivery.md no longer contains the retired Step 9-R "
+    "section",
+    "Step 9-R" not in _s157_delivery,
+    "agents/delivery.md still contains 'Step 9-R' — Task-2 AC-2 requires "
+    "this retired section fully removed",
+)
+check(
+    "s157(t2-ac2d): delivery.md no longer references version.d/ marker "
+    "machinery",
+    "version.d/" not in _s157_delivery,
+    "agents/delivery.md still contains 'version.d/' — Task-2 AC-2 requires "
+    "the marker-discipline machinery fully removed",
+)
+
+# --- Task-2 AC-4: CLAUDE.md §6.3 per-PR model, rebase-and-rebump trade-off,
+# changelog.d/ kept as fallback, /th:release prose gone ---------------------
+check(
+    "s157(t2-ac4a): CLAUDE.md §6.3 documents the rebase-and-rebump trade-off",
+    "rebase-and-rebump" in _s157_claude,
+    "marker 'rebase-and-rebump' not found in CLAUDE.md — Task-2 AC-4 "
+    "trade-off documentation missing",
+)
+check(
+    "s157(t2-ac4b): CLAUDE.md §6.3 keeps changelog.d/ as the batch/fallback "
+    "path, not team-harness's own default",
+    "remains the batch/fallback path" in _s157_claude,
+    "marker 'remains the batch/fallback path' not found in CLAUDE.md — "
+    "Task-2 AC-4 changelog.d/ fallback framing missing",
+)
+check(
+    "s157(t2-ac4c): CLAUDE.md no longer references the retired /th:release "
+    "skill",
+    "/th:release" not in _s157_claude,
+    "CLAUDE.md still contains '/th:release' — Task-2 AC-4 requires all "
+    "deferral/skill prose removed",
+)
+
+# --- Task-2 AC-5: skills/release/SKILL.md + version.d/.release-cut deleted
+# (skills/release/SKILL.md absence and skills/update/SKILL.md dangling-ref
+# absence are already Suite 132 e1/e2 — only the marker-file deletion is new
+# here) ----------------------------------------------------------------------
+_s157_release_cut_path = REPO_ROOT / "version.d" / ".release-cut"
+_s157_version_d_dir = REPO_ROOT / "version.d"
+check(
+    "s157(t2-ac5a): version.d/.release-cut marker file is deleted",
+    not _s157_release_cut_path.exists(),
+    "version.d/.release-cut must stay deleted under the per-pr-version-bump "
+    "model — Task-2 AC-5",
+)
+check(
+    "s157(t2-ac5b): version.d/ directory no longer exists (no leftover "
+    "tracked file inside it)",
+    not _s157_version_d_dir.exists(),
+    "version.d/ directory should no longer exist — Task-2 AC-5 (no other "
+    "tracked file was left inside it once the marker was deleted)",
+)
+
+# --- Task-2 AC-6: cost-and-caching.md records the superseded rationale
+# honestly; lifecycle.md no longer frames the deferred model as current ----
+check(
+    "s157(t2-ac6a): cost-and-caching.md marks the release-batching "
+    "rationale as superseded (history kept, not erased)",
+    "superseded" in _s157_cost_caching
+    and "history kept for context" in _s157_cost_caching,
+    "docs/cost-and-caching.md must mark the batching-per-release rationale "
+    "'superseded' while keeping the history for context — Task-2 AC-6",
+)
+check(
+    "s157(t2-ac6b): lifecycle.md's release walkthrough now describes the "
+    "per-PR bump model, not a dedicated release PR",
+    "per-PR bump model" in _s157_lifecycle,
+    "docs/lifecycle.md must describe 'per-PR bump model' in its release "
+    "walkthrough — Task-2 AC-6 requires the deferred-model framing removed",
+)
+
+# --- Task-2 AC-7: PR template names all three sites + changelog.d/ as batch
+# option; test.yml release-only allowlist no longer references version.d/* -
+check(
+    "s157(t2-ac7a): PR template requires all three version sites bumped "
+    "together",
+    ".claude-plugin/plugin.json" in _s157_pr_template
+    and "plugins[0].version" in _s157_pr_template
+    and "CLAUDE.md §3" in _s157_pr_template,
+    ".github/PULL_REQUEST_TEMPLATE.md must name all three version sites — "
+    "Task-2 AC-7",
+)
+check(
+    "s157(t2-ac7b): PR template keeps changelog.d/ as an explicit batching "
+    "option, not the default bump path",
+    "changelog.d/" in _s157_pr_template and "batching" in _s157_pr_template,
+    ".github/PULL_REQUEST_TEMPLATE.md must offer changelog.d/ as a batching "
+    "option — Task-2 AC-7",
+)
+check(
+    "s157(t2-ac7c): test.yml release-only allowlist no longer references "
+    "version.d/*",
+    "version.d" not in _s157_test_yml,
+    ".github/workflows/test.yml release-only allowlist must not reference "
+    "version.d/* — Task-2 AC-7",
+)
+
+# --- Task-2 AC-8: knowledge.md gains a [decision] bullet for the per-PR
+# adoption ---------------------------------------------------------------
+check(
+    "s157(t2-ac8): knowledge.md documents the per-PR version-bump adoption "
+    "decision",
+    "adopts the shipped per-PR version-bump default" in _s157_knowledge,
+    "marker 'adopts the shipped per-PR version-bump default' not found in "
+    "docs/knowledge.md — Task-2 AC-8 decision bullet missing",
+)
+
+# --- Task-2 AC-9: delivery.md Step 11.4b adopts Rule 7's mode-only allow-
+# list by reference, frames itself as same-session best-effort, and never
+# silently skips ------------------------------------------------------------
+_S157_STEP_11_4B_ANCHOR = (
+    "### Step 11.4b — Worktree teardown (post-merge, rule 4; "
+    "same-session best-effort; conditional)"
+)
+_S157_DELIVERY_STOPS = ("\n### ", "\n## ", "\n---\n")
+_s157_step_11_4b_slice = _slice_section(
+    _s157_delivery, _S157_STEP_11_4B_ANCHOR, _S157_DELIVERY_STOPS
+)
+check(
+    "s157(t2-ac9a): delivery.md Step 11.4b exists and is framed as "
+    "same-session best-effort",
+    bool(_s157_step_11_4b_slice),
+    "'### Step 11.4b — Worktree teardown (post-merge, rule 4; "
+    "same-session best-effort; conditional)' not found in agents/delivery.md",
+)
+check(
+    "s157(t2-ac9b): Step 11.4b references docs/worktree-discipline.md § "
+    "Rule 7 by pointer for the mode-only allow-list, without redefining it",
+    "docs/worktree-discipline.md § Rule 7" in _s157_step_11_4b_slice
+    and "0\\t0" in _s157_step_11_4b_slice,
+    "Step 11.4b must reference 'docs/worktree-discipline.md § Rule 7' and "
+    "state the '0\\t0' dual-numstat mode-only allow-list — Task-2 AC-9",
+)
+check(
+    "s157(t2-ac9c): Step 11.4b states every non-removed outcome is "
+    "reported, never a silent skip",
+    "Never a silent skip" in _s157_step_11_4b_slice,
+    "Step 11.4b must state 'Never a silent skip' — Task-2 AC-9 report "
+    "contract missing",
+)
+
+# --- Task-2 AC-10 (shallow guard only — see header note; qa/acceptance-
+# checker performs the authoritative before/after diff read) ---------------
+check(
+    "s157(t2-ac10): delivery.md Step 9 keeps the two-row shipped-default / "
+    "repo-local-deferral table intact (accidental-deletion guard only)",
+    "Per-PR bump (shipped default)" in _s157_delivery
+    and "Repo-local deferral" in _s157_delivery,
+    "agents/delivery.md Step 9 must still declare both the "
+    "'Per-PR bump (shipped default)' and 'Repo-local deferral' rows — "
+    "Task-2 AC-10 consumer-default table",
+)
+
+# --- Task-4 AC-1: docs/worktree-discipline.md Rule 7 exists with the
+# 4-condition predicate and the action/report table -------------------------
+check(
+    "s157(t4-ac1a): worktree-discipline.md declares Rule 7 — boot-time "
+    "preflight sweep",
+    "## Rule 7 — Boot-time preflight sweep: the durable worktree reaper"
+    in _s157_discipline,
+    "'## Rule 7 — Boot-time preflight sweep: the durable worktree reaper' "
+    "not found in docs/worktree-discipline.md — Task-4 AC-1",
+)
+check(
+    "s157(t4-ac1b): Rule 7 states the predicate is four cumulative "
+    "conditions",
+    "four cumulative conditions" in _s157_discipline
+    or "FOUR conditions" in _s157_discipline,
+    "docs/worktree-discipline.md Rule 7 must state the predicate is 4 "
+    "cumulative conditions — Task-4 AC-1",
+)
+check(
+    "s157(t4-ac1c): Rule 7 action/report table has all four "
+    "worktree_swept: outcomes",
+    "worktree_swept: removed" in _s157_discipline
+    and "worktree_swept: left" in _s157_discipline
+    and "worktree_swept: candidate" in _s157_discipline,
+    "docs/worktree-discipline.md Rule 7 must declare 'worktree_swept: "
+    "removed', 'worktree_swept: left', and 'worktree_swept: candidate' — "
+    "Task-4 AC-1 action/report table",
+)
+
+# --- Task-4 AC-2: Rule 3's teardown-ownership claim is corrected ----------
+_S157_RULE3_ANCHOR = "## Rule 3 — Finished means PR merged"
+_S157_DISCIPLINE_STOPS = ("\n## ", "\n---\n")
+_s157_rule3_slice = _slice_section(
+    _s157_discipline, _S157_RULE3_ANCHOR, _S157_DISCIPLINE_STOPS
+)
+check(
+    "s157(t4-ac2): worktree-discipline.md Rule 3 corrects the "
+    "'delivery post-merge' teardown-ownership claim",
+    "Teardown ownership (corrected" in _s157_rule3_slice
+    and "same-session best-effort" in _s157_rule3_slice,
+    "docs/worktree-discipline.md Rule 3 must contain a "
+    "'Teardown ownership (corrected...)' note stating delivery's teardown "
+    "is same-session best-effort — Task-4 AC-2",
+)
+
+# --- Task-4 AC-3: agents/leader.md Phase 0a gains the boot-time preflight
+# sweep step, referencing Rule 7/5/6 by pointer -----------------------------
+check(
+    "s157(t4-ac3a): leader.md Phase 0a declares the boot-time preflight "
+    "worktree sweep step",
+    "Boot-time preflight worktree sweep" in _s157_leader,
+    "marker 'Boot-time preflight worktree sweep' not found in "
+    "agents/leader.md Phase 0a — Task-4 AC-3",
+)
+check(
+    "s157(t4-ac3b): leader.md's preflight sweep step references "
+    "worktree-discipline.md § Rule 7 by pointer",
+    "docs/worktree-discipline.md § Rule 7" in _s157_leader,
+    "agents/leader.md must reference 'docs/worktree-discipline.md § "
+    "Rule 7' from its preflight sweep step — Task-4 AC-3",
+)
+check(
+    "s157(t4-ac3c): leader.md's preflight sweep composes with Rule 6's "
+    "per-lane isolation for multi-project initiatives",
+    "composing with Rule 6" in _s157_leader,
+    "agents/leader.md preflight sweep step must state it composes with "
+    "Rule 6's per-lane isolation — Task-4 AC-3",
+)
+
+# --- Task-4 AC-4: mode-only allow-list precision — dual numstat, 0\t0 -----
+check(
+    "s157(t4-ac4): worktree-discipline.md Rule 7 specifies the dual "
+    "--numstat / --cached --numstat 0\\t0 mode-only allow-list",
+    "diff --numstat` and `git -C <path> diff --cached --numstat` show "
+    "`0\\t0`" in _s157_discipline,
+    "docs/worktree-discipline.md Rule 7 must specify BOTH "
+    "'git -C <path> diff --numstat' and 'git -C <path> diff --cached "
+    "--numstat' showing '0\\t0' — Task-4 AC-4",
+)
+
+# --- Task-4 AC-5: report-when-not-removed contract, never a silent skip --
+check(
+    "s157(t4-ac5): Rule 7 states an unresolved worktree is never a silent, "
+    "permanent skip",
+    "Never a silent, permanent skip" in _s157_discipline,
+    "docs/worktree-discipline.md Rule 7 must state 'Never a silent, "
+    "permanent skip' — Task-4 AC-5",
+)
+
+# --- Task-4 AC-6: condition 3 AND-eads merged + no-commits-ahead ----------
+check(
+    "s157(t4-ac6a): Rule 7 condition 3 requires an empty "
+    "'origin/main..HEAD' rev-list (no commits ahead of the merge point)",
+    "rev-list origin/main..HEAD" in _s157_discipline,
+    "docs/worktree-discipline.md Rule 7 condition 3 must require "
+    "'git -C <path> rev-list origin/main..HEAD' to be empty — Task-4 AC-6",
+)
+check(
+    "s157(t4-ac6b): Rule 7's action/report table names the "
+    "commits-ahead-of-merge-point sub-case distinctly",
+    "commits ahead of merge point" in _s157_discipline,
+    "docs/worktree-discipline.md Rule 7 action/report table must name "
+    "'commits ahead of merge point' as its own outcome — Task-4 AC-6",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here, per the same rationale documented at Suite 156: it is a
+# documentation edit this tester dispatch is scoped away from (test files
+# only) rather than a property this test file can assert about itself.
+_s157_own = read(Path(__file__))
+check(
+    "suite157(self-ref): test file contains 'Suite 157' and "
+    "'per-pr-version-bump'",
+    "Suite 157" in _s157_own and "per-pr-version-bump" in _s157_own,
+    "test file must self-reference Suite 157 and the marker "
+    "'per-pr-version-bump'",
+)
+check(
+    "suite157(hygiene): CLAUDE.md does NOT contain 'Suite 157' (§11 "
+    "hygiene contract)",
+    "Suite 157" not in _s157_claude,
+    "CLAUDE.md must not mention Suite 157 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: per-pr-version-bump
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print()
