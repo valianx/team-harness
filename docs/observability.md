@@ -86,6 +86,22 @@ bearer credentials, or other sensitive values. Use mechanical context only
 (e.g., `"detail": "config file path: ~/.claude/.team-harness.json"`). The same
 KG content policy that governs knowledge-graph nodes applies here.
 
+### Free-text field bound (`bounded` intensity level)
+
+Every free-text field carried by any event in `00-execution-events.*` — this
+section's own `detail`/`error`/`suggestion`, `kg_write.writes[].detail`
+(§ "kg_write event" below), and `plan_structure.extra.detail`
+(§ "Additional pipeline event types" below) — is bounded to the `bounded`
+intensity level defined in `docs/output-contract-patterns.md § 2`: ONE compact
+clause — a short phrase or single sentence fragment, ≤120 chars — never
+multi-sentence narrative prose. This is a FORMAT bound only: it never reduces
+the one-JSON-object-per-line invariant, and it never removes an event —
+every `phase.*`/`gate.*` event this schema requires still fires unchanged,
+regardless of how compact its optional free-text fields are (see "Tier 0
+carve-out" below for the sole exemption from the observability floor itself).
+Canonical source: `agents/orchestrator.md § "Free-text field bound"`; the two
+sites must not diverge.
+
 ## Placement in 00-execution-events
 
 `operation.*` events are written as additional JSONL lines within the existing
@@ -460,6 +476,45 @@ Note: the `lane` field on `research.lane.skipped` names a **research fan-out lan
 | `skipped:policy-filtered` | The content-policy filter or an MCP `policy/*` return discarded the write. | Content-policy drop, MCP `policy/<code>` response |
 
 **Why a sibling event, not `operation.end`:** `operation.*` models one discrete operation with three states (`started` / `success` / `failed`) and no counters. A Phase 6 batch may write up to 5 nodes, with some `ok` and others `skipped:policy-filtered` in the same run. Forcing that into `operation.end` would require either one event per node (multiplies noise) or adding counters to `operation.*` (breaks its single-operation schema for every non-KG use). A sibling event `kg_write` with `attempted` / `succeeded` / `writes[]` expresses the batch in one line without contaminating `operation.*`. This does NOT violate the "no parallel KG-namespaced events" rule in the orchestrator — that rule prohibits a **family** with state suffixes (`kg.started` / `kg.success` / `kg.failed`); `kg_write` is a **single event type** with no suffixes. See the orchestrator's "Emitting kg_write events" subsection for the full rationale and the explicit exception.
+
+## 00-state.md bounded snapshot (`§ Agent Results` + `§ Hot Context`)
+
+`00-state.md § Agent Results` and `§ Hot Context` are **bounded, replaceable
+snapshots** (`docs/output-contract-patterns.md § 2` `bounded` intensity
+level) — current-state-only, never an accumulating append-log. All historical
+detail (what happened at each phase, over time) lives exclusively in
+`{events_file}`; `00-state.md` shows only where the pipeline is now.
+
+**`§ Agent Results` — keyed upsert, not append.** Each row is keyed by
+`(agent, phase)`. A re-dispatch of the same `(agent, phase)` key across
+iterations (e.g. `implementer` re-run after a Phase-3 iteration) overwrites
+that row in place — it never adds a second row for the same key. A distinct
+`(agent, phase)` key is always a distinct row: `security` and `adversary`
+both dispatch at Phase 3 (`3-verify`) but are different agents, so each keeps
+its own current-verdict row — including `adversary`'s
+`incomplete_on_changed_control` field — never collapsed into a single
+last-writer-wins value. In-place replacement happens **between iterations**
+(the same lens re-running), never **between lenses of the same phase** (two
+different lenses are always two rows).
+
+**`§ Hot Context` — overwrite in place, not append.** Rewritten at every phase
+transition to reflect only the current open insight/constraint; a new entry
+on the same topic replaces the prior one rather than appending beside it.
+
+**Iteration re-narration ban applies to both sections.** Neither section
+re-tells what happened in a past iteration — each references the iteration by
+ID only (`Iteration {N}`), per `docs/output-contract-patterns.md § 5`. The
+narrative for a given round lives exclusively in `failure-brief.md`.
+
+**Does not weaken the observability floor.** This is a FORMAT bound on two
+`00-state.md` sections; it does not touch `{events_file}`'s mandatory
+`phase.*`/`gate.*` emission (§ "Tier 0 carve-out" below is the only
+exemption from that floor) and it does not change what `00-pipeline-summary.md`
+derives from the trace.
+
+Canonical source: `agents/orchestrator.md § "Phase Transition Protocol"` (the
+upsert mechanic) and `§ "Agent Results"` / `§ "Hot Context"` (the schema
+templates); the two sites must not diverge.
 
 ## Active-lane observability surface
 
