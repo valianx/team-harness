@@ -1048,6 +1048,53 @@ _run_hook "$_clone_a3d"
 assert_deny "Suite16/AC-3b: no bump anywhere → hard-block still fires (regression guard — guard is not toothless)"
 
 # ---------------------------------------------------------------------------
+# AC-12: worst-case under-bump — DELETE a distributed asset (MAJOR floor) with
+# only a PATCH bump → still WARN, NEVER deny.
+#
+# This locks in the under-bump advisory-only contract as an explicit, tested
+# case rather than an untested implicit gap: the widest possible floor/actual
+# gap (MAJOR floor vs PATCH applied) must still resolve to nodecision with a
+# WARN-level signal, on an ordinary feature branch. The bump-floor sub-stage
+# (runBumpFloorSubstage) never denies on under-bump — only over-bump governance
+# (Suite 16 above) can deny. See the accepted residual documented in
+# 01-plan.md § Security Assessment (under-bump exposure) and § Adversarial
+# Findings Remediation (A2): the level check stays advisory by design.
+# ---------------------------------------------------------------------------
+echo
+echo "--- AC-12: feat branch + DELETE skills/qux/SKILL.md (MAJOR floor) + PATCH-only bump → WARN, never deny ---"
+
+_bare_ac12=$(_new_tmp)
+_clone_ac12=$(_new_tmp)
+_make_repo "$_bare_ac12" "$_clone_ac12" "2.107.0"
+
+(
+    cd "$_clone_ac12"
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    mkdir -p skills/qux
+    echo "# SKILL" > skills/qux/SKILL.md
+    git add skills/qux/
+    git commit -m "base: add skills/qux/SKILL.md" -q 2>/dev/null
+    git push origin HEAD:main -q 2>/dev/null
+    # Feature branch: DELETE the distributed asset (MAJOR floor via
+    # sawRemovedOrRenamed) but bump only PATCH — the widest possible
+    # under-bump gap.
+    git checkout -b feat/ac12-worst-under-bump -q 2>/dev/null
+    git rm skills/qux/SKILL.md -q 2>/dev/null
+    _write_plugin_json "2.107.1" .claude-plugin/plugin.json
+    _write_market_json "2.107.1" .claude-plugin/marketplace.json
+    git add .claude-plugin/
+    git commit -m "feat: delete skills/qux/SKILL.md (patch-only bump — worst-case under-bump)" -q 2>/dev/null
+)
+
+_run_hook "$_clone_ac12"
+
+assert_nodecision "AC-12: DELETE (MAJOR floor) + PATCH-only bump → nodecision (never deny)"
+assert_stderr_contains "AC-12: WARN present for worst-case under-bump" "WARN"
+assert_stderr_contains "AC-12: WARN names MAJOR floor" "MAJOR"
+assert_stderr_contains "AC-12: advisory note present" "advisory"
+
+# ---------------------------------------------------------------------------
 # Suite 17: SEC-001 closure — third-site (CLAUDE.md §3) enforcement
 #
 # These cases close the gap between the guard's declared contract (three
