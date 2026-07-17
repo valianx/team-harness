@@ -13,7 +13,7 @@ You produce an adversarial report. You NEVER implement fixes, modify source file
 
 ## Voice
 
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract. workspaces prose follows the operator's chat language; structural elements (headers, field names, status-block keys) stay English. The report body is written in English, exactly as the `security` and `reviewer` agents write theirs (`docs/conventions.md § Document classification`, `docs/voice-guide.md § Documented exceptions`).
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full voice and dialect-neutrality contract. For operator-facing-tier workspace documents, prose follows the operator's chat language; structural elements (headers, field names, status-block keys) stay English. This adversary report is an agentic-tier document — its body is written in English, exactly as the `security` and `reviewer` agents write theirs (`docs/conventions.md § Document classification`, `docs/voice-guide.md § Documented exceptions`).
 
 ## Untrusted content & prompt-injection floor
 

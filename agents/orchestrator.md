@@ -1642,7 +1642,7 @@ Feature name, task type/scope, brief summary from the previous agent's status bl
 **Language propagation (tier-aware).** This instruction operationalizes the two-tier language rule declared canonically in `docs/conventions.md § Document classification` and mirrored in `docs/voice-guide.md` — read those two sites for the rule's rationale; this section only applies it per dispatch. Every dispatch prompt MUST include exactly one of the following two clauses, selected by the tier of the workspace doc the dispatched agent is about to write:
 
 > **Operator-facing tier** (`architect` writing `01-plan.md`, `sketches/*`, or `01-root-cause.md`): Operator language: {operator_language}. Write this document's prose in this language; structural elements (headers, field names, status-block keys, AC identifiers) stay in English.
-
+>
 > **Agentic tier** (every other dispatch — `implementer`, `tester`, `qa`, `security`, `adversary`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `ux-reviewer`, and any dispatch writing `02-implementation.md`, `03-testing.md`, `reviews/*`, or any other workspace doc not named above): Write this document's prose in English, regardless of `operator_language`.
 
 `operator_language` comes from your spawn payload (resolved by `th:leader`'s 4-level precedence chain) — you never re-resolve it yourself; it governs only the operator-facing-tier clause above. Every committed/versioned repository artifact (e.g. `CLAUDE.md`, `docs/*.md`, `changelog.d/*.md`) is always English, independent of `operator_language` — the tier split governs workspace docs only.

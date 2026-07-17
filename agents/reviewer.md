@@ -356,7 +356,7 @@ When the PR body contains an `## Intentional removals (not regressions)` table w
 2. For each removal in the diff, cross-check it against the table. If the table accounts for it AND you can independently confirm the value is **relocated, not deleted** (verify the destination exists in the diff or repo — mirror the positive-justification posture of `agents/_shared/apply-review-disposition.md:120-131`), classify it as `intentional-relocation` and surface it in the `review_body` under the following heading as "confirms it matches the stated objective". Do NOT classify it as a regression and do NOT produce a `loosening-impact` CRITICAL for it.
 
    Emitted `review_body` output (English, as required by the Critical Rules):
-   ```
+   ```markdown
    ### Intentional removals (confirmed against the objective)
    - `{removed element}` — confirms it matches the stated objective; the value now lives in `{destination}`.
    ```
@@ -494,7 +494,7 @@ Each finding is classified as:
 If during analysis you detect **more than 10 critical findings**, switch to **structural review mode**:
 
 1. **Body:** Short and direct:
-   ```
+   ```text
    This PR has {N} critical issues indicating structural problems.
    Top 3 blockers:
    1. {description of the most severe critical}

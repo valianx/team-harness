@@ -68,8 +68,8 @@ the measurement method: `docs/output-contract-patterns.md`.
 
 | Level | Artifact classes |
 |-------|-------------------|
-| `verbatim` | Code/diffs, commands, identifiers, exact error strings, status-block enum values, CWE/OWASP tokens, `file:line` locators — never paraphrased or compressed. |
-| `tight` | Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports — a prose budget per item; item count is never capped. |
+| `verbatim` | Code/diffs, commands, identifiers, exact error strings, status-block field names and enum values, CWE/OWASP tokens, `file:line` locators — never paraphrased or compressed. |
+| `tight` | Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports — Critical/High findings and adversary per-control entries get a prose budget per item; item count is never capped. |
 | `bounded` | Whole-document/section capped, replaceable snapshots — `00-state.md`, `00-execution-events.md` free-text fields, `changelog.d/*.md`, `01-plan.md § Decisions for human review`, `failure-brief.md` iteration entries. |
 | `standard` | Ordinary analytical prose not covered above — architecture narrative, implementation/testing docs, `docs/` reference material. |
 

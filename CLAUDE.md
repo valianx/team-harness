@@ -286,7 +286,7 @@ The three things a developer already knows how to ask for — a work plan, an im
 
 ### 7.3 Language — English-only repo content
 
-Every committed artefact is in English. workspaces prose follows the operator's chat language (structure stays English). Live chat is not a committed artefact — operator may chat in any language.
+Every committed artefact is in English. Workspace docs split by tier: operator-facing follows the operator's language; agentic stays English (`docs/conventions.md`). Live chat may be in any language.
 
 **Documented exceptions:** `agents/leader.md` live chat and Step 6 intent-detection routing table render in the operator's resolved language, never a hardcoded language. No other committed artefact carries a language exception; reports stay English. See `docs/voice-guide.md`.
 

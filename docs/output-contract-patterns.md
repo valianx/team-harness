@@ -90,7 +90,7 @@ Patch/verify round narratives live in exactly one place: `failure-brief.md`. Eve
 that discusses an iteration references it by ID (`Iteration {N}`) and does not retell what
 happened in that round.
 
-**Canonical vehicle to imitate:** `agents/adversary.md:274-291` — the "Failure Brief" section's
+**Canonical vehicle to imitate:** `agents/adversary.md` § Failure Brief — the section's
 5-10 line per-iteration contract (`## Iteration {N} — adversary — {timestamp}`, root-cause type,
 blast radius, breaks found, required changes). This is the shape every other agent's
 iteration-reference points back to; no other file restates the round's content.
@@ -114,7 +114,7 @@ Measure the effect of this contract using the existing `00-pipeline-summary.md �
 2. Compare the `security`/`adversary`/`reviewer` report-body byte share (bytes/4 token proxy,
    consistent with the empirical baseline method below) against the feature's total run bytes,
    before and after this contract lands.
-3. A run "improves" when the two-lens report-body share drops from its pre-contract baseline
+3. A run "improves" when the three-report (`security`+`adversary`+`reviewer`) report-body share drops from its pre-contract baseline
    without a drop in reported finding count (cross-check against the finding count in the same
    run's `reviews/04-security.md` / `reviews/04-adversary.md`).
 

@@ -821,6 +821,7 @@ Write the complete report in English to `workspaces/{feature-name}/reviews/04-se
 ## Security Configuration
 
 ### HTTP Headers
+
 | Header | Status | Current Configuration | Recommended Configuration |
 |--------|--------|---------------------|--------------------------|
 | Strict-Transport-Security | {Present / Absent / Weak} | {current value} | `max-age=31536000; includeSubDomains; preload` |
@@ -831,12 +832,14 @@ Write the complete report in English to `workspaces/{feature-name}/reviews/04-se
 | Permissions-Policy | {Present / Absent} | {current value} | {appropriate restrictive policy} |
 
 ### CORS
+
 | Aspect | Status | Detail |
 |---------|--------|---------|
 | Allowed origins | {Restrictive / Broad / Wildcard} | {current configuration} |
 | Credentials | {Correct / Incorrect} | {detail} |
 
 ### Authentication
+
 | Aspect | Status | Detail |
 |---------|--------|---------|
 | JWT Algorithm | {Secure / Weak / Configurable} | {detail} |
