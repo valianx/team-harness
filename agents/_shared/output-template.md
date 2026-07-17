@@ -57,6 +57,32 @@ These skills surface internal pipeline state because the operator explicitly
 requested it. The narration lint (`tests/test_agent_structure.py` Suite 31)
 does not scan them.
 
+## Output Contract — Compression
+
+<!-- Compact mirror of docs/output-contract-patterns.md § 2 Intensity Levels.
+     Names and artifact-class assignments MUST match the canonical table exactly
+     (multi-site invariant) — edit both files together. -->
+
+Every full-lane artifact maps to one of four named intensity levels. Full detail, rationale, and
+the measurement method: `docs/output-contract-patterns.md`.
+
+| Level | Artifact classes |
+|-------|-------------------|
+| `verbatim` | Code/diffs, commands, identifiers, exact error strings, status-block field names and enum values, CWE/OWASP tokens, `file:line` locators — never paraphrased or compressed. |
+| `tight` | Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports — Critical/High findings and adversary per-control entries get a prose budget per item; item count is never capped. |
+| `bounded` | Whole-document/section capped, replaceable snapshots — `00-state.md`, `00-execution-events.md` free-text fields, `changelog.d/*.md`, `01-plan.md § Decisions for human review`, `failure-brief.md` iteration entries. |
+| `standard` | Ordinary analytical prose not covered above — architecture narrative, implementation/testing docs, `docs/` reference material. |
+
+**Verbatim rule:** code, commands, identifiers, and exact error strings are never paraphrased or
+compressed, regardless of the document's assigned level.
+
+**Clarity exemption:** a security warning's headline AND its actionable remediation (for
+Critical/High findings), an irreversible-action confirmation, and a multi-step sequence are
+exempt from compression at any level.
+
+**Non-negotiable floor:** compression is a format constraint only — no level caps the number of
+findings, controls, or AC results reported at any severity.
+
 ## Status block — common fields
 
 <!-- Consumed by: every leaf agent's Return Protocol status-block template. -->

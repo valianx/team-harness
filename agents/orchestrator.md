@@ -135,8 +135,8 @@ Triggered only when a dispatch of a specialist returns a genuine "tool unavailab
 | `implementer` | Writes production code following the architecture proposal | Yes | `02-implementation.md` |
 | `tester` | Creates tests with factory mocks, runs them | Yes (tests) | `03-testing.md` |
 | `qa` | Validates implementations against AC | No | `reviews/04-validation.md` |
-| `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in Spanish | No | `reviews/04-security.md` |
-| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in Spanish | No | `reviews/04-adversary.md` |
+| `security` | Audits code for security vulnerabilities (OWASP, CWE, ASVS); produces prioritized reports in English | No | `reviews/04-security.md` |
+| `adversary` | Independent adversarial reviewer with a break-the-design mandate; runs in Stage-2 verify in parallel with `security` on security-sensitive changes; verdict `broke-it \| could-not-break`; report in English | No | `reviews/04-adversary.md` |
 | `plan-reviewer` | Read-only audit of Stage 1 analysis artifact (`01-plan.md`) against the plan-shape rules; emits pass/concerns/fail verdict before STAGE-GATE-1 | No | `reviews/01-plan-review.md` |
 | `acceptance-checker` | External audit: compares original spec vs delivered artifacts; non-binding verdict (pass / concerns / fail) | No | `reviews/04-validation.md § Drift Analysis` |
 | `delivery` | Documents, bumps version, creates branch, commits, pushes | No | `00-state.md § Delivery` |
@@ -231,7 +231,7 @@ At EVERY phase boundary, execute these three steps as a single atomic unit. Skip
 1. **Append event to `{events_file}`** — `phase.start` before dispatch (`{"event":"phase.start", ...}`), `phase.end` after the agent returns (`{"event":"phase.end", ...}`, with `tokens`, `duration_ms`, `tools`, `model`, `effort` per the schema under "Execution Events JSONL" below), `gate` when a gate is reached (`{"event":"gate", ...}`).
    - **This step comes FIRST** because events are append-only and must reflect real-time — backfilling after the fact loses timestamp accuracy.
    - **Token tracking is mandatory.** Every `phase.end` MUST include `tokens`. Extract from the Task() call result metadata when available; otherwise estimate (`duration_min × 1500` opus-heavy / `× 800` sonnet-heavy) and set `tokens_estimated: true`. `"tokens":0` is FORBIDDEN.
-2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `§ Current State` fields, mark the completed phase `[x]` in the Phase Checklist, add the agent result row to the Agent Results table, update Recovery Instructions.
+2. **Update `00-state.md`** — rewrite TL;DR in place (4 bullets), update `§ Current State` fields, mark the completed phase `[x]` in the Phase Checklist, upsert the `§ Agent Results` row keyed by `(agent, phase)` (overwrite the row in place on a same-key re-run across iterations — never append a duplicate row for the same key; a new row is added only for a genuinely new `(agent, phase)` key, so `security` and `adversary` at Phase 3 each keep their own current-verdict row, never collapsed to one last-writer-wins value), overwrite `§ Hot Context` in place with the current-state snapshot, update Recovery Instructions.
 3. **Proceed to next dispatch** — only after steps 1 and 2 are done.
 
 **Enforcement rule:** you MUST NOT call `Agent()` or `Task()` for the next phase until the event has been appended and the state file has been updated. If context compaction occurred and you lost track, read `{events_file}` — if the last event does not match the last `[x]` in the Phase Checklist, backfill the missing events before continuing.
@@ -349,12 +349,27 @@ After `delivery` returns `status: success` at Phase 4, and before Phase 5, run t
 - [ ] 6 — KG Save
 
 ## Agent Results
+<!-- Bounded, replaceable snapshot (docs/output-contract-patterns.md § 2 `bounded` level) — keyed by
+     (agent, phase), never an accumulating append-log. A same-key re-run (a re-dispatch after an
+     iteration) overwrites its row in place; a distinct (agent, phase) key — e.g. `security` and
+     `adversary`, both at Phase 3 — is a distinct row, so a phase with two lenses always retains
+     both current verdicts (including `incomplete_on_changed_control`), never a single
+     last-writer-wins value. Historical detail across iterations lives only in {events_file};
+     iteration narratives live only in failure-brief.md (docs/output-contract-patterns.md § 5
+     Iteration Re-Narration Ban) — this table references an iteration by ID, it never re-tells
+     what happened in it. -->
 | Agent | Phase | Status | Tokens | Summary |
 |-------|-------|--------|--------|---------|
 | architect | 1-design | success | 48,200 | proposed repository pattern |
+| security | 3-verify | pass | 12,400 | 2 High, 0 Critical |
+| adversary | 3-verify | could-not-break (incomplete_on_changed_control: true) | 9,800 | changed control not fully probed |
 
 ## Hot Context
-- {insight from this task discovered DURING execution}
+<!-- Bounded, replaceable snapshot — overwritten in place at every phase transition, current-state
+     only, never an accumulating bullet log across the whole run. Historical detail lives in
+     {events_file}; an iteration reference points to {events_file}/failure-brief.md by iteration ID
+     (docs/output-contract-patterns.md § 5), it is never re-told here. -->
+- {current open insight/constraint, ≤200 chars — replaces the prior entry on the same topic rather than appending beside it}
 
 ## Recovery Instructions
 If reading this after context compaction:
@@ -1472,6 +1487,8 @@ After Phase 3 succeeds, drop agent invocation details and read workspace content
 
 **Writing the trace is mandatory, not best-effort.** Skipping events under context pressure is the failure mode that killed the previous spec. The append is a single-line `>>` redirect — the cost is negligible compared to the cost of running a pipeline blind. If you find yourself "saving tokens" by batching or skipping appends, you are deleting the only signal we have on whether the pipeline is healthy.
 
+**Mandatory observability floor (fenced — MUST NOT change).** The compaction rules below (§ "Free-text field bound" and the `00-state.md` bounded-snapshot conversion in § "Phase Checkpointing") bound FORMAT only. Every `phase.*`/`gate.*` event this schema requires still fires, unchanged, at every phase transition and every gate — no format bound ever removes an event. The only exemption from this observability invariant remains the pre-existing Tier-0 carve-out (single-file ≤5-line trivial/docs fixes, `workspaces: NONE` by design — `docs/observability.md § Tier 0 carve-out`); no other type, tier, or lane is newly exempted by this contract.
+
 ### Schema (key fields)
 
 | Field | Required | Description |
@@ -1491,6 +1508,10 @@ After Phase 3 succeeds, drop agent invocation details and read workspace content
 | `extra` | optional | Event-specific extras (e.g. test-ratchet counts). |
 
 **Do NOT pretty-print** — one JSON object per line, append-only, `>>` here-doc. In obsidian mode, the same JSONL content lives inside a ` ```jsonl ` fence in `00-execution-events.md`; extract with `sed -n '/^```jsonl$/,/^```$/{/^```/d;p}'` before piping to `jq`/`python3`.
+
+### Free-text field bound (`bounded` intensity level)
+
+Every free-text field carried by any event in `{events_file}` — `operation.*`'s `detail`/`error`/`suggestion`, `kg_write.writes[].detail`, `plan_structure.extra.detail`, and the `{summary}` argument to the stage-end notification toast (§ "Stage-end notification protocol") — is bounded to the `bounded` intensity level (`docs/output-contract-patterns.md § 2`): ONE compact clause — a short phrase or single sentence fragment, ≤120 chars — never multi-sentence narrative prose, stripped of `\n\r\t` and quote characters (mirrors the existing `{summary}` sanitisation rule in § "Stage-end notification protocol"). This is a FORMAT bound only — it never reduces the one-JSON-object-per-line invariant above, and, per the mandatory observability floor fenced at the top of this section, it never substitutes for an event: every `phase.*`/`gate.*` event still fires exactly as this schema requires, regardless of how compact its optional free-text fields are. Full contract mirrored at `docs/observability.md § Free-text field bound`.
 
 ### `tools` propagation
 
@@ -1531,7 +1552,7 @@ At every STAGE-GATE emission, before the STOP block: count `[x]` Phase Checklist
 
 `{docs_root}/00-pipeline-summary.md` — you rewrite it **in full** (never append) at 4 mandatory checkpoints: STAGE-GATE-1 emission; Stage-2 close (last task's Phase 3.6); every `iteration.start`; `pipeline.complete`/`pipeline.end`. Every-transition rewrite is best-effort beyond those four.
 
-**Schema:** `# Pipeline Summary: {feature}` header, `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effectiveness`, `## Verification Packet`, `## Cost`, `## Iterations`, `## Files Changed` — full field-by-field derivation rules in `docs/observability.md § Pipeline Summary Protocol` and `§ Cost rollup`. All numbers derive from `{events_file}` — never re-invent them by walking workspaces. The summary is a render of the trace, not an independent source of truth.
+**Schema:** `# Pipeline Summary: {feature}` header, `## TL;DR`, `## Phase Timeline`, `## Dispatch Issues`, `## Tool Effectiveness`, `## Verification Packet`, `## Cost`, `## Iterations`, `## Files Changed` — full field-by-field derivation rules in `docs/observability.md § Pipeline Summary Protocol` and `§ Cost rollup`. All numbers derive from `{events_file}` — never re-invent them by walking workspaces. The summary is a render of the trace, not an independent source of truth. `## Iterations` references each round by ID only (per `docs/output-contract-patterns.md § 5` Iteration Re-Narration Ban) — it never re-tells what happened in a round; the round's narrative lives only in `failure-brief.md`.
 
 **Failure modes:** write fails → log and retry at the next transition. Counts mismatch the JSONL → JSONL wins. Trace missing → render `(no trace recorded)` placeholders, never crash.
 
@@ -1618,11 +1639,13 @@ Lane: {inline|express|full}
 ### To specialists — always include in every invocation:
 Feature name, task type/scope, brief summary from the previous agent's status block (never full workspace content), reference to `00-knowledge-context.md` (if it exists — the file `th:leader` wrote at Phase 0a; you never re-query the KG for this baseline, only for the mid-pipeline touchpoints already documented above), what you expect, and (if iterating) what failed and what needs to change.
 
-**Language propagation.** Every dispatch prompt MUST include:
+**Language propagation (tier-aware).** This instruction operationalizes the two-tier language rule declared canonically in `docs/conventions.md § Document classification` and mirrored in `docs/voice-guide.md` — read those two sites for the rule's rationale; this section only applies it per dispatch. Every dispatch prompt MUST include exactly one of the following two clauses, selected by the tier of the workspace doc the dispatched agent is about to write:
 
-> Operator language: {operator_language}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.
+> **Operator-facing tier** (`architect` writing `01-plan.md`, `sketches/*`, or `01-root-cause.md`): Operator language: {operator_language}. Write this document's prose in this language; structural elements (headers, field names, status-block keys, AC identifiers) stay in English.
+>
+> **Agentic tier** (every other dispatch — `implementer`, `tester`, `qa`, `security`, `adversary`, `plan-reviewer`, `acceptance-checker`, `delivery`, `reviewer`, `ux-reviewer`, and any dispatch writing `02-implementation.md`, `03-testing.md`, `reviews/*`, or any other workspace doc not named above): Write this document's prose in English, regardless of `operator_language`.
 
-`operator_language` comes from your spawn payload (resolved by `th:leader`'s 4-level precedence chain) — you never re-resolve it yourself.
+`operator_language` comes from your spawn payload (resolved by `th:leader`'s 4-level precedence chain) — you never re-resolve it yourself; it governs only the operator-facing-tier clause above. Every committed/versioned repository artifact (e.g. `CLAUDE.md`, `docs/*.md`, `changelog.d/*.md`) is always English, independent of `operator_language` — the tier split governs workspace docs only.
 
 **Dispatch header marker (controlled first line — MANDATORY).** The FIRST LINE of every specialist dispatch prompt you build is the state-scoping marker, byte-identical, before any other prompt content:
 

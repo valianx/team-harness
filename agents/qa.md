@@ -367,8 +367,8 @@ The `reviews/04-validation.md` template for bug-fix mode adds a `Verified by` co
 
 ```markdown
 ### From Spec (01-plan.md § Review Summary)
-1. **AC-1**: Reproduction steps no longer produce the observed result; expected behaviour observed instead — PASS — `src/date-range/picker.ts:42` (boundary check now uses `<` instead of `<=`) — verified by `02-implementation.md` § Files Modified + `03-testing.md` AC Coverage entry for AC-1.
-2. **AC-2**: Regression test exists at `tests/date-range/picker.spec.ts` — PASS — `tests/date-range/picker.spec.ts:18-34` (test `should_exclude_to_boundary` fails on pre-fix, passes on post-fix) — verified by `02-regression-test.md` (authoring) + `03-testing.md` (post-fix suite).
+1. **AC-1**: PASS — `src/date-range/picker.ts:42` (boundary check now uses `<` instead of `<=`) — verified by `02-implementation.md` § Files Modified + `03-testing.md` AC Coverage entry for AC-1.
+2. **AC-2**: PASS — `tests/date-range/picker.spec.ts:18-34` (test `should_exclude_to_boundary` fails on pre-fix, passes on post-fix) — verified by `02-regression-test.md` (authoring) + `03-testing.md` (post-fix suite).
 ```
 
 **`security-sensitive: true` is forced for `type: fix | hotfix`** at Phase 0a Step 7 in the orchestrator. The security agent runs in parallel with you at Phase 3 regardless of any other criterion. The qa validate-mode is unchanged by this — security findings live in `reviews/04-security.md`, not in your scope.
@@ -438,6 +438,14 @@ hygiene-only failure must still trigger the failure-brief mechanism below.
 
 ---
 
+## AC Reference Convention (canonical statement lives in `01-plan.md`)
+
+`01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`). Every AC result you record here — Phase 3's `## Acceptance Criteria Results` and the bug-fix-mode template below — references `AC-N: verdict + file:line evidence` and does NOT re-quote the requirement text. This generalizes the verify-packet AC-avoidance pattern already in effect at § "Session Context Protocol" step 1 above (the packet "carries NO acceptance-criteria copy") to every report you write, not just the packet read.
+
+**Iteration re-narration ban.** Patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); `reviews/04-validation.md` and this ban's own failure-brief entries reference an iteration by ID (`Iteration {N}`), never retell what happened in a prior round.
+
+---
+
 ## Phase 3 — Validation Report
 
 Write the report to `workspaces/{feature-name}/reviews/04-validation.md`:
@@ -456,8 +464,8 @@ Write the report to `workspaces/{feature-name}/reviews/04-validation.md`:
 ## Acceptance Criteria Results
 
 ### From Spec (01-plan.md § Task List)
-1. **AC-1**: [Given/When/Then] — PASS/FAIL — `file:line` — [evidence]
-2. **AC-2**: [Given/When/Then] — PASS/FAIL — `file:line` — [evidence]
+1. **AC-1**: PASS/FAIL — `file:line` — [evidence]
+2. **AC-2**: PASS/FAIL — `file:line` — [evidence]
 
 ### Supplementary (added by QA)
 1. [Security criterion] — PASS/FAIL — `file:line` — [evidence]

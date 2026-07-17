@@ -305,8 +305,13 @@ check("reviewer.md Internal Review explicitly does not publish",
       "Does NOT publish to GitHub" in reviewer or "no GitHub publish" in reviewer.lower())
 check("reviewer.md has Reviewability Assessment section",
       "Reviewability Assessment" in reviewer)
-check("reviewer.md Reviewability score has alta/media/baja",
-      all(t in reviewer for t in ["alta", "media", "baja"]))
+_reviewability_start = reviewer.find("### Reviewability Assessment")
+_reviewability_end = reviewer.find("### Goal Assessment", _reviewability_start)
+_reviewability_slice = (
+    reviewer[_reviewability_start:_reviewability_end] if _reviewability_start != -1 else ""
+)
+check("reviewer.md Reviewability score has high/medium/low",
+      _reviewability_start != -1 and all(t in _reviewability_slice for t in ["high", "medium", "low"]))
 check("reviewer.md Reviewability mentions 40 lines / 4 params / 3 levels",
       "40" in reviewer and ("3 niveles" in reviewer or "3 levels" in reviewer))
 
@@ -318,10 +323,11 @@ check(
     "AC-6 (#379a) reconciliation sub-step missing from reviewer.md",
 )
 check(
-    "reviewer.md AC-6: has Spanish intentional-removals output heading",
-    "Remociones intencionales" in reviewer,
-    "marker 'Remociones intencionales' not found — "
-    "AC-6 (#379a) Spanish review_body heading missing from reviewer.md",
+    "reviewer.md AC-6: has English intentional-removals output heading",
+    "### Intentional removals (confirmed against the objective)" in reviewer,
+    "marker '### Intentional removals (confirmed against the objective)' not found — "
+    "AC-6 (#379a) English review_body heading missing from reviewer.md "
+    "(full-lane-output-verbosity-trim Task-2 converted this heading from Spanish to English)",
 )
 # AC-7: guard branches — BOTH must be asserted separately (qa-plan concern C4)
 check(
@@ -2921,18 +2927,22 @@ check(
     f"found: {_first_person_found}",
 )
 
-# (11) Affirmative: security/reviewer Spanish exception is preserved (regression guard).
+# (11) Affirmative: security/reviewer report bodies are English (regression guard).
+# The Spanish report-body exception was intentionally and canonically removed
+# (docs/voice-guide.md § Documented exceptions, docs/conventions.md § Two-tier
+# language rule) — this guard affirms the current English behavior so a future
+# reintroduction of a report-body language exception fails loudly.
 _security_md = read(AGENTS_DIR / "security.md")
 _reviewer_md = read(AGENTS_DIR / "reviewer.md")
 check(
-    "voice: agents/security.md Phase 4 report template still contains Spanish severity labels",
-    "Crítico" in _security_md and "Alto" in _security_md and "Medio" in _security_md,
-    "Spanish severity labels (Crítico/Alto/Medio) missing from security.md — exception may have been removed",
+    "voice: agents/security.md Phase 4 report template contains English severity labels",
+    "Critical" in _security_md and "High" in _security_md and "Medium" in _security_md,
+    "English severity labels (Critical/High/Medium) missing from security.md — report-body language contract may have regressed",
 )
 check(
-    "voice: agents/reviewer.md review body template still contains Spanish section headers",
-    "Revision de Codigo" in _reviewer_md or "Problemas Criticos" in _reviewer_md,
-    "Spanish section headers (Revision de Codigo/Problemas Criticos) missing from reviewer.md — exception may have been removed",
+    "voice: agents/reviewer.md review body template contains English section headers",
+    "## Code Review" in _reviewer_md or "### Critical Issues" in _reviewer_md,
+    "English section headers (Code Review/Critical Issues) missing from reviewer.md — report-body language contract may have regressed",
 )
 
 # ---------------------------------------------------------------------------
@@ -3800,9 +3810,10 @@ check(
     "reviewer.md must document the policy-aware review behaviour (Has Policy field)",
 )
 check(
-    "agents/reviewer.md policy-aware section mentions 'Violaciones de política'",
-    "Violaciones de política" in _reviewer_md,
-    "reviewer.md must include '## Violaciones de política' as a conditional body section",
+    "agents/reviewer.md policy-aware section mentions '## Policy Violations'",
+    "## Policy Violations" in _reviewer_md,
+    "reviewer.md must include '## Policy Violations' as a conditional body section "
+    "(renamed from Spanish 'Violaciones de política' by full-lane-output-verbosity-trim Task-2)",
 )
 
 # (21) skills/review-pr.md has Step 1.5 policy load (added in PR-10).
@@ -7473,7 +7484,7 @@ check(
 #   (1)  / AC-3  : reviewer.md § Scope Discipline -- section present + key tokens
 #   (2)  / AC-3  : reviewer.md § Scope Discipline -- Patterns & Consistency cross-ref
 #   (3)  / AC-3  : reviewer.md § Scope Discipline -- Tests cross-ref
-#   (4)  / AC-3  : reviewer.md § Phase 3 template -- Fuera de alcance section present
+#   (4)  / AC-3  : reviewer.md § Phase 3 template -- Out of Scope section present
 #   (5)  / AC-4  : reviewer.md § AI-Authored PR Review Lens -- three checks present
 #   (6)  / AC-5  : reviewer.md frontmatter -- context7 tools granted
 #   (7)  / AC-7/8: reviewer.md § No-Publish Invariant -- invariant declared
@@ -7501,7 +7512,16 @@ _S38_SCOPE_ANCHOR     = "## Scope Discipline"
 _S38_AI_LENS_ANCHOR   = "### AI-Authored PR Review Lens"
 _S38_NOPUB_ANCHOR     = "## No-Publish Invariant"
 _S38_BEHAV_ANCHOR     = "### Step 1.6 — Behavioral Verification"
-_S38_VERDICT_ANCHOR   = "## Verdict rule"
+_S38_VERDICT_ANCHOR   = "## Verdict rule — fenced"
+# NOTE: the anchor is widened from the bare "## Verdict rule" because a
+# cross-reference sentence earlier in the file (agents/reviewer-consolidator.md
+# § Language contract) mentions the heading name inline inside backticks
+# ("...the merge/verdict logic in `## Verdict rule` below is unaffected...").
+# `_slice_section` does a plain substring `find`, so the bare anchor matches
+# that inline mention first and slices an empty/wrong region instead of the
+# real "## Verdict rule — fenced, ..." heading below. Anchoring on the full
+# renamed heading prefix is both correct and unambiguous (that text is unique
+# in the file).
 _S38_REVIEW_MODE_ANCHOR = "## Review Mode"
 
 # ---- slices ----------------------------------------------------------------
@@ -7519,11 +7539,12 @@ _S38_SCOPE_TOKENS = (
     "In scope",
     "Out of scope",
     "attribution",
-    "Fuera de alcance",
 )
 check(
     "review-guardrails(1/ac-3): agents/reviewer.md § 'Scope Discipline'"
-    " present and contains In scope / Out of scope / attribution / Fuera de alcance",
+    " present and contains In scope / Out of scope / attribution"
+    " (Spanish 'Fuera de alcance' token retired by full-lane-output-verbosity-trim Task-2's"
+    " English report-body conversion)",
     bool(_s38_scope_slice)
     and all(t in _s38_scope_slice for t in _S38_SCOPE_TOKENS),
     f"anchor '{_S38_SCOPE_ANCHOR}' missing or tokens absent: {_S38_SCOPE_TOKENS}",
@@ -7554,13 +7575,14 @@ check(
 )
 
 # ---------------------------------------------------------------------------
-# Check (4) / AC-3 -- Phase 3 template has Fuera de alcance section
+# Check (4) / AC-3 -- Phase 3 template has Out of Scope section (English,
+# renamed from Spanish 'Fuera de alcance' by full-lane-output-verbosity-trim Task-2)
 # ---------------------------------------------------------------------------
 check(
     "review-guardrails(4/ac-3): agents/reviewer.md review_body template"
-    " includes '### Fuera de alcance' section",
-    "### Fuera de alcance" in _s38_reviewer_text,
-    "'### Fuera de alcance' section missing from reviewer.md review_body template",
+    " includes '### Out of Scope' section",
+    "### Out of Scope" in _s38_reviewer_text,
+    "'### Out of Scope' section missing from reviewer.md review_body template",
 )
 
 # ---------------------------------------------------------------------------
@@ -7635,7 +7657,7 @@ check(
 _S38_GUARD_TOKENS = (
     "Attribution guard",
     "out-of-scope",
-    "Fuera de alcance",
+    "Out of Scope",
     "any-CHANGES_REQUESTED",
 )
 check(
@@ -34433,6 +34455,1274 @@ check(
 )
 
 # Marker: opencode-th-update-executes
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 155 -- full-lane-output-verbosity-trim (Round 1: Task-1 + Task-5)
+# ---------------------------------------------------------------------------
+# Checks the two foundations of the output-verbosity-trim refactor covered by
+# this suite:
+#   Task-1 (docs/output-contract-patterns.md + compact mirror + changelog
+#           fragment) -- AC-1..AC-7
+#   Task-5 (Spanish report-body exception removal + two-tier language rule,
+#           declared in docs/voice-guide.md / docs/conventions.md / CLAUDE.md
+#           / agents/README.md) -- AC-1..AC-7
+# Any AC clause whose evidence lives in a file owned by a different task is
+# noted as deferred, never force-tested against content owned elsewhere.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 155: full-lane-output-verbosity-trim (Round 1) ===")
+
+import subprocess as _s155_subprocess
+
+_s155_output_contract = _read_or_empty(REPO_ROOT / "docs" / "output-contract-patterns.md")
+_s155_output_template = read(AGENTS_DIR / "_shared" / "output-template.md")
+_s155_voice_guide = read(REPO_ROOT / "docs" / "voice-guide.md")
+_s155_conventions = read(REPO_ROOT / "docs" / "conventions.md")
+_s155_claude_md = read(REPO_ROOT / "CLAUDE.md")
+_s155_readme = read(AGENTS_DIR / "README.md")
+_s155_adversary = read(AGENTS_DIR / "adversary.md")
+_s155_changelog_frag = _read_or_empty(
+    REPO_ROOT / "changelog.d" / "refactor-full-lane-output-verbosity-trim.md"
+)
+if not _s155_changelog_frag:
+    # Post-release-cut state: the fragment is consumed into the versioned
+    # CHANGELOG section. The AC asserts the change is changelogged, not that
+    # the transient fragment file survives the cut, so fall back to the
+    # assembled section.
+    _s155_changelog_full = read(REPO_ROOT / "CHANGELOG.md")
+    for _s155_section in re.split(r"(?=^## \[)", _s155_changelog_full, flags=re.MULTILINE):
+        if "output-contract-patterns.md" in _s155_section:
+            _s155_changelog_frag = _s155_section
+            break
+
+
+def _s155_slice(text: str, anchor: str) -> str:
+    """Anchor-to-next-heading slice, scoped to this suite (mirrors the
+    Suite 152 `_s152_slice` local-helper pattern -- a distinct local name
+    avoids depending on whichever module-level `_slice_section` happens to
+    be active at this point in the file)."""
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+def _s155_level_row(text: str, level: str) -> str:
+    m = re.search(rf"^\|\s*`{level}`\s*\|.*$", text, re.MULTILINE)
+    return m.group(0) if m else ""
+
+
+_S155_LEVELS = ("verbatim", "tight", "bounded", "standard")
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-1 -- exactly four named intensity levels, each with an explicit
+# artifact-class list
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task1-ac1-exists): docs/output-contract-patterns.md exists",
+    bool(_s155_output_contract),
+    "docs/output-contract-patterns.md is missing",
+)
+
+_s155_intensity_slice = _s155_slice(_s155_output_contract, "## 2. Intensity Levels")
+_s155_row_names = re.findall(r"^\|\s*`(\w+)`\s*\|", _s155_intensity_slice, re.MULTILINE)
+check(
+    "suite155(task1-ac1-exactly-four): '## 2. Intensity Levels' table has "
+    "exactly the four rows {verbatim, tight, bounded, standard} -- no "
+    "fifth level, none missing",
+    len(_s155_row_names) == 4 and set(_s155_row_names) == set(_S155_LEVELS),
+    f"found level rows {_s155_row_names}, expected exactly {_S155_LEVELS}",
+)
+
+_s155_canonical_rows = {lvl: _s155_level_row(_s155_output_contract, lvl) for lvl in _S155_LEVELS}
+check(
+    "suite155(task1-ac1-nonempty-classes): every level row carries a "
+    "non-trivial artifact-class cell (not a placeholder)",
+    all(len(row) > 40 for row in _s155_canonical_rows.values()),
+    f"level rows too short (likely placeholder): "
+    f"{[k for k, v in _s155_canonical_rows.items() if len(v) <= 40]}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-2 -- compact mirror in agents/_shared/output-template.md; names
+# and artifact-class assignments match the canonical table (multi-site
+# invariant) -- byte-level anchor consistency, not just section presence.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task1-ac2-section-exists): agents/_shared/output-template.md "
+    "has a '## Output Contract — Compression' section",
+    "## Output Contract — Compression" in _s155_output_template,
+    "output-template.md missing '## Output Contract — Compression' section",
+)
+
+_s155_mirror_slice = _s155_slice(_s155_output_template, "## Output Contract — Compression")
+_s155_mirror_rows = {lvl: _s155_level_row(_s155_mirror_slice, lvl) for lvl in _S155_LEVELS}
+check(
+    "suite155(task1-ac2-mirror-four-levels): the mirror table names the "
+    "same four levels, each with a non-empty artifact-class cell",
+    all(_s155_mirror_rows.values()),
+    f"mirror missing level rows: {[k for k, v in _s155_mirror_rows.items() if not v]}",
+)
+
+# Per-level anchor phrases hand-picked from the ACTUAL canonical + mirror
+# prose (verified byte-identical substrings present in both cells) -- a
+# rename or dropped artifact-class in either file decouples an anchor and
+# fails this check, catching multi-site divergence at the byte level
+# rather than merely "both files exist".
+_S155_LEVEL_ANCHORS = {
+    "verbatim": ["CWE/OWASP", "status-block", "enum values", "file:line"],
+    "tight": [
+        "Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports"
+    ],
+    "bounded": [
+        "`00-state.md`",
+        "`00-execution-events.md` free-text fields",
+        "`changelog.d/*.md`",
+        "`01-plan.md § Decisions for human review`",
+        "`failure-brief.md` iteration entries",
+    ],
+    "standard": ["docs/", "reference"],
+}
+_s155_mismatches = []
+for _lvl, _anchors in _S155_LEVEL_ANCHORS.items():
+    _canon_row = _s155_canonical_rows.get(_lvl, "")
+    _mirror_row = _s155_mirror_rows.get(_lvl, "")
+    for _anchor in _anchors:
+        if _anchor not in _canon_row or _anchor not in _mirror_row:
+            _s155_mismatches.append((_lvl, _anchor))
+check(
+    "suite155(task1-ac2-byte-consistency): every level's artifact-class "
+    "anchor phrase appears verbatim in BOTH the canonical table "
+    "(docs/output-contract-patterns.md § 2) and the compact mirror "
+    "(output-template.md) -- the multi-site invariant, checked at the "
+    "byte level, not just section presence",
+    not _s155_mismatches,
+    f"anchor/level pairs missing from one side: {_s155_mismatches}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-3 -- verbatim-preservation rule
+# ---------------------------------------------------------------------------
+_s155_verbatim_slice = _s155_slice(_s155_output_contract, "## 3. Verbatim-Preservation Rule")
+check(
+    "suite155(task1-ac3-verbatim-rule): § 3 states code/commands/"
+    "identifiers/exact error strings are never paraphrased or compressed",
+    bool(_s155_verbatim_slice)
+    and "never paraphrased" in _s155_verbatim_slice
+    and "Identifiers" in _s155_verbatim_slice
+    and "error strings" in _s155_verbatim_slice.lower(),
+    "§ 3 must state the verbatim-preservation rule for code/commands/"
+    "identifiers/exact error strings",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-4 -- clarity exemptions (security warnings incl. remediation,
+# irreversible-action confirmations, multi-step sequences)
+# ---------------------------------------------------------------------------
+_s155_clarity_slice = _s155_slice(_s155_output_contract, "## 4. Clarity Exemptions")
+check(
+    "suite155(task1-ac4-clarity-exemptions): § 4 exempts security "
+    "warnings (Critical/High), irreversible-action confirmations, and "
+    "multi-step sequences from compression",
+    bool(_s155_clarity_slice)
+    and "Security warnings" in _s155_clarity_slice
+    and "Critical/High" in _s155_clarity_slice
+    and "Irreversible-action confirmations" in _s155_clarity_slice
+    and "Multi-step sequences" in _s155_clarity_slice,
+    "§ 4 must cover Security warnings (Critical/High), Irreversible-"
+    "action confirmations, and Multi-step sequences",
+)
+check(
+    "suite155(task1-ac4-remediation-covered): the security-warning "
+    "exemption explicitly covers the remediation step for Critical/High "
+    "findings, not just the finding headline",
+    "remediation step that lets the reader act on it" in _s155_clarity_slice,
+    "§ 4 must state that the remediation step (not just the headline) is "
+    "part of the security-warning exemption",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-5 -- iteration re-narration ban
+# ---------------------------------------------------------------------------
+_s155_renarr_slice = _s155_slice(_s155_output_contract, "## 5. Iteration Re-Narration Ban")
+check(
+    "suite155(task1-ac5-renarration-ban): § 5 names failure-brief.md as "
+    "the sole vehicle for patch/verify narratives and cites "
+    "agents/adversary.md § Failure Brief's 5-10 line contract as the "
+    "pattern to imitate",
+    bool(_s155_renarr_slice)
+    and "failure-brief.md" in _s155_renarr_slice
+    and "adversary.md` § Failure Brief" in _s155_renarr_slice
+    and "5-10 line" in _s155_renarr_slice,
+    "§ 5 must name failure-brief.md as the sole vehicle and cite "
+    "agents/adversary.md § Failure Brief's 5-10 line contract",
+)
+check(
+    "suite155(task1-ac5-pointer-target-real): agents/adversary.md really "
+    "documents a 5-10 line per-iteration failure-brief contract (the "
+    "pointer § 5 cites is not dangling)",
+    "5-10 lines per iteration" in _s155_adversary,
+    "agents/adversary.md must contain the '5-10 lines per iteration' "
+    "phrase that § 5 points to",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-6 -- before/after measurement method + empirical baseline
+# ---------------------------------------------------------------------------
+_s155_measure_slice = _s155_slice(
+    _s155_output_contract, "## 6. Before/After Measurement Method"
+)
+check(
+    "suite155(task1-ac6-measurement-method): § 6 defines the before/"
+    "after method against 00-pipeline-summary.md § Cost and records the "
+    "empirical vault-run baseline",
+    bool(_s155_measure_slice)
+    and "00-pipeline-summary.md" in _s155_measure_slice
+    and "hotfix-psp" in _s155_measure_slice
+    and "79 KB" in _s155_measure_slice
+    and "1,232 KB" in _s155_measure_slice
+    and "pipeline-cost-lanes-and-trim" in _s155_measure_slice,
+    "§ 6 must reference 00-pipeline-summary.md § Cost and the empirical "
+    "baseline (hotfix-psp 79 KB ... pipeline-cost-lanes-and-trim 1,232 KB)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-1 AC-7 -- changelog fragment (covers both caps and the Spanish
+# exception removal); no plugin.json version bump.
+# NOTE: the "no plugin.json version bump" half of AC-7 is a diff-scope
+# fact (skip-version), not doc content -- it is verified via `git status`/
+# `git diff --stat` (.claude-plugin/plugin.json absent from the changed-files
+# list), not re-asserted here as a regex check against fragment prose (which
+# would be a hollow content check for a fact the fragment prose does not need
+# to restate).
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task1-ac7-changelog-exists): the change is changelogged "
+    "(pending changelog.d fragment OR assembled CHANGELOG.md section) "
+    "with a '### Changed' entry",
+    bool(_s155_changelog_frag) and "### Changed" in _s155_changelog_frag,
+    "changelog entry is missing (neither a pending fragment nor an "
+    "assembled CHANGELOG.md section) or lacks a '### Changed' heading",
+)
+check(
+    "suite155(task1-ac7-covers-both): the changelog entry covers BOTH "
+    "the verbosity-cap contract and the Spanish report-body exception "
+    "removal",
+    "intensity level" in _s155_changelog_frag.lower()
+    and "spanish" in _s155_changelog_frag.lower(),
+    "changelog entry must mention both the intensity-level contract "
+    "and the Spanish exception removal",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-1 -- docs/voice-guide.md § Documented exceptions: no Spanish
+# report-body exception; only the two surviving surfaces, described
+# parametrically (never a hardcoded language).
+# ---------------------------------------------------------------------------
+_s155_exceptions_slice = _s155_slice(_s155_voice_guide, "**Documented exceptions**")
+
+_S155_OLD_SPANISH_EXCEPTION_PHRASES = [
+    "committed artefacts where Spanish is allowed",
+    "lists patterns in both English and Spanish so the operator can chat",
+]
+check(
+    "suite155(task5-ac1-old-exception-removed): the old 'security/"
+    "reviewer report bodies are a Spanish exception' phrasing is gone "
+    "from docs/voice-guide.md",
+    not any(p in _s155_voice_guide for p in _S155_OLD_SPANISH_EXCEPTION_PHRASES),
+    "found stale Spanish-exception phrasing in docs/voice-guide.md",
+)
+check(
+    "suite155(task5-ac1-two-surfaces-only): § Documented exceptions "
+    "names only agents/leader.md live chat and its Step 6 intent-"
+    "detection routing table as surviving surfaces, and states no other "
+    "artefact carries an exception",
+    bool(_s155_exceptions_slice)
+    and "agents/leader.md` live chat" in _s155_exceptions_slice
+    and "Step 6 intent-detection routing table" in _s155_exceptions_slice
+    and "No other committed artefact carries a language exception" in _s155_exceptions_slice,
+    "§ Documented exceptions must name exactly the two surviving "
+    "surfaces and state no other artefact carries an exception",
+)
+check(
+    "suite155(task5-ac1-parametric-not-hardcoded): both surviving "
+    "surfaces are described via the resolved-language/precedence-chain "
+    "mechanism, not a hardcoded language pair",
+    "4-level precedence chain" in _s155_exceptions_slice
+    and "operator's instance" in _s155_exceptions_slice
+    and "not restricted to a fixed pair of languages" in _s155_exceptions_slice,
+    "§ Documented exceptions must describe both surfaces parametrically "
+    "(4-level precedence chain, current-operator instance, not a fixed "
+    "language pair)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-2 -- Operator-Supplied Content Boundary table: agentic-tier row
+# -> English; operator-facing-tier row -> operator's resolved language;
+# committed-agent-reports row (all three reviews/04-*.md files) -> English.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task5-ac2-boundary-agentic-row): the Content Boundary "
+    "table's agentic-tier workspace-doc row resolves to English",
+    re.search(
+        r"Prose body content in agentic-tier workspace docs[^\n]*\|\s*Agent\s*\|\s*English\s*\|",
+        _s155_voice_guide,
+    )
+    is not None,
+    "missing the agentic-tier -> English row",
+)
+check(
+    "suite155(task5-ac2-boundary-operator-row): the Content Boundary "
+    "table's operator-facing-tier row resolves to the operator's "
+    "resolved language",
+    re.search(
+        r"Prose body content in operator-facing-tier workspace docs[^\n]*Operator's resolved language",
+        _s155_voice_guide,
+    )
+    is not None,
+    "missing the operator-facing-tier -> operator's resolved language row",
+)
+check(
+    "suite155(task5-ac2-boundary-reports-row): the Content Boundary "
+    "table lists reviews/04-security.md, reviews/04-internal-review.md, "
+    "and reviews/04-adversary.md together in one English row",
+    re.search(
+        r"reviews/04-security\.md`, `reviews/04-internal-review\.md`, "
+        r"`reviews/04-adversary\.md`[^\n]*\|\s*Agent\s*\|\s*English\s*\|",
+        _s155_voice_guide,
+    )
+    is not None,
+    "missing the committed-agent-reports -> English row naming all "
+    "three reviews/04-*.md files together",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-3 -- docs/conventions.md § Document classification: (a) old
+# 'Spanish contract unchanged' clause removed from the reviews/04-*.md
+# row; (b) two-tier language rule declared canonically.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task5-ac3a-old-clause-removed): docs/conventions.md no "
+    "longer states the Spanish-language contract for security/reviewer "
+    "bodies is unchanged",
+    "Spanish-language contract for security/reviewer bodies is unchanged"
+    not in _s155_conventions,
+    "docs/conventions.md must not retain the removed Spanish-contract "
+    "clause",
+)
+_s155_two_tier_slice = _s155_slice(_s155_conventions, "### Two-tier language rule")
+check(
+    "suite155(task5-ac3b-two-tier-rule): docs/conventions.md declares "
+    "the two-tier language rule (operator-facing tier -> operator's "
+    "resolved language; agentic tier + every committed artefact -> "
+    "English, no exception)",
+    bool(_s155_two_tier_slice)
+    and "operator-facing tier" in _s155_two_tier_slice.lower()
+    and "agentic tier" in _s155_two_tier_slice.lower()
+    and "English with no exception" in _s155_two_tier_slice,
+    "docs/conventions.md § Two-tier language rule must declare both "
+    "tiers and the no-exception clause",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-4 -- CLAUDE.md §7.3: old exception removed; two surviving
+# surfaces named parametrically; §14 no longer states a fixed language
+# pair for live chat; consistent with docs/voice-guide.md.
+# ---------------------------------------------------------------------------
+_s155_claude_73_slice = _s155_slice(_s155_claude_md, "### 7.3 Language")
+check(
+    "suite155(task5-ac4-old-exception-removed): CLAUDE.md §7.3 no "
+    "longer names security/reviewer report bodies as a Spanish "
+    "exception",
+    bool(_s155_claude_73_slice)
+    and "security/reviewer report bodies (Spanish per contract)" not in _s155_claude_73_slice,
+    "CLAUDE.md §7.3 must not retain the old Spanish report-body "
+    "exception phrasing",
+)
+check(
+    "suite155(task5-ac4-two-surfaces-and-parametric): CLAUDE.md §7.3 "
+    "names only the leader live chat + Step 6 intent-detection table as "
+    "exceptions, described parametrically (never a hardcoded language)",
+    "Step 6 intent-detection routing table" in _s155_claude_73_slice
+    and "never a hardcoded language" in _s155_claude_73_slice
+    and "No other committed artefact carries a language exception" in _s155_claude_73_slice,
+    "CLAUDE.md §7.3 must name the two surfaces parametrically and state "
+    "no other artefact carries a language exception",
+)
+check(
+    "suite155(task5-ac4-section14-no-fixed-pair): CLAUDE.md §14 no "
+    "longer states live chat 'accepts Spanish and English' (a fixed "
+    "language pair)",
+    "live chat accepts Spanish and English" not in _s155_claude_md,
+    "CLAUDE.md must not retain the fixed-language-pair phrasing for "
+    "live chat",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-5 -- agents/README.md adversary roster: "report in English",
+# no "report in Spanish" mandate anywhere in the file.
+# ---------------------------------------------------------------------------
+check(
+    "suite155(task5-ac5-adversary-english): agents/README.md adversary "
+    "roster row says 'report in English'",
+    re.search(r"`adversary`[^\n]*report in English", _s155_readme) is not None,
+    "agents/README.md adversary roster row must say 'report in English'",
+)
+check(
+    "suite155(task5-ac5-no-spanish-mandate): agents/README.md carries no "
+    "'report in Spanish' mandate anywhere",
+    "report in Spanish" not in _s155_readme,
+    "agents/README.md must not contain 'report in Spanish' anywhere",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-6 -- the two surviving operator-language surfaces (leader live
+# chat + Step 6 intent-detection table) are unchanged: agents/leader.md
+# is not in this task's Files list, so it must carry NO diff at all
+# (unreachable-by-construction, not just "intended to be unreachable").
+# Diffs against the PR's merge-base with origin/main (falling back to a
+# local main), not bare HEAD -- a bare-HEAD diff only catches uncommitted
+# changes, so a change to agents/leader.md committed earlier in this same
+# PR would slip through undetected. Subprocess-based git checks are
+# precedented in this file (Suite 103, harness-scorecard determinism check).
+# ---------------------------------------------------------------------------
+try:
+    _s155_leader_base_ref = None
+    for _s155_leader_candidate_ref in ("origin/main", "main"):
+        _s155_leader_ref_check = _s155_subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", _s155_leader_candidate_ref],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if _s155_leader_ref_check.returncode == 0:
+            _s155_leader_base_ref = _s155_leader_candidate_ref
+            break
+    if _s155_leader_base_ref is None:
+        raise _s155_subprocess.SubprocessError(
+            "no resolvable base ref (origin/main or main)"
+        )
+    _s155_leader_diff = _s155_subprocess.run(
+        ["git", "diff", "--stat", f"{_s155_leader_base_ref}...HEAD", "--", "agents/leader.md"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    _s155_leader_untouched = (
+        _s155_leader_diff.returncode == 0 and _s155_leader_diff.stdout.strip() == ""
+    )
+    _s155_leader_detail = _s155_leader_diff.stdout.strip()
+except (OSError, _s155_subprocess.SubprocessError):
+    _s155_leader_untouched = False
+    _s155_leader_detail = "git invocation failed"
+check(
+    "suite155(task5-ac6-leader-untouched): agents/leader.md carries no "
+    "uncommitted diff -- unreachable-by-construction confirmed in "
+    "practice, not just by Files-list intent",
+    _s155_leader_untouched,
+    f"agents/leader.md has uncommitted changes: {_s155_leader_detail}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-5 AC-7 -- two-tier rule declared canonically in both docs/
+# conventions.md and docs/voice-guide.md (consistent wording), with a
+# forward pointer to agents/orchestrator.md's Language propagation
+# section. The REVERSE pointer (orchestrator.md -> conventions.md, tier-
+# aware dispatch instruction) is Task-4's job (Round 2, not yet
+# dispatched) -- not asserted here.
+# ---------------------------------------------------------------------------
+_S155_TWO_TIER_ANCHORS = ["operator-facing tier", "agentic tier", "English with no exception"]
+check(
+    "suite155(task5-ac7-canonical-conventions): docs/conventions.md § "
+    "Two-tier language rule declares the rule canonically",
+    all(a.lower() in _s155_conventions.lower() for a in _S155_TWO_TIER_ANCHORS),
+    f"docs/conventions.md must declare: {_S155_TWO_TIER_ANCHORS}",
+)
+check(
+    "suite155(task5-ac7-mirrored-voice-guide): docs/voice-guide.md "
+    "mirrors the two-tier rule (operator-facing-tier / agentic-tier doc "
+    "body wording) consistent with docs/conventions.md",
+    "operator-facing-tier doc bodies" in _s155_voice_guide
+    and "agentic-tier doc bodies" in _s155_voice_guide,
+    "docs/voice-guide.md must mirror operator-facing-tier / agentic-"
+    "tier doc-body wording",
+)
+check(
+    "suite155(task5-ac7-forward-pointer-to-orchestrator): docs/"
+    "conventions.md points forward to 'agents/orchestrator.md § "
+    "Communication Protocol → Language propagation' as the "
+    "operationalized dispatch instruction (Task-5's half of the "
+    "cross-reference; the reverse pointer FROM orchestrator.md is "
+    "Task-4/Round 2, deferred)",
+    "agents/orchestrator.md" in _s155_conventions and "Language propagation" in _s155_conventions,
+    "docs/conventions.md must forward-reference orchestrator.md's "
+    "Language propagation section",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here: registering a new suite in the canonical test
+# registry is a documentation edit, out of the tester agent's scope
+# (test files only) -- flagged as a follow-up in 03-testing.md instead.
+_s155_own = read(Path(__file__))
+check(
+    "suite155(self-ref): test file contains 'Suite 155' and "
+    "'full-lane-output-verbosity-trim'",
+    "Suite 155" in _s155_own and "full-lane-output-verbosity-trim" in _s155_own,
+    "test file must self-reference Suite 155 and the marker "
+    "'full-lane-output-verbosity-trim'",
+)
+check(
+    "suite155(hygiene): CLAUDE.md does NOT contain 'Suite 155' (§11 "
+    "hygiene contract)",
+    "Suite 155" not in _s155_claude_md,
+    "CLAUDE.md must not mention Suite 155 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: full-lane-output-verbosity-trim
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Suite 156 -- full-lane-output-verbosity-trim (Round 2: Task-2 + Task-3 + Task-4)
+# ---------------------------------------------------------------------------
+# Checks the three appliers of the output-verbosity-trim refactor:
+#   Task-2 (agents/security.md, agents/adversary.md, agents/reviewer.md,
+#           agents/reviewer-consolidator.md) -- findings-first prose budget +
+#           English report-body conversion -- AC-1..AC-12
+#   Task-3 (agents/qa.md, agents/tester.md, agents/acceptance-checker.md,
+#           agents/delivery.md, agents/plan-reviewer.md) -- canonical AC
+#           reference convention -- AC-1..AC-5
+#   Task-4 (agents/orchestrator.md, docs/observability.md) -- bounded infra
+#           files + English Team table + tier-aware language propagation --
+#           AC-1..AC-7
+# Plus one cross-task closure check verifying Task-5 AC-7's bidirectional
+# cross-reference exists on both sides now that Task-4's file is in place.
+# ---------------------------------------------------------------------------
+print()
+print("=== Suite 156: full-lane-output-verbosity-trim (Round 2) ===")
+
+_s156_security = read(AGENTS_DIR / "security.md")
+_s156_adversary = read(AGENTS_DIR / "adversary.md")
+_s156_reviewer = read(AGENTS_DIR / "reviewer.md")
+_s156_consolidator = read(AGENTS_DIR / "reviewer-consolidator.md")
+_s156_qa = read(AGENTS_DIR / "qa.md")
+_s156_tester = read(AGENTS_DIR / "tester.md")
+_s156_acceptance_checker = read(AGENTS_DIR / "acceptance-checker.md")
+_s156_delivery = read(AGENTS_DIR / "delivery.md")
+_s156_plan_reviewer = read(AGENTS_DIR / "plan-reviewer.md")
+_s156_orchestrator = read(AGENTS_DIR / "orchestrator.md")
+_s156_observability = read(REPO_ROOT / "docs" / "observability.md")
+_s156_conventions = read(REPO_ROOT / "docs" / "conventions.md")
+_s156_voice_guide = read(REPO_ROOT / "docs" / "voice-guide.md")
+_s156_claude_text = read(REPO_ROOT / "CLAUDE.md")
+
+
+def _s156_slice(text: str, anchor: str) -> str:
+    """Anchor-to-next-heading slice, scoped to this suite (mirrors the Suite
+    152/155 `_slice` local-helper pattern)."""
+    idx = text.find(anchor)
+    if idx == -1:
+        return ""
+    rest = text[idx:]
+    m = re.search(r"\n(?:#{1,6}) ", rest[1:])
+    if m:
+        return rest[: m.start() + 1]
+    return rest
+
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-1 -- security.md pipeline-mode report: no cap on finding count at
+# any severity; brevity is a FORMAT restriction only, never a reason to
+# merge/downgrade/omit a finding.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac1-no-count-cap): agents/security.md states 'no cap on "
+    "finding count' explicitly",
+    "No cap on finding count, at any severity" in _s156_security,
+    "security.md must explicitly state no cap on finding count at any severity",
+)
+check(
+    "suite156(task2-ac1-anti-drift): agents/security.md's anti-drift clause "
+    "forbids merging/downgrading/omitting a finding for brevity",
+    "never a reason to merge two distinct findings, downgrade a severity, "
+    "or omit a finding" in _s156_security,
+    "security.md must state brevity never merges/downgrades/omits a finding",
+)
+check(
+    "suite156(task2-ac1-anti-drift-adversary): agents/adversary.md's "
+    "anti-drift clause forbids merging/downgrading/omitting a control-attempt "
+    "for brevity (mirrors security.md, scoped to controls/breaks)",
+    "never a reason to merge two distinct control-attempts, downgrade a "
+    "`broke-it` verdict, or omit a control" in _s156_adversary,
+    "adversary.md must state brevity never merges/downgrades/omits a control",
+)
+check(
+    "suite156(task2-ac1-anti-drift-reviewer): agents/reviewer.md's "
+    "anti-drift clause forbids merging/downgrading/omitting a Critical "
+    "finding for brevity (mirrors security.md, scoped to Critical findings)",
+    "never a reason to merge two distinct Critical findings, downgrade a "
+    "Critical to a lower severity, or omit a Critical finding" in _s156_reviewer,
+    "reviewer.md must state brevity never merges/downgrades/omits a Critical "
+    "finding",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-2 -- security.md pipeline-mode per-finding prose budget: file:line
+# + [CWE-N] + <=1-sentence impact + <=1-line remediation pointer; full
+# remediation code blocks retained only in the audit-grade standalone template.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac2-pipeline-budget): agents/security.md's pipeline-mode "
+    "budget names file:line + [CWE-N] + <=1-sentence impact + <=1-line "
+    "remediation pointer",
+    "file:line` + `[CWE-N]` + an impact statement of ≤1 sentence + a "
+    "remediation pointer of ≤1 line" in _s156_security,
+    "security.md § Output Contract must state the exact pipeline-mode "
+    "per-finding budget",
+)
+check(
+    "suite156(task2-ac2-audit-grade-fenced-for-code): agents/security.md "
+    "states full remediation code blocks are retained only in the "
+    "audit-grade standalone template",
+    "Full remediation code blocks are retained only in the audit-grade "
+    "standalone template" in _s156_security,
+    "security.md must fence full remediation code blocks to audit-grade mode",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-3 -- adversary.md per-control prose bound: neither broke_count
+# nor incomplete_on_changed_control semantics is capped or altered.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac3-adversary-uncapped-semantics): agents/adversary.md "
+    "states neither broke_count nor incomplete_on_changed_control is capped "
+    "or altered by the per-control prose budget",
+    "Neither the number of controls attempted, the `broke_count`, nor the "
+    "`incomplete_on_changed_control` semantics is capped or altered"
+    in _s156_adversary,
+    "adversary.md § Output Contract must state broke_count/"
+    "incomplete_on_changed_control are never capped or altered",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-4 -- reviewer.md gains a Critical-finding prose budget without
+# changing the existing 'Critical: ALL (no cap)' count rule or the
+# inline_findings[] contract.
+# ---------------------------------------------------------------------------
+_s156_severity_slice = _s156_slice(_s156_reviewer, "### Severity Format Rules")
+check(
+    "suite156(task2-ac4-critical-still-uncapped): reviewer.md § Severity "
+    "Format Rules retains 'ALL (no cap)' for Critical AND gains a bounded "
+    "prose budget",
+    "ALL (no cap)" in _s156_severity_slice
+    and "Bounded prose budget" in _s156_severity_slice
+    and "inline_findings" in _s156_severity_slice,
+    "reviewer.md's Critical row must keep 'ALL (no cap)', add a bounded "
+    "prose budget, and retain the inline_findings[] contract",
+)
+check(
+    "suite156(task2-ac4-count-never-capped): reviewer.md explicitly states "
+    "the count of Critical findings is never capped",
+    "The count of Critical findings is never capped" in _s156_reviewer,
+    "reviewer.md must explicitly state the Critical count is never capped",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-5 -- security.md, adversary.md, reviewer.md, and
+# reviewer-consolidator.md each reference the iteration re-narration ban and
+# the clarity exemption.
+# ---------------------------------------------------------------------------
+_S156_LENS_FILES = {
+    "security.md": _s156_security,
+    "adversary.md": _s156_adversary,
+    "reviewer.md": _s156_reviewer,
+    "reviewer-consolidator.md": _s156_consolidator,
+}
+_s156_missing_renarr = [
+    name
+    for name, text in _S156_LENS_FILES.items()
+    if "Iteration re-narration ban" not in text
+]
+_s156_missing_clarity = [
+    name
+    for name, text in _S156_LENS_FILES.items()
+    if "Clarity exemption" not in text
+]
+check(
+    "suite156(task2-ac5-renarration-refs): all four review-lens files "
+    "reference 'Iteration re-narration ban'",
+    not _s156_missing_renarr,
+    f"missing 'Iteration re-narration ban' in: {_s156_missing_renarr}",
+)
+check(
+    "suite156(task2-ac5-clarity-refs): all four review-lens files "
+    "reference 'Clarity exemption'",
+    not _s156_missing_clarity,
+    f"missing 'Clarity exemption' in: {_s156_missing_clarity}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-6 -- prose-budget caps do NOT touch security.md's standalone
+# audit-grade template; the budget applies to pipeline mode only.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac6-audit-grade-fenced-from-budget): agents/security.md "
+    "states the audit-grade template is fenced from the pipeline-mode prose "
+    "budget",
+    "fenced from this budget" in _s156_security
+    and "fenced from the pipeline-mode prose budget" in _s156_security,
+    "security.md must state the audit-grade template is fenced from the "
+    "pipeline-mode prose budget (verbosity unaffected, language only)",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-7 -- report-body mandate in security.md/adversary.md/reviewer.md
+# converts from Spanish to English; no 'report in Spanish' mandate remains.
+# ---------------------------------------------------------------------------
+_s156_spanish_mandate_pattern = re.compile(r"report in spanish", re.IGNORECASE)
+_s156_found_spanish_mandate = [
+    name
+    for name, text in {
+        "security.md": _s156_security,
+        "adversary.md": _s156_adversary,
+        "reviewer.md": _s156_reviewer,
+    }.items()
+    if _s156_spanish_mandate_pattern.search(text)
+]
+check(
+    "suite156(task2-ac7-no-spanish-mandate): no 'report in Spanish' mandate "
+    "remains in security.md, adversary.md, or reviewer.md",
+    not _s156_found_spanish_mandate,
+    f"'report in Spanish' mandate still present in: {_s156_found_spanish_mandate}",
+)
+check(
+    "suite156(task2-ac7-english-mandate-present): all three files state the "
+    "report body is written in English",
+    "**ALWAYS** report in English" in _s156_security
+    and "**ALWAYS** report in English" in _s156_adversary
+    and "ALL review output MUST be written in English" in _s156_reviewer,
+    "each of security.md/adversary.md/reviewer.md must carry an explicit "
+    "English report-body mandate",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-8 -- the per-finding prose budget does NOT apply to
+# failure-brief.md's per-Critical/High remediation lines (Case-D iteration
+# vehicle stays uncapped).
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac8-failure-brief-exempt): agents/security.md's "
+    "Prose-budget exemption paragraph exempts failure-brief.md's "
+    "remediation lines from the report's prose budget",
+    "Prose-budget exemption" in _s156_security
+    and "uncapped" in _s156_security,
+    "security.md must state failure-brief.md remediation lines are exempt "
+    "from the pipeline-mode prose budget and remain uncapped",
+)
+check(
+    "suite156(task2-ac8-failure-brief-exempt-adversary): agents/adversary.md's "
+    "Prose-budget exemption paragraph exempts failure-brief.md's "
+    "remediation lines from the report's prose budget (mirrors security.md)",
+    "Prose-budget exemption" in _s156_adversary
+    and "uncapped" in _s156_adversary,
+    "adversary.md must state failure-brief.md remediation lines are exempt "
+    "from the report's prose budget and remain uncapped",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-9 -- reviewer-consolidator.md's language conversion is scoped to
+# consolidated-body PROSE only; the any-CHANGES_REQUESTED merge/verdict logic
+# is unaffected; no Spanish example strings remain.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac9-scoped-to-prose): reviewer-consolidator.md states "
+    "the language conversion is scoped to consolidated-body PROSE only and "
+    "the merge/verdict logic is unaffected",
+    "scoped to the consolidated-body PROSE only" in _s156_consolidator
+    and "unaffected" in _s156_consolidator,
+    "reviewer-consolidator.md must fence its language conversion to prose "
+    "only, leaving merge/verdict logic unaffected",
+)
+_s156_spanish_examples = [
+    tok
+    for tok in (
+        "también reportado",
+        "relacionado con",
+        "Contradicciones detectadas",
+        "Fuera de alcance",
+        "Problemas Criticos",
+    )
+    if tok in _s156_consolidator
+]
+check(
+    "suite156(task2-ac9-no-spanish-examples): no Spanish example/format "
+    "strings remain in reviewer-consolidator.md",
+    not _s156_spanish_examples,
+    f"Spanish example strings still present: {_s156_spanish_examples}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-10 -- the language conversion is orthogonal to the two-lens
+# floor: finding count, severity, and file:line+CWE fields are unaffected by
+# the language flip.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac10-orthogonal-to-floor): security.md and adversary.md "
+    "both state the language conversion is orthogonal to finding "
+    "count/severity/break semantics",
+    "orthogonal" in _s156_security and "orthogonal" in _s156_adversary,
+    "security.md and adversary.md must each state language conversion is "
+    "orthogonal to the count/severity/semantics floor",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-11 -- the audit-grade standalone template preserves its
+# structure field-by-field: risk-weight table, 10-row OWASP matrix,
+# per-finding fields (incl. the CWE-{N} convention), dependency/headers/
+# CORS/auth tables, and the 4-phase remediation plan -- all in English.
+# ---------------------------------------------------------------------------
+def _s156_slice_to_marker(text: str, start_anchor: str, end_anchor: str) -> str:
+    """Anchor-to-explicit-end-marker slice. Used instead of `_s156_slice` for
+    the audit-grade template: that section is a large fenced ```markdown```
+    code block containing many literal '#'-prefixed lines (its own example
+    headings, e.g. '### CRITICAL', '#### SEC-001: ...') which are text
+    INSIDE the fence, not real document headings -- `_s156_slice`'s
+    next-heading regex would (and did, before this fix) stop at the first
+    of those literal example headings instead of the real end of the
+    section, silently truncating the slice to ~400 bytes."""
+    start = text.find(start_anchor)
+    if start == -1:
+        return ""
+    end = text.find(end_anchor, start)
+    if end == -1:
+        return text[start:]
+    return text[start:end]
+
+
+_s156_audit_slice = _s156_slice_to_marker(
+    _s156_security, "### Audit / focused mode", "## Quality Gates"
+)
+_S156_OWASP_ROWS = (
+    "A01 Broken Access Control",
+    "A02 Security Misconfiguration",
+    "A03 Supply Chain Failures",
+    "A04 Cryptographic Failures",
+    "A05 Injection",
+    "A06 Insecure Design",
+    "A07 Authentication Failures",
+    "A08 Data Integrity Failures",
+    "A09 Logging Failures",
+    "A10 Exception Handling",
+)
+_s156_missing_owasp_rows = [r for r in _S156_OWASP_ROWS if r not in _s156_audit_slice]
+check(
+    "suite156(task2-ac11-owasp-10-rows): security.md's audit-grade template "
+    "retains all 10 OWASP Findings Statistics rows (A01..A10), in English",
+    bool(_s156_audit_slice) and not _s156_missing_owasp_rows,
+    f"missing OWASP rows: {_s156_missing_owasp_rows}",
+)
+check(
+    "suite156(task2-ac11-risk-weight-table): security.md's audit-grade "
+    "template retains the Severity/Count/Weight risk-weight table in "
+    "English (Critical/High/Medium/Low/Info)",
+    all(
+        t in _s156_audit_slice
+        for t in ("| Severity | Count | Weight |", "Critical", "High", "Medium", "Low", "Info")
+    ),
+    "audit-grade template must retain the risk-weight table with English "
+    "severity labels",
+)
+_S156_FINDING_FIELDS = (
+    "**Severity:**",
+    "**OWASP Category:**",
+    "**CWE:**",
+    "**File:**",
+    "**Description:**",
+    "**Evidence:**",
+    "**Impact:**",
+    "**Remediation:**",
+)
+_s156_missing_finding_fields = [f for f in _S156_FINDING_FIELDS if f not in _s156_audit_slice]
+check(
+    "suite156(task2-ac11-per-finding-fields): security.md's audit-grade "
+    "template retains every per-finding field name in English",
+    not _s156_missing_finding_fields,
+    f"missing per-finding fields: {_s156_missing_finding_fields}",
+)
+check(
+    "suite156(task2-ac11-cwe-convention): security.md's audit-grade "
+    "template retains the CWE-{N} reference convention",
+    "CWE-{N}" in _s156_audit_slice,
+    "audit-grade template must retain the 'CWE-{N}' reference convention",
+)
+_S156_CONFIG_TABLES = (
+    "### Dependencies with Known Vulnerabilities",
+    "### HTTP Headers",
+    "### CORS",
+    "### Authentication",
+)
+_s156_missing_config_tables = [t for t in _S156_CONFIG_TABLES if t not in _s156_security]
+check(
+    "suite156(task2-ac11-config-tables): security.md retains the "
+    "dependency/headers/CORS/auth tables in English",
+    not _s156_missing_config_tables,
+    f"missing config tables: {_s156_missing_config_tables}",
+)
+_S156_REMEDIATION_PHASES = (
+    "### Phase 1 — Immediate (block deploy)",
+    "### Phase 2 — Next release",
+    "### Phase 3 — Next sprint",
+    "### Phase 4 — Backlog",
+)
+_s156_missing_phases = [p for p in _S156_REMEDIATION_PHASES if p not in _s156_security]
+check(
+    "suite156(task2-ac11-4-phase-plan): security.md retains the 4-phase "
+    "Prioritized Remediation Plan in English",
+    not _s156_missing_phases,
+    f"missing remediation phases: {_s156_missing_phases}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-2 AC-12 -- verdict/enum tokens rendered in report bodies are
+# display-only and NEVER translated: broke-it/could-not-break/
+# incomplete_on_changed_control (adversary), APPROVE/REQUEST_CHANGES
+# (reviewer-consolidator), qa_status: clean (security).
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task2-ac12-adversary-tokens-verbatim): adversary.md declares "
+    "broke-it/could-not-break/incomplete_on_changed_control as display-only, "
+    "verbatim-preserved, with an explicit non-translation example",
+    "Verdict tokens are display-only, verbatim-preserved" in _s156_adversary
+    and "broke-it" in _s156_adversary
+    and "could-not-break" in _s156_adversary
+    and "incomplete_on_changed_control" in _s156_adversary
+    and "lo-rompió" in _s156_adversary,
+    "adversary.md must declare its verdict tokens display-only/verbatim and "
+    "give a non-translation counter-example",
+)
+check(
+    "suite156(task2-ac12-consolidator-tokens-verbatim): "
+    "reviewer-consolidator.md declares APPROVE/REQUEST_CHANGES as "
+    "display-only, verbatim-preserved enum tokens",
+    "Verdict tokens are display-only, verbatim-preserved" in _s156_consolidator
+    and "APPROVE" in _s156_consolidator
+    and "REQUEST_CHANGES" in _s156_consolidator,
+    "reviewer-consolidator.md must declare APPROVE/REQUEST_CHANGES "
+    "display-only/verbatim",
+)
+check(
+    "suite156(task2-ac12-security-token-verbatim): security.md declares "
+    "'qa_status: clean' display-only and verbatim-preserved",
+    "qa_status: clean" in _s156_security and "verbatim-preserved" in _s156_security,
+    "security.md must declare the qa_status: clean token display-only/verbatim",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-1 -- each of the five AC-consuming agents references
+# 'AC-N: verdict + file:line evidence' without re-quoting the requirement
+# text (01-plan.md § Task List is the sole canonical AC-text source).
+# ---------------------------------------------------------------------------
+_S156_AC_CONSUMERS = {
+    "qa.md": _s156_qa,
+    "tester.md": _s156_tester,
+    "acceptance-checker.md": _s156_acceptance_checker,
+    "delivery.md": _s156_delivery,
+    "plan-reviewer.md": _s156_plan_reviewer,
+}
+_s156_missing_ac_ref = [
+    name
+    for name, text in _S156_AC_CONSUMERS.items()
+    if "01-plan.md § Task List" not in text
+    or "ac reference convention" not in text.lower()
+]
+check(
+    "suite156(task3-ac1-canonical-ac-source): all five AC-consuming agents "
+    "cite '01-plan.md § Task List' as the canonical AC-text source via an "
+    "explicit AC reference convention paragraph",
+    not _s156_missing_ac_ref,
+    f"missing canonical AC-source citation in: {_s156_missing_ac_ref}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-2 -- delivery.md Step 9c Acceptance Matrix Description column is
+# reduced to a <=5-word gist; the workspace-only rule is retained.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task3-ac2-description-5-words): delivery.md's Acceptance "
+    "Matrix Description column is reduced to '(≤5 words)'",
+    "Description (≤5 words)" in _s156_delivery,
+    "delivery.md Step 9c matrix must use a 'Description (≤5 words)' column",
+)
+check(
+    "suite156(task3-ac2-workspace-only-retained): delivery.md retains the "
+    "'workspace-only, never committed into the product repo' rule",
+    "Workspace-only, never committed into the product repo" in _s156_delivery,
+    "delivery.md must retain the workspace-only acceptance-matrix rule",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-3 -- qa.md, tester.md, acceptance-checker.md, and
+# plan-reviewer.md establish the reference-not-recite rule, generalizing the
+# existing verify-packet AC-avoidance pattern (qa.md:301).
+# ---------------------------------------------------------------------------
+_S156_REQUOTE_MARKERS = {
+    "qa.md": ("does NOT re-quote the requirement text", _s156_qa),
+    "tester.md": ("does not re-quote the requirement text", _s156_tester),
+    "acceptance-checker.md": (
+        "do not re-quote the requirement text",
+        _s156_acceptance_checker,
+    ),
+    "plan-reviewer.md": ("never the requirement text itself", _s156_plan_reviewer),
+}
+_s156_missing_requote_rule = [
+    name for name, (marker, text) in _S156_REQUOTE_MARKERS.items() if marker not in text
+]
+check(
+    "suite156(task3-ac3-reference-not-recite): qa.md, tester.md, "
+    "acceptance-checker.md, and plan-reviewer.md each state their AC "
+    "reference is never a restatement of the requirement text",
+    not _s156_missing_requote_rule,
+    f"missing reference-not-recite statement in: {_s156_missing_requote_rule}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-4 -- each of the five files references the iteration
+# re-narration ban for its own body, by ID.
+# ---------------------------------------------------------------------------
+_s156_missing_task3_renarr = [
+    name
+    for name, text in _S156_AC_CONSUMERS.items()
+    if "Iteration re-narration ban" not in text
+]
+check(
+    "suite156(task3-ac4-renarration-refs): all five AC-consuming agents "
+    "reference the 'Iteration re-narration ban' for their own report body",
+    not _s156_missing_task3_renarr,
+    f"missing 'Iteration re-narration ban' in: {_s156_missing_task3_renarr}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-3 AC-5 -- this task introduces no new versioned
+# docs/specs/**/acceptance-matrix.md artifact (already eliminated in
+# v2.129.0; the residual is reference-only, not a new committed matrix).
+# ---------------------------------------------------------------------------
+_s156_specs_diff = _s155_subprocess.run(
+    ["git", "diff", "--stat", "HEAD", "--", "docs/specs/"],
+    cwd=REPO_ROOT,
+    capture_output=True,
+    text=True,
+    check=False,
+)
+check(
+    "suite156(task3-ac5-no-new-acceptance-matrix): this diff introduces no "
+    "changes under docs/specs/ (no new versioned acceptance-matrix.md)",
+    _s156_specs_diff.stdout.strip() == "",
+    f"unexpected docs/specs/ diff: {_s156_specs_diff.stdout.strip()!r}",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-1 -- 00-execution-events.md free-text fields (summary/detail)
+# are bounded to a compact clause; one JSONL line per event is unchanged.
+# ---------------------------------------------------------------------------
+_s156_freetext_slice = _s156_slice(
+    _s156_orchestrator, "### Free-text field bound (`bounded` intensity level)"
+)
+check(
+    "suite156(task4-ac1-freetext-bound): agents/orchestrator.md bounds "
+    "event free-text fields to a compact clause (<=120 chars, no "
+    "multi-sentence prose), one JSONL line per event unchanged",
+    bool(_s156_freetext_slice)
+    and "≤120 chars" in _s156_freetext_slice
+    and "never multi-sentence narrative prose" in _s156_freetext_slice,
+    "orchestrator.md § Free-text field bound must bound event free-text "
+    "fields to <=120 chars, no multi-sentence prose",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-2 -- 00-state.md § Agent Results / § Hot Context become a
+# bounded, overwrite-in-place snapshot, keyed by (agent, phase); security
+# AND adversary at Phase 3 each retain their own current-verdict row.
+# ---------------------------------------------------------------------------
+_s156_agent_results_slice = _s156_slice(_s156_orchestrator, "## Agent Results")
+check(
+    "suite156(task4-ac2-keyed-upsert): orchestrator.md's § Agent Results is "
+    "a keyed-(agent, phase) upsert snapshot, never an accumulating append-log",
+    "keyed by\n     (agent, phase)" in _s156_agent_results_slice
+    or "keyed by (agent, phase)" in _s156_agent_results_slice.replace("\n", " "),
+    "orchestrator.md § Agent Results must document the (agent, phase)-"
+    "keyed upsert mechanic",
+)
+check(
+    "suite156(task4-ac2-two-lens-rows-retained): orchestrator.md's § Agent "
+    "Results template retains distinct security and adversary rows for "
+    "Phase 3, including incomplete_on_changed_control",
+    "| security | 3-verify |" in _s156_agent_results_slice
+    and "| adversary | 3-verify |" in _s156_agent_results_slice
+    and "incomplete_on_changed_control" in _s156_agent_results_slice,
+    "orchestrator.md § Agent Results template must show both the security "
+    "and adversary Phase-3 rows, never collapsed to one",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-3 -- the 00-state.md schema and the 00-pipeline-summary.md
+# schema reference the iteration re-narration ban (reference an iteration
+# by ID, never re-tell it).
+# ---------------------------------------------------------------------------
+_s156_hot_context_slice = _s156_slice(_s156_orchestrator, "## Hot Context")
+_s156_pipeline_summary_slice = _s156_slice(
+    _s156_orchestrator, "## Pipeline Summary Protocol"
+)
+check(
+    "suite156(task4-ac3-state-schema-renarration): orchestrator.md's § "
+    "Agent Results and § Hot Context both reference the Iteration "
+    "Re-Narration Ban",
+    "Iteration Re-Narration Ban" in _s156_agent_results_slice
+    and "iteration reference points to" in _s156_hot_context_slice,
+    "orchestrator.md's 00-state.md schema (Agent Results + Hot Context) "
+    "must reference the Iteration Re-Narration Ban",
+)
+check(
+    "suite156(task4-ac3-summary-schema-renarration): orchestrator.md's "
+    "Pipeline Summary Protocol references the Iteration Re-Narration Ban "
+    "for '## Iterations'",
+    "Iteration Re-Narration Ban" in _s156_pipeline_summary_slice
+    and "## Iterations" in _s156_pipeline_summary_slice,
+    "orchestrator.md's Pipeline Summary Protocol must reference the "
+    "Iteration Re-Narration Ban for its '## Iterations' section",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-4 -- the mandatory observability floor is intact: compaction
+# bounds FORMAT only; every phase.*/gate.* event still fires; the Tier-0
+# carve-out is unchanged.
+# ---------------------------------------------------------------------------
+_s156_obs_floor_slice = _s156_slice(
+    _s156_orchestrator, "**Mandatory observability floor (fenced"
+)
+check(
+    "suite156(task4-ac4-observability-floor-fenced): orchestrator.md fences "
+    "the mandatory observability floor -- every phase.*/gate.* event still "
+    "fires, and the Tier-0 carve-out is unchanged",
+    bool(_s156_obs_floor_slice)
+    and "still fires, unchanged" in _s156_obs_floor_slice
+    and "Tier-0 carve-out" in _s156_obs_floor_slice,
+    "orchestrator.md must fence the observability floor: every phase.*/"
+    "gate.* event still fires and the Tier-0 carve-out is unchanged",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-5 -- docs/observability.md documents the bounded events-line
+# format and the bounded state-snapshot format, consistent with
+# orchestrator.md (multi-site invariant).
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task4-ac5-observability-md-mirrors): docs/observability.md "
+    "documents both the Free-text field bound and the 00-state.md bounded "
+    "snapshot, cross-referencing agents/orchestrator.md",
+    "Free-text field bound" in _s156_observability
+    and "00-state.md bounded snapshot" in _s156_observability
+    and "agents/orchestrator.md" in _s156_observability,
+    "docs/observability.md must document both bounded formats and "
+    "cross-reference agents/orchestrator.md",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-6 -- orchestrator.md's Team table rows for security/adversary
+# are converted to English; no descriptive Spanish reference remains.
+# ---------------------------------------------------------------------------
+_s156_team_table_slice = _s156_slice(_s156_orchestrator, "## Your Team")
+check(
+    "suite156(task4-ac6-team-table-english): orchestrator.md's Team table "
+    "rows for security/adversary read 'in English', not 'in Spanish'",
+    "reports in English" in _s156_team_table_slice
+    and "report in English" in _s156_team_table_slice
+    and not _s156_spanish_mandate_pattern.search(_s156_team_table_slice),
+    "orchestrator.md's Team table must describe security/adversary reports "
+    "as English, with no residual Spanish reference",
+)
+
+# ---------------------------------------------------------------------------
+# Task-4 AC-7 -- orchestrator.md § Communication Protocol -> Language
+# propagation becomes tier-aware: an operator-facing-tier clause and an
+# agentic-tier clause, cross-referenced to docs/conventions.md and
+# docs/voice-guide.md.
+# ---------------------------------------------------------------------------
+_s156_lang_prop_slice = _s156_slice(
+    _s156_orchestrator, "**Language propagation (tier-aware)"
+)
+check(
+    "suite156(task4-ac7-tier-aware-clauses): orchestrator.md's Language "
+    "propagation instruction carries both an operator-facing-tier clause "
+    "and an agentic-tier clause",
+    bool(_s156_lang_prop_slice)
+    and "**Operator-facing tier**" in _s156_lang_prop_slice
+    and "**Agentic tier**" in _s156_lang_prop_slice,
+    "orchestrator.md § Language propagation must declare both tiers "
+    "explicitly",
+)
+check(
+    "suite156(task4-ac7-canonical-cross-ref): orchestrator.md's Language "
+    "propagation instruction cross-references both "
+    "docs/conventions.md § Document classification and docs/voice-guide.md",
+    "docs/conventions.md § Document classification" in _s156_lang_prop_slice
+    and "docs/voice-guide.md" in _s156_lang_prop_slice,
+    "orchestrator.md § Language propagation must cross-reference both "
+    "canonical sites",
+)
+
+# ---------------------------------------------------------------------------
+# Cross-task closure -- Task-5 AC-7's reverse cross-reference (previously
+# deferred by Suite 155 pending Task-4/Round 2) is now closable:
+# docs/conventions.md's forward pointer to orchestrator.md, PLUS
+# orchestrator.md's Language propagation section now actually referencing
+# back to docs/conventions.md, together close the multi-site invariant.
+# ---------------------------------------------------------------------------
+check(
+    "suite156(task5-ac7-closure): the Task-5 AC-7 multi-site invariant is "
+    "now fully closed -- docs/conventions.md forward-references "
+    "orchestrator.md's Language propagation section AND orchestrator.md's "
+    "Language propagation section now references back to "
+    "docs/conventions.md and docs/voice-guide.md",
+    "agents/orchestrator.md" in _s156_conventions
+    and "Language propagation" in _s156_conventions
+    and bool(_s156_lang_prop_slice)
+    and "docs/conventions.md" in _s156_lang_prop_slice
+    and "docs/voice-guide.md" in _s156_lang_prop_slice,
+    "the forward (conventions.md -> orchestrator.md) and reverse "
+    "(orchestrator.md -> conventions.md/voice-guide.md) pointers must both "
+    "be present to close Task-5 AC-7",
+)
+
+# Self-referential guard (hygiene contract) -- mirrors the Suite 152/153/155
+# pattern. The docs/testing.md registry entry is deliberately NOT
+# self-checked here: registering a new suite in the canonical registry is a
+# documentation edit performed alongside test authoring, not a property the
+# test file can assert about itself.
+_s156_own = read(Path(__file__))
+check(
+    "suite156(self-ref): test file contains 'Suite 156' and "
+    "'full-lane-output-verbosity-trim'",
+    "Suite 156" in _s156_own and "full-lane-output-verbosity-trim" in _s156_own,
+    "test file must self-reference Suite 156 and the marker "
+    "'full-lane-output-verbosity-trim'",
+)
+check(
+    "suite156(hygiene): CLAUDE.md does NOT contain 'Suite 156' (§11 "
+    "hygiene contract)",
+    "Suite 156" not in _s156_claude_text,
+    "CLAUDE.md must not mention Suite 156 — only docs/testing.md is the "
+    "canonical registry",
+)
+
+# Marker: full-lane-output-verbosity-trim-round2
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

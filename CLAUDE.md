@@ -108,7 +108,7 @@ team-harness/
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
 | Distribution | Claude Code plugin (`th`) via custom marketplace (`valianx/team-harness`) — the only CC install channel. Go installer binary (GH Release assets) — the only opencode install channel; it does not serve Claude Code. |
 
-**Current version:** `2.130.0` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
+**Current version:** `2.130.1` (see `.claude-plugin/plugin.json` `version` field — canonical source of truth for the plugin marketplace. `CHANGELOG.md` tracks the release history).
 
 **Install modes — legacy, unreachable.** `standard`/`low-cost` (`INSTALL_MODE`) — retired CC install path, unwired from the opencode manifest engine. Detail: `docs/lifecycle.md § Installer identity`; [`agents/README.md §"Low-cost mode"`](./agents/README.md#low-cost-mode).
 
@@ -286,9 +286,9 @@ The three things a developer already knows how to ask for — a work plan, an im
 
 ### 7.3 Language — English-only repo content
 
-Every committed artefact is in English. workspaces prose follows the operator's chat language (structure stays English). Live chat is not a committed artefact — operator may chat in any language.
+Every committed artefact is in English. Workspace docs split by tier: operator-facing follows the operator's language; agentic stays English (`docs/conventions.md`). Live chat may be in any language.
 
-**Documented exceptions:** security/reviewer report bodies (Spanish per contract), leader intent-detection routing table (bilingual intent patterns). Full language boundary table, workspaces rules, and contributor checklist are in `docs/voice-guide.md`.
+**Documented exceptions:** `agents/leader.md` live chat and Step 6 intent-detection routing table render in the operator's resolved language, never a hardcoded language. No other committed artefact carries a language exception; reports stay English. See `docs/voice-guide.md`.
 
 ---
 
@@ -346,7 +346,7 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 ## 14. Subagent Orchestration
 
-**The `leader` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the leader's intent-detection dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts into the same leader. All repo artefacts are written in English; live chat accepts Spanish and English.
+**The `leader` agent is the canonical entry point for every development workflow.** Operators drive the pipeline conversationally; the leader's intent-detection dispatches the right phase or direct mode. Skills (slash commands like `/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts into the same leader. Repo artefacts are written in English; live chat renders in the operator's resolved language.
 
 Routing table and escalation rules: see `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 

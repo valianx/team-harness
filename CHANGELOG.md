@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.130.1] - 2026-07-17
+
+### Changed
+- Added a shared output-verbosity contract (`docs/output-contract-patterns.md`, compact mirror in `agents/_shared/output-template.md § Output Contract — Compression`): four named intensity levels (`verbatim`/`tight`/`bounded`/`standard`) each mapped to an explicit artifact-class list, a verbatim-preservation rule, clarity exemptions covering a Critical/High finding's headline AND its actionable remediation, a canonical iteration re-narration ban (patch/verify narratives live only in `failure-brief.md`), and a before/after measurement method against the existing `00-pipeline-summary.md § Cost` rollup. `security`, `adversary`, `reviewer`, and `reviewer-consolidator` pipeline-mode reports now apply a per-finding prose budget without capping finding count; `qa`, `tester`, `acceptance-checker`, `delivery`, and `plan-reviewer` reference AC results by `AC-N: verdict + file:line` instead of re-quoting requirement text; `00-execution-events.md` stays append-only with only its per-event free-text fields bounded, while `00-state.md` moves from accumulating free-text prose to a replaceable, overwrite-in-place snapshot (never append-only).
+- Removed the documented Spanish report-body exception for `security`/`reviewer`/`adversary` (and the `reviewer-consolidator` mirror): every committed artifact and report body is now English-only. The sole surviving operator-language surfaces are the leader's live chat and its Step-6 intent-detection routing table, both parametric to the operator's resolved language (not a hardcoded language pair). `01-plan.md` keeps the two-tier rule — operator-facing prose follows the operator's resolved language with structural elements in English; every other workspace document and all committed artifacts are English.
+
 ## [2.130.0] - 2026-07-16
 
 ### Fixed

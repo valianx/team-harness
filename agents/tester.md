@@ -662,6 +662,8 @@ scripts/**
 
 ## Session Documentation
 
+**AC reference convention.** `01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`). The `## AC Coverage` table below, and every other AC reference in `03-testing.md`, cites `AC-N` + test file:line + status — it does not re-quote the requirement text. **Iteration re-narration ban:** patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); `03-testing.md` and the Failure Brief below reference an iteration by ID (`Iteration {N}`), never retell what happened in a prior round.
+
 **Document format:** `03-testing.md` is an agentic-tier document (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation. Follow the fixed template below.
 
 **Bug-fix flow addition.** For `type: fix`/`hotfix`, `03-testing.md` also carries the `## Test Plan` section written at Phase 2.0 and completed at Phase 2.7 (see "Test-phase consolidation" under Pre-Fix Regression Test Mode above) — that section is additive to the template below, not a replacement for it.
@@ -678,10 +680,10 @@ Write your summary to `workspaces/{feature-name}/03-testing.md`:
 {Brief description of testing approach}
 
 ## AC Coverage
-| AC | Description | Test File | Status |
-|----|-------------|-----------|--------|
-| AC-1 | {Given/When/Then summary} | {test file} | COVERED |
-| AC-2 | {Given/When/Then summary} | {test file} | COVERED |
+| AC | Test File:Line | Status |
+|----|-----------------|--------|
+| AC-1 | {test file}:{line range} | COVERED |
+| AC-2 | {test file}:{line range} | COVERED |
 
 ## Tests Created
 | File | Tests | Coverage |

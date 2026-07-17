@@ -143,6 +143,8 @@ For each substantive commitment in the original description (`01-plan.md § Revi
 
 ## Session Documentation
 
+**AC reference convention.** `01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`). The `## Drift Analysis` sections below reference `AC-N` (or `qa`'s PASS/FAIL verdict) by ID + evidence — they do not re-quote the requirement text; only the **Original ask** block, which quotes the user's own description by design, is exempt from this rule. **Iteration re-narration ban:** patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); a re-invoked drift audit references a prior round by ID (`Iteration {N}`), never retells it.
+
 **Document format:** the `## Drift Analysis` section of `reviews/04-validation.md` is agentic-tier content (see `docs/conventions.md § Document classification`) — compact, structured, no `## Review Summary`/`## Technical Detail` split obligation.
 
 Append the audit report as a `## Drift Analysis` section to `workspaces/{feature-name}/reviews/04-validation.md`. If a prior `## Drift Analysis` section exists, replace it in place.
