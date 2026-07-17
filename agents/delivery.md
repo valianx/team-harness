@@ -1014,21 +1014,28 @@ Options: (A) commit or stash, then re-run teardown; (B) discard with `git -C <pa
 ```
 Log `worktree_teardown: blocked: dirty-worktree` and exit this step. Do NOT proceed.
 
-**1b. Re-verify condition 3 (merged AND no commits ahead) immediately before removal.** This step's Gate evaluated condition 3 once, before the Teardown protocol began — time has passed since then (this same step's condition-4 check, at minimum). Per `docs/worktree-discipline.md § Rule 7`'s Atomicity discipline (referenced here, not redefined), re-run the ancestry check with no other Bash call interleaved between this re-check and step 2's `git worktree remove`:
+**1b. Acquire the sweep lock, then re-verify condition 3 (merged AND no commits ahead) immediately before removal.** Before the ancestry re-check below, acquire this worktree's directory lock per the protocol specified canonically in `docs/worktree-discipline.md § Rule 7` (Lock protocol subsection) — by reference; do not re-derive or duplicate the acquire/check/release sequence (the `mkdir` primitive, the holder-file contents, or the 15-minute stale-lock expiry threshold) here.
+
+- Acquisition fails (another process holds a live, non-stale lock) → do NOT proceed. Log `worktree_teardown: skipped: sweep-lock-held` and report `— sweep lock held (retry next boot)`; the worktree remains a candidate for the leader's next boot-time preflight sweep.
+- The lock mechanism itself errors (not a held-lock `EEXIST`) → treat as "cannot proceed safely". Log `worktree_teardown: skipped: sweep-lock-error` and do NOT remove.
+
+Once the lock is held, this step's Gate evaluated condition 3 once, before the Teardown protocol began — time has passed since then (this same step's condition-4 check, at minimum). Per `docs/worktree-discipline.md § Rule 7`'s Atomicity discipline (referenced here, not redefined — retained as an internal defense layered under the lock), re-run the ancestry check with no other Bash call interleaved between this re-check and step 2's `git worktree remove`:
 
 ```bash
 git -C <path> rev-list origin/main..HEAD
 ```
 
-- Empty output → condition 3 still holds. Proceed to step 2.
-- Non-empty output → a commit landed in `<path>` after the Gate's check. **STOP.** Do not remove. Treat the worktree as unmerged: log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point`. Do NOT proceed to step 2.
+- Empty output → condition 3 still holds. Proceed to step 2, still holding the lock.
+- Non-empty output → a commit landed in `<path>` after the Gate's check. **STOP.** Do not remove. Release the lock (step 2b). Treat the worktree as unmerged: log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point`. Do NOT proceed to step 2.
 
-**2. Remove the worktree (clean path only):**
+**2. Remove the worktree (clean path only), lock held:**
 
 ```bash
 git worktree remove <path>
 git worktree prune
 ```
+
+**2b. Release the lock.** Per `docs/worktree-discipline.md § Rule 7`'s Lock protocol (referenced here, not redefined), release the lock immediately after the removal attempt above — on both the just-removed path and the step 1b leave path (best-effort; a release failure self-heals via the same stale-lock expiry Rule 7 defines).
 
 **3. Verify removal:**
 
@@ -1050,10 +1057,10 @@ If `<path>` still appears after `--force`, log `worktree_teardown: failed: path-
 
 Add one line to the delivery status block:
 ```
-worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point | skipped: sweep-lock-held | skipped: sweep-lock-error
 ```
 
-**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged` or `skipped: commits-ahead-of-merge-point` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge (or ancestry) condition resolves.
+**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged`, `skipped: commits-ahead-of-merge-point`, or `skipped: sweep-lock-held` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge (or ancestry, or lock) condition resolves.
 
 ---
 
