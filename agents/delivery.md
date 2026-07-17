@@ -431,11 +431,11 @@ This step is gateway-aware: if the project does not have an external gateway (or
 | Mode | Signal | Behavior |
 |------|--------|----------|
 | **Per-PR bump (shipped default)** | no `skip-version` flag, or `skip-version: false` | Proceed with Step 9. Bump the project version once at assembly (min one, max one) and update the CHANGELOG directly (or via a `changelog.d/` fragment where that convention exists — see Step 9e). |
-| **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump | Skip Step 9 entirely. Write a `changelog.d/` fragment (Step 9e is gated on bump; fragment is written independently via Step 10.0). |
+| **Repo-local deferral (opt-in, NOT a shipped default)** | `skip-version: true` — set ONLY when the consuming repository documents a repo-local versioning/release convention that defers or batches the bump | Skip Step 9 entirely. The `changelog.d/` fragment was already written by Step 7 (which always runs, ahead of Step 9); Step 9e's release-cut assembly is what's gated on the bump, not the fragment itself. |
 
 **Escape hatch (the seam a repo-local deferral convention uses).** If the consuming repository documents a repo-local versioning/release convention that defers or batches the bump (announced in its own `CLAUDE.md` or equivalent contributor doc), delivery honors that convention instead of bumping per PR — this is what `skip-version: true` exists for. Absent such a documented convention, the shipped default (bump once per PR) applies unconditionally. team-harness itself does not use this escape hatch — its own `CLAUDE.md §6.3` documents the per-PR shipped default, not a deferral.
 
-**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. Step 9e's fragment assembly runs independently as part of Step 10.0 (the fragment is staged regardless of the version skip).
+**If the orchestrator passed `skip-version: true` in the task context → SKIP THIS ENTIRE STEP** (Steps 9.0–9.4a and the bump portion of 9e). Log "Version bump skipped: repo-local deferral convention (skip-version: true)" in the delivery summary and go to Step 10. Do NOT stage the version files. The fragment was already written by Step 7 (unconditional, runs before Step 9); Step 10.0 merely stages whatever Step 7 produced, regardless of the version skip.
 
 ### Step 9.0 — Version sites (explicit enumeration)
 
@@ -1522,7 +1522,7 @@ dod: {pass | no gates discovered | failed: <command>}
 mergeable_state: clean | conflicting | undetermined | blocked | behind | unstable | not-verified: gh-unavailable
 ci_state: passing | failing | pending | none | not-verified
 coderabbit: detected | not-detected | not-verified: gh-unavailable
-worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point | skipped: sweep-lock-held | skipped: sweep-lock-error
 release_tag: verified: v{X.Y.Z} | created: v{X.Y.Z} | skipped: no-tag-sync-workflow | skipped: no-version-bump | skipped: pr-not-merged   # per-PR bump in a tag-synced repo only (Step 11.4c); omit otherwise
 context7_consult: hit:N miss:N skipped:N
 kg_hit_used: [node-name, ...]   # KG nodes from 00-knowledge-context.md that directly influenced a delivery decision; [] when none
