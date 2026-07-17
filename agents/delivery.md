@@ -1046,7 +1046,15 @@ git worktree list
 Check that `<path>` no longer appears in the output. If it still appears, do NOT force-remove yet — the apparent failure may be the documented Windows file-lock quirk (#57767), or it may be git correctly REFUSING to delete a tree that became dirty after step 1's check (e.g., a human edit landed while this step ran; note the lock was already released at step 2b, so it offers no protection here). Per the force-repair safety check specified canonically in `docs/worktree-discipline.md § Rule 7`'s Action-and-report table (referenced here, not redefined), collapse the re-check and the repair into **one single Bash tool invocation** — a shell conditional, not two separate agent-issued tool calls:
 
 ```bash
-if [ -z "$(git -C <path> status --porcelain)" ]; then git worktree prune; git worktree remove --force <path>; git worktree list; else echo "ABORT: worktree became dirty since last check, not force-removing"; fi
+porcelain="$(git -C <path> status --porcelain)"
+tainted="$(printf '%s\n' "$porcelain" | awk '{code=substr($0,1,2); if (code=="??" || code ~ /D/) print}')"
+if [ -z "$porcelain" ] || { [ -z "$tainted" ] && \
+    [ -z "$(git -C <path> diff --numstat | awk '$1!=0||$2!=0')" ] && \
+    [ -z "$(git -C <path> diff --cached --numstat | awk '$1!=0||$2!=0')" ]; }; then
+  git worktree prune; git worktree remove --force <path>; git worktree list
+else
+  echo "ABORT: worktree became dirty since last check, not force-removing"
+fi
 ```
 
 - The `if` branch fires only when the re-check comes back **still clean** (mode-only-or-nothing,
