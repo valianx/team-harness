@@ -317,15 +317,31 @@ window this rule's own Atomicity discipline and Lock protocol below disclose as 
 forcing in that second case destroys exactly the work git's own refusal was protecting.
 
 Before invoking Rule 4's `git worktree prune` + `git worktree remove --force <path>` repair on an
-initial-remove failure, re-verify condition 4 (dirtiness) first: `git -C <path> status --porcelain`
-plus the mode-only numstat allow-list already specified above.
+initial-remove failure, collapse the re-check and the repair itself into **one single Bash tool
+invocation** — a shell conditional, not two separate agent-issued tool calls:
 
-- Re-check shows **still clean** (mode-only-or-nothing) → proceed with the force-repair sequence —
+```bash
+if [ -z "$(git -C <path> status --porcelain)" ]; then git worktree prune; git worktree remove --force <path>; else echo "ABORT: worktree became dirty since last check, not force-removing"; fi
+```
+
+- The `if` branch fires only when the re-check comes back **still clean** (mode-only-or-nothing,
+  per the numstat allow-list already specified above) → proceed with the force-repair sequence —
   this is the genuine platform-quirk case Rule 4's caveat was written for.
-- Re-check shows **now dirty** (a real content change) → do NOT force. Abort the removal for this
-  candidate and fall through to the "fails 4 (dirty by content)" row above — treat it exactly like a
-  first-pass dirty result, never force-remove content that became genuinely dirty after the last
-  check.
+- The `else` branch fires when the re-check comes back **now dirty** (a real content change) → do
+  NOT force. Abort the removal for this candidate and fall through to the "fails 4 (dirty by
+  content)" row above — treat it exactly like a first-pass dirty result, never force-remove content
+  that became genuinely dirty after the last check.
+
+Two prior rounds re-checked dirtiness and then force-removed as two *separate* Bash tool calls,
+leaving an LLM-inference/dispatch-latency window (seconds to tens of seconds) between the check and
+the force-call — a fresh writer could land content in that gap with zero backstop once force was in
+play. Folding check + prune + force into one shell invocation narrows that window down to genuine
+OS-level command latency (milliseconds), the practical minimum achievable in this tool-call
+execution model. This is **not** a claim of full atomicity: the shell still executes `prune` and
+`remove --force` as sequential OS processes inside that one invocation, and the `if` condition is
+still evaluated before — not simultaneously with — the removal it gates. What this change closes is
+specifically the agent-latency multiplier the last two rounds found, not the underlying
+sequential-steps nature of check-then-act.
 
 This closes the specific gap in the Lock protocol's own residual-closure claim below: the *initial*
 `git worktree remove` call never uses `--force`, but Rule 4's repair-on-failure step does,

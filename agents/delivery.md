@@ -1043,15 +1043,28 @@ git worktree prune
 git worktree list
 ```
 
-Check that `<path>` no longer appears in the output. If it still appears, do NOT force-remove yet — the apparent failure may be the documented Windows file-lock quirk (#57767), or it may be git correctly REFUSING to delete a tree that became dirty after step 1's check (e.g., a human edit landed while this step ran; note the lock was already released at step 2b, so it offers no protection here). Re-verify condition 4 (dirtiness) first, per the force-repair safety check specified canonically in `docs/worktree-discipline.md § Rule 7`'s Action-and-report table (referenced here, not redefined): re-run `git -C <path> status --porcelain` plus the mode-only numstat allow-list from step 1 above.
+Check that `<path>` no longer appears in the output. If it still appears, do NOT force-remove yet — the apparent failure may be the documented Windows file-lock quirk (#57767), or it may be git correctly REFUSING to delete a tree that became dirty after step 1's check (e.g., a human edit landed while this step ran; note the lock was already released at step 2b, so it offers no protection here). Per the force-repair safety check specified canonically in `docs/worktree-discipline.md § Rule 7`'s Action-and-report table (referenced here, not redefined), collapse the re-check and the repair into **one single Bash tool invocation** — a shell conditional, not two separate agent-issued tool calls:
 
-- **Still clean** (mode-only-or-nothing) → the failure is the genuine platform quirk. Repair:
 ```bash
-git worktree prune
-git worktree remove --force <path>
-git worktree list   # verify again
+if [ -z "$(git -C <path> status --porcelain)" ]; then git worktree prune; git worktree remove --force <path>; git worktree list; else echo "ABORT: worktree became dirty since last check, not force-removing"; fi
 ```
-- **Now dirty** (a real content change) → do NOT force. Treat this exactly like step 1's dirty branch: log `worktree_teardown: blocked: dirty-worktree` and surface to the operator with the same STOP block as step 1, then exit this step. Do NOT proceed to `--force`.
+
+- The `if` branch fires only when the re-check comes back **still clean** (mode-only-or-nothing,
+  per the numstat allow-list from step 1 above) → the failure is the genuine platform quirk;
+  `prune` + `remove --force` + a final `worktree list` all execute inside this one invocation.
+- The `else` branch fires when the re-check comes back **now dirty** (a real content change) → do
+  NOT force. Treat this exactly like step 1's dirty branch: log `worktree_teardown: blocked:
+  dirty-worktree` and surface to the operator with the same STOP block as step 1, then exit this
+  step. Do NOT proceed to `--force`.
+
+Two prior rounds re-checked dirtiness and then force-removed as two *separate* Bash tool calls,
+leaving an LLM-inference/dispatch-latency window (seconds to tens of seconds) between the check and
+the force-call with zero backstop once force was in play. Folding check + prune + force + verify
+into one shell invocation narrows that window to genuine OS-level command latency (milliseconds) —
+the practical minimum achievable in this tool-call execution model, not a claim of full atomicity:
+the shell still runs `prune` and `remove --force` as sequential OS processes inside that one
+invocation. What this closes is the agent-latency multiplier the last two rounds found, not the
+underlying sequential-steps nature of check-then-act.
 
 If `<path>` still appears after a genuine force-repair (the clean branch above), log `worktree_teardown: failed: path-still-present` and surface to the operator. Do NOT continue silently.
 
