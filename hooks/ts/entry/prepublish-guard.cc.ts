@@ -5,11 +5,6 @@
 //
 // Fail mode: FAIL-OPEN on every evaluation fault.
 // Shim errors → none (non-covered call). Body faults are handled inside body.evaluate().
-//
-// Release-cut marker/trailer recognition lives entirely in the body —
-// it reads the marker via the existing readFile/gitDiffNameStatus methods and
-// the trailer via the existing readEnv method, so this entry needs no new
-// PrepublishReader capability.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -102,14 +97,6 @@ function makeReader(): PrepublishReader {
           encoding: "utf8",
           env: { ...process.env, MSYS_NO_PATHCONV: "1" },
         });
-      } catch {
-        return null;
-      }
-    },
-
-    gitCurrentBranch(): string | null {
-      try {
-        return execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
       } catch {
         return null;
       }
