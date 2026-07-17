@@ -662,15 +662,17 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 
 ### Step 9c — Acceptance Matrix
 
+**AC reference convention.** `01-plan.md § Task List` is the single canonical statement of AC text (`docs/output-contract-patterns.md`) — this generalizes `agents/qa.md:301`'s verify-packet AC-avoidance pattern to the matrix below. The matrix references `AC-N` + verdict + evidence; the `Description` column below is a ≤5-word gist, never a restatement of the requirement. **Iteration re-narration ban:** patch/verify round narratives live only in `failure-brief.md` (`docs/output-contract-patterns.md § 5`); this matrix references an iteration by ID when relevant, never retells it.
+
 **On `lane: full` (or when `lane` is absent):** Build the AC traceability matrix from `01-plan.md` § Task List (AC list), `03-testing.md`, `reviews/04-validation.md` and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/reviews/04-validation.md` as a new `## Acceptance Matrix` section — an addition, never a rewrite of qa's existing `## Acceptance Criteria Results` content:
 
 ```markdown
 ## Acceptance Matrix
 
-| AC | Description (1 line) | Test (file:line) | QA evidence (file:line) | Security |
-|----|----------------------|------------------|-------------------------|----------|
-| AC-1 | {gist} | `auth.spec.ts:42` PASS | `service.ts:18` PASS | clean |
-| AC-2 | {gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
+| AC | Description (≤5 words) | Test (file:line) | QA evidence (file:line) | Security |
+|----|-------------------------|------------------|-------------------------|----------|
+| AC-1 | {≤5-word gist} | `auth.spec.ts:42` PASS | `service.ts:18` PASS | clean |
+| AC-2 | {≤5-word gist} | `auth.spec.ts:67` PASS | `controller.ts:25` PASS | clean |
 ```
 
 **On `lane: express`:** `reviews/04-validation.md` is legitimately absent — `qa` never ran on this lane (Step 0 above). Do NOT create it. Build the same matrix shape from `01-plan.md` § Task List (AC list), `03-testing.md` (the tester's combined authoring+verify evidence, which substitutes for the QA-evidence column), and (if it exists) `reviews/04-security.md`. Append it to `workspaces/{feature-name}/03-testing.md` instead, as a new `## Acceptance Matrix` section — the one acceptance-evidence artifact express always produces:
@@ -678,9 +680,9 @@ If a check command does not exist in the project (e.g. no `lint` script), skip t
 ```markdown
 ## Acceptance Matrix
 
-| AC | Description (1 line) | Test (file:line) | QA evidence (file:line) | Security |
-|----|----------------------|------------------|-------------------------|----------|
-| AC-1 | {gist} | `auth.spec.ts:42` PASS | n/a (express — tester combined result) | clean |
+| AC | Description (≤5 words) | Test (file:line) | QA evidence (file:line) | Security |
+|----|-------------------------|------------------|-------------------------|----------|
+| AC-1 | {≤5-word gist} | `auth.spec.ts:42` PASS | n/a (express — tester combined result) | clean |
 ```
 
 **Workspace-only, never committed into the product repo.** The matrix lives in `reviews/04-validation.md` on `lane: full`, or in `03-testing.md` on `lane: express` — either way inside the gitignored `workspaces/` tree (see CLAUDE.md § "Workspaces as the shared board") — not under any tracked `docs/specs/` path. It is embedded verbatim in the PR body at Step 11.2, which is the durable, human-facing surface for this content; Step 10.0 does not stage `docs/specs/`, on any lane. This holds uniformly on `lane: full` and `lane: express` — express's minimal-artifact profile (`agents/orchestrator.md § Express Lane Profile`) never had a spec/matrix commit to skip in the first place; this step's express branch appends a section to a file the tester already wrote, not a new standalone file.
