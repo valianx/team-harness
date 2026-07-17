@@ -86,8 +86,19 @@ branch — the objective, queryable merge event. "Finished" is not:
 - The PR was approved.
 
 The worktree stays alive through review. Review-fix commits go into the same worktree on the same
-branch — never into a new branch or a separate patch PR. Teardown fires in the delivery agent,
-post-merge.
+branch — never into a new branch or a separate patch PR.
+
+**Teardown ownership (corrected — see Rule 7).** An earlier version of this rule stated that
+teardown "fires in the delivery agent, post-merge." That is aspirational, not what actually
+happens: `delivery` opens the PR in Phase 4 and its own run ends before a human or CI merges it —
+`delivery` has no live trigger for a merge event that happens after its own session is over. In
+the ordinary single-session flow, `delivery`'s own teardown attempt (Step 11.4b) is a
+**same-session best-effort**: it only removes the worktree when the PR is somehow already merged
+by the time delivery runs (e.g., an auto-merge landed mid-session). The **durable reaper** for the
+general case — a worktree whose PR merges in a later session, which is the common case — is the
+**preflight sweep at `th:leader`'s boot** (Rule 7 below). The Rule 4 teardown protocol itself is
+not removed by this correction; it is still the exact sequence both the same-session best-effort
+and the boot-time sweep execute once their own gate condition is met.
 
 ---
 
@@ -211,6 +222,115 @@ initiative (`agents/leader.md § Multi-Task fan-out`) — each lane runs in its 
 - **Plan declares each lane's worktree (Rule 5).** Every lane records its `worktree` /
   `worktree_branch` / `worktree_base` in its OWN orchestrator `00-state.md`, so teardown after each
   lane's PR merges (Rule 3/4) is a deterministic lookup, not a filesystem search.
+
+---
+
+## Rule 7 — Boot-time preflight sweep: the durable worktree reaper
+
+`delivery`'s Step 11.4b teardown is a same-session best-effort (see Rule 3's correction above) — it
+almost never fires, because the PR it just opened is rarely merged before its own run ends. The
+**durable reaper** is this Rule 7's preflight sweep, run by `th:leader` at boot, before it fans out
+into `th:orchestrator` (`agents/leader.md § Phase 0a`) — the first point in ANY later session that
+runs after a previous session's PR could have merged.
+
+This rule is the **canonical, single source of truth** for the worktree-sweep safety predicate.
+`agents/leader.md` (the boot-time preflight sweep) and `agents/delivery.md` Step 11.4b (the
+same-session teardown) each REFERENCE this rule by pointer — neither re-derives or duplicates the
+predicate, the allow-list, or the action/report table. A divergence between what either site does
+and what is written here is a defect in that site, not an allowed variation.
+
+### The safety predicate — four cumulative conditions
+
+All FOUR conditions below must hold for a worktree to be auto-removed. Any single failure means
+**leave it and report** — never a silent skip, and never an auto-removal on a partial match.
+
+**1. Not the main tree and not the current session's own active worktree.** Exclude the
+repository's main working tree. Exclude the worktree this session itself is actively using — read
+the `worktree:` field of this session's own `00-state.md`, if one already exists at this point in
+the boot sequence (Rule 5's existing mechanism supplies this field; no new lookup is invented).
+
+**2. Pipeline provenance.** Either signal is sufficient:
+- The branch name matches a conventional pipeline prefix (`feat/`, `fix/`, `refactor/`, `chore/`,
+  `docs/`) — a primary signal.
+- The worktree is registered in a discoverable `00-state.md` (`worktree:` field, Rule 5) —
+  authoritative confirmation, stronger than the branch-name signal alone.
+
+Neither signal present → provenance is unknown. Leave it and report as a candidate; never
+auto-remove on unknown provenance.
+
+**3. Branch merged to `origin/main` AND no commits ahead of the merge point.** Two
+sub-conditions, AND-ed — both must hold, not either:
+
+- **Merged.** Preferred: `gh pr view <branch> --json state,mergedAt` reports `MERGED` — this is a
+  read-only call and does not require `gh auth switch`. Fallback when `gh` is unavailable:
+  `git branch --merged origin/main` (ancestry check). See the squash-merge caveat below for this
+  fallback's coverage limit.
+- **No commits ahead.** `git -C <path> rev-list origin/main..HEAD` MUST be empty. A `MERGED` result
+  (or a merge-ancestry match) does **not**, by itself, prove no work would be lost: it does not
+  catch (a) a follow-up commit made in the worktree *after* the merge, with no new PR opened, where
+  `gh pr view` still reports the old PR as `MERGED` and `git status` is clean because the follow-up
+  work is committed, not just staged; or (b) a reused branch name, where `gh pr view <branch>` maps
+  to a *prior* merged PR while the worktree's `HEAD` carries new, unmerged commits under the same
+  branch name. AND-ing the commits-ahead check onto the merge check closes this gap: any commit past
+  the merge point treats the worktree as unmerged.
+
+Either sub-condition failing → treat the worktree as **unmerged**. Leave it and report; never
+auto-remove.
+
+**4. Clean beyond a mode-only allow-list.** `git -C <path> status --porcelain` must show nothing
+except mode-only diffs:
+
+- A modified path is **mode-only** — and does not count as dirty — only when BOTH
+  `git -C <path> diff --numstat` and `git -C <path> diff --cached --numstat` show `0\t0` for that
+  path (the canonical example: an executable-bit flip on `hooks/sketch-guard.sh`, tracked without
+  content changes).
+- Any modified path with a **non-zero** numstat on either command is a content change — blocks
+  removal.
+- Any **untracked** (`??`) path, or any **deleted** path, is a content change — blocks removal.
+
+One non-mode-only entry anywhere in the status output fails this condition entirely — it is not a
+per-file partial removal, it is a per-worktree pass/fail.
+
+### Action and report table
+
+| Conditions met | Action | Report |
+|---|---|---|
+| 1–4 (all) | Remove — `git worktree remove <path>` + `git worktree prune` + verify with `git worktree list` (Rule 4's exact protocol) | `worktree_swept: removed <path> (branch merged, clean)` |
+| 1–3, fails 4 (dirty by content) | Leave | `worktree_swept: left <path> — uncommitted changes: <files>` |
+| 1–2, fails 3 (unmerged, or merged-but-commits-ahead) | Leave | `worktree_swept: left <path> — branch unmerged` (or `— commits ahead of merge point` for the commits-ahead sub-case) |
+| 1 only, fails 2 (provenance unknown) | Leave | `worktree_swept: candidate <path> — unknown provenance, not auto-removed` |
+
+Never a silent, permanent skip: an unresolved worktree's report line reappears at every boot until
+the operator resolves it (merges the branch, cleans the tree, or removes it manually).
+
+### Squash-merge detection limit (documented, not a bug)
+
+The durable reaping path depends on `gh pr view` succeeding for the `MERGED` detection. The
+`git branch --merged origin/main` fallback is **conservative-only**: it cannot detect a
+squash-merged branch, because squash-merge creates a brand-new commit on `main` and the feature
+branch's tip is never that commit's ancestor. This repository's actual merge norm is squash-merge.
+Consequence, stated plainly: a squash-merged worktree is never wrongly removed (the fallback simply
+never confirms "merged" for it, so condition 3 fails and it is left) — but it is also **never
+auto-reaped by condition 3's ancestry check even when `gh` access IS available**, because
+`git -C <path> rev-list origin/main..HEAD` is never empty for a squash-merged branch's tip (the tip
+commit itself is not on `main`; only its squashed content is). For a repo that squash-merges, this
+sweep's practical auto-removal coverage is limited to non-squash-merged branches. Squash-merged
+worktrees will keep being reported as candidates at every boot and likely need periodic manual
+`git worktree remove` / `git worktree prune`.
+
+### Nature of the operation
+
+`git worktree remove` is a **local** git operation — it is not an outward action, and it is NOT
+gated by `dev-guard`. It may still prompt for local filesystem-write permission under the
+operator's own permission system; that prompt is expected and acceptable for a destructive-lite
+local operation, and is a separate concern from the outward-action gate. Never use `--no-verify` or
+bypass a hook to force a removal through.
+
+### Composition with Rule 6
+
+The sweep runs per-repo, at the point where `th:leader` touches that repo, respecting Rule 6's
+per-lane isolation: a sibling project in a multi-project initiative is a distinct repository, and
+the sweep never runs against a repo other than the one it is currently evaluating.
 
 ---
 
