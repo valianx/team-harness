@@ -517,11 +517,12 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
 
 **Step 9.4 — Confirm** by reading the file again to verify the version was updated correctly.
 
-**Step 9.4a — Multi-site invariant MATCH check (pre-STAGE-GATE-3, non-blocking for single-site bumps).** Read `01-plan.md § Review Summary → ### Multi-site invariants` (if present). If the section exists and lists ≥2 sites for any invariant:
+**Step 9.4a — Multi-site invariant MATCH check (pre-STAGE-GATE-3, unconditional on a discovered multi-site set; no-op for single-site consumers).** This check no longer gates on whether THIS PR's `01-plan.md § Review Summary` happens to declare a `### Multi-site invariants` table — `agents/architect.md` instructs architects to OMIT that table when a plan merely USES an existing invariant rather than modifying it, which is true of nearly every ordinary future PR, so a plan-declaration-only gate left this defense-in-depth backstop dormant for routine work. Instead, run the MATCH check whenever Step 9.0's site discovery (above) resolved a multi-site set — i.e., discovery rule 1 fired (`01-plan.md` declares the table for this PR) **or** discovery rule 2 fired (the repo documents its own canonical multi-site version table in `CLAUDE.md` or an equivalent contributor doc — team-harness documents its three-site table in `CLAUDE.md §3` + this contract, independent of any specific PR's plan). When discovery instead fell through to rule 3 (single-site Glob-first-match — no multi-site table exists for this repo), Step 9.4a remains a **no-op**: there is nothing to cross-check, and the consumer default path is unchanged (preserves AC-10).
 
-1. For each invariant row in the table, read the actual value at every listed site.
-2. Compare all values for the same invariant. A MATCH means every non-fenced site holds the same value and every fenced site is unchanged from `main` (no edit introduced).
-3. If any site diverges — two non-fenced sites hold different values, OR a fenced site was modified — return `status: failed` with a **"partial sync" report** naming the invariant, the expected value, and the actual value at each site. Example report:
+1. Resolve the site list from whichever discovery rule fired — the plan's explicit table, or the repo's documented canonical table.
+2. For each invariant row, read the actual value at every listed site.
+3. Compare all values for the same invariant. A MATCH means every non-fenced site holds the same value and every fenced site is unchanged from `main` (no edit introduced).
+4. If any site diverges — two non-fenced sites hold different values, OR a fenced site was modified — return `status: failed` with a **"partial sync" report** naming the invariant, the expected value, and the actual value at each site. Example report:
 
    ```
    Partial sync detected — invariant: plugin version
@@ -531,9 +532,9 @@ Before choosing a version, **read the git diff** (`git diff main...HEAD -- . ':!
    Action required: update .claude-plugin/marketplace.json before proceeding.
    ```
 
-4. If all sites MATCH (or the section is absent / has only single-site invariants), continue to Step 9e normally.
+5. If all sites MATCH (or discovery resolved a single-site set), continue to Step 9e normally.
 
-**Reference:** `agents/delivery.md` Step 9.0 is the worked example of multi-site enumeration for version-literal sites. The `### Multi-site invariants` table in `01-plan.md` is authored by the architect per `agents/architect.md § Phase 2 → Domain Heuristics → Multi-site invariants`. This step generalizes the Step 9.0 version-site MATCH obligation to arbitrary multi-site invariants declared in the plan.
+**Reference:** `agents/delivery.md` Step 9.0 is the worked example of multi-site enumeration for version-literal sites. The `### Multi-site invariants` table, when a PR's plan declares one, is authored by the architect per `agents/architect.md § Phase 2 → Domain Heuristics → Multi-site invariants`. This step generalizes the Step 9.0 version-site MATCH obligation to any multi-site invariant the repo canonically documents — declared by this PR's plan or standing from an earlier one — not only invariants a given PR's plan happens to restate.
 
 ### Step 9e — CHANGELOG release cut (with `changelog.d/` assembly)
 
