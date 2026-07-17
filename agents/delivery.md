@@ -977,7 +977,7 @@ Signal 3 is authoritative when positive — a `CodeRabbit` check in the rollup p
 
 ---
 
-### Step 11.4b — Worktree teardown (post-merge, rule 4; conditional)
+### Step 11.4b — Worktree teardown (post-merge, rule 4; same-session best-effort; conditional)
 
 **Gate:** run only when ALL of the following are true:
 1. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
@@ -985,19 +985,24 @@ Signal 3 is authoritative when positive — a `CodeRabbit` check in the rollup p
 
 When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skipped: branch-in-place` and continue.
 
+**Same-session best-effort, not the durable reaper.** Delivery runs pre-merge in the ordinary single-session flow: the PR it just opened is rarely already merged by the time this step executes, so gate condition 1 fails on most runs (`skipped: pr-not-merged`) and teardown here is a no-op. This step only removes a worktree when the PR is already merged at delivery time (e.g., an auto-merge landed while delivery was still running). The durable reaper for the common case — a worktree whose PR merges in a later session — is the boot-time preflight sweep in `th:leader` Phase 0a, which applies the same predicate from `docs/worktree-discipline.md § Rule 7` at a point in time that actually runs after the merge. Both sites reference Rule 7's predicate; neither redefines it.
+
 **Worktree teardown is re-anchored to PR merge (rule 3).** The worktree lives through review — review-fix commits go into the same worktree on the same branch. Do NOT tear down earlier than this step.
 
 **Teardown protocol:**
 
 Read the `worktree:` field from `00-state.md § Current State` to get `<path>`.
 
-**1. Check for uncommitted changes:**
+**1. Check for uncommitted changes (mode-only diffs are not "dirty"):**
 
 ```bash
 git -C <path> status --porcelain
 ```
 
-If any output exists (dirty worktree): **STOP**. Do not remove. Surface to the operator:
+If the output is empty, the worktree is clean — proceed to step 2. If output exists, apply the mode-only allow-list defined in `docs/worktree-discipline.md § Rule 7` (referenced here, not redefined): a modified path is mode-only, and does not count as dirty, only when BOTH `git -C <path> diff --numstat` and `git -C <path> diff --cached --numstat` show `0\t0` for that path (e.g., an executable-bit flip on `hooks/sketch-guard.sh`). Any non-zero numstat, any untracked (`??`) path, or any deleted path is a content change and blocks teardown.
+
+- Every modified path is mode-only → treat the worktree as clean. Proceed to step 2.
+- Any modified path carries a content change, or an untracked/deleted path exists → **STOP**. Do not remove. Surface to the operator:
 ```
 STOP: worktree <path> has uncommitted changes — teardown blocked.
 Inspect with: cd <path> && git status
@@ -1034,6 +1039,8 @@ Add one line to the delivery status block:
 ```
 worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
 ```
+
+**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge lands.
 
 ---
 
