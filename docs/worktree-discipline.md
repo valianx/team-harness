@@ -303,6 +303,37 @@ per-file partial removal, it is a per-worktree pass/fail.
 Never a silent, permanent skip: an unresolved worktree's report line reappears at every boot until
 the operator resolves it (merges the branch, cleans the tree, or removes it manually).
 
+**Force-repair safety check — mandatory at this rule's automated call sites.** The 1–4 row above
+delegates to "Rule 4's exact protocol," which includes a repair sequence for when the initial,
+non-forced `git worktree remove` fails: `git worktree prune` then `git worktree remove --force
+<path>` (Rule 4's "Windows file-lock caveat"). Rule 4's own text does not check WHY the initial
+removal failed before escalating to `--force` — for a human executing Rule 4's protocol manually,
+that is an acceptable simplification (the human can read the actual git error before deciding
+whether to force). For THIS rule's sweep — and for `agents/delivery.md` Step 11.4b, which mirrors
+this same safeguard — there is no human in the loop: an unattended, agent-executed force-removal
+cannot tell a genuine Windows file-lock quirk apart from git correctly REFUSING to delete a tree
+that became dirty after the sweep's last check (e.g., a human's uncommitted edit landing in the
+window this rule's own Atomicity discipline and Lock protocol below disclose as still open). Blindly
+forcing in that second case destroys exactly the work git's own refusal was protecting.
+
+Before invoking Rule 4's `git worktree prune` + `git worktree remove --force <path>` repair on an
+initial-remove failure, re-verify condition 4 (dirtiness) first: `git -C <path> status --porcelain`
+plus the mode-only numstat allow-list already specified above.
+
+- Re-check shows **still clean** (mode-only-or-nothing) → proceed with the force-repair sequence —
+  this is the genuine platform-quirk case Rule 4's caveat was written for.
+- Re-check shows **now dirty** (a real content change) → do NOT force. Abort the removal for this
+  candidate and fall through to the "fails 4 (dirty by content)" row above — treat it exactly like a
+  first-pass dirty result, never force-remove content that became genuinely dirty after the last
+  check.
+
+This closes the specific gap in the Lock protocol's own residual-closure claim below: the *initial*
+`git worktree remove` call never uses `--force`, but Rule 4's repair-on-failure step does,
+unconditionally — and only at this rule's automated call sites was that unconditional escalation
+missing a human able to notice the difference. Rule 4's own original teardown-protocol text and
+caveat (`## Rule 4` above, used by human-manual teardown flows outside this automated-sweep scope)
+are unchanged by this safeguard.
+
 ### Atomicity discipline — minimize the TOCTOU window, do not claim to eliminate it
 
 The four-condition predicate above is prose evaluated by an agent through separate, sequential
@@ -438,14 +469,21 @@ that human writer, the only defense remains the atomicity discipline above (whic
 commit landing before the final re-check); the one truly irreducible sliver is a human edit/commit
 landing in the single-tool-call gap between the final re-check and the `git worktree remove` call
 itself — the residual already named in the atomicity discipline subsection, which the lock does not
-narrow (it was never sweeper-vs-sweeper contention to begin with). Additional bound (not
-overclaimed): the removal never uses `--force` at either site, so a tree the human left dirty makes
-`git worktree remove` REFUSE (a git-level backstop); and a human commit in that sliver survives on
-the branch ref/reflog after the remove (the remove deletes the working directory and per-worktree
-admin metadata, not the branch or its commits) — genuinely unrecoverable loss is limited to
-uncommitted work in that sliver, which git's refusal-without-`--force` already covers. **The lock
-does not eliminate the risk an out-of-band human edit could cause; it reduces it to that bounded
-sliver and names it explicitly.**
+narrow (it was never sweeper-vs-sweeper contention to begin with). Additional bound, corrected: the
+*initial* `git worktree remove` call never uses `--force` at either site, so a tree the human left
+dirty makes that first call REFUSE (a git-level backstop) — and a human commit in that sliver
+survives on the branch ref/reflog after the remove (the remove deletes the working directory and
+per-worktree admin metadata, not the branch or its commits). This backstop is NOT, by itself, the
+end of the story: Rule 4's own repair-on-failure step (invoked when the initial call appears to
+fail) escalates to `git worktree remove --force <path>` unconditionally, without distinguishing this
+refusal from the documented Windows file-lock quirk — a naive reading of "the removal never uses
+`--force`" would miss that the *repair* step does. The Action-and-report table above closes this at
+this rule's automated call sites: the force-repair sequence re-verifies dirtiness before
+force-removing, and aborts (falls through to leave + report) if the tree is genuinely dirty, so the
+git-level refusal is not silently overridden. With that re-check in place, genuinely unrecoverable
+loss is limited to uncommitted work landing in the single-tool-call sliver itself. **The lock does
+not eliminate the risk an out-of-band human edit could cause; it reduces it to that bounded sliver
+and names it explicitly.**
 
 ### Squash-merge detection limit (documented, not a bug)
 

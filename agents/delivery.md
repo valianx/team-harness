@@ -1043,15 +1043,17 @@ git worktree prune
 git worktree list
 ```
 
-Check that `<path>` no longer appears in the output. If it still appears, the removal failed (common on Windows due to file-lock issue #57767). Repair:
+Check that `<path>` no longer appears in the output. If it still appears, do NOT force-remove yet — the apparent failure may be the documented Windows file-lock quirk (#57767), or it may be git correctly REFUSING to delete a tree that became dirty after step 1's check (e.g., a human edit landed while this step ran; note the lock was already released at step 2b, so it offers no protection here). Re-verify condition 4 (dirtiness) first, per the force-repair safety check specified canonically in `docs/worktree-discipline.md § Rule 7`'s Action-and-report table (referenced here, not redefined): re-run `git -C <path> status --porcelain` plus the mode-only numstat allow-list from step 1 above.
 
+- **Still clean** (mode-only-or-nothing) → the failure is the genuine platform quirk. Repair:
 ```bash
 git worktree prune
 git worktree remove --force <path>
 git worktree list   # verify again
 ```
+- **Now dirty** (a real content change) → do NOT force. Treat this exactly like step 1's dirty branch: log `worktree_teardown: blocked: dirty-worktree` and surface to the operator with the same STOP block as step 1, then exit this step. Do NOT proceed to `--force`.
 
-If `<path>` still appears after `--force`, log `worktree_teardown: failed: path-still-present` and surface to the operator. Do NOT continue silently.
+If `<path>` still appears after a genuine force-repair (the clean branch above), log `worktree_teardown: failed: path-still-present` and surface to the operator. Do NOT continue silently.
 
 **4. Log the outcome:**
 
