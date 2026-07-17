@@ -979,9 +979,12 @@ Signal 3 is authoritative when positive — a `CodeRabbit` check in the rollup p
 
 ### Step 11.4b — Worktree teardown (post-merge, rule 4; same-session best-effort; conditional)
 
-**Gate:** run only when ALL of the following are true:
-1. The PR was confirmed merged (Step 11.4 `mergeable_state` shows merged, OR the operator explicitly confirmed merge via STAGE-GATE-3 ship).
-2. `worktree:` in `00-state.md § Current State` is non-null (the task ran in a worktree, not branch-in-place).
+**Gate:** adopts `docs/worktree-discipline.md § Rule 7`'s full 4-condition safety predicate **by reference** (never redefined here). Conditions 1 and 2 are structurally satisfied by this step's own scope; conditions 3 and 4 are evaluated explicitly below. Run teardown only when ALL of the following are true:
+
+1. **Rule 7 condition 1 (not the main tree, not another session's active worktree) — structurally satisfied.** This step only ever acts on the worktree registered in THIS session's own `00-state.md § Current State → worktree:` field — never the repository's main tree, and never a worktree belonging to a different, still-active session.
+2. **Rule 7 condition 2 (pipeline provenance) — structurally satisfied.** The targeted worktree is, by construction, the one this same delivery session created and worked in, and is registered in this session's own `00-state.md` — the authoritative provenance signal.
+3. **Rule 7 condition 3 (merged AND no commits ahead of the merge point) — evaluated explicitly, both sub-conditions AND-ed, regardless of which branch of the merged-determination OR resolved "merged".** The PR was confirmed merged — via Step 11.4 `mergeable_state` showing merged, OR the operator explicitly confirming merge via STAGE-GATE-3 ship — **AND** `git -C <path> rev-list origin/main..HEAD` is empty. A merge signal alone does not prove no work would be lost: it does not catch a follow-up commit landed in this worktree *after* the merge (e.g., a later review-fix session reusing the same branch per Rule 3's documented pattern, where `gh pr view` still reports the *prior* PR as merged while `HEAD` carries new, unmerged commits). If the merge signal is present but `rev-list` is non-empty, treat the worktree as **unmerged** for this gate — do NOT proceed to teardown; log `worktree_teardown: skipped: commits-ahead-of-merge-point` and report `— commits ahead of merge point` (mirrors Rule 7's action/report table).
+4. **Rule 7 condition 4 (clean beyond the mode-only allow-list) — evaluated in the Teardown protocol's step 1 below.**
 
 When `worktree: null`, this step is a **no-op** — log `worktree_teardown: skipped: branch-in-place` and continue.
 
@@ -1037,10 +1040,10 @@ If `<path>` still appears after `--force`, log `worktree_teardown: failed: path-
 
 Add one line to the delivery status block:
 ```
-worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged
+worktree_teardown: removed | blocked: dirty-worktree | failed: path-still-present | skipped: branch-in-place | skipped: pr-not-merged | skipped: commits-ahead-of-merge-point
 ```
 
-**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge lands.
+**Never a silent skip.** Every non-`removed` outcome above — `blocked`, `failed`, or `skipped` — is reported in this status-block line; delivery never leaves a worktree behind without logging why. A `skipped: pr-not-merged` or `skipped: commits-ahead-of-merge-point` worktree is not lost — it remains a candidate for the leader's boot-time preflight sweep once the merge (or ancestry) condition resolves.
 
 ---
 
