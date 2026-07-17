@@ -1,12 +1,11 @@
 name: Tag Sync
 
 # The single, deterministic, idempotent tag authority (see
-# skills/release/SKILL.md Step 3 and agents/delivery.md Step 11.4c, both of
-# which VERIFY the tag this workflow creates rather than pushing it
-# themselves). Runs whenever a version bump merges to main — from either the
-# batch release/vX.Y.Z path or the single-PR inline-release path — so
-# the opencode-side artifact pipeline (release.yml) never depends on a human
-# remembering to push the tag. Trigger/logic unchanged.
+# agents/delivery.md Step 11.4c, which VERIFIES the tag this workflow
+# creates rather than pushing it itself). Runs whenever any PR's version
+# bump merges to main — team-harness bumps once per PR (CLAUDE.md §6.3) —
+# so the opencode-side artifact pipeline (release.yml) never depends on a
+# human remembering to push the tag. Trigger/logic unchanged.
 on:
   push:
     branches: [main]
